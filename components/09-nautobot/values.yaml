@@ -1,0 +1,24 @@
+---
+
+nautobot:
+  image:
+    tag: "2.1.1-py3.11"
+
+  db:
+    engine: "django.db.backends.postgresql"
+    host: "nautobot-primary.nautobot.svc"
+    name: "nautobot"
+    user: "nautobot"
+    existingSecret: "nautobot-pguser-nautobot"
+    existingSecretPasswordKey: "password"
+
+celery:
+  replicaCount: 1
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: true
+  auth:
+    password: "change-me"

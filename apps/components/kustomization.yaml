@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  - argocd-understack-project.yaml
+  - namespaces.yaml
+  - mariadb.yaml
+  - rabbitmq-cluster.yaml
+  - memcached.yaml
+  - postgres-db.yaml
+  - nautobot.yaml

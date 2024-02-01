@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nautobot
+spec:
+  project: understack
+  source:
+    repoURL: https://github.com/rackerlabs/understack.git
+    path: components/09-nautobot/
+    targetRevision: HEAD
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: nautobot
+  syncPolicy:
+    automated:
+      selfHeal: true

@@ -1,0 +1,17 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: operators
+spec:
+  sourceRepos:
+  - '*'
+  destinations:
+  # make sure our operators don't install in the wrong place
+  - namespace: '!nautobot'
+    server: '*'
+  - namespace: '!openstack'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'

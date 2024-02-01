@@ -1,0 +1,17 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: understack
+spec:
+  sourceRepos:
+  - '*'
+  destinations:
+  # make sure we target the right places
+  - namespace: 'nautobot'
+    server: '*'
+  - namespace: 'openstack'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'

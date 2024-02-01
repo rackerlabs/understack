@@ -1,0 +1,15 @@
+dex:
+  # disable auth provider
+  enabled: false
+notifications:
+  # disable notifying users or GitHub
+  enabled: false
+applicationSet:
+  # disable the ApplicationSet controller to auto-generate Applications
+  enabled: false
+server:
+  extraArgs:
+    - --insecure
+configs:
+  cm:
+    kustomize.buildOptions: --enable-helm
