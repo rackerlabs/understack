@@ -59,4 +59,7 @@ kubectl apply -k components/01-secrets/
 kubectl -n argocd apply -k apps/components/
 ```
 
-ArgoCD should successfully get everything deployed.
+ArgoCD should successfully get Nautobot deployed. Now come the OpenStack
+components which aren't working with GitOps methods at this time.
+
+[Install Keystone](./components/10-keystone/README.md)

@@ -81,6 +81,48 @@ kubeseal \
     -w components/01-secrets/encrypted-nautobot-redis.yaml
 ```
 
+## Keystone
+
+Generate the necessary secrets for OpenStack Keystone.
+
+```bash
+kubectl --namespace openstack \
+        create secret generic keystone-rabbitmq-password \
+        --type Opaque \
+        --from-literal=username="keystone" \
+        --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+        --dry-run -o yaml > secret-keystone-rabbitmq-password.yaml
+kubectl --namespace openstack \
+        create secret generic keystone-db-password \
+        --type Opaque \
+        --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+        --dry-run -o yaml > secret-keystone-db-password.yaml
+kubectl --namespace openstack \
+        create secret generic keystone-admin \
+        --type Opaque \
+        --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+        --dry-run -o yaml > secret-keystone-admin.yaml
+kubectl --namespace openstack \
+        create secret generic keystone-credential-keys \
+        --type Opaque \
+        --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+        --dry-run -o yaml > secret-keystone-credential-keys.yaml
+```
+
+Now let's seal them.
+
+```bash
+for skrt in $(find . -name "secret-keystone*.yaml" -depth 1); do
+    encskrt=$(echo "${skrt}" | sed -e 's/secret-/components\/01-secrets\/encrypted-/')
+    kubeseal \
+        --scope cluster-wide \
+        --allow-empty-data \
+        -o yaml \
+        -f "${skrt}" \
+        -w "${encskrt}"
+done
+```
+
 ## Generate Kustomize for the Install
 
 Now generate the kustomize for this.

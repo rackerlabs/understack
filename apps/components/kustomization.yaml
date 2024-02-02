@@ -11,3 +11,4 @@ resources:
   - memcached.yaml
   - postgres-db.yaml
   - nautobot.yaml
+  - keystone.yaml
