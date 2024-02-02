@@ -12,3 +12,29 @@ jobs:
       - uses: actions/checkout@v4
       - run: pip install yamllint
       - run: yamllint -c .yamllint.yaml --format github .
+
+  kustomize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v3
+      - name: kustomize build operators
+        run: |
+          for operator in $(find operators -maxdepth 1 -mindepth 1 -type d); do
+            echo "${operator}"
+            kubectl kustomize --enable-helm "${operator}" > /dev/null
+          done
+          echo "apps/operators"
+          kubectl kustomize apps/operators > /dev/null
+      - name: kustomize build components
+        run: |
+          for component in $(find components -maxdepth 1 -mindepth 1 -type d); do
+            if [[ "${component}" =~ "secrets" ]]; then
+              echo "Skipping secrets"
+            else
+              echo "${component}"
+              kubectl kustomize --enable-helm "${component}" > /dev/null
+            fi
+          done
+          echo "apps/components"
+          kubectl kustomize apps/components > /dev/null
