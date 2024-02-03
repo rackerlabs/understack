@@ -43,7 +43,7 @@ kubectl -n argocd apply -k apps/operators/
 
 ### Secrets
 
-Visit [./components/01-secrets](./components/01-secrets) and follow the steps there to
+Visit [/components/01-secrets/README.md](./components/01-secrets/README.md) and follow the steps there to
 generate the secrets you'll need. And then load them.
 
 ```bash
