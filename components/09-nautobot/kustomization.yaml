@@ -3,11 +3,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-# the hack for the helm chart rendered this manually from the branch with
-# the following command:
-# helm template -n nautobot nautobot ./ -f values.yaml > nautobot-helm_2.0.5-plus-password-ref.yaml
-# then I hand deleted the Secret kind
-  - nautobot-helm_2.0.5-plus-password-ref.yaml
+  - base
 
 # can't use the helm chart until
 # https://github.com/nautobot/helm-charts/pull/356

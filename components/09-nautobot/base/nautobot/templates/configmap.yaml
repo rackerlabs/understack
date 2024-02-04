@@ -1,0 +1,113 @@
+---
+# Source: nautobot/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nautobot-env
+  namespace: "nautobot"
+  labels:
+    app.kubernetes.io/name: nautobot
+    helm.sh/chart: nautobot-2.0.5
+    app.kubernetes.io/instance: nautobot
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "2.0.5"
+data:
+  NAUTOBOT_ALLOWED_HOSTS: "*"
+  NAUTOBOT_CREATE_SUPERUSER: "true"
+  NAUTOBOT_DB_ENGINE: "django.db.backends.postgresql"
+  NAUTOBOT_DB_HOST: "nautobot-primary.nautobot.svc"
+  NAUTOBOT_DB_NAME: "nautobot"
+  NAUTOBOT_DB_PORT: "5432"
+  NAUTOBOT_DB_TIMEOUT: "300"
+  NAUTOBOT_DB_USER: "nautobot"
+  NAUTOBOT_DEBUG: "False"
+  NAUTOBOT_LOG_LEVEL: "INFO"
+  NAUTOBOT_METRICS_ENABLED: "True"
+  NAUTOBOT_REDIS_HOST: "nautobot-redis-master"
+  NAUTOBOT_REDIS_PORT: "6379"
+  NAUTOBOT_REDIS_USERNAME: ""
+  NAUTOBOT_REDIS_SSL: "False"
+  NAUTOBOT_SUPERUSER_EMAIL: "admin@example.com"
+  NAUTOBOT_SUPERUSER_NAME: "admin"
+---
+# Source: nautobot/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nautobot-config
+  namespace: "nautobot"
+  labels:
+    app.kubernetes.io/name: nautobot
+    helm.sh/chart: nautobot-2.0.5
+    app.kubernetes.io/instance: nautobot
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "2.0.5"
+data:
+
+  uwsgi.ini: |
+    [uwsgi]
+    ; The IP address (typically localhost) and port that the WSGI process should listen on
+    http = 0.0.0.0:8080
+    https = 0.0.0.0:8443,/opt/nautobot/nautobot.crt,/opt/nautobot/nautobot.key
+
+
+    ; Fail to start if any parameter in the configuration file isn’t explicitly understood by uWSGI
+    strict = true
+
+    ; Enable master process to gracefully re-spawn and pre-fork workers
+    master = true
+
+    ; Allow Python app-generated threads to run
+    enable-threads = true
+
+    ;Try to remove all of the generated file/sockets during shutdown
+    vacuum = true
+
+    ; Do not use multiple interpreters, allowing only Nautobot to run
+    single-interpreter = true
+
+    ; Shutdown when receiving SIGTERM (default is respawn)
+    die-on-term = true
+
+    ; Prevents uWSGI from starting if it is unable load Nautobot (usually due to errors)
+    need-app = true
+
+    ; By default, uWSGI has rather verbose logging that can be noisy
+    disable-logging = true
+
+    ; Assert that critical 4xx and 5xx errors are still logged
+    log-4xx = true
+    log-5xx = true
+
+    ; Enable HTTP 1.1 keepalive support
+    http-keepalive = 1
+
+    ;
+    ; Advanced settings (disabled by default)
+    ; Customize these for your environment if and only if you need them.
+    ; Ref: https://uwsgi-docs.readthedocs.io/en/latest/Options.html
+    ;
+
+    ; Number of uWSGI workers to spawn. This should typically be 2n+1, where n is the number of CPU cores present. Default 3 as n will be >= 1
+    processes = 3
+
+    ; Number of uWSGI threads each worker will be pre-forked into before starting
+    threads = 2
+
+    ; set the socket listen queue size, in production the suggested value is 1024, however RHEL based kernels have a max of 128 by default
+    ; you may need to increase the somaxconn parameter in your kernel
+    listen = 128
+
+    ; If using subdirectory hosting e.g. example.com/nautobot, you must uncomment this line. Otherwise you'll get double paths e.g. example.com/nautobot/nautobot/.
+    ; See: https://uwsgi-docs.readthedocs.io/en/latest/Changelog-2.0.11.html#fixpathinfo-routing-action
+    ; route-run = fixpathinfo:
+
+    ; If hosted behind a load balancer uncomment these lines, the harakiri timeout should be greater than your load balancer timeout.
+    ; Ref: https://uwsgi-docs.readthedocs.io/en/latest/HTTP.html?highlight=keepalive#http-keep-alive
+    ; harakiri = 65
+    ; add-header = Connection: Keep-Alive
+    ; http-keepalive = 1
+
+    ; For larger installations, certain API calls (example: Relationships, GraphQL) can have a length of query parameters that go over uWSGI default limit.
+    ; Setting the buffer size to larger than default (4096) can have an impact on memory utilization, but can be set as high as the header limit of 65535.
+    buffer-size = 4096

@@ -1,0 +1,217 @@
+---
+# Source: nautobot/templates/celery-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nautobot-celery-beat
+  namespace: "nautobot"
+  labels:
+    app.kubernetes.io/name: nautobot
+    helm.sh/chart: nautobot-2.0.5
+    app.kubernetes.io/instance: nautobot
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "2.0.5"
+    app.kubernetes.io/component: nautobot-celery-beat
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nautobot
+      app.kubernetes.io/instance: nautobot
+      app.kubernetes.io/component: nautobot-celery-beat
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nautobot
+        helm.sh/chart: nautobot-2.0.5
+        app.kubernetes.io/instance: nautobot
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "2.0.5"
+        app.kubernetes.io/component: nautobot-celery-beat
+    spec:
+      serviceAccountName: nautobot
+
+      affinity:
+        podAffinity:
+
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: nautobot
+                    app.kubernetes.io/name: nautobot
+                    app.kubernetes.io/component: nautobot-celery-beat
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+
+      securityContext:
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      containers:
+        - name: nautobot-celery
+          tty: true
+          image: ghcr.io/nautobot/nautobot:2.1.1-py3.11
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsUser: 999
+          command:
+            - nautobot-server
+            - celery
+            - beat
+            - --loglevel
+            - $(NAUTOBOT_LOG_LEVEL)
+          env:
+            - name: "NAUTOBOT_K8S_COMPONENT"
+              value: "nautobot-celery-beat"
+            - name: NAUTOBOT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nautobot-pguser-nautobot
+                  key: password
+            - name: NAUTOBOT_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nautobot-redis
+                  key: redis-password
+          envFrom:
+            - configMapRef:
+                name: nautobot-env
+            - secretRef:
+                name: nautobot-env
+          resources:
+            limits:
+              cpu: 3328m
+              memory: 6656M
+            requests:
+              cpu: 5m
+              memory: 256M
+          volumeMounts:
+            - name: "git-repos"
+              mountPath: "/opt/nautobot/git"
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: "git-repos"
+          emptyDir: {}
+---
+# Source: nautobot/templates/celery-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nautobot-celery-default
+  namespace: "nautobot"
+  labels:
+    app.kubernetes.io/name: nautobot
+    helm.sh/chart: nautobot-2.0.5
+    app.kubernetes.io/instance: nautobot
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "2.0.5"
+    app.kubernetes.io/component: nautobot-celery-default
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nautobot
+      app.kubernetes.io/instance: nautobot
+      app.kubernetes.io/component: nautobot-celery-default
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nautobot
+        helm.sh/chart: nautobot-2.0.5
+        app.kubernetes.io/instance: nautobot
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: "2.0.5"
+        app.kubernetes.io/component: nautobot-celery-default
+    spec:
+      serviceAccountName: nautobot
+
+      affinity:
+        podAffinity:
+
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/instance: nautobot
+                    app.kubernetes.io/name: nautobot
+                    app.kubernetes.io/component: nautobot-celery-default
+                topologyKey: kubernetes.io/hostname
+              weight: 1
+        nodeAffinity:
+
+      securityContext:
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      containers:
+        - name: nautobot-celery
+          tty: true
+          image: ghcr.io/nautobot/nautobot:2.1.1-py3.11
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: false
+            runAsUser: 999
+          command:
+            - nautobot-server
+            - celery
+            - worker
+            - --loglevel
+            - $(NAUTOBOT_LOG_LEVEL)
+            - --queues
+            - $(CELERY_TASK_QUEUES)
+            - --events
+          env:
+            - name: "NAUTOBOT_K8S_COMPONENT"
+              value: "nautobot-celery-default"
+            - name: "CELERY_TASK_QUEUES"
+              value: "default"
+            - name: NAUTOBOT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nautobot-pguser-nautobot
+                  key: password
+            - name: NAUTOBOT_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nautobot-redis
+                  key: redis-password
+          envFrom:
+            - configMapRef:
+                name: nautobot-env
+            - secretRef:
+                name: nautobot-env
+          resources:
+            limits:
+              cpu: 3328m
+              memory: 6656M
+            requests:
+              cpu: 400m
+              memory: 1G
+          volumeMounts:
+            - name: "git-repos"
+              mountPath: "/opt/nautobot/git"
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: "git-repos"
+          emptyDir: {}
