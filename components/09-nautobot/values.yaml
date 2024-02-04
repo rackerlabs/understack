@@ -12,6 +12,11 @@ nautobot:
     existingSecret: "nautobot-pguser-nautobot"
     existingSecretPasswordKey: "password"
 
+  redis:
+    host: "nautobot-redis-master"
+    existingSecret: "nautobot-redis"
+    existingSecretPasswordKey: "redis-password"
+
 celery:
   replicaCount: 1
 
@@ -19,6 +24,4 @@ postgresql:
   enabled: false
 
 redis:
-  enabled: true
-  auth:
-    password: "change-me"
+  enabled: false

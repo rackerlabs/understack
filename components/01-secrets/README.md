@@ -48,7 +48,6 @@ kubectl --namespace nautobot \
     --dry-run \
     -o yaml \
     --type Opaque \
-    --from-literal=NAUTOBOT_REDIS_PASSWORD="$(./scripts/pwgen.sh)" \
     --from-literal=NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh)" \
     --from-literal=NAUTOBOT_SUPERUSER_API_TOKEN="$(./scripts/pwgen.sh)" \
     --from-literal=NAUTOBOT_SUPERUSER_PASSWORD="$(./scripts/pwgen.sh)" \
@@ -59,7 +58,7 @@ kubectl --namespace nautobot \
     --dry-run \
     -o yaml \
     --type Opaque \
-    --from-literal=redis-password="$(yq e '.data.NAUTOBOT_REDIS_PASSWORD' secret-nautobot-env.yaml | base64 -d)" \
+    --from-literal=redis-password="$(./scripts/pwgen.sh)" \
     > secret-nautobot-redis.yaml
 ```
 

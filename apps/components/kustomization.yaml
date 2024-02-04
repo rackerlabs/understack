@@ -10,5 +10,6 @@ resources:
   - rabbitmq-cluster.yaml
   - memcached.yaml
   - postgres-db.yaml
+  - nautobot-redis.yaml
   - nautobot.yaml
   - keystone.yaml
