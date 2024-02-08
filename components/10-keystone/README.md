@@ -59,7 +59,7 @@ You can run an OpenStack client in the cluster to validate it is running correct
 
 ```bash
 # start up a pod with the client
-kubectl -n openstack apply -f https://github.com/rackerlabs/genestack/blob/main/manifests/utils/utils-openstack-client-admin.yaml
+kubectl -n openstack apply -f https://raw.githubusercontent.com/rackerlabs/genestack/main/manifests/utils/utils-openstack-client-admin.yaml
 ```
 
 Show the catalog list
