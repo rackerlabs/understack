@@ -43,10 +43,15 @@ kubectl -n argocd apply -k apps/operators/
 
 ### Secrets
 
-Visit [/components/01-secrets/README.md](./components/01-secrets/README.md) and follow the steps there to
-generate the secrets you'll need. And then load them.
+To make it possible to utilize GitOps, we need to have our secrets pre-created
+and not randomly generated. A better solution for secrets will ultimately be
+needed but for now we can generate them easily for a dev environment and
+deploy them. Visit [/components/01-secrets/README.md](./components/01-secrets/README.md)
+for specific steps.  Otherwise just follow the steps below.
 
 ```bash
+# generate secrets
+./scripts/easy-secrets-gen.sh
 # make the namespaces where the secrets will live
 kubectl apply -k components/00-namespaces/
 # load the secrets
