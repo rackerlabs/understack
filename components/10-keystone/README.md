@@ -40,7 +40,7 @@ Secrets Reference:
 ```bash
 helm --namespace openstack template \
     keystone \
-    ./openstack-helm/keystone/ \
+    $(git rev-parse --show-toplevel)/openstack-helm/keystone/ \
     -f aio-values.yaml \
     --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.admin.password="$(kubectl --namespace openstack get secret mariadb -o jsonpath='{.data.root-password}' | base64 -d)" \

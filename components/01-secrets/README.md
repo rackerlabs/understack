@@ -19,7 +19,6 @@ Let's generate the MariaDB root creds.
 ```bash
 kubectl --namespace openstack \
     create secret generic mariadb \
-    --dry-run \
     -o yaml \
     --type Opaque \
     --from-literal=root-password="$(./scripts/pwgen.sh)" \
@@ -45,7 +44,6 @@ Now generate the Nautobot env secrets and the Redis (TODO: operator)
 ```bash
 kubectl --namespace nautobot \
     create secret generic nautobot-env \
-    --dry-run \
     -o yaml \
     --type Opaque \
     --from-literal=NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh)" \
@@ -55,7 +53,6 @@ kubectl --namespace nautobot \
 
 kubectl --namespace nautobot \
     create secret generic nautobot-redis \
-    --dry-run \
     -o yaml \
     --type Opaque \
     --from-literal=redis-password="$(./scripts/pwgen.sh)" \
@@ -90,22 +87,22 @@ kubectl --namespace openstack \
         --type Opaque \
         --from-literal=username="keystone" \
         --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-        --dry-run -o yaml > secret-keystone-rabbitmq-password.yaml
+        -o yaml > secret-keystone-rabbitmq-password.yaml
 kubectl --namespace openstack \
         create secret generic keystone-db-password \
         --type Opaque \
         --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-        --dry-run -o yaml > secret-keystone-db-password.yaml
+        -o yaml > secret-keystone-db-password.yaml
 kubectl --namespace openstack \
         create secret generic keystone-admin \
         --type Opaque \
         --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-        --dry-run -o yaml > secret-keystone-admin.yaml
+        -o yaml > secret-keystone-admin.yaml
 kubectl --namespace openstack \
         create secret generic keystone-credential-keys \
         --type Opaque \
         --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-        --dry-run -o yaml > secret-keystone-credential-keys.yaml
+        -o yaml > secret-keystone-credential-keys.yaml
 ```
 
 Now let's seal them.
