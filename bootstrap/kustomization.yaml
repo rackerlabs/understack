@@ -4,5 +4,6 @@ kind: Kustomization
 
 resources:
 - cert-manager/
+- ingress-nginx/
 - sealed-secrets/
 - argocd/
