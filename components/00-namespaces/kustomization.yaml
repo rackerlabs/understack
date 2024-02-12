@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - nautobot.yaml
   - openstack.yaml
+  - argo-workflow.yaml
