@@ -25,3 +25,12 @@ postgresql:
 
 redis:
   enabled: false
+
+ingress:
+  enabled: true
+  ingressClassName: "nginx"
+  tls: true
+  secretName: "nautobot-ingress-tls"
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
