@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # function to process each YAML file
 process_yaml() {
@@ -37,3 +37,4 @@ done
 
 # process the last one
 [[ -n $yaml_acc ]] && process_yaml "$yaml_acc"
+exit 0
