@@ -4,5 +4,6 @@ These are the bare minimum steps required to bootstrap your cluster up to ArgoCD
 
 Each component is installed with a manifest referenced in a child directory.  The components at this time are:
 
+- [ingress-nginx](https://kubernetes.github.io/ingress-nginx/)
 - [cert-manager](https://cert-manager.io/docs/)
 - [ArgoCD](https://argo-cd.readthedocs.io/en/stable/)
