@@ -18,23 +18,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-kubectl@v3
-      - name: kustomize build operators
+      - uses: azure/setup-helm@v4.0.0
+      - uses: bmuschko/setup-kubeconform@v1
+      - name: validate kustomize with kubeconform
         run: |
-          for operator in $(find operators -maxdepth 1 -mindepth 1 -type d); do
-            echo "${operator}"
-            kubectl kustomize --enable-helm "${operator}" > /dev/null
+          set -o errexit
+          set -o pipefail
+          items=$(find bootstrap -maxdepth 2 -name kustomization.yaml -exec dirname {} \;)
+          items+=($(find operators -maxdepth 2 -name kustomization.yaml -exec dirname {} \;))
+          items+=($(find components -maxdepth 2 -name kustomization.yaml -exec dirname {} \;))
+          items+=($(find apps -maxdepth 2 -name kustomization.yaml -exec dirname {} \;))
+
+          for item in ${items}; do
+            echo "${item}"
+            kubectl kustomize --enable-helm "${item}" | \
+              kubeconform -skip=Secret -strict -ignore-missing-schemas
           done
-          echo "apps/operators"
-          kubectl kustomize apps/operators > /dev/null
-      - name: kustomize build components
-        run: |
-          for component in $(find components -maxdepth 1 -mindepth 1 -type d); do
-            if [[ "${component}" =~ "secrets" ]]; then
-              echo "Skipping secrets"
-            else
-              echo "${component}"
-              kubectl kustomize --enable-helm "${component}" > /dev/null
-            fi
-          done
-          echo "apps/components"
-          kubectl kustomize apps/components > /dev/null
