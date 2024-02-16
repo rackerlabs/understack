@@ -13,3 +13,4 @@ resources:
   - nautobot-redis.yaml
   - nautobot.yaml
   - keystone.yaml
+  - argo-workflow.yaml
