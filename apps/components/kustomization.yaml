@@ -14,3 +14,4 @@ resources:
   - nautobot.yaml
   - keystone.yaml
   - argo-workflows.yaml
+  - argo-events.yaml
