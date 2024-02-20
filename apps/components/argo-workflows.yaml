@@ -1,12 +1,12 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: argo-workflow
+  name: argo-workflows
 spec:
   project: understack
   source:
     repoURL: https://github.com/rackerlabs/understack.git
-    path: components/11-argo-workflow/
+    path: components/11-argo-workflows/
     targetRevision: HEAD
   destination:
     server: "https://kubernetes.default.svc"
