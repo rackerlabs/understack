@@ -4,7 +4,7 @@ cd $(git rev-parse --show-toplevel)
 
 kubectl --namespace openstack \
     create secret generic mariadb \
-    --dry-run \
+    --dry-run=client \
     -o yaml \
     --type Opaque \
     --from-literal=root-password="$(./scripts/pwgen.sh)" \
@@ -13,7 +13,7 @@ kubectl --namespace openstack \
 
 kubectl --namespace nautobot \
     create secret generic nautobot-env \
-    --dry-run \
+    --dry-run=client \
     -o yaml \
     --type Opaque \
     --from-literal=NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh)" \
@@ -23,7 +23,7 @@ kubectl --namespace nautobot \
 
 kubectl --namespace nautobot \
     create secret generic nautobot-redis \
-    --dry-run \
+    --dry-run=client \
     -o yaml \
     --type Opaque \
     --from-literal=redis-password="$(./scripts/pwgen.sh)" \
@@ -34,25 +34,25 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=username="keystone" \
     --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-    --dry-run -o yaml \
+    --dry-run=client -o yaml \
     > secret-keystone-rabbitmq-password.yaml
 kubectl --namespace openstack \
     create secret generic keystone-db-password \
     --type Opaque \
     --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-    --dry-run -o yaml \
+    --dry-run=client -o yaml \
     > secret-keystone-db-password.yaml
 kubectl --namespace openstack \
     create secret generic keystone-admin \
     --type Opaque \
     --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-    --dry-run -o yaml \
+    --dry-run=client -o yaml \
     > secret-keystone-admin.yaml
 kubectl --namespace openstack \
     create secret generic keystone-credential-keys \
     --type Opaque \
     --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-    --dry-run -o yaml \
+    --dry-run=client -o yaml \
     > secret-keystone-credential-keys.yaml
 
 kubeseal \
