@@ -76,7 +76,7 @@ kubeseal \
     -f secret-nautobot-redis.yaml \
     -w components/01-secrets/encrypted-nautobot-redis.yaml
 
-for skrt in $(find . -name "secret-keystone*.yaml" -depth 1); do
+for skrt in $(find . -maxdepth 1 -name "secret-keystone*.yaml"); do
     encskrt=$(echo "${skrt}" | sed -e 's/secret-/components\/01-secrets\/encrypted-/')
     kubeseal \
         --scope cluster-wide \
