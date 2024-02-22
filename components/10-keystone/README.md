@@ -23,6 +23,17 @@ git clone https://github.com/openstack/openstack-helm-infra
 ./scripts/openstack-helm-depend-sync.sh keystone
 ```
 
+## Label the node(s)
+
+In order to deploy Openstack control plane, at least one of the Kubernetes
+nodes has to be labeled with `openstack-control-plane=enabled` label. If you
+don't have a node that meets this condition yet, use command similar to this:
+
+```bash
+❯ kubectl label node argotest-control-plane openstack-control-plane=enabled
+node/argotest-control-plane labeled
+```
+
 ## Deploy Keystone
 
 Since we cannot refer to the secrets by name, we must look them up live from the cluster
