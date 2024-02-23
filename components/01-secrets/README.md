@@ -121,6 +121,44 @@ for skrt in $(find . -name "secret-keystone*.yaml" -depth 1); do
 done
 ```
 
+## Ironic
+
+Generate the necessary secrets for OpenStack Ironic.
+
+```bash
+kubectl --namespace openstack \
+        create secret generic ironic-rabbitmq-password \
+        --type Opaque \
+        --from-literal=username="ironic" \
+        --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+        --dry-run=client -o yaml > secret-ironic-rabbitmq-password.yaml
+kubectl --namespace openstack \
+        create secret generic ironic-db-password \
+        --type Opaque \
+        --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+        --dry-run=client -o yaml > secret-ironic-db-password.yaml
+kubectl --namespace openstack \
+        create secret generic ironic-keystone-password \
+        --type Opaque \
+        --from-literal=username="ironic" \
+        --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+        --dry-run=client -o yaml > secret-ironic-keystone-password.yaml
+```
+
+Now let's seal them.
+
+```bash
+for skrt in $(find . -maxdepth 1-name "secret-ironic*.yaml"); do
+    encskrt=$(echo "${skrt}" | sed -e 's/secret-/components\/01-secrets\/encrypted-/')
+    kubeseal \
+        --scope cluster-wide \
+        --allow-empty-data \
+        -o yaml \
+        -f "${skrt}" \
+        -w "${encskrt}"
+done
+```
+
 ## Generate Kustomize for the Install
 
 Now generate the kustomize for this.
