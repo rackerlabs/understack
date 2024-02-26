@@ -30,8 +30,7 @@ nodes has to be labeled with `openstack-control-plane=enabled` label. If you
 don't have a node that meets this condition yet, use command similar to this:
 
 ```bash
-❯ kubectl label node argotest-control-plane openstack-control-plane=enabled
-node/argotest-control-plane labeled
+❯ kubectl label node $(kubectl get nodes -o 'jsonpath={.items[*].metadata.name}') openstack-control-plane=enabled
 ```
 
 ## Deploy Keystone
