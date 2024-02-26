@@ -42,9 +42,15 @@ these charts and have them applied to the cluster.
 
 Secrets Reference:
 
-- openstack-default-user is created by the messaging-topology-operator which is
-  executed by the rabbitmq-queues component. The name stems from the RabbitMQ
-  cluster from the rabbitmq-cluster component. `${CLUSTER_NAME}-default-user`
+- keystone-admin is the admin password for creating other users, services and endpoints.
+  It is used by the initialization / bootstrap jobs.
+- mariadb is the root password for the database and is used by the db-init job to create
+  the database.
+- rabbitmq-default-user is created by the messaging-topology-operator.
+  The name stems from the RabbitMQ cluster from the
+  [rabbitmq-cluster](../04-rabbitmq-cluster/) component. `${CLUSTER_NAME}-default-user`
+- keystone-db-password is the DB password for the keystone DB user.
+- keystone-rabbitmq-password is the RabbitMQ password for the keystone user.
 
 ```bash
 helm --namespace openstack template \
@@ -54,7 +60,7 @@ helm --namespace openstack template \
     --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.admin.password="$(kubectl --namespace openstack get secret mariadb -o jsonpath='{.data.root-password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-db-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_messaging.auth.admin.password="$(kubectl --namespace openstack get secret openstack-default-user -o jsonpath='{.data.password}' | base64 -d)" \
+    --set endpoints.oslo_messaging.auth.admin.password="$(kubectl --namespace openstack get secret rabbitmq-default-user -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_messaging.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
     --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
     | kubectl -n openstack apply -f -
