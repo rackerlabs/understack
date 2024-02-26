@@ -36,6 +36,14 @@ Secrets Reference:
   executed by the rabbitmq-queues component. The name stems from the RabbitMQ
   cluster from the rabbitmq-cluster component. `${CLUSTER_NAME}-default-user`
 
+### Create the rabbitmq and mariadb instances
+
+```bash
+kubectl -n openstack apply -k components/13-ironic
+```
+
+### Apply the ironic helm template with our custom aio-values.yaml
+
 ```bash
 helm --namespace openstack template \
     ironic \
@@ -45,12 +53,13 @@ helm --namespace openstack template \
     --set endpoints.oslo_db.auth.admin.password="$(kubectl --namespace openstack get secret mariadb -o jsonpath='{.data.root-password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-db-password -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_messaging.auth.admin.password="$(kubectl --namespace openstack get secret openstack-default-user -o jsonpath='{.data.password}' | base64 -d)" \
+    --set endpoints.oslo_messaging.hosts.default="openstack" \
     --set endpoints.oslo_messaging.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
     --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
     | kubectl -n openstack apply -f -
 ```
 
-At this point Keystone will go through some initialization and start uo.
+At this point Ironic will go through some initialization and start up.
 
 ## Validating Keystone
 

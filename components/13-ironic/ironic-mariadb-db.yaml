@@ -2,7 +2,7 @@
 apiVersion: mariadb.mmontes.io/v1alpha1
 kind: Database
 metadata:
-  name: keystone
+  name: ironic
   namespace: openstack
 spec:
   # If you want the database to be created with a different name than the resource name
@@ -17,7 +17,7 @@ spec:
 apiVersion: mariadb.mmontes.io/v1alpha1
 kind: User
 metadata:
-  name: keystone
+  name: ironic
   namespace: openstack
 spec:
   # If you want the user to be created with a different name than the resource name
@@ -26,7 +26,7 @@ spec:
     name: mariadb  # name of the MariaDB kind
     waitForIt: true
   passwordSecretKeyRef:
-    name: keystone-db-password
+    name: ironic-db-password
     key: password
   # This field is immutable and defaults to 10, 0 means unlimited.
   maxUserConnections: 0
@@ -36,7 +36,7 @@ spec:
 apiVersion: mariadb.mmontes.io/v1alpha1
 kind: Grant
 metadata:
-  name: keystone-grant
+  name: ironic-grant
   namespace: openstack
 spec:
   mariaDbRef:
@@ -44,9 +44,9 @@ spec:
     waitForIt: true
   privileges:
     - "ALL"
-  database: "keystone"
+  database: "ironic"
   table: "*"
-  username: keystone
+  username: ironic
   grantOption: true
   host: "%"
   retryInterval: 5s

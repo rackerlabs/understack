@@ -2,7 +2,7 @@
 apiVersion: rabbitmq.com/v1beta1
 kind: User
 metadata:
-  name: keystone
+  name: ironic
   namespace: openstack
 spec:
   tags:
@@ -12,15 +12,15 @@ spec:
     name: rabbitmq # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
   importCredentialsSecret:
-    name: keystone-rabbitmq-password
+    name: ironic-rabbitmq-password
 ---
 apiVersion: rabbitmq.com/v1beta1
 kind: Vhost
 metadata:
-  name: keystone-vhost
+  name: ironic-vhost
   namespace: openstack
 spec:
-  name: "keystone" # vhost name; required and cannot be updated
+  name: "ironic" # vhost name; required and cannot be updated
   defaultQueueType: quorum # default queue type for this vhost; require RabbitMQ version 3.11.12 or above
   rabbitmqClusterReference:
     name: rabbitmq # rabbitmqCluster must exist in the same namespace as this resource
@@ -29,11 +29,11 @@ spec:
 apiVersion: rabbitmq.com/v1beta1
 kind: Queue
 metadata:
-  name: keystone-queue
+  name: ironic-queue
   namespace: openstack
 spec:
-  name: keystone-qq # name of the queue
-  vhost: "keystone" # default to '/' if not provided
+  name: ironic-qq # name of the queue
+  vhost: "ironic" # default to '/' if not provided
   type: quorum # without providing a queue type, rabbitmq creates a classic queue
   autoDelete: false
   durable: true # seting 'durable' to false means this queue won't survive a server restart
@@ -44,12 +44,12 @@ spec:
 apiVersion: rabbitmq.com/v1beta1
 kind: Permission
 metadata:
-  name: keystone-permission
+  name: ironic-permission
   namespace: openstack
 spec:
-  vhost: "keystone" # name of a vhost
+  vhost: "ironic" # name of a vhost
   userReference:
-    name: "keystone" # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
+    name: "ironic" # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
   permissions:
     write: ".*"
     configure: ".*"

@@ -45,6 +45,15 @@ conf:
   ironic:
     ironic_conductor:
       automated_clean: false
+    conductor:
+      automated_clean: false
+    dhcp:
+      dhcp_provider: none
+  logging:
+    logger_root:
+      level: DEBUG
+    logger_ironic:
+      level: DEBUG
 
 endpoints:
   identity:
@@ -62,6 +71,8 @@ network:
     external_policy_local: false
     node_port:
       enabled: false
+  pxe:
+    device: ens1f0
 
 dependencies:
   dynamic:
