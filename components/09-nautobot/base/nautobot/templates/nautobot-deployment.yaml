@@ -100,6 +100,9 @@ spec:
             - name: "nautobot-config"
               mountPath: "/opt/nautobot/uwsgi.ini"
               subPath: "uwsgi.ini"
+            - name: "nautobot-config"
+              mountPath: "/opt/nautobot/nautobot_config.py"
+              subPath: "nautobot_config.py"
       containers:
         - name: nautobot
           tty: true
@@ -169,6 +172,9 @@ spec:
             - name: "nautobot-config"
               mountPath: "/opt/nautobot/uwsgi.ini"
               subPath: "uwsgi.ini"
+            - name: "nautobot-config"
+              mountPath: "/opt/nautobot/nautobot_config.py"
+              subPath: "nautobot_config.py"
           ports:
             - name: "https"
               containerPort: 8443
