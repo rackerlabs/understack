@@ -15,3 +15,9 @@ combination. The pattern that this project utilizes for this secret
 is `$COMPONENT-db-password`, where the component is lowercase.
 So for Keystone the name would be `keystone-db-password`.
 
+## RabbitMQ
+
+Each OpenStack component will have it's own RabbitMQ user/password
+combination. The pattern that this project utilizes for this secret
+is `$COMPONENT-rabbitmq-password`, where the component is lowercase.
+So for Keystone the name would be `keystone-rabbitmq-password`.

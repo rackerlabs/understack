@@ -44,9 +44,6 @@ Secrets Reference:
 
 - keystone-admin is the admin password for creating other users, services and endpoints.
   It is used by the initialization / bootstrap jobs.
-- rabbitmq-default-user is created by the messaging-topology-operator.
-  The name stems from the RabbitMQ cluster from the
-  [rabbitmq-cluster](../04-rabbitmq-cluster/) component. `${CLUSTER_NAME}-default-user`
 - keystone-db-password is the DB password for the keystone DB user.
 - keystone-rabbitmq-password is the RabbitMQ password for the keystone user.
 
@@ -57,7 +54,6 @@ helm --namespace openstack template \
     -f components/10-keystone/aio-values.yaml \
     --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-db-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_messaging.auth.admin.password="$(kubectl --namespace openstack get secret rabbitmq-default-user -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_messaging.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
     --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
     | kubectl -n openstack apply -f -

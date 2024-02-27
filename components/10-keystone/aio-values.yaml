@@ -1099,7 +1099,7 @@ manifests:
   secret_fernet_keys: true
   secret_ingress_tls: true
   secret_keystone: true
-  secret_rabbitmq: true
+  secret_rabbitmq: false
   secret_registry: true
   service_ingress_api: true
   service_api: true
