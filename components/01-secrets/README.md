@@ -23,7 +23,6 @@ kubectl --namespace openstack \
     -o yaml \
     --type Opaque \
     --from-literal=root-password="$(./scripts/pwgen.sh)" \
-    --from-literal=password="$(./scripts/pwgen.sh)" \
     > secret-mariadb.yaml
 ```
 

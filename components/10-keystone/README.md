@@ -44,8 +44,6 @@ Secrets Reference:
 
 - keystone-admin is the admin password for creating other users, services and endpoints.
   It is used by the initialization / bootstrap jobs.
-- mariadb is the root password for the database and is used by the db-init job to create
-  the database.
 - rabbitmq-default-user is created by the messaging-topology-operator.
   The name stems from the RabbitMQ cluster from the
   [rabbitmq-cluster](../04-rabbitmq-cluster/) component. `${CLUSTER_NAME}-default-user`
@@ -58,7 +56,6 @@ helm --namespace openstack template \
     ./openstack-helm/keystone/ \
     -f components/10-keystone/aio-values.yaml \
     --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_db.auth.admin.password="$(kubectl --namespace openstack get secret mariadb -o jsonpath='{.data.root-password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-db-password -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_messaging.auth.admin.password="$(kubectl --namespace openstack get secret rabbitmq-default-user -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_messaging.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \

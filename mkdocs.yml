@@ -48,3 +48,5 @@ plugins:
 
 nav:
   - index.md
+  - openstack-helm.md
+  - secrets.md
