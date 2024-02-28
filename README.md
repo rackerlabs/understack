@@ -40,6 +40,10 @@ traffic and utilize ArgoCD to deploy the rest of the stack. We'll call that
 ./bootstrap/bootstrap.sh
 ```
 
+### (Optional) Install MetalLB
+
+[Install MetalLB](./components/20-metallb/README.md)
+
 
 At this point ArgoCD can start doing the heavy lifting.
 
@@ -76,3 +80,4 @@ components which aren't working with GitOps methods at this time.
 [Install Keystone](./components/keystone/README.md)
 
 [Configure environment for Keystone/Dex auth](./components/dexidp/README.md).
+

@@ -1,0 +1,30 @@
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lb-external
+  namespace: metallb-system
+spec:
+  addresses:
+  - 10.22.37.207/32  # This is assumed to be the public LB vip address
+  - 10.22.37.208/32
+  - 10.22.37.209/32
+  - 10.22.37.210/32
+  - 10.22.37.211/32
+  - 10.22.37.212/32
+  - 10.22.37.213/32
+  autoAssign: true
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: lb-external-advertisement
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - lb-external
+  # nodeSelectors:  # Optional block to limit nodes for a given advertisement
+  # - matchLabels:
+  #     kubernetes.io/hostname: xs0018.b0013.ord.ohthree.com
+  interfaces:  # Optional block to limit ifaces used to advertise VIPs
+  - ens1f0
