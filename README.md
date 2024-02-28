@@ -86,3 +86,7 @@ ArgoCD should successfully get Nautobot deployed. Now come the OpenStack
 components which aren't working with GitOps methods at this time.
 
 [Install Keystone](./components/10-keystone/README.md)
+
+### (Optional) Install MetalLB
+
+[(Optional) Install MetalLB](./components/20-metallb/README.md)
