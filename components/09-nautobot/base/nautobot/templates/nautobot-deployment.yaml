@@ -175,6 +175,9 @@ spec:
             - name: "nautobot-config"
               mountPath: "/opt/nautobot/nautobot_config.py"
               subPath: "nautobot_config.py"
+            - name: "nautobot-dexauth"
+              mountPath: "/opt/nautobot/dexauth.py"
+              subPath: "dexauth.py"
           ports:
             - name: "https"
               containerPort: 8443
@@ -190,3 +193,6 @@ spec:
         - name: "nautobot-config"
           configMap:
             name: nautobot-config
+        - name: "nautobot-dexauth"
+          configMap:
+            name: dexauth

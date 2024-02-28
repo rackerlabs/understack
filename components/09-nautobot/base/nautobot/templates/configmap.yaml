@@ -582,6 +582,23 @@ data:
     SOCIAL_AUTH_OIDC_USERNAME_KEY = 'name'
     SOCIAL_AUTH_OIDC_KEY = 'nautobot'
     SOCIAL_AUTH_OIDC_SECRET = 'verysecret'
+    # The “openid”, “profile” and “email” are requested by default,
+    # below *adds* scope.
+    SOCIAL_AUTH_OIDC_SCOPE = ['groups']
+
+    # include custom auth pipeline to sync groups
+    SOCIAL_AUTH_PIPELINE = (
+      "social_core.pipeline.social_auth.social_details",
+      "social_core.pipeline.social_auth.social_uid",
+      "social_core.pipeline.social_auth.auth_allowed",
+      "social_core.pipeline.social_auth.social_user",
+      "social_core.pipeline.user.get_username",
+      "social_core.pipeline.user.create_user",
+      "social_core.pipeline.social_auth.associate_user",
+      "social_core.pipeline.social_auth.load_extra_data",
+      "social_core.pipeline.user.user_details",
+      "dexauth.group_sync",
+    )
 
     # By default uploaded media is stored on the local filesystem. Using Django-storages is also supported. Provide the
     # class path of the storage driver in STORAGE_BACKEND and any configuration options in STORAGE_CONFIG.
@@ -624,4 +641,3 @@ data:
     # or a package containing an application.
     # https://docs.nautobot.com/projects/core/en/latest/configuration/optional-settings/#extra-applications
     # EXTRA_INSTALLED_APPS = []
-
