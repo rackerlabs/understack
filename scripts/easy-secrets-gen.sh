@@ -55,6 +55,25 @@ kubectl --namespace openstack \
     --dry-run=client -o yaml \
     > secret-keystone-credential-keys.yaml
 
+# ironic credentials
+kubectl --namespace openstack \
+    create secret generic ironic-rabbitmq-password \
+    --type Opaque \
+    --from-literal=username="ironic" \
+    --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+    --dry-run=client -o yaml > secret-ironic-rabbitmq-password.yaml
+kubectl --namespace openstack \
+    create secret generic ironic-db-password \
+    --type Opaque \
+    --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+    --dry-run=client -o yaml > secret-ironic-db-password.yaml
+kubectl --namespace openstack \
+    create secret generic ironic-keystone-password \
+    --type Opaque \
+    --from-literal=username="ironic" \
+    --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
+    --dry-run=client -o yaml > secret-ironic-keystone-password.yaml
+
 kubeseal \
     --scope cluster-wide \
     --allow-empty-data \
@@ -76,7 +95,7 @@ kubeseal \
     -f secret-nautobot-redis.yaml \
     -w components/01-secrets/encrypted-nautobot-redis.yaml
 
-for skrt in $(find . -maxdepth 1 -name "secret-keystone*.yaml"); do
+for skrt in $(find . -maxdepth 1 -name "secret-keystone*.yaml" -o -name "secret-ironic*.yaml"); do
     encskrt=$(echo "${skrt}" | sed -e 's/secret-/components\/01-secrets\/encrypted-/')
     kubeseal \
         --scope cluster-wide \
