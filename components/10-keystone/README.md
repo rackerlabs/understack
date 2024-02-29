@@ -59,7 +59,7 @@ helm --namespace openstack template \
     | kubectl -n openstack apply -f -
 ```
 
-At this point Keystone will go through some initialization and start uo.
+At this point Keystone will go through some initialization and start up.
 
 ## Validating Keystone
 
