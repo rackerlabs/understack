@@ -506,7 +506,7 @@ conf:
       # 12 hours
       expiration: 43200
     identity:
-      domain_specific_drivers_enabled: True
+      domain_specific_drivers_enabled: true
       domain_config_dir: /etc/keystone/domains
     fernet_tokens:
       key_repository: /etc/keystone/fernet-keys/
@@ -917,14 +917,6 @@ endpoints:
     namespace: null
     name: keystone
     auth:
-      admin:
-        region_name: RegionOne
-        username: admin
-        password: password
-        project_name: admin
-        user_domain_name: default
-        project_domain_name: default
-        default_domain_id: default
       # test:
       #   role: admin
       #   region_name: RegionOne
@@ -934,6 +926,14 @@ endpoints:
       #   user_domain_name: default
       #   project_domain_name: default
       #   default_domain_id: default
+      admin:
+        region_name: RegionOne
+        username: admin
+        password: password
+        project_name: admin
+        user_domain_name: default
+        project_domain_name: default
+        default_domain_id: default
     hosts:
       default: keystone
       internal: keystone-api

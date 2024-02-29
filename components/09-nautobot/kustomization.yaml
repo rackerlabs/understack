@@ -8,13 +8,13 @@ resources:
 # can't use the helm chart until
 # https://github.com/nautobot/helm-charts/pull/356
 # is merged
-#helmGlobals:
-#  chartHome: ../../charts/
-#helmCharts:
-#- name: nautobot
-#  includeCRDs: true
-#  namespace: nautobot
-#  valuesFile: values.yaml
-#  releaseName: nautobot
-#  version: 2.0.5
-#  repo: https://nautobot.github.io/helm-charts/
+# helmGlobals:
+#   chartHome: ../../charts/
+# helmCharts:
+# - name: nautobot
+#   includeCRDs: true
+#   namespace: nautobot
+#   valuesFile: values.yaml
+#   releaseName: nautobot
+#   version: 2.0.5
+#   repo: https://nautobot.github.io/helm-charts/
