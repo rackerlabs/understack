@@ -6,3 +6,7 @@
 # sealed secrets
 components/01-secrets/encrypted-*.yaml
 components/01-secrets/kustomization.yaml
+
+# python virtualenv
+.venv/
+venv/
