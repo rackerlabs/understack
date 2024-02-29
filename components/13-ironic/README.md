@@ -52,7 +52,7 @@ helm --namespace openstack template \
     --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-db-password -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_messaging.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.identity.auth.ironic.password="$(kubeclt --namespace openstack get secret ironic-keystone-password -o jsonpath='{.data.password}' | base64 -d)" \
+    --set endpoints.identity.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-keystone-password -o jsonpath='{.data.password}' | base64 -d)" \
     --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
     | kubectl -n openstack apply -f -
 ```
