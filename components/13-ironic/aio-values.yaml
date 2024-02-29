@@ -1,0 +1,100 @@
+---
+
+images:
+  tags:
+    ironic_manage_cleaning_network: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    ironic_retrive_cleaning_network: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    ironic_retrive_swift_config: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    bootstrap: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    db_init: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    db_drop: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    ironic_db_sync: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
+    ironic_api: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
+    ironic_conductor: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
+    ironic_pxe: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
+    ironic_pxe_init: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
+    ironic_pxe_http: docker.io/nginx:1.13.3
+    ks_user: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    ks_service: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    ks_endpoints: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    rabbit_init: docker.io/rabbitmq:3.7-management
+    dep_check: quay.io/airshipit/kubernetes-entrypoint:v1.0.0
+    image_repo_sync: docker.io/docker:17.07.0
+  pull_policy: "IfNotPresent"
+  local_registry:
+    active: false
+    exclude:
+      - dep_check
+      - image_repo_sync
+
+bootstrap:
+  image:
+    enabled: false
+    openstack:
+      enabled: false
+  network:
+    enabled: false
+    openstack:
+      enabled: false
+  object_store:
+    enabled: false
+    openstack:
+      enabled: false
+
+conf:
+  ironic:
+    conductor:
+      automated_clean: false
+    dhcp:
+      dhcp_provider: none
+
+network:
+  api:
+    ingress:
+      public: true
+      classes:
+        namespace: "nginx"
+        cluster: "nginx-openstack"
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+    external_policy_local: false
+    node_port:
+      enabled: false
+  pxe:
+    device: ens1f0
+
+dependencies:
+  dynamic:
+    common:
+      local_image_registry:
+        jobs: null
+  static:
+    api:
+      jobs:
+        - ironic-db-sync
+        - ironic-ks-user
+        - ironic-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+    conductor:
+      jobs:
+        - ironic-db-sync
+        - ironic-ks-user
+        - ironic-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+
+manifests:
+  job_db_init: false
+  job_db_drop: false
+  job_manage_cleaning_network: false
+  job_rabbit_init: false
+  secret_db: false
+  secret_rabbitmq: false
+  secret_registry: false
