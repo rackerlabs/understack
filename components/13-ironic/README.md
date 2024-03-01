@@ -48,6 +48,7 @@ Secrets Reference:
 helm --namespace openstack template \
     ironic \
     ./openstack-helm/ironic/ \
+    -f components/openstack-2023.1-jammy.yaml \
     -f components/13-ironic/aio-values.yaml \
     --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-db-password -o jsonpath='{.data.password}' | base64 -d)" \
