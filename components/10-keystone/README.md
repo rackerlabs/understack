@@ -51,6 +51,7 @@ Secrets Reference:
 helm --namespace openstack template \
     keystone \
     ./openstack-helm/keystone/ \
+    -f components/openstack-2023.1-jammy.yaml \
     -f components/10-keystone/aio-values.yaml \
     --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
     --set endpoints.oslo_db.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-db-password -o jsonpath='{.data.password}' | base64 -d)" \
