@@ -50,3 +50,4 @@ nav:
   - index.md
   - openstack-helm.md
   - secrets.md
+  - install-understack-ubuntu-k3s.md

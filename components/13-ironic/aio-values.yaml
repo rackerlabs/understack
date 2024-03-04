@@ -20,6 +20,17 @@ conf:
       automated_clean: false
     dhcp:
       dhcp_provider: none
+    oslo_messaging_rabbit:
+      rabbit_ha_queues: true
+
+endpoints:
+  oslo_messaging:
+    namespace: null
+    statefulset:
+      replicas: 3
+      name: rabbitmq-server
+    hosts:
+      default: rabbitmq-nodes
 
 network:
   api:
@@ -62,6 +73,13 @@ dependencies:
           service: oslo_db
         - endpoint: internal
           service: oslo_messaging
+    # (nicholas.kuechler) The upstream helm values have ironic-db-init
+    # as a dependency for db_sync, but we have job_db_init false so
+    # ironic-db-init never gets created, and this dependency won't pass.
+    # unset it, so that ironic-db-init is no longer listed in it.
+    # https://opendev.org/openstack/openstack-helm/src/branch/master/ironic/values.yaml#L310-L312
+    db_sync:
+      jobs:
 
 manifests:
   job_db_init: false
