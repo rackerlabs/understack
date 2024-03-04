@@ -1,0 +1,58 @@
+# Full documentation available at
+# https://github.com/dexidp/helm-charts/tree/master/charts/dex#values
+#
+
+replicaCount: 1
+config:
+  # Set it to a valid URL
+  issuer: https://dexidp.local
+
+  # See https://dexidp.io/docs/storage/ for more options
+  # We probably want 'postgres' or 'crd' in production
+  storage:
+    type: kubernetes
+    config:
+      inCluster: true
+
+  # Enable at least one connector
+  # See https://dexidp.io/docs/connectors/ for more options
+  enablePasswordDB: false
+  connectors:
+    - type: keystone
+      # Required field for connector id.
+      id: keystone_internal
+      # Required field for connector name.
+      name: Keystone
+      config:
+        # Required, without v3 suffix.
+        keystoneHost: http://keystone-api.openstack.svc.cluster.local:5000
+        # Required, admin user credentials to connect to keystone.
+        domain: default
+        keystoneUsername: demo
+        keystonePassword: DEMO_PASS
+  logger:
+    level: info
+
+  staticClients:
+    - id: nautobot
+      secret: verysecret
+      name: "Undercloud Nautobot"
+      redirectURIs:
+        - "http://localhost:8000/complete/oidc/"
+        - "https://nautobot.local/complete/oidc/"
+
+ingress:
+  enabled: true
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+  className: "nginx"
+  hosts:
+    - host: dexidp.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+      - dexidp.local
+      secretName: dex-ingress-tls

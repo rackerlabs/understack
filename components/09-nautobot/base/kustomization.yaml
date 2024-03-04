@@ -8,3 +8,4 @@ resources:
 - nautobot/templates/service-account.yaml
 - nautobot/templates/service.yaml
 - nautobot/templates/ingress.yaml
+- nautobot/templates/dexauth-cm.yaml

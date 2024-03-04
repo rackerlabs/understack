@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dexidp
+spec:
+  project: understack
+  source:
+    repoURL: https://github.com/rackerlabs/understack.git
+    path: components/13-dexidp/
+    targetRevision: HEAD
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: dex
+  syncPolicy:
+    automated:
+      selfHeal: true
