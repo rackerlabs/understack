@@ -23,6 +23,9 @@ spec:
               - op: replace
                 path: /spec/tls/0/hosts/0
                 value: nautobot.${DNS_ZONE}
+              - op: replace
+                path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
+                value: ${DEPLOY_NAME}-cluster-issuer
     - repoURL: ${UC_DEPLOY_GIT_URL}
       path: secrets/${DEPLOY_NAME}/
       targetRevision: HEAD
