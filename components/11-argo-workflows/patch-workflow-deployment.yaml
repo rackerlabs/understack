@@ -1,0 +1,7 @@
+## configure the workflow controller to monitor the argo-events namespace
+- op: replace
+  path: /spec/template/spec/containers/0/args
+  value:
+    - --namespaced
+    - --managed-namespace
+    - argo-events
