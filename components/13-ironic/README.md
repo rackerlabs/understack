@@ -54,7 +54,6 @@ helm --namespace openstack template \
     -f components/openstack-2023.1-jammy.yaml \
     -f components/13-ironic/aio-values.yaml \
     -f secret-openstack.yaml \
-    --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
     | kubectl -n openstack apply -f -
 ```
 
