@@ -45,15 +45,15 @@ Secrets Reference:
   is created by the ks-user job using the keystone-admin credential.
 
 ```bash
+# create secrets yaml file if you're not already storing or providing it differently
+./scripts/gen-os-secrets.sh secret-openstack.yaml
+
 helm --namespace openstack template \
     ironic \
     ./openstack-helm/ironic/ \
     -f components/openstack-2023.1-jammy.yaml \
     -f components/13-ironic/aio-values.yaml \
-    --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_db.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-db-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_messaging.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.identity.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-keystone-password -o jsonpath='{.data.password}' | base64 -d)" \
+    -f secret-openstack.yaml \
     --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
     | kubectl -n openstack apply -f -
 ```

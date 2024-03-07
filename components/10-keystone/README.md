@@ -48,14 +48,15 @@ Secrets Reference:
 - keystone-rabbitmq-password is the RabbitMQ password for the keystone user.
 
 ```bash
+# create secrets yaml file if you're not already storing or providing it differently
+./scripts/gen-os-secrets.sh secret-openstack.yaml
+
 helm --namespace openstack template \
     keystone \
     ./openstack-helm/keystone/ \
     -f components/openstack-2023.1-jammy.yaml \
     -f components/10-keystone/aio-values.yaml \
-    --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_db.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-db-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_messaging.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
+    -f secret-openstack.yaml \
     --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
     | kubectl -n openstack apply -f -
 ```
