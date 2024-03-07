@@ -1,28 +1,5 @@
 # OpenStack Keystone
 
-So unfortunately OpenStack Helm doesn't publish helm charts that can be consumed like
-regular helm charts. You must instead clone two of their git repos side by side and
-build the dependencies manually. They additionally don't split out secrets but instead
-template them into giant config files or even executable scripts that then get stored
-as secrets, a clear violation of <https://12factor.net>. As a result we cannot store
-a declarative config of Keystone and allow users to supply their own secrets.
-
-Due to the above issues, for now we'll skip the ArgoCD ability for this deployment.
-
-## Get OpenStack Helm Ready
-
-You may have done this for another OpenStack component and can share the same
-git clones. This assumes you're doing this from the top level of this repo.
-
-```bash
-# clone the two repos because they reference the infra one as a relative path
-# so you can't use real helm commands
-git clone https://github.com/openstack/openstack-helm
-git clone https://github.com/openstack/openstack-helm-infra
-# update the dependencies cause we can't use real helm references
-./scripts/openstack-helm-depend-sync.sh keystone
-```
-
 ## Label the node(s)
 
 In order to deploy Openstack control plane, at least one of the Kubernetes
@@ -51,13 +28,11 @@ Secrets Reference:
 # create secrets yaml file if you're not already storing or providing it differently
 ./scripts/gen-os-secrets.sh secret-openstack.yaml
 
-helm --namespace openstack template \
-    keystone \
-    ./openstack-helm/keystone/ \
-    -f components/openstack-2023.1-jammy.yaml \
-    -f components/10-keystone/aio-values.yaml \
-    -f secret-openstack.yaml \
-    | kubectl -n openstack apply -f -
+kubectl kustomize \
+  --enable-helm \
+  --load-restrictor LoadRestrictionsNone \
+  components/10-keystone \
+  | kubectl -n openstack apply -f -
 ```
 
 At this point Keystone will go through some initialization and start up.
