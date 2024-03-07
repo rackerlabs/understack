@@ -6,3 +6,17 @@ resources:
   - namespace.yaml
   - https://github.com/argoproj/argo-events/releases/download/v1.9.1/namespace-install.yaml
   - https://github.com/argoproj/argo-events/releases/download/v1.9.1/install-validating-webhook.yaml
+
+  ## configure rbac to integrate with argo-workflow
+  # - default-role.yaml
+  - argo-server-role.yaml
+  - argo-role.yaml
+
+  ## deploy argo-event components
+  - native-eventbus.yaml
+  - webhook-event-source.yaml
+
+  ## configure webhook Sensor and associated role
+  - sensor-workflow-role.yaml
+  - webhook-sensor.yaml
+  - workflow-role.yaml

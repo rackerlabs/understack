@@ -1,0 +1,40 @@
+# This Role is included in the argo-workflows quick-start installation manfiest and can be found at:
+# https://github.com/argoproj/argo-workflows/blob/main/manifests/quick-start/base/executor/emissary/executor-role.yaml
+#
+# This Role enables a Workflow Pod (running Emissary executor) to be able to create and patch WorkflowTaskResults,
+# which get shared with the Workflow Controller. The Controller uses the results to update Workflow status.
+#
+# More information can be found at: https://github.com/argoproj/argo-workflows/blob/main/docs/workflow-rbac.md
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    workflows.argoproj.io/description: |
+      Recomended minimum permissions for the `emissary` executor.
+  name: executor
+rules:
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflowtaskresults
+  verbs:
+  - create
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-executor
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: executor
+subjects:
+- kind: ServiceAccount
+  name: workflow
