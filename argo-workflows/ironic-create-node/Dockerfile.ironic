@@ -1,0 +1,26 @@
+ARG BASE=registry.sno.rackspace.net/undercloud/argo-python3.11.8-alpine3.19:0.0.1
+
+FROM ${BASE} as builder
+RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
+RUN --mount=type=cache,target=/root/.cache/.pip pip install python-ironicclient==5.5.0
+
+FROM ${BASE} as prod
+ARG APP_PATH=/app
+ARG APP_USER=appuser
+ARG APP_GROUP=appgroup
+ARG APP_USER_UID=1000
+ARG APP_GROUP_GID=1000
+LABEL org.opencontainers.image.title="Python 3.11 image with Ironic Client"
+LABEL org.opencontainers.image.base.name="registry.sno.rackspace.net/undercloud/argo-ironic"
+LABEL org.opencontainers.image.version="0.0.1"
+
+
+ENV PATH="/opt/venv/bin:$PATH"
+COPY --from=builder /opt/venv /opt/venv
+
+WORKDIR /app
+
+USER $APP_USER
+
+COPY --chown=${APP_USER}:${APP_GROUP} src/ /app
+CMD ["python", "/app/main.py"]
