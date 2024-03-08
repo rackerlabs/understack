@@ -56,7 +56,7 @@ spec:
       initContainers:
         # This init container will run post_upgrade which initializes/upgrades the DB as well as collects static files
         - name: nautobot-init
-          image: ghcr.io/nautobot/nautobot:2.1.1-py3.11
+          image: ghcr.io/rss-engineering/nautobot-rackspace:latest
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
@@ -106,7 +106,7 @@ spec:
       containers:
         - name: nautobot
           tty: true
-          image: ghcr.io/nautobot/nautobot:2.1.1-py3.11
+          image: ghcr.io/rss-engineering/nautobot-rackspace:latest
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
@@ -183,7 +183,8 @@ spec:
               containerPort: 8443
             - name: "http"
               containerPort: 8080
-
+      imagePullSecrets:
+        - name: registry-secret-ghcr
       terminationGracePeriodSeconds: 30
       volumes:
         - name: "nautobot-static"

@@ -57,7 +57,7 @@ spec:
       containers:
         - name: nautobot-celery
           tty: true
-          image: ghcr.io/nautobot/nautobot:2.1.1-py3.11
+          image: ghcr.io/rss-engineering/nautobot-rackspace:latest
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
@@ -100,6 +100,8 @@ spec:
           volumeMounts:
             - name: "git-repos"
               mountPath: "/opt/nautobot/git"
+      imagePullSecrets:
+        - name: registry-secret-ghcr
       terminationGracePeriodSeconds: 30
       volumes:
         - name: "git-repos"
@@ -163,7 +165,7 @@ spec:
       containers:
         - name: nautobot-celery
           tty: true
-          image: ghcr.io/nautobot/nautobot:2.1.1-py3.11
+          image: ghcr.io/rss-engineering/nautobot-rackspace:latest
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
@@ -211,6 +213,8 @@ spec:
           volumeMounts:
             - name: "git-repos"
               mountPath: "/opt/nautobot/git"
+      imagePullSecrets:
+        - name: registry-secret-ghcr
       terminationGracePeriodSeconds: 30
       volumes:
         - name: "git-repos"
