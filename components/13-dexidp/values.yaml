@@ -35,12 +35,18 @@ config:
 
   staticClients:
     - id: nautobot
-      secret: verysecret
+      secretEnv: NAUTOBOT_SSO_CLIENT_SECRET
       name: "Undercloud Nautobot"
       redirectURIs:
         - "http://localhost:8000/complete/oidc/"
         - "https://nautobot.local/complete/oidc/"
 
+envVars:
+  - name: NAUTOBOT_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: nautobot-sso
+        key: client-secret
 ingress:
   enabled: true
   annotations:
