@@ -29,6 +29,18 @@ kubectl --namespace nautobot \
     --from-literal=redis-password="$(./scripts/pwgen.sh)" \
     > secret-nautobot-redis.yaml
 
+NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
+for ns in nautobot dex; do
+  kubectl --namespace $ns \
+    create secret generic nautobot-sso \
+    --dry-run=client \
+    -o yaml \
+    --type Opaque \
+    --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
+    > secret-nautobot-sso-$ns.yaml
+done
+unset NAUTOBOT_SSO_SECRET
+
 kubectl --namespace openstack \
     create secret generic keystone-rabbitmq-password \
     --type Opaque \
@@ -103,6 +115,15 @@ for skrt in $(find . -maxdepth 1 -name "secret-keystone*.yaml" -o -name "secret-
         -o yaml \
         -f "${skrt}" \
         -w "${encskrt}"
+done
+
+for ns in nautobot dex; do
+  kubeseal \
+    --scope cluster-wide \
+    --allow-empty-data \
+    -o yaml \
+    -f secret-nautobot-sso-$ns.yaml \
+    -w components/01-secrets/encrypted-nautobot-sso-$ns.yaml
 done
 
 cd components/01-secrets/
