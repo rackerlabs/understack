@@ -103,6 +103,14 @@ spec:
             - name: "nautobot-config"
               mountPath: "/opt/nautobot/nautobot_config.py"
               subPath: "nautobot_config.py"
+            - name: "nautobot-dexauth"
+              mountPath: "/opt/nautobot/dexauth.py"
+              subPath: "dexauth.py"
+              readOnly: true
+            - name: "nautobot-dex-creds"
+              mountPath: "/opt/nautobot/dex_client_secret"
+              subPath: client-secret
+              readOnly: true
       containers:
         - name: nautobot
           tty: true
@@ -178,6 +186,11 @@ spec:
             - name: "nautobot-dexauth"
               mountPath: "/opt/nautobot/dexauth.py"
               subPath: "dexauth.py"
+              readOnly: true
+            - name: "nautobot-dex-creds"
+              mountPath: "/opt/nautobot/dex_client_secret"
+              subPath: client-secret
+              readOnly: true
           ports:
             - name: "https"
               containerPort: 8443
@@ -196,3 +209,7 @@ spec:
         - name: "nautobot-dexauth"
           configMap:
             name: dexauth
+        - name: "nautobot-dex-creds"
+          secret:
+            secretName: nautobot-sso
+            optional: false
