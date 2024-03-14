@@ -16,3 +16,4 @@ resources:
   - argo-workflows.yaml
   - argo-events.yaml
   - ironic.yaml
+  - dexidp.yaml
