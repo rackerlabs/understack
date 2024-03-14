@@ -505,8 +505,6 @@ conf:
       lockout_duration: 1800
     auth:
       methods: password,token,application_credential,totp
-      password: rxt
-      totp: rxt
 
   # NOTE(lamt) We can leverage multiple domains with different
   # configurations as outlined in
