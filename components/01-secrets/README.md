@@ -61,6 +61,21 @@ kubectl --namespace nautobot \
     > secret-nautobot-redis.yaml
 ```
 
+```bash
+# This secret needs to be synchronized in both namespaces
+NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
+for ns in nautobot dex; do
+  kubectl --namespace $ns \
+    create secret generic nautobot-sso \
+    --dry-run=client \
+    -o yaml \
+    --type Opaque \
+    --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
+    > secret-nautobot-sso-$ns.yaml
+done
+unset NAUTOBOT_SSO_SECRET
+```
+
 Let's encrypt them.
 
 ```bash
@@ -77,6 +92,15 @@ kubeseal \
     -o yaml \
     -f secret-nautobot-redis.yaml \
     -w components/01-secrets/encrypted-nautobot-redis.yaml
+
+for ns in nautobot dex; do
+  kubeseal \
+    --scope cluster-wide \
+    --allow-empty-data \
+    -o yaml \
+    -f secret-nautobot-sso-$ns.yaml \
+    -w components/01-secrets/encrypted-nautobot-sso-$ns.yaml
+done
 ```
 
 ## Keystone
