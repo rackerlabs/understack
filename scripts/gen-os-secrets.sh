@@ -17,6 +17,12 @@ if ! type -p kubectl > /dev/null; then
     exit 1
 fi
 
+KUSTOMIZE_VERSION=$(kubectl version --client -o yaml | yq .kustomizeVersion)
+if ! (echo -e "v5.0.0\n$KUSTOMIZE_VERSION" | sort -V -C); then
+  echo "kustomize needs to be at version 5.0.0 or newer (comes with kubectl 1.27+)"
+  exit 1
+fi
+
 SCRIPTS_DIR="$(dirname "$0")"
 
 echo "This script will attempt to look up the existing values this repo used"
