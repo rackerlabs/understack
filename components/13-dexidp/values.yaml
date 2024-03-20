@@ -59,6 +59,11 @@ config:
       redirectURIs:
         - "http://localhost:8000/complete/oidc/"
         - "https://nautobot.local/complete/oidc/"
+    - id: argo
+      secretEnv: ARGO_SSO_CLIENT_SECRET
+      name: "Undercloud Argo"
+      redirectURIs:
+        - "https://workflows.local/oauth2/callback"
 
 envVars:
   - name: NAUTOBOT_SSO_CLIENT_SECRET
@@ -81,6 +86,11 @@ envVars:
       secretKeyRef:
         name: azure-sso
         key: issuer
+  - name: ARGO_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: argo-sso
+        key: client-secret
 ingress:
   enabled: true
   annotations:
