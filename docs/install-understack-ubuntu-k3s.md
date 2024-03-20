@@ -323,6 +323,12 @@ git clone https://github.com/openstack/openstack-helm-infra
 ./scripts/openstack-helm-depend-sync.sh ironic
 ```
 
+Load the secrets values file from the cluster:
+
+```bash
+./scripts/gen-os-secrets.sh secret-openstack.yaml
+```
+
 Label the kubernetes nodes as being openstack enabled:
 ```bash
 kubectl label node $(kubectl get nodes -o 'jsonpath={.items[*].metadata.name}') openstack-control-plane=enabled
@@ -337,10 +343,7 @@ helm --namespace openstack template \
     keystone \
     ./openstack-helm/keystone/ \
     -f components/10-keystone/aio-values.yaml \
-    --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_db.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-db-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_messaging.auth.keystone.password="$(kubectl --namespace openstack get secret keystone-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
+    -f secret-openstack.yaml \
     | kubectl -n openstack apply -f -
 ```
 
@@ -382,11 +385,7 @@ helm --namespace openstack template \
     ironic \
     ./openstack-helm/ironic/ \
     -f components/13-ironic/aio-values.yaml \
-    --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_db.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-db-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_messaging.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.identity.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-keystone-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
+    -f secret-openstack.yaml \
     | kubectl -n openstack apply -f -
 ```
 

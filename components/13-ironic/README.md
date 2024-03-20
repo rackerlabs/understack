@@ -1,28 +1,5 @@
 # OpenStack Ironic
 
-So unfortunately OpenStack Helm doesn't publish helm charts that can be consumed like
-regular helm charts. You must instead clone two of their git repos side by side and
-build the dependencies manually. They additionally don't split out secrets but instead
-template them into giant config files or even executable scripts that then get stored
-as secrets, a clear violation of <https://12factor.net>. As a result we cannot store
-a declarative config of Keystone and allow users to supply their own secrets.
-
-Due to the above issues, for now we'll skip the ArgoCD ability for this deployment.
-
-## Get OpenStack Helm Ready
-
-You may have done this for another OpenStack component and can share the same
-git clones. This assumes you're doing this from the top level of this repo.
-
-```bash
-# clone the two repos because they reference the infra one as a relative path
-# so you can't use real helm commands
-git clone https://github.com/openstack/openstack-helm
-git clone https://github.com/openstack/openstack-helm-infra
-# update the dependencies cause we can't use real helm references
-./scripts/openstack-helm-depend-sync.sh ironic
-```
-
 ## Deploy Ironic
 
 NOTE: The PXE service currently has the host network devices mapped into
@@ -45,17 +22,14 @@ Secrets Reference:
   is created by the ks-user job using the keystone-admin credential.
 
 ```bash
-helm --namespace openstack template \
-    ironic \
-    ./openstack-helm/ironic/ \
-    -f components/openstack-2023.1-jammy.yaml \
-    -f components/13-ironic/aio-values.yaml \
-    --set endpoints.identity.auth.admin.password="$(kubectl --namespace openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_db.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-db-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.oslo_messaging.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --set endpoints.identity.auth.ironic.password="$(kubectl --namespace openstack get secret ironic-keystone-password -o jsonpath='{.data.password}' | base64 -d)" \
-    --post-renderer $(git rev-parse --show-toplevel)/scripts/openstack-helm-sealed-secrets.sh \
-    | kubectl -n openstack apply -f -
+# create secrets yaml file if you're not already storing or providing it differently
+./scripts/gen-os-secrets.sh secret-openstack.yaml
+
+kubectl kustomize \
+  --enable-helm \
+  --load-restrictor LoadRestrictionsNone \
+  components/13-ironic \
+  | kubectl -n openstack apply -f -
 ```
 
 At this point Ironic will go through some initialization and start up.
