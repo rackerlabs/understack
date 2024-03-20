@@ -4,3 +4,21 @@ kind: Kustomization
 
 resources:
   - https://github.com/argoproj/argo-workflows/releases/download/v3.5.4/namespace-install.yaml
+  - ingress.yaml
+
+  ## configure argo-workflow rbac
+  - argo-server-cluster-role.yaml
+
+patches:
+- target:  # configure argo-server namespaced and to set to server mode to disable auth until auth can be worked out
+    group: apps
+    version: v1
+    kind: Deployment
+    name: argo-server
+  path: patch-server-deployment.yaml
+- target:  # configure the workflow controller to monitor the argo-events namespace
+    group: apps
+    version: v1
+    kind: Deployment
+    name: workflow-controller
+  path: patch-workflow-deployment.yaml

@@ -1,0 +1,16 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: nautobot-webhook
+spec:
+  service:
+    ports:
+    - name: insecure
+      port: 12000
+      targetPort: 12000
+  webhook:
+    nautobot:
+      endpoint: /nautobot
+      method: POST
+      port: "12000"

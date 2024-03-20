@@ -1,0 +1,45 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: nautobot-webhook
+spec:
+  template:
+    serviceAccountName: operate-workflow-sa
+  dependencies:
+    - name: nautobot-dep
+      eventSourceName: nautobot-webhook       # must match EventSource name
+      eventName: nautobot                     # must match event name defined in EventSource
+  triggers:
+    - template:
+        name: nautobot-workflow-trigger
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: nautobot-webhook-
+              spec:
+                serviceAccountName: workflow
+                entrypoint: whalesay
+                arguments:
+                  parameters:
+                  - name: message
+                    # the value will get overridden by event payload from test-dep
+                    value: hello world
+                templates:
+                - name: whalesay
+                  inputs:
+                    parameters:
+                    - name: message
+                  container:
+                    image: docker/whalesay:latest
+                    command: [cowsay]
+                    args: ["{{inputs.parameters.message}}"]
+          parameters:
+            - src:
+                dependencyName: nautobot-dep
+                dataKey: body
+              dest: spec.arguments.parameters.0.value
