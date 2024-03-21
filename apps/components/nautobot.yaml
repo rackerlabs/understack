@@ -11,6 +11,24 @@ spec:
     - repoURL: https://github.com/rackerlabs/understack.git
       path: components/09-nautobot/
       targetRevision: HEAD
+      kustomize:
+        patches:
+          - target:
+              kind: Ingress
+              name: nautobot
+            patch: |-
+              - op: replace
+                path: /spec/rules/0/host
+                value: nautobot.${DNS_ZONE}
+              - op: replace
+                path: /spec/tls/0/hosts/0
+                value: nautobot.${DNS_ZONE}
+    - repoURL: ${UC_DEPLOY_GIT_URL}
+      path: secrets/${DEPLOY_NAME}/
+      targetRevision: HEAD
+      directory:
+        include: 'secret-nautobot*.yaml'
+        exclude: secret-nautobot-sso-dex.yaml
   destination:
     server: "https://kubernetes.default.svc"
     namespace: nautobot

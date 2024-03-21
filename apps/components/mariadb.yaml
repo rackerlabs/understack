@@ -4,10 +4,15 @@ metadata:
   name: mariadb
 spec:
   project: understack
-  source:
-    repoURL: https://github.com/rackerlabs/understack.git
-    path: components/03-mariadb/
-    targetRevision: HEAD
+  sources:
+    - repoURL: https://github.com/rackerlabs/understack.git
+      path: components/03-mariadb/
+      targetRevision: HEAD
+    - repoURL: ${UC_DEPLOY_GIT_URL}
+      path: secrets/${DEPLOY_NAME}/
+      targetRevision: HEAD
+      directory:
+        include: secret-mariadb.yaml
   destination:
     server: "https://kubernetes.default.svc"
     namespace: openstack
