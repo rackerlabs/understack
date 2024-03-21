@@ -5,7 +5,6 @@ namespace: argocd
 
 resources:
   - argocd-understack-project.yaml
-  - namespaces.yaml
   - mariadb.yaml
   - rabbitmq-cluster.yaml
   - memcached.yaml
