@@ -34,7 +34,7 @@ config:
       name: azure
       id: azure
       config:
-        issuer: https://login.microsoftonline.com/570057f4-73ef-41c8-bcbb-08db2fc15c2b/v2.0
+        issuer: $AZURE_ISSUER
         clientId: $AZURE_SSO_CLIENT_ID
         clientSecret: $AZURE_SSO_CLIENT_SECRET
         redirectURI: https://dexidp.local/callback
