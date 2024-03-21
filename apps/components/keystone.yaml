@@ -14,3 +14,9 @@ spec:
   syncPolicy:
     automated:
       selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    managedNamespaceMetadata:
+      labels:
+        kubernetes.io/metadata.name: openstack
+        name: openstack
