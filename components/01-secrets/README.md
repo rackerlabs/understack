@@ -61,6 +61,21 @@ kubectl --namespace nautobot \
     > secret-nautobot-redis.yaml
 ```
 
+```bash
+# This secret needs to be synchronized in both namespaces
+NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
+for ns in nautobot dex; do
+  kubectl --namespace $ns \
+    create secret generic nautobot-sso \
+    --dry-run=client \
+    -o yaml \
+    --type Opaque \
+    --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
+    > secret-nautobot-sso-$ns.yaml
+done
+unset NAUTOBOT_SSO_SECRET
+```
+
 Let's encrypt them.
 
 ```bash
@@ -77,6 +92,15 @@ kubeseal \
     -o yaml \
     -f secret-nautobot-redis.yaml \
     -w components/01-secrets/encrypted-nautobot-redis.yaml
+
+for ns in nautobot dex; do
+  kubeseal \
+    --scope cluster-wide \
+    --allow-empty-data \
+    -o yaml \
+    -f secret-nautobot-sso-$ns.yaml \
+    -w components/01-secrets/encrypted-nautobot-sso-$ns.yaml
+done
 ```
 
 ## Keystone
@@ -157,6 +181,31 @@ for skrt in $(find . -maxdepth 1-name "secret-ironic*.yaml"); do
         -f "${skrt}" \
         -w "${encskrt}"
 done
+
+```
+## Azure SSO authentication
+
+First, you need to obtain necessary credentials from [PasswordSafe](https://passwordsafe.corp.rackspace.com/projects/37639/credentials/329301/). Replace the `<CLIENTID>`, `<CLIENTSECRET>` and `<ISSUER>` in the following command.
+
+PasswordSafe mappings:
+- `<CLIENTID>` is stored as `Username`
+- `<CLIENTSECRET>` is stored in `Password` field
+- `<ISSUER>` needs to be constructed. The value should be `https://login.microsoftonline.com/<APPID>/v2.0`, where `<APPID>` is stored in PasswordSafe under `Hostname` field. Pay particular attention to `/v2.0` at the end of URL and don't add trailing slash. Example value would be: `https://login.microsoftonline.com/1234abcd-1234-0000-beef-12345678900a/v2.0`
+
+```bash
+kubectl --namespace dex \
+    create secret generic azure-sso --dry-run=client \
+    --from-literal=client-id=<CLIENTID> \
+    --from-literal=client-secret=<CLIENTSECRET> \
+    --from-literal=issuer=<ISSUER> \
+    -o yaml > secret-azure-sso.yaml
+
+kubeseal \
+  --scope cluster-wide \
+  --allow-empty-data \
+  -o yaml \
+  -f secret-azure-sso.yaml \
+  -w components/01-secrets/encrypted-azure-sso.yaml
 ```
 
 ## Generate Kustomize for the Install

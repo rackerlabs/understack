@@ -5,3 +5,4 @@ resources:
   - nautobot.yaml
   - openstack.yaml
   - argo-workflows.yaml
+  - dexidp.yaml

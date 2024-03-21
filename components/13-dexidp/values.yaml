@@ -30,17 +30,57 @@ config:
         domain: default
         keystoneUsername: demo
         keystonePassword: DEMO_PASS
+    - type: oidc
+      name: azure
+      id: azure
+      config:
+        issuer: $AZURE_ISSUER
+        clientId: $AZURE_SSO_CLIENT_ID
+        clientSecret: $AZURE_SSO_CLIENT_SECRET
+        redirectURI: https://dexidp.local/callback
+        scopes:
+          - openid
+          - email
+        insecureSkipEmailVerified: true
+        # enabling insecureEnableGroups adds the list of group UUIDs to the
+        # access token, which in turn results in a HTTP headers for requests to
+        # https://dexidp.local/userinfo being way too large for Ingress
+        # controller and python requests library. Even after adjusting ingress
+        # controlloer, the Nautobot still cannot handle token that large.
+        insecureEnableGroups: false
+        getUserInfo: true
   logger:
     level: info
 
   staticClients:
     - id: nautobot
-      secret: verysecret
+      secretEnv: NAUTOBOT_SSO_CLIENT_SECRET
       name: "Undercloud Nautobot"
       redirectURIs:
         - "http://localhost:8000/complete/oidc/"
         - "https://nautobot.local/complete/oidc/"
 
+envVars:
+  - name: NAUTOBOT_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: nautobot-sso
+        key: client-secret
+  - name: AZURE_SSO_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: azure-sso
+        key: client-id
+  - name: AZURE_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: azure-sso
+        key: client-secret
+  - name: AZURE_ISSUER
+    valueFrom:
+      secretKeyRef:
+        name: azure-sso
+        key: issuer
 ingress:
   enabled: true
   annotations:
