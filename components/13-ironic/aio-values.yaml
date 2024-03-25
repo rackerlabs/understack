@@ -1,5 +1,14 @@
 ---
 
+# we don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete, which they
+# can't if they set to deploy in PostSync
+helm3_hook: false
+
 bootstrap:
   image:
     enabled: false
