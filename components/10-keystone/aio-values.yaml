@@ -49,6 +49,11 @@ network:
       enabled: false
       port: 30357
 
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+
 dependencies:
   dynamic:
     common:
