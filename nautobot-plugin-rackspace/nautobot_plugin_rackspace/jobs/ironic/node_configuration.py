@@ -11,7 +11,7 @@ class IronicNodeConfiguration:
 
     boot_interface: str = ""
 
-    conductor_group: str = ""
+    conductor_group: str | None = None
     """The conductor group for a node. Case-insensitive str up to 255
     characters, containing a-z, 0-9, _, -, and .."""
 
@@ -93,7 +93,7 @@ class IronicNodeConfiguration:
     bios_interface: str = ""
     """The bios interface to be used for this node."""
 
-    chassis_uuid: str = ""
+    chassis_uuid: str | None = ""
     """UUID of the chassis associated with this Node. May be empty or None."""
 
     instance_info: dict = field(default_factory=dict)
