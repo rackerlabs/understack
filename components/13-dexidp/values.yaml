@@ -31,7 +31,7 @@ config:
         keystoneUsername: demo
         keystonePassword: DEMO_PASS
     - type: oidc
-      name: azure
+      name: Azure
       id: azure
       config:
         issuer: $AZURE_ISSUER
@@ -41,6 +41,7 @@ config:
         scopes:
           - openid
           - email
+          - offline_access
         insecureSkipEmailVerified: true
         insecureEnableGroups: true
         getUserInfo: true
