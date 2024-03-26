@@ -42,13 +42,10 @@ config:
           - openid
           - email
         insecureSkipEmailVerified: true
-        # enabling insecureEnableGroups adds the list of group UUIDs to the
-        # access token, which in turn results in a HTTP headers for requests to
-        # https://dexidp.local/userinfo being way too large for Ingress
-        # controller and python requests library. Even after adjusting ingress
-        # controlloer, the Nautobot still cannot handle token that large.
-        insecureEnableGroups: false
+        insecureEnableGroups: true
         getUserInfo: true
+        claimMapping:
+          groups: "roles"
   logger:
     level: info
 
