@@ -14,8 +14,9 @@ config:
     config:
       inCluster: true
 
-  # Enable at least one connector
-  # See https://dexidp.io/docs/connectors/ for more options
+  oauth2:
+    skipApprovalScreen: true
+
   enablePasswordDB: false
   connectors:
     - type: keystone
