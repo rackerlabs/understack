@@ -18,6 +18,7 @@ class IronicClient:
         self.auth_url = auth_url
         self.tenant_name = tenant_name
         self.logged_in = False
+        self.os_ironic_api_version = "1.82"
 
     def login(self):
         auth = v3.Password(
@@ -45,13 +46,23 @@ class IronicClient:
         self._ensure_logged_in()
 
         return self.client.node.create(
-            os_ironic_api_version="1.82", **node_data
+            os_ironic_api_version=self.os_ironic_api_version, **node_data
         )
 
     def list_nodes(self):
         self._ensure_logged_in()
 
         return self.client.node.list()
+
+    def get_node(self, node_ident: str, fields: list[str] | None = None):
+        self._ensure_logged_in()
+
+        return self.client.node.get(node_ident, fields, os_ironic_api_version=self.os_ironic_api_version)
+
+    def update_node(self, node_id, patch):
+        self._ensure_logged_in()
+
+        return self.client.node.update(node_id, patch, os_ironic_api_version=self.os_ironic_api_version)
 
     def _ensure_logged_in(self):
         if not self.logged_in:

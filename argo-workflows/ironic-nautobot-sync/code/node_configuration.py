@@ -2,7 +2,7 @@ from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
 
-from .redfish_driver_info import RedfishDriverInfo
+from redfish_driver_info import RedfishDriverInfo
 
 
 @dataclass
