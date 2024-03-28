@@ -53,3 +53,4 @@ nav:
   - openstack-helm.md
   - secrets.md
   - install-understack-ubuntu-k3s.md
+  - gitops-install.md
