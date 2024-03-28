@@ -29,6 +29,8 @@ data:
   NAUTOBOT_REDIS_SSL: "False"
   NAUTOBOT_SUPERUSER_EMAIL: "admin@example.com"
   NAUTOBOT_SUPERUSER_NAME: "admin"
+  RAX_SUPERUSER_GROUPS: undercloud-dev
+  RAX_STAFF_GROUPS: undercloud-dev
 ---
 # Source: nautobot/templates/configmap.yaml
 apiVersion: v1
