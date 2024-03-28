@@ -22,3 +22,9 @@ patches:
     kind: Deployment
     name: workflow-controller
   path: patch-workflow-deployment.yaml
+
+configMapGenerator:
+  - name: workflow-controller-configmap
+    behavior: merge
+    files:
+      - sso

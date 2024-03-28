@@ -41,6 +41,20 @@ for ns in nautobot dex; do
 done
 unset NAUTOBOT_SSO_SECRET
 
+ARGO_SSO_SECRET=$(./scripts/pwgen.sh)
+for ns in argo argo-events argocd dex; do
+  kubectl --namespace $ns \
+    create secret generic argo-sso \
+    --dry-run=client \
+    -o yaml \
+    --type Opaque \
+    --from-literal=client-secret="$ARGO_SSO_SECRET" \
+    --from-literal=client-id=argo \
+    > secret-argo-sso-$ns.yaml
+done
+unset ARGO_SSO_SECRET
+
+
 kubectl --namespace openstack \
     create secret generic keystone-rabbitmq-password \
     --type Opaque \
@@ -124,6 +138,15 @@ for ns in nautobot dex; do
     -o yaml \
     -f secret-nautobot-sso-$ns.yaml \
     -w components/01-secrets/encrypted-nautobot-sso-$ns.yaml
+done
+
+for ns in argo argo-events argocd dex; do
+  kubeseal \
+    --scope cluster-wide \
+    --allow-empty-data \
+    -o yaml \
+    -f secret-argo-sso-$ns.yaml \
+    -w components/01-secrets/encrypted-argo-sso-$ns.yaml
 done
 
 cd components/01-secrets/
