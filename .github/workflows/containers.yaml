@@ -1,0 +1,36 @@
+name: container builds
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "containers/**"
+      - ".github/workflows/containers.yml"
+  pull_request:
+    paths:
+      - "containers/**"
+      - ".github/workflows/containers.yml"
+  workflow_dispatch:
+
+jobs:
+  ghcr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: setup docker buildx
+        uses: docker/setup-buildx-action@v3
+      - name: login to ghcr.io
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: build and deploy container to registry
+        uses: docker/build-push-action@v5
+        with:
+          context: "{{defaultContext}}:containers"
+          file: containers/Dockerfile.ironic
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ghcr.io/rackerlabs/openstackhelm/ironic:2023.1-ubuntu_jammy

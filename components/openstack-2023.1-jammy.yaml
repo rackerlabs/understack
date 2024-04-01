@@ -21,7 +21,7 @@ images:
 
     # ironic
     ironic_api: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
-    ironic_conductor: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
+    ironic_conductor: "ghcr.io/rackerlabs/openstackhelm/ironic:2023.1-ubuntu_jammy"
     ironic_pxe: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
     ironic_pxe_init: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
     ironic_pxe_http: "docker.io/nginx:1.13.3"
