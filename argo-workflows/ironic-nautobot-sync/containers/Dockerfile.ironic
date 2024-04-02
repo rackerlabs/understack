@@ -1,4 +1,4 @@
-ARG BASE=registry.sno.rackspace.net/undercloud/argo-python3.11.8-alpine3.19:0.0.1
+ARG BASE=ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest
 
 FROM ${BASE} as builder
 RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
@@ -11,8 +11,8 @@ ARG APP_GROUP=appgroup
 ARG APP_USER_UID=1000
 ARG APP_GROUP_GID=1000
 LABEL org.opencontainers.image.title="Python 3.11 image with Ironic Client"
-LABEL org.opencontainers.image.base.name="registry.sno.rackspace.net/undercloud/argo-ironic"
-LABEL org.opencontainers.image.version="0.0.1"
+LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8"
+LABEL org.opencontainers.image.source=https://github.com/rackerlabs/understack
 
 
 ENV PATH="/opt/venv/bin:$PATH"
@@ -22,5 +22,5 @@ WORKDIR /app
 
 USER $APP_USER
 
-COPY --chown=${APP_USER}:${APP_GROUP} src/ /app
+COPY --chown=${APP_USER}:${APP_GROUP} code/ /app
 CMD ["python", "/app/main.py"]

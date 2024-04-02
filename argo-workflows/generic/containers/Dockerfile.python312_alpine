@@ -1,8 +1,8 @@
-FROM trow.sno.rackspace.net/f/docker/python:3.11.8-alpine3.19 as builder
+FROM python:3.12.2-alpine3.19 as builder
 
-LABEL org.opencontainers.image.title="Python 3.11 image base image"
-LABEL org.opencontainers.image.base.name="registry.sno.rackspace.net/undercloud/argo-python3.11.8-alpine3.19"
-LABEL org.opencontainers.image.version="0.0.1"
+LABEL org.opencontainers.image.title="Python 3.12 image base image"
+LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19"
+LABEL org.opencontainers.image.source=https://github.com/rackerlabs/understack
 
 ENV PYTHONUNBUFFERED=1
 
@@ -23,7 +23,7 @@ WORKDIR /app
 CMD ["python", "-"]
 
 # Example usage in final image
-# FROM ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19
+# FROM ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19
 #
 #  # This section needs to be repeated in child images
 #  ARG APP_PATH=/app
@@ -36,7 +36,7 @@ CMD ["python", "-"]
 # RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
 # RUN --mount=type=cache,target=/root/.cache/.pip pip install --no-cache-dir python-ironicclient==5.4.0
 #
-# FROM trow.sno.rackspace.net/f/docker/python:3.11.8-alpine3.19 as prod
+# FROM ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19 as prod
 # ENV PATH="/opt/venv/bin:$PATH"
 # COPY --from=builder /opt/venv /opt/venv
 #
