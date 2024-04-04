@@ -20,9 +20,3 @@ resources:
   - sensor-workflow-role.yaml
   - webhook-sensor.yaml
   - workflow-role.yaml
-
-configMapGenerator:
-  - name: workflow-controller-configmap
-    behavior: merge
-    files:
-      - sso
