@@ -10,7 +10,7 @@ spec:
   templates:
     - name: synchronize-server
       container:
-        image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:latest
+        image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:0.0.1
         command:
           - python
           - /app/synchronize-server.py

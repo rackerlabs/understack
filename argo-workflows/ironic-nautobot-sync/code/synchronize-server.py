@@ -82,18 +82,20 @@ if ironic_node.provision_state not in STATES_ALLOWING_UPDATES:
     logger.info(f"Device {node_id} is in a {ironic_node.provision_state} provisioning state, so the updates are not allowed.")
     sys.exit(0)
 
+# Update OBM address
 drac_ip = update_data['ip_addresses'][0]['host']
-expected_driver_info = RedfishDriverInfo(
-    redfish_address=f"https://{drac_ip}",
-    redfish_system_id="/redfish/v1/Systems/1",
-    redfish_username="root",
-    redfish_password="REDACTED",
-    redfish_auth_type="auto",
-    redfish_verify_ca=False
-)
+expected_address = f"https://{drac_ip}"
+current_address = ironic_node.driver_info['redfish_address']
+if current_address != expected_address:
+    logger.info(f"{node_id} Updating driver_info.redfish_address from {current_address} to {expected_address}")
+    patch = [{"op": "replace", "path": "/driver_info/redfish_address", "value": expected_address}]
+    response = client.update_node(node_id, patch)
+    logger.info(f"Updated: {response}")
 
-if ironic_node.driver_info != asdict(expected_driver_info):
-    logger.info(f"{node_id} Updating driver_info")
-    patch = [{"op": "replace", "path": "/driver_info", "value": asdict(expected_driver_info)}]
+# Brand new servers come with an unverifiable certificate, so we need to dsable
+# TLS certificate validation initially.
+if ironic_node.driver_info['redfish_verify_ca']:
+    logger.info(f"{node_id} Disabling driver_info.redfish_verify_ca")
+    patch = [{"op": "replace", "path": "/driver_info/redfish_verify_ca", "value": False}]
     response = client.update_node(node_id, patch)
     logger.info(f"Updated: {response}")
