@@ -2,6 +2,7 @@
 name: build-container-images
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'argo-workflows/generic/containers/*'
@@ -47,7 +48,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest,ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:${{ env.VERSION_PYTHON311 }}
           labels: |
-              org.opencontainers.image.version: "${{ env.VERSION_PYTHON311 }}"
+              org.opencontainers.image.version=${{ env.VERSION_PYTHON311 }}
 
       - name: Build and deploy Python 3.12 image
         uses: docker/build-push-action@v5
@@ -58,7 +59,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19:latest,ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19:${{ env.VERSION_PYTHON312 }}
           labels: |
-              org.opencontainers.image.version: "${{ env.VERSION_PYTHON312 }}"
+              org.opencontainers.image.version=${{ env.VERSION_PYTHON312 }}
 
       - name: Build and deploy Python 3.11 with Ironic client
         uses: docker/build-push-action@v5
@@ -69,4 +70,4 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:latest,ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:${{ env.VERSION_PYTHON_IRONIC }}
           labels: |
-              org.opencontainers.image.version: "${{ env.VERSION_PYTHON_IRONIC }}"
+              org.opencontainers.image.version=${{ env.VERSION_PYTHON_IRONIC }}
