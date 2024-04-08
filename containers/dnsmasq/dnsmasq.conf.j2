@@ -1,0 +1,66 @@
+#
+# UnderStack dnsmasq configuration for OpenStack Ironic
+#
+# This script should be processed with envsubst
+#
+
+# log to stderr
+log-facility=-
+
+# configs
+conf-dir=/etc/dnsmasq.d
+
+# bind to all interfaces
+#interface={{ env.INTERFACE }}
+except-interface=lo
+bind-interfaces
+
+# DNS port to listen on, set to 0 to disable
+port={{ env.DNS_PORT | default(53) }}
+dhcp-alternate-port=1067,68
+
+{% if env.LOG_DNS_QUERIES | default(False, True) %}
+# enable DNS logging
+log-queries=extra
+{% endif %}
+
+# for now, do not set any resolv settings which results in us
+# forwarding requests to kubedns within the cluster
+
+# don't advertise /etc/hosts entries
+no-hosts
+
+# DHCP range to hand out
+{% if env.DHCP_RANGE is defined %}
+dhcp-range={{ env.DHCP_RANGE }}
+{% endif %}
+
+# don't set to enable logging
+{% if env.LOG_DHCP_QUERIES | default(False, True) %}
+# enable DNS logging
+log-dhcp
+{% endif %}
+
+# check if client is already running iPXE
+dhcp-match=ipxe,175
+
+# Detect PXE architecture
+dhcp-match=set:efi,option:client-arch,7
+dhcp-match=set:efi,option:client-arch,9
+dhcp-match=set:efi,option:client-arch,11
+dhcp-match=set:efi,option:client-arch,16
+# dhcpv6.option: Client System Architecture Type (61)
+dhcp-match=set:efi6,option6:61,0007
+dhcp-match=set:efi6,option6:61,0009
+dhcp-match=set:efi6,option6:61,0011
+dhcp-match=set:efi6,option6:61,0016
+
+# provide PXE services to HTTPClient machines as well
+dhcp-pxe-vendor=PXEClient,HTTPClient
+
+# disable DHCP for unknown hosts (disabling inventory)
+#dhcp-ignore=tag:!known
+
+# conductor will write configs here
+dhcp-hostsdir=/etc/dnsmasq.d/ironic.dhcp-hosts.d
+dhcp-optsdir=/etc/dnsmasq.d/ironic.dhcp-opts.d
