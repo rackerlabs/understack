@@ -25,9 +25,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: markdownlint
+        uses: nosborn/github-action-markdown-cli@v3.3.0
+        with:
+          files: docs
+          config_file: .markdownlint.yml
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
       - run: pip install -r requirements-docs.txt
       - run: mkdocs build
       - uses: actions/upload-pages-artifact@v2
@@ -39,7 +46,7 @@ jobs:
     needs: build
 
     # ensure we only run on commits to the main branch
-    if: github.ref == 'refs/heads/main'
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
 
     runs-on: ubuntu-latest
 
