@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: synchronize-server-to-ironic
+kind: WorkflowTemplate
+spec:
+  arguments:
+    parameters:
+      - name: interface_update_event
+        value: "{}"
+  templates:
+    - name: synchronize-server
+      container:
+        image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:0.0.1
+        command:
+          - python
+          - /app/synchronize-server.py
+        args:
+          - "{{workflow.parameters.interface_update_event}}"
+        volumeMounts:
+          - mountPath: /etc/ironic-secrets/
+            name: ironic-secrets
+            readOnly: true
+      volumes:
+        - name: ironic-secrets
+          secret:
+            secretName: production-ironic-for-argo-creds

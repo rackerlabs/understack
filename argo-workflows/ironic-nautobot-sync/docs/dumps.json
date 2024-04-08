@@ -1,0 +1,106 @@
+root@openstack-admin-client:/# cat node-12345678-legacy.json
+{
+    "boot_interface": "redfish-virtual-media",
+    "boot_mode": "bios",
+    "deploy_interface": "ramdisk",
+    "driver": "redfish",
+    "driver_info": {
+        "redfish_address": "https://10.10.10.157",
+        "redfish_system_id": "/redfish/v1/Systems/1",
+        "redfish_username": "root",
+        "redfish_password": "REDACTED",
+        "redfish_verify_ca": false,
+	"bootloader": "http://192.168.194.25:8080/esp.img"
+    },
+   "name": "12345678-compute01-productname-iad.example.com",
+   "properties": {
+        "cpu_arch": "x86_64",
+        "root_device": {
+            "rotational": false
+        }
+    },
+    "instance_info": {
+        "image_source": "http://192.168.194.25:8080/jammy-server-cloudimg-amd64-disk-kvm.img",
+        "image_os_hash_value": "48c922978584cd3ae85f641e0bafb5a53f8bf0902e394f785ba448e47f46757c",
+	"image_os_hash_algo": "sha256",
+	"image_type": "partition",
+  	"kernel": "http://192.168.194.25:8080/undercloud.kernel",
+	"ramdisk": "http://192.168.194.25:8080/undercloud.initramfs",
+        "root_gb": "30",
+        "capabilities": {
+            "boot_mode": "bios"
+        }
+    },
+    "uuid": "36519de1-3d9a-4b4c-b367-293f2cf15212"
+}
+root@openstack-admin-client:/# cat node-12345678-keekz.json
+{
+    "boot_interface": "redfish-virtual-media",
+    "boot_mode": "uefi",
+    "deploy_interface": "ramdisk",
+    "driver": "redfish",
+    "driver_info": {
+        "redfish_address": "https://10.10.10.157",
+        "redfish_system_id": "/redfish/v1/Systems/1",
+        "redfish_username": "root",
+        "redfish_password": "REDACTED",
+        "redfish_verify_ca": false,
+	"bootloader": "http://192.168.194.25:8080/esp.img"
+    },
+   "name": "12345678-compute01-productname-iad.example.com",
+   "properties": {
+        "cpu_arch": "x86_64",
+        "root_device": {
+            "rotational": false
+        }
+    },
+    "instance_info": {
+        "image_source": "http://192.168.194.25:8080/jammy-server-cloudimg-amd64-disk-kvm.img",
+        "image_os_hash_value": "48c922978584cd3ae85f641e0bafb5a53f8bf0902e394f785ba448e47f46757c",
+	"image_os_hash_algo": "sha256",
+	"image_type": "partition",
+  	"kernel": "http://192.168.194.25:8080/undercloud.kernel",
+	"ramdisk": "http://192.168.194.25:8080/undercloud.initramfs",
+        "root_gb": "30",
+        "capabilities": {
+            "boot_mode": "uefi",
+            "disk_label": "gpt"
+        }
+    },
+    "uuid": "36519de1-3d9a-4b4c-b367-293f2cf15212"
+}
+root@openstack-admin-client:/# cat node-12345678-port.json
+{
+  "address": "98:f2:b3:ec:7c:a7",
+  "node_uuid": "36519de1-3d9a-4b4c-b367-293f2cf15212",
+  "uuid": "08304985-8f79-43ec-8000-d6cdfc96c2be"
+}
+root@openstack-admin-client:/# cat node-12345678-port.json
+{
+  "address": "98:f2:b3:ec:7c:a7",
+  "node_uuid": "36519de1-3d9a-4b4c-b367-293f2cf15212",
+  "uuid": "08304985-8f79-43ec-8000-d6cdfc96c2be"
+}
+root@openstack-admin-client:/# cat node-12345678-network.json
+{
+    "links": [
+        {
+            "id": "port-08304985-8f79-43ec-8000-d6cdfc96c2be",
+            "type": "phy",
+            "ethernet_mac_address": "98:f2:b3:ec:7c:a7"
+        }
+    ],
+    "networks": [
+        {
+            "id": "network0",
+            "type": "ipv4",
+            "link": "port-08304985-8f79-43ec-8000-d6cdfc96c2be",
+            "ip_address": "192.168.194.21",
+            "netmask": "255.255.255.128",
+            "network_id": "network0",
+            "routes": []
+        }
+    ],
+    "services": []
+}
+root@openstack-admin-client:/#
