@@ -315,7 +315,7 @@ nautobot        job.batch/nautobot-backup-sg6f             1/1           2m48s  
 
 ## Install UnderStack Components
 
-[https://github.com/rackerlabs/understack/blob/main/components/10-keystone/README.md](https://github.com/rackerlabs/understack/blob/main/components/10-keystone/README.md)
+[https://github.com/rackerlabs/understack/blob/main/components/keystone/README.md](https://github.com/rackerlabs/understack/blob/main/components/keystone/README.md)
 
 ### OpenStack Pre-requisites
 
@@ -349,7 +349,7 @@ Install keystone:
 helm --namespace openstack template \
     keystone \
     ./openstack-helm/keystone/ \
-    -f components/10-keystone/aio-values.yaml \
+    -f components/keystone/aio-values.yaml \
     -f secret-openstack.yaml \
     | kubectl -n openstack apply -f -
 ```
@@ -369,7 +369,7 @@ kubectl exec -it openstack-admin-client -n openstack -- openstack service list
 
 References:
 
-* [https://github.com/rackerlabs/understack/blob/main/components/10-keystone/README.md](https://github.com/rackerlabs/understack/blob/main/components/10-keystone/README.md)
+* [https://github.com/rackerlabs/understack/blob/main/components/keystone/README.md](https://github.com/rackerlabs/understack/blob/main/components/keystone/README.md)
 
 ### Ironic
 

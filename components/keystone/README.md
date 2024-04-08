@@ -31,7 +31,7 @@ Secrets Reference:
 kubectl kustomize \
   --enable-helm \
   --load-restrictor LoadRestrictionsNone \
-  components/10-keystone \
+  components/keystone \
   | kubectl -n openstack apply -f -
 ```
 

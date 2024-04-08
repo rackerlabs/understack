@@ -85,6 +85,6 @@ kubectl -n argocd apply -k apps/components/
 ArgoCD should successfully get Nautobot deployed. Now come the OpenStack
 components which aren't working with GitOps methods at this time.
 
-[Install Keystone](./components/10-keystone/README.md)
+[Install Keystone](./components/keystone/README.md)
 
 [Configure environment for Keystone/Dex auth](./components/13-dexidp/README.md).
