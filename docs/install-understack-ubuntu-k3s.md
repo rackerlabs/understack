@@ -325,8 +325,9 @@ nautobot        job.batch/nautobot-backup-sg6f             1/1           2m48s  
 git clone https://github.com/openstack/openstack-helm
 git clone https://github.com/openstack/openstack-helm-infra
 # update the dependencies cause we can't use real helm references
-./scripts/openstack-helm-depend-sync.sh keystone
 ./scripts/openstack-helm-depend-sync.sh ironic
+# keystone can now be used from a helm repo
+helm repo add osh https://tarballs.opendev.org/openstack/openstack-helm/
 ```
 
 Load the secrets values file from the cluster:
@@ -346,12 +347,12 @@ kubectl label node $(kubectl get nodes -o 'jsonpath={.items[*].metadata.name}') 
 Install keystone:
 
 ```bash
-helm --namespace openstack template \
+helm --namespace openstack install \
     keystone \
-    ./openstack-helm/keystone/ \
+    osh/keystone \
+    -f components/openstack-2023.1-jammy.yaml \
     -f components/keystone/aio-values.yaml \
-    -f secret-openstack.yaml \
-    | kubectl -n openstack apply -f -
+    -f secret-openstack.yaml
 ```
 
 Install the openstack admin client:

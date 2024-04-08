@@ -17,7 +17,7 @@ so that we can injected them into the templated configs. Upstream should really 
 secrets to be passed by reference. As a result of this we cannot use GitOps to generate
 these charts and have them applied to the cluster.
 
-Secrets Reference:
+### Secrets Reference
 
 - keystone-admin is the admin password for creating other users, services and endpoints.
   It is used by the initialization / bootstrap jobs.
@@ -27,12 +27,32 @@ Secrets Reference:
 ```bash
 # create secrets yaml file if you're not already storing or providing it differently
 ./scripts/gen-os-secrets.sh secret-openstack.yaml
+```
 
-kubectl kustomize \
-  --enable-helm \
-  --load-restrictor LoadRestrictionsNone \
-  components/keystone \
-  | kubectl -n openstack apply -f -
+### Database and RabbitMQ
+
+```bash
+kubectl -n openstack apply -k components/keystone/
+```
+
+### OpenStack Helm
+
+Firstly you must have the OpenStack Helm repo available, if you've done this
+previously you do not need to do it again.
+
+```bash
+ helm repo add osh https://tarballs.opendev.org/openstack/openstack-helm/
+ ```
+
+Now install or upgrade Keystone.
+
+```bash
+helm --namespace openstack \
+  install \
+  keystone osh/keystone \
+  -f components/openstack-2023.1-jammy.yaml \
+  -f components/keystone/aio-values.yaml \
+  -f secret-openstack.yaml
 ```
 
 At this point Keystone will go through some initialization and start up.

@@ -8,9 +8,6 @@ spec:
     - repoURL: https://github.com/rackerlabs/understack.git
       path: components/keystone/
       targetRevision: ${UC_REPO_REF}
-      directory:
-        exclude: kustomization.yaml
-        recurse: false
       ref: understack
     - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
       chart: keystone
