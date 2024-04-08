@@ -5,12 +5,10 @@ namespace: argocd
 
 resources:
   - argocd-understack-project.yaml
-  - namespaces.yaml
   - mariadb.yaml
   - rabbitmq-cluster.yaml
   - memcached.yaml
   - postgres-db.yaml
-  - nautobot-redis.yaml
   - nautobot.yaml
   - keystone.yaml
   - argo-workflows.yaml

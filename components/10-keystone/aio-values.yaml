@@ -1,4 +1,13 @@
 ---
+# we don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete, which they
+# can't if they set to deploy in PostSync
+helm3_hook: false
+
 labels:
   api:
     node_selector_key: openstack-control-plane
@@ -11,10 +20,6 @@ labels:
     node_selector_value: enabled
 
 release_group: null
-
-# NOTE(gagehugo): the pre-install hook breaks upgrade for helm2
-# Set to false to upgrade using helm2
-helm3_hook: true
 
 bootstrap:
   enabled: true
@@ -43,6 +48,11 @@ network:
     node_port:
       enabled: false
       port: 30357
+
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
 
 dependencies:
   dynamic:

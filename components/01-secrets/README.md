@@ -124,11 +124,6 @@ kubectl --namespace openstack \
         --type Opaque \
         --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
         --dry-run -o yaml > secret-keystone-admin.yaml
-kubectl --namespace openstack \
-        create secret generic keystone-credential-keys \
-        --type Opaque \
-        --from-literal=password="$($(git rev-parse --show-toplevel)/scripts/pwgen.sh)" \
-        --dry-run -o yaml > secret-keystone-credential-keys.yaml
 ```
 
 Now let's seal them.

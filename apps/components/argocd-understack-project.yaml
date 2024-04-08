@@ -16,6 +16,8 @@ spec:
     server: '*'
   - namespace: 'argo-events'
     server: '*'
+  - namespace: 'dex'
+    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'

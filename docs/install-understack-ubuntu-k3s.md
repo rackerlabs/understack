@@ -128,7 +128,8 @@ Generate secrets:
 ./scripts/easy-secrets-gen.sh
 
 # make the namespaces where the secrets will live
-kubectl apply -k components/00-namespaces/
+kubectl create ns openstack
+kubectl create ns nautobot
 
 # load the secrets
 kubectl apply -k components/01-secrets/
