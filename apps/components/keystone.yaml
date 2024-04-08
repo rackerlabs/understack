@@ -11,7 +11,7 @@ spec:
       ref: understack
     - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
       chart: keystone
-      targetRevision: 0.3.7
+      targetRevision: 0.3.11
       helm:
         releaseName: keystone
         valueFiles:
