@@ -7,10 +7,10 @@ spec:
   sources:
     - repoURL: https://github.com/rackerlabs/understack.git
       path: components/08-nautobot-redis/
-      targetRevision: HEAD
+      targetRevision: ${UC_REPO_REF}
     - repoURL: https://github.com/rackerlabs/understack.git
       path: components/09-nautobot/
-      targetRevision: HEAD
+      targetRevision: ${UC_REPO_REF}
       kustomize:
         patches:
           - target:

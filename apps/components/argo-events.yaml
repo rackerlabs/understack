@@ -7,7 +7,7 @@ spec:
   source:
     repoURL: https://github.com/rackerlabs/understack.git
     path: components/12-argo-events/
-    targetRevision: HEAD
+    targetRevision: ${UC_REPO_REF}
   destination:
     server: "https://kubernetes.default.svc"
     namespace: argo-events
