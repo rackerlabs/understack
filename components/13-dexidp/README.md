@@ -58,15 +58,21 @@ deployment.apps/coredns restarted
 $
 ```
 
-### Making components accessible from your machine If running development
+### Making components accessible from your machine
 
-cluster on your machine, you may need to create  create an entry in
-your `/etc/hosts` file that looks similiar to this:
+If running development cluster on your machine, you may need to create  create
+an entry in your `/etc/hosts` file that looks similar to this:
 
 ```hosts
 # Nautobot kind cluster
-127.0.0.1 argocd.local nautobot.local keystone keystone.openstack dexidp.local
+127.0.0.1 argocd.local nautobot.local keystone keystone.openstack dexidp.local workflows.local
 ```
+
+
+### Azure authentication
+Dex can optionally be configured to allow authentication through Azure SSO. The
+exact steps to configure this are available in
+[01-secrets/README.md](../01-secrets/README.md).
 
 [socialauth]: https://python-social-auth.readthedocs.io/en/latest/backends/oidc.html
 [disco]: https://openid.net/specs/openid-connect-discovery-1_0.html

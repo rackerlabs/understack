@@ -180,12 +180,22 @@ done
 ```
 ## Azure SSO authentication
 
+Setting up Understack for Azure backed authentication involves two steps:
+1. Creating a Kubernetes secret that contains credentials to talk to AAD.
+2. Updating Dexidp `Application` to use Azure settings/values
+
+Detailed steps are:
+
 First, you need to obtain necessary credentials from [PasswordSafe](https://passwordsafe.corp.rackspace.com/projects/37639/credentials/329301/). Replace the `<CLIENTID>`, `<CLIENTSECRET>` and `<ISSUER>` in the following command.
 
 PasswordSafe mappings:
 - `<CLIENTID>` is stored as `Username`
 - `<CLIENTSECRET>` is stored in `Password` field
-- `<ISSUER>` needs to be constructed. The value should be `https://login.microsoftonline.com/<APPID>/v2.0`, where `<APPID>` is stored in PasswordSafe under `Hostname` field. Pay particular attention to `/v2.0` at the end of URL and don't add trailing slash. Example value would be: `https://login.microsoftonline.com/1234abcd-1234-0000-beef-12345678900a/v2.0`
+- `<ISSUER>` needs to be constructed. The value should be
+`https://login.microsoftonline.com/<APPID>/v2.0`, where `<APPID>` is stored in
+PasswordSafe under `Hostname` field. Pay particular attention to `/v2.0` at the
+end of URL and don't add trailing slash. Example value would be:
+`https://login.microsoftonline.com/1234abcd-1234-0000-beef-12345678900a/v2.0`
 
 ```bash
 kubectl --namespace dex \
@@ -202,6 +212,14 @@ kubeseal \
   -f secret-azure-sso.yaml \
   -w components/01-secrets/encrypted-azure-sso.yaml
 ```
+
+The second part of the setup involves switching Dex to use the Azure backend.
+This can be done by executing:
+
+```shell
+argocd app set argocd/dexidp --values '$values/components/13-dexidp/values-azure.yaml'
+```
+
 
 ## Generate Kustomize for the Install
 
