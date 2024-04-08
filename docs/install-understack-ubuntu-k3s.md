@@ -11,6 +11,7 @@ git clone https://github.com/rackerlabs/understack.git
 ## Install Pre-requisites
 
 Install some packages we'll need later and some useful troubleshooting utilities.
+
 ```bash
 apt-get -y install curl jq net-tools telnet git apt-transport-https wget
 ```
@@ -18,6 +19,7 @@ apt-get -y install curl jq net-tools telnet git apt-transport-https wget
 ## Update Ubuntu
 
 Update to the latest ubuntu packages and reboot if necessary.
+
 ```bash
 apt-get -y update
 ```
@@ -90,6 +92,7 @@ K3s installer should give us a working kubernetes.
 The kubectl config from k3s is in `/etc/rancher/k3s/k3s.yaml` and kubectl will automatically use it.
 
 See everything running in the new k3s kubernetes cluster:
+
 ```bash
 kubectl get all --all-namespaces
 ```
@@ -97,6 +100,7 @@ kubectl get all --all-namespaces
 ## Install UnderStack
 
 Get the repo:
+
 ```bash
 git clone https://github.com/rackerlabs/understack.git
 ```
@@ -108,6 +112,7 @@ References:
 ### Bootstrap UnderStack
 
 Run the initial bootstrap:
+
 ```bash
 kubectl kustomize --enable-helm bootstrap | kubectl apply --server-side -f -
 ```
@@ -331,6 +336,7 @@ Load the secrets values file from the cluster:
 ```
 
 Label the kubernetes nodes as being openstack enabled:
+
 ```bash
 kubectl label node $(kubectl get nodes -o 'jsonpath={.items[*].metadata.name}') openstack-control-plane=enabled
 ```
@@ -399,7 +405,7 @@ kubectl exec -it openstack-admin-client -n openstack -- openstack baremetal cond
 
 If everything is working, you should see output similar to the following:
 
-```
+```bash
 # kubectl exec -it openstack-admin-client -n openstack -- openstack baremetal conductor list
 +---------------------------------------------+-----------------+-------+
 | Hostname                                    | Conductor Group | Alive |
