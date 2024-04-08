@@ -124,6 +124,7 @@ the deployment of all the components of UnderStack.
 ./scripts/gitops-deploy.sh ./my-k3s.env
 pushd "${UC_DEPLOY}"
 git add clusters/my-k3s
+git add helm-configs/my-k3s
 git commit -m "my-k3s: initial cluster config"
 popd
 ```
@@ -136,6 +137,9 @@ any changes to each of components to your cluster by modifying or adding
 values files or kustomize patches. This should be considered a rough template
 that is yours to modify. Once you've made all the changes you want to make,
 ensure that you `git push` your `$UC_DEPLOY` repo so that ArgoCD can access it.
+
+For OpenStack Helm components, an empty file in `$UC_DEPLOY/helm-configs/my-k3s`
+has been created for each component for you to use for customization.
 
 ## Doing the Deployment
 

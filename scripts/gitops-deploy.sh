@@ -52,5 +52,16 @@ for part in operators components; do
     done
     rm -rf "${OUTPUT_DIR}/${part}/kustomization.yaml"
 done
+
+# create helm-configs directory for values.yaml overrides
+helmcfgsdir="${UC_DEPLOY}/helm-configs/${DEPLOY_NAME}"
+mkdir -p "${helmcfgsdir}"
+for helmvals in keystone; do
+    helmvals="${helmcfgsdir}/${helmvals}.yaml"
+    if [ ! -f "${helmvals}" ]; then
+        echo "# add your values.yaml overrides for the helm chart here" > "${helmvals}"
+    fi
+done
+
 echo "Creating app-of-apps config"
 template "${SCRIPTS_DIR}/../apps/app-of-apps.yaml" "${OUTPUT_DIR}/app-of-apps.yaml"

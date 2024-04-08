@@ -21,6 +21,7 @@ spec:
           - $understack/components/openstack-2023.1-jammy.yaml
           - $understack/components/keystone/aio-values.yaml
           - $secrets/secrets/${DEPLOY_NAME}/secret-openstack.yaml
+          - $secrets/helm-configs/${DEPLOY_NAME}/keystone.yaml
     - repoURL: ${UC_DEPLOY_GIT_URL}
       path: secrets/${DEPLOY_NAME}/
       targetRevision: HEAD
