@@ -15,3 +15,4 @@ resources:
   - argo-events.yaml
   - ironic.yaml
   - dexidp.yaml
+  - ingress-nginx.yaml
