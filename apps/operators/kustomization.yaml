@@ -9,3 +9,4 @@ resources:
   - postgres-operator.yaml
   - rabbitmq-operator.yaml
   - messaging-topology-operator.yaml
+  - ingress-nginx.yaml

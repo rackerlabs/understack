@@ -18,8 +18,6 @@ spec:
     server: '*'
   - namespace: 'dex'
     server: '*'
-  - namespace: 'ingress-nginx'
-    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
