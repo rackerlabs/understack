@@ -1,5 +1,4 @@
 ---
-
 # we don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as
 # post-install,post-upgrade which in ArgoCD
@@ -103,3 +102,20 @@ manifests:
   secret_db: false
   secret_rabbitmq: false
   secret_registry: false
+
+pod:
+  mounts:
+    ironic_conductor:
+      ironic_conductor:
+        volumeMounts:
+          - name: dnsmasq-ironic
+            mountPath: /etc/dnsmasq.d/
+          - name: dnsmasq-dhcp
+            mountPath: /var/lib/dnsmasq/
+        volumes:
+          - name: dnsmasq-ironic
+            persistentVolumeClaim:
+              claimName: dnsmasq-ironic
+          - name: dnsmasq-dhcp
+            persistentVolumeClaim:
+              claimName: dnsmasq-dhcp
