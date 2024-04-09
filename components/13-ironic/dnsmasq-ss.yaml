@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: ironic-dnsmasq
+  namespace: openstack
 spec:
   replicas: 1
   selector:
@@ -44,6 +45,8 @@ spec:
         - name: pod-tmp
           emptyDir: {}
         - name: pod-dnsmasq-d
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: dnsmasq-ironic
         - name: pod-dhcp
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: dnsmasq-dhcp
