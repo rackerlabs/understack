@@ -3,7 +3,7 @@ kind: Application
 metadata:
   name: ingress-nginx
 spec:
-  project: understack
+  project: operators
   sources:
     - chart: ingress-nginx
       repoURL: https://kubernetes.github.io/ingress-nginx
