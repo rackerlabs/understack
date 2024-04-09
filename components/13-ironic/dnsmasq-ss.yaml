@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ironic-dnsmasq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: ironic-dnsmasq
+  template:
+    metadata:
+      labels:
+        application: ironic-dnsmasq
+    spec:
+      containers:
+        - name: dnsmasq
+          image: docker.io/cardoe/dnsmasq:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              add: ["NET_ADMIN"]
+          args:
+            - /usr/sbin/dnsmasq
+            - '--no-daemon'
+          envFrom:
+            - configMapRef:
+                name: ironic-dnsmasq
+          ports:
+            - containerPort: 53
+              protocol: UDP
+            - containerPort: 1067
+              protocol: UDP
+              hostPort: 67
+          volumeMounts:
+            - name: pod-tmp
+              mountPath: /tmp
+            - name: pod-dnsmasq-d
+              mountPath: /etc/dnsmasq.d
+            - name: pod-dhcp
+              mountPath: /var/lib/misc
+      volumes:
+        - name: pod-tmp
+          emptyDir: {}
+        - name: pod-dnsmasq-d
+          emptyDir: {}
+        - name: pod-dhcp
+          emptyDir: {}

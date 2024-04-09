@@ -5,6 +5,9 @@ kind: Kustomization
 resources:
   - ironic-mariadb-db.yaml
   - ironic-rabbitmq-queue.yaml
+  - dnsmasq-pvc.yaml
+  - dnsmasq-cm.yaml
+  - dnsmasq-ss.yaml
 
 helmGlobals:
   chartHome: ../../charts/

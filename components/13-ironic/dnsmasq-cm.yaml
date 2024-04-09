@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ironic-dnsmasq
+data:
+  DNS_PORT: '53'
+  # When defining the IP address range, make sure to include subnet
+  # information, especially for the pools serving relayed requests
+  DHCP_RANGE: 192.168.200.4,192.168.200.12,255.255.255.0,192.168.200.255,30m
+  LOG_DNS_QUERIES: 'true'
+  LOG_DHCP_QUERIES: 'true'

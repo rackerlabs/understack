@@ -28,7 +28,7 @@ conf:
     conductor:
       automated_clean: false
     dhcp:
-      dhcp_provider: none
+      dhcp_provider: dnsmasq
     oslo_messaging_rabbit:
       rabbit_ha_queues: true
 
