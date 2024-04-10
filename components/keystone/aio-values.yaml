@@ -1,13 +1,4 @@
 ---
-# we don't want to enable OpenStack Helm's
-# helm.sh/hooks because they set them as
-# post-install,post-upgrade which in ArgoCD
-# maps to PostSync. However the deployments
-# and statefulsets in OpenStack Helm
-# depend on the jobs to complete, which they
-# can't if they set to deploy in PostSync
-helm3_hook: false
-
 labels:
   api:
     node_selector_key: openstack-control-plane
@@ -1085,3 +1076,28 @@ manifests:
   secret_registry: true
   service_ingress_api: true
   service_api: true
+
+# we don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete to become
+# healthy. Which they cannot because they are in
+# the post step and not in the main step.
+# Turning this on results in the keys jobs
+# editing the annotation which deletes the item
+# and wipes our keys.
+helm3_hook: false
+
+annotations:
+  job:
+    keystone_fernet_setup:
+      "helm.sh/hook": pre-install,pre-upgrade
+      "helm.sh/hook-weight": "1"
+    keystone_db_sync:
+      "helm.sh/hook": pre-install,pre-upgrade
+      "helm.sh/hook-weight": "2"
+    keystone_credential_setup:
+      "helm.sh/hook": pre-install,pre-upgrade
+      "helm.sh/hook-weight": "1"
