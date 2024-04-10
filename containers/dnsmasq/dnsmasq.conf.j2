@@ -1,7 +1,7 @@
 #
 # UnderStack dnsmasq configuration for OpenStack Ironic
 #
-# This script should be processed with envsubst
+# This config should be processed with jinja
 #
 
 # log to stderr
@@ -55,9 +55,6 @@ dhcp-match=set:efi6,option6:61,0016
 
 # provide PXE services to HTTPClient machines as well
 dhcp-pxe-vendor=PXEClient,HTTPClient
-
-# disable DHCP for unknown hosts (disabling inventory)
-#dhcp-ignore=tag:!known
 
 # conductor will write configs here
 dhcp-hostsdir=/etc/dnsmasq.d/hostsdir.d
