@@ -13,6 +13,14 @@ spec:
       labels:
         application: ironic-dnsmasq
     spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  application: ironic
+                  component: conductor
       containers:
         - name: dnsmasq
           image: ghcr.io/rackerlabs/openstackhelm/dnsmasq:2023.1-ubuntu_jammy
