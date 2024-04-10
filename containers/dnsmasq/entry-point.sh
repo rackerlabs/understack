@@ -5,8 +5,8 @@ set -eux
 . /helpers.sh
 
 mkdir -p /etc/dnsmasq.d/
-mkdir -p /etc/dnsmasq.d/ironic.dhcp-hosts.d
-mkdir -p /etc/dnsmasq.d/ironic.dhcp-opts.d
+mkdir -p /etc/dnsmasq.d/hostsdir.d
+mkdir -p /etc/dnsmasq.d/optsdir.d
 
 render_j2_file /etc/dnsmasq.conf.j2 /etc/dnsmasq.conf
 
