@@ -1,14 +1,11 @@
 # syntax=docker/dockerfile:1
-FROM ubuntu:jammy
+FROM alpine:3.19.1
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        dnsmasq \
-        python3 \
-        python3-pip \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+LABEL org.opencontainers.image.title="dnsmasq for ironic deployed as openstack-helm"
+LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/dnsmasq-alpine3.19.1"
+LABEL org.opencontainers.image.source=https://github.com/rackerlabs/understack
 
-RUN pip3 install --no-cache-dir 'jinja2>3,<4'
+RUN apk add --update --no-cache dnsmasq=2.90-r2 python3=3.11.8-r0 py3-pip=23.3.1-r0 py3-jinja2=3.1.2-r3
 
 COPY common/helpers.sh /helpers.sh
 COPY dnsmasq/entry-point.sh /entry-point.sh
