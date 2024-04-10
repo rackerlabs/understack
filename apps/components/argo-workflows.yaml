@@ -4,10 +4,15 @@ metadata:
   name: argo-workflows
 spec:
   project: understack
-  source:
-    repoURL: https://github.com/rackerlabs/understack.git
-    path: components/11-argo-workflows/
-    targetRevision: ${UC_REPO_REF}
+  sources:
+    - repoURL: https://github.com/rackerlabs/understack.git
+      path: components/11-argo-workflows/
+      targetRevision: ${UC_REPO_REF}
+    - repoURL: ${UC_DEPLOY_GIT_URL}
+      path: secrets/${DEPLOY_NAME}/
+      targetRevision: HEAD
+      directory:
+        include: secret-argo-sso-argo.yaml
   destination:
     server: "https://kubernetes.default.svc"
     namespace: argo
