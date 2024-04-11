@@ -217,7 +217,7 @@ The second part of the setup involves switching Dex to use the Azure backend.
 This can be done by executing:
 
 ```shell
-argocd app set argocd/dexidp --values '$values/components/13-dexidp/values-azure.yaml'
+argocd app set argocd/dexidp --values '$values/components/dexidp/values-azure.yaml'
 ```
 
 

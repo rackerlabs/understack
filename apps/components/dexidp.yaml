@@ -11,11 +11,11 @@ spec:
       helm:
         releaseName: dex
         valueFiles:
-          - $values/components/13-dexidp/values-generic.yaml
+          - $values/components/dexidp/values-generic.yaml
           # enable this for Azure integration (you need to create secret yourself)
           #  - values-azure.yaml
     - repoURL: https://github.com/rackerlabs/understack
-      path: components/13-dexidp
+      path: components/dexidp
       targetRevision: ${UC_REPO_REF}
       ref: values
     - repoURL: ${UC_DEPLOY_GIT_URL}
