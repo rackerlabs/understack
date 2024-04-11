@@ -31,7 +31,8 @@ no-hosts
 # DHCP range to hand out
 {% if env.DHCP_RANGE is defined %}
 dhcp-range={{ env.DHCP_RANGE }}
-shared-network=eth0,{{ env.DHCP_RANGE.split(',')[0] }}
+shared-network=eth0,{{ env.DHCP_RANGE_ROUTER }}
+dhcp-option=option:router,{{ env.DHCP_RANGE_ROUTER }}
 {% endif %}
 
 # don't set to enable logging
@@ -66,3 +67,5 @@ dhcp-optsdir=/etc/dnsmasq.d/optsdir.d
 {% for component in components -%}
 address=/{{ component }}.{{ env.DNS_ZONE }}/{{ env.INGRESS_IP }}
 {% endfor %}
+
+dhcp-option=option:dns-server,{{ env.get('DNS_IP', env['INGRESS_IP']) }}

@@ -6,6 +6,7 @@ data:
   # When defining the IP address range, make sure to include subnet
   # information, especially for the pools serving relayed requests
   DHCP_RANGE: 192.168.200.4,192.168.200.12,255.255.255.0,192.168.200.255,30m
+  DHCP_RANGE_ROUTER: 192.168.200.1
   # external IP address of Ingress. Used to populate DNS A records for the
   # Understack components
   INGRESS_IP: 192.168.1.177
