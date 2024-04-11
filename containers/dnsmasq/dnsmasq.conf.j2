@@ -31,6 +31,7 @@ no-hosts
 # DHCP range to hand out
 {% if env.DHCP_RANGE is defined %}
 dhcp-range={{ env.DHCP_RANGE }}
+shared-network=eth0,{{ env.DHCP_RANGE.split(',')[0] }}
 {% endif %}
 
 # don't set to enable logging
