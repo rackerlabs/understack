@@ -9,3 +9,5 @@ data:
   DHCP_RANGE: 192.168.200.4,192.168.200.12,255.255.255.0,192.168.200.255,30m
   LOG_DNS_QUERIES: 'true'
   LOG_DHCP_QUERIES: 'true'
+  # If you want to print rendered dnsmasq.conf in the logs
+  # DEBUG_DNSMASQ_CONF: "yes"
