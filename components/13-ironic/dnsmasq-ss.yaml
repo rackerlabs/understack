@@ -37,8 +37,9 @@ spec:
             - configMapRef:
                 name: ironic-dnsmasq
           ports:
-            - containerPort: 53
+            - containerPort: 1053
               protocol: UDP
+              hostPort: 53
             - containerPort: 1067
               protocol: UDP
               hostPort: 67

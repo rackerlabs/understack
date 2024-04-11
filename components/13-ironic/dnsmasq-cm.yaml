@@ -3,13 +3,13 @@ kind: ConfigMap
 metadata:
   name: ironic-dnsmasq
 data:
-  DNS_PORT: '53'
   # When defining the IP address range, make sure to include subnet
   # information, especially for the pools serving relayed requests
   DHCP_RANGE: 192.168.200.4,192.168.200.12,255.255.255.0,192.168.200.255,30m
   # external IP address of Ingress. Used to populate DNS A records for the
   # Understack components
   INGRESS_IP: 192.168.1.177
+  DNS_PORT: '1053'
   LOG_DNS_QUERIES: 'true'
   LOG_DHCP_QUERIES: 'true'
   # If you want to print rendered dnsmasq.conf in the logs
