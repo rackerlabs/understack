@@ -87,4 +87,4 @@ components which aren't working with GitOps methods at this time.
 
 [Install Keystone](./components/keystone/README.md)
 
-[Configure environment for Keystone/Dex auth](./components/13-dexidp/README.md).
+[Configure environment for Keystone/Dex auth](./components/dexidp/README.md).
