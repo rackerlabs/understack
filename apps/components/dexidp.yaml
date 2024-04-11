@@ -12,9 +12,8 @@ spec:
         releaseName: dex
         valueFiles:
           - $values/components/dexidp/values-generic.yaml
-          # enable this for Azure integration (you need to create secret yourself)
-          #  - values-azure.yaml
-    - repoURL: https://github.com/rackerlabs/understack
+          - $secrets/helm-configs/${DEPLOY_NAME}/dexidp.yaml
+    - repoURL: https://github.com/rackerlabs/understack.git
       path: components/dexidp
       targetRevision: ${UC_REPO_REF}
       ref: values
@@ -23,6 +22,7 @@ spec:
       targetRevision: HEAD
       directory:
         include: secret-nautobot-sso-dex.yaml
+      ref: secrets
   destination:
     server: "https://kubernetes.default.svc"
     namespace: dex
