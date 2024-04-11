@@ -21,7 +21,7 @@ spec:
       path: secrets/${DEPLOY_NAME}/
       targetRevision: HEAD
       directory:
-        include: secret-nautobot-sso-dex.yaml
+        include: 'secret-*-sso-dex.yaml'
       ref: secrets
   destination:
     server: "https://kubernetes.default.svc"

@@ -53,6 +53,12 @@ envVars:
       secretKeyRef:
         name: nautobot-sso
         key: client-secret
+  - name: ARGO_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: argo-sso
+        key: client-secret
+
 ingress:
   enabled: true
   annotations:
