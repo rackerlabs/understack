@@ -59,3 +59,9 @@ dhcp-pxe-vendor=PXEClient,HTTPClient
 # conductor will write configs here
 dhcp-hostsdir=/etc/dnsmasq.d/hostsdir.d
 dhcp-optsdir=/etc/dnsmasq.d/optsdir.d
+
+# static DNS entries to reach UnderStack components
+{% set components = env.get('COMPONENTS', ['argocd', 'dex', 'ironic', 'keystone', 'nautobot', 'workflows', ]) -%}
+{% for component in components -%}
+address=/{{ component }}.{{ env.DNS_ZONE }}/{{ env.INGRESS_IP }}
+{% endfor %}
