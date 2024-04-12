@@ -16,11 +16,11 @@ helm template \
     nautobot \
     /path/to/nautobot/helm-charts/charts/nautobot \
     --skip-tests \
-    -f components/09-nautobot/values.yaml \
-    --output-dir components/09-nautobot/base
+    -f components/nautobot/values.yaml \
+    --output-dir components/nautobot/base
 # we do secrets separately
-rm -f components/09-nautobot/base/nautobot/templates/secret.yaml
-cd components/09-nautobot/base
+rm -f components/nautobot/base/nautobot/templates/secret.yaml
+cd components/nautobot/base
 kustomize create --autodetect --recursive
 cd ../../..
 ```
