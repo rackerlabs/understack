@@ -12,9 +12,13 @@ spec:
         releaseName: ingress-nginx
         valueFiles:
           - $values/bootstrap/ingress-nginx/values.yaml
-    - repoURL: https://github.com/rackerlabs/understack
+          - $secrets/helm-configs/${DEPLOY_NAME}/ingress-nginx.yaml
+    - repoURL: https://github.com/rackerlabs/understack.git
       targetRevision: ${UC_REPO_REF}
       ref: values
+    - repoURL: ${UC_DEPLOY_GIT_URL}
+      targetRevision: HEAD
+      ref: secrets
   destination:
     server: "https://kubernetes.default.svc"
     namespace: ingress-nginx
