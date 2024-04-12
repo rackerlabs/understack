@@ -21,6 +21,12 @@ bootstrap:
           --user="${OS_USERNAME}" \
           --domain="${OS_DEFAULT_DOMAIN}" \
           "admin"
+    # create a demo user with demo password
+    openstack user create --domain="${OS_DEFAULT_DOMAIN}" --password demo demo
+    # create undercloud-dev group
+    openstack group create --or-show undercloud-dev
+    # add demo user to undercloud-dev group
+    openstack group add user undercloud-dev demo
 
 network:
   api:
