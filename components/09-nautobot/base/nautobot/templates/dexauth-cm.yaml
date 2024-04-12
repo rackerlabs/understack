@@ -28,6 +28,7 @@ data:
     ):  # pylint: disable=keyword-arg-before-vararg, unused-argument
         """Sync the users groups from Azure and set staff/superuser as
         appropriate"""
+        logger.debug(f"group_sync: uid: {uid} user: {user} response: {response}")
         if user and response and response.get(GROUPS_ATTR_NAME, False):
             group_memberships = response.get(GROUPS_ATTR_NAME)
             is_staff = False
