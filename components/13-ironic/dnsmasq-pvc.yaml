@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    undercloud.local/purpose: dnsmasq-etc
+  name: dnsmasq-ironic
+  namespace: openstack
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 16Mi
+  storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    undercloud.local/purpose: dnsmasq-dhcp
+  name: dnsmasq-dhcp
+  namespace: openstack
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 16Mi
+  storageClassName: standard

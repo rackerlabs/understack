@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ironic-dnsmasq
+  namespace: openstack
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      application: ironic-dnsmasq
+  template:
+    metadata:
+      labels:
+        application: ironic-dnsmasq
+    spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  application: ironic
+                  component: conductor
+      containers:
+        - name: dnsmasq
+          image: ghcr.io/rackerlabs/openstackhelm/dnsmasq:2023.1-ubuntu_jammy
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              add: ["NET_ADMIN"]
+          args:
+            - /usr/sbin/dnsmasq
+            - '--no-daemon'
+          envFrom:
+            - configMapRef:
+                name: ironic-dnsmasq
+          ports:
+            - containerPort: 1053
+              protocol: UDP
+              hostPort: 53
+            - containerPort: 1067
+              protocol: UDP
+              hostPort: 67
+          volumeMounts:
+            - name: pod-tmp
+              mountPath: /tmp
+            - name: pod-dnsmasq-d
+              mountPath: /etc/dnsmasq.d
+            - name: pod-dhcp
+              mountPath: /var/lib/misc
+      volumes:
+        - name: pod-tmp
+          emptyDir: {}
+        - name: pod-dnsmasq-d
+          persistentVolumeClaim:
+            claimName: dnsmasq-ironic
+        - name: pod-dhcp
+          persistentVolumeClaim:
+            claimName: dnsmasq-dhcp

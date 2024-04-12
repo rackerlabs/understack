@@ -1,0 +1,71 @@
+name: ironic container builds
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "containers/**"
+      - ".github/workflows/containers.yaml"
+  pull_request:
+    paths:
+      - "containers/**"
+      - ".github/workflows/containers.yaml"
+  workflow_dispatch:
+
+jobs:
+  ghcr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: setup docker buildx
+        uses: docker/setup-buildx-action@v3
+      - name: login to ghcr.io
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ironic image metadata
+        id: ironic-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/rackerlabs/openstackhelm/ironic
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,enable={{is_default_branch}}
+            type=raw,value=2023.1-ubuntu_jammy
+          labels: |
+            org.opencontainers.image.title=ironic with ISO utils
+            org.opencontainers.image.base.name=docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy
+      - name: build and deploy Ironic container image to registry
+        uses: docker/build-push-action@v5
+        with:
+          context: "{{defaultContext}}:containers"
+          file: Dockerfile.ironic
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.ironic-meta.outputs.tags }}
+          labels: ${{ steps.ironic-meta.outputs.labels }}
+
+      - name: dnsmasq image metadata
+        id: dnsmasq-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/rackerlabs/openstackhelm/dnsmasq
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,enable={{is_default_branch}}
+            type=raw,value=2023.1-ubuntu_jammy
+          labels: |
+            org.opencontainers.image.title=dnsmasq for Ironic deployed as openstack-helm
+            org.opencontainers.image.base.name=docker.io/alpine:3.19.1
+      - name: build and deploy dnsmasq container to registry
+        uses: docker/build-push-action@v5
+        with:
+          context: "{{defaultContext}}:containers"
+          file: Dockerfile.dnsmasq
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.dnsmasq-meta.outputs.tags }}
+          labels: ${{ steps.dnsmasq-meta.outputs.labels }}

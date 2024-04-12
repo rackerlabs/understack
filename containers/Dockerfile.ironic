@@ -1,0 +1,8 @@
+# syntax=docker/dockerfile:1
+FROM docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        genisoimage \
+        isolinux \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
