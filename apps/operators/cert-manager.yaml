@@ -18,7 +18,7 @@ spec:
           installCRDs: true
     - repoURL: ${UC_DEPLOY_GIT_URL}
       path: secrets/${DEPLOY_NAME}/
-      targetRevision: HEAD
+      targetRevision: ${UC_DEPLOY_REF}
       directory:
         include: cluster-issuer.yaml
   destination:

@@ -9,7 +9,7 @@ usage() {
 
 template() {
     local subvars
-    subvars="\$DNS_ZONE \$UC_DEPLOY_GIT_URL \$UC_REPO_REF \$DEPLOY_NAME"
+    subvars="\$DNS_ZONE \$UC_DEPLOY_GIT_URL \$UC_REPO_REF \$UC_DEPLOY_REF \$DEPLOY_NAME"
     cat "$1" | envsubst "${subvars}" > "$2"
 }
 
@@ -48,6 +48,7 @@ export DNS_ZONE
 export UC_DEPLOY_GIT_URL
 export DEPLOY_NAME
 export UC_REPO_REF="${UC_REPO_REF:-HEAD}"
+export UC_DEPLOY_REF="${UC_DEPLOY_REF:-HEAD}"
 
 for part in operators components; do
     echo "Creating ${part} configs"

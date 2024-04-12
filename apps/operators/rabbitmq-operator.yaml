@@ -7,7 +7,7 @@ spec:
   source:
     repoURL: https://github.com/rackerlabs/understack.git
     path: operators/rabbitmq-operator/
-    targetRevision: HEAD
+    targetRevision: ${UC_DEPLOY_REF}
   destination:
     server: "https://kubernetes.default.svc"
     namespace: rabbitmq-system

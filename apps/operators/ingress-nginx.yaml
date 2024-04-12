@@ -17,7 +17,7 @@ spec:
       targetRevision: ${UC_REPO_REF}
       ref: values
     - repoURL: ${UC_DEPLOY_GIT_URL}
-      targetRevision: HEAD
+      targetRevision: ${UC_DEPLOY_REF}
       ref: secrets
   destination:
     server: "https://kubernetes.default.svc"
