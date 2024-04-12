@@ -3,6 +3,18 @@
 config:
   issuer: https://dex.${DNS_ZONE}
 
+  staticClients:
+    - id: nautobot
+      secretEnv: NAUTOBOT_SSO_CLIENT_SECRET
+      name: "Undercloud Nautobot"
+      redirectURIs:
+        - "https://nautobot.${DNS_ZONE}/complete/oidc/"
+    - id: argo
+      secretEnv: ARGO_SSO_CLIENT_SECRET
+      name: "Undercloud Argo"
+      redirectURIs:
+        - "https://workflows.${DNS_ZONE}/oauth2/callback"
+
 ingress:
   annotations:
     cert-manager.io/cluster-issuer: ${DEPLOY_NAME}-cluster-issuer
@@ -16,15 +28,3 @@ ingress:
     - hosts:
         - dex.${DNS_ZONE}
       secretName: dex-ingress-tls
-
-staticClients:
-  - id: nautobot
-    secretEnv: NAUTOBOT_SSO_CLIENT_SECRET
-    name: "Undercloud Nautobot"
-    redirectURIs:
-      - "https://nautobot.${DNS_ZONE}/complete/oidc/"
-  - id: argo
-    secretEnv: ARGO_SSO_CLIENT_SECRET
-    name: "Undercloud Argo"
-    redirectURIs:
-      - "https://workflows.${DNS_ZONE}/oauth2/callback"
