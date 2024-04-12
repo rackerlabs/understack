@@ -61,7 +61,7 @@ done
 
 # create helm-configs directory for values.yaml overrides
 mkdir -p "${UC_DEPLOY_HELM_CFG}"
-for component in keystone dexidp; do
+for component in keystone dexidp ingress-nginx; do
     helmvals="${UC_DEPLOY_HELM_CFG}/${component}.yaml"
     if [ -f "${helmvals}" ]; then
         echo "You have ${helmvals} already, not overwriting"
