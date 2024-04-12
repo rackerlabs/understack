@@ -17,6 +17,34 @@ nautobot:
     existingSecret: "nautobot-redis"
     existingSecretPasswordKey: "redis-password"
 
+  django:
+    existingSecret: nautobot-django
+
+  # since we use dex, we don't want this
+  superUser:
+    enabled: false
+
+  extraVolumes:
+    - name: nautobot-dexauth
+      configMap:
+        name: dexauth
+        defaultMode: 420
+    - name: nautobot-dex-creds
+      secret:
+        secretName: nautobot-sso
+        defaultMode: 420
+        optional: false
+
+  extraVolumeMounts:
+    - name: nautobot-dexauth
+      mountPath: /opt/nautobot/dexauth.py
+      readOnly: true
+      subPath: dexauth.py
+    - name: nautobot-dex-creds
+      mountPath: /opt/nautobot/dex_client_secret
+      readOnly: true
+      subPath: client-secret
+
 celery:
   replicaCount: 1
 
