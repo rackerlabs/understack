@@ -3,7 +3,7 @@
 ## Deploy Ironic
 
 NOTE: The PXE service currently has the host network devices mapped into
-the container. You'll have to edit the [aio-values.yaml](./aio-values.yaml)
+the container. You'll have to edit the [values.yaml](./values.tpl.yaml)
 file in the `network.pxe.device` field to the correct value for your
 server to have this start up successfully.
 
@@ -24,12 +24,33 @@ Secrets Reference:
 ```bash
 # create secrets yaml file if you're not already storing or providing it differently
 ./scripts/gen-os-secrets.sh secret-openstack.yaml
+```
 
-kubectl kustomize \
-  --enable-helm \
-  --load-restrictor LoadRestrictionsNone \
-  components/ironic \
-  | kubectl -n openstack apply -f -
+### Database and RabbitMQ
+
+```bash
+kubectl -n openstack apply -k components/ironic/
+```
+
+### OpenStack Helm
+
+Firstly you must have the OpenStack Helm repo available, if you've done this
+previously you do not need to do it again.
+
+```bash
+helm repo add osh https://tarballs.opendev.org/openstack/openstack-helm/
+```
+
+Now customize `components/ironic/values.tpl.yaml` and then install or upgrade Ironic.
+
+```bash
+helm --namespace openstack \
+    install \
+    ironic osh/ironic \
+    -f components/openstack-2023.1-jammy.yaml \
+    -f components/ironic/aio-values.yaml \
+    -f components/ironic/values.tpl.yaml \
+    -f secret-openstack.yaml
 ```
 
 At this point Ironic will go through some initialization and start up.
