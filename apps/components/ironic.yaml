@@ -23,7 +23,7 @@ spec:
           - $secrets/secrets/${DEPLOY_NAME}/secret-openstack.yaml
     - repoURL: ${UC_DEPLOY_GIT_URL}
       path: secrets/${DEPLOY_NAME}/
-      targetRevision: HEAD
+      targetRevision: ${UC_DEPLOY_REF}
       directory:
         include: 'secret-ironic-*.yaml'
       ref: secrets

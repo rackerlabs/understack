@@ -62,6 +62,9 @@ UC_DEPLOY_EMAIL="my@email"
 The `UC_REPO` and `UC_DEPLOY` variables are local paths on your machine to where
 these two repos have been cloned.
 
+Optional variables of `UC_REPO_REF` and `UC_DEPLOY_REF` can be defined which
+can be set to any valid git reference in their respective repos (e.g. branch or tag or commit).
+
 #### Deployment Name
 
 The `DEPLOY_NAME` variable contains the name that you'll refer to your

@@ -19,7 +19,7 @@ spec:
       ref: values
     - repoURL: ${UC_DEPLOY_GIT_URL}
       path: secrets/${DEPLOY_NAME}/
-      targetRevision: HEAD
+      targetRevision: ${UC_DEPLOY_REF}
       directory:
         include: 'secret-*-sso-dex.yaml'
       ref: secrets
