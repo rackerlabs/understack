@@ -505,7 +505,9 @@ conf:
       lockout_failure_attempts: 5
       lockout_duration: 1800
     auth:
-      methods: password,token,application_credential,totp
+      methods: password,token,openid,mapped,application_credential,totp
+    openid:
+      remote_id_attribute: HTTP_OIDC_ISS
 
   # NOTE(lamt) We can leverage multiple domains with different
   # configurations as outlined in
