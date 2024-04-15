@@ -8,7 +8,6 @@ in
 
 pkgs.mkShellNoCC {
   packages = with pkgs; [
-    cmctl
     kubectl
     kubernetes-helm
     kubeseal

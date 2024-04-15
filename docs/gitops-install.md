@@ -154,7 +154,7 @@ If you do not have ArgoCD deployed then you can use the following:
 
 ```bash
 kubectl kustomize --enable-helm \
-    https://github.com/rackerlabs/understack/bootstrap/argocd/ \
+    https://github.com/rackerlabs/understack/bootstrap/phase_2/argocd/ \
     | kubectl apply -f -
 ```
 

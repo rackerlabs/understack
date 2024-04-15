@@ -1,0 +1,24 @@
+#!/bin/bash
+
+wait_for_cert_manager() {
+  local cmd="kubectl apply -f bootstrap/phase_1/cert-manager/cmchecker.yaml --dry-run=server"
+  max_tries=10
+  current_retry=1
+
+  echo -n "Waiting for cert-manager to become available."
+  until $cmd &>/dev/null; do
+    if (( current_retry == max_tries )); then
+      echo "Timed out waiting for cert-manager to come up."
+      exit 1
+    else
+      echo -n "."
+    fi
+    sleep 2
+    (( current_retry++ ))
+  done
+  echo " done."
+}
+
+kubectl kustomize --enable-helm bootstrap/phase_1 | kubectl apply --server-side -f -
+wait_for_cert_manager
+kubectl kustomize --enable-helm bootstrap/phase_2 | kubectl apply --server-side -f -
