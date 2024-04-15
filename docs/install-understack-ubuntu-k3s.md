@@ -362,7 +362,7 @@ References:
 
 ### Ironic
 
-First we need to update the `./components/13-ironic/aio-values.yaml` file and adjust a
+First we need to update the `./components/ironic/aio-values.yaml` file and adjust a
 setting to match our environment.
 
 Change the network.pxe.device to be the network device on the physical host you'll
@@ -380,7 +380,7 @@ Install the OpenStack Ironic helm chart using our custom aio-values.yaml overrid
 helm --namespace openstack template \
     ironic \
     ./openstack-helm/ironic/ \
-    -f components/13-ironic/aio-values.yaml \
+    -f components/ironic/aio-values.yaml \
     -f secret-openstack.yaml \
     | kubectl -n openstack apply -f -
 ```
@@ -405,4 +405,4 @@ If everything is working, you should see output similar to the following:
 
 References:
 
-* [https://github.com/rackerlabs/understack/blob/main/components/13-ironic/README.md](https://github.com/rackerlabs/understack/blob/main/components/13-ironic/README.md)
+* [https://github.com/rackerlabs/understack/blob/main/components/ironic/README.md](https://github.com/rackerlabs/understack/blob/main/components/ironic/README.md)

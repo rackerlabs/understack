@@ -28,7 +28,7 @@ Secrets Reference:
 kubectl kustomize \
   --enable-helm \
   --load-restrictor LoadRestrictionsNone \
-  components/13-ironic \
+  components/ironic \
   | kubectl -n openstack apply -f -
 ```
 

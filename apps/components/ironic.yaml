@@ -6,7 +6,7 @@ spec:
   project: understack
   sources:
     - repoURL: https://github.com/rackerlabs/understack.git
-      path: components/13-ironic/
+      path: components/ironic/
       targetRevision: ${UC_REPO_REF}
       directory:
         exclude: kustomization.yaml
@@ -19,7 +19,7 @@ spec:
         releaseName: ironic
         valueFiles:
           - $understack/components/openstack-2023.1-jammy.yaml
-          - $understack/components/13-ironic/aio-values.yaml
+          - $understack/components/ironic/aio-values.yaml
           - $secrets/secrets/${DEPLOY_NAME}/secret-openstack.yaml
     - repoURL: ${UC_DEPLOY_GIT_URL}
       path: secrets/${DEPLOY_NAME}/
