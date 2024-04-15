@@ -30,7 +30,7 @@ config:
         # Required, admin user credentials to connect to keystone.
         domain: default
         keystoneUsername: demo
-        keystonePassword: DEMO_PASS
+        keystonePassword: demo
     - type: oidc
       name: Azure
       id: azure
