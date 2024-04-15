@@ -5,6 +5,7 @@ site_description: |-
 
 theme:
   name: material
+  custom_dir: docs/overrides
   logo: assets/logo.png
   favicon: assets/favicon.png
 
@@ -56,7 +57,7 @@ plugins:
   - search
 
 nav:
-  - index.md
+  - Home: index.md
   - openstack-helm.md
   - secrets.md
   - install-understack-ubuntu-k3s.md
