@@ -73,18 +73,6 @@ References:
 
 * [https://github.com/bitnami-labs/sealed-secrets?tab=readme-ov-file#installation](https://github.com/bitnami-labs/sealed-secrets?tab=readme-ov-file#installation)
 
-## Install Cert Manager cmctl
-
-```bash
-curl -fsSL -o cmctl.tar.gz https://github.com/cert-manager/cert-manager/releases/latest/download/cmctl-linux-amd64.tar.gz
-tar xzf cmctl.tar.gz
-sudo mv cmctl /usr/local/bin
-```
-
-References:
-
-* [https://cert-manager.io/docs/reference/cmctl/](https://cert-manager.io/docs/reference/cmctl/)
-
 ## Test Kubernetes
 
 K3s installer should give us a working kubernetes.
@@ -114,7 +102,7 @@ References:
 Run the initial bootstrap:
 
 ```bash
-kubectl kustomize --enable-helm bootstrap | kubectl apply --server-side -f -
+./bootstrap/bootstrap.sh
 ```
 
 Wait a couple minutes for it to finish bootstrapping. Then:

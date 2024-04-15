@@ -1,0 +1,13 @@
+# This YAML is not applied to the final installation - used only to verify if
+# the cert-manager is ready.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cmapichecker
+  namespace: cert-manager
+spec:
+  secretName: cmapichecker
+  dnsNames:
+    - cmapichecker.example.com
+  issuerRef:
+    name: cmapicher
