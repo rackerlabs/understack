@@ -46,6 +46,19 @@ spec:
                     enabled: false
                   # Skip TLS verify, not recommended in production environments. Useful for testing purposes. >= v3.2.4
                   insecureSkipVerify: true
+          - target:
+              kind: Ingress
+              name: argo-workflows
+            patch: |-
+              - op: replace
+                path: /spec/rules/0/host
+                value: workflows.${DNS_ZONE}
+              - op: replace
+                path: /spec/tls/0/hosts/0
+                value: workflows.${DNS_ZONE}
+              - op: replace
+                path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
+                value: ${DEPLOY_NAME}-cluster-issuer
     - repoURL: ${UC_DEPLOY_GIT_URL}
       path: secrets/${DEPLOY_NAME}/
       targetRevision: ${UC_DEPLOY_REF}
