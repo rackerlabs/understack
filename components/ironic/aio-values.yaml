@@ -103,6 +103,8 @@ pod:
             mountPath: /etc/dnsmasq.d/
           - name: dnsmasq-dhcp
             mountPath: /var/lib/dnsmasq/
+          - name: host-var-lib-ironic
+            mountPath: /var/lib/ironic
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
