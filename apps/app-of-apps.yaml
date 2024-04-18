@@ -14,7 +14,7 @@ spec:
   source:
     path: clusters/${DEPLOY_NAME}
     repoURL: ${UC_DEPLOY_GIT_URL}
-    targetRevision: main
+    targetRevision: ${UC_DEPLOY_REF}
     directory:
       recurse: true
   syncPolicy:
