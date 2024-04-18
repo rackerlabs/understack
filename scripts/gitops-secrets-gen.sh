@@ -94,3 +94,9 @@ spec:
         ingress:
           ingressClassName: nginx
 EOF
+
+echo "Creating metallb secret placeholder"
+cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml"
+---
+
+EOF
