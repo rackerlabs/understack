@@ -467,8 +467,11 @@ SOCIAL_AUTH_OIDC_VERIFY_SSL = False
 SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = os.getenv("SOCIAL_AUTH_OIDC_OIDC_ENDPOINT", "http://dexidp.local")
 SOCIAL_AUTH_OIDC_USERNAME_KEY = 'name'
 SOCIAL_AUTH_OIDC_KEY = 'nautobot'
-with open("/opt/nautobot/dex_client_secret") as oidc_secret:
-  SOCIAL_AUTH_OIDC_SECRET = oidc_secret.read()
+try:
+    with open("/opt/nautobot/dex_client_secret") as oidc_secret:
+        SOCIAL_AUTH_OIDC_SECRET = oidc_secret.read()
+except FileNotFoundError:
+    pass
 # The “openid”, “profile” and “email” are requested by default,
 # below *adds* scope.
 SOCIAL_AUTH_OIDC_SCOPE = ['groups']
