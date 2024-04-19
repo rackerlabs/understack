@@ -19,7 +19,7 @@ jobs:
 
     strategy:
       matrix:
-        openstack: [2023.1]
+        openstack: [2023.1, 2024.1]
 
     steps:
       - name: setup docker buildx

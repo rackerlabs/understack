@@ -1,0 +1,34 @@
+---
+images:
+  tags:
+    # these are common across all these OpenStack Helm installations
+    bootstrap: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    db_init: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    db_drop: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    ks_user: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    ks_service: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    ks_endpoints: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+
+    # keystone
+    keystone_api: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+    keystone_bootstrap: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    keystone_credential_rotate: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+    keystone_credential_setup: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+    keystone_db_sync: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+    keystone_domain_manage: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+    keystone_fernet_rotate: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+    keystone_fernet_setup: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+
+    # ironic
+    ironic_api: "docker.io/openstackhelm/ironic:2024.1-ubuntu_jammy"
+    ironic_conductor: "ghcr.io/rackerlabs/openstackhelm/ironic:2024.1-ubuntu_jammy"
+    ironic_pxe: "docker.io/openstackhelm/ironic:2024.1-ubuntu_jammy"
+    ironic_pxe_init: "docker.io/openstackhelm/ironic:2024.1-ubuntu_jammy"
+    ironic_pxe_http: "docker.io/nginx:1.13.3"
+    ironic_db_sync: "docker.io/openstackhelm/ironic:2024.1-ubuntu_jammy"
+    # these want curl which apparently is in the heat image
+    ironic_manage_cleaning_network: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    ironic_retrive_cleaning_network: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    ironic_retrive_swift_config: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+
+...
