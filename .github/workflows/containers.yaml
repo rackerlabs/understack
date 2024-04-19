@@ -17,6 +17,10 @@ jobs:
   ghcr:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        openstack: [2023.1]
+
     steps:
       - name: setup docker buildx
         uses: docker/setup-buildx-action@v3
@@ -36,15 +40,16 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,enable={{is_default_branch}}
-            type=raw,value=2023.1-ubuntu_jammy
+            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy
           labels: |
             org.opencontainers.image.title=ironic with ISO utils
-            org.opencontainers.image.base.name=docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy
+            org.opencontainers.image.base.name=docker.io/openstackhelm/ironic:${{ matrix.openstack }}-ubuntu_jammy
       - name: build and deploy Ironic container image to registry
         uses: docker/build-push-action@v5
         with:
           context: "{{defaultContext}}:containers"
           file: Dockerfile.ironic
+          build-args: OPENSTACK_VERSION=${{ matrix.openstack }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.ironic-meta.outputs.tags }}
           labels: ${{ steps.ironic-meta.outputs.labels }}
