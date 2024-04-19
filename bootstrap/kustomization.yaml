@@ -3,7 +3,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- issuer-kube-system-self-signed.yaml
+- cert-manager/issuer-kube-system-self-signed.yaml
 - ingress-nginx/
 - sealed-secrets/
 - argocd/

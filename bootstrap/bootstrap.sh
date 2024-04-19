@@ -1,7 +1,7 @@
 #!/bin/bash
 
 wait_for_cert_manager() {
-  local cmd="kubectl apply -f bootstrap/phase_1/cert-manager/cmchecker.yaml --dry-run=server"
+  local cmd="kubectl apply -f bootstrap/cert-manager/cmchecker.yaml --dry-run=server"
   max_tries=10
   current_retry=1
 
@@ -19,6 +19,6 @@ wait_for_cert_manager() {
   echo " done."
 }
 
-kubectl kustomize --enable-helm bootstrap/phase_1 | kubectl apply --server-side -f -
+kubectl kustomize --enable-helm bootstrap/cert-manager/ | kubectl apply --server-side -f -
 wait_for_cert_manager
-kubectl kustomize --enable-helm bootstrap/phase_2 | kubectl apply --server-side -f -
+kubectl kustomize --enable-helm bootstrap | kubectl apply --server-side -f -

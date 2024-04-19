@@ -11,7 +11,7 @@ spec:
       helm:
         releaseName: ingress-nginx
         valueFiles:
-          - $values/bootstrap/phase_2/ingress-nginx/values.yaml
+          - $values/bootstrap/ingress-nginx/values.yaml
           - $secrets/helm-configs/${DEPLOY_NAME}/ingress-nginx.yaml
     - repoURL: https://github.com/rackerlabs/understack.git
       targetRevision: ${UC_REPO_REF}
