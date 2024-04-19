@@ -75,5 +75,19 @@ for component in keystone dexidp ingress-nginx ironic nautobot; do
     fi
 done
 
+for cfg in bootstrap/argocd/ingress.yaml; do
+    basefile=$(basename "${cfg}")
+    component=$(basename "$(dirname "${cfg}")")
+    outfile="${UC_DEPLOY_CLUSTER}/${component}/${basefile}"
+
+    mkdir -p "${UC_DEPLOY_CLUSTER}/${component}"
+    if [ ! -f "${outfile}" ]; then
+        template "${UC_REPO}/${cfg}" "${outfile}"
+    else
+        echo "You have ${outfile} already, not overwriting"
+    fi
+done
+
+
 echo "Creating app-of-apps config"
 template "${UC_REPO_APPS}/app-of-apps.yaml" "${UC_DEPLOY_CLUSTER}/app-of-apps.yaml"

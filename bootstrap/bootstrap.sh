@@ -22,3 +22,7 @@ wait_for_cert_manager() {
 kubectl kustomize --enable-helm bootstrap/cert-manager/ | kubectl apply --server-side -f -
 wait_for_cert_manager
 kubectl kustomize --enable-helm bootstrap | kubectl apply --server-side -f -
+kubectl apply -f bootstrap/cert-manager/issuer-kube-system-self-signed.yaml
+export DEPLOY_NAME=selfsigned
+export DNS_ZONE=local
+cat bootstrap/argocd/ingress.yaml | envsubst | kubectl apply -f -
