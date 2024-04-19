@@ -41,9 +41,6 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,enable={{is_default_branch}}
             type=raw,value=${{ matrix.openstack }}-ubuntu_jammy
-          labels: |
-            org.opencontainers.image.title=ironic with ISO utils
-            org.opencontainers.image.base.name=docker.io/openstackhelm/ironic:${{ matrix.openstack }}-ubuntu_jammy
       - name: build and deploy Ironic container image to registry
         uses: docker/build-push-action@v5
         with:
@@ -53,6 +50,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.ironic-meta.outputs.tags }}
           labels: ${{ steps.ironic-meta.outputs.labels }}
+          annotations: ${{ steps.ironic-meta.outputs.annotations }}
 
   dnsmasq:
     runs-on: ubuntu-latest
