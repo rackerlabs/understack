@@ -22,7 +22,7 @@ if [ ! -f "$1" ]; then
     usage
 fi
 
-source "$1"
+. "$1"
 
 if [ ! -d "${UC_REPO}" ]; then
     echo "UC_REPO not set to a path." >&2
