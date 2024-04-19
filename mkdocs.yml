@@ -58,7 +58,9 @@ plugins:
 
 nav:
   - Home: index.md
-  - openstack-helm.md
-  - secrets.md
-  - install-understack-ubuntu-k3s.md
-  - gitops-install.md
+  - 'Getting Started':
+    - openstack-helm.md
+    - secrets.md
+  - 'Installation':
+    - gitops-install.md
+    - install-understack-ubuntu-k3s.md
