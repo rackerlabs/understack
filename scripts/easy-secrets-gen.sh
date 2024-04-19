@@ -1,9 +1,10 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 cd $(git rev-parse --show-toplevel)
 
 DEST_DIR=${1:-.}
 
+[ ! -f "${DEST_DIR}/secret-mariadb.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic mariadb \
     --dry-run=client \
@@ -31,6 +32,7 @@ if [ ! -f "${DEST_DIR}/secret-nautobot-django.yaml" ]; then
         > "${DEST_DIR}/secret-nautobot-django.yaml"
 fi
 
+[ ! -f "${DEST_DIR}/secret-nautobot-redis.yaml" ] && \
 kubectl --namespace nautobot \
     create secret generic nautobot-redis \
     --dry-run=client \
@@ -41,6 +43,7 @@ kubectl --namespace nautobot \
 
 NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
 for ns in nautobot dex; do
+  [ ! -f "${DEST_DIR}/secret-nautobot-sso-$ns.yaml" ] && \
   kubectl --namespace $ns \
     create secret generic nautobot-sso \
     --dry-run=client \
@@ -53,6 +56,7 @@ unset NAUTOBOT_SSO_SECRET
 
 ARGO_SSO_SECRET=$(./scripts/pwgen.sh)
 for ns in argo argo-events argocd dex; do
+  [ ! -f "${DEST_DIR}/secret-argo-sso-$ns.yaml" ] && \
   kubectl --namespace $ns \
     create secret generic argo-sso \
     --dry-run=client \
@@ -79,6 +83,7 @@ export IRONIC_DB_PASSWORD="$(./scripts/pwgen.sh)"
 # rabbitmq user password for the ironic queues
 export IRONIC_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
 
+[ ! -f "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic keystone-rabbitmq-password \
     --type Opaque \
@@ -86,12 +91,16 @@ kubectl --namespace openstack \
     --from-literal=password="${KEYSTONE_RABBITMQ_PASSWORD}" \
     --dry-run=client -o yaml \
     > "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-keystone-db-password.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic keystone-db-password \
     --type Opaque \
     --from-literal=password="${KEYSTONE_DB_PASSWORD}" \
     --dry-run=client -o yaml \
     > "${DEST_DIR}/secret-keystone-db-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-keystone-admin.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic keystone-admin \
     --type Opaque \
@@ -100,17 +109,22 @@ kubectl --namespace openstack \
     > "${DEST_DIR}/secret-keystone-admin.yaml"
 
 # ironic credentials
+[ ! -f "${DEST_DIR}/secret-ironic-rabbitmq-password.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic ironic-rabbitmq-password \
     --type Opaque \
     --from-literal=username="ironic" \
     --from-literal=password="${IRONIC_RABBITMQ_PASSWORD}" \
     --dry-run=client -o yaml > "${DEST_DIR}/secret-ironic-rabbitmq-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-ironic-db-password.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic ironic-db-password \
     --type Opaque \
     --from-literal=password="${IRONIC_DB_PASSWORD}" \
     --dry-run=client -o yaml > "${DEST_DIR}/secret-ironic-db-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-ironic-keystone-password.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic ironic-keystone-password \
     --type Opaque \
@@ -119,6 +133,7 @@ kubectl --namespace openstack \
     --dry-run=client -o yaml > "${DEST_DIR}/secret-ironic-keystone-password.yaml"
 
 if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
+    [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
     yq '(.. | select(tag == "!!str")) |= envsubst' \
         "./components/openstack-secrets.tpl.yaml" \
         > "${DEST_DIR}/secret-openstack.yaml"
