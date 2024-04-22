@@ -6,7 +6,7 @@ spec:
   project: understack
   source:
     repoURL: https://github.com/rackerlabs/understack.git
-    path: components/07-postgres/
+    path: components/postgres/
     targetRevision: ${UC_REPO_REF}
   destination:
     server: "https://kubernetes.default.svc"
