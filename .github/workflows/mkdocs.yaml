@@ -47,8 +47,8 @@ jobs:
     # depend on the docs being built
     needs: build
 
-    # ensure we only run on commits to the main branch
-    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    # ensure we only run on commits to the main branch or manual workflows executions
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
 
     runs-on: ubuntu-latest
 
