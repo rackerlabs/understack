@@ -6,7 +6,7 @@ spec:
   project: understack
   sources:
     - repoURL: https://github.com/rackerlabs/understack.git
-      path: components/11-argo-workflows/
+      path: components/argo-workflows/
       targetRevision: ${UC_REPO_REF}
       kustomize:
         patches:

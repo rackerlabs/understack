@@ -6,7 +6,7 @@ spec:
   project: understack
   source:
     repoURL: https://github.com/rackerlabs/understack.git
-    path: components/06-memcached/
+    path: components/memcached/
     targetRevision: ${UC_REPO_REF}
   destination:
     server: "https://kubernetes.default.svc"
