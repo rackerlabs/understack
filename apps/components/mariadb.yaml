@@ -6,7 +6,7 @@ spec:
   project: understack
   sources:
     - repoURL: https://github.com/rackerlabs/understack.git
-      path: components/03-mariadb/
+      path: components/mariadb/
       targetRevision: ${UC_REPO_REF}
     - repoURL: ${UC_DEPLOY_GIT_URL}
       path: secrets/${DEPLOY_NAME}/
