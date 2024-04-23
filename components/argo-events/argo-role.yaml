@@ -72,6 +72,12 @@ rules:
 - apiGroups:
   - argoproj.io
   resources:
+  - workflowtasksets/status
+  verbs:
+  - patch
+- apiGroups:
+  - argoproj.io
+  resources:
   - workflowtemplates
   - workflowtemplates/finalizers
   verbs:
