@@ -4,7 +4,7 @@ metadata:
   name: argocd
   namespace: argocd
   annotations:
-    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    cert-manager.io/cluster-issuer: ${DEPLOY_NAME}-cluster-issuer
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
 spec:
@@ -19,8 +19,8 @@ spec:
             name: argo-cd-argocd-server
             port:
               name: http
-    host: argocd.local
+    host: argocd.${DNS_ZONE}
   tls:
   - hosts:
-    - argocd.local
+    - argocd.${DNS_ZONE}
     secretName: argocd-ingress-tls
