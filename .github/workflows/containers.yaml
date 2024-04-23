@@ -57,10 +57,9 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,enable={{is_default_branch}}
-            type=raw,value=2023.1-ubuntu_jammy
+            type=raw,value=0.0.1
           labels: |
             org.opencontainers.image.title=dnsmasq for Ironic deployed as openstack-helm
-            org.opencontainers.image.base.name=docker.io/alpine:3.19.1
       - name: build and deploy dnsmasq container to registry
         uses: docker/build-push-action@v5
         with:
