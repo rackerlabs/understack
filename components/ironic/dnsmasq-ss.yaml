@@ -1,9 +1,29 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ironic-dnsmasq
+  labels:
+    application: ironic-dnsmasq
+spec:
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dhcp
+    port: 67
+    protocol: UDP
+  clusterIP: None
+  selector:
+    application: ironic-dnsmasq
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: ironic-dnsmasq
   namespace: openstack
 spec:
+  serviceName: ironic-dnsmasq
   replicas: 1
   selector:
     matchLabels:
