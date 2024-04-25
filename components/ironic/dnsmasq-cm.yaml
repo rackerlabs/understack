@@ -10,7 +10,7 @@ data:
   # external IP address of Ingress. Used to populate DNS A records for the
   # Understack components
   INGRESS_IP: 192.168.1.177
-  DNS_PORT: '1053'
+  DNS_PORT: '53'
   LOG_DNS_QUERIES: 'true'
   LOG_DHCP_QUERIES: 'true'
   # If you want to print rendered dnsmasq.conf in the logs
