@@ -176,3 +176,11 @@ At this point ArgoCD will work to deploy Understack.
 [app-of-apps]: <https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/>
 [argocd]: <https://argo-cd.readthedocs.io/en/stable/>
 [gh-deploy-keys]: <https://docs.github.com/en/authentication/connecting-to-github-with-ssh/managing-deploy-keys#set-up-deploy-keys>
+
+## Advanced Configurations
+
+### Argo CD
+
+The UnderStack deploy makes a hardcoded Argo CD config that works with github.com and a SSH key.
+If you use something, such as a privately hosted Git service, you can refer to the Argo CD
+documentation for configuration details: <https://argo-cd.readthedocs.io/en/stable/user-guide/private-repositories/#unknown-ssh-hosts>
