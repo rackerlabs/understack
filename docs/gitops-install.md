@@ -47,7 +47,7 @@ To avoid defining many environment variables we'll simplify by creating an
 `.env` file for our deployment. In this case we'll call it `my-k3s.env` and
 place it where we've cloned understack. A complete file would like like
 
-```bash title="/path/to/understack/my-k3s.env"
+```bash title="/path/to/uc-deploy/my-k3s.env"
 UC_REPO="$HOME/devel/understack"
 UC_DEPLOY="$HOME/devel/uc-deploy"
 DEPLOY_NAME="my-k3s"
@@ -90,9 +90,17 @@ which needs to be set into the `UC_DEPLOY_EMAIL` variable.
 All Ingress DNS names will be created as subdomains of the value you put
 into the `DNS_ZONE` variable.
 
+#### Saving the Environment Config
+
+```bash
+cd /path/to/uc-deploy
+git add my-k3s.env
+git commit -m "my-k3s: save environment config"
+```
+
 #### Getting Ready to Generate Secrets and Configs
 
-You can run `source /path/to/understack/my-k3s.env` to have `$UC_DEPLOY` in
+You can run `source /path/to/uc-deploy/my-k3s.env` to have `$UC_DEPLOY` in
 your shell.
 
 ### Populating the infrastructure
@@ -111,7 +119,8 @@ using random data to sucessfully continue the installation.
 TODO: probably give at least one secure example
 
 ```bash
-./scripts/gitops-secrets-gen.sh ./my-k3s.env
+# from your understack checkout
+./scripts/gitops-secrets-gen.sh ${UC_DEPLOY}/my-k3s.env
 pushd "${UC_DEPLOY}"
 git add secrets/my-k3s
 git commit -m "my-k3s: secrets generation"
@@ -124,7 +133,8 @@ In this section we will use the [App of Apps][app-of-apps] pattern to define
 the deployment of all the components of UnderStack.
 
 ```bash
-./scripts/gitops-deploy.sh ./my-k3s.env
+# from your understack checkout
+./scripts/gitops-deploy.sh ${UC_DEPLOY}/my-k3s.env
 pushd "${UC_DEPLOY}"
 git add clusters/my-k3s
 git add helm-configs/my-k3s
