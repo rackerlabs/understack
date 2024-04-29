@@ -464,8 +464,7 @@ AUTHENTICATION_BACKENDS = [
 SOCIAL_AUTH_OIDC_SSL_PROTOCOL = None
 # TODO: until we figure out how to add local CA to python trusted CAs
 SOCIAL_AUTH_OIDC_VERIFY_SSL = False
-SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = os.getenv("SOCIAL_AUTH_OIDC_OIDC_ENDPOINT", "http://dexidp.local")
-SOCIAL_AUTH_OIDC_USERNAME_KEY = 'name'
+SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = os.getenv("SOCIAL_AUTH_OIDC_OIDC_ENDPOINT", "http://dex.dex.svc.cluster.local:5556")
 SOCIAL_AUTH_OIDC_KEY = 'nautobot'
 try:
     with open("/opt/nautobot/dex_client_secret") as oidc_secret:
