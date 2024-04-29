@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1
-FROM docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy
+
+ARG OPENSTACK_VERSION
+FROM docker.io/openstackhelm/ironic:${OPENSTACK_VERSION}-ubuntu_jammy
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
