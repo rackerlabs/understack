@@ -1,4 +1,4 @@
-## Overview
+# Overview
 
 The [Dex IDP](https://dexidp.io/) is deployed to act as an OAuth2/OpenID
 Connect identity provider for Nautobot and potentially other applications in
@@ -27,49 +27,19 @@ requirements:
 
 Unfortunately, these Nautobot changes alone are not enough to have
 authentication working in most setups. We also need to make sure that every
-step of [authorziation code grant][authzcodegrant] can be completed. Given that
-we use ephemeral clusters for development and they use `.local` domain,
-following needs to work:
+step of [authorziation code grant][authzcodegrant] can be completed.
 
-- Nautobot container can reach the Dex using the issuer URL (`https://dexidp.local`).
-- End-user's browser must be able to reach Dex using exactly the same URL.
-- Nautobot needs to be reachable using the DNS name, i.e. `https://nautobot.local`
-- All of these needs to happen over HTTPS.
+For ephemeral clusters in development it is recommended to use a service like
+[sslip.io](https://sslip.io) to use hostnames like:
 
-When Dex and Nautobot are hosted in the same cluster, by default they will try
-to communicate over the internal networking and plain HTTP. This clearly
-violates the requirements listed above, so we have to force the communication
-between the pods to happen over the Ingress (which provides TLS termination and
-stable hostname).
+- dex.127-0-0-1.sslip.io
+- nautobot-127-0-0-1.sslip.io
 
-### Fixing DNS on development cluster
+And creating HTTPS certificates for them. Then you can access the services
+via DNS names and not have to patch your `/etc/hosts` or the DNS resolution in the cluster.
 
-In development cluster, this can be done by reconfiguring [CoreDNS][coredns]
-component. We have provided
-[`scripts/patch-coredns.sh`](../../scripts/patch-coredns.sh) script to make the
-necessary changes automatically.
+## Azure authentication
 
-```shell
-$ ./scripts/patch-coredns.sh
-[*] Patching coredns ConfigMap
-configmap/coredns replaced
-[*] Restarting CoreDNS
-deployment.apps/coredns restarted
-$
-```
-
-### Making components accessible from your machine
-
-If running development cluster on your machine, you may need to create  create
-an entry in your `/etc/hosts` file that looks similar to this:
-
-```hosts
-# Nautobot kind cluster
-127.0.0.1 argocd.local nautobot.local keystone keystone.openstack dexidp.local workflows.local
-```
-
-
-### Azure authentication
 Dex can optionally be configured to allow authentication through Azure SSO. The
 exact steps to configure this are available in
 [01-secrets/README.md](../01-secrets/README.md).
@@ -77,4 +47,3 @@ exact steps to configure this are available in
 [socialauth]: https://python-social-auth.readthedocs.io/en/latest/backends/oidc.html
 [disco]: https://openid.net/specs/openid-connect-discovery-1_0.html
 [authzcodegrant]: https://datatracker.ietf.org/doc/html/rfc6749#section-4.1
-[coredns]: https://kubernetes.io/docs/tasks/administer-cluster/coredns/#about-coredns

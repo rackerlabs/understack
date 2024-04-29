@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 function usage() {
     echo "$(basename "$0") <deploy.env>" >&2

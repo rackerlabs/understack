@@ -308,13 +308,7 @@ nautobot        job.batch/nautobot-backup-sg6f             1/1           2m48s  
 ### OpenStack Pre-requisites
 
 ```bash
-# clone the two repos because they reference the infra one as a relative path
-# so you can't use real helm commands
-git clone https://github.com/openstack/openstack-helm
-git clone https://github.com/openstack/openstack-helm-infra
-# update the dependencies cause we can't use real helm references
-./scripts/openstack-helm-depend-sync.sh ironic
-# keystone can now be used from a helm repo
+# add the OpenStack Helm repo we can install from
 helm repo add osh https://tarballs.opendev.org/openstack/openstack-helm/
 ```
 
@@ -379,7 +373,7 @@ Install the OpenStack Ironic helm chart using our custom aio-values.yaml overrid
 ```bash
 helm --namespace openstack template \
     ironic \
-    ./openstack-helm/ironic/ \
+    osh/ironic/ \
     -f components/ironic/aio-values.yaml \
     -f secret-openstack.yaml \
     | kubectl -n openstack apply -f -
