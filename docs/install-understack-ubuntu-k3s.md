@@ -27,7 +27,7 @@ apt-get -y update
 ## Install K3s
 
 ```bash
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik" sh -
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --node-label=openstack-control-plane=enabled" sh -
 ```
 
 References:
