@@ -1,46 +1,22 @@
 # Full documentation available at
 # https://github.com/dexidp/helm-charts/tree/master/charts/dex#values
 #
+# This file is intended to be combined with the values-generic.yaml
+# connectors is a list which must be duplicated since helm won't merge
 
-replicaCount: 1
 config:
-  # Set it to a valid URL
-  issuer: https://dexidp.local
-
-  # See https://dexidp.io/docs/storage/ for more options
-  # We probably want 'postgres' or 'crd' in production
-  storage:
-    type: kubernetes
-    config:
-      inCluster: true
-
-  oauth2:
-    skipApprovalScreen: true
-
-  enablePasswordDB: false
   connectors:
-    - type: keystone
-      # Required field for connector id.
-      id: keystone_internal
-      # Required field for connector name.
-      name: Keystone
-      config:
-        # Required, without v3 suffix.
-        keystoneHost: http://keystone-api.openstack.svc.cluster.local:5000
-        # Required, admin user credentials to connect to keystone.
-        domain: default
-        keystoneUsername: demo
-        keystonePassword: demo
     - type: oidc
       name: Azure
       id: azure
       config:
-        issuer: $AZURE_ISSUER
-        clientId: $AZURE_SSO_CLIENT_ID
-        clientSecret: $AZURE_SSO_CLIENT_SECRET
-        redirectURI: https://dexidp.local/callback
+        issuer: $OIDC_ISSUER
+        clientId: $OIDC_CLIENT_ID
+        clientSecret: $OIDC_CLIENT_SECRET
+        redirectURI: $OIDC_REDIRECT_URI
         scopes:
-          - openid
+          - openid  # required for OIDC
+          - profile  # provides the "preferred_username" key which some services need
           - email
           - offline_access
         insecureSkipEmailVerified: true
@@ -48,60 +24,3 @@ config:
         getUserInfo: true
         claimMapping:
           groups: "roles"
-  logger:
-    level: info
-
-  staticClients:
-    - id: nautobot
-      secretEnv: NAUTOBOT_SSO_CLIENT_SECRET
-      name: "Undercloud Nautobot"
-      redirectURIs:
-        - "http://localhost:8000/complete/oidc/"
-        - "https://nautobot.local/complete/oidc/"
-    - id: argo
-      secretEnv: ARGO_SSO_CLIENT_SECRET
-      name: "Undercloud Argo"
-      redirectURIs:
-        - "https://workflows.local/oauth2/callback"
-
-envVars:
-  - name: NAUTOBOT_SSO_CLIENT_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: nautobot-sso
-        key: client-secret
-  - name: AZURE_SSO_CLIENT_ID
-    valueFrom:
-      secretKeyRef:
-        name: azure-sso
-        key: client-id
-  - name: AZURE_SSO_CLIENT_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: azure-sso
-        key: client-secret
-  - name: AZURE_ISSUER
-    valueFrom:
-      secretKeyRef:
-        name: azure-sso
-        key: issuer
-  - name: ARGO_SSO_CLIENT_SECRET
-    valueFrom:
-      secretKeyRef:
-        name: argo-sso
-        key: client-secret
-ingress:
-  enabled: true
-  annotations:
-    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
-    nginx.ingress.kubernetes.io/backend-protocol: HTTP
-  className: "nginx"
-  hosts:
-    - host: dexidp.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - hosts:
-      - dexidp.local
-      secretName: dex-ingress-tls

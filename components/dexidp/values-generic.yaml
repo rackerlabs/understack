@@ -27,10 +27,12 @@ config:
       config:
         # Required, without v3 suffix.
         keystoneHost: http://keystone-api.openstack.svc.cluster.local:5000
-        # Required, admin user credentials to connect to keystone.
+        # domain ID where users will authenticate against
         domain: default
+        # admin user credentials for getting refresh tokens for users without prompting them for creds
         keystoneUsername: demo
         keystonePassword: demo
+
   logger:
     level: info
 
@@ -63,6 +65,30 @@ envVars:
       secretKeyRef:
         name: argocd-sso
         key: client-secret
+  - name: OIDC_ISSUER
+    valueFrom:
+      secretKeyRef:
+        name: oidc-sso
+        key: issuer
+        optional: true
+  - name: OIDC_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: oidc-sso
+        key: client-id
+        optional: true
+  - name: OIDC_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: oidc-sso
+        key: client-secret
+        optional: true
+  - name: OIDC_REDIRECT_URI
+    valueFrom:
+      secretKeyRef:
+        name: oidc-sso
+        key: redirect-uri
+        optional: true
 
 ingress:
   enabled: true
