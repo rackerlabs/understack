@@ -103,8 +103,8 @@ pod:
             mountPath: /etc/dnsmasq.d/
           - name: dnsmasq-dhcp
             mountPath: /var/lib/dnsmasq/
-          - name: host-var-lib-ironic
-            mountPath: /var/lib/ironic
+          - name: host-var-lib-understack
+            mountPath: /var/lib/understack
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -112,6 +112,9 @@ pod:
           - name: dnsmasq-dhcp
             persistentVolumeClaim:
               claimName: dnsmasq-dhcp
+          - name: host-var-lib-understack
+            hostPath:
+              path: /var/lib/understack
 
 # we don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as
