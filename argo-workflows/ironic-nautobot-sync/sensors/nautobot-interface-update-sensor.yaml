@@ -2,61 +2,65 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   finalizers:
-  - sensor-controller
+    - sensor-controller
   labels:
     argocd.argoproj.io/instance: argo-events
   name: nautobot-interface-update
   namespace: argo-events
 spec:
   dependencies:
-  - eventName: nautobot
-    eventSourceName: nautobot-webhook
-    name: nautobot-dep
-    filters:
-      dataLogicalOperator: "and"
-      data:
-        - path: "body.event"
-          type: "string"
-          value:
-            - "updated"
-        - path: "body.model"
-          type: "string"
-          value:
-            - "interface"
-        - path: "body.data.name"
-          type: "string"
-          value:
-            - "iLO"
-            - "iDRAC"
+    - eventName: nautobot
+      eventSourceName: nautobot-webhook
+      filters:
+        data:
+          - path: body.event
+            type: string
+            value:
+              - updated
+          - path: body.model
+            type: string
+            value:
+              - interface
+          - path: body.data.name
+            type: string
+            value:
+              - iLO
+              - iDRAC
+          - path: body.data.ip_addresses.0
+            type: string
+            value:
+              - .*
+        dataLogicalOperator: and
+      name: nautobot-dep
   template:
     serviceAccountName: operate-workflow-sa
   triggers:
-  - template:
-      k8s:
-        operation: create
-        parameters:
-        - dest: spec.arguments.parameters.0.value
-          src:
-            dataKey: body
-            dependencyName: nautobot-dep
-        source:
-          resource:
-            apiVersion: argoproj.io/v1alpha1
-            kind: Workflow
-            metadata:
-              generateName: nautobot-interface-update-
-            spec:
-              entrypoint: start
-              arguments:
-                parameters:
-                  - name: message
-                    value: "Some nautobot interface has changed"
-              templates:
-                - name: start
-                  container:
-                    image: docker/whalesay:latest
-                    command:
-                      - cowsay
-                    args:
-                      - 'Some nautobot interface has changed'
-      name: nautobot-interface-update-trigger
+    - template:
+        name: nautobot-interface-update-trigger
+        k8s:
+          operation: create
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: body
+                dependencyName: nautobot-dep
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: nautobot-interface-update-
+              spec:
+                arguments:
+                  parameters:
+                    - name: interface_update_event
+                      value: Some nautobot interface has changed
+                entrypoint: start
+                serviceAccountName: operate-workflow-sa
+                templates:
+                  - name: start
+                    steps:
+                      - - name: synchronize-server-to-ironic
+                          templateRef:
+                            name: synchronize-server-to-ironic
+                            template: synchronize-server
