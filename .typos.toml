@@ -1,0 +1,15 @@
+[files]
+extend-exclude = [
+    ".venv",
+    "venv",
+    "assets",
+]
+
+[default]
+extend-ignore-identifiers-re = [
+    "ironic_retrive_*",
+]
+
+[default.extend-words]
+# Don't correct "HPE"
+HPE = "HPE"
