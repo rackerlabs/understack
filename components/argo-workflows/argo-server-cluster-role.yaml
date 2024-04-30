@@ -1,4 +1,4 @@
-## configure clusterrole for argo-server to provide permissions when argo-worfklows is running namespaced
+## configure clusterrole for argo-server to provide permissions when argo-workflows is running namespaced
 
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

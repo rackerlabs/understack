@@ -114,7 +114,7 @@ storage and injection of these in a production environment needs to be
 carefully considered. For the purposes of this document no specific
 choice has been made but tools like Vault, Sealed Secrets, SOPS, etc
 should be considered. This will only generate the necessary secrets
-using random data to sucessfully continue the installation.
+using random data to successfully continue the installation.
 
 TODO: probably give at least one secure example
 

@@ -370,7 +370,7 @@ jobs:
     user: keystone
     group: keystone
   fernet_rotate:
-    # NOTE(rk760n): key rotation frequency, token expiration, active keys should statisfy the formula
+    # NOTE(rk760n): key rotation frequency, token expiration, active keys should satisfy the formula
     # max_active_keys = (token_expiration / rotation_frequency) + 2
     # as expiration is 12h, and max_active_keys set to 3 by default, rotation_frequency need to be adjusted
     # 12 hours
@@ -529,7 +529,7 @@ conf:
       - vhost: "keystone"
         name: "ha_ttl_keystone"
         definition:
-          # mirror messges to other nodes in rmq cluster
+          # mirror messages to other nodes in rmq cluster
           ha-mode: "all"
           ha-sync-mode: "automatic"
           # 70s
@@ -1002,7 +1002,7 @@ endpoints:
         tls:
           # NOTE(lamt): Specify a CA value here will place a LDAPS certificate at
           # /etc/certs/tls.ca.  To ensure keystone uses LDAPS, the
-          # following key will need to be overrided under section [ldap] or the
+          # following key will need to be overridden under section [ldap] or the
           # correct domain-specific setting, else it will not be enabled:
           #
           #   use_tls: true
