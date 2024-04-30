@@ -1,4 +1,4 @@
-# This role was sourced from the argo-workflows installation manifest, and is included to provide the neccessary RBAC
+# This role was sourced from the argo-workflows installation manifest, and is included to provide the necessary RBAC
 # configuration for a namespaced argo-workflows/events install. Typically this role would be created within the
 # argo-workflows namespace, however since this installation is configured to use the argo-events namespace, this role
 # will need to be created here.
