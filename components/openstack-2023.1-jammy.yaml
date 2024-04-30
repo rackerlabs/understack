@@ -28,7 +28,7 @@ images:
     ironic_db_sync: "docker.io/openstackhelm/ironic:2023.1-ubuntu_jammy"
     # these want curl which apparently is in the heat image
     ironic_manage_cleaning_network: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
-    ironic_retrieve_cleaning_network: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
-    ironic_retrieve_swift_config: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    ironic_retrive_cleaning_network: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
+    ironic_retrive_swift_config: "docker.io/openstackhelm/heat:2023.1-ubuntu_jammy"
 
 ...
