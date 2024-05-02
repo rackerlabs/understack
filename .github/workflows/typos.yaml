@@ -1,0 +1,18 @@
+# https://github.com/crate-ci/typos
+name: Typos Spell Checker
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  spellcheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Typos Spell Checker
+        uses: crate-ci/typos@master
+        with:
+          config: ./.typos.toml
