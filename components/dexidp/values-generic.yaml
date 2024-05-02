@@ -58,6 +58,11 @@ envVars:
       secretKeyRef:
         name: argo-sso
         key: client-secret
+  - name: ARGOCD_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: argocd-sso
+        key: client-secret
 
 ingress:
   enabled: true

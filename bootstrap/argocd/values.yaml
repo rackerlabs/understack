@@ -1,5 +1,5 @@
 dex:
-  # disable auth provider
+  # disable shipping ArgoCD's dex, we'll use the Undercloud provided one
   enabled: false
 notifications:
   # disable notifying users or GitHub
@@ -13,3 +13,13 @@ server:
 configs:
   cm:
     kustomize.buildOptions: --enable-helm
+    oidc.config: |
+      name: SSO
+      issuer: $argocd-sso:issuer
+      clientID: $argocd-sso:client-id
+      clientSecret: $argocd-sso:client-secret
+      requestedIDTokenClaims: {"groups": {"essential": true}}
+  rbac:
+    policy.csv: |
+      g, ucadmin, role:admin
+    policy.default: role:readonly

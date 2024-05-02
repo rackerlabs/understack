@@ -14,6 +14,11 @@ config:
       name: "Undercloud Argo"
       redirectURIs:
         - "https://workflows.${DNS_ZONE}/oauth2/callback"
+    - id: argocd
+      secretEnv: ARGOCD_SSO_CLIENT_SECRET
+      name: "Undercloud ArgoCD"
+      redirectURIs:
+        - "https://argocd.${DNS_ZONE}/auth/callback"
 
 ingress:
   annotations:

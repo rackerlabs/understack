@@ -55,7 +55,7 @@ done
 unset NAUTOBOT_SSO_SECRET
 
 ARGO_SSO_SECRET=$(./scripts/pwgen.sh)
-for ns in argo argo-events argocd dex; do
+for ns in argo argo-events dex; do
   [ ! -f "${DEST_DIR}/secret-argo-sso-$ns.yaml" ] && \
   kubectl --namespace $ns \
     create secret generic argo-sso \
@@ -67,6 +67,23 @@ for ns in argo argo-events argocd dex; do
     > "${DEST_DIR}/secret-argo-sso-$ns.yaml"
 done
 unset ARGO_SSO_SECRET
+
+ARGOCD_SSO_SECRET=$(./scripts/pwgen.sh)
+for ns in argocd dex; do
+  [ ! -f "${DEST_DIR}/secret-argocd-sso-$ns.yaml" ] && \
+  kubectl --namespace $ns \
+    create secret generic argocd-sso \
+    --dry-run=client \
+    -o yaml \
+    --type Opaque \
+    --from-literal=issuer="https://dex.${DNS_ZONE}" \
+    --from-literal=client-secret="$ARGOCD_SSO_SECRET" \
+    --from-literal=client-id=argocd \
+    | yq '.metadata.labels |= {"app.kubernetes.io/part-of": "argocd"}' \
+    > "${DEST_DIR}/secret-argocd-sso-$ns.yaml"
+done
+unset ARGOCD_SSO_SECRET
+rm -rf "${DEST_DIR}/secret-argo-sso-argocd.yaml"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 export MEMCACHE_SECRET_KEY="$(./scripts/pwgen.sh 64)"
