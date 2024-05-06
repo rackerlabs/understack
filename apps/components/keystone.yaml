@@ -11,11 +11,11 @@ spec:
       ref: understack
     - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
       chart: keystone
-      targetRevision: 0.3.11
+      targetRevision: 0.3.13
       helm:
         releaseName: keystone
         valueFiles:
-          - $understack/components/openstack-2023.1-jammy.yaml
+          - $understack/components/openstack-2024.1-jammy.yaml
           - $understack/components/keystone/aio-values.yaml
           - $secrets/secrets/${DEPLOY_NAME}/secret-openstack.yaml
           - $secrets/helm-configs/${DEPLOY_NAME}/keystone.yaml
