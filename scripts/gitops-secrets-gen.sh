@@ -18,7 +18,9 @@ if [ ! -f "$1" ]; then
     usage
 fi
 
-source "$1"
+. "$1"
+
+export UC_REPO="$(git rev-parse --show-toplevel)"
 
 if [ ! -d "${UC_DEPLOY}" ]; then
     echo "UC_DEPLOY not set to a path." >&2
