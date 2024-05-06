@@ -158,6 +158,8 @@ values files or kustomize patches. This should be considered a rough template
 that is yours to modify. Once you've made all the changes you want to make,
 ensure that you `git push` your `$UC_DEPLOY` repo so that ArgoCD can access it.
 
+For authentication, please review the [authentication](auth.md) documentation.
+
 For OpenStack Helm components, an empty file in `$UC_DEPLOY/helm-configs/my-k3s`
 has been created for each component for you to use for customization.
 
