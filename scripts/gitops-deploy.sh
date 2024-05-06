@@ -24,6 +24,8 @@ fi
 
 . "$1"
 
+export UC_REPO="$(git rev-parse --show-toplevel)"
+
 if [ ! -d "${UC_REPO}" ]; then
     echo "UC_REPO not set to a path." >&2
     usage
