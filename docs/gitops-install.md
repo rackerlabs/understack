@@ -171,9 +171,16 @@ to your git server so that ArgoCD can access it.
 If you do not have ArgoCD deployed then you can use the following:
 
 ```bash
+cd ${UC_DEPLOY}
 kubectl kustomize --enable-helm \
     https://github.com/rackerlabs/understack/bootstrap/argocd/ \
     | kubectl apply -f -
+```
+
+Now configure ArgoCD to be able to authenticate against Dex IdP.
+
+```bash
+kubectl -n argocd apply -f "secrets/${DEPLOY_NAME}/secret-argocd-sso-argocd.yaml"
 ```
 
 Now configure your ArgoCD to have the credential access to your deploy repo:

@@ -21,12 +21,16 @@ bootstrap:
           --user="${OS_USERNAME}" \
           --domain="${OS_DEFAULT_DOMAIN}" \
           "admin"
-    # create a demo user with demo password
-    openstack user create --domain="${OS_DEFAULT_DOMAIN}" --password demo demo
-    # create undercloud-dev group
-    openstack group create --or-show undercloud-dev
-    # add demo user to undercloud-dev group
-    openstack group add user undercloud-dev demo
+    # create groups which will stand in for permissions since dex cannot use roles yet
+    openstack group create --or-show ucadmin
+    openstack group create --or-show dctech
+    openstack group create --or-show user
+    # TODO: only create this actually requested
+    # create 'demo' user with sufficient permissions
+    openstack user create --or-show --password demo --email 'demo@example.com' demo
+    openstack user set --email 'demo@example.com' demo
+    # add 'demo' user to 'ucadmin' group
+    openstack group add user ucadmin demo
 
 network:
   api:
