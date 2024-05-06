@@ -15,12 +15,27 @@ bootstrap:
 
 conf:
   ironic:
+    DEFAULT:
+      enabled_deploy_interfaces: direct,ramdisk
+      default_deploy_interface: direct
+      enabled_bios_interfaces: no-bios,redfish
+      enabled_boot_interfaces: http-ipxe,http,redfish-virtual-media,ipxe,pxe
+      enabled_hardware_types: ipmi,redfish,manual-management
+      enabled_inspect_interfaces: redfish,no-inspect
+      enabled_management_interfaces: noop,ipmitool,redfish
+      enabled_network_interfaces: noop
+      enabled_power_interfaces: fake,ipmitool,redfish
+      enabled_raid_interfaces: no-raid,redfish
+      enabled_vendor_interfaces: no-vendor,ipmitool,redfish
     conductor:
       automated_clean: false
     dhcp:
       dhcp_provider: dnsmasq
     oslo_messaging_rabbit:
       rabbit_ha_queues: true
+    pxe:
+      images_path: /var/lib/understack/master_iso_images
+      instance_master_path: /var/lib/understack/master_iso_images
 
 endpoints:
   oslo_messaging:
