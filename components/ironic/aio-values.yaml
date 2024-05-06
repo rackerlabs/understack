@@ -44,7 +44,8 @@ network:
     node_port:
       enabled: false
   pxe:
-    device: ens1f0
+    # hack to make things not fail on the default case
+    device: lo
 
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided

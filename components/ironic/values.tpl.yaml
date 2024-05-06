@@ -1,3 +1,1 @@
-network:
-  pxe:
-    device: ens1f0
+---
