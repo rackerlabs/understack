@@ -67,8 +67,12 @@ spec:
                     command: ["ansible-playbook", "-vvvv", "-i", "inventory/understack", "initial-setup.yml"]
                     # command: [cowsay]
                     # args: ["{{inputs.parameters.message}}"]
-          # parameters:
-          #   - src:
-          #       dependencyName: post-sync-webhook-dep
-          #       dataKey: body
-          #     dest: spec.arguments.parameters.0.value
+          parameters:
+            - src:
+                dependencyName: post-sync-webhook-dep
+                dataKey: body.token
+              dest: spec.arguments.parameters.0.value
+            - src:
+                dependencyName: post-sync-webhook-dep
+                dataKey: body.url
+              dest: spec.arguments.parameters.1.value
