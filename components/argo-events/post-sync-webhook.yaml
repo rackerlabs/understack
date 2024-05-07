@@ -39,21 +39,26 @@ spec:
                 generateName: post-sync-webhook-
               spec:
                 serviceAccountName: workflow
-                entrypoint: whalesay
+                # entrypoint: undercloud-nautobot-ansible
                 arguments:
                   parameters:
-                  - name: message
+                  - name: token
                     # the value will get overridden by event payload from post-sync-webhook-dep
                     value: hello world
                 templates:
-                - name: whalesay
+                - name: undercloud-nautobot-ansible
                   inputs:
                     parameters:
-                    - name: message
+                    - name: token
                   container:
                     image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+                    # imagePullSecrets:
+                    # - name: regcred
                     # ansible-playbook -i inventory/local initial-setup.yml
-                    command: ["ansible-playbook", "-i", "inventory/local", "initial-setup.yml"]
+                    env:
+                    - name: NAUTOBOT_TOKEN
+                      value: 0123456789abcdef0123456789abcdef01234567
+                    command: ["ansible-playbook", "-i", "inventory/understack", "initial-setup.yml"]
                     # command: [cowsay]
                     # args: ["{{inputs.parameters.message}}"]
           parameters:
