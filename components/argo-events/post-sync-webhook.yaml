@@ -1,0 +1,63 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: post-sync-webhook
+spec:
+  service:
+    ports:
+    - name: insecure
+      port: 12001
+      targetPort: 12001
+  webhook:
+    post-sync-webhook:
+      endpoint: /post-sync-webhook
+      method: POST
+      port: "12001"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: post-sync-webhook
+spec:
+  template:
+    serviceAccountName: operate-workflow-sa
+  dependencies:
+    - name: post-sync-webhook-dep
+      eventSourceName: post-sync-webhook       # must match EventSource name
+      eventName: post-sync-webhook             # must match event name defined in EventSource
+  triggers:
+    - template:
+        name: post-sync-webhook-workflow-trigger
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: post-sync-webhook-
+              spec:
+                serviceAccountName: workflow
+                entrypoint: whalesay
+                arguments:
+                  parameters:
+                  - name: message
+                    # the value will get overridden by event payload from post-sync-webhook-dep
+                    value: hello world
+                templates:
+                - name: whalesay
+                  inputs:
+                    parameters:
+                    - name: message
+                  container:
+                    image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+                    # ansible-playbook -i inventory/local initial-setup.yml
+                    command: ["ansible-playbook", "-i", "inventory/local", "initial-setup.yml"]
+                    # command: [cowsay]
+                    # args: ["{{inputs.parameters.message}}"]
+          parameters:
+            - src:
+                dependencyName: post-sync-webhook-dep
+                dataKey: body
+              dest: spec.arguments.parameters.0.value
