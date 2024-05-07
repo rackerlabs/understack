@@ -17,14 +17,21 @@ if [ $# -ne 1 ]; then
     usage
 fi
 
+SCRIPTS_DIR=$(dirname "$0")
+
 if [ ! -f "$1" ]; then
     echo "Did not get a file with environment variables." >&2
     usage
 fi
 
+# set temp path so we can reset it after import
+UC_REPO_PATH="$(cd "${SCRIPTS_DIR}" && git rev-parse --show-toplevel)"
+export UC_REPO="${UC_REPO_PATH}"
+
 . "$1"
 
-export UC_REPO="$(git rev-parse --show-toplevel)"
+# set the value again after import
+export UC_REPO="${UC_REPO_PATH}"
 
 if [ ! -d "${UC_REPO}" ]; then
     echo "UC_REPO not set to a path." >&2
