@@ -39,7 +39,7 @@ spec:
                 generateName: post-sync-webhook-
               spec:
                 serviceAccountName: workflow
-                # entrypoint: undercloud-nautobot-ansible
+                entrypoint: undercloud-nautobot-ansible
                 arguments:
                   parameters:
                   - name: token
