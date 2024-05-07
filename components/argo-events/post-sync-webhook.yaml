@@ -44,18 +44,24 @@ spec:
                   parameters:
                   - name: token
                     # the value will get overridden by event payload from post-sync-webhook-dep
-                    value: hello world
+                    value: 0123456789abcdef0123456789abcdef01234567
+                  - name: url
+                    # the value will get overridden by event payload from post-sync-webhook-dep
+                    value: http://nautobot-default.nautobot.svc
                 templates:
                 - name: undercloud-nautobot-ansible
                   inputs:
                     parameters:
                     - name: token
+                    - name: url
                   container:
                     image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
                     # imagePullSecrets:
                     # - name: regcred
                     # ansible-playbook -i inventory/local initial-setup.yml
                     env:
+                    - name: NAUTOBOT_URL
+                      value: "{{inputs.parameters.url}}"
                     - name: NAUTOBOT_TOKEN
                       value: "{{inputs.parameters.token}}"
                     command: ["ansible-playbook", "-i", "inventory/understack", "initial-setup.yml"]
