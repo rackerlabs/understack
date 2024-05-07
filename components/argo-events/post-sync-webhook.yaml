@@ -64,7 +64,7 @@ spec:
                       value: "{{inputs.parameters.url}}"
                     - name: NAUTOBOT_TOKEN
                       value: "{{inputs.parameters.token}}"
-                    command: ["ansible-playbook", "-i", "inventory/understack", "initial-setup.yml"]
+                    command: ["ansible-playbook", "-vvvv", "-i", "inventory/understack", "initial-setup.yml"]
                     # command: [cowsay]
                     # args: ["{{inputs.parameters.message}}"]
           parameters:
