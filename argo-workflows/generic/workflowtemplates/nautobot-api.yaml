@@ -1,0 +1,58 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: nautobot-api
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/description: HTTP Template Workflow to query the Nautobot API
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: method
+        value: GET
+      - name: uri
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: method
+            value: GET
+          - name: nautobot_url
+            valueFrom:
+              configMapKeyRef:
+                name: nautobot
+                key: url
+          - name: uri
+      outputs:
+        parameters:
+          - name: result
+            valueFrom:
+              expression: "steps['send-request'].outputs.result"
+      steps:
+        - - name: send-request
+            template: http
+            arguments:
+              parameters:
+                - name: method
+                  value: "{{inputs.parameters.method}}"
+                - name: url
+                  value: "{{inputs.parameters.nautobot_url}}/api{{inputs.parameters.uri}}"
+
+    - name: http
+      inputs:
+        parameters:
+          - name: method
+          - name: url
+      http:
+        timeoutSeconds: 30
+        url: "{{inputs.parameters.url}}"
+        method: "{{inputs.parameters.method}}"
+        headers:
+          - name: Authorization
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: bearer_token

@@ -41,6 +41,8 @@ rules:
   - get
   - watch
   - list
+  - create
+  - update
 - apiGroups:
   - ""
   resources:
@@ -67,6 +69,12 @@ rules:
   - patch
   - delete
   - create
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflowtasksets/status
+  verbs:
+  - patch
 - apiGroups:
   - argoproj.io
   resources:
