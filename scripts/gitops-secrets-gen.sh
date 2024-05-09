@@ -106,8 +106,9 @@ spec:
           ingressClassName: nginx
 EOF
 
-echo "Creating metallb secret placeholder"
-cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml"
----
+if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml" ]; then
+    echo "Creating metallb secret placeholder"
+    echo "---" > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml"
+fi
 
-EOF
+exit 0
