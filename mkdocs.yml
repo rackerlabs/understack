@@ -65,3 +65,4 @@ nav:
     - gitops-install.md
     - install-understack-ubuntu-k3s.md
     - auth.md
+    - networking.md
