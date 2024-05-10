@@ -45,4 +45,13 @@ spec:
 You will want to review and edit the dnsmasq DHCP configuration for your environment:
 <https://github.com/rackerlabs/understack/blob/main/components/ironic/dnsmasq-cm.yaml>
 
-The important settings to review are `DHCP_RANGE`, `DHCP_RANGE_ROUTER`, and `INGRESS_IP`.
+The dnsmasq setup can listen for multiple ranges by configuring a list in
+the `DHCP_TAGS` value. So if you have `DHCP_TAGS: tag1,tag2` it would
+expect the following variables:
+
+* `DHCP_RANGE_TAG1` and `DHCP_RANGE_TAG2` to define the DHCP range to serve up
+* optionally `DHCP_OPTION_TAG1_ROUTER` to define a default router for the tag1 range
+* optionally `DHCP_PROXY_TAG1` to define the DHCP relay agent's gateway IP
+
+To identify the ranges you must set `DHCP_SETTAG_TAG1_CIRCUITID` and `DHCP_SETTAG_TAG2_CIRCUITID`
+to the values provided. If you only use 1 tag, you do not need to set these.
