@@ -59,10 +59,13 @@ plugins:
 nav:
   - Home: index.md
   - 'Getting Started':
-    - openstack-helm.md
-    - secrets.md
+    - 'Prerequisites':
+      - kubernetes.md
+      - openstack-helm.md
+    - 'Configuration':
+      - secrets.md
+      - auth.md
+      - networking.md
   - 'Installation':
     - gitops-install.md
     - install-understack-ubuntu-k3s.md
-    - auth.md
-    - networking.md

@@ -181,19 +181,19 @@ kubectl kustomize --enable-helm \
 Now configure ArgoCD to be able to authenticate against Dex IdP.
 
 ```bash
-kubectl -n argocd apply -f "secrets/${DEPLOY_NAME}/secret-argocd-sso-argocd.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-argocd-sso-argocd.yaml"
 ```
 
 Now configure your ArgoCD to have the credential access to your deploy repo:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/my-k3s/argocd/secret-deploy-repo.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
 ```
 
 Finally run the following to have ArgoCD deploy the system:
 
 ```bash
-kubectl apply -f "${UC_DEPLOY}/clusters/my-k3s/app-of-apps.yaml"
+kubectl apply -f "${UC_DEPLOY}/clusters/${DEPLOY_NAME}/app-of-apps.yaml"
 ```
 
 At this point ArgoCD will work to deploy Understack.

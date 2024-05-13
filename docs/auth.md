@@ -1,4 +1,4 @@
-# Authn / Authz
+# Authentication and Authorization
 
 You must configure how users and operators will authenticate against the various services
 provided by Understack. At this time [Dex IdP](https://dexidp.io) is used for all the
