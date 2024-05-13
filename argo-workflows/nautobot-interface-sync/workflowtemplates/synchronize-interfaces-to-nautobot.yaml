@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: synchronize-interfaces-to-nautobot
+kind: WorkflowTemplate
+spec:
+  arguments:
+    parameters:
+      - name: hostname
+        value: "{}"
+      - name: oob_secret
+        value: "{}"
+  templates:
+    - name: synchronize-interfaces
+      container:
+        image: ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:0.0.1
+        command:
+          - python
+          - /app/sync_nautobot_interfaces.py
+        args: ["--hostname", "{{workflow.parameters.hostname}}"]
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/oob-secrets/
+            name: oob-secrets
+            readOnly: true
+      inputs:
+        parameters:
+          - name: oob_secret
+      volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
+        - name: oob-secrets
+          secret:
+            secretName: "{{inputs.parameters.oob_secret}}"
