@@ -77,3 +77,7 @@ nav:
   - 'Installation':
     - gitops-install.md
     - install-understack-ubuntu-k3s.md
+  - 'Components':
+    - component-overview.md
+    - component-argo-events.md
+    - component-argo-workflows.md

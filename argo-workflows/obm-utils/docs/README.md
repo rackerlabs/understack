@@ -2,13 +2,6 @@
 
 The WorkflowTemplates provided in this directory were created to provide common lifecycle and maintenance functions on OBM controllers.
 
-## WorkflowTemplates
-
-| WorkflowTemplate    | Description                                               | Input      | Output     |
-|-------------------  |-----------------------------------------------------------|------------|------------|
-| obm-firmware-update | Update OBM firmware on target Device                      |            |            |
-| obm-sync-creds      | Sync's a devices OBM password with what we have on record |            |            |
-
 ## Caveats
 
 - TODO: the obm-sync-creds workflow logic should probably be broken to include an obm-update-password workflow, which then likely has more utility.
