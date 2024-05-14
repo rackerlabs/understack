@@ -26,8 +26,16 @@ apt-get -y update
 
 ## Install K3s
 
+We're using k3s for a lightweight kubernetes install.
+
+Note the `INSTALL_K3S_EXEC` options used:
+
+* Disable traefik servicelb because we're using ingress-nginx and MetalLB
+* Change cluster-cidr and service-cidr options because k3s defaults to using 10.x.x.x IP ranges, but we're already using 10.x.x.x internally
+* Add a node label `openstack-control-plane=enabled` which is needed for the OpenStack components
+
 ```bash
-curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --node-label=openstack-control-plane=enabled" sh -
+curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="--disable=traefik --disable=servicelb --cluster-cidr=172.20.0.0/16 --service-cidr=172.21.0.0/16 --node-label=openstack-control-plane=enabled" sh -
 ```
 
 References:
