@@ -4,15 +4,6 @@ The WorkflowTemplates provided in this directory were created to establish commo
 the nautobot-api WorkflowTemplate is consumed by the get-device-nautobot WorkflowTemplate, to produce it's own output containing information on a Nautobot Device,
 which can then be consumed by future WorkflowTemplates.
 
-## WorkflowTemplates
-
-| WorkflowTemplate    | Description                                           | Input                   | Output     |
-|-------------------  |-------------------------------------------------------|------------             |------------|
-| get-device-nautobot | Return Device Information from Nautobot               | hostname                | device     |
-| get-obm-creds       | Get the credentials for the target Device             | hostname                | secret     |
-| get-obm-ip          | Get OBM IP address for target Device                  | hostname                | ip         |
-| nautobot-api        | HTTP Template Workflow to query the Nautobot API      | method,nautobot_url,uri | result     |
-
 ## Setup
 
 The Nautobot Workflows require a ConfigMap as well as a Secret to define the API URL as well as the API Token. You can define those with:
