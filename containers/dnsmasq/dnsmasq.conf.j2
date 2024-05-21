@@ -27,17 +27,67 @@ log-queries=extra
 # don't advertise /etc/hosts entries
 no-hosts
 
-# DHCP range to hand out
-{% if env.DHCP_RANGE is defined %}
-dhcp-range={{ env.DHCP_RANGE }}
-shared-network=eth0,{{ env.DHCP_RANGE_ROUTER }}
-dhcp-option=option:router,{{ env.DHCP_RANGE_ROUTER }}
-{% endif %}
+# common DHCP config
+# the environment variables will be named like:
+# DHCP_RELAY_MAC_$NAME
+# DHCP_RANGE_$NAME
+# DHCP_OPTION_$NAME_$OPTION
+# DHCP_ALLOWED_SRVIDS_$NAME
+{% macro dhcp_config(name) -%}
+{% set dhcp_circuitid = "DHCP_SETTAG_" ~ name|upper ~ "_CIRCUITID" -%}
+{% set dhcp_range = "DHCP_RANGE_" ~ name|upper -%}
+{% set dhcp_proxy = "DHCP_PROXY_" ~ name|upper -%}
+{% set dhcp_option = "DHCP_OPTION_" ~ name|upper ~ "_" -%}
+{% set dhcp_allowed = "DHCP_ALLOWED_SRVIDS_" ~ name|upper -%}
+{% if env[dhcp_circuitid] is defined %}
+# tag the traffic with the PXE relay MAC
+{% set tag = name|lower ~ "," -%}
+dhcp-circuitid=set:{{ tag }}{{ env[dhcp_circuitid] }}
+{% else -%}
+# no tag by the PXE relay MAC
+{% set tag = "" -%}
+{%- endif %}
+dhcp-range={{ tag }}{{ env[dhcp_range] }}
+shared-network=eth0,{{ env[dhcp_range].split(',')[0] }}
+{% if env[dhcp_proxy] is defined -%}
+shared-network=eth0,{{ env[dhcp_proxy] }}
+{{ dhcp_proxy_list.append(env[dhcp_proxy]) or '' }}
+{%- endif %}
+{% for key, value in env.items() if key.startswith(dhcp_option) -%}
+{% set option = key|replace(dhcp_option, '') -%}
+{% if option|int(-1) != -1 -%}
+{% set option_prefix = '' -%}
+{% else -%}
+{% set option_prefix = 'option:' -%}
+{% endif -%}
+dhcp-option={{ tag }}{{ option_prefix }}{{ option|replace('_', '-')|lower }},{{ value }}
+{%- endfor %}
+{% if env[dhcp_allowed] is defined %}
+{{ dhcp_allowed_srvids_list.append(env[dhcp_allowed]) or '' }}
+{%- endif %}
+{%- endmacro %}
+
+dhcp-authoritative
+# DHCP ranges to hand out
+{% set dhcp_proxy_list = [] -%}
+{% set dhcp_allowed_srvids_list = [] -%}
+{{ dhcp_proxy_list.append(env.POD_IP) or '' }}
+{% set dhcp_tags_str = env.DHCP_TAGS|default('default') -%}
+{% set dhcp_tags = dhcp_tags_str.split(',') -%}
+{% for name in dhcp_tags %}
+# pool {{ name }}
+{{ dhcp_config(name) }}
+{% endfor %}
+dhcp-proxy={{ dhcp_proxy_list|join(',') }}
+dhcp-allowed-srvids={{ dhcp_allowed_srvids_list|join(',') }}
+enable-tftp
+tftp-no-fail
 
 # don't set to enable logging
 {% if env.LOG_DHCP_QUERIES | default(False, True) %}
 # enable DNS logging
 log-dhcp
+log-debug
 {% endif %}
 
 # check if client is already running iPXE
@@ -68,3 +118,5 @@ address=/{{ component }}.{{ env.DNS_ZONE }}/{{ env.INGRESS_IP }}
 {% endfor %}
 
 dhcp-option=option:dns-server,{{ env.get('DNS_IP', env['INGRESS_IP']) }}
+dhcp-boot=nonexistent.file
+# end of template
