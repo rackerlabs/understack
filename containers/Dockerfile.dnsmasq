@@ -1,10 +1,44 @@
 # syntax=docker/dockerfile:1
-FROM debian:bookworm-20240408-slim
+FROM debian:bookworm-20240408-slim as builder
+
+ENV DEBFULLNAME "Marek Skrobacki"
+ENV DEBEMAIL "marek.skrobacki@rackspace.co.uk"
+ENV QUILT_PATCHES=debian/patches
+
+RUN echo "deb-src http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list
+RUN apt-get update && apt-get -y install \
+    build-essential \
+    devscripts \
+    fakeroot \
+    debhelper \
+    automake \
+    autotools-dev \
+    pkg-config \
+    ca-certificates \
+    quilt \
+    --no-install-recommends
+WORKDIR /src
+RUN apt-get -y build-dep dnsmasq
+RUN apt-get -y source dnsmasq
+WORKDIR /src/dnsmasq-2.89
+RUN mkdir -p debian/patches
+COPY dnsmasq/dhcp-allowed-srvids.patch /src/dnsmasq-2.89/debian/patches/
+RUN echo dhcp-allowed-srvids.patch > debian/patches/series
+RUN quilt push -a
+RUN dch -v 2.89-2 "patched for dhcp-allowed-srvids"
+RUN dpkg-buildpackage -rfakeroot
+
+
+FROM debian:bookworm-20240408-slim as prod
+
+COPY --from=builder /src/dnsmasq-base_2.89-2_amd64.deb /tmp
+COPY --from=builder /src/dnsmasq_2.89-2_all.deb /tmp
 
 RUN apt-get update && \
-    apt-get -y install --no-install-recommends dnsmasq=2.89-1 python3-jinja2=3.1.2-1 && \
+    apt-get -y install --no-install-recommends python3-jinja2=3.1.2-1 && \
+    apt-get -y --fix-broken install --no-install-recommends /tmp/dnsmasq-base_2.89-2_amd64.deb /tmp/dnsmasq_2.89-2_all.deb && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/*.deb
 
 COPY common/helpers.sh /helpers.sh
 COPY dnsmasq/entry-point.sh /entry-point.sh
@@ -12,6 +46,7 @@ RUN chmod +x /entry-point.sh
 COPY dnsmasq/dnsmasq.conf.j2 /etc/dnsmasq.conf.j2
 # let our entry point write out the script
 RUN ln -sf /etc/dnsmasq.d/dnsmasq.conf /etc/dnsmasq.conf
+
 
 EXPOSE 1053/udp
 EXPOSE 1067/udp

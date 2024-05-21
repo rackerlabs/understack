@@ -73,11 +73,14 @@ dhcp-authoritative
 {{ dhcp_config(name) }}
 {% endfor %}
 dhcp-proxy={{ dhcp_proxy_list|join(',') }}
+enable-tftp
+tftp-no-fail
 
 # don't set to enable logging
 {% if env.LOG_DHCP_QUERIES | default(False, True) %}
 # enable DNS logging
 log-dhcp
+log-debug
 {% endif %}
 
 # check if client is already running iPXE
