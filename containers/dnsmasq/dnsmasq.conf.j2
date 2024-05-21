@@ -32,11 +32,13 @@ no-hosts
 # DHCP_RELAY_MAC_$NAME
 # DHCP_RANGE_$NAME
 # DHCP_OPTION_$NAME_$OPTION
+# DHCP_ALLOWED_SRVIDS_$NAME
 {% macro dhcp_config(name) -%}
 {% set dhcp_circuitid = "DHCP_SETTAG_" ~ name|upper ~ "_CIRCUITID" -%}
 {% set dhcp_range = "DHCP_RANGE_" ~ name|upper -%}
 {% set dhcp_proxy = "DHCP_PROXY_" ~ name|upper -%}
 {% set dhcp_option = "DHCP_OPTION_" ~ name|upper ~ "_" -%}
+{% set dhcp_allowed = "DHCP_ALLOWED_SRVIDS_" ~ name|upper -%}
 {% if env[dhcp_circuitid] is defined %}
 # tag the traffic with the PXE relay MAC
 {% set tag = name|lower ~ "," -%}
@@ -60,11 +62,15 @@ shared-network=eth0,{{ env[dhcp_proxy] }}
 {% endif -%}
 dhcp-option={{ tag }}{{ option_prefix }}{{ option|replace('_', '-')|lower }},{{ value }}
 {%- endfor %}
+{% if env[dhcp_allowed] is defined %}
+{{ dhcp_allowed_srvids_list.append(env[dhcp_allowed]) or '' }}
+{%- endif %}
 {%- endmacro %}
 
 dhcp-authoritative
 # DHCP ranges to hand out
 {% set dhcp_proxy_list = [] -%}
+{% set dhcp_allowed_srvids_list = [] -%}
 {{ dhcp_proxy_list.append(env.POD_IP) or '' }}
 {% set dhcp_tags_str = env.DHCP_TAGS|default('default') -%}
 {% set dhcp_tags = dhcp_tags_str.split(',') -%}
@@ -73,6 +79,7 @@ dhcp-authoritative
 {{ dhcp_config(name) }}
 {% endfor %}
 dhcp-proxy={{ dhcp_proxy_list|join(',') }}
+dhcp-allowed-srvids={{ dhcp_allowed_srvids_list|join(',') }}
 enable-tftp
 tftp-no-fail
 
