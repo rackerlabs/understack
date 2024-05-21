@@ -45,6 +45,8 @@ nautobot:
 
 celery:
   replicaCount: 1
+  extraEnvVarsSecret:
+    - nautobot-django
 
 postgresql:
   enabled: false
