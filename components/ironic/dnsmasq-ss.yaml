@@ -43,8 +43,7 @@ spec:
                   component: conductor
       containers:
         - name: dnsmasq
-          image: ghcr.io/rackerlabs/openstackhelm/dnsmasq:0.0.1
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/rackerlabs/openstackhelm/dnsmasq:latest
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
