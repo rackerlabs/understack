@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: demo-nautobot-device-create-prefix
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/description: Create a Nautobot IPAM Prefix
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: payload
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: payload
+      script:
+        image: ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:0.0.1:latest
+        command: [python]
+        source: |
+          import logging
+          import argparse
+          import pynautobot
+          import os
+          import json
+
+          logger = logging.getLogger(__name__)
+          logging.basicConfig(encoding="utf-8", level=logging.INFO)
+
+
+          if __name__ == "__main__":
+            payload = json.loads('{{inputs.parameters.payload}}')
+            device_name = payload["device_name"]
+            tenant_name = payload["tenant_name"]
+            subnet = payload["subnet"]
+            address_ipv4 = payload["address_ipv4"]
+
+            pyn = pynautobot.api(os.environ["NAUTOBOT_URL"], token=os.environ["NAUTOBOT_TOKEN"])
+
+            # create IPAM prefix (subnet)
+            namespace=tenant_name
+            try:
+                pyn.ipam.prefixes.create(prefix=subnet, status="Active", namespace=namespace)
+            except pynautobot.core.query.RequestError as e:
+                if e.req.status_code == 400:
+                    logger.warning(f"Prefix {subnet} already exists.")
+        env:
+          - name: NAUTOBOT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: nautobot
+                key: url
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: token

@@ -1,0 +1,89 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: demo-nautobot-device-create-assign-ip
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/description: Create and Associate a Nautbot Device with an IP address
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: payload
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: payload
+      script:
+        image: ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:0.0.1:latest
+        command: [python]
+        source: |
+          import logging
+          import argparse
+          import pynautobot
+          import os
+          import json
+
+          logger = logging.getLogger(__name__)
+          logging.basicConfig(encoding="utf-8", level=logging.INFO)
+
+
+          if __name__ == "__main__":
+            payload = json.loads('{{inputs.parameters.payload}}')
+            device_name = payload["device_name"]
+            tenant_name = payload["tenant_name"]
+            subnet = payload["subnet"]
+            address_ipv4 = payload["address_ipv4"]
+
+            # TODO: how do we want to determine which interface to associate with the address
+            interface_name = payload.get("interface_name", "NIC.Slot.2_1")
+
+            pyn = pynautobot.api(os.environ["NAUTOBOT_URL"], token=os.environ["NAUTOBOT_TOKEN"])
+            namespace=tenant_name
+
+            # create IP address
+            try:
+                address = pyn.ipam.ip_addresses.create(address=address_ipv4, status="Active", namespace=namespace)
+            except pynautobot.core.query.RequestError as e:
+                # nautobot throws a 500 trying to add a duplicate unique key
+                if "already exists" in e.error:
+                    logger.warning(f"IP {address_ipv4} already exists.")
+                    address = pyn.ipam.ip_addresses.get(address=address_ipv4, namespace=namespace)
+                else:
+                    raise Exception(e)
+
+            try:
+                address_assoc = pyn.ipam.ip_address_to_interface.create(
+                    ip_address=address.id, host=device_name, interface={"name": interface_name, "device__name": device_name}
+                )
+                logger.info(
+                    f"IP {address_ipv4} has been associated with {device_name}. Association ID: {address_assoc.id}"
+                )
+            except pynautobot.core.query.RequestError as e:
+                if "ip_address must make a unique set" in e.error:
+                    address_assoc = pyn.ipam.ip_address_to_interface.get(ip_address=address.id)
+                    logger.warning(
+                        f"IP {address_ipv4} already associated with {device_name}. Association ID: {address_assoc.id}"
+                    )
+                else:
+                    raise Exception(e)
+
+            device = pyn.dcim.devices.get(name=device_name)
+            if not device:
+                raise Exception("Unable to identify target device.")
+            print(device)
+            print(json.dumps(dict(address), indent=4))
+            print(json.dumps(dict(address_assoc), indent=4))
+        env:
+          - name: NAUTOBOT_URL
+            valueFrom:
+              configMapKeyRef:
+                name: nautobot
+                key: url
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: token

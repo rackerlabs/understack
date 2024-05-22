@@ -1,0 +1,62 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: demo-nautobot-device-provision
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/description: Update a Nautobot Device for Provisioning
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: payload
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: payload
+            value: "{{workflow.parameters.payload}}"
+      outputs:
+        parameters:
+          - name: device
+            valueFrom:
+              expression: "tasks['create-assign-ip'].outputs.result"
+      dag:
+        tasks:
+          - name: assign-tenant
+            templateRef:
+              name: demo-nautobot-device-tenant-assign
+              template: main
+            arguments:
+              parameters:
+                - name: payload
+                  value: "{{inputs.parameters.payload}}"
+          - name: create-ipam-namespace
+            dependencies: [assign-tenant]
+            templateRef:
+              name: demo-nautobot-device-create-namespace
+              template: main
+            arguments:
+              parameters:
+                - name: payload
+                  value: "{{inputs.parameters.payload}}"
+          - name: create-ipam-prefix
+            dependencies: [assign-tenant]
+            templateRef:
+              name: demo-nautobot-device-create-prefix
+              template: main
+            arguments:
+              parameters:
+                - name: payload
+                  value: "{{inputs.parameters.payload}}"
+          - name: create-assign-ip
+            dependencies: [create-ipam-namespace, create-ipam-prefix]
+            templateRef:
+              name: demo-nautobot-device-create-assign-ip
+              template: main
+            arguments:
+              parameters:
+                - name: payload
+                  value: "{{inputs.parameters.payload}}"
