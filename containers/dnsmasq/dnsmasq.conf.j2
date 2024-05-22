@@ -10,8 +10,13 @@ log-facility=-
 # configs
 conf-dir=/etc/dnsmasq.d
 
+{% if env.PROVISIONER_INTERFACE is defined -%}
+interface={{ PROVISIONER_INTERFACE }}
+bind-dynamic
+{%- else -%}
 except-interface=lo
 bind-interfaces
+{%- endif %}
 
 # DNS port to listen on, set to 0 to disable
 port={{ env.DNS_PORT | default(53) }}
@@ -48,9 +53,9 @@ dhcp-circuitid=set:{{ tag }}{{ env[dhcp_circuitid] }}
 {% set tag = "" -%}
 {%- endif %}
 dhcp-range={{ tag }}{{ env[dhcp_range] }}
-shared-network=eth0,{{ env[dhcp_range].split(',')[0] }}
+shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_range].split(',')[0] }}
 {% if env[dhcp_proxy] is defined -%}
-shared-network=eth0,{{ env[dhcp_proxy] }}
+shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_proxy] }}
 {{ dhcp_proxy_list.append(env[dhcp_proxy]) or '' }}
 {%- endif %}
 {% for key, value in env.items() if key.startswith(dhcp_option) -%}
