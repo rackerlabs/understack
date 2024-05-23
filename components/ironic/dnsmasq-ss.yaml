@@ -73,6 +73,9 @@ spec:
               mountPath: /etc/dnsmasq.d
             - name: pod-dhcp
               mountPath: /var/lib/misc
+            - name: understack-images
+              mountPath: /var/lib/understack/master_iso_images
+              readOnly: true
       volumes:
         - name: pod-tmp
           emptyDir: {}
@@ -82,3 +85,6 @@ spec:
         - name: pod-dhcp
           persistentVolumeClaim:
             claimName: dnsmasq-dhcp
+        - name: understack-images
+          hostPath:
+            path: /var/lib/understack/master_iso_images

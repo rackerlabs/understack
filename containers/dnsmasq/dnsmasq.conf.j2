@@ -87,6 +87,7 @@ dhcp-proxy={{ dhcp_proxy_list|join(',') }}
 dhcp-allowed-srvids={{ dhcp_allowed_srvids_list|join(',') }}
 enable-tftp
 tftp-no-fail
+tftp-root={{ env['TFTP_DIR'] | default('/var/lib/understack/master_iso_images') }}
 
 # don't set to enable logging
 {% if env.LOG_DHCP_QUERIES | default(False, True) %}
