@@ -11,7 +11,7 @@ mkdir -p /etc/dnsmasq.d/optsdir.d
 render_j2_file /etc/dnsmasq.conf.j2 /etc/dnsmasq.conf
 
 if [ -n "${DEBUG_DNSMASQ_CONF+x}" ]; then
-  cat /etc/dnsmasq.conf
+  cat /etc/dnsmasq.conf >&2
 fi
 
 /usr/sbin/dnsmasq --test
