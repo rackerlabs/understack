@@ -111,4 +111,13 @@ if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml" ]; then
     echo "---" > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml"
 fi
 
+if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-env.yaml" ]; then
+echo "Creating nautobot-env secret placeholder"
+ kubectl --namespace nautobot \
+        create secret generic nautobot-env \
+        --dry-run=client \
+        -o yaml \
+        --type Opaque > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-env.yaml"
+fi
+
 exit 0

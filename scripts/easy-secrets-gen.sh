@@ -14,14 +14,7 @@ kubectl --namespace openstack \
     --from-literal=password="$(./scripts/pwgen.sh)" \
     > "${DEST_DIR}/secret-mariadb.yaml"
 
-# handle conversion of nautobot secret
-if [ -f "${DEST_DIR}/secret-nautobot-env.yaml" ]; then
-    NAUTOBOT_SECRET_KEY=$(yq '.data.NAUTOBOT_SECRET_KEY' "${DEST_DIR}/secret-nautobot-env.yaml" | base64 -d)
-    rm -f "${DEST_DIR}/secret-nautobot-env.yaml"
-else
-    NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh)"
-fi
-
+NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh)"
 if [ ! -f "${DEST_DIR}/secret-nautobot-django.yaml" ]; then
     kubectl --namespace nautobot \
         create secret generic nautobot-django \
