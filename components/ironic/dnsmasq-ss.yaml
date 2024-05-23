@@ -41,6 +41,7 @@ spec:
                 matchLabels:
                   application: ironic
                   component: conductor
+      hostNetwork: true
       containers:
         - name: dnsmasq
           image: ghcr.io/rackerlabs/openstackhelm/dnsmasq:latest
