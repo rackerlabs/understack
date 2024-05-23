@@ -3,6 +3,8 @@ kind: ConfigMap
 metadata:
   name: ironic-dnsmasq
 data:
+  # interface to listen on the host
+  PROVISIONER_INTERFACE: "eth0"
   # common separated list of DHCP tagged configs
   DHCP_TAGS: tag1
   # When defining the IP address range, make sure to include subnet

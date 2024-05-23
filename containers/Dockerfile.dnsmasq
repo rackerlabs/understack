@@ -47,9 +47,5 @@ COPY dnsmasq/dnsmasq.conf.j2 /etc/dnsmasq.conf.j2
 # let our entry point write out the script
 RUN ln -sf /etc/dnsmasq.d/dnsmasq.conf /etc/dnsmasq.conf
 
-
-EXPOSE 1053/udp
-EXPOSE 1067/udp
-
 ENTRYPOINT ["/entry-point.sh"]
 CMD ["/usr/sbin/dnsmasq", "-d"]
