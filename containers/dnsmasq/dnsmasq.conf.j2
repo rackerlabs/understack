@@ -11,7 +11,7 @@ log-facility=-
 conf-dir=/etc/dnsmasq.d
 
 {% if env.PROVISIONER_INTERFACE is defined -%}
-interface={{ PROVISIONER_INTERFACE }}
+interface={{ env.PROVISIONER_INTERFACE }}
 bind-dynamic
 {%- else -%}
 except-interface=lo
