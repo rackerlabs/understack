@@ -62,6 +62,9 @@ spec:
             - name: dhcp
               containerPort: 67
               protocol: UDP
+            - name: tftp
+              containerPort: 69
+              protocol: UDP
           volumeMounts:
             - name: pod-tmp
               mountPath: /tmp
