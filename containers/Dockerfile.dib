@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1
+FROM debian:bookworm
+
+WORKDIR /build
+
+# install dependencies
+RUN apt-get update && apt-get -y install \
+        python3-diskimage-builder \
+        bzip2 \
+        dosfstools \
+        gdisk \
+        procps \
+        squashfs-tools \
+        sudo \
+        apt-transport-https \
+        inetutils-ping \
+        rpm \
+        zstd \
+    && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/*.deb
+
+CMD ["disk-image-create"]
+
+# DIB_RELEASE=noble DIB_CLOUD_INIT_DATASOURCES="ConfigDrive, OpenStack" disk-image-create ubuntu package-installs vm block-device-efi
+# but that fails
+# cd /root/.cache/image-create/ && curl -O https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.squashfs.manifest
+# then it works
+# you want to keep /root/.cache/dib and /root/.cache/image-create to avoid long slow downloads
+# docker run --privileged -it --platform linux/amd64 -v /some/host/path:/source this-container:latest
