@@ -1,8 +1,6 @@
 ---
 
 nautobot:
-  extraEnvVarsSecret:
-    - nautobot-env
 
   db:
     engine: "django.db.backends.postgresql"
@@ -49,7 +47,6 @@ celery:
   replicaCount: 1
   extraEnvVarsSecret:
     - nautobot-django
-    - nautobot-env
 
 postgresql:
   enabled: false
