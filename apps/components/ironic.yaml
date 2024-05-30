@@ -11,7 +11,7 @@ spec:
       ref: understack
     - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
       chart: ironic
-      targetRevision: 0.2.14
+      targetRevision: 0.2.15
       helm:
         releaseName: ironic
         valueFiles:
