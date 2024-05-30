@@ -22,23 +22,6 @@ bootstrap:
     openstack group add user ucadmin demo
 
 network:
-  api:
-    ingress:
-      public: true
-      classes:
-        namespace: "nginx"
-        cluster: "nginx-openstack"
-      annotations:
-        nginx.ingress.kubernetes.io/rewrite-target: /
-    external_policy_local: false
-    node_port:
-      enabled: false
-      port: 30500
-  admin:
-    node_port:
-      enabled: false
-      port: 30357
-
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
@@ -161,14 +144,6 @@ conf:
       methods: password,token,openid,mapped,application_credential,totp
     openid:
       remote_id_attribute: HTTP_OIDC_ISS
-
-# Names of secrets used by bootstrap and environmental checks
-secrets:
-  tls:
-    identity:
-      api:
-        public: keystone-tls-public
-        internal: keystone-tls-public
 
 # typically overridden by environmental
 # values, but should include all endpoints
