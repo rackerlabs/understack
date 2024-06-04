@@ -11,6 +11,14 @@ kind: ServiceAccount
 metadata:
   name: workflow
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  annotations:
+    kubernetes.io/service-account.name: default
+  name: workflow.service-account-token
+type: kubernetes.io/service-account-token
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -35,6 +43,40 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: executor
+subjects:
+- kind: ServiceAccount
+  name: workflow
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    workflows.argoproj.io/description: |
+      Recommended minimum permissions for the `emissary` executor.
+  name: http-template-role
+rules:
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflowtasksets
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflowtasksets/status
+  verbs:
+  - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-http-template
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: http-template-role
 subjects:
 - kind: ServiceAccount
   name: workflow
