@@ -32,28 +32,12 @@ client = IronicClient(
 
 def event_to_node_configuration(event: dict) -> IronicNodeConfiguration:
     node_config  = IronicNodeConfiguration()
-    # TODO: these should be changed to defaults in Ironic configuration
     node_config.conductor_group = None
     node_config.driver = 'redfish'
-    node_config.network_interface = 'noop'
-    node_config.management_interface = 'redfish'
-    node_config.boot_interface = 'redfish-virtual-media'
-    node_config.power_interface = 'redfish'
-    node_config.rescue_interface = 'no-rescue'
-    node_config.raid_interface = 'redfish'
-    node_config.inspect_interface = 'redfish'
-    node_config.bios_interface = 'redfish'
-    node_config.vendor_interface = 'redfish'
-    node_config.console_interface = 'no-console'
-    node_config.deploy_interface = 'ramdisk'
-    node_config.storage_interface = 'noop'
 
     node_config.chassis_uuid = None
     node_config.uuid = event['device']['id']
     node_config.name = event['device']['name']
-    # Not available at that stage.
-    # network_data_dict = asdict(network_data)
-    # _validate_network_data(network_data_dict)
 
     return node_config
 
