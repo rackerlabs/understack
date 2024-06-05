@@ -44,6 +44,10 @@ spec:
               src:
                 dataKey: body
                 dependencyName: nautobot-dep
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.data.device.name
+                dependencyName: nautobot-dep
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
@@ -55,8 +59,10 @@ spec:
                   parameters:
                     - name: interface_update_event
                       value: Some nautobot interface has changed
+                    - name: device_hostname
+                      value: hostname of the device that event is for
                 entrypoint: start
-                serviceAccountName: operate-workflow-sa
+                serviceAccountName: workflow
                 templates:
                   - name: start
                     steps:
@@ -64,3 +70,7 @@ spec:
                           templateRef:
                             name: synchronize-server-to-ironic
                             template: synchronize-server
+                      - - name: synchronize-server-obm-creds
+                          templateRef:
+                            name: synchronize-obm-creds
+                            template: main

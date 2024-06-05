@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: synchronize-obm-creds
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: interface_update_event
+        value: "{}"
+  templates:
+    - name: main
+      steps:
+        - - name: load-obm-creds
+            templateRef:
+              name: get-obm-creds
+              template: main
+            arguments:
+              parameters:
+                - name: hostname
+                  value: '{{workflow.parameters.device_hostname}}'
+        - - name: synchronize-obm-creds
+            template: synchronize-obm-creds
+            arguments:
+              parameters:
+                - name: obm
+                  value: "{{ steps.load-obm-creds.outputs.parameters.secret }}"
+
+    - name: synchronize-obm-creds
+      inputs:
+        parameters:
+          - name: obm
+      container:
+        image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:latest
+        command:
+          - python
+          - /app/synchronize-obm-creds.py
+        args:
+          - "{{workflow.parameters.interface_update_event}}"
+        volumeMounts:
+          - mountPath: /etc/ironic-secrets/
+            name: ironic-secrets
+            readOnly: true
+          - mountPath: /etc/obm
+            name: obm-secret
+            readOnly: true
+      volumes:
+        - name: ironic-secrets
+          secret:
+            secretName: production-ironic-for-argo-creds
+        - name: obm-secret
+          secret:
+            secretName: "{{ inputs.parameters.obm }}"
