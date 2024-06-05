@@ -9,16 +9,16 @@ from redfish_driver_info import RedfishDriverInfo
 class IronicNodeConfiguration:
     """The boot interface for a Node, e.g. “pxe”."""
 
-    boot_interface: str = ""
+    boot_interface: str | None = None
 
     conductor_group: str | None = None
     """The conductor group for a node. Case-insensitive str up to 255
     characters, containing a-z, 0-9, _, -, and .."""
 
-    console_interface: str = ""
+    console_interface: str | None = None
     """The console interface for a node, e.g. “no-console”."""
 
-    deploy_interface: str = ""
+    deploy_interface: str | None = None
     """The deploy interface for a node, e.g. “iscsi”."""
 
     driver_info: dict | RedfishDriverInfo = field(default_factory=dict)
@@ -32,21 +32,21 @@ class IronicNodeConfiguration:
     extra: dict = field(default_factory=dict)
     """A set of one or more arbitrary metadata key and value pairs."""
 
-    inspect_interface: str = ""
+    inspect_interface: str | None = None
     """The interface used for node inspection, e.g. “no-inspect”."""
 
-    management_interface: str = ""
+    management_interface: str | None = None
     """Interface for out-of-band node management, e.g. “ipmitool”."""
 
     name: str = ""
     """Human-readable identifier for the Node resource. May be undefined.
     Certain words are reserved."""
 
-    network_interface: str = ""
+    network_interface: str | None = None
     """Which Network Interface provider to use when plumbing the network
     connections for this Node."""
 
-    power_interface: str = ""
+    power_interface: str | None = None
     """Interface used for performing power actions on the node, e.g.
     “ipmitool”."""
 
@@ -54,24 +54,24 @@ class IronicNodeConfiguration:
     """Physical characteristics of this Node. Populated during inspection, if
     performed. Can be edited via the REST API at any time."""
 
-    raid_interface: str = ""
+    raid_interface: str | None = None
     """Interface used for configuring RAID on this node, e.g. “no-raid”."""
 
-    rescue_interface: str = ""
+    rescue_interface: str | None = None
     """The interface used for node rescue, e.g. “no-rescue”."""
 
     resource_class: str = ""
     """A str which can be used by external schedulers to identify this Node as
     a unit of a specific type of resource."""
 
-    storage_interface: str = ""
+    storage_interface: str | None = None
     """Interface used for attaching and detaching volumes on this node, e.g.
     “cinder”."""
 
     uuid: str = ""
     """The UUID for the resource."""
 
-    vendor_interface: str = ""
+    vendor_interface: str | None = None
     """Interface for vendor-specific functionality on this node, e.g.
     “no-vendor”."""
 
@@ -90,7 +90,7 @@ class IronicNodeConfiguration:
     automated_clean: bool = False
     """Indicates whether the node will perform automated clean or not."""
 
-    bios_interface: str = ""
+    bios_interface: str | None = None
     """The bios interface to be used for this node."""
 
     chassis_uuid: str | None = ""
