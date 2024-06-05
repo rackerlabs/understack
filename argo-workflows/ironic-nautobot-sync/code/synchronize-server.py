@@ -34,7 +34,6 @@ def event_to_node_configuration(event: dict) -> IronicNodeConfiguration:
     node_config  = IronicNodeConfiguration()
     node_config.conductor_group = None
     node_config.driver = 'redfish'
-    node_config.storage_interface = 'noop'
     node_config.chassis_uuid = None
     node_config.uuid = event['device']['id']
     node_config.name = event['device']['name']
