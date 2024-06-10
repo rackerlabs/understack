@@ -71,7 +71,8 @@ kubectl --namespace dex \
     -o yaml > ${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-oidc-sso-dex.yaml
 ```
 
-You must remember to commit this file to your `${UC_DEPLOY}` repo.
+You must remember to add this secret to your secret storage (e.g. for
+Kube Seal you must commit the sealed file to your `${UC_DEPLOY}` repo).
 
 ### Static Users
 
@@ -93,7 +94,7 @@ to different parts of the system. The default groups through the system are:
 To customize the administrator group set the following in your
 `helm-configs/${DEPLOY_NAME}/nautobot.yaml`
 
-```yaml title=helm-configs/${DEPLOY_NAME}/nautobot.yaml
+```yaml title="helm-configs/${DEPLOY_NAME}/nautobot.yaml"
 nautobot:
   extraEnvVars:
     # ignoring existing values here, don't remove
