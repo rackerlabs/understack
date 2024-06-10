@@ -160,7 +160,7 @@ if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
     [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
     yq '(.. | select(tag == "!!str")) |= envsubst' \
         "./components/openstack-secrets.tpl.yaml" \
-        | secret-seal-stdin "${DEST_DIR}/secret-openstack.yaml"
+        > "${DEST_DIR}/secret-openstack.yaml"
 fi
 
 cd ${DEST_DIR}
