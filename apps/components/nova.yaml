@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nova
+spec:
+  project: understack
+  sources:
+    - repoURL: https://github.com/rackerlabs/understack.git
+      path: components/nova/
+      targetRevision: ${UC_REPO_REF}
+      ref: understack
+    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
+      chart: nova
+      targetRevision: 0.3.42
+      helm:
+        releaseName: nova
+        valueFiles:
+          - $understack/components/openstack-2024.1-jammy.yaml
+          - $understack/components/nova/aio-values.yaml
+          - $secrets/secrets/${DEPLOY_NAME}/secret-openstack.yaml
+          - $secrets/helm-configs/${DEPLOY_NAME}/nova.yaml
+    - repoURL: ${UC_DEPLOY_GIT_URL}
+      path: secrets/${DEPLOY_NAME}/
+      targetRevision: ${UC_DEPLOY_REF}
+      directory:
+        include: 'secret-nova-*.yaml'
+      ref: secrets
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: openstack
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    managedNamespaceMetadata:
+      labels:
+        kubernetes.io/metadata.name: openstack
+        name: openstack
