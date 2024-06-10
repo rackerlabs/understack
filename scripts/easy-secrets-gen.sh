@@ -4,6 +4,21 @@ cd $(git rev-parse --show-toplevel)
 
 DEST_DIR=${1:-.}
 
+if ! type -p kubeseal kubectl > /dev/null; then
+    echo "You must have kubeseal & kubectl installed to use this script" >&2
+    exit 1
+fi
+
+function secret-seal-stdin() {
+    # this is meant to be piped to
+    # $1 is output file, -w
+    kubeseal \
+        --scope cluster-wide \
+        --allow-empty-data \
+        -o yaml \
+        -w $1
+}
+
 [ ! -f "${DEST_DIR}/secret-mariadb.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic mariadb \
@@ -12,7 +27,7 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=root-password="$(./scripts/pwgen.sh)" \
     --from-literal=password="$(./scripts/pwgen.sh)" \
-    > "${DEST_DIR}/secret-mariadb.yaml"
+    | secret-seal-stdin "${DEST_DIR}/secret-mariadb.yaml"
 
 NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh)"
 if [ ! -f "${DEST_DIR}/secret-nautobot-django.yaml" ]; then
@@ -22,7 +37,7 @@ if [ ! -f "${DEST_DIR}/secret-nautobot-django.yaml" ]; then
         -o yaml \
         --type Opaque \
         --from-literal="NAUTOBOT_SECRET_KEY=${NAUTOBOT_SECRET_KEY}" \
-        > "${DEST_DIR}/secret-nautobot-django.yaml"
+        | secret-seal-stdin "${DEST_DIR}/secret-nautobot-django.yaml"
 fi
 
 [ ! -f "${DEST_DIR}/secret-nautobot-redis.yaml" ] && \
@@ -32,7 +47,7 @@ kubectl --namespace nautobot \
     -o yaml \
     --type Opaque \
     --from-literal=redis-password="$(./scripts/pwgen.sh)" \
-    > "${DEST_DIR}/secret-nautobot-redis.yaml"
+    | secret-seal-stdin "${DEST_DIR}/secret-nautobot-redis.yaml"
 
 NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
 for ns in nautobot dex; do
@@ -43,7 +58,7 @@ for ns in nautobot dex; do
     -o yaml \
     --type Opaque \
     --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
-    > "${DEST_DIR}/secret-nautobot-sso-$ns.yaml"
+    | secret-seal-stdin "${DEST_DIR}/secret-nautobot-sso-$ns.yaml"
 done
 unset NAUTOBOT_SSO_SECRET
 
@@ -57,7 +72,7 @@ for ns in argo argo-events dex; do
     --type Opaque \
     --from-literal=client-secret="$ARGO_SSO_SECRET" \
     --from-literal=client-id=argo \
-    > "${DEST_DIR}/secret-argo-sso-$ns.yaml"
+    | secret-seal-stdin "${DEST_DIR}/secret-argo-sso-$ns.yaml"
 done
 unset ARGO_SSO_SECRET
 
@@ -73,10 +88,9 @@ for ns in argocd dex; do
     --from-literal=client-secret="$ARGOCD_SSO_SECRET" \
     --from-literal=client-id=argocd \
     | yq '.metadata.labels |= {"app.kubernetes.io/part-of": "argocd"}' \
-    > "${DEST_DIR}/secret-argocd-sso-$ns.yaml"
+    | secret-seal-stdin "${DEST_DIR}/secret-argocd-sso-$ns.yaml"
 done
 unset ARGOCD_SSO_SECRET
-rm -rf "${DEST_DIR}/secret-argo-sso-argocd.yaml"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 export MEMCACHE_SECRET_KEY="$(./scripts/pwgen.sh 64)"
@@ -100,7 +114,7 @@ kubectl --namespace openstack \
     --from-literal=username="keystone" \
     --from-literal=password="${KEYSTONE_RABBITMQ_PASSWORD}" \
     --dry-run=client -o yaml \
-    > "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml"
+    | secret-seal-stdin "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml"
 
 [ ! -f "${DEST_DIR}/secret-keystone-db-password.yaml" ] && \
 kubectl --namespace openstack \
@@ -108,7 +122,7 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=password="${KEYSTONE_DB_PASSWORD}" \
     --dry-run=client -o yaml \
-    > "${DEST_DIR}/secret-keystone-db-password.yaml"
+    | secret-seal-stdin "${DEST_DIR}/secret-keystone-db-password.yaml"
 
 [ ! -f "${DEST_DIR}/secret-keystone-admin.yaml" ] && \
 kubectl --namespace openstack \
@@ -116,7 +130,7 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=password="${KEYSTONE_ADMIN_PASSWORD}" \
     --dry-run=client -o yaml \
-    > "${DEST_DIR}/secret-keystone-admin.yaml"
+    | secret-seal-stdin "${DEST_DIR}/secret-keystone-admin.yaml"
 
 # ironic credentials
 [ ! -f "${DEST_DIR}/secret-ironic-rabbitmq-password.yaml" ] && \
@@ -125,14 +139,14 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=username="ironic" \
     --from-literal=password="${IRONIC_RABBITMQ_PASSWORD}" \
-    --dry-run=client -o yaml > "${DEST_DIR}/secret-ironic-rabbitmq-password.yaml"
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-ironic-rabbitmq-password.yaml"
 
 [ ! -f "${DEST_DIR}/secret-ironic-db-password.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic ironic-db-password \
     --type Opaque \
     --from-literal=password="${IRONIC_DB_PASSWORD}" \
-    --dry-run=client -o yaml > "${DEST_DIR}/secret-ironic-db-password.yaml"
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-ironic-db-password.yaml"
 
 [ ! -f "${DEST_DIR}/secret-ironic-keystone-password.yaml" ] && \
 kubectl --namespace openstack \
@@ -140,70 +154,16 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=username="ironic" \
     --from-literal=password="${IRONIC_KEYSTONE_PASSWORD}" \
-    --dry-run=client -o yaml > "${DEST_DIR}/secret-ironic-keystone-password.yaml"
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-ironic-keystone-password.yaml"
 
 if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
     [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
     yq '(.. | select(tag == "!!str")) |= envsubst' \
         "./components/openstack-secrets.tpl.yaml" \
-        > "${DEST_DIR}/secret-openstack.yaml"
+        | secret-seal-stdin "${DEST_DIR}/secret-openstack.yaml"
 fi
 
-if [ "x${SKIP_KUBESEAL}" = "xy" ]; then
-    echo "Skipping kubeseal"
-    exit 0
-fi
-
-kubeseal \
-    --scope cluster-wide \
-    --allow-empty-data \
-    -o yaml \
-    -f "${DEST_DIR}/secret-mariadb.yaml" \
-    -w components/01-secrets/encrypted-mariadb.yaml
-
-kubeseal \
-    --scope cluster-wide \
-    --allow-empty-data \
-    -o yaml \
-    -f "${DEST_DIR}/secret-nautobot-env.yaml" \
-    -w components/01-secrets/encrypted-nautobot-env.yaml
-
-kubeseal \
-    --scope cluster-wide \
-    --allow-empty-data \
-    -o yaml \
-    -f "${DEST_DIR}/secret-nautobot-redis.yaml" \
-    -w components/01-secrets/encrypted-nautobot-redis.yaml
-
-for skrt in $(find "${DEST_DIR}" -maxdepth 1 -name "secret-keystone*.yaml" -o -name "secret-ironic*.yaml"); do
-    encskrt=$(echo "${skrt}" | sed -e 's/secret-/components\/01-secrets\/encrypted-/')
-    kubeseal \
-        --scope cluster-wide \
-        --allow-empty-data \
-        -o yaml \
-        -f "${skrt}" \
-        -w "${encskrt}"
-done
-
-for ns in nautobot dex; do
-  kubeseal \
-    --scope cluster-wide \
-    --allow-empty-data \
-    -o yaml \
-    -f "${DEST_DIR}/secret-nautobot-sso-$ns.yaml" \
-    -w components/01-secrets/encrypted-nautobot-sso-$ns.yaml
-done
-
-for ns in argo argo-events argocd dex; do
-  kubeseal \
-    --scope cluster-wide \
-    --allow-empty-data \
-    -o yaml \
-    -f secret-argo-sso-$ns.yaml \
-    -w components/01-secrets/encrypted-argo-sso-$ns.yaml
-done
-
-cd components/01-secrets/
+cd ${DEST_DIR}
 rm -f kustomization.yaml
 kustomize create --autodetect
-cd ../..
+cd -

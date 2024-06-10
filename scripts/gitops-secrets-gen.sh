@@ -7,6 +7,16 @@ function usage() {
     exit 1
 }
 
+function secret-seal-stdin() {
+    # this is meant to be piped to
+    # $1 is output file, -w
+    kubeseal \
+        --scope cluster-wide \
+        --allow-empty-data \
+        -o yaml \
+        -w $1
+}
+
 if [ $# -ne 1 ]; then
     usage
 fi
@@ -66,7 +76,6 @@ fi
 
 export DNS_ZONE
 export DEPLOY_NAME
-export SKIP_KUBESEAL=y
 export DO_TMPL_VALUES=y
 mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 "${SCRIPTS_DIR}/easy-secrets-gen.sh" "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
@@ -74,7 +83,7 @@ mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 if [ "x${NO_SECRET_DEPLOY}" = "x" ]; then
     echo "Creating ArgoCD config"
     mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd"
-    cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
+    cat << EOF | secret-seal-stdin "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
 apiVersion: v1
 kind: Secret
 metadata:
@@ -106,6 +115,7 @@ spec:
           ingressClassName: nginx
 EOF
 
+# Placeholders don't need sealing
 if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml" ]; then
     echo "Creating metallb secret placeholder"
     echo "---" > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml"

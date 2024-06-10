@@ -118,12 +118,9 @@ TODO: some examples and documentation on how to build out a cluster
 
 Secrets in their very nature are sensitive pieces of data. The ultimate
 storage and injection of these in a production environment needs to be
-carefully considered. For the purposes of this document no specific
-choice has been made but tools like Vault, Sealed Secrets, SOPS, etc
-should be considered. This will only generate the necessary secrets
-using random data to successfully continue the installation.
-
-TODO: probably give at least one secure example
+carefully considered. For the purposes of this document, Sealed Secrets
+has been chosen; other tools like Vault, SOPS, etc should be considered
+for production deployments.
 
 ```bash
 # from your understack checkout
