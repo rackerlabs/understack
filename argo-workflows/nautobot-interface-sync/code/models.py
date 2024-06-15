@@ -1,6 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from sushy import Sushy
+from sushy.exceptions import ResourceNotFoundError
 from sushy.resources.system.network.adapter import NetworkAdapter
 from sushy.resources.system.network.port import NetworkPort
 from sushy.resources.chassis.chassis import Chassis as SushyChassis
@@ -60,11 +61,13 @@ class Interface:
     def from_redfish(cls, data: NetworkPort, nic: NIC) -> Interface:
         if data.root.json["Vendor"] == "HPE":
             name = f"{nic.name}_{data.physical_port_number}"
+            macaddr = data.associated_network_addresses[0]
         else:
             name = data.identity
+            macaddr = cls.fetch_macaddr_from_sys_resource(data)
         return cls(
             name,
-            data.associated_network_addresses[0],
+            macaddr,
             nic.location,
             data.current_link_speed_mbps,
             nic.model,
@@ -81,6 +84,15 @@ class Interface:
             data.get("speed", 0),
             nic.model,
         )
+
+    @classmethod
+    def fetch_macaddr_from_sys_resource(cls, data: NetworkPort) -> str:
+        try:
+            path = f"{data.root.get_system().ethernet_interfaces.path}/{data.identity}"
+            macaddr = data.root.get_system().ethernet_interfaces.get_member(path).mac_address
+        except ResourceNotFoundError:
+            macaddr = ''
+        return macaddr
 
 
 @dataclass
