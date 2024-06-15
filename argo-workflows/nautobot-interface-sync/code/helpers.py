@@ -58,6 +58,6 @@ def oob_sushy_session(oob_ip, oob_username, oob_password):
 
 def is_off_board(interface):
     return (
-        "Embedded" not in interface.location
-        and "Integrated" not in interface.name
+        "Embedded ALOM" in interface.location
+        or "Embedded" not in interface.location
     )
