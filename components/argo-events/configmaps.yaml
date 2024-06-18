@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  url: http://nautobot-default.nautobot.svc
+kind: ConfigMap
+metadata:
+  name: nautobot
+  namespace: argo-events
+  labels:
+    workflows.argoproj.io/configmap-type: Parameter
