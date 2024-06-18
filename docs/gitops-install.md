@@ -173,9 +173,7 @@ If you do not have ArgoCD deployed then you can use the following:
 
 ```bash
 cd ${UC_DEPLOY}
-kubectl kustomize --enable-helm \
-    https://github.com/rackerlabs/understack/bootstrap/argocd/ \
-    | kubectl apply -f -
+kubectl kustomize --enable-helm https://github.com/rackerlabs/understack/bootstrap/ | kubectl apply -f -
 ```
 
 Now configure ArgoCD to be able to authenticate against Dex IdP.
