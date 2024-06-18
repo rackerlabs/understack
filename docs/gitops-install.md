@@ -114,6 +114,15 @@ your shell.
 
 TODO: some examples and documentation on how to build out a cluster
 
+### Bootstrapping ArgoCD and Sealed-Secrets
+
+If you do not have ArgoCD deployed then you can use the following:
+
+```bash
+cd ${UC_DEPLOY}
+kubectl kustomize --enable-helm https://github.com/rackerlabs/understack/bootstrap/ | kubectl apply -f -
+```
+
 ### Generating secrets
 
 Secrets in their very nature are sensitive pieces of data. The ultimate
@@ -166,14 +175,7 @@ At this point we will use our configs to make the actual deployment.
 Make sure everything you've committed to your deployment repo is pushed
 to your git server so that ArgoCD can access it.
 
-If you do not have ArgoCD deployed then you can use the following:
-
-```bash
-cd ${UC_DEPLOY}
-kubectl kustomize --enable-helm https://github.com/rackerlabs/understack/bootstrap/ | kubectl apply -f -
-```
-
-Now configure ArgoCD to be able to authenticate against Dex IdP.
+Configure ArgoCD to be able to authenticate against Dex IdP.
 
 ```bash
 kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-argocd-sso-argocd.yaml"
