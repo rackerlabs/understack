@@ -111,6 +111,13 @@ export IRONIC_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
 export IRONIC_DB_PASSWORD="$(./scripts/pwgen.sh)"
 # rabbitmq user password for the ironic queues
 export IRONIC_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
+# neutron keystone service account
+export NEUTRON_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
+# neutron user password in mariadb for neutron db
+export NEUTRON_DB_PASSWORD="$(./scripts/pwgen.sh)"
+# rabbitmq user password for the neutron queues
+export NEUTRON_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
+
 
 [ ! -f "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml" ] && \
 kubectl --namespace openstack \
@@ -160,6 +167,30 @@ kubectl --namespace openstack \
     --from-literal=username="ironic" \
     --from-literal=password="${IRONIC_KEYSTONE_PASSWORD}" \
     --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-ironic-keystone-password.yaml"
+
+# neutron credentials
+[ ! -f "${DEST_DIR}/secret-neutron-rabbitmq-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic neutron-rabbitmq-password \
+    --type Opaque \
+    --from-literal=username="neutron" \
+    --from-literal=password="${NEUTRON_RABBITMQ_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-neutron-rabbitmq-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-neutron-db-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic neutron-db-password \
+    --type Opaque \
+    --from-literal=password="${NEUTRON_DB_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-neutron-db-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-neutron-keystone-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic neutron-keystone-password \
+    --type Opaque \
+    --from-literal=username="neutron" \
+    --from-literal=password="${NEUTRON_KEYSTONE_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-neutron-keystone-password.yaml"
 
 if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
     [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
