@@ -7,6 +7,16 @@ function usage() {
     exit 1
 }
 
+if ! type -p kubeseal kubectl > /dev/null; then
+    echo "You must have kubeseal & kubectl installed to use this script" >&2
+    exit 1
+fi
+
+if ! $(kubectl api-resources | grep -q sealedsecrets); then
+    echo "Your cluster doesn't appear to have the sealed secrets operator installed." >&2
+    exit 1
+fi
+
 function secret-seal-stdin() {
     # this is meant to be piped to
     # $1 is output file, -w

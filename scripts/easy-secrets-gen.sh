@@ -9,6 +9,11 @@ if ! type -p kubeseal kubectl > /dev/null; then
     exit 1
 fi
 
+if ! $(kubectl api-resources | grep -q sealedsecrets); then
+    echo "Your cluster doesn't appear to have the sealed secrets operator installed." >&2
+    exit 1
+fi
+
 function secret-seal-stdin() {
     # this is meant to be piped to
     # $1 is output file, -w
