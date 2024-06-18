@@ -25,3 +25,12 @@ repos:
           - --line-length=120
           - --check
           - --diff
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.28.4
+    hooks:
+      - id: check-jsonschema
+        name: validate argo workflows / workflowtemplates
+        args:
+          - --schemafile
+          - https://raw.githubusercontent.com/argoproj/argo-workflows/master/api/jsonschema/schema.json
+        files: "argo-workflows/.*/(workflows|workflowtemplates)/.*.(yml|yaml)$"
