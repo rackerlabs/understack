@@ -9,6 +9,14 @@ rules:
   - argoproj.io
   resources:
   - workflows
+  verbs:
+  - list
+  - update
+  - create
+  - patch
+- apiGroups:
+  - argoproj.io
+  resources:
   - workflowtemplates
   verbs:
   - list
