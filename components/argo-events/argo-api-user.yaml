@@ -9,6 +9,7 @@ rules:
   - argoproj.io
   resources:
   - workflows
+  - workflowtemplates
   verbs:
   - list
   - update
