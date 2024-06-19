@@ -1,0 +1,44 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argoapi
+  namespace: argo-events
+rules:
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflows
+  verbs:
+  - list
+  - update
+  - create
+  - patch
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argoapi
+  namespace: argo-events
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argoapi
+  namespace: argo-events
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argoapi
+subjects:
+- kind: ServiceAccount
+  name: argoapi
+  namespace: argo-events
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argoapi.service-account-token
+  annotations:
+    kubernetes.io/service-account.name: argoapi
+type: kubernetes.io/service-account-token
