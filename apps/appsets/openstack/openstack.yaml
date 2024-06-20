@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: openstack
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  argocd.argoproj.io/secret-type: cluster
+          - list:
+              elements:
+                - component: keystone
+                  chartVersion: 0.3.13
+                - component: ironic
+                  chartVersion: 0.2.15
+  template:
+    metadata:
+      name: '{{.name}}-{{.component}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      sources:
+        - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+          path: components/{{.component}}/
+          targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+          ref: understack
+        - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
+          chart: '{{.component}}'
+          targetRevision: '{{.chartVersion}}'
+          helm:
+            releaseName: '{{.component}}'
+            valueFiles:
+              - $understack/components/openstack-2024.1-jammy.yaml
+              - $understack/components/{{.component}}/aio-values.yaml
+              - $secrets/secrets/{{.name}}/secret-openstack.yaml
+              - $secrets/helm-configs/{{.name}}/{{.component}}.yaml
+        - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+          path: secrets/{{.name}}/
+          targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+          directory:
+            include: 'secret-{{.component}}-*.yaml'
+          ref: secrets
+      ignoreDifferences:
+        - kind: Secret
+          name: keystone-fernet-keys
+          jqPathExpressions:
+            - .data
+        - kind: Secret
+          name: keystone-credential-keys
+          jqPathExpressions:
+            - .data
+      destination:
+        server: '{{.server}}'
+        namespace: openstack
+      syncPolicy:
+        automated:
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - RespectIgnoreDifferences=true
+        managedNamespaceMetadata:
+          labels:
+            kubernetes.io/metadata.name: openstack
+            name: openstack
