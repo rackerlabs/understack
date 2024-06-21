@@ -67,6 +67,7 @@ validation:
 nav:
   - Home: index.md
   - 'Getting Started':
+    - vision.md
     - 'Prerequisites':
       - kubernetes.md
       - openstack-helm.md
