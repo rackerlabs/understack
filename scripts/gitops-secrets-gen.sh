@@ -132,11 +132,14 @@ EOF
 fi
 
 echo "Creating Cert Manager Cluster Issuer"
+[ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster-issuer.yaml" ] && \
+    mv -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster-issuer.yaml" "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/"
 cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/cluster-issuer.yaml"
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: ${DEPLOY_NAME}-cluster-issuer
+  namespace: cert-manager
 spec:
   acme:
     email: ${UC_DEPLOY_EMAIL}
