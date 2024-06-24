@@ -12,8 +12,8 @@ conf:
         session_cookie_secure: "True"
         session_cookie_httponly: "True"
         allowed_hosts:
+          - '*'
           - 'horizon.uc.ohthree.com'
-          - 'https://horizon.uc.ohthree.com'
 
 # (nicholas.kuechler) updating the jobs list to remove the 'horizon-db-init' job.
 dependencies:
