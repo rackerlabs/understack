@@ -1,1 +1,1 @@
-# OpenStack Neutron
+# OpenStack Horizon
