@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            argocd.argoproj.io/secret-type: cluster
+  template:
+    metadata:
+      name: '{{.name}}-argocd'
+    spec:
+      project: default
+      source:
+        repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+        path: bootstrap/argocd/
+        targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+        kustomize:
+          patches:
+            - target:
+                kind: ConfigMap
+                name: argocd-cm
+              patch: |-
+                - op: replace
+                  path: /data/url
+                  value: https://argocd.{{index .metadata.annotations "dns_zone"}}
+      destination:
+        server: '{{.server}}'
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -177,7 +177,7 @@ to your git server so that ArgoCD can access it.
 Configure ArgoCD to be able to authenticate against Dex IdP.
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-argocd-sso-argocd.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-argocd-sso-argocd.yaml"
 ```
 
 Then configure your ArgoCD to be aware of your cluster:

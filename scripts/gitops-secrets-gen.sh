@@ -57,7 +57,9 @@ if [ "x${DEPLOY_NAME}" = "x" ]; then
     usage
 fi
 
-if [ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" ]; then
+[ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy.repo.yaml" ] && \
+    mv -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/"
+if [ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-deploy-repo.yaml" ]; then
     NO_SECRET_DEPLOY=1
 else
     if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
