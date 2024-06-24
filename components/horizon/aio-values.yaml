@@ -1,6 +1,12 @@
 ---
 release_group: null
 
+conf:
+  horizon:
+    local_settings:
+      config:
+        debug: "True"
+
 # (nicholas.kuechler) updating the jobs list to remove the 'horizon-db-init' job.
 dependencies:
   dynamic:
