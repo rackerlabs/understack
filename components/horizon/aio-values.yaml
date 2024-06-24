@@ -7,6 +7,10 @@ conf:
       config:
         debug: "True"
         use_ssl: "True"
+        csrf_cookie_secure: "True"
+        allowed_hosts:
+          - '*'
+          - 'https://horizon.uc.ohthree.com'
 
 # (nicholas.kuechler) updating the jobs list to remove the 'horizon-db-init' job.
 dependencies:
