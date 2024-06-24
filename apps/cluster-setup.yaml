@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-setup
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  argocd.argoproj.io/secret-type: cluster
+          - git:
+              repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+              revision: '{{index .metadata.annotations "uc_repo_ref"}}'
+              directories:
+                - path: apps/appsets/*
+  template:
+    metadata:
+      name: '{{.name}}-{{.path.basename}}-appset'
+    spec:
+      project: default
+      source:
+        repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+        path: '{{.path.path}}'
+        targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+        directory:
+          recurse: true
+      destination:
+        server: '{{.server}}'
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -119,7 +119,6 @@ TODO: some examples and documentation on how to build out a cluster
 If you do not have ArgoCD deployed then you can use the following:
 
 ```bash
-cd ${UC_DEPLOY}
 kubectl kustomize --enable-helm https://github.com/rackerlabs/understack/bootstrap/ | kubectl apply -f -
 ```
 
@@ -181,6 +180,12 @@ Configure ArgoCD to be able to authenticate against Dex IdP.
 kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-argocd-sso-argocd.yaml"
 ```
 
+Then configure your ArgoCD to be aware of your cluster:
+
+```bash
+kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-*-cluster.yaml"
+```
+
 Now configure your ArgoCD to have the credential access to your deploy repo:
 
 ```bash
@@ -191,6 +196,8 @@ Finally run the following to have ArgoCD deploy the system:
 
 ```bash
 kubectl apply -f "${UC_DEPLOY}/clusters/${DEPLOY_NAME}/app-of-apps.yaml"
+# from your understack checkout
+kubectl apply -f apps/cluster-setup.yaml
 ```
 
 At this point ArgoCD will work to deploy Understack.
