@@ -19,7 +19,7 @@ conf:
       enabled_deploy_interfaces: direct,ramdisk
       default_deploy_interface: direct
       enabled_bios_interfaces: no-bios,redfish
-      enabled_boot_interfaces: http-ipxe,http,redfish-virtual-media,ipxe,pxe
+      enabled_boot_interfaces: http-ipxe,http,redfish-virtual-media,redfish-https,ipxe,pxe
       enabled_hardware_types: ipmi,redfish,manual-management
       enabled_inspect_interfaces: redfish,no-inspect
       enabled_management_interfaces: noop,ipmitool,redfish
