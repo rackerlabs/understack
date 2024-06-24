@@ -6,8 +6,10 @@ conf:
     local_settings:
       config:
         debug: "True"
+        endpoint_type: "publicURL"
         use_ssl: "True"
         csrf_cookie_secure: "True"
+        session_cookie_secure: "True"
         allowed_hosts:
           - '*'
           - 'horizon.uc.ohthree.com'
