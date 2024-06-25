@@ -206,14 +206,14 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=username="nova" \
     --from-literal=password="${NOVA_RABBITMQ_PASSWORD}" \
-    --dry-run=client -o yaml > "${DEST_DIR}/secret-nova-rabbitmq-password.yaml"
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-rabbitmq-password.yaml"
 
 [ ! -f "${DEST_DIR}/secret-nova-db-password.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic nova-db-password \
     --type Opaque \
     --from-literal=password="${NOVA_DB_PASSWORD}" \
-    --dry-run=client -o yaml > "${DEST_DIR}/secret-nova-db-password.yaml"
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-db-password.yaml"
 
 [ ! -f "${DEST_DIR}/secret-nova-keystone-password.yaml" ] && \
 kubectl --namespace openstack \
@@ -221,7 +221,7 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=username="nova" \
     --from-literal=password="${NOVA_KEYSTONE_PASSWORD}" \
-    --dry-run=client -o yaml > "${DEST_DIR}/secret-nova-keystone-password.yaml"
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-keystone-password.yaml"
 
 if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
     [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
