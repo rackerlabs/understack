@@ -96,6 +96,8 @@ for ns in argocd dex; do
     | secret-seal-stdin "${DEST_DIR}/secret-argocd-sso-$ns.yaml"
 done
 unset ARGOCD_SSO_SECRET
+mkdir -p "${DEST_DIR}/cluster/"
+mv -f "${DEST_DIR}/secret-argocd-sso-argocd.yaml" "${DEST_DIR}/cluster/"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 export MEMCACHE_SECRET_KEY="$(./scripts/pwgen.sh 64)"

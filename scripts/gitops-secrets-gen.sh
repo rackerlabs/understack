@@ -57,7 +57,9 @@ if [ "x${DEPLOY_NAME}" = "x" ]; then
     usage
 fi
 
-if [ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" ]; then
+[ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy.repo.yaml" ] && \
+    mv -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/"
+if [ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-deploy-repo.yaml" ]; then
     NO_SECRET_DEPLOY=1
 else
     if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
@@ -90,14 +92,36 @@ export DO_TMPL_VALUES=y
 mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 "${SCRIPTS_DIR}/easy-secrets-gen.sh" "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 
+mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
+echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
+cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-${DEPLOY_NAME}-cluster.yaml"
+apiVersion: v1
+kind: Secret
+data:
+  config: $(printf '{"tlsClientConfig":{"insecure":false}}' | base64)
+  name: $(printf "$DEPLOY_NAME" | base64)
+  server: $(printf "https://kubernetes.default.svc" | base64)
+metadata:
+  name: ${DEPLOY_NAME}-cluster
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+  annotations:
+    uc_repo_git_url: "https://github.com/rackerlabs/understack.git"
+    uc_repo_ref: "HEAD"
+    uc_deploy_git_url: "$UC_DEPLOY_GIT_URL"
+    uc_deploy_ref: "HEAD"
+    dns_zone: "$DNS_ZONE"
+EOF
+
 if [ "x${NO_SECRET_DEPLOY}" = "x" ]; then
-    echo "Creating ArgoCD config"
-    mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd"
-    cat << EOF | secret-seal-stdin "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
+    echo "Creating ArgoCD repo-creds"
+    cat << EOF | secret-seal-stdin "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-deploy-repo.yaml"
 apiVersion: v1
 kind: Secret
 metadata:
   name: ${DEPLOY_NAME}-repo
+  namespace: argocd
   labels:
     argocd.argoproj.io/secret-type: repo-creds
 data:
@@ -108,11 +132,14 @@ EOF
 fi
 
 echo "Creating Cert Manager Cluster Issuer"
-cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster-issuer.yaml"
+[ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster-issuer.yaml" ] && \
+    mv -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster-issuer.yaml" "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/"
+cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/cluster-issuer.yaml"
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: ${DEPLOY_NAME}-cluster-issuer
+  namespace: cert-manager
 spec:
   acme:
     email: ${UC_DEPLOY_EMAIL}
@@ -124,6 +151,11 @@ spec:
         ingress:
           ingressClassName: nginx
 EOF
+
+pushd "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
+rm -rf kustomization.yaml
+kustomize create --autodetect
+popd
 
 # Placeholders don't need sealing
 if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml" ]; then

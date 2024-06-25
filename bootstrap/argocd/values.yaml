@@ -5,8 +5,8 @@ notifications:
   # disable notifying users or GitHub
   enabled: false
 applicationSet:
-  # disable the ApplicationSet controller to auto-generate Applications
-  enabled: false
+  # enable the ApplicationSet controller to auto-generate Applications
+  enabled: true
 server:
   extraArgs:
     - --insecure
