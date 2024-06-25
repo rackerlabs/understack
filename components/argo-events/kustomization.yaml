@@ -22,3 +22,6 @@ resources:
   - workflow-role.yaml
 
   - configmaps.yaml
+
+  # adds argoapi service account user
+  - argo-api-user.yaml
