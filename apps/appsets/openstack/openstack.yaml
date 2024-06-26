@@ -18,6 +18,10 @@ spec:
                   chartVersion: 0.3.13
                 - component: ironic
                   chartVersion: 0.2.15
+                - component: neutron
+                  chartVersion: 0.3.44
+                - component: nova
+                  chartVersion: 0.3.42
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
