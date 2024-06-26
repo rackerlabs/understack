@@ -83,7 +83,9 @@ dhcp-authoritative
 # pool {{ name }}
 {{ dhcp_config(name) }}
 {% endfor %}
+{% if dhcp_proxy_list | length > 0 %}
 dhcp-proxy={{ dhcp_proxy_list|join(',') }}
+{% endif %}
 dhcp-allowed-srvids={{ dhcp_allowed_srvids_list|join(',') }}
 enable-tftp
 tftp-no-fail
