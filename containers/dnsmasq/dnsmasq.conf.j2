@@ -32,19 +32,20 @@ log-queries=extra
 # don't advertise /etc/hosts entries
 no-hosts
 
+{% macro dhcp_config(name) -%}
 # common DHCP config
 # the environment variables will be named like:
-# DHCP_RELAY_MAC_$NAME
-# DHCP_RANGE_$NAME
-# DHCP_OPTION_$NAME_$OPTION
-# DHCP_ALLOWED_SRVIDS_$NAME
-{% macro dhcp_config(name) -%}
 {% set dhcp_circuitid = "DHCP_SETTAG_" ~ name|upper ~ "_CIRCUITID" -%}
+# {{ dhcp_circuitid }}
 {% set dhcp_range = "DHCP_RANGE_" ~ name|upper -%}
+# {{ dhcp_range }}
 {% set dhcp_proxy = "DHCP_PROXY_" ~ name|upper -%}
+# {{ dhcp_proxy }}
 {% set dhcp_option = "DHCP_OPTION_" ~ name|upper ~ "_" -%}
+# {{ dhcp_option }}_$OPTION
 {% set dhcp_allowed = "DHCP_ALLOWED_SRVIDS_" ~ name|upper -%}
-{% if env[dhcp_circuitid] is defined %}
+# {{ dhcp_allowed }}
+{% if env[dhcp_circuitid] is defined and env[dhcp_circuitid] %}
 # tag the traffic with the PXE relay MAC
 {% set tag = name|lower ~ "," -%}
 dhcp-circuitid=set:{{ tag }}{{ env[dhcp_circuitid] }}
@@ -54,7 +55,7 @@ dhcp-circuitid=set:{{ tag }}{{ env[dhcp_circuitid] }}
 {%- endif %}
 dhcp-range={{ tag }}{{ env[dhcp_range] }}
 shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_range].split(',')[0] }}
-{% if env[dhcp_proxy] is defined -%}
+{% if env[dhcp_proxy] is defined and env[dhcp_proxy] -%}
 shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_proxy] }}
 {{ dhcp_proxy_list.append(env[dhcp_proxy]) or '' }}
 {%- endif %}
@@ -67,7 +68,7 @@ shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_pro
 {% endif -%}
 dhcp-option={{ tag }}{{ option_prefix }}{{ option|replace('_', '-')|lower }},{{ value }}
 {%- endfor %}
-{% if env[dhcp_allowed] is defined %}
+{% if env[dhcp_allowed] is defined and env[dhcp_allowed] %}
 {{ dhcp_allowed_srvids_list.append(env[dhcp_allowed]) or '' }}
 {%- endif %}
 {%- endmacro %}
@@ -76,13 +77,16 @@ dhcp-authoritative
 # DHCP ranges to hand out
 {% set dhcp_proxy_list = [] -%}
 {% set dhcp_allowed_srvids_list = [] -%}
+{% if env.POD_IP is defined and env.POD_IP -%}
 {{ dhcp_proxy_list.append(env.POD_IP) or '' }}
+{%- endif %}
 {% set dhcp_tags_str = env.DHCP_TAGS|default('default') -%}
 {% set dhcp_tags = dhcp_tags_str.split(',') -%}
 {% for name in dhcp_tags %}
 # pool {{ name }}
 {{ dhcp_config(name) }}
 {% endfor %}
+# dhcp_proxy_list '{{ dhcp_proxy_list }}'
 {% if dhcp_proxy_list | length > 0 %}
 dhcp-proxy={{ dhcp_proxy_list|join(',') }}
 {% endif %}
