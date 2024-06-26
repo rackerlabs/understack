@@ -8,9 +8,11 @@ spec:
   - '*'
   destinations:
   # make sure our operators don't install in the wrong place
-  - namespace: '!nautobot'
+  - namespace: 'rabbitmq-system'
     server: '*'
-  - namespace: '!openstack'
+  - namespace: 'mariadb-operator'
+    server: '*'
+  - namespace: 'postgres-operator'
     server: '*'
   clusterResourceWhitelist:
   - group: '*'
