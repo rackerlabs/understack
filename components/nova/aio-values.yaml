@@ -58,7 +58,9 @@ manifests:
   job_db_init: false
   job_rabbit_init: false
   pod_rally_test: false
-  secret_db: false
+  secret_db_api: true
+  secret_db_cell0: true
+  secret_db: true
   secret_keystone: true
 
 # we don't want to enable OpenStack Helm's
@@ -73,3 +75,18 @@ manifests:
 # editing the annotation which deletes the item
 # and wipes our keys.
 helm3_hook: false
+
+annotations:
+  job:
+    nova_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    nova_ks_service:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    nova_ks_user:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    nova_ks_endpoints:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
