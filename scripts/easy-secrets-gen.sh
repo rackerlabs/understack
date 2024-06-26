@@ -119,7 +119,12 @@ export NEUTRON_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
 export NEUTRON_DB_PASSWORD="$(./scripts/pwgen.sh)"
 # rabbitmq user password for the neutron queues
 export NEUTRON_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
-
+# nova keystone service account
+export NOVA_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
+# nova user password in mariadb for nova db
+export NOVA_DB_PASSWORD="$(./scripts/pwgen.sh)"
+# rabbitmq user password for the inovaronic queues
+export NOVA_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
 
 [ ! -f "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml" ] && \
 kubectl --namespace openstack \
@@ -193,6 +198,30 @@ kubectl --namespace openstack \
     --from-literal=username="neutron" \
     --from-literal=password="${NEUTRON_KEYSTONE_PASSWORD}" \
     --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-neutron-keystone-password.yaml"
+
+# nova credentials
+[ ! -f "${DEST_DIR}/secret-nova-rabbitmq-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic nova-rabbitmq-password \
+    --type Opaque \
+    --from-literal=username="nova" \
+    --from-literal=password="${NOVA_RABBITMQ_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-rabbitmq-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-nova-db-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic nova-db-password \
+    --type Opaque \
+    --from-literal=password="${NOVA_DB_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-db-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-nova-keystone-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic nova-keystone-password \
+    --type Opaque \
+    --from-literal=username="nova" \
+    --from-literal=password="${NOVA_KEYSTONE_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-keystone-password.yaml"
 
 if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
     [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
