@@ -61,4 +61,8 @@ images:
     nova_spiceproxy_assets: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
     nova_service_cleaner: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
+    # placement
+    placement: "docker.io/openstackhelm/placement:2024.1-ubuntu_jammy"
+    placement_db_sync: "docker.io/openstackhelm/placement:2024.1-ubuntu_jammy"
+
 ...
