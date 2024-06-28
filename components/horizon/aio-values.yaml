@@ -23,8 +23,6 @@ dependencies:
   static:
     db_sync:
       jobs:
-    dhcp:
-      jobs:
 
 manifests:
   job_db_init: false
