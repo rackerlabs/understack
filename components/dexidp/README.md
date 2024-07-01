@@ -40,10 +40,6 @@ via DNS names and not have to patch your `/etc/hosts` or the DNS resolution in t
 
 ## Azure authentication
 
-Dex can optionally be configured to allow authentication through Azure SSO. The
-exact steps to configure this are available in
-[01-secrets/README.md](../01-secrets/README.md).
-
 [socialauth]: https://python-social-auth.readthedocs.io/en/latest/backends/oidc.html
 [disco]: https://openid.net/specs/openid-connect-discovery-1_0.html
 [authzcodegrant]: https://datatracker.ietf.org/doc/html/rfc6749#section-4.1
