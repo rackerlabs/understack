@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: operators
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  argocd.argoproj.io/secret-type: cluster
+          - git:
+              repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+              revision: '{{index .metadata.annotations "uc_repo_ref"}}'
+              directories:
+                - path: operators/*
+  template:
+    metadata:
+      name: '{{.name}}-{{.path.basename}}'
+    spec:
+      project: operators
+      source:
+        repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+        targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+        path: '{{.path.path}}'
+      destination:
+        server: '{{.server}}'
+        namespace: '{{.path.basename}}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

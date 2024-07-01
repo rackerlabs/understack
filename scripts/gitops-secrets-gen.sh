@@ -139,7 +139,6 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: ${DEPLOY_NAME}-cluster-issuer
-  namespace: cert-manager
 spec:
   acme:
     email: ${UC_DEPLOY_EMAIL}
