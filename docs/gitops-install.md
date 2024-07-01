@@ -1,8 +1,8 @@
-# GitOps based Install
+# Dev Environment GitOps based Install
 
 This guide is not meant to be a definitive guide to [GitOps][gitops] and
 how it can be used with UnderStack or even a best practices example
-but instead focused on an example development oriented installation.
+but instead focused on an example _development_ oriented installation.
 It will make a few assumptions and some opinionated choices that may
 not align with a production best practices installation.
 Most notable assumptions are:
