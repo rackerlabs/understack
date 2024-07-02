@@ -131,9 +131,6 @@ Generate secrets:
 # make the namespaces where the secrets will live
 kubectl create ns openstack
 kubectl create ns nautobot
-
-# load the secrets
-kubectl apply -k components/01-secrets/
 ```
 
 ```bash
