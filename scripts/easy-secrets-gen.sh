@@ -125,6 +125,12 @@ export NOVA_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
 export NOVA_DB_PASSWORD="$(./scripts/pwgen.sh)"
 # rabbitmq user password for the inovaronic queues
 export NOVA_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
+# horizon user password for database
+export HORIZON_DB_PASSWORD="$(./scripts/pwgen.sh)"
+# placement keystone service account
+export PLACEMENT_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
+# placement user password for database
+export PLACEMENT_DB_PASSWORD="$(./scripts/pwgen.sh)"
 
 [ ! -f "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml" ] && \
 kubectl --namespace openstack \
@@ -222,6 +228,30 @@ kubectl --namespace openstack \
     --from-literal=username="nova" \
     --from-literal=password="${NOVA_KEYSTONE_PASSWORD}" \
     --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-keystone-password.yaml"
+
+# horizon credentials
+[ ! -f "${DEST_DIR}/secret-horizon-db-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic horizon-db-password \
+    --type Opaque \
+    --from-literal=password="${HORIZON_DB_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-horizon-db-password.yaml"
+
+# placement credentials
+[ ! -f "${DEST_DIR}/secret-placement-keystone-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic placement-keystone-password \
+    --type Opaque \
+    --from-literal=username="placement" \
+    --from-literal=password="${PLACEMENT_KEYSTONE_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-placement-keystone-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-placement-db-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic placement-db-password \
+    --type Opaque \
+    --from-literal=password="${PLACEMENT_DB_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-placement-db-password.yaml"
 
 if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
     [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
