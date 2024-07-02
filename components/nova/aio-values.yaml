@@ -1,6 +1,13 @@
 ---
 release_group: null
 
+# temporarily set this to the same as the control plane
+labels:
+  agent:
+    compute_ironic:
+      node_selector_key: openstack-control-plane
+      node_selector_value: enabled
+
 # typically overridden by environmental
 # values, but should include all endpoints
 # required by this chart
@@ -13,10 +20,25 @@ endpoints:
       default: rabbitmq-nodes
 
 network:
+  # we're using ironic and actual switches
+  backend:
+    - baremetal
+
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
   use_external_ingress_controller: true
+
+conf:
+  ceph:
+    # ceph is providing block storage to VM creation and is connected via libvirt
+    # we aren't using this so we don't want to enable this part of the chart
+    enabled: false
+
+console:
+  # we are working with baremetal nodes and not QEMU so we don't need novnc or spice
+  # connected to QEMU
+  console_kind: none
 
 # (nicholas.kuechler) Using custom dependencies in order to
 # prevent the nova-db-init and nova-rabbit-init jobs from running
@@ -39,15 +61,28 @@ dependencies:
     cell_setup:
       jobs:
         - nova-db-sync
+      # remove default dependency to run on the same node as a compute service
+      pod: []
     service_cleaner:
       jobs:
         - nova-db-sync
     compute:
+      pod: []
       jobs:
         - nova-db-sync
     compute_ironic:
       jobs:
         - nova-db-sync
+      # this chunk is here just to disable waiting on glance/image service
+      services:
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: compute
+        - endpoint: internal
+          service: network
+        - endpoint: internal
+          service: baremetal
     conductor:
       jobs:
         - nova-db-sync
@@ -63,11 +98,14 @@ dependencies:
 manifests:
   job_db_init: false
   job_rabbit_init: false
+  job_storage_init: false
   pod_rally_test: false
   secret_db_api: true
   secret_db_cell0: true
   secret_db: true
   secret_keystone: true
+  daemonset_compute: false
+  statefulset_compute_ironic: true
 
 # we don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as
@@ -94,5 +132,8 @@ annotations:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
     nova_ks_endpoints:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    nova_cell_setup:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
