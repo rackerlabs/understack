@@ -22,6 +22,8 @@ spec:
                   chartVersion: 0.3.44
                 - component: nova
                   chartVersion: 0.3.42
+                - component: placement
+                  chartVersion: 0.3.15
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
