@@ -4,7 +4,7 @@ metadata:
   finalizers:
     - sensor-controller
   labels:
-    argocd.argoproj.io/instance: argo-events
+    argocd.argoproj.io/instance: argo-workflows-templates
   name: nautobot-interface-update
   namespace: argo-events
 spec:
@@ -74,3 +74,11 @@ spec:
                           templateRef:
                             name: synchronize-obm-creds
                             template: main
+                      - - name: synchronize-interfaces-to-ironic
+                          templateRef:
+                            name: synchronize-interfaces-to-ironic
+                            template: main
+                          arguments:
+                            parameters:
+                              - name: node_id
+                                value: "{{workflow.parameters.interface_update_event.device.id}}"
