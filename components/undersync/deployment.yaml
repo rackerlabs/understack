@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: undersync-deployment
+  labels:
+    app: undersync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: undersync
+  template:
+    metadata:
+      labels:
+        app: undersync
+    spec:
+      containers:
+      - name: undersync
+        image: ghcr.io/rss-engineering/undersync/undersync:latest
+        ports:
+        - containerPort: 8080
