@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: synchronize-interfaces-to-ironic
+kind: WorkflowTemplate
+spec:
+  arguments:
+    parameters:
+      - name: device_id
+  entrypoint: main
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: device_id
+      container:
+        image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:0.0.3
+        command:
+          - python
+          - /app/synchronize-interfaces.py
+        args:
+          - --device-id
+          - "{{inputs.parameters.device_id}}"
+          - --debug
+        volumeMounts:
+          - mountPath: /etc/ironic-secrets/
+            name: ironic-secrets
+            readOnly: true
+      volumes:
+        - name: ironic-secrets
+          secret:
+            secretName: production-ironic-for-argo-creds

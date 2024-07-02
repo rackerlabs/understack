@@ -2,7 +2,7 @@ ARG BASE=ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest
 
 FROM ${BASE} as builder
 RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
-RUN --mount=type=cache,target=/root/.cache/.pip pip install python-ironicclient==5.5.0
+RUN --mount=type=cache,target=/root/.cache/.pip pip install python-ironicclient==5.5.0 pydantic==2.8.0
 
 FROM ${BASE} as prod
 ARG APP_PATH=/app
