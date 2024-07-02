@@ -12,6 +12,12 @@ endpoints:
     hosts:
       default: rabbitmq-nodes
 
+network:
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:
   dynamic:
