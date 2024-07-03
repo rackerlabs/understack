@@ -5,12 +5,13 @@ kind: WorkflowTemplate
 spec:
   arguments:
     parameters:
-      - name: node_id
+      - name: device_id
+  entrypoint: main
   templates:
     - name: main
       inputs:
         parameters:
-          - name: node_id
+          - name: device_id
       container:
         image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:0.0.3
         command:
@@ -18,7 +19,7 @@ spec:
           - /app/synchronize-interfaces.py
         args:
           - --device-id
-          - "{{inputs.parameters.node_id}}"
+          - "{{inputs.parameters.device_id}}"
           - --debug
         volumeMounts:
           - mountPath: /etc/ironic-secrets/
