@@ -80,5 +80,5 @@ spec:
                             template: main
                           arguments:
                             parameters:
-                              - name: node_id
-                                value: "{{workflow.parameters.interface_update_event.device.id}}"
+                              - name: device_id
+                                value: "{{=jsonpath(workflow.parameters.interface_update_event, '$.data.device.id')}}"
