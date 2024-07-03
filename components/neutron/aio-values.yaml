@@ -12,6 +12,37 @@ endpoints:
     hosts:
       default: rabbitmq-nodes
 
+network:
+  # we're using ironic and actual switches
+  backend:
+    - baremetal
+
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+
+conf:
+  plugins:
+    ml2_conf:
+      ml2:
+        # set the default ml2 backend as the logger for testing, actual deployment should override
+        mechanism_drivers: logger
+  neutron:
+    DEFAULT:
+      # we aren't using neutron routers
+      service_plugins: ""
+      # we don't want HA L3 routers. It's a Python value so we need to quote it in YAML.
+      l3_ha: "False"
+      # we aren't using availability zones so having calls attempt to add things to
+      # availability zones won't work.
+      default_availability_zones: ""
+
+# disable the neutron-ironic-agent from loading a non-existent config
+pod:
+  use_fqdn:
+    neutron_agent: false
+
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:
   dynamic:
@@ -60,6 +91,7 @@ manifests:
   daemonset_l2gw_agent: false
   daemonset_bagpipe_bgp: false
   daemonset_bgp_dragent: false
+  daemonset_netns_cleanup_cron: false
   deployment_ironic_agent: true
 
 # We don't want to enable OpenStack Helm's
@@ -74,3 +106,18 @@ manifests:
 # editing the annotation which deletes the item
 # and wipes our keys.
 helm3_hook: false
+
+annotations:
+  job:
+    neutron_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    neutron_ks_service:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    neutron_ks_user:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    neutron_ks_endpoints:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation

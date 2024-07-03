@@ -31,4 +31,38 @@ images:
     ironic_retrive_cleaning_network: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
     ironic_retrive_swift_config: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
 
+    # neutron
+    neutron_db_sync: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_dhcp: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_l3: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_l2gw: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_linuxbridge_agent: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_metadata: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_ovn_metadata: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_openvswitch_agent: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_server: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_rpc_server: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_bagpipe_bgp: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+    neutron_netns_cleanup_cron: "docker.io/openstackhelm/neutron:2024.1-ubuntu_jammy"
+
+    # nova
+    nova_api: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_cell_setup: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_cell_setup_init: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
+    nova_compute: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_compute_ironic: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_compute_ssh: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_conductor: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_db_sync: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_novncproxy: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_novncproxy_assets: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_scheduler: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_spiceproxy: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_spiceproxy_assets: "docker.io/openstackhelm/nova:2024.1-ubuntu_jammy"
+    nova_service_cleaner: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
+
+    # placement
+    placement: "docker.io/openstackhelm/placement:2024.1-ubuntu_jammy"
+    placement_db_sync: "docker.io/openstackhelm/placement:2024.1-ubuntu_jammy"
+
 ...
