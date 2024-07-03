@@ -1,0 +1,53 @@
+---
+release_group: null
+
+conf:
+  horizon:
+    local_settings:
+      config:
+        debug: "False"
+        endpoint_type: "publicURL"
+        use_ssl: "True"
+        csrf_cookie_secure: "True"
+        session_cookie_secure: "True"
+        session_cookie_httponly: "True"
+        allowed_hosts:
+          - '*'
+
+network:
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+
+# (nicholas.kuechler) updating the jobs list to remove the 'horizon-db-init' job.
+dependencies:
+  dynamic:
+    common:
+      local_image_registry:
+        jobs: null
+  static:
+    db_sync:
+      jobs:
+
+manifests:
+  job_db_init: false
+
+# We don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete to become
+# healthy. Which they cannot because they are in
+# the post step and not in the main step.
+# Turning this on results in the keys jobs
+# editing the annotation which deletes the item
+# and wipes our keys.
+helm3_hook: false
+
+annotations:
+  job:
+    horizon_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation

@@ -1,0 +1,17 @@
+# add your values.yaml overrides for the helm chart here
+
+conf:
+  horizon:
+    local_settings:
+      config:
+        allowed_hosts:
+          - 'horizon.${DNS_ZONE}'
+        csrf_trusted_origins:
+          - "https://horizon.${DNS_ZONE}"
+
+network:
+  dashboard:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        cert-manager.io/cluster-issuer: ${DEPLOY_NAME}-cluster-issuer

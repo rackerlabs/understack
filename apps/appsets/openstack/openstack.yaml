@@ -24,6 +24,8 @@ spec:
                   chartVersion: 0.3.44
                 - component: nova
                   chartVersion: 0.3.42
+                - component: horizon
+                  chartVersion: 0.3.26
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
