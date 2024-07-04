@@ -21,7 +21,7 @@ spec:
                 - component: placement
                   chartVersion: 0.3.15
                 - component: neutron
-                  chartVersion: 0.3.44
+                  chartVersion: 0.3.45
                 - component: nova
                   chartVersion: 0.3.42
                 - component: horizon
