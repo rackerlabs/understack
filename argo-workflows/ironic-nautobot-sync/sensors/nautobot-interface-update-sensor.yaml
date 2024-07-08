@@ -26,7 +26,7 @@ spec:
             value:
               - iLO
               - iDRAC
-          - path: body.data.ip_addresses.0
+          - path: body.data.ip_addresses.0.address
             type: string
             value:
               - .*
