@@ -8,28 +8,19 @@ spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
-    - matrix:
-        generators:
-          - clusters:
-              selector:
-                matchLabels:
-                  argocd.argoproj.io/secret-type: cluster
-          - git:
-              repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-              revision: '{{index .metadata.annotations "uc_repo_ref"}}'
-              directories:
-                - path: apps/appsets/*
+    - clusters:
+        selector:
+          matchLabels:
+            argocd.argoproj.io/secret-type: cluster
   template:
     metadata:
-      name: '{{.name}}-{{.path.basename}}-appset'
+      name: '{{.name}}-cluster-setup'
     spec:
       project: default
       source:
         repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-        path: '{{.path.path}}'
+        path: 'apps'
         targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-        directory:
-          recurse: true
       destination:
         server: '{{.server}}'
         namespace: argocd
