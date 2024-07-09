@@ -1,4 +1,4 @@
-name: ironic container builds
+name: container builds
 
 on:
   push:
@@ -14,11 +14,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  ironic:
+  openstack:
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
+        project: [ironic]
         openstack: [2023.1, 2024.1]
 
     steps:
@@ -32,24 +33,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Ironic image metadata
-        id: ironic-meta
+      - name: image metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/rackerlabs/openstackhelm/ironic
+          images: ghcr.io/rackerlabs/openstackhelm/${{ matrix.project }}
           tags: |
             type=sha,enable={{is_default_branch}}
             type=raw,value=${{ matrix.openstack }}-ubuntu_jammy
-      - name: build and deploy Ironic container image to registry
+      - name: build and deploy container image to registry
         uses: docker/build-push-action@v5
         with:
           context: "{{defaultContext}}:containers"
-          file: Dockerfile.ironic
+          file: Dockerfile.${{ matrix.project }}
           build-args: OPENSTACK_VERSION=${{ matrix.openstack }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.ironic-meta.outputs.tags }}
-          labels: ${{ steps.ironic-meta.outputs.labels }}
-          annotations: ${{ steps.ironic-meta.outputs.annotations }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
 
   dnsmasq:
     runs-on: ubuntu-latest
