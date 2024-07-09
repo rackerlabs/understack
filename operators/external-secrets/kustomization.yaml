@@ -7,5 +7,5 @@ helmCharts:
   includeCRDs: true
   namespace: external-secrets
   releaseName: external-secrets
-  version: 0.9.19
+  version: 0.9.20
   repo: https://charts.external-secrets.io
