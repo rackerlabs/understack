@@ -328,6 +328,17 @@ if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
         > "${DEST_DIR}/secret-openstack.yaml"
 fi
 
+# Argo Events access to RabbitMQ - credentials
+for ns in argo-events openstack; do
+  [ ! -f "${DEST_DIR}/secret-argo-rabbitmq-password-$ns.yaml" ] && \
+  kubectl --namespace $ns \
+      create secret generic argo-rabbitmq-password \
+      --type Opaque \
+      --from-literal=username="argo" \
+      --from-literal=password="${ARGO_RABBITMQ_PASSWORD}" \
+      --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-argo-rabbitmq-password-$ns.yaml"
+done
+
 mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
 echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
 cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-${DEPLOY_NAME}-cluster.yaml"
