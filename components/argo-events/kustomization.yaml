@@ -19,6 +19,7 @@ resources:
   ## deploy argo-event components
   - native-eventbus.yaml
   - webhook-event-source.yaml
+  - openstack-event-source.yaml
 
   ## configure webhook Sensor and associated role
   - sensor-workflow-role.yaml
