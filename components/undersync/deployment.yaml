@@ -19,3 +19,11 @@ spec:
         image: ghcr.io/rss-engineering/undersync/undersync:latest
         ports:
         - containerPort: 8080
+        env:
+          - name: RACK_ENV
+            value: "production"
+        envFrom:
+          - secretRef:
+            name: settings
+      imagePullSecrets:
+      - name: dockerconfigjson-github-com
