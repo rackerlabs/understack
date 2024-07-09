@@ -24,6 +24,6 @@ spec:
             value: "production"
         envFrom:
           - secretRef:
-            name: settings
+              name: settings
       imagePullSecrets:
       - name: dockerconfigjson-github-com
