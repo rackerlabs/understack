@@ -1,27 +1,36 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: undersync
+  name: components
 spec:
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+    applicationsSync: create-update
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
-    - clusters:
-        selector:
-          matchLabels:
-            argocd.argoproj.io/secret-type: cluster
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  argocd.argoproj.io/secret-type: cluster
+          - list:
+              elements:
+                - component: openstack
+                - component: undersync
   template:
     metadata:
-      name: '{{.name}}-undersync'
+      name: '{{.name}}-{{.component}}'
     spec:
       project: default
       source:
         repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
         targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-        path: 'components/undersync'
+        path: 'components/{{.component}}'
       destination:
         server: '{{.server}}'
-        namespace: 'undersync'
+        namespace: '{{.component}}'
       syncPolicy:
         automated:
           selfHeal: true

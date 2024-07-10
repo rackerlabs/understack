@@ -3,6 +3,8 @@ kind: ApplicationSet
 metadata:
   name: cluster-config
 spec:
+  syncPolicy:
+    preserveResourcesOnDeletion: true
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
@@ -33,5 +35,4 @@ spec:
           prune: false
           selfHeal: true
         syncOptions:
-          - CreateNamespace=true
           - RespectIgnoreDifferences=true

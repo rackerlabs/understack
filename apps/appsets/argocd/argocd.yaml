@@ -3,6 +3,9 @@ kind: ApplicationSet
 metadata:
   name: argocd
 spec:
+  syncPolicy:
+    applicationsSync: create-update
+    preserveResourcesOnDeletion: true
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
@@ -37,3 +40,6 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+        managedNamespaceMetadata:
+          annotations:
+            argocd.argoproj.io/sync-options: Delete=false

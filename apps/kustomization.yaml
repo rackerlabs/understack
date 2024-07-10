@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- appsets/argocd/argocd.yaml
+- cluster-setup.yaml
+- appsets/cert-manager/cert-manager.yaml
+- appsets/cluster-config/cluster-config.yaml
+- appsets/operators/argocd-operators-project.yaml
+- appsets/operators/operators.yaml
+- appsets/components.yaml
+- appsets/openstack/openstack.yaml
