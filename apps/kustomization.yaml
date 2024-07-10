@@ -7,4 +7,5 @@ resources:
 - appsets/cluster-config/cluster-config.yaml
 - appsets/operators/argocd-operators-project.yaml
 - appsets/operators/operators.yaml
+- appsets/components.yaml
 - appsets/openstack/openstack.yaml
