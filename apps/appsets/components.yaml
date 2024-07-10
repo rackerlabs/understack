@@ -18,6 +18,7 @@ spec:
           - list:
               elements:
                 - component: openstack
+                - component: undersync
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
