@@ -1,5 +1,8 @@
 ---
 images:
+  # imagePullPolicy
+  pull_policy: "Always"
+
   tags:
     # these are common across all these OpenStack Helm installations
     bootstrap: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
