@@ -5,9 +5,6 @@ metadata:
 spec:
   project: understack
   sources:
-    - repoURL: https://github.com/rackerlabs/understack.git
-      path: components/nautobot-redis/
-      targetRevision: ${UC_REPO_REF}
     - repoURL: https://nautobot.github.io/helm-charts/
       chart: nautobot
       targetRevision: 2.1.0
