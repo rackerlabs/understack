@@ -20,6 +20,13 @@ bootstrap:
     openstack user set --email 'demo@example.com' demo
     # add 'demo' user to 'ucadmin' group
     openstack group add user ucadmin demo
+    # add 'demo' user to have 'member' role, needed for horizon dashboard use
+    openstack role add --user demo --project demo member
+    # create 'argoworkflow' user
+    # credentials for ironic-nautobot-sync and other argo workflows
+    openstack project create undercloud --or-show
+    openstack user create --project undercloud --password demo argoworkflow --or-show
+    openstack role add --user argoworkflow --project undercloud member
 
 network:
   # configure OpenStack Helm to use Undercloud's ingress
