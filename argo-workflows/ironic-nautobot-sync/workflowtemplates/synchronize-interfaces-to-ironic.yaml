@@ -25,7 +25,17 @@ spec:
           - mountPath: /etc/ironic-secrets/
             name: ironic-secrets
             readOnly: true
-      volumes:
-        - name: ironic-secrets
-          secret:
-            secretName: production-ironic-for-argo-creds
+        envFrom:
+          - secretRef:
+              name: production-ironic-for-argo-creds
+        env:
+          - name: NAUTOBOT_API
+            valueFrom:
+              configMapKeyRef:
+                name: nautobot
+                key: url
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: token
