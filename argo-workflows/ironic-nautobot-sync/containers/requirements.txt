@@ -1,0 +1,3 @@
+python-ironicclient==5.5.0
+pydantic==2.8.0
+pynautobot==2.2.0
