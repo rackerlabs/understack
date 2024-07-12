@@ -25,7 +25,7 @@ conf:
       enabled_management_interfaces: noop,ipmitool,redfish
       enabled_network_interfaces: noop
       enabled_power_interfaces: fake,ipmitool,redfish
-      enabled_raid_interfaces: no-raid,redfish
+      enabled_raid_interfaces: no-raid,redfish,idrac-redfish
       enabled_vendor_interfaces: no-vendor,ipmitool,redfish
     conductor:
       automated_clean: false

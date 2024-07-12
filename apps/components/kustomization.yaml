@@ -8,7 +8,6 @@ resources:
   - mariadb.yaml
   - rabbitmq-cluster.yaml
   - memcached.yaml
-  - postgres-db.yaml
   - nautobot.yaml
   - keystone.yaml
   - argo-workflows.yaml

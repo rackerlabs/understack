@@ -19,6 +19,7 @@ spec:
               elements:
                 - component: openstack
                 - component: undersync
+                - component: nautobot
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
