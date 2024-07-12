@@ -28,11 +28,10 @@ The included Workflows include references to configuration ConfigMaps and Secret
 
 ### Nautbot
 
-You will want to create/obtain a Nautbot API token, and the create the following ConfigMap and Secret:
+The Secret will be defined by the External Secret.
 
 ```bash
 kubectl -n argo create configmap nautobot '--from-literal=url=https://nautobot.local'
-kubectl -n argo create secret generic nautobot-token --from-literal=token=${NAUTOBOT_TOKEN} --from-literal=bearer_token="Token ${NAUTOBOT_TOKEN}"
 ```
 
 ## Security

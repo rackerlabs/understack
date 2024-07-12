@@ -6,11 +6,10 @@ which can then be consumed by future WorkflowTemplates.
 
 ## Setup
 
-The Nautobot Workflows require a ConfigMap as well as a Secret to define the API URL as well as the API Token. You can define those with:
+The Nautobot Workflows require a ConfigMap.
 
 ```bash
 kubectl -n argo create configmap nautobot '--from-literal=url=https://nautobot.local'
-kubectl -n argo create secret generic nautobot-token --from-literal=token=${NAUTOBOT_TOKEN} --from-literal=bearer_token="Token ${NAUTOBOT_TOKEN}"
 ```
 
 ## Caveats
