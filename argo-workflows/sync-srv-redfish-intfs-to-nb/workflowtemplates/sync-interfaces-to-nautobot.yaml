@@ -1,6 +1,6 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
-  name: synchronize-interfaces-to-nautobot
+  name: sync-interfaces-to-nautobot
 kind: WorkflowTemplate
 spec:
   arguments:
@@ -16,7 +16,7 @@ spec:
         command:
           - python
           - /app/sync_nautobot_interfaces.py
-        args: ["--hostname", "{{workflow.parameters.hostname}}"]
+        args: ["--hostname", "{{workflow.parameters.device_hostname}}"]
         volumeMounts:
           - mountPath: /etc/nb-token/
             name: nb-token

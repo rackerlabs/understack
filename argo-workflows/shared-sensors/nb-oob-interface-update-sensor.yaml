@@ -5,7 +5,7 @@ metadata:
     - sensor-controller
   labels:
     argocd.argoproj.io/instance: argo-workflows-templates
-  name: nautobot-interface-update
+  name: nb-oob-interface-update
   namespace: argo-events
 spec:
   dependencies:
@@ -48,12 +48,16 @@ spec:
               src:
                 dataKey: body.data.device.name
                 dependencyName: nautobot-dep
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.data.device.name
+                dependencyName: nautobot-dep
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: nautobot-interface-update-
+                generateName: enroll-srv-to-uc-
               spec:
                 arguments:
                   parameters:
@@ -61,24 +65,18 @@ spec:
                       value: Some nautobot interface has changed
                     - name: device_hostname
                       value: hostname of the device that event is for
+                    - name: hostname
+                      value: to support other workflows that references hostname
                 entrypoint: start
                 serviceAccountName: workflow
                 templates:
                   - name: start
                     steps:
-                      - - name: synchronize-server-to-ironic
+                      - - name: sync-srv-redfish-intfs-to-nb
                           templateRef:
-                            name: synchronize-server-to-ironic
-                            template: synchronize-server
-                      - - name: synchronize-server-obm-creds
-                          templateRef:
-                            name: synchronize-obm-creds
+                            name: sync-srv-redfish-intfs-to-nb
                             template: main
-                      - - name: synchronize-interfaces-to-ironic
+                      - - name: sync-nb-server-to-ironic
                           templateRef:
-                            name: synchronize-interfaces-to-ironic
+                            name: sync-nb-server-to-ironic
                             template: main
-                          arguments:
-                            parameters:
-                              - name: device_id
-                                value: "{{=jsonpath(workflow.parameters.interface_update_event, '$.data.device.id')}}"
