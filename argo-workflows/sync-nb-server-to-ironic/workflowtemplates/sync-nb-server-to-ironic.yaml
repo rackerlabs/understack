@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: sync-nb-server-to-ironic
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: interface_update_event
+        value: Some nautobot interface has changed
+      - name: device_hostname
+        value: hostname of the device that event is for
+  templates:
+    - name: main
+      steps:
+        - - name: synchronize-server-to-ironic
+            templateRef:
+              name: synchronize-server-to-ironic
+              template: synchronize-server
+        - - name: synchronize-server-obm-creds
+            templateRef:
+              name: synchronize-obm-creds
+              template: main
+        - - name: synchronize-interfaces-to-ironic
+            templateRef:
+              name: synchronize-interfaces-to-ironic
+              template: main
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{=jsonpath(workflow.parameters.interface_update_event, '$.data.device.id')}}"

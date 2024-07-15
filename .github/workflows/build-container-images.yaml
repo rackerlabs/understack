@@ -69,8 +69,8 @@ jobs:
       - name: Build and deploy Python 3.11 with Ironic client
         uses: docker/build-push-action@v5
         with:
-          context: argo-workflows/ironic-nautobot-sync
-          file: argo-workflows/ironic-nautobot-sync/containers/Dockerfile.ironic
+          context: argo-workflows/sync-nb-server-to-ironic
+          file: argo-workflows/sync-nb-server-to-ironic/containers/Dockerfile.ironic
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:latest,ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:${{ env.VERSION_PYTHON_IRONIC }}
@@ -102,8 +102,8 @@ jobs:
       - name: Build and deploy Python 3.11 with Nautobot Int Sync
         uses: docker/build-push-action@v5
         with:
-          context: argo-workflows/nautobot-interface-sync
-          file: argo-workflows/nautobot-interface-sync/containers/Dockerfile.nautobot_int_sync
+          context: argo-workflows/sync-srv-redfish-intfs-to-nb
+          file: argo-workflows/sync-srv-redfish-intfs-to-nb/containers/Dockerfile.nautobot_int_sync
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:latest,ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:${{ env.VERSION_PYTHON_NAUTOBOT_INT_SYNC }}
