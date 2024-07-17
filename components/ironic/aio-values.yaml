@@ -18,15 +18,16 @@ conf:
     DEFAULT:
       enabled_deploy_interfaces: direct,ramdisk
       default_deploy_interface: direct
-      enabled_bios_interfaces: no-bios,redfish
+      enabled_bios_interfaces: no-bios,redfish,idrac-redfish
       enabled_boot_interfaces: http-ipxe,http,redfish-virtual-media,redfish-https,ipxe,pxe
-      enabled_hardware_types: ipmi,redfish,manual-management
-      enabled_inspect_interfaces: redfish,no-inspect
-      enabled_management_interfaces: noop,ipmitool,redfish
+      enabled_hardware_types: ipmi,redfish,manual-management,idrac
+      enabled_inspect_interfaces: redfish,no-inspect,idrac-redfish
+      enabled_management_interfaces: noop,ipmitool,redfish,idrac-redfish
       enabled_network_interfaces: noop
-      enabled_power_interfaces: fake,ipmitool,redfish
+      enabled_power_interfaces: fake,ipmitool,redfish,idrac-redfish
       enabled_raid_interfaces: no-raid,redfish,idrac-redfish
-      enabled_vendor_interfaces: no-vendor,ipmitool,redfish
+      enabled_vendor_interfaces: no-vendor,ipmitool,redfish,idrac-redfish
+      enabled_firmware_interfaces: redfish
     conductor:
       automated_clean: false
     dhcp:
