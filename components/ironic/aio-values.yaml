@@ -27,7 +27,7 @@ conf:
       enabled_power_interfaces: fake,ipmitool,redfish,idrac-redfish
       enabled_raid_interfaces: no-raid,redfish,idrac-redfish
       enabled_vendor_interfaces: no-vendor,ipmitool,redfish,idrac-redfish
-      enabled_firmware_interfaces: redfish
+      enabled_firmware_interfaces: no-firmware,redfish
     conductor:
       automated_clean: false
     dhcp:
