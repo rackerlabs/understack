@@ -54,7 +54,7 @@ spec:
           path: secrets/{{.name}}/
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
           directory:
-            include: 'secret-{{.component}}-*.yaml'
+            include: '{secret-{{.component}}-*.yaml,secret-openstack-*.yaml}'
           ref: secrets
       ignoreDifferences:
         - kind: Secret
