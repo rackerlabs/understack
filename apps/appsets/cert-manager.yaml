@@ -17,14 +17,20 @@ spec:
         - resources-finalizer.argocd.argoproj.io
     spec:
       project: default
-      source:
-        repoURL: https://charts.jetstack.io
-        chart: cert-manager
-        targetRevision: '1.*'
-        helm:
-          releaseName: cert-manager
-          valuesObject:
-            installCRDs: true
+      sources:
+        - repoURL: https://charts.jetstack.io
+          chart: cert-manager
+          targetRevision: '1.*'
+          helm:
+            releaseName: cert-manager
+            valuesObject:
+              installCRDs: true
+        - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+          path: secrets/{{.name}}/
+          targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+          directory:
+            include: 'secret-acme-*.yaml'
+          ref: secrets
       destination:
         server: '{{.server}}'
         namespace: cert-manager
