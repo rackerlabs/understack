@@ -8,31 +8,31 @@ from pynautobot.models.dcim import Devices as NautobotDevice
 
 class Nautobot:
     ALLOWED_STATUSES = [
-        'enroll',
-        'verifying',
-        'manageable',
-        'inspecting',
-        'inspect wait',
-        'inspect failed',
-        'cleaning',
-        'clean wait',
-        'available',
-        'deploying',
-        'wait call-back'
-        'deploy failed',
-        'active',
-        'deleting',
-        'error',
-        'adopting',
-        'rescuing'
-        'rescue wait',
-        'rescue failed',
-        'rescue',
-        'unrescuing',
-        'unrescue failed',
-        'servicing',
-        'service wait',
-        'service failed'
+        "enroll",
+        "verifying",
+        "manageable",
+        "inspecting",
+        "inspect wait",
+        "inspect failed",
+        "cleaning",
+        "clean wait",
+        "available",
+        "deploying",
+        "wait call-back",
+        "deploy failed",
+        "active",
+        "deleting",
+        "error",
+        "adopting",
+        "rescuing",
+        "rescue wait",
+        "rescue failed",
+        "rescue",
+        "unrescuing",
+        "unrescue failed",
+        "servicing",
+        "service wait",
+        "service failed",
     ]
     def __init__(self, url, token, logger=None, session=None):
         self.url = url
@@ -64,4 +64,7 @@ class Nautobot:
         if new_status not in self.ALLOWED_STATUSES:
             raise Exception(f"Status {new_status} for device {device_id} is not in ALLOWED_STATUSES.")
 
-        return device.update({"status": new_status})
+        device.custom_fields['ironic_provisioning_status'] = new_status
+        response = device.save()
+        print(f"save result: {response}")
+        return response
