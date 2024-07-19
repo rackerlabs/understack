@@ -10,3 +10,4 @@ components/01-secrets/kustomization.yaml
 # python virtualenv
 .venv/
 venv/
+.python-version
