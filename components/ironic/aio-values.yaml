@@ -16,18 +16,22 @@ bootstrap:
 conf:
   ironic:
     DEFAULT:
-      enabled_deploy_interfaces: direct,ramdisk
+      # We only want to default to direct, otherwise defaults interfere with hardware
+      # types selecting their own defaults. So we purposefully leave the defaults unset
+      # but enable everything that our Redfish focused (with iDRAC and iLO support)
+      # systems need
       default_deploy_interface: direct
-      enabled_bios_interfaces: no-bios,redfish,idrac-redfish
-      enabled_boot_interfaces: http-ipxe,http,redfish-virtual-media,redfish-https,ipxe,pxe
-      enabled_hardware_types: ipmi,redfish,manual-management,idrac,ilo,ilo5
-      enabled_inspect_interfaces: redfish,no-inspect,idrac-redfish
-      enabled_management_interfaces: noop,ipmitool,redfish,idrac-redfish
-      enabled_network_interfaces: noop
-      enabled_power_interfaces: fake,ipmitool,redfish,idrac-redfish
-      enabled_raid_interfaces: no-raid,redfish,idrac-redfish
-      enabled_vendor_interfaces: no-vendor,ipmitool,redfish,idrac-redfish
+      enabled_bios_interfaces: no-bios,redfish,idrac-redfish,ilo
+      enabled_boot_interfaces: http-ipxe,http,ipxe,pxe,redfish-virtual-media,redfish-https,ilo-virtual-media,ilo-uefi-https,ilo-pxe,ilo-ipxe
+      enabled_deploy_interfaces: direct,ramdisk
       enabled_firmware_interfaces: no-firmware,redfish
+      enabled_hardware_types: redfish,ipmi,idrac,ilo5,ilo,manual-management
+      enabled_inspect_interfaces: redfish,no-inspect,inspector,idrac-redfish,ilo
+      enabled_management_interfaces: noop,ipmitool,redfish,idrac-redfish,ilo,ilo5
+      enabled_network_interfaces: noop,neutron
+      enabled_power_interfaces: fake,redfish,ipmitool,idrac-redfish,ilo
+      enabled_raid_interfaces: no-raid,redfish,idrac-redfish,ilo5
+      enabled_vendor_interfaces: no-vendor,redfish,ipmitool,idrac-redfish,ilo
     conductor:
       automated_clean: false
     dhcp:
