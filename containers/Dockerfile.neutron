@@ -1,0 +1,7 @@
+# syntax=docker/dockerfile:1
+
+ARG OPENSTACK_VERSION
+FROM docker.io/openstackhelm/neutron:${OPENSTACK_VERSION}-ubuntu_jammy
+
+COPY python/neutron-understack /tmp/neutron-understack
+RUN /var/lib/openstack/bin/python -m pip install --no-input --no-index /tmp/neutron-understack
