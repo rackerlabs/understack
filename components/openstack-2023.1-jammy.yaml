@@ -40,7 +40,7 @@ images:
     neutron_metadata: "docker.io/openstackhelm/neutron:2023.1-ubuntu_jammy"
     neutron_ovn_metadata: "docker.io/openstackhelm/neutron:2023.1-ubuntu_jammy"
     neutron_openvswitch_agent: "docker.io/openstackhelm/neutron:2023.1-ubuntu_jammy"
-    neutron_server: "docker.io/openstackhelm/neutron:2023.1-ubuntu_jammy"
+    neutron_server: "ghcr.io/rackerlabs/understack/neutron:2023.1-ubuntu_jammy"
     neutron_rpc_server: "docker.io/openstackhelm/neutron:2023.1-ubuntu_jammy"
     neutron_bagpipe_bgp: "docker.io/openstackhelm/neutron:2023.1-ubuntu_jammy"
     neutron_netns_cleanup_cron: "docker.io/openstackhelm/neutron:2023.1-ubuntu_jammy"

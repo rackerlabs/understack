@@ -26,8 +26,8 @@ conf:
   plugins:
     ml2_conf:
       ml2:
-        # set the default ml2 backend as the logger for testing, actual deployment should override
-        mechanism_drivers: logger
+        # set the default ml2 backend to our plugin, neutron_understack
+        mechanism_drivers: understack
   neutron:
     DEFAULT:
       # we aren't using neutron routers
