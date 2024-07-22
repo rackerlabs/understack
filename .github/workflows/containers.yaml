@@ -74,16 +74,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: dnsmasq image metadata
-        id: dnsmasq-meta
+      - name: image metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/rackerlabs/openstackhelm/dnsmasq
+          images: ghcr.io/rackerlabs/understack/dnsmasq
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,enable={{is_default_branch}}
           labels: |
-            org.opencontainers.image.title=dnsmasq for Ironic deployed as openstack-helm
+            org.opencontainers.image.title=dnsmasq for Understack's Ironic
         env:
           # Create the annotations at the index as well since this
           # defaults to manifest only and we have to manually merge
@@ -98,5 +98,5 @@ jobs:
           context: "{{defaultContext}}:containers"
           file: Dockerfile.dnsmasq
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.dnsmasq-meta.outputs.tags }}
-          labels: ${{ steps.dnsmasq-meta.outputs.labels }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
