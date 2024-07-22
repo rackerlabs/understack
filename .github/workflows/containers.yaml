@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         project: [ironic, neutron]
-        openstack: [2023.1, 2024.1]
+        openstack: [2024.1]
 
     steps:
       - name: setup docker buildx

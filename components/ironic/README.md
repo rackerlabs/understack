@@ -47,7 +47,7 @@ Now customize `components/ironic/values.tpl.yaml` and then install or upgrade Ir
 helm --namespace openstack \
     install \
     ironic osh/ironic \
-    -f components/openstack-2023.1-jammy.yaml \
+    -f components/openstack-2024.1-jammy.yaml \
     -f components/ironic/aio-values.yaml \
     -f components/ironic/values.tpl.yaml \
     -f secret-openstack.yaml
