@@ -41,6 +41,14 @@ jobs:
           tags: |
             type=sha,enable={{is_default_branch}}
             type=raw,value=${{ matrix.openstack }}-ubuntu_jammy
+        env:
+          # Create the annotations at the index as well since this
+          # defaults to manifest only and we have to manually merge
+          # the container is multi-arch because of provenance creating
+          # an 'unknown/unknown' arch with data. We've got no annotations
+          # that are arch specific so populate them at the index as well.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+
       - name: build and deploy container image to registry
         uses: docker/build-push-action@v5
         with:
@@ -76,6 +84,14 @@ jobs:
             type=sha,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=dnsmasq for Ironic deployed as openstack-helm
+        env:
+          # Create the annotations at the index as well since this
+          # defaults to manifest only and we have to manually merge
+          # the container is multi-arch because of provenance creating
+          # an 'unknown/unknown' arch with data. We've got no annotations
+          # that are arch specific so populate them at the index as well.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+
       - name: build and deploy dnsmasq container to registry
         uses: docker/build-push-action@v5
         with:
