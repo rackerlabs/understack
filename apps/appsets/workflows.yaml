@@ -23,7 +23,7 @@ spec:
           path: 'argo-workflows'
           directory:
             recurse: true
-            include: '{shared-sensors/*.yaml,*/sensors/*.yaml,*/workflowtemplates/*.yaml}'
+            include: '{generic/deps/*.yaml,shared-sensors/*.yaml,*/sensors/*.yaml,*/workflowtemplates/*.yaml}'
             exclude: '{example-feature/*,*/*/*example*}'
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
