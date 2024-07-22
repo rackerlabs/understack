@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: synchronize-provision-state-to-nautobot
+kind: WorkflowTemplate
+spec:
+  arguments:
+    parameters:
+      - name: device_uuid
+        value: "{}"
+      - name: provision_state
+        value: "{}"
+  templates:
+    - name: synchronize-state
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-to-nautobot-sync:latest
+        command:
+          - python
+          - /app/main.py
+        args:
+          - --device_uuid
+          - "{{workflow.parameters.device_uuid}}"
+          - --provisioning-state
+          - "{{workflow.parameters.provision_state}}"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+      inputs:
+        parameters:
+          - name: device_uuid
+          - name: provision_state
+      volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
