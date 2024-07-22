@@ -37,7 +37,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/rackerlabs/openstackhelm/${{ matrix.project }}
+          images: ghcr.io/rackerlabs/understack/${{ matrix.project }}
           tags: |
             type=sha,enable={{is_default_branch}}
             type=raw,value=${{ matrix.openstack }}-ubuntu_jammy
