@@ -199,6 +199,12 @@ export PLACEMENT_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
 export PLACEMENT_DB_PASSWORD="$(./scripts/pwgen.sh)"
 # horizon user password for database
 export HORIZON_DB_PASSWORD="$(./scripts/pwgen.sh)"
+# glance keystone service account
+export GLANCE_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
+# glance user password in mariadb for glance db
+export GLANCE_DB_PASSWORD="$(./scripts/pwgen.sh)"
+# rabbitmq user password for the glance queues
+export GLANCE_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
 
 [ ! -f "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml" ] && \
 kubectl --namespace openstack \
@@ -320,6 +326,30 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=password="${HORIZON_DB_PASSWORD}" \
     --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-horizon-db-password.yaml"
+
+# glance credentials
+[ ! -f "${DEST_DIR}/secret-glance-rabbitmq-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic glance-rabbitmq-password \
+    --type Opaque \
+    --from-literal=username="glance" \
+    --from-literal=password="${GLANCE_RABBITMQ_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-glance-rabbitmq-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-glance-db-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic glance-db-password \
+    --type Opaque \
+    --from-literal=password="${GLANCE_DB_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-glance-db-password.yaml"
+
+[ ! -f "${DEST_DIR}/secret-glance-keystone-password.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic glance-keystone-password \
+    --type Opaque \
+    --from-literal=username="glance" \
+    --from-literal=password="${GLANCE_KEYSTONE_PASSWORD}" \
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-glance-keystone-password.yaml"
 
 if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
     [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
