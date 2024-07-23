@@ -30,7 +30,7 @@ conf:
       enabled_management_interfaces: ipmitool,redfish,idrac-redfish,ilo,ilo5
       enabled_network_interfaces: noop,neutron
       enabled_power_interfaces: redfish,ipmitool,idrac-redfish,ilo
-      enabled_raid_interfaces: redfish,idrac-redfish,ilo5
+      enabled_raid_interfaces: redfish,idrac-redfish,ilo5,agent
       enabled_vendor_interfaces: redfish,ipmitool,idrac-redfish,ilo
     conductor:
       automated_clean: false
