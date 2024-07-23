@@ -24,7 +24,7 @@ conf:
       enabled_bios_interfaces: no-bios,redfish,idrac-redfish,ilo
       enabled_boot_interfaces: http-ipxe,ipxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,ilo-virtual-media,ilo-uefi-https,ilo-ipxe
       enabled_deploy_interfaces: direct,ramdisk
-      enabled_firmware_interfaces: redfish
+      enabled_firmware_interfaces: redfish,no-firmware
       enabled_hardware_types: redfish,idrac,ilo5,ilo
       enabled_inspect_interfaces: redfish,inspector,idrac-redfish,ilo
       enabled_management_interfaces: ipmitool,redfish,idrac-redfish,ilo,ilo5
