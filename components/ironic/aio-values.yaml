@@ -22,7 +22,7 @@ conf:
       # systems need
       default_deploy_interface: direct
       enabled_bios_interfaces: no-bios,redfish,idrac-redfish,ilo
-      enabled_boot_interfaces: http-ipxe,http,ipxe,pxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,ilo-virtual-media,ilo-uefi-https,ilo-pxe,ilo-ipxe
+      enabled_boot_interfaces: http-ipxe,ipxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,ilo-virtual-media,ilo-uefi-https,ilo-ipxe
       enabled_deploy_interfaces: direct,ramdisk
       enabled_firmware_interfaces: no-firmware,redfish
       enabled_hardware_types: redfish,ipmi,idrac,ilo5,ilo,manual-management
