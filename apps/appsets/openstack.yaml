@@ -24,6 +24,8 @@ spec:
                   chartVersion: 0.3.15
                 - component: neutron
                   chartVersion: 0.3.45
+                - component: glance
+                  chartVersion: 0.4.26
                 - component: nova
                   chartVersion: 0.3.42
                 - component: horizon
