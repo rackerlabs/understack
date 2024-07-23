@@ -76,6 +76,7 @@ def log_call(method: str, context: typing.Union[NetworkContext, SubnetContext, P
         )
         return
     LOG.info("%s method called with data: %s", method, jsondata)
+    LOG.debug("%s method executed with context: %s", method, context.current)
 
 
 class UnderstackDriver(MechanismDriver):
