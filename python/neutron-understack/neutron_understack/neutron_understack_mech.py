@@ -1,19 +1,24 @@
 import json
 import logging
-import typing
 import uuid
 
-from neutron_lib.plugins.ml2.api import MechanismDriver, NetworkContext, PortContext, SubnetContext
+from neutron_lib.plugins.ml2.api import MechanismDriver
+from neutron_lib.plugins.ml2.api import NetworkContext
+from neutron_lib.plugins.ml2.api import PortContext
+from neutron_lib.plugins.ml2.api import SubnetContext
 
 LOG = logging.getLogger(__name__)
 
 
-def dump_context(context: typing.Union[NetworkContext, SubnetContext, PortContext]) -> dict:
+def dump_context(context: NetworkContext | SubnetContext | PortContext) -> dict:
     # RESOURCE_ATTRIBUTE_MAP
     # from neutron_lib.api.definitions import network, subnet, port, portbindings
-    # The properties of a NetworkContext.current are defined in network.RESOURCE_ATTRIBUTE_MAP
-    # The properties of a SubnetContext.current are defined in subnet.RESOURCE_ATTRIBUTE_MAP
-    # The properties of a PortContext.current are defined in port.RESOURCE_ATTRIBUTE_MAP
+    # The properties of a NetworkContext.current are defined in
+    #   network.RESOURCE_ATTRIBUTE_MAP
+    # The properties of a SubnetContext.current are defined in
+    #   subnet.RESOURCE_ATTRIBUTE_MAP
+    # The properties of a PortContext.current are defined in
+    #   port.RESOURCE_ATTRIBUTE_MAP
     attr_map = {
         NetworkContext: ("current", "original", "network_segments"),
         SubnetContext: ("current", "original"),
@@ -62,7 +67,9 @@ def dump_context(context: typing.Union[NetworkContext, SubnetContext, PortContex
     return retval
 
 
-def log_call(method: str, context: typing.Union[NetworkContext, SubnetContext, PortContext]) -> None:
+def log_call(
+    method: str, context: NetworkContext | SubnetContext | PortContext
+) -> None:
     data = dump_context(context)
     data.update({"method": method})
     try:
@@ -81,7 +88,9 @@ def log_call(method: str, context: typing.Union[NetworkContext, SubnetContext, P
 
 class UnderstackDriver(MechanismDriver):
     # See MechanismDriver docs for resource_provider_uuid5_namespace
-    resource_provider_uuid5_namespace = uuid.UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
+    resource_provider_uuid5_namespace = uuid.UUID(
+        "6eae3046-4072-11ef-9bcf-d6be6370a162"
+    )
 
     def initialize(self):
         pass
