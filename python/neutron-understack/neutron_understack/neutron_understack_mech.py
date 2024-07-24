@@ -69,9 +69,12 @@ def dump_context(
 ) -> dict:
     # RESOURCE_ATTRIBUTE_MAP
     # from neutron_lib.api.definitions import network, subnet, port, portbindings
-    # The properties of a NetworkContext.current are defined in network.RESOURCE_ATTRIBUTE_MAP
-    # The properties of a SubnetContext.current are defined in subnet.RESOURCE_ATTRIBUTE_MAP
-    # The properties of a PortContext.current are defined in port.RESOURCE_ATTRIBUTE_MAP
+    # The properties of a NetworkContext.current are defined in
+    #   network.RESOURCE_ATTRIBUTE_MAP
+    # The properties of a SubnetContext.current are defined in
+    #   subnet.RESOURCE_ATTRIBUTE_MAP
+    # The properties of a PortContext.current are defined in
+    #   port.RESOURCE_ATTRIBUTE_MAP
     attr_map = {
         NetworkContext: ("current", "original", "network_segments"),
         SubnetContext: ("current", "original"),
@@ -122,6 +125,7 @@ def dump_context(
 
 def log_call(
     method: str, context: typing.Union[NetworkContext, SubnetContext, PortContext]
+    method: str, context: NetworkContext | SubnetContext | PortContext
 ) -> None:
     data = dump_context(context)
     data.update({"method": method})
