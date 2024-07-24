@@ -15,12 +15,14 @@ repos:
     rev: 7.0.0
     hooks:
       - id: flake8
+        exclude: '^python/'
         args:
           - --max-line-length=120
   - repo: https://github.com/psf/black
     rev: 24.4.2
     hooks:
       - id: black
+        exclude: '^python/'
         args:
           - --line-length=120
           - --check
@@ -38,3 +40,11 @@ repos:
     rev: v1.22.8
     hooks:
       - id: typos
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.5.4
+    hooks:
+      - id: ruff
+        files: '^python/'
+        args: [--fix]
+      - id: ruff-format
+        files: '^python/'
