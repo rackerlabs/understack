@@ -3,6 +3,7 @@ import logging
 import typing
 import uuid
 
+from pprint import pprint
 from neutron_lib.plugins.ml2.api import MechanismDriver, NetworkContext, PortContext, SubnetContext
 
 LOG = logging.getLogger(__name__)
@@ -76,7 +77,13 @@ def log_call(method: str, context: typing.Union[NetworkContext, SubnetContext, P
         )
         return
     LOG.info("%s method called with data: %s", method, jsondata)
-    LOG.debug("%s method executed with context: %s", method, context.current)
+    LOG.debug("%s method executed with context:", method)
+    # for chunk in chunked(str(context.current), 750):
+    pprint(context.current)
+
+
+def chunked(inputstr, length):
+    return (inputstr[0 + i : length + i] for i in range(0, len(inputstr), length))
 
 
 class UnderstackDriver(MechanismDriver):
