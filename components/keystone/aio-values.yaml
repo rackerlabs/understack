@@ -27,6 +27,7 @@ bootstrap:
     openstack role add --user argoworkflow --project undercloud member
     # allow ironic user to see servers in undercloud project
     openstack role add --project undercloud --user ironic --user-domain service  member
+    openstack role add --project service --user ironic --user-domain service service
     # add 'demo' user to have 'member' role, needed for horizon dashboard use
     openstack role add --user demo --project undercloud member
 
