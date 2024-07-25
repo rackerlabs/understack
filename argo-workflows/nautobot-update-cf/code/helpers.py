@@ -24,7 +24,8 @@ def arg_parser(name):
     )
     parser.add_argument("--device_uuid", required=True,
                         help="Nautobot device UUID")
-    parser.add_argument("--provisioning-state", required=True)
+    parser.add_argument("--field-name", required=True)
+    parser.add_argument("--field-value", required=True)
     parser.add_argument("--nautobot_url", required=False)
     parser.add_argument("--nautobot_token", required=False)
 

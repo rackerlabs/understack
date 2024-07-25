@@ -12,14 +12,16 @@ spec:
   templates:
     - name: synchronize-state
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-to-nautobot-sync:latest
+        image: ghcr.io/rackerlabs/understack/nautobot-update-cf:latest
         command:
           - python
           - /app/main.py
         args:
           - --device_uuid
           - "{{workflow.parameters.device_uuid}}"
-          - --provisioning-state
+          - --field-name
+          - "ironic_provisioning_status"
+          - --field-value
           - "{{workflow.parameters.provision_state}}"
         volumeMounts:
           - mountPath: /etc/nb-token/
