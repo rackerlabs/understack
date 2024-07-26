@@ -11,3 +11,9 @@ components/01-secrets/kustomization.yaml
 .venv/
 venv/
 .python-version
+
+# python packaging
+*.egg-info
+/python/*/build/
+/python/*/dist/
+__pycache__

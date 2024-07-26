@@ -1,0 +1,51 @@
+[build-system]
+requires = [
+  "setuptools>=61.0",
+  "wheel",
+  "setuptools_scm[toml]>=3.4",
+]
+
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "understack-workflows"
+authors = [
+    {name = "Understack Developers", email = "undercloud-dev@rackspace.com"},
+]
+description = "The glue between different systems and services that are run in our Workflows"
+license = {text = "Apache Software License"}
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: OpenStack",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Systems Administration"
+]
+
+# determine our version from git
+dynamic = ["version"]
+
+# adjust once our dependencies are happy going higher
+# but need to adjust ruff rules too
+requires-python = ">= 3.11,<3.12"
+
+[tool.ruff]
+target-version = "py311"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
