@@ -41,6 +41,9 @@ conf:
     pxe:
       images_path: /var/lib/understack/master_iso_images
       instance_master_path: /var/lib/understack/master_iso_images
+    inspector:
+      extra_kernel_params: ipa-collect-lldp=1
+      hooks: "$default_hooks,parse-lldp,local-link-connection,physical-network"
 
 endpoints:
   oslo_messaging:
