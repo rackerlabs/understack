@@ -1,0 +1,42 @@
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+[tool.poetry]
+name = "understack-workflows"
+version = "0.0.0"
+authors = ["Understack Developers"]
+description = "The glue between different systems and services that are run in our Workflows"
+readme = "README.md"
+packages = [{include = "understack_workflows"}]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: OpenStack",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Systems Administration"
+]
+
+[tool.poetry.dependencies]
+python = "~3.11.0"
+
+[tool.ruff]
+target-version = "py311"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
