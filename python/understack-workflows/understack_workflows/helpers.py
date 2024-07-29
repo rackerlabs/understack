@@ -8,16 +8,21 @@ import sushy
 logger = logging.getLogger(__name__)
 
 
-def setup_logger(name):
-    logger = logging.getLogger(name)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+def setup_logger(name: str | None = None, level: int = logging.DEBUG):
+    """Standardize our logging.
+
+    Configures the root logger to prefix messages with a timestamp
+    and to output the log level we want to see by default.
+
+    params:
+    name: logger hierarchy or root logger
+    level: default log level (DEBUG)
+    """
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.DEBUG,
     )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    return logger
+    return logging.getLogger(name)
 
 
 def arg_parser(name):

@@ -1,17 +1,14 @@
 import json
-import logging
 import sys
 
 import ironicclient.common.apiclient.exceptions
 
+from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.ironic.secrets import read_secret
 from understack_workflows.node_configuration import IronicNodeConfiguration
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.DEBUG
-)
-logger = logging.getLogger(__name__)
+logger = setup_logger(__name__)
 
 
 def event_to_node_configuration(event: dict) -> IronicNodeConfiguration:
