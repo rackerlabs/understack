@@ -24,6 +24,15 @@ classifiers = [
 [tool.poetry.dependencies]
 python = "~3.11.0"
 
+pydantic = "^2"
+pynautobot = "^2"
+python-ironicclient = "^5"
+
+[tool.poetry.scripts]
+synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
+synchronize-obm-creds = "understack_workflows.main.synchronize_obm_creds:main"
+synchronize-server = "understack_workflows.main.synchronize_server:main"
+
 [tool.ruff]
 target-version = "py311"
 fix = true

@@ -10,10 +10,9 @@ spec:
   templates:
     - name: synchronize-server
       container:
-        image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:0.0.3
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - python
-          - /app/synchronize-server.py
+          - synchronize-server
         args:
           - "{{workflow.parameters.interface_update_event}}"
         volumeMounts:
