@@ -31,9 +31,29 @@ class Nautobot:
             self.exit_with_error(f"Device {device_id} not found in Nautobot")
         return device
 
+    def device_interfaces(self, device_id: str):
+        return self.session.dcim.interfaces.filter(device_id=device_id)
+
     def update_cf(self, device_id, field_name: str, field_value: str):
         device = self.device_by_id(device_id)
         device.custom_fields[field_name] = field_value
         response = device.save()
-        print(f"save result: {response}")
+        self.logger.info(f"save result: {response}")
         return response
+
+    def uplink_switches(self, device_id) -> list[str]:
+        interfaces = self.device_interfaces(device_id)
+        ids = set()
+        for iface in interfaces:
+            endpoint = iface.connected_endpoint
+            if not endpoint:
+                continue
+            endpoint.full_details()
+            self.logger.debug(f"{iface} connected device {iface.connected_endpoint.device} ")
+            remote_switch = endpoint.device
+            if not remote_switch:
+                continue
+
+            ids.add(remote_switch.id)
+
+        return list(ids)
