@@ -1,19 +1,14 @@
 import json
-import logging
 import sys
 
 import ironicclient.common.apiclient.exceptions
 
+from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.ironic.secrets import read_secret
 from understack_workflows.node_configuration import IronicNodeConfiguration
 
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger = setup_logger(__name__)
 
 
 def replace_or_add_field(path, current_val, expected_val):

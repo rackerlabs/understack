@@ -6,14 +6,11 @@ from uuid import UUID
 import pynautobot
 from ironicclient.v1.port import Port
 
+from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.port_configuration import PortConfiguration
 
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+logger = setup_logger(__name__)
 
 
 def get_nautobot_interfaces(device_id: UUID) -> list[PortConfiguration]:
