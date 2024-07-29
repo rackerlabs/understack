@@ -12,10 +12,9 @@ spec:
   templates:
     - name: synchronize-interfaces
       container:
-        image: ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:0.0.1
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - python
-          - /app/sync_nautobot_interfaces.py
+          - sync-nautobot-interfaces
         args: ["--hostname", "{{workflow.parameters.device_hostname}}"]
         volumeMounts:
           - mountPath: /etc/nb-token/

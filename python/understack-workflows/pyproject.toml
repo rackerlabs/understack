@@ -37,12 +37,15 @@ dependencies = [
     "pydantic==2.8.0",
     "pynautobot==2.2.0",
     "python-ironicclient==5.5.0",
+    "requests==2.32.3",
+    "sushy==5.1.1",
 ]
 
 [project.scripts]
 synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
 synchronize-obm-creds = "understack_workflows.main.synchronize_obm_creds:main"
 synchronize-server = "understack_workflows.main.synchronize_server:main"
+sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"
 
 [tool.ruff]
 target-version = "py311"

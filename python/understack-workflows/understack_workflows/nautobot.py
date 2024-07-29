@@ -1,8 +1,9 @@
 import logging
-import pynautobot
-import requests
 import sys
 from typing import Protocol
+
+import pynautobot
+import requests
 from pynautobot.core.api import Api as NautobotApi
 from pynautobot.models.dcim import Devices as NautobotDevice
 from pynautobot.models.dcim import Interfaces as NautobotInterface
@@ -43,7 +44,6 @@ class Nautobot:
         self,
         device: NautobotDevice,
     ) -> NautobotInterface:
-
         oob_intf = self.session.dcim.interfaces.get(
             device_id=device.id, name=["iDRAC", "iLO"]
         )
@@ -73,7 +73,6 @@ class Nautobot:
         device_id: str,
         device_name: str,
     ) -> list[dict]:
-
         payload = []
         for interface in interfaces:
             nautobot_intf = self.session.dcim.interfaces.get(
@@ -81,12 +80,9 @@ class Nautobot:
             )
             if nautobot_intf is None:
                 self.logger.info(
-                    f"{interface.name} was NOT found for "
-                    f"{device_name}, creating..."
+                    f"{interface.name} was NOT found for " f"{device_name}, creating..."
                 )
-                payload.append(
-                    self.interface_payload_data(device_id, interface)
-                )
+                payload.append(self.interface_payload_data(device_id, interface))
             else:
                 self.logger.info(
                     f"{nautobot_intf.name} found in Nautobot for "
@@ -94,10 +90,7 @@ class Nautobot:
                 )
         return payload
 
-    def interface_payload_data(
-        self, device_id: str, interface: Interface
-    ) -> dict:
-
+    def interface_payload_data(self, device_id: str, interface: Interface) -> dict:
         return {
             "device": device_id,
             "name": interface.name,
@@ -111,9 +104,7 @@ class Nautobot:
         self, device_name: str, interfaces: list[Interface]
     ) -> list[NautobotInterface] | None:
         device = self.device(device_name)
-        payload = self.construct_interfaces_payload(
-            interfaces, device.id, device.name
-        )
+        payload = self.construct_interfaces_payload(interfaces, device.id, device.name)
         if payload:
             try:
                 req = self.session.dcim.interfaces.create(payload)

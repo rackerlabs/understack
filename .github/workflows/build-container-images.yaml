@@ -88,16 +88,6 @@ jobs:
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_OBM_UTILS }}
 
-      - name: Build and deploy Python 3.11 with Nautobot Int Sync
-        uses: docker/build-push-action@v5
-        with:
-          context: argo-workflows/sync-srv-redfish-intfs-to-nb
-          file: argo-workflows/sync-srv-redfish-intfs-to-nb/containers/Dockerfile.nautobot_int_sync
-          # push for all main branch commits
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:latest,ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:${{ env.VERSION_PYTHON_NAUTOBOT_INT_SYNC }}
-          labels: |
-              org.opencontainers.image.version=${{ env.VERSION_PYTHON_NAUTOBOT_INT_SYNC }}
       - name: Build and deploy Python 3.11 with PyNautobot
         uses: docker/build-push-action@v5
         with:
