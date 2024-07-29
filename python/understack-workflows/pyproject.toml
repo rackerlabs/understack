@@ -27,11 +27,16 @@ python = "~3.11.0"
 pydantic = "^2"
 pynautobot = "^2"
 python-ironicclient = "^5"
+requests = "^2"
+sushy = "^5"
+# required by sushy but not depended on by it
+setuptools = "^70"
 
 [tool.poetry.scripts]
 synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
 synchronize-obm-creds = "understack_workflows.main.synchronize_obm_creds:main"
 synchronize-server = "understack_workflows.main.synchronize_server:main"
+sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"
 
 [tool.ruff]
 target-version = "py311"
