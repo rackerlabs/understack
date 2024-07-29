@@ -100,3 +100,50 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  workflows:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        container:
+          - name: ironic-nautobot-client
+            title: Understack Ironic Nautobot Clients
+
+    steps:
+      - name: setup docker buildx
+        uses: docker/setup-buildx-action@v3
+      - name: login to ghcr.io
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/rackerlabs/understack/${{ matrix.container.name }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.container.title }}
+        env:
+          # Create the annotations at the index as well since this
+          # defaults to manifest only and we have to manually merge
+          # the container is multi-arch because of provenance creating
+          # an 'unknown/unknown' arch with data. We've got no annotations
+          # that are arch specific so populate them at the index as well.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+
+      - name: build and deploy container image to registry
+        uses: docker/build-push-action@v5
+        with:
+          file: containers/Dockerfile.${{ matrix.container.name }}
+          pull: true  # ensure we always have an up to date source
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          # prod is the target that has the code installed
+          target: prod

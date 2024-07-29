@@ -33,6 +33,17 @@ dynamic = ["version"]
 # but need to adjust ruff rules too
 requires-python = ">= 3.11,<3.12"
 
+dependencies = [
+    "pydantic==2.8.0",
+    "pynautobot==2.2.0",
+    "python-ironicclient==5.5.0",
+]
+
+[project.scripts]
+synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
+synchronize-obm-creds = "understack_workflows.main.synchronize_obm_creds:main"
+synchronize-server = "understack_workflows.main.synchronize_server:main"
+
 [tool.ruff]
 target-version = "py311"
 fix = true

@@ -13,10 +13,9 @@ spec:
         parameters:
           - name: device_id
       container:
-        image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - python
-          - /app/synchronize-interfaces.py
+          - synchronize-interfaces
         args:
           - --device-id
           - "{{inputs.parameters.device_id}}"

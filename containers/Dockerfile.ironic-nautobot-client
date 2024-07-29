@@ -1,0 +1,27 @@
+ARG BASE=ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest
+
+FROM ${BASE} AS builder
+ARG APP_PATH=/app
+ARG APP_USER=appuser
+ARG APP_GROUP=appgroup
+ARG APP_USER_UID=1000
+ARG APP_GROUP_GID=1000
+RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
+RUN --mount=type=cache,target=/root/.cache/.pip /opt/venv/bin/pip install 'build==1.2.1' 'wheel==0.43.0'
+
+# copy in the code
+COPY --chown=${APP_USER}:${APP_GROUP} python/understack-workflows /app
+# build wheels
+RUN --mount=type=cache,target=/root/.cache/.pip cd /app && /opt/venv/bin/python -m build --wheel
+# need netifaces built as a wheel
+RUN --mount=type=cache,target=/root/.cache/.pip cd /app/dist && /opt/venv/bin/pip wheel netifaces
+
+FROM ${BASE} AS prod
+
+WORKDIR /app
+
+COPY --from=builder /app/dist/*.whl /opt/venv/wheels/
+
+USER $APP_USER
+
+RUN /opt/venv/bin/pip install --no-cache-dir --find-links /opt/venv/wheels/ understack-workflows
