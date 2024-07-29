@@ -12,6 +12,7 @@ class IronicClient:
         auth_url: str,
         tenant_name: str,
     ) -> None:
+        """Initialize our ironicclient wrapper."""
         self.svc_url = svc_url
         self.username = username
         self.password = password

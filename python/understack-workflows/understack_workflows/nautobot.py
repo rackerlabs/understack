@@ -17,6 +17,7 @@ class Interface(Protocol):
 
 class Nautobot:
     def __init__(self, url, token, logger=None, session=None):
+        """Initialize our Nautobot API wrapper."""
         self.url = url
         self.token = token
         self.logger = logger or logging.getLogger(__name__)

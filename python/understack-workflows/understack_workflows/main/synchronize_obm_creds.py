@@ -27,10 +27,7 @@ def event_to_node_configuration(event: dict) -> IronicNodeConfiguration:
 
 
 def credential_secrets():
-    """
-    Returns name of the Kubernetes Secret used to store OBM credentials
-    for server node_id
-    """
+    """Reads Kubernetes Secret files with username/password credentials."""
     username = None
     password = None
     with open("/etc/obm/username") as f:
