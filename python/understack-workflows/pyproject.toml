@@ -47,6 +47,17 @@ synchronize-obm-creds = "understack_workflows.main.synchronize_obm_creds:main"
 synchronize-server = "understack_workflows.main.synchronize_server:main"
 sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"
 
+[tool.setuptools.packages.find]
+# avoid packaging up our tests
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+
 [tool.ruff]
 target-version = "py311"
 fix = true
