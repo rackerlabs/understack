@@ -17,11 +17,11 @@ logger.addHandler(handler)
 
 
 def get_nautobot_interfaces(device_id: UUID) -> list[PortConfiguration]:
-    """
-    Return a List of Ironic Ports for all Nautobot Interfaceswith a
+    """Provides mapping of Nautobot to Ironic ports.
+
+    Return a List of Ironic Ports for all Nautobot Interfaces with a
     MAC address, for the specified Device.
     """
-
     nautobot_api = os.environ["NAUTOBOT_API"]
     nautobot_token = os.environ["NAUTOBOT_TOKEN"]
     nautobot = pynautobot.api(nautobot_api, nautobot_token)
@@ -39,7 +39,8 @@ def get_nautobot_interfaces(device_id: UUID) -> list[PortConfiguration]:
 
 
 def get_patch(nautobot_port: PortConfiguration, port: Port) -> list:
-    """
+    """Generate patch to change data.
+
     Compare attributes between Port objects and return a patch object
     containing any changes.
     """

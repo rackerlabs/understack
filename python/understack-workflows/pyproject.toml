@@ -44,6 +44,7 @@ fix = true
 
 [tool.ruff.lint]
 select = [
+  "D",       # pydocstyle
   "E",       # pycodestyle (error)
   "F",       # pyflakes
   "B",       # flake8-bugbear
@@ -52,5 +53,18 @@ select = [
   "ASYNC",   # flake8-async
 ]
 
+ignore = [
+    "D100",  # don't require docs for every module
+    "D101",  # don't require docs for every class
+    "D102",  # don't require docs for every class method
+    "D103",  # don't require docs for every function
+    "D104",  # don't require docs for every package
+    "D417"   # don't require docs for every function parameter
+]
+
 [tool.ruff.lint.isort]
 force-single-line = true
+
+[tool.ruff.lint.pydocstyle]
+# enable the google doc style rules by default
+convention = "google"

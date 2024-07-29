@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 def read_secret(secret_name: str) -> str:
-    """Retrieve value of Kubernetes secret"""
+    """Retrieve value of Kubernetes secret."""
 
     def normalized(name):
         return re.sub(r"[^A-Za-z0-9-_]", "", name)
