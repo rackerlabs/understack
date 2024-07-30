@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/.pip pip install --no-cache-dir -r /a
 FROM ${BASE} as prod
 
 LABEL org.opencontainers.image.title="Python 3.11 image with pynautobot"
-LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/ironic-to-nautobot-sync-python3.11.8"
+LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/nautobot-update-cf"
 LABEL org.opencontainers.image.source=https://github.com/rackerlabs/understack
 
 
