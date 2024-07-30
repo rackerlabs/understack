@@ -9,13 +9,15 @@ class ArgoClient:
     def __init__(
         self,
         token: str,
-        namespace="argo-events",
+        namespace="default",
         api_url="https://argo-server.argo.svc.cluster.local:2746",
+        logger=None
     ):
         self.token = token
         self.namespace = namespace
         self.api_url = api_url
         self.headers = {"Authorization": f"Bearer {self.token}"}
+        self.logger = logger
 
     def submit(
         self,
@@ -35,7 +37,8 @@ class ArgoClient:
             verify=False,
         )
         response.raise_for_status()
-        print(response.json())
+        if self.logger:
+            self.logger.debug(f"Response: {response.json()}")
         return response
 
     def submit_wait(self, *args, **kwargs):
@@ -44,7 +47,8 @@ class ArgoClient:
         workflow_name = response.json()["metadata"]["name"]
         result = None
         for i in range(1, max_attempts + 1):
-            print(f"Workflow: {workflow_name} retry {i}/{max_attempts}")
+            if self.logger:
+                self.logger.debug(f"Workflow: {workflow_name} retry {i}/{max_attempts}")
             time.sleep(5)
             result = self.check_status(workflow_name)
             if result in ["Succeeded", "Failed", "Error"]:

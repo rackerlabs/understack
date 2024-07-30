@@ -10,15 +10,58 @@ from neutron_lib.plugins.ml2.api import NetworkContext
 from neutron_lib.plugins.ml2.api import PortContext
 from neutron_lib.plugins.ml2.api import SubnetContext
 from neutron_understack.argo.workflows import ArgoClient
+from oslo_config import cfg
 
 LOG = logging.getLogger(__name__)
 
+def setup_conf():
+    grp = cfg.OptGroup("ml2_type_understack")
+    opts = [
+        cfg.StrOpt(
+            "provisioning_network",
+            help="provisioning_network ID as configured in ironic.conf",
+        ),
+        cfg.StrOpt(
+            "argo_workflow_sa",
+            default="workflow",
+            help="ServiceAccount to submit Workflow as",
+        ),
+        cfg.StrOpt(
+            "argo_api_url",
+            default="https://argo-server.argo.svc.cluster.local:2746",
+            help="URL of the Argo Server API",
+        ),
+        cfg.StrOpt(
+            "argo_namespace",
+            default="argo-events",
+            help="Namespace to submit the Workflows to",
+        ),
+        cfg.IntOpt(
+            "argo_max_attempts",
+            default=15,
+            help="Number of tries to retrieve the Workflow run result. Sleeps 5 seconds between attempts.",
+        ),
+        cfg.BoolOpt(
+            "argo_dry_run", default=True, help="Call Undersync with dry-run mode"
+        ),
+        cfg.BoolOpt("argo_force", default=False, help="Call Undersync with force mode"),
+    ]
+    cfg.CONF.register_group(grp)
+    cfg.CONF.register_opts(opts, group=grp)
+
+
+setup_conf()
 
 argo_token = None
 with open("/run/secrets/kubernetes.io/serviceaccount/token") as token_file:
     argo_token = token_file.read()
 
-argo_client = ArgoClient(argo_token)
+argo_client = ArgoClient(
+    argo_token,
+    logger=LOG,
+    api_url=cfg.CONF.ml2_type_understack.argo_api_url,
+    namespace=cfg.CONF.ml2_type_understack.argo_namespace,
+)
 
 
 def dump_context(
@@ -172,11 +215,8 @@ class UnderstackDriver(MechanismDriver):
     def check_vlan_transparency(self, context):
         log_call("check_vlan_transparency", context)
 
-    # TODO: obtain from the plugin config
-    PROVISIONING_NETWORK_ID = "7d37463c-a031-4927-b423-f0dec1e34c10"
-
     def __network_name(self, network_id: str):
-        if network_id == self.PROVISIONING_NETWORK_ID:
+        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
             return "provisioning"
         else:
             return "tenant"
@@ -192,12 +232,11 @@ class UnderstackDriver(MechanismDriver):
             parameters={
                 "device_uuid": device_uuid,
                 "network_name": network_name,
-                "dry_run": True,
-                "force": False,
+                "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
+                "force": cfg.CONF.ml2_type_understack.argo_force,
             },
-            # TODO: obtain from the config
-            service_account="workflow",
-            max_attempts=20,
+            service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
+            max_attempts=cfg.CONF.ml2_type_understack.argo_max_attempts,
         )
         LOG.info(f"Binding workflow {result}")
         if result == "Succeeded":
