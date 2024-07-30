@@ -27,3 +27,6 @@ resources:
   - workflow-role.yaml
 
   - configmaps.yaml
+
+  ## allow neutron's service account to submit workflows
+  - svc-neutron.yaml
