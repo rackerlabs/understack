@@ -1,14 +1,72 @@
 import json
 import logging
+from pprint import pprint
 import typing
 import uuid
 
-from neutron_lib.plugins.ml2.api import MechanismDriver, NetworkContext, PortContext, SubnetContext
+import neutron_lib.api.definitions.portbindings as portbindings
+from neutron_lib.plugins.ml2.api import MechanismDriver
+from neutron_lib.plugins.ml2.api import NetworkContext
+from neutron_lib.plugins.ml2.api import PortContext
+from neutron_lib.plugins.ml2.api import SubnetContext
+from neutron_understack.argo.workflows import ArgoClient
+from oslo_config import cfg
 
 LOG = logging.getLogger(__name__)
 
+def setup_conf():
+    grp = cfg.OptGroup("ml2_type_understack")
+    opts = [
+        cfg.StrOpt(
+            "provisioning_network",
+            help="provisioning_network ID as configured in ironic.conf",
+        ),
+        cfg.StrOpt(
+            "argo_workflow_sa",
+            default="workflow",
+            help="ServiceAccount to submit Workflow as",
+        ),
+        cfg.StrOpt(
+            "argo_api_url",
+            default="https://argo-server.argo.svc.cluster.local:2746",
+            help="URL of the Argo Server API",
+        ),
+        cfg.StrOpt(
+            "argo_namespace",
+            default="argo-events",
+            help="Namespace to submit the Workflows to",
+        ),
+        cfg.IntOpt(
+            "argo_max_attempts",
+            default=15,
+            help="Number of tries to retrieve the Workflow run result. Sleeps 5 seconds between attempts.",
+        ),
+        cfg.BoolOpt(
+            "argo_dry_run", default=True, help="Call Undersync with dry-run mode"
+        ),
+        cfg.BoolOpt("argo_force", default=False, help="Call Undersync with force mode"),
+    ]
+    cfg.CONF.register_group(grp)
+    cfg.CONF.register_opts(opts, group=grp)
 
-def dump_context(context: typing.Union[NetworkContext, SubnetContext, PortContext]) -> dict:
+
+setup_conf()
+
+argo_token = None
+with open("/run/secrets/kubernetes.io/serviceaccount/token") as token_file:
+    argo_token = token_file.read()
+
+argo_client = ArgoClient(
+    argo_token,
+    logger=LOG,
+    api_url=cfg.CONF.ml2_type_understack.argo_api_url,
+    namespace=cfg.CONF.ml2_type_understack.argo_namespace,
+)
+
+
+def dump_context(
+    context: typing.Union[NetworkContext, SubnetContext, PortContext],
+) -> dict:
     # RESOURCE_ATTRIBUTE_MAP
     # from neutron_lib.api.definitions import network, subnet, port, portbindings
     # The properties of a NetworkContext.current are defined in network.RESOURCE_ATTRIBUTE_MAP
@@ -62,7 +120,9 @@ def dump_context(context: typing.Union[NetworkContext, SubnetContext, PortContex
     return retval
 
 
-def log_call(method: str, context: typing.Union[NetworkContext, SubnetContext, PortContext]) -> None:
+def log_call(
+    method: str, context: typing.Union[NetworkContext, SubnetContext, PortContext]
+) -> None:
     data = dump_context(context)
     data.update({"method": method})
     try:
@@ -76,12 +136,20 @@ def log_call(method: str, context: typing.Union[NetworkContext, SubnetContext, P
         )
         return
     LOG.info("%s method called with data: %s", method, jsondata)
-    LOG.debug("%s method executed with context: %s", method, context.current)
+    LOG.debug("%s method executed with context:", method)
+    # for chunk in chunked(str(context.current), 750):
+    pprint(context.current)
+
+
+def chunked(inputstr, length):
+    return (inputstr[0 + i : length + i] for i in range(0, len(inputstr), length))
 
 
 class UnderstackDriver(MechanismDriver):
     # See MechanismDriver docs for resource_provider_uuid5_namespace
-    resource_provider_uuid5_namespace = uuid.UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
+    resource_provider_uuid5_namespace = uuid.UUID(
+        "6eae3046-4072-11ef-9bcf-d6be6370a162"
+    )
 
     def initialize(self):
         pass
@@ -141,7 +209,39 @@ class UnderstackDriver(MechanismDriver):
         log_call("delete_port_postcommit", context)
 
     def bind_port(self, context):
+        self._move_to_network(context)
         log_call("bind_port", context)
 
     def check_vlan_transparency(self, context):
         log_call("check_vlan_transparency", context)
+
+    def __network_name(self, network_id: str):
+        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+            return "provisioning"
+        else:
+            return "tenant"
+
+    def _move_to_network(self, context):
+        device_uuid = context.current["binding:host_id"]
+        network_name = self.__network_name(context.current["network_id"])
+        LOG.debug(f"Selected {network_name=} for {device_uuid=}")
+
+        result = argo_client.submit_wait(
+            template_name="undersync-device",
+            entrypoint="trigger-undersync",
+            parameters={
+                "device_uuid": device_uuid,
+                "network_name": network_name,
+                "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
+                "force": cfg.CONF.ml2_type_understack.argo_force,
+            },
+            service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
+            max_attempts=cfg.CONF.ml2_type_understack.argo_max_attempts,
+        )
+        LOG.info(f"Binding workflow {result}")
+        if result == "Succeeded":
+            context.current["bind:vif_type"] = portbindings.VIF_TYPE_OTHER
+        else:
+            context.current["bind:vif_type"] = portbindings.VIF_TYPE_BINDING_FAILED
+
+        return context

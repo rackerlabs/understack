@@ -25,11 +25,9 @@ bootstrap:
     openstack project create undercloud --or-show
     openstack user create --project undercloud --password demo argoworkflow --or-show
     openstack role add --user argoworkflow --project undercloud member
-    # ironic-neutron-agent user
-    # TODO: investigate if we can use 'ironic' user for this.
-    openstack user create --project service --domain service --password ironic-neutron-password ironic-neutron-agent --or-show
-    openstack role add --domain service --user ironic-neutron-agent service
-    openstack role add --project service --project-domain service --user ironic-neutron-agent --user-domain service member
+    # allow ironic user to see servers in undercloud project
+    openstack role add --project undercloud --user ironic --user-domain service  member
+    openstack role add --project service --user ironic --user-domain service service
     # add 'demo' user to have 'member' role, needed for horizon dashboard use
     openstack role add --user demo --project undercloud member
 

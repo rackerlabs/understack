@@ -4,6 +4,7 @@
   value:
     - server
     - --auth-mode=sso
+    - --auth-mode=client
     - --namespaced
     - --managed-namespace
     - argo-events
