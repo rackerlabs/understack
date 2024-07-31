@@ -5,6 +5,8 @@ import typing
 import uuid
 
 import neutron_lib.api.definitions.portbindings as portbindings
+from neutron_lib import constants as p_const
+from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
 from neutron_lib.plugins.ml2.api import NetworkContext
 from neutron_lib.plugins.ml2.api import PortContext
@@ -13,6 +15,7 @@ from neutron_understack.argo.workflows import ArgoClient
 from oslo_config import cfg
 
 LOG = logging.getLogger(__name__)
+
 
 def setup_conf():
     grp = cfg.OptGroup("ml2_type_understack")
@@ -141,12 +144,7 @@ def log_call(
         return
     LOG.info("%s method called with data: %s", method, jsondata)
     LOG.debug("%s method executed with context:", method)
-    # for chunk in chunked(str(context.current), 750):
     pprint(context.current)
-
-
-def chunked(inputstr, length):
-    return (inputstr[0 + i : length + i] for i in range(0, len(inputstr), length))
 
 
 class UnderstackDriver(MechanismDriver):
@@ -206,6 +204,9 @@ class UnderstackDriver(MechanismDriver):
     def update_port_postcommit(self, context):
         log_call("update_port_postcommit", context)
 
+        if context.current["binding:vif_type"] == portbindings.VIF_TYPE_OTHER:
+            self._move_to_network(context)
+
     def delete_port_precommit(self, context):
         log_call("delete_port_precommit", context)
 
@@ -213,8 +214,44 @@ class UnderstackDriver(MechanismDriver):
         log_call("delete_port_postcommit", context)
 
     def bind_port(self, context):
-        self._move_to_network(context)
         log_call("bind_port", context)
+        for segment in context.network.network_segments:
+            if self.check_segment(segment):
+                context.set_binding(
+                    segment[api.ID],
+                    portbindings.VIF_TYPE_OTHER,
+                    {},
+                    status=p_const.PORT_STATUS_ACTIVE,
+                )
+                LOG.debug(f"Bound segment: {segment}")
+                return
+            else:
+                LOG.debug(
+                    "Refusing to bind port for segment ID %(id)s, "
+                    "segment %(seg)s, phys net %(physnet)s, and "
+                    "network type %(nettype)s",
+                    {
+                        "id": segment[api.ID],
+                        "seg": segment[api.SEGMENTATION_ID],
+                        "physnet": segment[api.PHYSICAL_NETWORK],
+                        "nettype": segment[api.NETWORK_TYPE],
+                    },
+                )
+
+    def check_segment(self, segment):
+        """Verify a segment is valid for the Understack MechanismDriver.
+
+        Verify the requested segment is supported by Understack and return True or
+        False to indicate this to callers.
+        """
+        network_type = segment[api.NETWORK_TYPE]
+        return network_type in [
+            p_const.TYPE_LOCAL,
+            p_const.TYPE_GRE,
+            p_const.TYPE_VXLAN,
+            p_const.TYPE_VLAN,
+            p_const.TYPE_FLAT,
+        ]
 
     def check_vlan_transparency(self, context):
         log_call("check_vlan_transparency", context)
@@ -230,7 +267,7 @@ class UnderstackDriver(MechanismDriver):
         network_name = self.__network_name(context.current["network_id"])
         LOG.debug(f"Selected {network_name=} for {device_uuid=}")
 
-        result = argo_client.submit_wait(
+        result = argo_client.submit(
             template_name="undersync-device",
             entrypoint="trigger-undersync",
             parameters={
@@ -240,12 +277,6 @@ class UnderstackDriver(MechanismDriver):
                 "force": cfg.CONF.ml2_type_understack.argo_force,
             },
             service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
-            max_attempts=cfg.CONF.ml2_type_understack.argo_max_attempts,
         )
-        LOG.info(f"Binding workflow {result}")
-        if result == "Succeeded":
-            context.current["bind:vif_type"] = portbindings.VIF_TYPE_OTHER
-        else:
-            context.current["bind:vif_type"] = portbindings.VIF_TYPE_BINDING_FAILED
-
+        LOG.info(f"Binding workflow submitted: {result}")
         return context
