@@ -2,14 +2,16 @@ import json
 import logging
 import sys
 
-from ironic.client import IronicClient
-from ironic.secrets import read_secret
+from understack_workflows.ironic.client import IronicClient
+from understack_workflows.ironic.secrets import read_secret
 
 logger = logging.getLogger(__name__)
 
 
 if len(sys.argv) < 1:
-    raise ValueError("Please provide node configuration in JSON format as first argument.")
+    raise ValueError(
+        "Please provide node configuration in JSON format as first argument."
+    )
 
 logger.info("Pushing device new node to Ironic.")
 client = IronicClient(

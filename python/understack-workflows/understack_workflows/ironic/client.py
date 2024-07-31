@@ -1,7 +1,6 @@
 from ironicclient import client as iclient
 from keystoneauth1 import session
 from keystoneauth1.identity import v3
-from typing import List
 
 
 class IronicClient:
@@ -13,6 +12,7 @@ class IronicClient:
         auth_url: str,
         tenant_name: str,
     ) -> None:
+        """Initialize our ironicclient wrapper."""
         self.svc_url = svc_url
         self.username = username
         self.password = password
@@ -31,7 +31,9 @@ class IronicClient:
             user_domain_name="Default",
         )
         insecure_ssl = True
-        sess = session.Session(auth=auth, verify=(not insecure_ssl), app_name="nautobot")
+        sess = session.Session(
+            auth=auth, verify=(not insecure_ssl), app_name="nautobot"
+        )
         self.client = iclient.Client(
             1,
             endpoint_override=self.svc_url,
@@ -44,7 +46,9 @@ class IronicClient:
     def create_node(self, node_data: dict):
         self._ensure_logged_in()
 
-        return self.client.node.create(os_ironic_api_version=self.os_ironic_api_version, **node_data)
+        return self.client.node.create(
+            os_ironic_api_version=self.os_ironic_api_version, **node_data
+        )
 
     def list_nodes(self):
         self._ensure_logged_in()
@@ -54,27 +58,37 @@ class IronicClient:
     def get_node(self, node_ident: str, fields: list[str] | None = None):
         self._ensure_logged_in()
 
-        return self.client.node.get(node_ident, fields, os_ironic_api_version=self.os_ironic_api_version)
+        return self.client.node.get(
+            node_ident, fields, os_ironic_api_version=self.os_ironic_api_version
+        )
 
     def update_node(self, node_id, patch):
         self._ensure_logged_in()
 
-        return self.client.node.update(node_id, patch, os_ironic_api_version=self.os_ironic_api_version)
+        return self.client.node.update(
+            node_id, patch, os_ironic_api_version=self.os_ironic_api_version
+        )
 
     def create_port(self, port_data: dict):
         self._ensure_logged_in()
 
-        return self.client.port.create(os_ironic_api_version=self.os_ironic_api_version, **port_data)
+        return self.client.port.create(
+            os_ironic_api_version=self.os_ironic_api_version, **port_data
+        )
 
-    def update_port(self, port_id: str, patch: List):
+    def update_port(self, port_id: str, patch: list):
         self._ensure_logged_in()
 
-        return self.client.port.update(port_id, patch, os_ironic_api_version=self.os_ironic_api_version)
+        return self.client.port.update(
+            port_id, patch, os_ironic_api_version=self.os_ironic_api_version
+        )
 
     def delete_port(self, port_id: str):
         self._ensure_logged_in()
 
-        return self.client.port.delete(port_id, os_ironic_api_version=self.os_ironic_api_version)
+        return self.client.port.delete(
+            port_id, os_ironic_api_version=self.os_ironic_api_version
+        )
 
     def list_ports(self, node_id: dict):
         self._ensure_logged_in()

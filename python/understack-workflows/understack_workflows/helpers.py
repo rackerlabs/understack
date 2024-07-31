@@ -1,30 +1,35 @@
 import argparse
 import logging
 import os
-import sushy
 import sys
+
+import sushy
 
 logger = logging.getLogger(__name__)
 
 
-def setup_logger(name):
-    logger = logging.getLogger(name)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+def setup_logger(name: str | None = None, level: int = logging.DEBUG):
+    """Standardize our logging.
+
+    Configures the root logger to prefix messages with a timestamp
+    and to output the log level we want to see by default.
+
+    params:
+    name: logger hierarchy or root logger
+    level: default log level (DEBUG)
+    """
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.DEBUG,
     )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.DEBUG)
-    return logger
+    return logging.getLogger(name)
 
 
 def arg_parser(name):
     parser = argparse.ArgumentParser(
         prog=os.path.basename(name), description="Nautobot Interface sync"
     )
-    parser.add_argument("--hostname", required=True,
-                        help="Nautobot device name")
+    parser.add_argument("--hostname", required=True, help="Nautobot device name")
     parser.add_argument("--oob_username", required=False, help="OOB username")
     parser.add_argument("--oob_password", required=False, help="OOB password")
     parser.add_argument("--nautobot_url", required=False)
@@ -39,7 +44,7 @@ def exit_with_error(error):
 
 def credential(subpath, item):
     try:
-        return open(f"/etc/{subpath}/{item}", "r").read().strip()
+        return open(f"/etc/{subpath}/{item}").read().strip()
     except FileNotFoundError:
         exit_with_error(f"{subpath} {item} not found in mounted files")
 
@@ -57,7 +62,4 @@ def oob_sushy_session(oob_ip, oob_username, oob_password):
 
 
 def is_off_board(interface):
-    return (
-        "Embedded ALOM" in interface.location
-        or "Embedded" not in interface.location
-    )
+    return "Embedded ALOM" in interface.location or "Embedded" not in interface.location

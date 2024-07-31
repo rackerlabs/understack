@@ -1,10 +1,12 @@
-from setuptools import setup
 import codecs
 import os.path
 
+from setuptools import setup
+
 # Obtaining version number using recommended approach from
 # https://packaging.python.org/guides/single-sourcing-package-version/
-# This avoids problems that may arise from trying to import neutron_understack while it is not installed.
+# This avoids problems that may arise from trying to import neutron_understack while
+# it is not installed.
 
 
 def read(rel_path):

@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 from sushy import Sushy
 from sushy.exceptions import ResourceNotFoundError
+from sushy.resources.chassis.chassis import Chassis as SushyChassis
 from sushy.resources.system.network.adapter import NetworkAdapter
 from sushy.resources.system.network.port import NetworkPort
-from sushy.resources.chassis.chassis import Chassis as SushyChassis
 
 
 class ManufacturerNotSupported(Exception):
@@ -22,10 +24,7 @@ class NIC:
     def from_redfish(cls, data: NetworkAdapter) -> NIC:
         location = cls.nic_location(data)
         nic = cls(data.identity, location, [], data.model)
-        nic.interfaces = [
-            Interface.from_redfish(i, nic)
-            for i in cls.nic_ports(data)
-        ]
+        nic.interfaces = [Interface.from_redfish(i, nic) for i in cls.nic_ports(data)]
         return nic
 
     @classmethod
@@ -89,9 +88,11 @@ class Interface:
     def fetch_macaddr_from_sys_resource(cls, data: NetworkPort) -> str:
         try:
             path = f"{data.root.get_system().ethernet_interfaces.path}/{data.identity}"
-            macaddr = data.root.get_system().ethernet_interfaces.get_member(path).mac_address
+            macaddr = (
+                data.root.get_system().ethernet_interfaces.get_member(path).mac_address
+            )
         except ResourceNotFoundError:
-            macaddr = ''
+            macaddr = ""
         return macaddr
 
 
@@ -130,8 +131,7 @@ class Chassis:
 
         chassis = cls(chassis_data.name, [], [])
         chassis.nics = [
-            NIC.from_redfish(i)
-            for i in chassis_data.network_adapters.get_members()
+            NIC.from_redfish(i) for i in chassis_data.network_adapters.get_members()
         ]
         chassis.network_interfaces = cls.interfaces_from_nics(chassis.nics)
         return chassis

@@ -20,10 +20,8 @@ on:
 env:
   VERSION_PYTHON311: 0.0.1
   VERSION_PYTHON312: 0.0.1
-  VERSION_PYTHON_IRONIC: 0.0.4
   VERSION_ARGO_UTILS: 0.0.1
   VERSION_OBM_UTILS: 0.0.1
-  VERSION_PYTHON_NAUTOBOT_INT_SYNC: 0.0.1
   VERSION_PYTHON_NAUTOBOT: 0.0.1
 
 jobs:
@@ -67,17 +65,6 @@ jobs:
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_PYTHON312 }}
 
-      - name: Build and deploy Python 3.11 with Ironic client
-        uses: docker/build-push-action@v5
-        with:
-          context: argo-workflows/sync-nb-server-to-ironic
-          file: argo-workflows/sync-nb-server-to-ironic/containers/Dockerfile.ironic
-          # push for all main branch commits
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:latest,ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:${{ env.VERSION_PYTHON_IRONIC }}
-          labels: |
-              org.opencontainers.image.version=${{ env.VERSION_PYTHON_IRONIC }}
-
       - name: Build and deploy Argo Utils image
         uses: docker/build-push-action@v5
         with:
@@ -100,16 +87,6 @@ jobs:
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_OBM_UTILS }}
 
-      - name: Build and deploy Python 3.11 with Nautobot Int Sync
-        uses: docker/build-push-action@v5
-        with:
-          context: argo-workflows/sync-srv-redfish-intfs-to-nb
-          file: argo-workflows/sync-srv-redfish-intfs-to-nb/containers/Dockerfile.nautobot_int_sync
-          # push for all main branch commits
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:latest,ghcr.io/rackerlabs/understack/nautobot-interfaces-sync:${{ env.VERSION_PYTHON_NAUTOBOT_INT_SYNC }}
-          labels: |
-              org.opencontainers.image.version=${{ env.VERSION_PYTHON_NAUTOBOT_INT_SYNC }}
       - name: Build and deploy Python 3.11 with PyNautobot nautobot-update-cf
         uses: docker/build-push-action@v5
         with:

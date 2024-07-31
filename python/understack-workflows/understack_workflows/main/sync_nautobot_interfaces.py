@@ -1,14 +1,13 @@
 import sushy
-from models import Chassis
-from helpers import (
-    setup_logger,
-    arg_parser,
-    credential,
-    oob_sushy_session,
-    exit_with_error,
-    is_off_board,
-)
 from nautobot import Nautobot
+
+from understack_workflows.helpers import arg_parser
+from understack_workflows.helpers import credential
+from understack_workflows.helpers import exit_with_error
+from understack_workflows.helpers import is_off_board
+from understack_workflows.helpers import oob_sushy_session
+from understack_workflows.helpers import setup_logger
+from understack_workflows.models import Chassis
 
 logger = setup_logger(__name__)
 
@@ -34,9 +33,7 @@ def main():
         exit_with_error(e)
 
     interfaces = [
-        interface
-        for interface in chassis.network_interfaces
-        if is_off_board(interface)
+        interface for interface in chassis.network_interfaces if is_off_board(interface)
     ]
 
     nautobot.bulk_create_interfaces(device_name, interfaces)

@@ -31,10 +31,9 @@ spec:
         parameters:
           - name: obm
       container:
-        image: ghcr.io/rackerlabs/understack/argo-ironic-client-python3.11.8:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - python
-          - /app/synchronize-obm-creds.py
+          - synchronize-obm-creds
         args:
           - "{{workflow.parameters.interface_update_event}}"
         volumeMounts:

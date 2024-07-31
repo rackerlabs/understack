@@ -1,24 +1,24 @@
+import argparse
 import logging
 import os
-from ironic.client import IronicClient
-import pynautobot
-import argparse
 from uuid import UUID
-from typing import List
-from port_configuration import PortConfiguration
+
+import pynautobot
 from ironicclient.v1.port import Port
 
+from understack_workflows.helpers import setup_logger
+from understack_workflows.ironic.client import IronicClient
+from understack_workflows.port_configuration import PortConfiguration
 
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+logger = setup_logger(__name__)
 
 
-def get_nautobot_interfaces(device_id: UUID) -> List[PortConfiguration]:
-    """Return a List of Ironic Ports for all Nautobot Interfaceswith a MAC address, for the specified Device."""
+def get_nautobot_interfaces(device_id: UUID) -> list[PortConfiguration]:
+    """Provides mapping of Nautobot to Ironic ports.
 
+    Return a List of Ironic Ports for all Nautobot Interfaces with a
+    MAC address, for the specified Device.
+    """
     nautobot_api = os.environ["NAUTOBOT_API"]
     nautobot_token = os.environ["NAUTOBOT_TOKEN"]
     nautobot = pynautobot.api(nautobot_api, nautobot_token)
@@ -27,12 +27,20 @@ def get_nautobot_interfaces(device_id: UUID) -> List[PortConfiguration]:
     ports = []
     for i in interfaces:
         if i.mac_address:
-            ports.append(PortConfiguration(node_uuid=str(device_id), address=i.mac_address, uuid=i.id))
+            ports.append(
+                PortConfiguration(
+                    node_uuid=str(device_id), address=i.mac_address, uuid=i.id
+                )
+            )
     return ports
 
 
-def get_patch(nautobot_port: PortConfiguration, port: Port) -> List:
-    """Compare attributes between Port objects and return a patch object containing any changes."""
+def get_patch(nautobot_port: PortConfiguration, port: Port) -> list:
+    """Generate patch to change data.
+
+    Compare attributes between Port objects and return a patch object
+    containing any changes.
+    """
     patch = []
     for a in nautobot_port.__fields__:
         new_value = getattr(nautobot_port, a)
@@ -42,7 +50,26 @@ def get_patch(nautobot_port: PortConfiguration, port: Port) -> List:
     return patch
 
 
-def main(args):
+def main():
+    parser = argparse.ArgumentParser(
+        description="Update Ironic ports from Nautobot Interfaces"
+    )
+    parser.add_argument(
+        "--device-id",
+        required=True,
+        help="Ironic Node and Nautobot Device ID",
+        type=UUID,
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_const",
+        dest="loglevel",
+        const=logging.DEBUG,
+        default=logging.WARNING,
+    )
+    parser.add_argument("--dry-run", action=argparse.BooleanOptionalAction)
+    args = parser.parse_args()
+
     device_id = args.device_id
     dry_run = args.dry_run
     logger.setLevel(args.loglevel)
@@ -68,7 +95,6 @@ def main(args):
     # Update existing Ironic Ports
     new_ports = []
     for n in nautobot_ports:
-
         # identify any matching Ironic Ports
         matching_port = None
         for i in ironic_ports:
@@ -80,8 +106,9 @@ def main(args):
             new_ports.append(n)
             continue
 
-        # If a matching port was found, we will remove it from the ironic_ports list. Once this loop completes, any
-        # remaining ports in ironic_ports will be considered stale, and will be removed from Ironic
+        # If a matching port was found, we will remove it from the ironic_ports
+        # list. Once this loop completes, any remaining ports in ironic_ports will
+        # be considered stale, and will be removed from Ironic
         ironic_ports.remove(matching_port)
 
         # if any data has changed on this interface, patch the matching ironic Port
@@ -93,7 +120,9 @@ def main(args):
                 response = client.update_port(n.uuid, patch)
                 logger.debug(f"Updated: {response}")
         else:
-            logger.debug(f"An existing Ironic Port was found for Nautobot Interface {n.uuid}")
+            logger.debug(
+                f"An existing Ironic Port was found for Nautobot Interface {n.uuid}"
+            )
 
     # Create new Ironic Ports
     for p in new_ports:
@@ -107,16 +136,13 @@ def main(args):
     for i in ironic_ports:
         logger.debug(f"[ - ] {i}")
         if not dry_run:
-            logger.info(f"Nautobot Interface {i.uuid} no longer exists, deleting corresponding Ironic Port")
+            logger.info(
+                f"Nautobot Interface {i.uuid} no longer exists, deleting "
+                f"corresponding Ironic Port"
+            )
             response = client.delete_port(i.uuid)
             logger.debug(f"Deleted: {response}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Update Ironic ports from Nautobot Interfaces")
-    parser.add_argument("--device-id", required=True, help="Ironic Node and Nautobot Device ID", type=UUID)
-    parser.add_argument("--debug", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.WARNING)
-    parser.add_argument("--dry-run", action=argparse.BooleanOptionalAction)
-    args = parser.parse_args()
-
-    main(args)
+    main()

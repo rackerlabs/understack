@@ -1,0 +1,88 @@
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+[tool.poetry]
+name = "understack-workflows"
+version = "0.0.0"
+authors = ["Understack Developers"]
+description = "The glue between different systems and services that are run in our Workflows"
+readme = "README.md"
+packages = [{include = "understack_workflows"}]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: OpenStack",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Systems Administration"
+]
+
+[tool.poetry.dependencies]
+python = "~3.11.0"
+
+pydantic = "^2"
+pynautobot = "^2"
+python-ironicclient = "^5"
+requests = "^2"
+sushy = "^5"
+# required by sushy but not depended on by it
+setuptools = "^70"
+
+[tool.peotry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = "^7"
+pytest-github-actions-annotate-failures = "*"
+
+[tool.poetry.scripts]
+synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
+synchronize-obm-creds = "understack_workflows.main.synchronize_obm_creds:main"
+synchronize-server = "understack_workflows.main.synchronize_server:main"
+sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"
+
+[tool.setuptools.packages.find]
+# avoid packaging up our tests
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+
+[tool.ruff]
+target-version = "py311"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "D",       # pydocstyle
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
+]
+
+ignore = [
+    "D100",  # don't require docs for every module
+    "D101",  # don't require docs for every class
+    "D102",  # don't require docs for every class method
+    "D103",  # don't require docs for every function
+    "D104",  # don't require docs for every package
+    "D417"   # don't require docs for every function parameter
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[tool.ruff.lint.pydocstyle]
+# enable the google doc style rules by default
+convention = "google"
