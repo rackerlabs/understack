@@ -34,6 +34,13 @@ conf:
       enabled_vendor_interfaces: redfish,ipmitool,idrac-redfish,ilo
     conductor:
       automated_clean: false
+      # (nicholas.kuechler) tuning for idrac hardware type
+      # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#nodes-go-into-maintenance-mode
+      sync_power_state_interval: 70
+    agent:
+      # (nicholas.kuechler) tuning for idrac hardware type
+      # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#timeout-when-powering-off
+      post_deploy_get_power_state_retry_interval: 18
     dhcp:
       dhcp_provider: dnsmasq
     oslo_messaging_rabbit:
