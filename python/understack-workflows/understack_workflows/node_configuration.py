@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
+
+from ironicclient.common.utils import args_array_to_dict
+from ironicclient.v1.node import Node
 
 from understack_workflows.redfish_driver_info import RedfishDriverInfo
 
@@ -8,6 +13,21 @@ from understack_workflows.redfish_driver_info import RedfishDriverInfo
 @dataclass
 class IronicNodeConfiguration:
     """The boot interface for a Node, e.g. “pxe”."""
+
+    uuid: str
+    """The UUID for the resource."""
+
+    name: str
+    """Human-readable identifier for the Node resource. May be undefined.
+    Certain words are reserved."""
+
+    driver: str
+    """The name of the driver used to manage this Node."""
+
+    driver_info: RedfishDriverInfo = field(default_factory=RedfishDriverInfo)
+    """All the metadata required by the driver to manage this Node. List of
+    fields varies between drivers, and can be retrieved from the
+    /v1/drivers/<DRIVER_NAME>/properties resource."""
 
     boot_interface: str | None = None
 
@@ -21,14 +41,6 @@ class IronicNodeConfiguration:
     deploy_interface: str | None = None
     """The deploy interface for a node, e.g. “iscsi”."""
 
-    driver_info: dict | RedfishDriverInfo = field(default_factory=dict)
-    """All the metadata required by the driver to manage this Node. List of
-    fields varies between drivers, and can be retrieved from the
-    /v1/drivers/<DRIVER_NAME>/properties resource."""
-
-    driver: str = ""
-    """The name of the driver used to manage this Node."""
-
     extra: dict = field(default_factory=dict)
     """A set of one or more arbitrary metadata key and value pairs."""
 
@@ -37,10 +49,6 @@ class IronicNodeConfiguration:
 
     management_interface: str | None = None
     """Interface for out-of-band node management, e.g. “ipmitool”."""
-
-    name: str = ""
-    """Human-readable identifier for the Node resource. May be undefined.
-    Certain words are reserved."""
 
     network_interface: str | None = None
     """Which Network Interface provider to use when plumbing the network
@@ -67,9 +75,6 @@ class IronicNodeConfiguration:
     storage_interface: str | None = None
     """Interface used for attaching and detaching volumes on this node, e.g.
     “cinder”."""
-
-    uuid: str = ""
-    """The UUID for the resource."""
 
     vendor_interface: str | None = None
     """Interface for vendor-specific functionality on this node, e.g.
@@ -156,10 +161,37 @@ class IronicNodeConfiguration:
         "parent_node",
     ]
 
-    def create_arguments(self):
-        arguments = {
-            k: v
-            for k, v in asdict(self).items()
-            if k not in self.CREATE_EXCLUDED_KEYWORDS
-        }
-        return arguments
+    def create_node(self, client) -> Node:
+        """Create a node from our config."""
+        # this follows the code in the python-ironicclient
+        field_list = ["uuid", "name", "driver", "driver_info"]
+        fields = dict(
+            (k, v)
+            for (k, v) in asdict(self).items()
+            if k in field_list and v is not None
+        )
+        fields = args_array_to_dict(fields, "driver_info")
+        return client.create_node(fields)
+
+    @staticmethod
+    def from_event(event: dict) -> IronicNodeConfiguration:
+        # check for events we support
+        model = event.get("model")
+        if model not in ["interface"]:
+            raise ValueError(f"'{model}' events not supported")
+
+        data = event["data"]
+
+        driver = "redfish"
+
+        di = RedfishDriverInfo(
+            redfish_address=f"https://{data['ip_addresses'][0]['host']}",
+            redfish_verify_ca=False,
+        )
+
+        return IronicNodeConfiguration(
+            data["device"]["id"],
+            data["device"]["name"],
+            driver,
+            driver_info=di,
+        )

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class RedfishDriverInfo:
-    redfish_address: str
+    redfish_address: str | None = None
     """The URL address to the Redfish controller"""
 
     redfish_system_id: str | None = None

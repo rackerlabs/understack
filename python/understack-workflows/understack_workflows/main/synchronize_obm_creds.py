@@ -11,18 +11,6 @@ from understack_workflows.node_configuration import IronicNodeConfiguration
 logger = setup_logger(__name__)
 
 
-def event_to_node_configuration(event: dict) -> IronicNodeConfiguration:
-    node_config = IronicNodeConfiguration()
-    node_config.conductor_group = None
-    node_config.driver = "redfish"
-
-    node_config.chassis_uuid = None
-    node_config.uuid = event["device"]["id"]
-    node_config.name = event["device"]["name"]
-
-    return node_config
-
-
 def credential_secrets():
     """Reads Kubernetes Secret files with username/password credentials."""
     username = None
@@ -64,22 +52,21 @@ def main():
 
     interface_update_event = json.loads(sys.argv[1])
     logger.debug(f"Received: {interface_update_event}")
-    update_data = interface_update_event["data"]
 
-    node_id = update_data["device"]["id"]
-    logger.debug(f"Checking if node with UUID: {node_id} exists in Ironic.")
+    node = IronicNodeConfiguration.from_event(interface_update_event)
+    logger.debug(f"Checking if node with UUID {node.uuid} exists in Ironic.")
 
     try:
-        ironic_node = client.get_node(node_id)
+        ironic_node = client.get_node(node.uuid)
     except ironicclient.common.apiclient.exceptions.NotFound:
-        logger.debug(f"Node: {node_id} not found in Ironic.")
+        logger.debug(f"Node: {node.uuid} not found in Ironic.")
         ironic_node = None
         sys.exit(1)
 
     STATES_ALLOWING_UPDATES = ["enroll"]
     if ironic_node.provision_state not in STATES_ALLOWING_UPDATES:
         logger.info(
-            f"Device {node_id} is in a {ironic_node.provision_state} "
+            f"Device {node.uuid} is in a {ironic_node.provision_state} "
             f"provisioning state, so the updates are not allowed."
         )
         sys.exit(0)
@@ -100,6 +87,6 @@ def main():
     ]
     patches = [p for p in patches if p is not None]
 
-    response = client.update_node(node_id, patches)
+    response = client.update_node(node.uuid, patches)
     logger.info(f"Patching: {patches}")
     logger.info(f"Updated: {response}")
