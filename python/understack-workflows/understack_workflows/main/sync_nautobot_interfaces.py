@@ -1,5 +1,4 @@
 import sushy
-from nautobot import Nautobot
 
 from understack_workflows.helpers import arg_parser
 from understack_workflows.helpers import credential
@@ -8,6 +7,7 @@ from understack_workflows.helpers import is_off_board
 from understack_workflows.helpers import oob_sushy_session
 from understack_workflows.helpers import setup_logger
 from understack_workflows.models import Chassis
+from understack_workflows.nautobot import Nautobot
 
 logger = setup_logger(__name__)
 
