@@ -28,6 +28,6 @@ WORKDIR /app
 RUN mkdir -p /opt/venv/wheels/
 COPY --from=builder /app/dist/*.whl /app/dist/requirements.txt /opt/venv/wheels/
 
-RUN --mount=type=cache,target=/root/.cache/.pip /opt/venv/bin/pip install --find-links /opt/venv/wheels/ --only-binary netifaces -r /opt/venv/wheels/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/.pip /opt/venv/bin/pip install --find-links /opt/venv/wheels/ --only-binary netifaces -r /opt/venv/wheels/requirements.txt understack-workflows
 
 USER $APP_USER
