@@ -126,6 +126,10 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/rackerlabs/understack/${{ matrix.container.name }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=tag
+            type=ref,event=pr
           labels: |
             org.opencontainers.image.title=${{ matrix.container.title }}
         env:
