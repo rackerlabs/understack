@@ -1,8 +1,5 @@
-import sushy
-
 from understack_workflows.helpers import arg_parser
 from understack_workflows.helpers import credential
-from understack_workflows.helpers import exit_with_error
 from understack_workflows.helpers import is_off_board
 from understack_workflows.helpers import oob_sushy_session
 from understack_workflows.helpers import setup_logger
@@ -27,10 +24,7 @@ def main():
     oob_ip = nautobot.device_oob_ip(device_name)
     oob = oob_sushy_session(oob_ip, oob_username, oob_password)
 
-    try:
-        chassis = Chassis.from_redfish(oob)
-    except sushy.exceptions.AccessError as e:
-        exit_with_error(e)
+    chassis = Chassis.from_redfish(oob)
 
     interfaces = [
         interface for interface in chassis.network_interfaces if is_off_board(interface)

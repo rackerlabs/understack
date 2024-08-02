@@ -7,10 +7,12 @@ on:
     paths:
       - "containers/**"
       - ".github/workflows/containers.yaml"
+      - "python/**"
   pull_request:
     paths:
       - "containers/**"
       - ".github/workflows/containers.yaml"
+      - "python/**"
   workflow_dispatch:
 
 jobs:
