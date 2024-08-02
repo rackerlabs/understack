@@ -3,7 +3,6 @@ import sys
 from typing import Protocol
 
 import pynautobot
-import requests
 from pynautobot.core.api import Api as NautobotApi
 from pynautobot.models.dcim import Devices as NautobotDevice
 from pynautobot.models.dcim import Interfaces as NautobotInterface
@@ -28,12 +27,7 @@ class Nautobot:
         sys.exit(1)
 
     def api_session(self, url: str, token: str) -> NautobotApi:
-        try:
-            return pynautobot.api(url, token=token)
-        except requests.exceptions.ConnectionError as e:
-            self.exit_with_error(e)
-        except pynautobot.core.query.RequestError as e:
-            self.exit_with_error(e)
+        return pynautobot.api(url, token=token)
 
     def device(self, device_name: str) -> NautobotDevice:
         device = self.session.dcim.devices.get(name=device_name)

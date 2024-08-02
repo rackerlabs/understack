@@ -1,11 +1,9 @@
 import argparse
 import logging
 import os
-import sys
+import pathlib
 
 import sushy
-
-logger = logging.getLogger(__name__)
 
 
 def setup_logger(name: str | None = None, level: int = logging.DEBUG):
@@ -37,28 +35,19 @@ def arg_parser(name):
     return parser
 
 
-def exit_with_error(error):
-    logger.error(error)
-    sys.exit(1)
-
-
 def credential(subpath, item):
-    try:
-        return open(f"/etc/{subpath}/{item}").read().strip()
-    except FileNotFoundError:
-        exit_with_error(f"{subpath} {item} not found in mounted files")
+    ref = pathlib.Path("/etc").joinpath(subpath).joinpath(item)
+    with ref.open() as f:
+        return f.read().strip()
 
 
 def oob_sushy_session(oob_ip, oob_username, oob_password):
-    try:
-        return sushy.Sushy(
-            f"https://{oob_ip}",
-            username=oob_username,
-            password=oob_password,
-            verify=False,
-        )
-    except sushy.exceptions.ConnectionError as e:
-        exit_with_error(e)
+    return sushy.Sushy(
+        f"https://{oob_ip}",
+        username=oob_username,
+        password=oob_password,
+        verify=False,
+    )
 
 
 def is_off_board(interface):

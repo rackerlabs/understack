@@ -27,7 +27,6 @@ python = "~3.11.0"
 pydantic = "^2"
 pynautobot = "^2"
 python-ironicclient = "^5"
-requests = "^2"
 sushy = "^5"
 # required by sushy but not depended on by it
 setuptools = "^70"
