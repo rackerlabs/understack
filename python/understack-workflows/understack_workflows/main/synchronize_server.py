@@ -2,6 +2,7 @@ import json
 import sys
 
 import ironicclient.common.apiclient.exceptions
+from ironicclient.common.utils import args_array_to_patch
 
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
@@ -60,18 +61,27 @@ def main():
 
     drac_ip = update_data["ip_addresses"][0]["host"]
     expected_address = f"https://{drac_ip}"
-    current_address = ironic_node.driver_info.get("redfish_address", None)
-    current_verify_ca = ironic_node.driver_info.get("redfish_verify_ca", None)
 
-    patches = [
-        replace_or_add_field(
-            "/driver_info/redfish_address", current_address, expected_address
-        ),
-        replace_or_add_field(
-            "/driver_info/redfish_verify_ca", current_verify_ca, False
-        ),
+    updates = [
+        f"name={node.name}",
+        f"driver={node.driver}",
+        f"driver_info/redfish_address={expected_address}",
+        "driver_info/redfish_verify_ca=false",
     ]
-    patches = [p for p in patches if p is not None]
+    resets = [
+        "bios_interface",
+        "boot_interface",
+        "inspect_interface",
+        "management_interface",
+        "power_interface",
+        "vendor_interface",
+        "raid_interface",
+        "network_interface",
+    ]
+
+    # using the behavior from the ironicclient code
+    patches = args_array_to_patch("add", updates)
+    patches.extend(args_array_to_patch("remove", resets))
 
     response = client.update_node(node.uuid, patches)
     logger.info(f"Patching: {patches}")

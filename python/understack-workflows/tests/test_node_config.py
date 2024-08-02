@@ -23,4 +23,4 @@ def test_node_config_from_event_interface_event(interface_event):
     node = IronicNodeConfiguration.from_event(interface_event)
     assert node.uuid == interface_event["data"]["device"]["id"]
     assert node.name == interface_event["data"]["device"]["name"]
-    assert node.driver == "redfish"
+    assert node.driver == "idrac"

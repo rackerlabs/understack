@@ -182,7 +182,9 @@ class IronicNodeConfiguration:
 
         data = event["data"]
 
-        driver = "redfish"
+        # if we got an iDRAC interface then we'll want to use
+        # the idrac driver otherwise redfish
+        driver = "idrac" if data["name"] == "iDRAC" else "redfish"
 
         di = RedfishDriverInfo(
             redfish_address=f"https://{data['ip_addresses'][0]['host']}",
