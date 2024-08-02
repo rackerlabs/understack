@@ -25,7 +25,7 @@ classifiers = [
 python = "~3.11.0"
 
 pydantic = "^2"
-pynautobot = "^2"
+pynautobot = "^2.2.1"
 python-ironicclient = "^5"
 sushy = "^5"
 # required by sushy but not depended on by it
