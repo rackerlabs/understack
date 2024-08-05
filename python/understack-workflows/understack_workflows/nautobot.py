@@ -1,10 +1,10 @@
 import logging
 import sys
 from typing import Protocol
+from uuid import UUID
 
 import pynautobot
 from pynautobot.core.api import Api as NautobotApi
-from pynautobot.models.dcim import Devices as NautobotDevice
 from pynautobot.models.dcim import Interfaces as NautobotInterface
 
 
@@ -29,22 +29,16 @@ class Nautobot:
     def api_session(self, url: str, token: str) -> NautobotApi:
         return pynautobot.api(url, token=token)
 
-    def device(self, device_name: str) -> NautobotDevice:
-        device = self.session.dcim.devices.get(name=device_name)
-        if not device:
-            self.exit_with_error(f"Device {device_name} not found in Nautobot")
-        return device
-
     def device_oob_interface(
         self,
-        device: NautobotDevice,
+        device_id: UUID,
     ) -> NautobotInterface:
         oob_intf = self.session.dcim.interfaces.get(
-            device_id=device.id, name=["iDRAC", "iLO"]
+            device_id=device_id, name=["iDRAC", "iLO"]
         )
         if not oob_intf:
             self.exit_with_error(
-                f"No OOB interfaces found for {device.name} in Nautobot"
+                f"No OOB interfaces found for device {device_id!s} in Nautobot"
             )
         return oob_intf
 
@@ -56,17 +50,15 @@ class Nautobot:
             )
         return ips[0].host
 
-    def device_oob_ip(self, device_name: str) -> str:
-        device = self.device(device_name)
-        oob_intf = self.device_oob_interface(device)
+    def device_oob_ip(self, device_id: UUID) -> str:
+        oob_intf = self.device_oob_interface(device_id)
         oob_ip = self.ip_from_interface(oob_intf)
         return oob_ip
 
     def construct_interfaces_payload(
         self,
         interfaces: list[Interface],
-        device_id: str,
-        device_name: str,
+        device_id: UUID,
     ) -> list[dict]:
         payload = []
         for interface in interfaces:
@@ -75,19 +67,20 @@ class Nautobot:
             )
             if nautobot_intf is None:
                 self.logger.info(
-                    f"{interface.name} was NOT found for {device_name}, creating..."
+                    f"{interface.name} was NOT found for device {device_id!s}, "
+                    f"creating..."
                 )
                 payload.append(self.interface_payload_data(device_id, interface))
             else:
                 self.logger.info(
                     f"{nautobot_intf.name} found in Nautobot for "
-                    f"{device_name}, no action will be taken."
+                    f"device {device_id!s}, no action will be taken."
                 )
         return payload
 
-    def interface_payload_data(self, device_id: str, interface: Interface) -> dict:
+    def interface_payload_data(self, device_id: UUID, interface: Interface) -> dict:
         return {
-            "device": device_id,
+            "device": str(device_id),
             "name": interface.name,
             "mac_address": interface.mac_addr,
             "type": "other",
@@ -96,10 +89,9 @@ class Nautobot:
         }
 
     def bulk_create_interfaces(
-        self, device_name: str, interfaces: list[Interface]
+        self, device_id: UUID, interfaces: list[Interface]
     ) -> list[NautobotInterface] | None:
-        device = self.device(device_name)
-        payload = self.construct_interfaces_payload(interfaces, device.id, device.name)
+        payload = self.construct_interfaces_payload(interfaces, device_id)
         if payload:
             try:
                 req = self.session.dcim.interfaces.create(payload)

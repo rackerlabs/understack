@@ -8,7 +8,7 @@ spec:
     parameters:
       - name: interface_update_event
         value: Some nautobot interface has changed
-      - name: device_hostname
+      - name: hostname
         value: hostname of the device that event is for
   templates:
     - name: main

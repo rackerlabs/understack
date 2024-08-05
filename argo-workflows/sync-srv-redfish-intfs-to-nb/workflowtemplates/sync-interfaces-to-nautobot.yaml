@@ -5,7 +5,7 @@ kind: WorkflowTemplate
 spec:
   arguments:
     parameters:
-      - name: hostname
+      - name: device_id
         value: "{}"
       - name: oob_secret
         value: "{}"
@@ -15,7 +15,7 @@ spec:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - sync-nautobot-interfaces
-        args: ["--hostname", "{{workflow.parameters.device_hostname}}"]
+        args: ["--device-id", "{{workflow.parameters.device_id}}"]
         volumeMounts:
           - mountPath: /etc/nb-token/
             name: nb-token
