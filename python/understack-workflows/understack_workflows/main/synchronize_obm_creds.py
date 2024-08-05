@@ -4,27 +4,13 @@ import sys
 import ironicclient.common.apiclient.exceptions
 from ironicclient.common.utils import args_array_to_patch
 
+from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.ironic.secrets import read_secret
 from understack_workflows.node_configuration import IronicNodeConfiguration
 
 logger = setup_logger(__name__)
-
-
-def credential_secrets():
-    """Reads Kubernetes Secret files with username/password credentials."""
-    username = None
-    password = None
-    with open("/etc/obm/username") as f:
-        # strip leading and trailing whitespace
-        username = f.read().strip()
-
-    with open("/etc/obm/password") as f:
-        # strip leading and trailing whitespace
-        password = f.read().strip()
-
-    return [username, password]
 
 
 def main():
@@ -64,7 +50,8 @@ def main():
         sys.exit(0)
 
     # Update OBM credentials
-    expected_username, expected_password = credential_secrets()
+    expected_username = credential("obm", "username")
+    expected_password = credential("obm", "password")
 
     updates = [
         f"driver_info/redfish_username={expected_username}",
