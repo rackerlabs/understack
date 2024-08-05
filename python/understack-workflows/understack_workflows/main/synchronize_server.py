@@ -12,15 +12,6 @@ from understack_workflows.node_configuration import IronicNodeConfiguration
 logger = setup_logger(__name__)
 
 
-def replace_or_add_field(path, current_val, expected_val):
-    if current_val == expected_val:
-        return None
-    if current_val is None:
-        return {"op": "add", "path": path, "value": expected_val}
-    else:
-        return {"op": "replace", "path": path, "value": expected_val}
-
-
 def main():
     if len(sys.argv) < 1:
         raise ValueError(
