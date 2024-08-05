@@ -1,8 +1,7 @@
 import json
 import logging
-from pprint import pprint
-import typing
 import uuid
+from pprint import pprint
 
 import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
@@ -11,8 +10,9 @@ from neutron_lib.plugins.ml2.api import MechanismDriver
 from neutron_lib.plugins.ml2.api import NetworkContext
 from neutron_lib.plugins.ml2.api import PortContext
 from neutron_lib.plugins.ml2.api import SubnetContext
-from neutron_understack.argo.workflows import ArgoClient
 from oslo_config import cfg
+
+from neutron_understack.argo.workflows import ArgoClient
 
 LOG = logging.getLogger(__name__)
 
@@ -42,7 +42,8 @@ def setup_conf():
         cfg.IntOpt(
             "argo_max_attempts",
             default=15,
-            help="Number of tries to retrieve the Workflow run result. Sleeps 5 seconds between attempts.",
+            help="Number of tries to retrieve the Workflow run result. "
+            "Sleeps 5 seconds between attempts.",
         ),
         cfg.BoolOpt(
             "argo_dry_run", default=True, help="Call Undersync with dry-run mode"
@@ -68,7 +69,7 @@ argo_client = ArgoClient(
 
 
 def dump_context(
-    context: typing.Union[NetworkContext, SubnetContext, PortContext],
+    context: NetworkContext | SubnetContext | PortContext,
 ) -> dict:
     # RESOURCE_ATTRIBUTE_MAP
     # from neutron_lib.api.definitions import network, subnet, port, portbindings
@@ -127,7 +128,6 @@ def dump_context(
 
 
 def log_call(
-    method: str, context: typing.Union[NetworkContext, SubnetContext, PortContext]
     method: str, context: NetworkContext | SubnetContext | PortContext
 ) -> None:
     data = dump_context(context)
