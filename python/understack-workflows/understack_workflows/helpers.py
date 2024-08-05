@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import pathlib
+from functools import partial
 
 import sushy
 
@@ -33,6 +34,19 @@ def arg_parser(name):
     parser.add_argument("--nautobot_url", required=False)
     parser.add_argument("--nautobot_token", required=False)
     return parser
+
+
+def boolean_args(val):
+    normalised = str(val).upper()
+    if normalised in ["YES", "TRUE", "T", "1"]:
+        return True
+    elif normalised in ["NO", "FALSE", "F", "N", "0"]:
+        return False
+    else:
+        raise argparse.ArgumentTypeError("boolean expected")
+
+
+comma_list_args = partial(str.split, sep=",")
 
 
 def credential(subpath, item):

@@ -43,6 +43,7 @@ synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
 synchronize-obm-creds = "understack_workflows.main.synchronize_obm_creds:main"
 synchronize-server = "understack_workflows.main.synchronize_server:main"
 sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"
+undersync-switch = "understack_workflows.main.undersync_switch:main"
 
 [tool.setuptools.packages.find]
 # avoid packaging up our tests
