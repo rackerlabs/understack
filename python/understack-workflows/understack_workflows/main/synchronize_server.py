@@ -2,6 +2,7 @@ import json
 import sys
 
 import ironicclient.common.apiclient.exceptions
+from ironicclient.common.utils import args_array_to_patch
 
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
@@ -9,26 +10,6 @@ from understack_workflows.ironic.secrets import read_secret
 from understack_workflows.node_configuration import IronicNodeConfiguration
 
 logger = setup_logger(__name__)
-
-
-def replace_or_add_field(path, current_val, expected_val):
-    if current_val == expected_val:
-        return None
-    if current_val is None:
-        return {"op": "add", "path": path, "value": expected_val}
-    else:
-        return {"op": "replace", "path": path, "value": expected_val}
-
-
-def event_to_node_configuration(event: dict) -> IronicNodeConfiguration:
-    node_config = IronicNodeConfiguration()
-    node_config.conductor_group = None
-    node_config.driver = "redfish"
-    node_config.chassis_uuid = None
-    node_config.uuid = event["device"]["id"]
-    node_config.name = event["device"]["name"]
-
-    return node_config
 
 
 def main():
@@ -47,47 +28,52 @@ def main():
     )
 
     interface_update_event = json.loads(sys.argv[1])
-    logger.debug(f"Received: {interface_update_event}")
+    logger.debug(f"Received: {json.dumps(interface_update_event, indent=2)}")
     update_data = interface_update_event["data"]
 
-    node_id = update_data["device"]["id"]
-    logger.debug(f"Checking if node with UUID: {node_id} exists in Ironic.")
+    node = IronicNodeConfiguration.from_event(interface_update_event)
+    logger.debug(f"Checking if node UUID {node.uuid} exists in Ironic.")
 
     try:
-        ironic_node = client.get_node(node_id)
+        ironic_node = client.get_node(node.uuid)
     except ironicclient.common.apiclient.exceptions.NotFound:
-        logger.debug(f"Node: {node_id} not found in Ironic.")
-        ironic_node = None
+        logger.debug(f"Node: {node.uuid} not found in Ironic, creating")
+        ironic_node = node.create_node(client)
 
-    if not ironic_node:
-        node_config = event_to_node_configuration(update_data)
-        response = client.create_node(node_config.create_arguments())
-        logger.debug(response)
-        ironic_node = client.get_node(node_id)
+    logger.debug("Got Ironic node: %s", json.dumps(ironic_node.to_dict(), indent=2))
 
-    STATES_ALLOWING_UPDATES = ["enroll"]
+    STATES_ALLOWING_UPDATES = ["enroll", "manage"]
     if ironic_node.provision_state not in STATES_ALLOWING_UPDATES:
         logger.info(
-            f"Device {node_id} is in a {ironic_node.provision_state} "
+            f"Device {node.uuid} is in a {ironic_node.provision_state} "
             f"provisioning state, so the updates are not allowed."
         )
         sys.exit(0)
 
     drac_ip = update_data["ip_addresses"][0]["host"]
     expected_address = f"https://{drac_ip}"
-    current_address = ironic_node.driver_info.get("redfish_address", None)
-    current_verify_ca = ironic_node.driver_info.get("redfish_verify_ca", None)
 
-    patches = [
-        replace_or_add_field(
-            "/driver_info/redfish_address", current_address, expected_address
-        ),
-        replace_or_add_field(
-            "/driver_info/redfish_verify_ca", current_verify_ca, False
-        ),
+    updates = [
+        f"name={node.name}",
+        f"driver={node.driver}",
+        f"driver_info/redfish_address={expected_address}",
+        "driver_info/redfish_verify_ca=false",
     ]
-    patches = [p for p in patches if p is not None]
+    resets = [
+        "bios_interface",
+        "boot_interface",
+        "inspect_interface",
+        "management_interface",
+        "power_interface",
+        "vendor_interface",
+        "raid_interface",
+        "network_interface",
+    ]
 
-    response = client.update_node(node_id, patches)
+    # using the behavior from the ironicclient code
+    patches = args_array_to_patch("add", updates)
+    patches.extend(args_array_to_patch("remove", resets))
+
+    response = client.update_node(node.uuid, patches)
     logger.info(f"Patching: {patches}")
     logger.info(f"Updated: {response}")

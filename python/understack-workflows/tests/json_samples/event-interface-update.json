@@ -1,0 +1,487 @@
+{
+  "event": "updated",
+  "timestamp": "2024-07-30 18:04:41.828756+00:00",
+  "model": "interface",
+  "username": "person@company.com",
+  "request_id": "de6f6f70-3907-4aaa-acde-f68b6ceae71e",
+  "data": {
+    "id": "67e80b37-1efa-4591-baf1-5d68d1ed5981",
+    "lag": null,
+    "mtu": null,
+    "url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/",
+    "vrf": null,
+    "mode": null,
+    "name": "iDRAC",
+    "tags": [],
+    "type": { "label": "1000BASE-T (1GE)", "value": "1000base-t" },
+    "cable": null,
+    "label": "",
+    "bridge": null,
+    "device": {
+      "id": "0ccdd4ae-3e49-42cd-9b70-f742ece59312",
+      "url": "/api/dcim/devices/0ccdd4ae-3e49-42cd-9b70-f742ece59312/",
+      "face": { "label": "Front", "value": "front" },
+      "name": "1327198-GP2S.3.understack.iad3",
+      "rack": {
+        "id": "f5cc7552-061b-48a0-93f9-404a553eb99d",
+        "url": "/api/dcim/racks/f5cc7552-061b-48a0-93f9-404a553eb99d/",
+        "object_type": "dcim.rack"
+      },
+      "role": {
+        "id": "8c4ab2e6-f84a-4474-9e78-d81b8f9d167c",
+        "url": "/api/extras/roles/8c4ab2e6-f84a-4474-9e78-d81b8f9d167c/",
+        "object_type": "extras.role"
+      },
+      "serial": "",
+      "status": {
+        "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+        "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+        "object_type": "extras.status"
+      },
+      "tenant": {
+        "id": "fc0147e3-c716-4b03-a52a-c1ee7ad30221",
+        "url": "/api/tenancy/tenants/fc0147e3-c716-4b03-a52a-c1ee7ad30221/",
+        "object_type": "tenancy.tenant"
+      },
+      "cluster": null,
+      "created": "2024-07-30T17:37:18.661137Z",
+      "display": "1327198-GP2S.3.understack.iad3",
+      "comments": "",
+      "location": {
+        "id": "3a8f1bb1-71fe-4b7e-b1a0-31402e8117f8",
+        "url": "/api/dcim/locations/3a8f1bb1-71fe-4b7e-b1a0-31402e8117f8/",
+        "object_type": "dcim.location"
+      },
+      "platform": null,
+      "position": 5,
+      "asset_tag": null,
+      "notes_url": "/api/dcim/devices/0ccdd4ae-3e49-42cd-9b70-f742ece59312/notes/",
+      "parent_bay": null,
+      "device_type": {
+        "id": "2ddd7ac2-1843-4d7a-8547-f91a1f523383",
+        "url": "/api/dcim/device-types/2ddd7ac2-1843-4d7a-8547-f91a1f523383/",
+        "object_type": "dcim.devicetype"
+      },
+      "object_type": "dcim.device",
+      "primary_ip4": null,
+      "primary_ip6": null,
+      "vc_position": null,
+      "vc_priority": null,
+      "last_updated": "2024-07-30T17:40:11.713297Z",
+      "natural_slug": "1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_0ccd",
+      "custom_fields": {
+        "core_number": 1327198,
+        "connected_to_network": "provisioning",
+        "ironic_provisioning_status": ""
+      },
+      "secrets_group": null,
+      "virtual_chassis": null,
+      "software_version": null,
+      "device_redundancy_group": null,
+      "local_config_context_data": null,
+      "local_config_context_schema": null,
+      "controller_managed_device_group": null,
+      "device_redundancy_group_priority": null,
+      "local_config_context_data_owner_object_id": null,
+      "local_config_context_data_owner_content_type": null
+    },
+    "status": {
+      "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+      "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+      "name": "Active",
+      "color": "4calf50",
+      "created": "2024-04-29T00:00:00Z",
+      "display": "Active",
+      "notes_url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/notes/",
+      "description": "Unit is active",
+      "object_type": "extras.status",
+      "last_updated": "2024-05-23T15:20:38.861176Z",
+      "natural_slug": "active_3709",
+      "custom_fields": {}
+    },
+    "created": "2024-07-30T17:37:18.750296Z",
+    "display": "iDRAC",
+    "enabled": true,
+    "mgmt_only": true,
+    "notes_url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/notes/",
+    "cable_peer": null,
+    "description": "test",
+    "mac_address": "",
+    "object_type": "dcim.interface",
+    "ip_addresses": [
+      {
+        "id": "b1739ed2-d6c6-4722-9f39-b6a8bab02b60",
+        "url": "/api/ipam/ip-addresses/b1739ed2-d6c6-4722-9f39-b6a8bab02b60/",
+        "host": "10.46.96.156",
+        "role": null,
+        "type": "host",
+        "parent": {
+          "id": "f3b3041f-c449-4706-be7a-aa6ac144c5a2",
+          "url": "/api/ipam/prefixes/f3b3041f-c449-4706-be7a-aa6ac144c5a2/",
+          "object_type": "ipam.prefix"
+        },
+        "status": {
+          "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+          "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+          "object_type": "extras.status"
+        },
+        "tenant": null,
+        "address": "10.46.96.156/26",
+        "created": "2024-07-16T16:23:55.723588Z",
+        "display": "10.46.96.156/26",
+        "dns_name": "",
+        "notes_url": "/api/ipam/ip-addresses/b1739ed2-d6c6-4722-9f39-b6a8bab02b60/notes/",
+        "interfaces": [
+          {
+            "id": "67e80b37-1efa-4591-baf1-5d68d1ed5981",
+            "url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/",
+            "object_type": "dcim.interface"
+          }
+        ],
+        "ip_version": 4,
+        "nat_inside": null,
+        "description": "",
+        "mask_length": 26,
+        "object_type": "ipam.ipaddress",
+        "last_updated": "2024-07-16T16:23:55.723616Z",
+        "natural_slug": "company_10-46-96-156_b173",
+        "custom_fields": {},
+        "vm_interfaces": [],
+        "nat_outside_list": []
+      }
+    ],
+    "last_updated": "2024-07-30T18:04:41.623727Z",
+    "natural_slug": "idrac_1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_67e8",
+    "tagged_vlans": [],
+    "custom_fields": {},
+    "untagged_vlan": null,
+    "cable_peer_type": null,
+    "ip_address_count": 1,
+    "parent_interface": null,
+    "connected_endpoint": null,
+    "connected_endpoint_type": null,
+    "connected_endpoint_reachable": null
+  },
+  "snapshots": {
+    "prechange": null,
+    "postchange": {
+      "id": "67e80b37-1efa-4591-baf1-5d68d1ed5981",
+      "lag": null,
+      "mtu": null,
+      "url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/",
+      "vrf": null,
+      "mode": null,
+      "name": "iDRAC",
+      "tags": [],
+      "type": { "label": "1000BASE-T (1GE)", "value": "1000base-t" },
+      "cable": null,
+      "label": "",
+      "bridge": null,
+      "device": {
+        "id": "0ccdd4ae-3e49-42cd-9b70-f742ece59312",
+        "url": "/api/dcim/devices/0ccdd4ae-3e49-42cd-9b70-f742ece59312/",
+        "face": { "label": "Front", "value": "front" },
+        "name": "1327198-GP2S.3.understack.iad3",
+        "rack": {
+          "id": "f5cc7552-061b-48a0-93f9-404a553eb99d",
+          "url": "/api/dcim/racks/f5cc7552-061b-48a0-93f9-404a553eb99d/",
+          "object_type": "dcim.rack"
+        },
+        "role": {
+          "id": "8c4ab2e6-f84a-4474-9e78-d81b8f9d167c",
+          "url": "/api/extras/roles/8c4ab2e6-f84a-4474-9e78-d81b8f9d167c/",
+          "object_type": "extras.role"
+        },
+        "serial": "",
+        "status": {
+          "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+          "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+          "object_type": "extras.status"
+        },
+        "tenant": {
+          "id": "fc0147e3-c716-4b03-a52a-c1ee7ad30221",
+          "url": "/api/tenancy/tenants/fc0147e3-c716-4b03-a52a-c1ee7ad30221/",
+          "object_type": "tenancy.tenant"
+        },
+        "cluster": null,
+        "created": "2024-07-30T17:37:18.661137Z",
+        "display": "1327198-GP2S.3.understack.iad3",
+        "comments": "",
+        "location": {
+          "id": "3a8f1bb1-71fe-4b7e-b1a0-31402e8117f8",
+          "url": "/api/dcim/locations/3a8f1bb1-71fe-4b7e-b1a0-31402e8117f8/",
+          "object_type": "dcim.location"
+        },
+        "platform": null,
+        "position": 5,
+        "asset_tag": null,
+        "notes_url": "/api/dcim/devices/0ccdd4ae-3e49-42cd-9b70-f742ece59312/notes/",
+        "parent_bay": null,
+        "device_type": {
+          "id": "2ddd7ac2-1843-4d7a-8547-f91a1f523383",
+          "url": "/api/dcim/device-types/2ddd7ac2-1843-4d7a-8547-f91a1f523383/",
+          "object_type": "dcim.devicetype"
+        },
+        "object_type": "dcim.device",
+        "primary_ip4": null,
+        "primary_ip6": null,
+        "vc_position": null,
+        "vc_priority": null,
+        "last_updated": "2024-07-30T17:40:11.713297Z",
+        "natural_slug": "1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_0ccd",
+        "custom_fields": {
+          "core_number": 1327198,
+          "connected_to_network": "provisioning",
+          "ironic_provisioning_status": ""
+        },
+        "secrets_group": null,
+        "virtual_chassis": null,
+        "software_version": null,
+        "device_redundancy_group": null,
+        "local_config_context_data": null,
+        "local_config_context_schema": null,
+        "controller_managed_device_group": null,
+        "device_redundancy_group_priority": null,
+        "local_config_context_data_owner_object_id": null,
+        "local_config_context_data_owner_content_type": null
+      },
+      "status": {
+        "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+        "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+        "name": "Active",
+        "color": "4calf50",
+        "created": "2024-04-29T00:00:00Z",
+        "display": "Active",
+        "notes_url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/notes/",
+        "description": "Unit is active",
+        "object_type": "extras.status",
+        "last_updated": "2024-05-23T15:20:38.861176Z",
+        "natural_slug": "active_3709",
+        "custom_fields": {}
+      },
+      "created": "2024-07-30T17:37:18.750296Z",
+      "display": "iDRAC",
+      "enabled": true,
+      "mgmt_only": true,
+      "notes_url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/notes/",
+      "cable_peer": null,
+      "description": "test",
+      "mac_address": "",
+      "object_type": "dcim.interface",
+      "ip_addresses": [
+        {
+          "id": "b1739ed2-d6c6-4722-9f39-b6a8bab02b60",
+          "url": "/api/ipam/ip-addresses/b1739ed2-d6c6-4722-9f39-b6a8bab02b60/",
+          "host": "10.46.96.156",
+          "role": null,
+          "type": "host",
+          "parent": {
+            "id": "f3b3041f-c449-4706-be7a-aa6ac144c5a2",
+            "url": "/api/ipam/prefixes/f3b3041f-c449-4706-be7a-aa6ac144c5a2/",
+            "object_type": "ipam.prefix"
+          },
+          "status": {
+            "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+            "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+            "object_type": "extras.status"
+          },
+          "tenant": null,
+          "address": "10.46.96.156/26",
+          "created": "2024-07-16T16:23:55.723588Z",
+          "display": "10.46.96.156/26",
+          "dns_name": "",
+          "notes_url": "/api/ipam/ip-addresses/b1739ed2-d6c6-4722-9f39-b6a8bab02b60/notes/",
+          "interfaces": [
+            {
+              "id": "67e80b37-1efa-4591-baf1-5d68d1ed5981",
+              "url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/",
+              "object_type": "dcim.interface"
+            }
+          ],
+          "ip_version": 4,
+          "nat_inside": null,
+          "description": "",
+          "mask_length": 26,
+          "object_type": "ipam.ipaddress",
+          "last_updated": "2024-07-16T16:23:55.723616Z",
+          "natural_slug": "company_10-46-96-156_b173",
+          "custom_fields": {},
+          "vm_interfaces": [],
+          "nat_outside_list": []
+        }
+      ],
+      "last_updated": "2024-07-30T18:04:41.623727Z",
+      "natural_slug": "idrac_1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_67e8",
+      "tagged_vlans": [],
+      "custom_fields": {},
+      "untagged_vlan": null,
+      "cable_peer_type": null,
+      "ip_address_count": 1,
+      "parent_interface": null,
+      "connected_endpoint": null,
+      "connected_endpoint_type": null,
+      "connected_endpoint_reachable": null
+    },
+    "differences": {
+      "removed": null,
+      "added": {
+        "id": "67e80b37-1efa-4591-baf1-5d68d1ed5981",
+        "lag": null,
+        "mtu": null,
+        "url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/",
+        "vrf": null,
+        "mode": null,
+        "name": "iDRAC",
+        "tags": [],
+        "type": { "label": "1000BASE-T (1GE)", "value": "1000base-t" },
+        "cable": null,
+        "label": "",
+        "bridge": null,
+        "device": {
+          "id": "0ccdd4ae-3e49-42cd-9b70-f742ece59312",
+          "url": "/api/dcim/devices/0ccdd4ae-3e49-42cd-9b70-f742ece59312/",
+          "face": { "label": "Front", "value": "front" },
+          "name": "1327198-GP2S.3.understack.iad3",
+          "rack": {
+            "id": "f5cc7552-061b-48a0-93f9-404a553eb99d",
+            "url": "/api/dcim/racks/f5cc7552-061b-48a0-93f9-404a553eb99d/",
+            "object_type": "dcim.rack"
+          },
+          "role": {
+            "id": "8c4ab2e6-f84a-4474-9e78-d81b8f9d167c",
+            "url": "/api/extras/roles/8c4ab2e6-f84a-4474-9e78-d81b8f9d167c/",
+            "object_type": "extras.role"
+          },
+          "serial": "",
+          "status": {
+            "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+            "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+            "object_type": "extras.status"
+          },
+          "tenant": {
+            "id": "fc0147e3-c716-4b03-a52a-c1ee7ad30221",
+            "url": "/api/tenancy/tenants/fc0147e3-c716-4b03-a52a-c1ee7ad30221/",
+            "object_type": "tenancy.tenant"
+          },
+          "cluster": null,
+          "created": "2024-07-30T17:37:18.661137Z",
+          "display": "1327198-GP2S.3.understack.iad3",
+          "comments": "",
+          "location": {
+            "id": "3a8f1bb1-71fe-4b7e-b1a0-31402e8117f8",
+            "url": "/api/dcim/locations/3a8f1bb1-71fe-4b7e-b1a0-31402e8117f8/",
+            "object_type": "dcim.location"
+          },
+          "platform": null,
+          "position": 5,
+          "asset_tag": null,
+          "notes_url": "/api/dcim/devices/0ccdd4ae-3e49-42cd-9b70-f742ece59312/notes/",
+          "parent_bay": null,
+          "device_type": {
+            "id": "2ddd7ac2-1843-4d7a-8547-f91a1f523383",
+            "url": "/api/dcim/device-types/2ddd7ac2-1843-4d7a-8547-f91a1f523383/",
+            "object_type": "dcim.devicetype"
+          },
+          "object_type": "dcim.device",
+          "primary_ip4": null,
+          "primary_ip6": null,
+          "vc_position": null,
+          "vc_priority": null,
+          "last_updated": "2024-07-30T17:40:11.713297Z",
+          "natural_slug": "1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_0ccd",
+          "custom_fields": {
+            "core_number": 1327198,
+            "connected_to_network": "provisioning",
+            "ironic_provisioning_status": ""
+          },
+          "secrets_group": null,
+          "virtual_chassis": null,
+          "software_version": null,
+          "device_redundancy_group": null,
+          "local_config_context_data": null,
+          "local_config_context_schema": null,
+          "controller_managed_device_group": null,
+          "device_redundancy_group_priority": null,
+          "local_config_context_data_owner_object_id": null,
+          "local_config_context_data_owner_content_type": null
+        },
+        "status": {
+          "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+          "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+          "name": "Active",
+          "color": "4calf50",
+          "created": "2024-04-29T00:00:00Z",
+          "display": "Active",
+          "notes_url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/notes/",
+          "description": "Unit is active",
+          "object_type": "extras.status",
+          "last_updated": "2024-05-23T15:20:38.861176Z",
+          "natural_slug": "active_3709",
+          "custom_fields": {}
+        },
+        "created": "2024-07-30T17:37:18.750296Z",
+        "display": "iDRAC",
+        "enabled": true,
+        "mgmt_only": true,
+        "notes_url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/notes/",
+        "cable_peer": null,
+        "description": "test",
+        "mac_address": "",
+        "object_type": "dcim.interface",
+        "ip_addresses": [
+          {
+            "id": "b1739ed2-d6c6-4722-9f39-b6a8bab02b60",
+            "url": "/api/ipam/ip-addresses/b1739ed2-d6c6-4722-9f39-b6a8bab02b60/",
+            "host": "10.46.96.156",
+            "role": null,
+            "type": "host",
+            "parent": {
+              "id": "f3b3041f-c449-4706-be7a-aa6ac144c5a2",
+              "url": "/api/ipam/prefixes/f3b3041f-c449-4706-be7a-aa6ac144c5a2/",
+              "object_type": "ipam.prefix"
+            },
+            "status": {
+              "id": "3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd",
+              "url": "/api/extras/statuses/3709c38e-1f4f-4cdf-a9d4-45ad14e9f3dd/",
+              "object_type": "extras.status"
+            },
+            "tenant": null,
+            "address": "10.46.96.156/26",
+            "created": "2024-07-16T16:23:55.723588Z",
+            "display": "10.46.96.156/26",
+            "dns_name": "",
+            "notes_url": "/api/ipam/ip-addresses/b1739ed2-d6c6-4722-9f39-b6a8bab02b60/notes/",
+            "interfaces": [
+              {
+                "id": "67e80b37-1efa-4591-baf1-5d68d1ed5981",
+                "url": "/api/dcim/interfaces/67e80b37-1efa-4591-baf1-5d68d1ed5981/",
+                "object_type": "dcim.interface"
+              }
+            ],
+            "ip_version": 4,
+            "nat_inside": null,
+            "description": "",
+            "mask_length": 26,
+            "object_type": "ipam.ipaddress",
+            "last_updated": "2024-07-16T16:23:55.723616Z",
+            "natural_slug": "company_10-46-96-156_b173",
+            "custom_fields": {},
+            "vm_interfaces": [],
+            "nat_outside_list": []
+          }
+        ],
+        "last_updated": "2024-07-30T18:04:41.623727Z",
+        "natural_slug": "idrac_1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_67e8",
+        "tagged_vlans": [],
+        "custom_fields": {},
+        "untagged_vlan": null,
+        "cable_peer_type": null,
+        "ip_address_count": 1,
+        "parent_interface": null,
+        "connected_endpoint": null,
+        "connected_endpoint_type": null,
+        "connected_endpoint_reachable": null
+      }
+    }
+  }
+}
