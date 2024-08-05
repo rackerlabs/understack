@@ -63,7 +63,7 @@ def main():
         ironic_node = None
         sys.exit(1)
 
-    STATES_ALLOWING_UPDATES = ["enroll"]
+    STATES_ALLOWING_UPDATES = ["enroll", "manage"]
     if ironic_node.provision_state not in STATES_ALLOWING_UPDATES:
         logger.info(
             f"Device {node.uuid} is in a {ironic_node.provision_state} "

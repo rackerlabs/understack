@@ -51,7 +51,7 @@ def main():
 
     logger.debug("Got Ironic node: %s", json.dumps(ironic_node.to_dict(), indent=2))
 
-    STATES_ALLOWING_UPDATES = ["enroll"]
+    STATES_ALLOWING_UPDATES = ["enroll", "manage"]
     if ironic_node.provision_state not in STATES_ALLOWING_UPDATES:
         logger.info(
             f"Device {node.uuid} is in a {ironic_node.provision_state} "
