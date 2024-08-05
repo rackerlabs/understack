@@ -35,4 +35,4 @@ configMapGenerator:
     behavior: merge
     files:
       - sso
-      - workflow-defaults
+      - workflowDefaults=workflow-defaults
