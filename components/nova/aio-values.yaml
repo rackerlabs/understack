@@ -34,6 +34,12 @@ conf:
     # ceph is providing block storage to VM creation and is connected via libvirt
     # we aren't using this so we don't want to enable this part of the chart
     enabled: false
+  DEFAULT:
+    # We are not wiring up the network to the nova metadata API so we must use
+    # config_drive to pass data. To avoid users having to remember this, just
+    # force it on always.
+    force_config_drive: true
+
 
 console:
   # we are working with baremetal nodes and not QEMU so we don't need novnc or spice
