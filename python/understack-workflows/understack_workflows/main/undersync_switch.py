@@ -1,8 +1,11 @@
+import argparse
+import os
 import sys
 
+from understack_workflows.helpers import boolean_args
+from understack_workflows.helpers import comma_list_args
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
-from understack_workflows.helpers import undersync_switch_parser
 from understack_workflows.main.undersync import Undersync
 
 
@@ -21,10 +24,36 @@ def call_undersync(args, switches):
         sys.exit(2)
 
 
+def argument_parser():
+    parser = argparse.ArgumentParser(
+        prog=os.path.basename(__file__),
+        description="Trigger undersync run for a set of switches.",
+    )
+    parser.add_argument(
+        "--switch_uuids",
+        type=comma_list_args,
+        required=True,
+        help="Comma separated list of UUIDs of the switches to Undersync",
+    )
+    parser.add_argument(
+        "--force",
+        type=boolean_args,
+        help="Call Undersync's force endpoint",
+        required=False,
+    )
+    parser.add_argument(
+        "--dry-run",
+        type=boolean_args,
+        help="Call Undersync's dry-run endpoint",
+        required=False,
+    )
+
+    return parser
+
+
 def main():
     """Requests an Undersync run on a pair of switches."""
-    parser = undersync_switch_parser(__file__)
-    args = parser.parse_args()
+    args = argument_parser().parse_args()
 
     response = call_undersync(args, args.switch_uuids)
     logger.info(f"Undersync returned: {response.json()}")

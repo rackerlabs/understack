@@ -36,34 +36,7 @@ def arg_parser(name):
     return parser
 
 
-def undersync_switch_parser(name):
-    parser = argparse.ArgumentParser(
-        prog=os.path.basename(name),
-        description="Trigger undersync run for a set of switches.",
-    )
-    parser.add_argument(
-        "--switch_uuids",
-        type=__comma_list,
-        required=True,
-        help="Comma separated list of UUIDs of the switches to Undersync",
-    )
-    parser.add_argument(
-        "--force",
-        type=__boolean_args,
-        help="Call Undersync's force endpoint",
-        required=False,
-    )
-    parser.add_argument(
-        "--dry-run",
-        type=__boolean_args,
-        help="Call Undersync's dry-run endpoint",
-        required=False,
-    )
-
-    return parser
-
-
-def __boolean_args(val):
+def boolean_args(val):
     normalised = str(val).upper()
     if normalised in ["YES", "TRUE", "T", "1"]:
         return True
@@ -73,7 +46,7 @@ def __boolean_args(val):
         raise argparse.ArgumentTypeError("boolean expected")
 
 
-__comma_list = partial(str.split, sep=",")
+comma_list_args = partial(str.split, sep=",")
 
 
 def credential(subpath, item):
