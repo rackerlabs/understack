@@ -1,0 +1,64 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: idrac-enable-network-boot
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/description: Enable network boot in Dell iDrac BIOS
+spec:
+  arguments:
+    parameters:
+      - name: hostname
+  serviceAccountName: workflow
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: get-obm-ip
+            templateRef:
+              name: get-obm-ip
+              template: main
+            arguments:
+              parameters:
+                - name: hostname
+                  value: "{{workflow.parameters.hostname}}"
+          - name: get-obm-creds
+            templateRef:
+              name: get-obm-creds
+              template: main
+            arguments:
+              parameters:
+                - name: hostname
+                  value: "{{workflow.parameters.hostname}}"
+          - name: idrac-enable-network-boot
+            dependencies: [get-obm-ip, get-obm-creds]
+            template: idrac-enable-network-boot
+            arguments:
+              parameters:
+                - name: host
+                  value: "{{tasks.get-obm-ip.outputs.parameters.ip}}"
+                - name: target_creds_secret_name
+                  value: "{{tasks.get-obm-creds.outputs.parameters.secret}}"
+
+    - name: idrac-enable-network-boot
+      inputs:
+        parameters:
+          - name: host
+          - name: target_creds_secret_name
+      container:
+        image: ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:latest
+        command: [GetSetBiosAttributesREDFISH.py]
+        args: ["-ip", "{{ inputs.parameters.host }}", "-u", "$OBM_USERNAME", "-p", "$OBM_PASSWORD", "--attribute-names", "PxeDev1EnDis,PxeDev1Interface,HttpDev1Interface", "--attribute-values", "Enabled,NIC.Slot.1-1,NIC.Slot.1-1", "--reboot"]
+        env:
+          - name: OBM_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: "{{inputs.parameters.target_creds_secret_name}}"
+                key: username
+          - name: OBM_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: "{{inputs.parameters.target_creds_secret_name}}"
+                key: password
