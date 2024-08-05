@@ -6,7 +6,7 @@ from understack_workflows.helpers import boolean_args
 from understack_workflows.helpers import comma_list_args
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
-from understack_workflows.main.undersync import Undersync
+from understack_workflows.undersync.client import Undersync
 
 
 def call_undersync(args, switches):
