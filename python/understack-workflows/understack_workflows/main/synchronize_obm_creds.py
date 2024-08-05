@@ -2,6 +2,7 @@ import json
 import sys
 
 import ironicclient.common.apiclient.exceptions
+from ironicclient.common.utils import args_array_to_patch
 
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
@@ -24,15 +25,6 @@ def credential_secrets():
         password = f.read().strip()
 
     return [username, password]
-
-
-def replace_or_add_field(path, current_val, expected_val):
-    if current_val == expected_val:
-        return None
-    if current_val is None:
-        return {"op": "add", "path": path, "value": expected_val}
-    else:
-        return {"op": "replace", "path": path, "value": expected_val}
 
 
 def main():
@@ -74,18 +66,13 @@ def main():
     # Update OBM credentials
     expected_username, expected_password = credential_secrets()
 
-    current_username = ironic_node.driver_info.get("redfish_username", None)
-    current_password_is_set = ironic_node.driver_info.get("redfish_password", None)
-
-    patches = [
-        replace_or_add_field(
-            "/driver_info/redfish_username", current_username, expected_username
-        ),
-        replace_or_add_field(
-            "/driver_info/redfish_password", current_password_is_set, expected_password
-        ),
+    updates = [
+        f"driver_info/redfish_username={expected_username}",
+        f"driver_info/redfish_password={expected_password}",
     ]
-    patches = [p for p in patches if p is not None]
+
+    # using the behavior from the ironicclient code
+    patches = args_array_to_patch("add", updates)
 
     response = client.update_node(node.uuid, patches)
     logger.info(f"Patching: {patches}")
