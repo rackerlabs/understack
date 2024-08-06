@@ -6,29 +6,56 @@ resources:
   - https://github.com/argoproj/argo-workflows/releases/download/v3.5.6/namespace-install.yaml
   - ingress.yaml
 
-  ## configure argo-workflow rbac
-  - argo-server-cluster-role.yaml
-
 patches:
-- target:  # configure argo-server namespaced and to set to server mode to disable auth until auth can be worked out
+- target:  # configure argo-server to use sso and client auth and monitor argo-events namespace
     group: apps
     version: v1
     kind: Deployment
     name: argo-server
-  path: patch-server-deployment.yaml
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/args
+      value:
+        - server
+        - --auth-mode=sso
+        - --auth-mode=client
+        - --namespaced
+        - --managed-namespace
+        - argo-events
+
 - target:  # configure the workflow controller to monitor the argo-events namespace
     group: apps
     version: v1
     kind: Deployment
     name: workflow-controller
-  path: patch-workflow-deployment.yaml
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/args
+      value:
+        - --namespaced
+        - --managed-namespace
+        - argo-events
+
 - target:
     group: rbac.authorization.k8s.io
     version: v1
     kind: Role
     name: argo-role
-  path: patch-roles.yaml
-
+  patch: |-
+    # grant configmap create, update to allow for memoization of argo workflows
+    - op: add
+      path: /rules/0
+      value:
+        apiGroups:
+        - ""
+        resources:
+        - configmaps
+        verbs:
+        - get
+        - watch
+        - list
+        - create
+        - update
 
 configMapGenerator:
   - name: workflow-controller-configmap
