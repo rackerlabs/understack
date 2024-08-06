@@ -17,6 +17,7 @@ spec:
                   argocd.argoproj.io/secret-type: cluster
           - list:
               elements:
+                - component: dex
                 - component: openstack
                 - component: undersync
                 - component: nautobot
