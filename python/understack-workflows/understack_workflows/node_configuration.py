@@ -4,10 +4,13 @@ from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
 
-from ironicclient.common.utils import args_array_to_dict
 from ironicclient.v1.node import Node
 
 from understack_workflows.redfish_driver_info import RedfishDriverInfo
+
+
+def dict_without_none(data):
+    return {k: v for k, v in data if v is not None}
 
 
 @dataclass
@@ -167,10 +170,9 @@ class IronicNodeConfiguration:
         field_list = ["uuid", "name", "driver", "driver_info"]
         fields = dict(
             (k, v)
-            for (k, v) in asdict(self).items()
+            for (k, v) in asdict(self, dict_factory=dict_without_none).items()
             if k in field_list and v is not None
         )
-        fields = args_array_to_dict(fields, "driver_info")
         return client.create_node(fields)
 
     @staticmethod
