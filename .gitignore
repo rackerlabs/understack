@@ -17,3 +17,4 @@ venv/
 /python/*/build/
 /python/*/dist/
 __pycache__
+.coverage

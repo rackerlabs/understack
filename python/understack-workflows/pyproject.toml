@@ -37,6 +37,7 @@ optional = true
 [tool.poetry.group.test.dependencies]
 pytest = "^7"
 pytest-github-actions-annotate-failures = "*"
+pytest-cov = "^5.0.0"
 
 [tool.poetry.scripts]
 synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
@@ -51,7 +52,7 @@ exclude = ["tests*"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q"
+addopts = "-ra --cov=understack_workflows"
 testpaths = [
     "tests",
 ]
