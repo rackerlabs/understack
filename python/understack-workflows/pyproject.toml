@@ -46,6 +46,7 @@ synchronize-server = "understack_workflows.main.synchronize_server:main"
 sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
 undersync-device = "understack_workflows.main.undersync_device:main"
+nautobot-update-cf = "understack_workflows.main.nautobot_update_cf:main"
 
 [tool.setuptools.packages.find]
 # avoid packaging up our tests
