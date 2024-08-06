@@ -146,6 +146,10 @@ pod:
           - name: host-var-lib-understack
             hostPath:
               path: /var/lib/understack
+  useHostIPC:
+    conductor: false
+  useHostNetwork:
+    conductor: false
 
 # we don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as
