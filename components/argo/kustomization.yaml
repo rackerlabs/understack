@@ -6,6 +6,9 @@ resources:
   - https://github.com/argoproj/argo-workflows/releases/download/v3.5.10/namespace-install.yaml
   - ingress.yaml
 
+  # external secret for SSO auth
+  - external-secret-argo-sso.yaml
+
 patches:
 - target:  # configure argo-server to use sso and client auth and monitor argo-events namespace
     group: apps
