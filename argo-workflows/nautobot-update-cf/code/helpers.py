@@ -31,41 +31,6 @@ def arg_parser(name):
 
     return parser
 
-
-def undersync_parser(name):
-    parser = argparse.ArgumentParser(
-        prog=os.path.basename(name), description="Trigger undersync run for a device"
-    )
-    parser.add_argument("--device_uuid", required=True, help="Nautobot device UUID")
-    parser.add_argument("--network-name", required=True)
-    parser.add_argument("--nautobot_url", required=False)
-    parser.add_argument("--nautobot_token", required=False)
-    parser.add_argument(
-        "--force",
-        type=__boolean_args,
-        help="Call Undersync's force endpoint",
-        required=False,
-    )
-    parser.add_argument(
-        "--dry-run",
-        type=__boolean_args,
-        help="Call Undersync's dry-run endpoint",
-        required=False,
-    )
-
-    return parser
-
-
-def __boolean_args(val):
-    normalised = str(val).upper()
-    if normalised in ["YES", "TRUE", "T", "1"]:
-        return True
-    elif normalised in ["NO", "FALSE", "F", "N", "0"]:
-        return False
-    else:
-        raise argparse.ArgumentTypeError("boolean expected")
-
-
 def exit_with_error(error):
     logger.error(error)
     sys.exit(1)

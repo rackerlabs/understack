@@ -3,13 +3,14 @@ metadata:
   name: undersync-device
 kind: WorkflowTemplate
 spec:
+  entrypoint: trigger-undersync
+  serviceAccountName: workflow
   templates:
     - name: trigger-undersync
       container:
-        image: ghcr.io/rackerlabs/understack/nautobot-update-cf:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - python
-          - /app/with_ifaces.py
+          - undersync-device
         args:
           - --device_uuid
           - "{{workflow.parameters.device_uuid}}"

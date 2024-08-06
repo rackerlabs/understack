@@ -5,6 +5,7 @@ from uuid import UUID
 
 import pynautobot
 from pynautobot.core.api import Api as NautobotApi
+from pynautobot.models.dcim import Devices as NautobotDevice
 from pynautobot.models.dcim import Interfaces as NautobotInterface
 
 
@@ -102,3 +103,38 @@ class Nautobot:
                 self.logger.info(f"{interface.name} successfully created")
 
             return req
+
+    def device_by_id(self, device_id: UUID) -> NautobotDevice:
+        device = self.session.dcim.devices.get(device_id)
+        if not device:
+            self.exit_with_error(f"Device {device_id!s} not found in Nautobot")
+        return device
+
+    def device_interfaces(self, device_id: UUID):
+        return self.session.dcim.interfaces.filter(device_id=device_id)
+
+    def update_cf(self, device_id: UUID, field_name: str, field_value: str):
+        device = self.device_by_id(device_id)
+        device.custom_fields[field_name] = field_value
+        response = device.save()
+        self.logger.info(f"save result: {response}")
+        return response
+
+    def uplink_switches(self, device_id: UUID) -> list[str]:
+        interfaces = self.device_interfaces(device_id)
+        ids = set()
+        for iface in interfaces:
+            endpoint = iface.connected_endpoint
+            if not endpoint:
+                continue
+            endpoint.full_details()
+            self.logger.debug(
+                f"{iface} connected device {iface.connected_endpoint.device} "
+            )
+            remote_switch = endpoint.device
+            if not remote_switch:
+                continue
+
+            ids.add(remote_switch.id)
+
+        return list(ids)
