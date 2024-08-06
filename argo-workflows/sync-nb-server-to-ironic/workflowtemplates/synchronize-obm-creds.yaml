@@ -18,7 +18,7 @@ spec:
             arguments:
               parameters:
                 - name: hostname
-                  value: '{{workflow.parameters.device_hostname}}'
+                  value: '{{workflow.parameters.hostname}}'
         - - name: synchronize-obm-creds
             template: synchronize-obm-creds
             arguments:

@@ -1,6 +1,5 @@
 import argparse
 import logging
-import os
 import pathlib
 from functools import partial
 
@@ -22,18 +21,6 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG):
         level=logging.DEBUG,
     )
     return logging.getLogger(name)
-
-
-def arg_parser(name):
-    parser = argparse.ArgumentParser(
-        prog=os.path.basename(name), description="Nautobot Interface sync"
-    )
-    parser.add_argument("--hostname", required=True, help="Nautobot device name")
-    parser.add_argument("--oob_username", required=False, help="OOB username")
-    parser.add_argument("--oob_password", required=False, help="OOB password")
-    parser.add_argument("--nautobot_url", required=False)
-    parser.add_argument("--nautobot_token", required=False)
-    return parser
 
 
 def boolean_args(val):
