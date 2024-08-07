@@ -10,6 +10,16 @@ applicationSet:
 server:
   extraArgs:
     - --insecure
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    extraTls:
+      - hosts:
+        - argocd.example.com
+        secretName: argocd-ingress-tls
 configs:
   cm:
     kustomize.buildOptions: --enable-helm
