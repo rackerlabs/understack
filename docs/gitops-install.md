@@ -174,13 +174,7 @@ At this point we will use our configs to make the actual deployment.
 Make sure everything you've committed to your deployment repo is pushed
 to your git server so that ArgoCD can access it.
 
-Configure ArgoCD to be able to authenticate against Dex IdP.
-
-```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-argocd-sso-argocd.yaml"
-```
-
-Then configure your ArgoCD to be aware of your cluster:
+Configure your ArgoCD to be aware of your cluster:
 
 ```bash
 kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-*-cluster.yaml"

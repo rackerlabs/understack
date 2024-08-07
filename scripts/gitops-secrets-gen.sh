@@ -123,16 +123,15 @@ kubectl --namespace nautobot \
     | secret-seal-stdin "${DEST_DIR}/secret-nautobot-redis.yaml"
 
 NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
-for ns in nautobot dex; do
-  [ ! -f "${DEST_DIR}/secret-nautobot-sso-$ns.yaml" ] && \
-  kubectl --namespace $ns \
-    create secret generic nautobot-sso \
-    --dry-run=client \
-    -o yaml \
-    --type Opaque \
-    --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
-    | secret-seal-stdin "${DEST_DIR}/secret-nautobot-sso-$ns.yaml"
-done
+[ ! -f "${DEST_DIR}/secret-nautobot-sso-dex.yaml" ] && \
+kubectl --namespace dex \
+  create secret generic nautobot-sso \
+  --dry-run=client \
+  -o yaml \
+  --type Opaque \
+  --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
+  --from-literal=client-id=nautobot \
+  | secret-seal-stdin "${DEST_DIR}/secret-nautobot-sso-dex.yaml"
 unset NAUTOBOT_SSO_SECRET
 
 ARGO_SSO_SECRET=$(./scripts/pwgen.sh)
@@ -148,22 +147,18 @@ kubectl --namespace dex \
 unset ARGO_SSO_SECRET
 
 ARGOCD_SSO_SECRET=$(./scripts/pwgen.sh)
-for ns in argocd dex; do
-  [ ! -f "${DEST_DIR}/secret-argocd-sso-$ns.yaml" ] && \
-  kubectl --namespace $ns \
-    create secret generic argocd-sso \
-    --dry-run=client \
-    -o yaml \
-    --type Opaque \
-    --from-literal=issuer="https://dex.${DNS_ZONE}" \
-    --from-literal=client-secret="$ARGOCD_SSO_SECRET" \
-    --from-literal=client-id=argocd \
-    | yq '.metadata.labels |= {"app.kubernetes.io/part-of": "argocd"}' \
-    | secret-seal-stdin "${DEST_DIR}/secret-argocd-sso-$ns.yaml"
-done
+[ ! -f "${DEST_DIR}/secret-argocd-sso-dex.yaml" ] && \
+kubectl --namespace dex \
+  create secret generic argocd-sso \
+  --dry-run=client \
+  -o yaml \
+  --type Opaque \
+  --from-literal=issuer="https://dex.${DNS_ZONE}" \
+  --from-literal=client-secret="$ARGOCD_SSO_SECRET" \
+  --from-literal=client-id=argocd \
+  | secret-seal-stdin "${DEST_DIR}/secret-argocd-sso-dex.yaml"
 unset ARGOCD_SSO_SECRET
 mkdir -p "${DEST_DIR}/cluster/"
-mv -f "${DEST_DIR}/secret-argocd-sso-argocd.yaml" "${DEST_DIR}/cluster/"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 export MEMCACHE_SECRET_KEY="$(./scripts/pwgen.sh 64)"

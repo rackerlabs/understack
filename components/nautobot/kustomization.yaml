@@ -5,6 +5,7 @@ kind: Kustomization
 resources:
   - postgres-nautobot.yaml
   - secretstore-nautobot.yaml
+  - external-secret-nautobot-sso.yaml
 
 helmCharts:
 - name: redis
