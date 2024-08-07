@@ -23,6 +23,8 @@ spec:
         path: bootstrap/argocd/
         targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
         kustomize:
+          components:
+            - components/sso
           patches:
             - target:
                 kind: ConfigMap
