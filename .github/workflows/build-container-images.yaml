@@ -86,14 +86,3 @@ jobs:
           tags: ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:latest,ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:${{ env.VERSION_OBM_UTILS }}
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_OBM_UTILS }}
-
-      - name: Build and deploy Python 3.11 with PyNautobot nautobot-update-cf
-        uses: docker/build-push-action@v5
-        with:
-          context: argo-workflows/nautobot-update-cf
-          file: argo-workflows/nautobot-update-cf/containers/Dockerfile
-          # push for all main branch commits
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/rackerlabs/understack/nautobot-update-cf:latest,ghcr.io/rackerlabs/understack/nautobot-update-cf:${{ env.VERSION_PYTHON_NAUTOBOT }}
-          labels: |
-              org.opencontainers.image.version=${{ env.VERSION_PYTHON_NAUTOBOT  }}

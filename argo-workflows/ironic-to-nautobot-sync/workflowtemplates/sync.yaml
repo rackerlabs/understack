@@ -3,21 +3,15 @@ metadata:
   name: synchronize-provision-state-to-nautobot
 kind: WorkflowTemplate
 spec:
-  arguments:
-    parameters:
-      - name: device_uuid
-        value: "{}"
-      - name: provision_state
-        value: "{}"
+  serviceAccountName: workflow
   templates:
     - name: synchronize-state
       container:
-        image: ghcr.io/rackerlabs/understack/nautobot-update-cf:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - python
-          - /app/main.py
+          - nautobot-update-cf
         args:
-          - --device_uuid
+          - --device-id
           - "{{workflow.parameters.device_uuid}}"
           - --field-name
           - "ironic_provisioning_status"
