@@ -123,16 +123,15 @@ kubectl --namespace nautobot \
     | secret-seal-stdin "${DEST_DIR}/secret-nautobot-redis.yaml"
 
 NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
-for ns in nautobot dex; do
-  [ ! -f "${DEST_DIR}/secret-nautobot-sso-$ns.yaml" ] && \
-  kubectl --namespace $ns \
-    create secret generic nautobot-sso \
-    --dry-run=client \
-    -o yaml \
-    --type Opaque \
-    --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
-    | secret-seal-stdin "${DEST_DIR}/secret-nautobot-sso-$ns.yaml"
-done
+[ ! -f "${DEST_DIR}/secret-nautobot-sso-dex.yaml" ] && \
+kubectl --namespace dex \
+  create secret generic nautobot-sso \
+  --dry-run=client \
+  -o yaml \
+  --type Opaque \
+  --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
+  --from-literal=client-id=nautobot \
+  | secret-seal-stdin "${DEST_DIR}/secret-nautobot-sso-dex.yaml"
 unset NAUTOBOT_SSO_SECRET
 
 ARGO_SSO_SECRET=$(./scripts/pwgen.sh)
