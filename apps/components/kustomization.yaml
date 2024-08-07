@@ -10,7 +10,6 @@ resources:
   - memcached.yaml
   - nautobot.yaml
   - keystone.yaml
-  - argo-workflows.yaml
   - argo-workflows-templates.yaml
   - argo-events.yaml
   - ironic.yaml

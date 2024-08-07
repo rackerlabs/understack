@@ -136,17 +136,15 @@ done
 unset NAUTOBOT_SSO_SECRET
 
 ARGO_SSO_SECRET=$(./scripts/pwgen.sh)
-for ns in argo argo-events dex; do
-  [ ! -f "${DEST_DIR}/secret-argo-sso-$ns.yaml" ] && \
-  kubectl --namespace $ns \
-    create secret generic argo-sso \
-    --dry-run=client \
-    -o yaml \
-    --type Opaque \
-    --from-literal=client-secret="$ARGO_SSO_SECRET" \
-    --from-literal=client-id=argo \
-    | secret-seal-stdin "${DEST_DIR}/secret-argo-sso-$ns.yaml"
-done
+[ ! -f "${DEST_DIR}/secret-argo-sso-dex.yaml" ] && \
+kubectl --namespace dex \
+  create secret generic argo-sso \
+  --dry-run=client \
+  -o yaml \
+  --type Opaque \
+  --from-literal=client-secret="$ARGO_SSO_SECRET" \
+   --from-literal=client-id=argo \
+  | secret-seal-stdin "${DEST_DIR}/secret-argo-sso-dex.yaml"
 unset ARGO_SSO_SECRET
 
 ARGOCD_SSO_SECRET=$(./scripts/pwgen.sh)

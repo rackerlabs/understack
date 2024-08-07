@@ -1,0 +1,68 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - https://github.com/argoproj/argo-workflows/releases/download/v3.5.10/namespace-install.yaml
+  - ingress.yaml
+
+  # external secret for SSO auth
+  - external-secret-argo-sso.yaml
+
+patches:
+- target:  # configure argo-server to use sso and client auth and monitor argo-events namespace
+    group: apps
+    version: v1
+    kind: Deployment
+    name: argo-server
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/args
+      value:
+        - server
+        - --auth-mode=sso
+        - --auth-mode=client
+        - --namespaced
+        - --managed-namespace
+        - argo-events
+
+- target:  # configure the workflow controller to monitor the argo-events namespace
+    group: apps
+    version: v1
+    kind: Deployment
+    name: workflow-controller
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/args
+      value:
+        - --namespaced
+        - --managed-namespace
+        - argo-events
+
+- target:
+    group: rbac.authorization.k8s.io
+    version: v1
+    kind: Role
+    name: argo-role
+  patch: |-
+    # grant configmap create, update to allow for memoization of argo workflows
+    - op: add
+      path: /rules/0
+      value:
+        apiGroups:
+        - ""
+        resources:
+        - configmaps
+        verbs:
+        - get
+        - watch
+        - list
+        - create
+        - update
+
+configMapGenerator:
+  - name: workflow-controller-configmap
+    behavior: merge
+    files:
+      - sso
+      - workflowDefaults=workflow-defaults
