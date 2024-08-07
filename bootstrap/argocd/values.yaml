@@ -8,8 +8,6 @@ applicationSet:
   # enable the ApplicationSet controller to auto-generate Applications
   enabled: true
 server:
-  extraArgs:
-    - --insecure
   ingress:
     enabled: true
     ingressClassName: nginx
@@ -21,6 +19,8 @@ server:
         - argocd.example.com
         secretName: argocd-ingress-tls
 configs:
+  params:
+    server.insecure: true
   cm:
     kustomize.buildOptions: --enable-helm
   rbac:
