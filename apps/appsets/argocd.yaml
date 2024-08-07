@@ -33,6 +33,18 @@ spec:
                 - op: replace
                   path: /data/url
                   value: https://argocd.{{index .metadata.annotations "dns_zone"}}
+            - target:
+                kind: Ingress
+              patch: |-
+                - op: replace
+                  path: /spec/rules/0/host
+                  value: argocd.{{index .metadata.annotations "dns_zone"}}
+                - op: replace
+                  path: /spec/tls/0/hosts/0
+                  value: argocd.{{index .metadata.annotations "dns_zone"}}
+                - op: replace
+                  path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
+                  value: {{.name}}-cluster-issuer
       destination:
         server: '{{.server}}'
         namespace: argocd
