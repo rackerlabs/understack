@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: infra
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  argocd.argoproj.io/secret-type: cluster
+          - list:
+              elements:
+                - component: cert-manager
+                  source:
+                    repoURL: https://charts.jetstack.io
+                    chart: cert-manager
+                    targetRevision: '1.*'
+                    helm:
+                      releaseName: cert-manager
+                      valuesObject:
+                        installCRDs: true
+  template:
+    metadata:
+      name: '{{.name}}-{{.component}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      destination:
+        server: '{{.server}}'
+        namespace: '{{.component}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+  templatePatch: |
+    spec:
+      {{- if hasKey . "source" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      source: {{ .source | toJson }}
+      {{- end }}
+      {{- if hasKey . "sources" }}
+      sources:
+        {{- range $source := .sources }}
+        # indentation matters so collapse to single line with toJson to keep it
+        - {{ $source | toJson }}
+        {{- end }}
+      {{- end }}
