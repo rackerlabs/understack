@@ -427,11 +427,6 @@ kustomize create --autodetect
 popd
 
 # Placeholders don't need sealing
-if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml" ]; then
-    echo "Creating metallb secret placeholder"
-    echo "---" > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-metallb.yaml"
-fi
-
 if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-env.yaml" ]; then
     echo "Creating nautobot-env secret placeholder"
     kubectl --namespace nautobot \

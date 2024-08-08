@@ -24,6 +24,23 @@ spec:
                       releaseName: cert-manager
                       valuesObject:
                         installCRDs: true
+                - component: metallb
+                  skipComponent: '{{has "metallb" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
+                  source:
+                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    path: 'bootstrap/metallb'
+                  ignoreDifferences:
+                    - group: "apiextensions.k8s.io"
+                      kind: CustomResourceDefinition
+                      name: bgppeers.metallb.io
+                      jsonPointers:
+                        - /spec/conversion/webhook/clientConfig/caBundle
+                    - group: "apiextensions.k8s.io"
+                      kind: CustomResourceDefinition
+                      name: addresspools.metallb.io
+                      jsonPointers:
+                        - /spec/conversion/webhook/clientConfig/caBundle
                 - component: ingress-nginx
                   skipComponent: '{{has "ingress-nginx" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
                   sources:
@@ -79,6 +96,7 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+          - RespectIgnoreDifferences=true
   templatePatch: |
     spec:
       {{- if hasKey . "source" }}
@@ -91,4 +109,8 @@ spec:
         # indentation matters so collapse to single line with toJson to keep it
         - {{ $source | toJson }}
         {{- end }}
+      {{- end }}
+      {{- if hasKey . "ignoreDifferences" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      ignoreDifferences: {{ .ignoreDifferences | toJson }}
       {{- end }}
