@@ -15,6 +15,7 @@ spec:
           - list:
               elements:
                 - component: cert-manager
+                  skipComponent: '{{has "cert-manager" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
                   source:
                     repoURL: https://charts.jetstack.io
                     chart: cert-manager
@@ -24,6 +25,7 @@ spec:
                       valuesObject:
                         installCRDs: true
                 - component: ingress-nginx
+                  skipComponent: '{{has "ingress-nginx" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
@@ -53,6 +55,14 @@ spec:
                         valueFiles:
                           - $secrets/helm-configs/{{.name}}/provisioning-ingress-nginx.yaml
                         ignoreMissingValueFiles: true
+            selector:
+              # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
+              # ArgoCD's templating operates with strings so it's the string "true"
+              matchExpressions:
+                - key: skipComponent
+                  operator: NotIn
+                  values:
+                    - "true"
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
