@@ -12,7 +12,7 @@ spec:
         command:
           - undersync-device
         args:
-          - --device_uuid
+          - --device-id
           - "{{workflow.parameters.device_uuid}}"
           - --network-name
           - "{{workflow.parameters.network_name}}"
