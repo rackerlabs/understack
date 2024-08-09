@@ -1,0 +1,116 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: infra
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchLabels:
+                  argocd.argoproj.io/secret-type: cluster
+          - list:
+              elements:
+                - component: cert-manager
+                  skipComponent: '{{has "cert-manager" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
+                  source:
+                    repoURL: https://charts.jetstack.io
+                    chart: cert-manager
+                    targetRevision: '1.15.2'
+                    helm:
+                      releaseName: cert-manager
+                      valuesObject:
+                        installCRDs: true
+                - component: metallb
+                  skipComponent: '{{has "metallb" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
+                  source:
+                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    path: 'bootstrap/metallb'
+                  ignoreDifferences:
+                    - group: "apiextensions.k8s.io"
+                      kind: CustomResourceDefinition
+                      name: bgppeers.metallb.io
+                      jsonPointers:
+                        - /spec/conversion/webhook/clientConfig/caBundle
+                    - group: "apiextensions.k8s.io"
+                      kind: CustomResourceDefinition
+                      name: addresspools.metallb.io
+                      jsonPointers:
+                        - /spec/conversion/webhook/clientConfig/caBundle
+                - component: ingress-nginx
+                  skipComponent: '{{has "ingress-nginx" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: secrets
+                    - repoURL: https://kubernetes.github.io/ingress-nginx
+                      chart: ingress-nginx
+                      targetRevision: 4.9.1
+                      helm:
+                        releaseName: ingress-nginx
+                        valueFiles:
+                          - $secrets/helm-configs/{{.name}}/ingress-nginx.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: https://kubernetes.github.io/ingress-nginx
+                      chart: ingress-nginx
+                      targetRevision: 4.9.1
+                      helm:
+                        releaseName: provisioning-ingress-nginx
+                        valuesObject:
+                          controller:
+                            electionID: ingress-controller-leader
+                            ingressClass: provisioning-nginx  # default: nginx
+                            ingressClassResource:
+                              name: provisioning-nginx  # default: nginx
+                              enabled: true
+                              default: false
+                              controllerValue: "k8s.io/provisioning-ingress-nginx"  # default: k8s.io/ingress-nginx
+                        valueFiles:
+                          - $secrets/helm-configs/{{.name}}/provisioning-ingress-nginx.yaml
+                        ignoreMissingValueFiles: true
+            selector:
+              # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
+              # ArgoCD's templating operates with strings so it's the string "true"
+              matchExpressions:
+                - key: skipComponent
+                  operator: NotIn
+                  values:
+                    - "true"
+  template:
+    metadata:
+      name: '{{.name}}-{{.component}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      destination:
+        server: '{{.server}}'
+        namespace: '{{.component}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - RespectIgnoreDifferences=true
+  templatePatch: |
+    spec:
+      {{- if hasKey . "source" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      source: {{ .source | toJson }}
+      {{- end }}
+      {{- if hasKey . "sources" }}
+      sources:
+        {{- range $source := .sources }}
+        # indentation matters so collapse to single line with toJson to keep it
+        - {{ $source | toJson }}
+        {{- end }}
+      {{- end }}
+      {{- if hasKey . "ignoreDifferences" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      ignoreDifferences: {{ .ignoreDifferences | toJson }}
+      {{- end }}
