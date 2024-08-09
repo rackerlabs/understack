@@ -1,7 +1,9 @@
 ---
-site_name: UnderStack
+site_name: Understack
 site_description: |-
-  OpenStack based bare-metal deployment environment with DCIM and IPAM support
+  Understack is a collection of open-source tools and technologies that provides
+  flexible, scalable, and cost-effective infrastructure management solution. The
+  focus is on deploying bare metal in data centers with functional DCIM and IPAM.
 
 theme:
   name: material
@@ -66,19 +68,22 @@ validation:
 
 nav:
   - Home: index.md
-  - 'Getting Started':
+  - Overview:
     - vision.md
     - 'Prerequisites':
       - kubernetes.md
       - openstack-helm.md
     - 'Configuration':
       - secrets.md
-      - auth.md
       - networking.md
-  - 'Installation':
-    - gitops-install.md
-    - install-understack-ubuntu-k3s.md
-  - 'Components':
-    - component-overview.md
-    - component-argo-events.md
-    - component-argo-workflows.md
+    - Components:
+      - component-overview.md
+      - component-argo-events.md
+      - component-argo-workflows.md
+  - 'Deployment Guide':
+    - deploy-guide/index.md
+    - deploy-guide/gitops-install.md
+    - deploy-guide/install-understack-ubuntu-k3s.md
+    - deploy-guide/auth.md
+  - 'User Guide':
+    - user-guide/index.md
