@@ -12,6 +12,8 @@ UnderStack also uses common kubernetes tools: Helm, Kustomize, and Kubeseal.
 [Helm](https://helm.sh) is a package manager for kubernetes and UnderStack uses a number of
 upstream Helm charts.
 
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD046 -->
 !!! example "Installation"
 
     === "Ubuntu"
@@ -23,11 +25,14 @@ upstream Helm charts.
         sudo apt-get update
         sudo apt-get install helm
         ```
+<!-- markdownlint-restore -->
 
 ### Kustomize
 
 [Kustomize](https://kubectl.docs.kubernetes.io/guides/introduction/kustomize/) helps make customizations in kubernetes easier.
 
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD046 -->
 !!! example "Installation"
 
     === "Ubuntu"
@@ -36,12 +41,15 @@ upstream Helm charts.
         curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
         sudo mv kustomize /usr/bin
         ```
+<!-- markdownlint-restore -->
 
 ### Kubeseal
 
 [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) and the `kubeseal` cli tool make it possible to
 store sescrets in a public repository.
 
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD046 -->
 !!! example "Installation"
 
     === "Ubuntu"
@@ -51,3 +59,4 @@ store sescrets in a public repository.
         tar xzf kubeseal-0.26.0-linux-amd64.tar.gz
         sudo mv kubeseal /usr/bin
         ```
+<!-- markdownlint-restore -->

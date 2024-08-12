@@ -6,6 +6,8 @@ The easiest way to install the OpenStack CLI is to utilize your
 OS packages. But if you want to install it manually you will need
 to already have Python on your system.
 
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD046 -->
 === "Ubuntu or Debian"
 
     ``` bash
@@ -43,38 +45,39 @@ to already have Python on your system.
     export PATH="$HOME/.bin:$PATH"
     EOF
     ```
+<!-- markdownlint-restore -->
 
 ## Configuration
 
 The easiest way to configure your client is via `clouds.yaml`.
 
-    ``` yaml title="$HOME/.config/openstack/clouds.yaml"
-    clouds:
-      understack:
-        auth:
-          auth_url: https://your.endpoint.url/v3
-          user_domain_name: mydomain
-          username: myuser
-          password: mypass
-          project_domain_name: mydomain
-          project_name: myproject
-        region_name:
-          - MyRegion
-        interface: public
-        identity_api_version: 3
-    ```
+```yaml title="$HOME/.config/openstack/clouds.yaml"
+clouds:
+  understack:
+    auth:
+      auth_url: https://your.endpoint.url/v3
+      user_domain_name: mydomain
+      username: myuser
+      password: mypass
+      project_domain_name: mydomain
+      project_name: myproject
+    region_name:
+      - MyRegion
+    interface: public
+    identity_api_version: 3
+```
 
 With the above configuration in `$HOME/.config/openstack/clouds.yaml` you
 will be able to run the OpenStack CLI as follows:
 
-    ``` bash
-    openstack --os-cloud understack <sub-command-here>
-    ```
+```bash
+openstack --os-cloud understack <sub-command-here>
+```
 
 Or you can set the `OS_CLOUD` environment variable once and shorten the
 command as follows:
 
-    ``` bash
-    export OS_CLOUD=understack
-    openstack <sub-command-here>
-    ```
+```bash
+export OS_CLOUD=understack
+openstack <sub-command-here>
+```
