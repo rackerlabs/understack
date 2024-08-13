@@ -3,6 +3,8 @@ kind: ApplicationSet
 metadata:
   name: infra
 spec:
+  syncPolicy:
+    applicationsSync: create-update
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
