@@ -97,3 +97,4 @@ nav:
   - 'User Guide':
     - user-guide/index.md
     - user-guide/openstack-cli.md
+    - user-guide/openstack-image.md
