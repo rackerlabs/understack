@@ -71,6 +71,13 @@ spec:
                           - op: replace
                             path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
                             value: '{{.name }}-cluster-issuer'
+                - component: argo-events
+                  ignoreDifferences:
+                    - group: ''
+                      kind: ServiceAccount
+                      name: workflow
+                      jsonPointers:
+                        - /imagePullSecrets
 
   template:
     metadata:
@@ -89,9 +96,11 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+          - RespectIgnoreDifferences=true
   templatePatch: |
-    {{- if hasKey . "kustomize" }}
+    {{- if or (hasKey . "kustomize") (hasKey . "ignoreDifferences") }}
     spec:
+      {{- if hasKey . "kustomize" }}
       source:
         kustomize:
           {{- if hasKey .kustomize "patches" }}
@@ -106,4 +115,9 @@ spec:
                 {{- end }}
             {{- end }}
           {{- end }}
+        {{- end }}
+      {{- if hasKey . "ignoreDifferences" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      ignoreDifferences: {{ .ignoreDifferences | toJson }}
+      {{- end }}
     {{- end }}
