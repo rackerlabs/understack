@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dex
+  annotations:
+    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+spec:
+  rules:
+    - host: dex.DNS_ZONE
+      http:
+        paths:
+          - backend:
+              service:
+                name: dex
+                port:
+                  number: 5556
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - dex.DNS_ZONE
+      secretName: dex-ingress-tls

@@ -7,4 +7,3 @@ resources:
   - argocd-understack-project.yaml
   - nautobot.yaml
   - argo-workflows-templates.yaml
-  - dexidp.yaml

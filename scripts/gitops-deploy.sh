@@ -71,7 +71,7 @@ done
 
 # create helm-configs directory for values.yaml overrides
 mkdir -p "${UC_DEPLOY_HELM_CFG}"
-for component in dexidp nautobot; do
+for component in dex nautobot; do
     helmvals="${UC_DEPLOY_HELM_CFG}/${component}.yaml"
     if [ -f "${helmvals}" ]; then
         echo "You have ${helmvals} already, not overwriting"

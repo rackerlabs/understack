@@ -18,10 +18,46 @@ spec:
           - list:
               elements:
                 - component: dex
-                  source:
-                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                    path: 'components/dex'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/dex'
+                      ref: understack
+                      kustomize:
+                        patches:
+                          - target:
+                              kind: Ingress
+                              name: dex
+                            patch: |-
+                              - op: replace
+                                path: /spec/rules/0/host
+                                value: workflows.{{index .metadata.annotations "dns_zone" }}
+                              - op: replace
+                                path: /spec/tls/0/hosts/0
+                                value: workflows.{{index .metadata.annotations "dns_zone" }}
+                              - op: replace
+                                path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
+                                value: '{{.name }}-cluster-issuer'
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: secrets
+                      path: 'secrets/{{.name}}'
+                      directory:
+                        include: 'secret-*-sso-dex.yaml'
+                    - repoURL: https://charts.dexidp.io
+                      chart: dex
+                      targetRevision: 0.16.0
+                      helm:
+                        releaseName: dex
+                        valuesObject:
+                          config:
+                            issuer: 'https://dex.{{index .metadata.annotations "dns_zone" }}'
+                          env:
+                            DNS_ZONE: '{{index .metadata.annotations "dns_zone" }}'
+                        valueFiles:
+                          - $understack/components/dex/values.yaml
+                          - $secrets/helm-configs/{{.name}}/dex.yaml
+                        ignoreMissingValueFiles: true
                 - component: openstack
                   source: &uc_component
                     repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
