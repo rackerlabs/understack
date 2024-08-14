@@ -52,6 +52,8 @@ spec:
               - $understack/components/{{.component}}/aio-values.yaml
               - $secrets/secrets/{{.name}}/secret-openstack.yaml
               - $secrets/helm-configs/{{.name}}/{{.component}}.yaml
+            # don't require all the values files
+            ignoreMissingValueFiles: true
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           path: secrets/{{.name}}/
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'

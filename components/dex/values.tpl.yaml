@@ -1,8 +1,6 @@
 # add your values.yaml overrides for the helm chart here
 
 config:
-  issuer: https://dex.${DNS_ZONE}
-
   staticClients:
     - id: nautobot
       secretEnv: NAUTOBOT_SSO_CLIENT_SECRET
@@ -19,17 +17,3 @@ config:
       name: "Undercloud ArgoCD"
       redirectURIs:
         - "https://argocd.${DNS_ZONE}/auth/callback"
-
-ingress:
-  annotations:
-    cert-manager.io/cluster-issuer: ${DEPLOY_NAME}-cluster-issuer
-    nginx.ingress.kubernetes.io/backend-protocol: HTTP
-  hosts:
-    - host: dex.${DNS_ZONE}
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - hosts:
-        - dex.${DNS_ZONE}
-      secretName: dex-ingress-tls

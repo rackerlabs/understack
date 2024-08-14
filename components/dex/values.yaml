@@ -4,9 +4,6 @@
 
 replicaCount: 1
 config:
-  # Set it to a valid URL
-  issuer: https://dexidp.local
-
   # See https://dexidp.io/docs/storage/ for more options
   # We probably want 'postgres' or 'crd' in production
   storage:
@@ -41,13 +38,17 @@ config:
       secretEnv: NAUTOBOT_SSO_CLIENT_SECRET
       name: "Undercloud Nautobot"
       redirectURIs:
-        - "http://localhost:8000/complete/oidc/"
-        - "https://nautobot.local/complete/oidc/"
+        - "https://nautobot.$DNS_ZONE/complete/oidc/"
     - id: argo
       secretEnv: ARGO_SSO_CLIENT_SECRET
       name: "Undercloud Argo"
       redirectURIs:
-        - "https://workflows.local/oauth2/callback"
+        - "https://workflows.$DNS_ZONE/oauth2/callback"
+    - id: argocd
+      secretEnv: ARGOCD_SSO_CLIENT_SECRET
+      name: "Undercloud ArgoCD"
+      redirectURIs:
+        - "https://argocd.$DNS_ZONE/auth/callback"
 
 envVars:
   - name: NAUTOBOT_SSO_CLIENT_SECRET
@@ -89,19 +90,3 @@ envVars:
         name: oidc-sso
         key: redirect-uri
         optional: true
-
-ingress:
-  enabled: true
-  annotations:
-    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
-    nginx.ingress.kubernetes.io/backend-protocol: HTTP
-  className: "nginx"
-  hosts:
-    - host: dexidp.local
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - hosts:
-      - dexidp.local
-      secretName: dex-ingress-tls
