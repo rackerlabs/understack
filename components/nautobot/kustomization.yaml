@@ -10,7 +10,7 @@ resources:
 helmCharts:
 - name: redis
   repo: https://charts.bitnami.com/bitnami
-  version: 18.12.1
+  version: 18.19.4
   namespace: nautobot
-  releaseName: nautobot-redis
+  releaseName: nautobot
   valuesFile: redis-values.yaml

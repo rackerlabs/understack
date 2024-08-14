@@ -4,5 +4,4 @@ kind: Kustomization
 namespace: argocd
 
 resources:
-  - nautobot.yaml
   - argo-workflows-templates.yaml
