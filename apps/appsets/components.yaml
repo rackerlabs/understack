@@ -91,10 +91,6 @@ spec:
                               cert-manager.io/cluster-issuer: '{{.name }}-cluster-issuer'
                               nginx.ingress.kubernetes.io/backend-protocol: HTTPS
                             hostname: 'nautobot.{{index .metadata.annotations "dns_zone" }}'
-                          nautobot:
-                            extraEnvVars:
-                              - name: SOCIAL_AUTH_OIDC_OIDC_ENDPOINT
-                                value: 'https://dex.{{index .metadata.annotations "dns_zone" }}'
                         valueFiles:
                           - $understack/components/nautobot/nautobot-values.yaml
                           - $secrets/helm-configs/{{.name}}/nautobot.yaml
