@@ -78,7 +78,7 @@ spec:
                       ref: secrets
                       path: 'secrets/{{.name}}'
                       directory:
-                        include: 'secret-nautobot.yaml'
+                        include: 'secret-nautobot-*.yaml'
                         exclude: 'secret-nautobot-sso-dex.yaml'
                     - repoURL: https://nautobot.github.io/helm-charts/
                       chart: nautobot
