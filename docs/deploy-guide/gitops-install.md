@@ -189,7 +189,6 @@ kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-de
 Finally run the following to have ArgoCD deploy the system:
 
 ```bash
-kubectl apply -f "${UC_DEPLOY}/clusters/${DEPLOY_NAME}/app-of-apps.yaml"
 # from your understack checkout
 kubectl apply -f apps/cluster-setup.yaml
 ```

@@ -68,9 +68,42 @@ spec:
                     <<: *uc_component
                     path: 'components/undersync'
                 - component: nautobot
-                  source:
-                    <<: *uc_component
-                    path: 'components/nautobot'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/nautobot'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: secrets
+                      path: 'secrets/{{.name}}'
+                      directory:
+                        include: 'secret-nautobot.yaml'
+                        exclude: 'secret-nautobot-sso-dex.yaml'
+                    - repoURL: https://nautobot.github.io/helm-charts/
+                      chart: nautobot
+                      targetRevision: 2.1.0
+                      helm:
+                        releaseName: nautobot
+                        valuesObject:
+                          ingress:
+                            annotations:
+                              cert-manager.io/cluster-issuer: '{{.name }}-cluster-issuer'
+                              nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+                            hostname: 'nautobot.{{index .metadata.annotations "dns_zone" }}'
+                          nautobot:
+                            extraEnvVars:
+                              - name: SOCIAL_AUTH_OIDC_OIDC_ENDPOINT
+                                value: 'https://dex.{{index .metadata.annotations "dns_zone" }}'
+                        valueFiles:
+                          - $understack/components/nautobot/nautobot-values.yaml
+                          - $secrets/helm-configs/{{.name}}/nautobot.yaml
+                        ignoreMissingValueFiles: true
+                        fileParameters:
+                          - name: nautobot.config
+                            # until ArgoCD 2.13.0 is released we cannot use a reference
+                            # path: $understack/components/nautobot/nautobot_config.py
+                            path: 'https://raw.githubusercontent.com/rackerlabs/understack/{{index .metadata.annotations "uc_repo_ref" }}/components/nautobot/nautobot_config.py'
                 - component: argo
                   source:
                     <<: *uc_component

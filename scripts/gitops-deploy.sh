@@ -59,19 +59,9 @@ export DEPLOY_NAME
 export UC_REPO_REF="${UC_REPO_REF:-HEAD}"
 export UC_DEPLOY_REF="${UC_DEPLOY_REF:-HEAD}"
 
-for part in operators components; do
-    echo "Creating ${part} configs"
-    mkdir -p "${UC_DEPLOY_CLUSTER}/${part}"
-    for tmpl in $(find "${UC_REPO_APPS}/${part}" -type f); do
-        outfile=$(basename "${tmpl}")
-        template "${tmpl}" "${UC_DEPLOY_CLUSTER}/${part}/${outfile}"
-    done
-    rm -rf "${UC_DEPLOY_CLUSTER}/${part}/kustomization.yaml"
-done
-
 # create helm-configs directory for values.yaml overrides
 mkdir -p "${UC_DEPLOY_HELM_CFG}"
-for component in dex nautobot; do
+for component in dex; do
     helmvals="${UC_DEPLOY_HELM_CFG}/${component}.yaml"
     if [ -f "${helmvals}" ]; then
         echo "You have ${helmvals} already, not overwriting"
@@ -83,6 +73,3 @@ for component in dex nautobot; do
         echo "# add your values.yaml overrides for the helm chart here" > "${helmvals}"
     fi
 done
-
-echo "Creating app-of-apps config"
-template "${UC_REPO_APPS}/app-of-apps.yaml" "${UC_DEPLOY_CLUSTER}/app-of-apps.yaml"
