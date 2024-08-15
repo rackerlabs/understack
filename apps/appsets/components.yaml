@@ -31,10 +31,10 @@ spec:
                             patch: |-
                               - op: replace
                                 path: /spec/rules/0/host
-                                value: workflows.{{index .metadata.annotations "dns_zone" }}
+                                value: dex.{{index .metadata.annotations "dns_zone" }}
                               - op: replace
                                 path: /spec/tls/0/hosts/0
-                                value: workflows.{{index .metadata.annotations "dns_zone" }}
+                                value: dex.{{index .metadata.annotations "dns_zone" }}
                               - op: replace
                                 path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
                                 value: '{{.name }}-cluster-issuer'
