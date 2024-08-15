@@ -5,7 +5,8 @@ metadata:
   name: get-device-nautobot
   namespace: argo-events
   annotations:
-    workflows.argoproj.io/description: Return Device Information from Nautobot
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/generic/workflowtemplates/get-device-nautobot.yaml`. Return Device Information from Nautobot
 spec:
   serviceAccountName: workflow
   entrypoint: main

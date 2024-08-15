@@ -8,6 +8,9 @@ metadata:
     argocd.argoproj.io/instance: argo-events
   name: ironic-node-update
   namespace: argo-events
+  annotations:
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/ironic-to-nautobot-sensor/sensors/sync.yaml`
 spec:
   dependencies:
   - eventName: openstack

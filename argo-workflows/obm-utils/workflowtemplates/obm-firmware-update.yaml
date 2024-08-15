@@ -4,7 +4,9 @@ metadata:
   name: obm-firmware-update
   namespace: argo-events
   annotations:
-    workflows.argoproj.io/description: Update OBM firmware on target Device
+    workflows.argoproj.io/title: Update OBM firmware on target Device
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/obm-utils/workflowtemplates/obm-firmware-update.yaml`
 spec:
   serviceAccountName: workflow
   entrypoint: main

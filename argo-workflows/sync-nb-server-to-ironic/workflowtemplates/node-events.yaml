@@ -2,6 +2,9 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: node-events
+  annotations:
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/sync-nb-server-to-ironic/node-events.yaml`
 spec:
   volumes:
     - name: argo-secrets

@@ -1,6 +1,9 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
   name: synchronize-provision-state-to-nautobot
+  annotations:
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/ironic-to-nautobot-sensor/workflowtemplates/sync.yaml`
 kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow
