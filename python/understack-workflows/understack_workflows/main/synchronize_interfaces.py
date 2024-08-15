@@ -24,15 +24,13 @@ def get_nautobot_interfaces(device_id: UUID) -> list[PortConfiguration]:
     nautobot = pynautobot.api(nautobot_api, nautobot_token)
     interfaces = nautobot.dcim.interfaces.filter(device_id=device_id)
 
-    ports = []
-    for i in interfaces:
-        if i.mac_address:
-            ports.append(
-                PortConfiguration(
-                    node_uuid=str(device_id), address=i.mac_address, uuid=i.id
-                )
-            )
-    return ports
+    return [
+        PortConfiguration(
+            node_uuid=str(device_id), address=i.mac_address, uuid=i.id, name=i.name
+        )
+        for i in interfaces
+        if i.mac_address
+    ]
 
 
 def get_patch(nautobot_port: PortConfiguration, port: Port) -> list:

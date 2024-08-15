@@ -34,4 +34,3 @@ jobs:
         with:
           coverageFile: python/understack-workflows/coverage.xml
           token: ${{ secrets.GITHUB_TOKEN }}
-          sourceDir: python/understack-workflows
