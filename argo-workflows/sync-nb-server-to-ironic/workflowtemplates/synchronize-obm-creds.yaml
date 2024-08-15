@@ -1,6 +1,9 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
   name: synchronize-obm-creds
+  annotations:
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/sync-nb-server-to-ironic/synchronize-obm-creds.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: main

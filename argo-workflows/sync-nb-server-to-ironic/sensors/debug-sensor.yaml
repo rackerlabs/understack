@@ -3,6 +3,9 @@ kind: Sensor
 metadata:
   name: debug-sensor
   namespace: argo-events
+  annotations:
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/sync-nb-server-to-ironic/sensors/debug-sensor.yaml`
 spec:
   dependencies:
   - eventName: interface-update

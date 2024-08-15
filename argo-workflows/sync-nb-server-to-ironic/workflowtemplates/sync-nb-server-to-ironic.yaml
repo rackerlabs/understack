@@ -1,6 +1,9 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
   name: sync-nb-server-to-ironic
+  annotations:
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/sync-nb-server-to-ironic/sync-nb-server-to-ironic.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: main

@@ -7,6 +7,9 @@ metadata:
     argocd.argoproj.io/instance: argo-workflows-templates
   name: nb-oob-interface-update
   namespace: argo-events
+  annotations:
+    workflows.argoproj.io/description: |
+      Defined in `argo-workflows/shared-sensors/nb-oob-interface-update-sensor.yaml`
 spec:
   dependencies:
     - eventName: nautobot

@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "properties": {
+            "workflows.argoproj.io/description": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workflows.argoproj.io/description"
+          ]
+        }
+      },
+      "required": [
+        "annotations"
+      ]
+    }
+  },
+  "required": [
+    "metadata"
+  ]
+}
