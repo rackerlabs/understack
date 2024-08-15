@@ -14,6 +14,8 @@ spec:
         args:
           - --device_uuid
           - "{{workflow.parameters.device_uuid}}"
+          - --interface_uuid
+          - "{{workflow.parameters.interface_uuid}}"
           - --network-name
           - "{{workflow.parameters.network_name}}"
           - --dry-run

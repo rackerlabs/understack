@@ -262,9 +262,10 @@ class UnderstackDriver(MechanismDriver):
         else:
             return "tenant"
 
-    def _move_to_network(self, context):
+    def _move_to_network(self, context: PortContext):
         device_uuid = context.current["binding:host_id"]
         network_name = self.__network_name(context.current["network_id"])
+        interface_id = context.current["id"]
         LOG.debug(f"Selected {network_name=} for {device_uuid=}")
 
         result = argo_client.submit(
@@ -273,6 +274,7 @@ class UnderstackDriver(MechanismDriver):
             parameters={
                 "device_uuid": device_uuid,
                 "network_name": network_name,
+                "interface_id": interface_id,
                 "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
                 "force": cfg.CONF.ml2_type_understack.argo_force,
             },

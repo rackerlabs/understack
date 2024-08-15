@@ -15,6 +15,7 @@ logger = setup_logger(__name__)
 def update_nautobot(args) -> list[str]:
     default_nb_url = "http://nautobot-default.nautobot.svc.cluster.local"
     device_uuid = args.device_id
+    # interface_uuid = args.interface_id
     field_name = "connected_to_network"
     field_value = args.network_name
     nb_url = args.nautobot_url or default_nb_url
@@ -52,6 +53,9 @@ def argument_parser():
     )
     parser.add_argument(
         "--device-id", type=UUID, required=True, help="Nautobot device UUID"
+    )
+    parser.add_argument(
+        "--interface-id", type=UUID, required=False, help="Nautobot interface UUID"
     )
     parser.add_argument("--network-name", required=True)
     parser.add_argument(
