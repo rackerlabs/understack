@@ -10,3 +10,4 @@ class PortConfiguration(BaseModel):
     ]  # ironicclient's Port class lowercases this attribute
     uuid: str  # using a str here to due to ironicclient Port attribute
     node_uuid: str  # using a str here due to ironicclient Port attribute
+    name: str  # port name
