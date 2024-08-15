@@ -34,3 +34,15 @@ jobs:
             kubectl kustomize --enable-helm "${item}" | \
               kubeconform -skip=Secret -strict -ignore-missing-schemas
           done
+
+  workflows-description:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: thiagodnf/yaml-schema-checker@v0.0.12
+        with:
+          jsonSchemaFile: argo-workflows/.workflow_with_description.schema.json
+          yamlFiles: |
+            argo-workflows/**/workflowtemplates/*.y*ml
+            argo-workflows/**/sensors/*.y*ml
+            argo-workflows/**/workflows/*.y*ml
