@@ -1,0 +1,7 @@
+# Adds a column to the Workflow List View
+- # The name of this column, e.g., "Workflow Completed".
+  name: Workflow Completed
+  # The type of this column, "label" or "annotation".
+  type: label
+  # The key of the label or annotation, e.g., "workflows.argoproj.io/completed".
+  key: workflows.argoproj.io/completed

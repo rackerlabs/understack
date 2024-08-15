@@ -66,3 +66,5 @@ configMapGenerator:
     files:
       - sso
       - workflowDefaults=workflow-defaults
+      - links=include-links
+      - columns=include-columns
