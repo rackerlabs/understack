@@ -13,6 +13,11 @@ bootstrap:
     openstack:
       enabled: false
 
+conductor:
+  pxe:
+    # at this time we are running our own dnsmasq container and statefulset
+    enabled: false
+
 conf:
   ironic:
     DEFAULT:

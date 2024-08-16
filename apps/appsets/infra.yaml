@@ -17,7 +17,7 @@ spec:
           - list:
               elements:
                 - component: cert-manager
-                  skipComponent: '{{has "cert-manager" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
+                  skipComponent: '{{has "cert-manager" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   source:
                     repoURL: https://charts.jetstack.io
                     chart: cert-manager
@@ -27,7 +27,7 @@ spec:
                       valuesObject:
                         installCRDs: true
                 - component: metallb
-                  skipComponent: '{{has "metallb" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
+                  skipComponent: '{{has "metallb" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   source:
                     repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                     targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
@@ -44,7 +44,7 @@ spec:
                       jsonPointers:
                         - /spec/conversion/webhook/clientConfig/caBundle
                 - component: ingress-nginx
-                  skipComponent: '{{has "ingress-nginx" (default "[]" (index .metadata.annotations "uc_skip_components") | fromJson)}}'
+                  skipComponent: '{{has "ingress-nginx" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
