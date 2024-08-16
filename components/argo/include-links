@@ -18,4 +18,4 @@
   url: http://my-chat
 - name: Failed Workflows
   scope: workflow-list
-  url: /workflows?namespace=argo-events&phase=Failed&phase=Error&limit=50
+  url: https://workflows.uc.ohthree.com/workflows?namespace=argo-events&phase=Failed&phase=Error&limit=50
