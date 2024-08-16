@@ -27,7 +27,7 @@ nautobot:
       configMap:
         name: dexauth
         defaultMode: 420
-    - name: nautobot-dex-creds
+    - name: nautobot-sso
       secret:
         secretName: nautobot-sso
         defaultMode: 420
@@ -38,10 +38,9 @@ nautobot:
       mountPath: /opt/nautobot/dexauth.py
       readOnly: true
       subPath: dexauth.py
-    - name: nautobot-dex-creds
-      mountPath: /opt/nautobot/dex_client_secret
+    - name: nautobot-sso
+      mountPath: /opt/nautobot/sso/
       readOnly: true
-      subPath: client-secret
 
   extraEnvVarsSecret:
     - nautobot-custom-env
