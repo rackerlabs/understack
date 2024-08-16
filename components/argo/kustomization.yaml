@@ -66,5 +66,8 @@ configMapGenerator:
     files:
       - sso
       - workflowDefaults=workflow-defaults
+  - name: workflow-controller-configmap
+    behavior: replace
+    files:
       - links=include-links
       - columns=include-columns
