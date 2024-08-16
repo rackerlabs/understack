@@ -43,10 +43,14 @@ nautobot:
       readOnly: true
       subPath: client-secret
 
+  extraEnvVarsSecret:
+    - nautobot-custom-env
+
 celery:
   replicaCount: 1
   extraEnvVarsSecret:
     - nautobot-django
+    - nautobot-custom-env
 
 postgresql:
   enabled: false

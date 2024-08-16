@@ -427,13 +427,13 @@ kustomize create --autodetect
 popd
 
 # Placeholders don't need sealing
-if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-env.yaml" ]; then
-    echo "Creating nautobot-env secret placeholder"
+if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-custom-env.yaml" ]; then
+    echo "Creating nautobot-custom-env secret placeholder"
     kubectl --namespace nautobot \
-        create secret generic nautobot-env \
+        create secret generic nautobot-custom-env \
         --dry-run=client \
         -o yaml \
-        --type Opaque > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-env.yaml"
+        --type Opaque > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-custom-env.yaml"
 fi
 
 exit 0
