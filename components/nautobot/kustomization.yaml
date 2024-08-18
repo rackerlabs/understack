@@ -7,6 +7,13 @@ resources:
   - secretstore-nautobot.yaml
   - external-secret-nautobot-sso.yaml
 
+configMapGenerator:
+  - name: dexauth
+    files:
+      - dexauth.py
+    options:
+      disableNameSuffixHash: true
+
 helmCharts:
 - name: redis
   repo: https://charts.bitnami.com/bitnami
