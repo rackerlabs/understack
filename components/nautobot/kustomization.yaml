@@ -13,11 +13,3 @@ configMapGenerator:
       - dexauth.py
     options:
       disableNameSuffixHash: true
-
-helmCharts:
-- name: redis
-  repo: https://charts.bitnami.com/bitnami
-  version: 18.19.4
-  namespace: nautobot
-  releaseName: nautobot
-  valuesFile: redis-values.yaml

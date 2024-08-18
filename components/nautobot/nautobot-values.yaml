@@ -10,11 +10,6 @@ nautobot:
     existingSecret: "nautobot-pguser-nautobot"
     existingSecretPasswordKey: "password"
 
-  redis:
-    host: "nautobot-redis-master"
-    existingSecret: "nautobot-redis"
-    existingSecretPasswordKey: "redis-password"
-
   django:
     existingSecret: nautobot-django
 
@@ -55,7 +50,7 @@ postgresql:
   enabled: false
 
 redis:
-  enabled: false
+  enabled: true
 
 ingress:
   enabled: true

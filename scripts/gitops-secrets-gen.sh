@@ -113,15 +113,6 @@ if [ ! -f "${DEST_DIR}/secret-nautobot-django.yaml" ]; then
         | secret-seal-stdin "${DEST_DIR}/secret-nautobot-django.yaml"
 fi
 
-[ ! -f "${DEST_DIR}/secret-nautobot-redis.yaml" ] && \
-kubectl --namespace nautobot \
-    create secret generic nautobot-redis \
-    --dry-run=client \
-    -o yaml \
-    --type Opaque \
-    --from-literal=redis-password="$(./scripts/pwgen.sh)" \
-    | secret-seal-stdin "${DEST_DIR}/secret-nautobot-redis.yaml"
-
 NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
 [ ! -f "${DEST_DIR}/secret-nautobot-sso-dex.yaml" ] && \
 kubectl --namespace dex \
