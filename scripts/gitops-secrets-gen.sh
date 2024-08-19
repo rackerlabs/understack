@@ -115,44 +115,25 @@ if [ ! -f "${DEST_DIR}/secret-nautobot-django.yaml" ]; then
         | secret-seal-stdin "${DEST_DIR}/secret-nautobot-django.yaml"
 fi
 
-NAUTOBOT_SSO_SECRET=$(./scripts/pwgen.sh)
-[ ! -f "${DEST_DIR}/secret-nautobot-sso-dex.yaml" ] && \
-kubectl --namespace dex \
-  create secret generic nautobot-sso \
-  --dry-run=client \
-  -o yaml \
-  --type Opaque \
-  --from-literal=client-secret="$NAUTOBOT_SSO_SECRET" \
-  --from-literal=client-id=nautobot \
-  --from-literal=issuer="https://dex.${DNS_ZONE}" \
-  | secret-seal-stdin "${DEST_DIR}/secret-nautobot-sso-dex.yaml"
-unset NAUTOBOT_SSO_SECRET
+## Dex based SSO Auth. Client Configurations
+mkdir -p "${DEST_DIR}/dex/"
+# clients generated are in the list below
+for client in nautobot argo argocd; do
+    if [ ! -f "${DEST_DIR}/dex/secret-nautobot-sso-dex.yaml" ]; then
+        SSO_SECRET=$(./scripts/pwgen.sh)
+        kubectl --namespace dex \
+            create secret generic "${client}-sso" \
+            --dry-run=client \
+            -o yaml \
+            --type Opaque \
+            --from-literal=client-secret="$SSO_SECRET" \
+            --from-literal=client-id="${client}" \
+            --from-literal=issuer="https://dex.${DNS_ZONE}" \
+            | secret-seal-stdin "${DEST_DIR}/dex/secret-${client}-sso-dex.yaml"
+        unset SSO_SECRET
+    fi
+done
 
-ARGO_SSO_SECRET=$(./scripts/pwgen.sh)
-[ ! -f "${DEST_DIR}/secret-argo-sso-dex.yaml" ] && \
-kubectl --namespace dex \
-  create secret generic argo-sso \
-  --dry-run=client \
-  -o yaml \
-  --type Opaque \
-  --from-literal=client-secret="$ARGO_SSO_SECRET" \
-  --from-literal=client-id=argo \
-  --from-literal=issuer="https://dex.${DNS_ZONE}" \
-  | secret-seal-stdin "${DEST_DIR}/secret-argo-sso-dex.yaml"
-unset ARGO_SSO_SECRET
-
-ARGOCD_SSO_SECRET=$(./scripts/pwgen.sh)
-[ ! -f "${DEST_DIR}/secret-argocd-sso-dex.yaml" ] && \
-kubectl --namespace dex \
-  create secret generic argocd-sso \
-  --dry-run=client \
-  -o yaml \
-  --type Opaque \
-  --from-literal=issuer="https://dex.${DNS_ZONE}" \
-  --from-literal=client-secret="$ARGOCD_SSO_SECRET" \
-  --from-literal=client-id=argocd \
-  | secret-seal-stdin "${DEST_DIR}/secret-argocd-sso-dex.yaml"
-unset ARGOCD_SSO_SECRET
 mkdir -p "${DEST_DIR}/cluster/"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy

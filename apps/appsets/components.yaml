@@ -41,9 +41,7 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: secrets
-                      path: 'secrets/{{.name}}'
-                      directory:
-                        include: 'secret-*-sso-dex.yaml'
+                      path: 'secrets/{{.name}}/dex'
                     - repoURL: https://charts.dexidp.io
                       chart: dex
                       targetRevision: 0.16.0
