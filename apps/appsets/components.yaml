@@ -82,7 +82,7 @@ spec:
                         exclude: 'secret-nautobot-sso-dex.yaml'
                     - repoURL: https://nautobot.github.io/helm-charts/
                       chart: nautobot
-                      targetRevision: 2.1.0
+                      targetRevision: 2.1.3
                       helm:
                         releaseName: nautobot
                         valuesObject:

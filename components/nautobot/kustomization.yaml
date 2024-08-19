@@ -7,10 +7,9 @@ resources:
   - secretstore-nautobot.yaml
   - external-secret-nautobot-sso.yaml
 
-helmCharts:
-- name: redis
-  repo: https://charts.bitnami.com/bitnami
-  version: 18.19.4
-  namespace: nautobot
-  releaseName: nautobot
-  valuesFile: redis-values.yaml
+configMapGenerator:
+  - name: dexauth
+    files:
+      - dexauth.py
+    options:
+      disableNameSuffixHash: true

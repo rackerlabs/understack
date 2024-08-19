@@ -10,11 +10,6 @@ nautobot:
     existingSecret: "nautobot-pguser-nautobot"
     existingSecretPasswordKey: "password"
 
-  redis:
-    host: "nautobot-redis-master"
-    existingSecret: "nautobot-redis"
-    existingSecretPasswordKey: "redis-password"
-
   django:
     existingSecret: nautobot-django
 
@@ -27,7 +22,7 @@ nautobot:
       configMap:
         name: dexauth
         defaultMode: 420
-    - name: nautobot-dex-creds
+    - name: nautobot-sso
       secret:
         secretName: nautobot-sso
         defaultMode: 420
@@ -38,10 +33,9 @@ nautobot:
       mountPath: /opt/nautobot/dexauth.py
       readOnly: true
       subPath: dexauth.py
-    - name: nautobot-dex-creds
-      mountPath: /opt/nautobot/dex_client_secret
+    - name: nautobot-sso
+      mountPath: /opt/nautobot/sso/
       readOnly: true
-      subPath: client-secret
 
   extraEnvVarsSecret:
     - nautobot-custom-env
@@ -56,7 +50,7 @@ postgresql:
   enabled: false
 
 redis:
-  enabled: false
+  enabled: true
 
 ingress:
   enabled: true

@@ -1,8 +1,7 @@
 import os
-import sys
 
 from nautobot.core.settings import *  # noqa F401,F403
-from nautobot.core.settings_funcs import is_truthy, parse_redis_connection
+from nautobot.core.settings_funcs import is_truthy
 
 #########################
 #                       #
@@ -23,7 +22,8 @@ from nautobot.core.settings_funcs import is_truthy, parse_redis_connection
 #     "default": {
 #         "BACKEND": os.getenv(
 #             "NAUTOBOT_CACHES_BACKEND",
-#             "django_prometheus.cache.backends.redis.RedisCache" if METRICS_ENABLED else "django_redis.cache.RedisCache",
+#             "django_prometheus.cache.backends.redis.RedisCache"
+#             if METRICS_ENABLED else "django_redis.cache.RedisCache",
 #         ),
 #         "LOCATION": parse_redis_connection(redis_database=1),
 #         "TIMEOUT": 300,
@@ -61,8 +61,8 @@ from nautobot.core.settings_funcs import is_truthy, parse_redis_connection
 
 # Ensure proper Unicode handling for MySQL
 #
-if DATABASES["default"]["ENGINE"].endswith("mysql"):
-    DATABASES["default"]["OPTIONS"] = {"charset": "utf8mb4"}
+if DATABASES["default"]["ENGINE"].endswith("mysql"):  # noqa F405
+    DATABASES["default"]["OPTIONS"] = {"charset": "utf8mb4"}  # noqa F405
 
 # This key is used for secure generation of random numbers and strings. It must never be exposed outside of this file.
 # For optimal security, SECRET_KEY should be at least 50 characters in length and contain a mix of letters, numbers, and
@@ -127,7 +127,8 @@ SECRET_KEY = os.getenv("NAUTOBOT_SECRET_KEY", "celery-does-not-need-this")
 #             "datefmt": "%H:%M:%S",
 #         },
 #         "verbose": {
-#             "format": "%(asctime)s.%(msecs)03d %(levelname)-7s %(name)-20s %(filename)-15s %(funcName)30s() :\n  %(message)s",
+#             "format": "%(asctime)s.%(msecs)03d %(levelname)-7s %(name)-20s "
+#                       "%(filename)-15s %(funcName)30s() :\n  %(message)s",
 #             "datefmt": "%H:%M:%S",
 #         },
 #     },
@@ -453,41 +454,45 @@ INSTALLATION_METRICS_ENABLED = is_truthy(os.getenv("NAUTOBOT_INSTALLATION_METRIC
 #     (re.compile(r"(username|password|passwd|pwd)((?:\s+is.?|:)?\s+)\S+", re.IGNORECASE), r"\1\2{replacement}"),
 # ]
 
+
 # Configure SSO, for more information see docs/configuration/authentication/sso.md
 #
 # SOCIAL_AUTH_POSTGRES_JSONFIELD = False
-AUTHENTICATION_BACKENDS = [
-    "social_core.backends.open_id_connect.OpenIdConnectAuth",
-    "nautobot.core.authentication.ObjectPermissionBackend",
-]
+def _read_cred(filename):
+    try:
+        with open(filename) as cred:
+            return cred.read().strip()
+    except FileNotFoundError:
+        return None
 
-SOCIAL_AUTH_OIDC_SSL_PROTOCOL = None
-# TODO: until we figure out how to add local CA to python trusted CAs
-SOCIAL_AUTH_OIDC_VERIFY_SSL = False
-SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = os.getenv("SOCIAL_AUTH_OIDC_OIDC_ENDPOINT", "http://dex.dex.svc.cluster.local:5556")
-SOCIAL_AUTH_OIDC_KEY = 'nautobot'
-try:
-    with open("/opt/nautobot/dex_client_secret") as oidc_secret:
-        SOCIAL_AUTH_OIDC_SECRET = oidc_secret.read()
-except FileNotFoundError:
-    pass
+
+# configure our SSO login from our secret
+SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = _read_cred("/opt/nautobot/sso/issuer") or os.getenv("SOCIAL_AUTH_OIDC_OIDC_ENDPOINT")
+SOCIAL_AUTH_OIDC_KEY = _read_cred("/opt/nautobot/sso/client-id") or "nautobot"
+SOCIAL_AUTH_OIDC_SECRET = _read_cred("/opt/nautobot/sso/client-secret")
 # The “openid”, “profile” and “email” are requested by default,
 # below *adds* scope.
-SOCIAL_AUTH_OIDC_SCOPE = ['groups']
+SOCIAL_AUTH_OIDC_SCOPE = ["groups"]
 
 # include custom auth pipeline to sync groups
 SOCIAL_AUTH_PIPELINE = (
-  "social_core.pipeline.social_auth.social_details",
-  "social_core.pipeline.social_auth.social_uid",
-  "social_core.pipeline.social_auth.auth_allowed",
-  "social_core.pipeline.social_auth.social_user",
-  "social_core.pipeline.user.get_username",
-  "social_core.pipeline.user.create_user",
-  "social_core.pipeline.social_auth.associate_user",
-  "social_core.pipeline.social_auth.load_extra_data",
-  "social_core.pipeline.user.user_details",
-  "dexauth.group_sync",
+    "social_core.pipeline.social_auth.social_details",
+    "social_core.pipeline.social_auth.social_uid",
+    "social_core.pipeline.social_auth.auth_allowed",
+    "social_core.pipeline.social_auth.social_user",
+    "social_core.pipeline.user.get_username",
+    "social_core.pipeline.user.create_user",
+    "social_core.pipeline.social_auth.associate_user",
+    "social_core.pipeline.social_auth.load_extra_data",
+    "social_core.pipeline.user.user_details",
+    "dexauth.group_sync",
 )
+
+if SOCIAL_AUTH_OIDC_OIDC_ENDPOINT and SOCIAL_AUTH_OIDC_SECRET:
+    AUTHENTICATION_BACKENDS = [
+        "social_core.backends.open_id_connect.OpenIdConnectAuth",
+        "nautobot.core.authentication.ObjectPermissionBackend",
+    ]
 
 # By default uploaded media is stored on the local filesystem. Using Django-storages is also supported. Provide the
 # class path of the storage driver in STORAGE_BACKEND and any configuration options in STORAGE_CONFIG.
