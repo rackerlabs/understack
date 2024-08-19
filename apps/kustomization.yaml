@@ -3,7 +3,6 @@ kind: Kustomization
 resources:
 - appsets/argocd.yaml
 - appsets/infra.yaml
-- appsets/cluster-config.yaml
 - appsets/argocd-operators-project.yaml
 - appsets/operators.yaml
 - appsets/components.yaml

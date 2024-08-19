@@ -50,9 +50,7 @@ if [ "x${DEPLOY_NAME}" = "x" ]; then
     usage
 fi
 
-[ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy.repo.yaml" ] && \
-    mv -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/"
-if [ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-deploy-repo.yaml" ]; then
+if [ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" ]; then
     NO_SECRET_DEPLOY=1
 else
     if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
@@ -331,9 +329,10 @@ mkdir -p "${DEST_DIR}/metallb"
 # create a placeholder directory for undersync configs
 mkdir -p "${DEST_DIR}/undersync"
 
-mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
+# create ArgoCD configs
+mkdir -p "${DEST_DIR}/argocd"
 echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
-cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-${DEPLOY_NAME}-cluster.yaml"
+cat << EOF > "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml"
 apiVersion: v1
 kind: Secret
 data:
@@ -355,7 +354,7 @@ EOF
 
 if [ "x${NO_SECRET_DEPLOY}" = "x" ]; then
     echo "Creating ArgoCD repo-creds"
-    cat << EOF | secret-seal-stdin "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-deploy-repo.yaml"
+    cat << EOF | secret-seal-stdin "${DEST_DIR}/argocd/secret-deploy-repo.yaml"
 apiVersion: v1
 kind: Secret
 metadata:
@@ -370,7 +369,6 @@ data:
 EOF
 fi
 
-
 for component in $(find "${DEST_DIR}" -maxdepth 1 -mindepth 1 -type d); do
     if [ ! -f "${component}/kustomization.yaml" ]; then
         pushd "${component}" > /dev/null
@@ -379,10 +377,5 @@ for component in $(find "${DEST_DIR}" -maxdepth 1 -mindepth 1 -type d); do
         popd > /dev/null
     fi
 done
-
-pushd "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
-rm -rf kustomization.yaml
-kustomize create --autodetect
-popd
 
 exit 0
