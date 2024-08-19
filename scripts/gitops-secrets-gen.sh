@@ -138,187 +138,68 @@ mkdir -p "${DEST_DIR}/cluster/"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 export MEMCACHE_SECRET_KEY="$(./scripts/pwgen.sh 64)"
-# keystone admin user password
-export KEYSTONE_ADMIN_PASSWORD="$(./scripts/pwgen.sh)"
-# keystone user password in mariadb for keystone db
-export KEYSTONE_DB_PASSWORD="$(./scripts/pwgen.sh)"
-# rabbitmq user password for the keystone queues
-export KEYSTONE_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
-# ironic keystone service account
-export IRONIC_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
-# ironic user password in mariadb for ironic db
-export IRONIC_DB_PASSWORD="$(./scripts/pwgen.sh)"
-# rabbitmq user password for the ironic queues
-export IRONIC_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
-# neutron keystone service account
-export NEUTRON_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
-# neutron user password in mariadb for neutron db
-export NEUTRON_DB_PASSWORD="$(./scripts/pwgen.sh)"
-# rabbitmq user password for the neutron queues
-export NEUTRON_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
-# nova keystone service account
-export NOVA_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
-# nova user password in mariadb for nova db
-export NOVA_DB_PASSWORD="$(./scripts/pwgen.sh)"
-# rabbitmq user password for the inovaronic queues
-export NOVA_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
-# placement keystone service account
-export PLACEMENT_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
-# placement user password in mariadb for placement db
-export PLACEMENT_DB_PASSWORD="$(./scripts/pwgen.sh)"
-# horizon user password for database
-export HORIZON_DB_PASSWORD="$(./scripts/pwgen.sh)"
-# glance keystone service account
-export GLANCE_KEYSTONE_PASSWORD="$(./scripts/pwgen.sh)"
-# glance user password in mariadb for glance db
-export GLANCE_DB_PASSWORD="$(./scripts/pwgen.sh)"
-# rabbitmq user password for the glance queues
-export GLANCE_RABBITMQ_PASSWORD="$(./scripts/pwgen.sh)"
 
-[ ! -f "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic keystone-rabbitmq-password \
-    --type Opaque \
-    --from-literal=username="keystone" \
-    --from-literal=password="${KEYSTONE_RABBITMQ_PASSWORD}" \
-    --dry-run=client -o yaml \
-    | secret-seal-stdin "${DEST_DIR}/secret-keystone-rabbitmq-password.yaml"
+## OpenStack component secret generation
+## each openstack component is very similar to collapse this
+## into a loop to generate the same thing for each
+for component in keystone ironic placement neutron nova glance; do
+    mkdir -p "${DEST_DIR}/${component}/"
+    # keystone service account username
+    [ "x${component}" = "xkeystone" ] && keystone_user="admin" || keystone_user="${component}"
+    KEYSTONE_USER=$(echo "${keystone_user}" | tr '[:lower:]' '[:upper:]')
+    # uppercase the component name to make our variable
+    COMPONENT=$(echo "$component" | tr '[:lower:]' '[:upper:]')
+    VARNAME_RABBITMQ_PASSWORD="${COMPONENT}_RABBITMQ_PASSWORD"
+    VARNAME_DB_PASSWORD="${COMPONENT}_DB_PASSWORD"
+    VARNAME_KEYSTONE_PASSWORD="${KEYSTONE_USER}_KEYSTONE_PASSWORD"
+    # generate the passwords and set the variable names
+    declare "${VARNAME_RABBITMQ_PASSWORD}"="$(./scripts/pwgen.sh)"
+    declare "${VARNAME_DB_PASSWORD}"="$(./scripts/pwgen.sh)"
+    declare "${VARNAME_KEYSTONE_PASSWORD}"="$(./scripts/pwgen.sh)"
+    # export the variables for templating the openstack secret
+    export "${VARNAME_RABBITMQ_PASSWORD?}"
+    export "${VARNAME_DB_PASSWORD?}"
+    export "${VARNAME_KEYSTONE_PASSWORD?}"
 
-[ ! -f "${DEST_DIR}/secret-keystone-db-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic keystone-db-password \
-    --type Opaque \
-    --from-literal=password="${KEYSTONE_DB_PASSWORD}" \
-    --dry-run=client -o yaml \
-    | secret-seal-stdin "${DEST_DIR}/secret-keystone-db-password.yaml"
+    [ ! -f "${DEST_DIR}/${component}/secret-rabbitmq-password.yaml" ] && \
+        kubectl --namespace openstack \
+        create secret generic "${component}-rabbitmq-password" \
+        --type Opaque \
+        --from-literal=username="${component}" \
+        --from-literal=password="${!VARNAME_RABBITMQ_PASSWORD}" \
+        --dry-run=client -o yaml \
+        | secret-seal-stdin "${DEST_DIR}/${component}/secret-rabbitmq-password.yaml"
 
-[ ! -f "${DEST_DIR}/secret-keystone-admin.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic keystone-admin \
-    --type Opaque \
-    --from-literal=password="${KEYSTONE_ADMIN_PASSWORD}" \
-    --dry-run=client -o yaml \
-    | secret-seal-stdin "${DEST_DIR}/secret-keystone-admin.yaml"
+    [ ! -f "${DEST_DIR}/${component}/secret-db-password.yaml" ] && \
+        kubectl --namespace openstack \
+        create secret generic "${component}-db-password" \
+        --type Opaque \
+        --from-literal=username="${component}" \
+        --from-literal=password="${!VARNAME_DB_PASSWORD}" \
+        --dry-run=client -o yaml \
+        | secret-seal-stdin "${DEST_DIR}/${component}/secret-db-password.yaml"
 
-# ironic credentials
-[ ! -f "${DEST_DIR}/secret-ironic-rabbitmq-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic ironic-rabbitmq-password \
-    --type Opaque \
-    --from-literal=username="ironic" \
-    --from-literal=password="${IRONIC_RABBITMQ_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-ironic-rabbitmq-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-ironic-db-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic ironic-db-password \
-    --type Opaque \
-    --from-literal=password="${IRONIC_DB_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-ironic-db-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-ironic-keystone-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic ironic-keystone-password \
-    --type Opaque \
-    --from-literal=username="ironic" \
-    --from-literal=password="${IRONIC_KEYSTONE_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-ironic-keystone-password.yaml"
-
-# neutron credentials
-[ ! -f "${DEST_DIR}/secret-neutron-rabbitmq-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic neutron-rabbitmq-password \
-    --type Opaque \
-    --from-literal=username="neutron" \
-    --from-literal=password="${NEUTRON_RABBITMQ_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-neutron-rabbitmq-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-neutron-db-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic neutron-db-password \
-    --type Opaque \
-    --from-literal=password="${NEUTRON_DB_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-neutron-db-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-neutron-keystone-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic neutron-keystone-password \
-    --type Opaque \
-    --from-literal=username="neutron" \
-    --from-literal=password="${NEUTRON_KEYSTONE_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-neutron-keystone-password.yaml"
-
-# nova credentials
-[ ! -f "${DEST_DIR}/secret-nova-rabbitmq-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic nova-rabbitmq-password \
-    --type Opaque \
-    --from-literal=username="nova" \
-    --from-literal=password="${NOVA_RABBITMQ_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-rabbitmq-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-nova-db-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic nova-db-password \
-    --type Opaque \
-    --from-literal=password="${NOVA_DB_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-db-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-nova-keystone-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic nova-keystone-password \
-    --type Opaque \
-    --from-literal=username="nova" \
-    --from-literal=password="${NOVA_KEYSTONE_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-nova-keystone-password.yaml"
-
-# placement credentials
-[ ! -f "${DEST_DIR}/secret-placement-keystone-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic placement-keystone-password \
-    --type Opaque \
-    --from-literal=username="placement" \
-    --from-literal=password="${PLACEMENT_KEYSTONE_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-placement-keystone-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-placement-db-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic placement-db-password \
-    --type Opaque \
-    --from-literal=password="${PLACEMENT_DB_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-placement-db-password.yaml"
+    [ ! -f "${DEST_DIR}/${component}/secret-keystone-password.yaml" ] && \
+        kubectl --namespace openstack \
+        create secret generic "${component}-${keystone_user}-password" \
+        --type Opaque \
+        --from-literal=username="${keystone_user}" \
+        --from-literal=password="${!VARNAME_KEYSTONE_PASSWORD}" \
+        --dry-run=client -o yaml \
+        | secret-seal-stdin "${DEST_DIR}/openstack/secret-keystone-password.yaml"
+done
 
 # horizon credentials
-[ ! -f "${DEST_DIR}/secret-horizon-db-password.yaml" ] && \
+mkdir -p "${DEST_DIR}/horizon"
+# horizon user password for database
+export HORIZON_DB_PASSWORD="$(./scripts/pwgen.sh)"
+[ ! -f "${DEST_DIR}/horizon/secret-db-password.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic horizon-db-password \
     --type Opaque \
+    --from-literal=username="horizon" \
     --from-literal=password="${HORIZON_DB_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-horizon-db-password.yaml"
-
-# glance credentials
-[ ! -f "${DEST_DIR}/secret-glance-rabbitmq-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic glance-rabbitmq-password \
-    --type Opaque \
-    --from-literal=username="glance" \
-    --from-literal=password="${GLANCE_RABBITMQ_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-glance-rabbitmq-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-glance-db-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic glance-db-password \
-    --type Opaque \
-    --from-literal=password="${GLANCE_DB_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-glance-db-password.yaml"
-
-[ ! -f "${DEST_DIR}/secret-glance-keystone-password.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic glance-keystone-password \
-    --type Opaque \
-    --from-literal=username="glance" \
-    --from-literal=password="${GLANCE_KEYSTONE_PASSWORD}" \
-    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-glance-keystone-password.yaml"
+    --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/horizon/secret-db-password.yaml"
 
 if [ "x${DO_TMPL_VALUES}" = "xy" ]; then
     [ ! -f "${DEST_DIR}/secret-openstack.yaml" ] && \
