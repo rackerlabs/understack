@@ -96,7 +96,7 @@ nav:
       - component-argo-workflows.md
   - 'Deployment Guide':
     - deploy-guide/index.md
-    - deploy-guide/gitops-install.md
+    - Quick Start: deploy-guide/gitops-install.md
     - deploy-guide/install-understack-ubuntu-k3s.md
     - deploy-guide/auth.md
   - 'User Guide':
