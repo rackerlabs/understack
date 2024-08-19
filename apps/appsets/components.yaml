@@ -78,10 +78,7 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: secrets
-                      path: 'secrets/{{.name}}'
-                      directory:
-                        include: 'secret-nautobot-*.yaml'
-                        exclude: 'secret-nautobot-sso-dex.yaml'
+                      path: 'secrets/{{.name}}/nautobot'
                     - repoURL: https://nautobot.github.io/helm-charts/
                       chart: nautobot
                       targetRevision: 2.1.3

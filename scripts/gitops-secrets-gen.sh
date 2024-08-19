@@ -103,15 +103,50 @@ kubectl --namespace openstack \
     --from-literal=password="$(./scripts/pwgen.sh)" \
     | secret-seal-stdin "${DEST_DIR}/openstack/secret-mariadb.yaml"
 
-NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh)"
-if [ ! -f "${DEST_DIR}/secret-nautobot-django.yaml" ]; then
+# Nautobot secrets
+mkdir -p "${DEST_DIR}/nautobot/"
+if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-django.yaml" ]; then
     kubectl --namespace nautobot \
         create secret generic nautobot-django \
         --dry-run=client \
         -o yaml \
         --type Opaque \
-        --from-literal="NAUTOBOT_SECRET_KEY=${NAUTOBOT_SECRET_KEY}" \
-        | secret-seal-stdin "${DEST_DIR}/secret-nautobot-django.yaml"
+        --from-literal=NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh 2>/dev/null)" \
+        | secret-seal-stdin "${DEST_DIR}/nautobot/secret-nautobot-django.yaml"
+fi
+
+if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-custom-env.yaml" ]; then
+    echo "Creating nautobot-custom-env secret placeholder"
+    kubectl --namespace nautobot \
+        create secret generic nautobot-custom-env \
+        --dry-run=client \
+        -o yaml \
+        --type Opaque > "${DEST_DIR}/nautobot/secret-nautobot-custom-env.yaml"
+fi
+
+if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-superuser.yaml" ]; then
+    # username value comes from the helm chart nautobot.superUser.username
+    # email value comes from the helm chart nautobot.superUser.email
+    kubectl --namespace nautobot \
+        create secret generic nautobot-superuser \
+        --dry-run=client \
+        -o yaml \
+        --type Opaque \
+        --from-literal=username=admin \
+        --from-literal=email="admin@example.com" \
+        --from-literal=password="$(./scripts/pwgen.sh 2>/dev/null)" \
+        --from-literal=apitoken="$(./scripts/pwgen.sh 2>/dev/null)" \
+        | secret-seal-stdin "${DEST_DIR}/nautobot/secret-nautobot-superuser.yaml"
+fi
+
+if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-redis.yaml" ]; then
+    kubectl --namespace nautobot \
+        create secret generic nautobot-redis \
+        --dry-run=client \
+        -o yaml \
+        --type Opaque \
+        --from-literal=NAUTOBOT_REDIS_PASSWORD="$(./scripts/pwgen.sh 2>/dev/null)" \
+        | secret-seal-stdin "${DEST_DIR}/nautobot/secret-nautobot-redis.yaml"
 fi
 
 ## Dex based SSO Auth. Client Configurations
@@ -349,15 +384,5 @@ pushd "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
 rm -rf kustomization.yaml
 kustomize create --autodetect
 popd
-
-# Placeholders don't need sealing
-if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-custom-env.yaml" ]; then
-    echo "Creating nautobot-custom-env secret placeholder"
-    kubectl --namespace nautobot \
-        create secret generic nautobot-custom-env \
-        --dry-run=client \
-        -o yaml \
-        --type Opaque > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/secret-nautobot-custom-env.yaml"
-fi
 
 exit 0
