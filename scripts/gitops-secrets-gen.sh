@@ -325,6 +325,9 @@ for ns in argo-events openstack; do
       --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-argo-rabbitmq-password-$ns.yaml"
 done
 
+# create placeholder directory for metallb configs
+mkdir -p "${DEST_DIR}/metallb"
+
 mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
 echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
 cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-${DEPLOY_NAME}-cluster.yaml"
