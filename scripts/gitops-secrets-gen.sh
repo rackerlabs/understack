@@ -161,7 +161,27 @@ for client in nautobot argo argocd; do
     fi
 done
 
-mkdir -p "${DEST_DIR}/cluster/"
+if [ ! -f "${DEST_DIR}/cert-manager/cluster-issuer.yaml" ]; then
+    echo "Creating cert-manager ClusterIssuer"
+    cat <<- EOF > "${DEST_DIR}/cert-manager/cluster-issuer.yaml"
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ${DEPLOY_NAME}-cluster-issuer
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  acme:
+    email: ${UC_DEPLOY_EMAIL}
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: nginx
+EOF
+fi
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 MEMCACHE_SECRET_KEY=$(cat "${DEST_DIR}/secret-openstack.yaml" 2>/dev/null | yq '.endpoints.oslo_cache.auth.memcache_secret_key')
@@ -344,25 +364,6 @@ data:
 EOF
 fi
 
-echo "Creating Cert Manager Cluster Issuer"
-[ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster-issuer.yaml" ] && \
-    mv -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster-issuer.yaml" "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/"
-cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/cluster-issuer.yaml"
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: ${DEPLOY_NAME}-cluster-issuer
-spec:
-  acme:
-    email: ${UC_DEPLOY_EMAIL}
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    server: https://acme-v02.api.letsencrypt.org/directory
-    solvers:
-    - http01:
-        ingress:
-          ingressClassName: nginx
-EOF
 
 for component in $(find "${DEST_DIR}" -maxdepth 1 -mindepth 1 -type d); do
     if [ ! -f "${component}/kustomization.yaml" ]; then

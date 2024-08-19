@@ -18,14 +18,18 @@ spec:
               elements:
                 - component: cert-manager
                   skipComponent: '{{has "cert-manager" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
-                  source:
-                    repoURL: https://charts.jetstack.io
-                    chart: cert-manager
-                    targetRevision: '1.15.2'
-                    helm:
-                      releaseName: cert-manager
-                      valuesObject:
-                        installCRDs: true
+                  sources:
+                    - repoURL: https://charts.jetstack.io
+                      chart: cert-manager
+                      targetRevision: '1.15.2'
+                      helm:
+                        releaseName: cert-manager
+                        valuesObject:
+                          crds:
+                            enabled: true
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: 'secrets/{{.name}}/cert-manager'
                 - component: metallb
                   skipComponent: '{{has "metallb" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   source:
