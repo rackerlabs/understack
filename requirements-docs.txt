@@ -1,2 +1,7 @@
 mkdocs
 mkdocs-material
+mkdocs-swagger-ui-tag
+mkdocs-glightbox
+markdown-exec
+mkdocs-multirepo-plugin>=0.8.3
+mkdocs-include-dir-to-nav

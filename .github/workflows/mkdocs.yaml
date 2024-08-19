@@ -38,6 +38,8 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-docs.txt
       - run: pip install -r requirements-docs.txt
+      - run: rm -rf docs/workflows && mkdir docs/workflows
+      - run: python scripts/argo-workflows-to-mkdocs.py argo-workflows docs/workflows
       - run: mkdocs build --strict
       - uses: actions/upload-pages-artifact@v2
         with:

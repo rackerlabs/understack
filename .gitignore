@@ -18,3 +18,7 @@ venv/
 /python/*/dist/
 __pycache__
 .coverage
+
+# auto-generated argo-workflows docs
+# see .github/workflows/mkdocs.yaaml
+docs/workflows/
