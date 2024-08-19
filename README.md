@@ -31,5 +31,6 @@ project directory. If you don't have `nix-shell` on your machine, it can be
 
 ### Install
 
-Follow the [GitOps Install Guide](https://rackerlabs.github.io/understack/gitops-install/)
+Follow the [GitOps Install
+Guide](https://rackerlabs.github.io/understack/deploy-guide/gitops-install/)
 which walks through creating a configuration and bootstrapping UnderStack.
