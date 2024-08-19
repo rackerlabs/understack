@@ -65,10 +65,13 @@ spec:
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       path: 'secrets/{{.name}}/openstack'
                 - component: undersync
-                  source: &uc_component
-                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                    path: 'components/undersync'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/undersync'
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: 'secrets/{{.name}}/undersync'
                 - component: nautobot
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
@@ -100,8 +103,9 @@ spec:
                             # path: $understack/components/nautobot/nautobot_config.py
                             path: 'https://raw.githubusercontent.com/rackerlabs/understack/{{index .metadata.annotations "uc_repo_ref" }}/components/nautobot/nautobot_config.py'
                 - component: argo
-                  source:
-                    <<: *uc_component
+                  source: &uc_component
+                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                     path: 'components/argo'
                     kustomize:
                       patches:

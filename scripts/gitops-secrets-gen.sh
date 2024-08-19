@@ -328,6 +328,9 @@ done
 # create placeholder directory for metallb configs
 mkdir -p "${DEST_DIR}/metallb"
 
+# create a placeholder directory for undersync configs
+mkdir -p "${DEST_DIR}/undersync"
+
 mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
 echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
 cat << EOF > "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster/secret-${DEPLOY_NAME}-cluster.yaml"
