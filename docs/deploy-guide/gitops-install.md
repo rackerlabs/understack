@@ -58,19 +58,8 @@ UC_DEPLOY_EMAIL="my@email"
 
 #### Paths
 
-The `UC_REPO` and `UC_DEPLOY` variables are local paths on your machine to where
-these two repos have been cloned.
-
-Optional variables of `UC_REPO_REF` and `UC_DEPLOY_REF` can be defined which
-can be set to any valid git reference in their respective repos (e.g. branch or tag or commit).
-A working default for these values, appended to your `my-k3s.env` file can be:
-
-```bash
-UC_REPO_REF=$(cd ${UC_REPO} && git rev-parse --abbrev-ref HEAD)
-UC_DEPLOY_REF=$(cd ${UC_DEPLOY} && git rev-parse --abbrev-ref HEAD)
-```
-
-This would set the value to your current branch each time.
+The `UC_DEPLOY` variable is a local path on your machine to where
+your deploy repo has been cloned.
 
 #### Deployment Name
 

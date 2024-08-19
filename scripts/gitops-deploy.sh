@@ -9,7 +9,7 @@ usage() {
 
 template() {
     local subvars
-    subvars="\$DNS_ZONE \$UC_DEPLOY_GIT_URL \$UC_REPO_REF \$UC_DEPLOY_REF \$DEPLOY_NAME"
+    subvars="\$DNS_ZONE \$UC_DEPLOY_GIT_URL \$DEPLOY_NAME"
     cat "$1" | envsubst "${subvars}" > "$2"
 }
 
@@ -26,7 +26,6 @@ fi
 
 # set temp path so we can reset it after import
 UC_REPO_PATH="$(cd "${SCRIPTS_DIR}" && git rev-parse --show-toplevel)"
-export UC_REPO="${UC_REPO_PATH}"
 
 . "$1"
 
@@ -56,8 +55,6 @@ UC_DEPLOY_HELM_CFG="${UC_DEPLOY}/helm-configs/${DEPLOY_NAME}"
 export DNS_ZONE
 export UC_DEPLOY_GIT_URL
 export DEPLOY_NAME
-export UC_REPO_REF="${UC_REPO_REF:-HEAD}"
-export UC_DEPLOY_REF="${UC_DEPLOY_REF:-HEAD}"
 
 # create helm-configs directory for values.yaml overrides
 mkdir -p "${UC_DEPLOY_HELM_CFG}"

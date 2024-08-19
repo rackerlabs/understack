@@ -38,14 +38,7 @@ if [ ! -f "$1" ]; then
     usage
 fi
 
-# set temp path so we can reset it after import
-UC_REPO_PATH="$(cd "${SCRIPTS_DIR}" && git rev-parse --show-toplevel)"
-export UC_REPO="${UC_REPO_PATH}"
-
 . "$1"
-
-# set the value again after import
-export UC_REPO="${UC_REPO_PATH}"
 
 if [ ! -d "${UC_DEPLOY}" ]; then
     echo "UC_DEPLOY not set to a path." >&2
