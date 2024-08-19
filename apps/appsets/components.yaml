@@ -59,13 +59,17 @@ spec:
                           - $secrets/helm-configs/{{.name}}/dex.yaml
                         ignoreMissingValueFiles: true
                 - component: openstack
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/openstack'
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: 'secrets/{{.name}}/openstack'
+                - component: undersync
                   source: &uc_component
                     repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                     targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                    path: 'components/openstack'
-                - component: undersync
-                  source:
-                    <<: *uc_component
                     path: 'components/undersync'
                 - component: nautobot
                   sources:

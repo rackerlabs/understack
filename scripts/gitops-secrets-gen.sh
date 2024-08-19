@@ -92,7 +92,9 @@ export DO_TMPL_VALUES=y
 mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 DEST_DIR="${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 
-[ ! -f "${DEST_DIR}/secret-mariadb.yaml" ] && \
+# OpenStack's mariadb secrets
+mkdir -p "${DEST_DIR}/openstack/"
+[ ! -f "${DEST_DIR}/openstack/secret-mariadb.yaml" ] && \
 kubectl --namespace openstack \
     create secret generic mariadb \
     --dry-run=client \
@@ -100,7 +102,7 @@ kubectl --namespace openstack \
     --type Opaque \
     --from-literal=root-password="$(./scripts/pwgen.sh)" \
     --from-literal=password="$(./scripts/pwgen.sh)" \
-    | secret-seal-stdin "${DEST_DIR}/secret-mariadb.yaml"
+    | secret-seal-stdin "${DEST_DIR}/openstack/secret-mariadb.yaml"
 
 NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh)"
 if [ ! -f "${DEST_DIR}/secret-nautobot-django.yaml" ]; then
@@ -413,6 +415,15 @@ spec:
         ingress:
           ingressClassName: nginx
 EOF
+
+for component in $(find "${DEST_DIR}" -maxdepth 1 -mindepth 1 -type d); do
+    if [ ! -f "${component}/kustomization.yaml" ]; then
+        pushd "${component}" > /dev/null
+        kustomize create --autodetect
+        echo "Creating ${component}/kustomization.yaml, don't forget to commit it"
+        popd > /dev/null
+    fi
+done
 
 pushd "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/cluster"
 rm -rf kustomization.yaml
