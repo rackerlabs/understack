@@ -38,6 +38,7 @@ optional = true
 pytest = "^7"
 pytest-github-actions-annotate-failures = "*"
 pytest-cov = "^5.0.0"
+pytest-mock = "^3.14.0"
 
 [tool.poetry.scripts]
 synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
