@@ -18,7 +18,7 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG):
     """
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=logging.DEBUG,
+        level=level,
     )
     return logging.getLogger(name)
 
