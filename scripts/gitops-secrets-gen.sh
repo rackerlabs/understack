@@ -235,7 +235,7 @@ kubectl --namespace openstack \
     | secret-seal-stdin "${DEST_DIR}/openstack/secret-mariadb.yaml"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
-MEMCACHE_SECRET_KEY=$(cat "${DEST_DIR}/secret-openstack.yaml" 2>/dev/null | yq '.endpoints.oslo_cache.auth.memcache_secret_key')
+MEMCACHE_SECRET_KEY=$(yq '.endpoints.oslo_cache.auth.memcache_secret_key' < "${DEST_DIR}/secret-openstack.yaml")
 if [[ $? -ne 0 || "x${MEMCACHE_SECRET_KEY}" = "xnull" ]]; then
     MEMCACHE_SECRET_KEY="$(./scripts/pwgen.sh 64 2>/dev/null)"
 fi
