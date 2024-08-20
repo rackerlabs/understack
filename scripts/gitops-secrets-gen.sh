@@ -50,9 +50,7 @@ if [ "x${DEPLOY_NAME}" = "x" ]; then
     usage
 fi
 
-if [ -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" ]; then
-    NO_SECRET_DEPLOY=1
-else
+if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" ]; then
     if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
         echo "UC_DEPLOY_GIT_URL is not set." >&2
         usage
@@ -82,18 +80,81 @@ export DEPLOY_NAME
 mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 DEST_DIR="${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 
-# OpenStack's mariadb secrets
-mkdir -p "${DEST_DIR}/openstack/"
-[ ! -f "${DEST_DIR}/openstack/secret-mariadb.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic mariadb \
-    --dry-run=client \
-    -o yaml \
-    --type Opaque \
-    --from-literal=root-password="$(./scripts/pwgen.sh)" \
-    --from-literal=password="$(./scripts/pwgen.sh)" \
-    | secret-seal-stdin "${DEST_DIR}/openstack/secret-mariadb.yaml"
+###
+### start of secrets for each component
+###
 
+# create ArgoCD configs
+mkdir -p "${DEST_DIR}/argocd"
+echo "Checking argocd"
+if [ ! -f "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml" ]; then
+    echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
+    cat <<- EOF > "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml"
+apiVersion: v1
+kind: Secret
+data:
+  config: $(printf '{"tlsClientConfig":{"insecure":false}}' | base64)
+  name: $(printf "$DEPLOY_NAME" | base64)
+  server: $(printf "https://kubernetes.default.svc" | base64)
+metadata:
+  name: ${DEPLOY_NAME}-cluster
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+  annotations:
+    uc_repo_git_url: "https://github.com/rackerlabs/understack.git"
+    uc_repo_ref: "HEAD"
+    uc_deploy_git_url: "$UC_DEPLOY_GIT_URL"
+    uc_deploy_ref: "HEAD"
+    dns_zone: "$DNS_ZONE"
+EOF
+fi
+
+if [ ! -f "${DEST_DIR}/argocd/secret-deploy-repo.yaml" ]; then
+    echo "Creating ArgoCD repo-creds"
+    cat << EOF | secret-seal-stdin "${DEST_DIR}/argocd/secret-deploy-repo.yaml"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${DEPLOY_NAME}-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repo-creds
+data:
+  sshPrivateKey: $(cat "${UC_DEPLOY_SSH_FILE}" | base64 | tr -d '\n')
+  type: $(printf "git" | base64)
+  url: $(printf "${UC_DEPLOY_GIT_URL}" | base64)
+EOF
+fi
+
+echo "Checking cert-manager"
+if [ ! -f "${DEST_DIR}/cert-manager/cluster-issuer.yaml" ]; then
+    echo "Creating cert-manager ClusterIssuer"
+    cat <<- EOF > "${DEST_DIR}/cert-manager/cluster-issuer.yaml"
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ${DEPLOY_NAME}-cluster-issuer
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  acme:
+    email: ${UC_DEPLOY_EMAIL}
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: nginx
+EOF
+fi
+
+echo "Checking metallb"
+# create placeholder directory for metallb configs
+mkdir -p "${DEST_DIR}/metallb"
+
+echo "Checking nautobot"
 # Nautobot secrets
 mkdir -p "${DEST_DIR}/nautobot/"
 if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-django.yaml" ]; then
@@ -140,6 +201,7 @@ if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-redis.yaml" ]; then
         | secret-seal-stdin "${DEST_DIR}/nautobot/secret-nautobot-redis.yaml"
 fi
 
+echo "Checking dex"
 ## Dex based SSO Auth. Client Configurations
 mkdir -p "${DEST_DIR}/dex/"
 # clients generated are in the list below
@@ -159,27 +221,18 @@ for client in nautobot argo argocd; do
     fi
 done
 
-if [ ! -f "${DEST_DIR}/cert-manager/cluster-issuer.yaml" ]; then
-    echo "Creating cert-manager ClusterIssuer"
-    cat <<- EOF > "${DEST_DIR}/cert-manager/cluster-issuer.yaml"
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: ${DEPLOY_NAME}-cluster-issuer
-  annotations:
-    argocd.argoproj.io/sync-wave: "5"
-spec:
-  acme:
-    email: ${UC_DEPLOY_EMAIL}
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    server: https://acme-v02.api.letsencrypt.org/directory
-    solvers:
-    - http01:
-        ingress:
-          ingressClassName: nginx
-EOF
-fi
+echo "Checking openstack"
+# OpenStack's mariadb secrets
+mkdir -p "${DEST_DIR}/openstack/"
+[ ! -f "${DEST_DIR}/openstack/secret-mariadb.yaml" ] && \
+kubectl --namespace openstack \
+    create secret generic mariadb \
+    --dry-run=client \
+    -o yaml \
+    --type Opaque \
+    --from-literal=root-password="$(./scripts/pwgen.sh)" \
+    --from-literal=password="$(./scripts/pwgen.sh)" \
+    | secret-seal-stdin "${DEST_DIR}/openstack/secret-mariadb.yaml"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 MEMCACHE_SECRET_KEY=$(cat "${DEST_DIR}/secret-openstack.yaml" 2>/dev/null | yq '.endpoints.oslo_cache.auth.memcache_secret_key')
@@ -205,6 +258,7 @@ convert_to_secret_name() {
 ## each openstack component is very similar to collapse this
 ## into a loop to generate the same thing for each
 for component in keystone ironic placement neutron nova glance; do
+    echo "Checking ${component}"
     mkdir -p "${DEST_DIR}/${component}/"
     # keystone service account username
     [ "x${component}" = "xkeystone" ] && keystone_user="admin" || keystone_user="${component}"
@@ -284,6 +338,7 @@ for component in keystone ironic placement neutron nova glance; do
     fi
 done
 
+echo "Checking horizon"
 # horizon credentials
 mkdir -p "${DEST_DIR}/horizon"
 # horizon user password for database
@@ -312,6 +367,7 @@ yq '(.. | select(tag == "!!str")) |= envsubst' \
     "./components/openstack-secrets.tpl.yaml" \
     > "${DEST_DIR}/secret-openstack.yaml"
 
+echo "Checking argo-events"
 # Argo Events access to RabbitMQ - credentials
 for ns in argo-events openstack; do
   [ ! -f "${DEST_DIR}/secret-argo-rabbitmq-password-$ns.yaml" ] && \
@@ -323,51 +379,9 @@ for ns in argo-events openstack; do
       --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-argo-rabbitmq-password-$ns.yaml"
 done
 
-# create placeholder directory for metallb configs
-mkdir -p "${DEST_DIR}/metallb"
-
+echo "Checking undersync"
 # create a placeholder directory for undersync configs
 mkdir -p "${DEST_DIR}/undersync"
-
-# create ArgoCD configs
-mkdir -p "${DEST_DIR}/argocd"
-echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
-cat << EOF > "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml"
-apiVersion: v1
-kind: Secret
-data:
-  config: $(printf '{"tlsClientConfig":{"insecure":false}}' | base64)
-  name: $(printf "$DEPLOY_NAME" | base64)
-  server: $(printf "https://kubernetes.default.svc" | base64)
-metadata:
-  name: ${DEPLOY_NAME}-cluster
-  namespace: argocd
-  labels:
-    argocd.argoproj.io/secret-type: cluster
-  annotations:
-    uc_repo_git_url: "https://github.com/rackerlabs/understack.git"
-    uc_repo_ref: "HEAD"
-    uc_deploy_git_url: "$UC_DEPLOY_GIT_URL"
-    uc_deploy_ref: "HEAD"
-    dns_zone: "$DNS_ZONE"
-EOF
-
-if [ "x${NO_SECRET_DEPLOY}" = "x" ]; then
-    echo "Creating ArgoCD repo-creds"
-    cat << EOF | secret-seal-stdin "${DEST_DIR}/argocd/secret-deploy-repo.yaml"
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ${DEPLOY_NAME}-repo
-  namespace: argocd
-  labels:
-    argocd.argoproj.io/secret-type: repo-creds
-data:
-  sshPrivateKey: $(cat "${UC_DEPLOY_SSH_FILE}" | base64 | tr -d '\n')
-  type: $(printf "git" | base64)
-  url: $(printf "${UC_DEPLOY_GIT_URL}" | base64)
-EOF
-fi
 
 for component in $(find "${DEST_DIR}" -maxdepth 1 -mindepth 1 -type d); do
     if [ ! -f "${component}/kustomization.yaml" ]; then
