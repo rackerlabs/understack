@@ -38,11 +38,13 @@ optional = true
 pytest = "^7"
 pytest-github-actions-annotate-failures = "*"
 pytest-cov = "^5.0.0"
+pytest-mock = "^3.14.0"
 
 [tool.poetry.scripts]
 synchronize-interfaces = "understack_workflows.main.synchronize_interfaces:main"
 synchronize-obm-creds = "understack_workflows.main.synchronize_obm_creds:main"
 synchronize-server = "understack_workflows.main.synchronize_server:main"
+synchronize-provision-state = "understack_workflows.main.synchronize_provision_state:main"
 sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
 undersync-device = "understack_workflows.main.undersync_device:main"
@@ -57,6 +59,10 @@ minversion = "6.0"
 addopts = "-ra --cov=understack_workflows"
 testpaths = [
     "tests",
+]
+filterwarnings = [
+  # sushy
+  "ignore:pkg_resources is deprecated as an API.:DeprecationWarning"
 ]
 
 [tool.ruff]

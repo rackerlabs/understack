@@ -12,13 +12,11 @@ spec:
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - nautobot-update-cf
+          - synchronize-provision-state
         args:
           - --device-id
           - "{{workflow.parameters.device_uuid}}"
-          - --field-name
-          - "ironic_provisioning_status"
-          - --field-value
+          - --provision-state
           - "{{workflow.parameters.provision_state}}"
         volumeMounts:
           - mountPath: /etc/nb-token/
