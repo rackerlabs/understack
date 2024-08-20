@@ -103,3 +103,4 @@ nav:
     - user-guide/index.md
     - user-guide/openstack-cli.md
     - user-guide/openstack-image.md
+    - user-guide/rabbitmq-cheat-sheet.md
