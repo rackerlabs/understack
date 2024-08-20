@@ -44,7 +44,7 @@ spec:
       hostNetwork: true
       containers:
         - name: dnsmasq
-          image: ghcr.io/rackerlabs/openstackhelm/dnsmasq:latest
+          image: ghcr.io/rackerlabs/understack/dnsmasq:latest
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
