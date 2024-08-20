@@ -259,12 +259,16 @@ load_or_gen_os_secret() {
     local secret_var=$2
 
     if kubectl -n openstack get secret "${secret_var}" > /dev/null; then
-        declare "${data_var}"="$(kubectl -n openstack get secret "${secret_var}" -o jsonpath='{.data.password}' | base64 -d)"
+        local data="$(kubectl -n openstack get secret "${secret_var}" -o jsonpath='{.data.password}' | base64 -d)"
+        # good ol' bash 3 compat for macOS
+        eval "${data_var}=\"${data}\""
         # return 1 because we have an existing secret
         return 1
     else
         echo "Generating ${secret_var}"
-        declare "${data_var}"="$(./scripts/pwgen.sh 2>/dev/null)"
+        local data="$(./scripts/pwgen.sh 2>/dev/null)"
+        # good ol' bash 3 compat for macOS
+        eval "${data_var}=\"${data}\""
         # return 0 because we need to write this out
         return 0
     fi
