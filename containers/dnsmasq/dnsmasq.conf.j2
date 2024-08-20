@@ -90,7 +90,9 @@ dhcp-authoritative
 {% if dhcp_proxy_list | length > 0 %}
 dhcp-proxy={{ dhcp_proxy_list|join(',') }}
 {% endif %}
+{% if dhcp_allowed_srvids_list | length > 0 %}
 dhcp-allowed-srvids={{ dhcp_allowed_srvids_list|join(',') }}
+{% endif %}
 enable-tftp
 tftp-no-fail
 tftp-root={{ env['TFTP_DIR'] | default('/var/lib/understack/master_iso_images') }}
