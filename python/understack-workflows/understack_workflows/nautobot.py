@@ -120,6 +120,15 @@ class Nautobot:
         self.logger.info(f"save result: {response}")
         return response
 
+    def update_device_status(self, device_id: UUID, device_status: str):
+        device = self.device_by_id(device_id)
+        device.status = device_status
+        result = device.save()
+        self.logger.info(
+            f"device {device_id} updated to Status {device_status} {result=}"
+        )
+        return result
+
     def uplink_switches(self, device_id: UUID) -> list[str]:
         interfaces = self.device_interfaces(device_id)
         ids = set()
