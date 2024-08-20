@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# get the failure from the command that failed in a pipe
+set -o pipefail
+
 function usage() {
     echo "$(basename "$0") <deploy.env>" >&2
     echo "" >&2
@@ -12,7 +15,7 @@ if ! type -p kubeseal kubectl > /dev/null; then
     exit 1
 fi
 
-if ! $(kubectl api-resources | grep -q sealedsecrets); then
+if ! kubectl api-resources | grep -q sealedsecrets; then
     echo "Your cluster doesn't appear to have the sealed secrets operator installed." >&2
     exit 1
 fi
@@ -247,8 +250,6 @@ if [[ $? -ne 0 || "x${MEMCACHE_SECRET_KEY}" = "xnull" ]]; then
 fi
 export MEMCACHE_SECRET_KEY
 
-# for the secret loading below
-set -o pipefail
 # for the tr commands below
 export LC_ALL=C
 
