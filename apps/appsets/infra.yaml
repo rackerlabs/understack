@@ -18,20 +18,27 @@ spec:
               elements:
                 - component: cert-manager
                   skipComponent: '{{has "cert-manager" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
-                  source:
-                    repoURL: https://charts.jetstack.io
-                    chart: cert-manager
-                    targetRevision: '1.15.2'
-                    helm:
-                      releaseName: cert-manager
-                      valuesObject:
-                        installCRDs: true
-                - component: metallb
+                  sources:
+                    - repoURL: https://charts.jetstack.io
+                      chart: cert-manager
+                      targetRevision: '1.15.2'
+                      helm:
+                        releaseName: cert-manager
+                        valuesObject:
+                          crds:
+                            enabled: true
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: 'secrets/{{.name}}/cert-manager'
+                - component: metallb-system
                   skipComponent: '{{has "metallb" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
-                  source:
-                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                    path: 'bootstrap/metallb'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'bootstrap/metallb'
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: 'secrets/{{.name}}/metallb'
                   ignoreDifferences:
                     - group: "apiextensions.k8s.io"
                       kind: CustomResourceDefinition

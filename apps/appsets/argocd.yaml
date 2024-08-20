@@ -18,33 +18,42 @@ spec:
       name: '{{.name}}-argocd'
     spec:
       project: default
-      source:
-        repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-        path: bootstrap/argocd/
-        targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-        kustomize:
-          components:
-            - components/sso
-          patches:
-            - target:
-                kind: ConfigMap
-                name: argocd-cm
-              patch: |-
-                - op: replace
-                  path: /data/url
-                  value: https://argocd.{{index .metadata.annotations "dns_zone"}}
-            - target:
-                kind: Ingress
-              patch: |-
-                - op: replace
-                  path: /spec/rules/0/host
-                  value: argocd.{{index .metadata.annotations "dns_zone"}}
-                - op: replace
-                  path: /spec/tls/0/hosts/0
-                  value: argocd.{{index .metadata.annotations "dns_zone"}}
-                - op: replace
-                  path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
-                  value: {{.name}}-cluster-issuer
+      sources:
+        - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+          targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+          path: bootstrap/argocd/
+          kustomize:
+            components:
+              - components/sso
+            patches:
+              - target:
+                  kind: ConfigMap
+                  name: argocd-cm
+                patch: |-
+                  - op: replace
+                    path: /data/url
+                    value: https://argocd.{{index .metadata.annotations "dns_zone"}}
+              - target:
+                  kind: Ingress
+                patch: |-
+                  - op: replace
+                    path: /spec/rules/0/host
+                    value: argocd.{{index .metadata.annotations "dns_zone"}}
+                  - op: replace
+                    path: /spec/tls/0/hosts/0
+                    value: argocd.{{index .metadata.annotations "dns_zone"}}
+                  - op: replace
+                    path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
+                    value: {{.name}}-cluster-issuer
+        - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+          targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+          path: 'secrets/{{.name}}/argocd'
+      ignoreDifferences:
+        - kind: Secret
+          namespace: argocd
+          jqPathExpressions:
+            - .metadata.annotations.uc_repo_ref
+            - .metadata.annotations.uc_deploy_ref
       destination:
         server: '{{.server}}'
         namespace: argocd
@@ -54,6 +63,7 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+          - RespectIgnoreDifferences=true
         managedNamespaceMetadata:
           annotations:
             argocd.argoproj.io/sync-options: Delete=false

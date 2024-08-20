@@ -13,9 +13,12 @@ nautobot:
   django:
     existingSecret: nautobot-django
 
-  # since we use dex, we don't want this
+  # used by Argo Workflows to update data
   superUser:
-    enabled: false
+    enabled: true
+    existingSecret: nautobot-superuser
+    existingSecretPasswordKey: password
+    existingSecretApiTokenKey: apitoken
 
   extraVolumes:
     - name: nautobot-dexauth
@@ -51,6 +54,9 @@ postgresql:
 
 redis:
   enabled: true
+  auth:
+    existingSecret: nautobot-redis
+    existingSecretPasswordKey: NAUTOBOT_REDIS_PASSWORD
 
 ingress:
   enabled: true

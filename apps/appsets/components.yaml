@@ -41,9 +41,7 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: secrets
-                      path: 'secrets/{{.name}}'
-                      directory:
-                        include: 'secret-*-sso-dex.yaml'
+                      path: 'secrets/{{.name}}/dex'
                     - repoURL: https://charts.dexidp.io
                       chart: dex
                       targetRevision: 0.16.0
@@ -59,14 +57,21 @@ spec:
                           - $secrets/helm-configs/{{.name}}/dex.yaml
                         ignoreMissingValueFiles: true
                 - component: openstack
-                  source: &uc_component
-                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                    path: 'components/openstack'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/openstack'
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: 'secrets/{{.name}}/openstack'
                 - component: undersync
-                  source:
-                    <<: *uc_component
-                    path: 'components/undersync'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/undersync'
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: 'secrets/{{.name}}/undersync'
                 - component: nautobot
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
@@ -76,10 +81,7 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: secrets
-                      path: 'secrets/{{.name}}'
-                      directory:
-                        include: 'secret-nautobot-*.yaml'
-                        exclude: 'secret-nautobot-sso-dex.yaml'
+                      path: 'secrets/{{.name}}/nautobot'
                     - repoURL: https://nautobot.github.io/helm-charts/
                       chart: nautobot
                       targetRevision: 2.1.3
@@ -101,8 +103,9 @@ spec:
                             # path: $understack/components/nautobot/nautobot_config.py
                             path: 'https://raw.githubusercontent.com/rackerlabs/understack/{{index .metadata.annotations "uc_repo_ref" }}/components/nautobot/nautobot_config.py'
                 - component: argo
-                  source:
-                    <<: *uc_component
+                  source: &uc_component
+                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                     path: 'components/argo'
                     kustomize:
                       patches:
