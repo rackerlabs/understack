@@ -16,7 +16,7 @@ spec:
         args:
           - --device-id
           - "{{workflow.parameters.device_uuid}}"
-          - --provisioning-state
+          - --provision-state
           - "{{workflow.parameters.provision_state}}"
         volumeMounts:
           - mountPath: /etc/nb-token/

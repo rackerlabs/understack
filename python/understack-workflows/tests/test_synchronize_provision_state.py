@@ -2,8 +2,8 @@ import uuid
 
 import pytest
 
-from understack_workflows.main.synchronize_provision_state_to_nautobot import argument_parser
-from understack_workflows.main.synchronize_provision_state_to_nautobot import do_action
+from understack_workflows.main.synchronize_provision_state import argument_parser
+from understack_workflows.main.synchronize_provision_state import do_action
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def test_parse_device_name():
 def test_parse_device_id(device_id):
     parser = argument_parser()
     args = parser.parse_args(
-        ["--device-id", str(device_id), "--provisioning-state", "active"]
+        ["--device-id", str(device_id), "--provision-state", "active"]
     )
 
     assert args.device_id == device_id

@@ -10,7 +10,7 @@ from understack_workflows.nautobot import Nautobot
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
-        description="Ironic to Nautobot provisioning state sync",
+        description="Update CustomField in Nautobot",
     )
     parser.add_argument(
         "--device-id", required=True, type=UUID, help="Nautobot device UUID"

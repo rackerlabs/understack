@@ -45,7 +45,7 @@ def main():
     if ironic_node.provision_state not in STATES_ALLOWING_UPDATES:
         logger.info(
             f"Device {node.uuid} is in a {ironic_node.provision_state} "
-            f"provisioning state, so the updates are not allowed."
+            f"provision_state, so the updates are not allowed."
         )
         sys.exit(0)
 
