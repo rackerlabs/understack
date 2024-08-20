@@ -60,6 +60,10 @@ addopts = "-ra --cov=understack_workflows"
 testpaths = [
     "tests",
 ]
+filterwarnings = [
+  # sushy
+  "ignore:pkg_resources is deprecated as an API.:DeprecationWarning"
+]
 
 [tool.ruff]
 target-version = "py311"
