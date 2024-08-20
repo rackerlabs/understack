@@ -27,7 +27,7 @@ function secret-seal-stdin() {
         --scope cluster-wide \
         --allow-empty-data \
         -o yaml \
-        -w $1
+        -w "$1"
 }
 
 if [ $# -ne 1 ]; then
@@ -41,6 +41,7 @@ if [ ! -f "$1" ]; then
     usage
 fi
 
+# shellcheck disable=SC1090
 . "$1"
 
 if [ ! -d "${UC_DEPLOY}" ]; then
@@ -48,12 +49,12 @@ if [ ! -d "${UC_DEPLOY}" ]; then
     usage
 fi
 
-if [ "x${DEPLOY_NAME}" = "x" ]; then
+if [ -z "${DEPLOY_NAME}" ]; then
     echo "DEPLOY_NAME is not set." >&2
     usage
 fi
 
-if [ "x${DNS_ZONE}" = "x" ]; then
+if [ -z "${DNS_ZONE}" ]; then
     echo "DNS_ZONE is not set." >&2
     usage
 fi
@@ -73,7 +74,7 @@ function gen-argocd() {
     echo "Checking argocd"
     if [ ! -f "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml" ]; then
         echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
-        if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
+        if [ -z "${UC_DEPLOY_GIT_URL}" ]; then
             echo "UC_DEPLOY_GIT_URL is not set." >&2
             usage
         fi
@@ -82,7 +83,7 @@ apiVersion: v1
 kind: Secret
 data:
   config: $(printf '{"tlsClientConfig":{"insecure":false}}' | base64)
-  name: $(printf "$DEPLOY_NAME" | base64)
+  name: $(printf '%s' "$DEPLOY_NAME" | base64)
   server: $(printf "https://kubernetes.default.svc" | base64)
 metadata:
   name: ${DEPLOY_NAME}-cluster
@@ -101,11 +102,11 @@ EOF
 
     if [ ! -f "${DEST_DIR}/argocd/secret-deploy-repo.yaml" ]; then
         echo "Creating ArgoCD repo-creds"
-        if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
+        if [ -z "${UC_DEPLOY_GIT_URL}" ]; then
             echo "UC_DEPLOY_GIT_URL is not set." >&2
             usage
         fi
-        if [ "x${UC_DEPLOY_SSH_FILE}" = "x" ]; then
+        if [ -z "${UC_DEPLOY_SSH_FILE}" ]; then
             echo "UC_DEPLOY_SSH_FILE is not set." >&2
             usage
         fi
@@ -122,14 +123,14 @@ metadata:
   labels:
     argocd.argoproj.io/secret-type: repo-creds
 data:
-  sshPrivateKey: $(cat "${UC_DEPLOY_SSH_FILE}" | base64 | tr -d '\n')
+  sshPrivateKey: $(base64 < "${UC_DEPLOY_SSH_FILE}" | tr -d '\n')
   type: $(printf "git" | base64)
-  url: $(printf "${UC_DEPLOY_GIT_URL}" | base64)
+  url: $(printf '%s' "${UC_DEPLOY_GIT_URL}" | base64)
 EOF
     fi
 }
 
-[ ! -z ${UC_AIO} ] && gen-argocd || echo "UC_AIO is NOT set so not creating ArgoCD bits"
+[ -n "${UC_AIO}" ] && gen-argocd || echo "UC_AIO is NOT set so not creating ArgoCD bits"
 
 echo "Checking cert-manager"
 if [ ! -f "${DEST_DIR}/cert-manager/cluster-issuer.yaml" ]; then
@@ -172,7 +173,7 @@ if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-django.yaml" ]; then
         --dry-run=client \
         -o yaml \
         --type Opaque \
-        --from-literal=NAUTOBOT_SECRET_KEY="$(./scripts/pwgen.sh 2>/dev/null)" \
+        --from-literal=NAUTOBOT_SECRET_KEY="$("${SCRIPTS_DIR}/pwgen.sh" 2>/dev/null)" \
         | secret-seal-stdin "${DEST_DIR}/nautobot/secret-nautobot-django.yaml"
 fi
 
@@ -195,8 +196,8 @@ if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-superuser.yaml" ]; then
         --type Opaque \
         --from-literal=username=admin \
         --from-literal=email="admin@example.com" \
-        --from-literal=password="$(./scripts/pwgen.sh 2>/dev/null)" \
-        --from-literal=apitoken="$(./scripts/pwgen.sh 2>/dev/null)" \
+        --from-literal=password="$("${SCRIPTS_DIR}/pwgen.sh" 2>/dev/null)" \
+        --from-literal=apitoken="$("${SCRIPTS_DIR}/pwgen.sh" 2>/dev/null)" \
         | secret-seal-stdin "${DEST_DIR}/nautobot/secret-nautobot-superuser.yaml"
 fi
 
@@ -206,7 +207,7 @@ if [ ! -f "${DEST_DIR}/nautobot/secret-nautobot-redis.yaml" ]; then
         --dry-run=client \
         -o yaml \
         --type Opaque \
-        --from-literal=NAUTOBOT_REDIS_PASSWORD="$(./scripts/pwgen.sh 2>/dev/null)" \
+        --from-literal=NAUTOBOT_REDIS_PASSWORD="$("${SCRIPTS_DIR}/pwgen.sh" 2>/dev/null)" \
         | secret-seal-stdin "${DEST_DIR}/nautobot/secret-nautobot-redis.yaml"
 fi
 
@@ -216,7 +217,7 @@ mkdir -p "${DEST_DIR}/dex/"
 # clients generated are in the list below
 for client in nautobot argo argocd; do
     if [ ! -f "${DEST_DIR}/dex/secret-nautobot-sso-dex.yaml" ]; then
-        SSO_SECRET=$(./scripts/pwgen.sh)
+        SSO_SECRET=$("${SCRIPTS_DIR}/pwgen.sh")
         kubectl --namespace dex \
             create secret generic "${client}-sso" \
             --dry-run=client \
@@ -239,14 +240,14 @@ kubectl --namespace openstack \
     --dry-run=client \
     -o yaml \
     --type Opaque \
-    --from-literal=root-password="$(./scripts/pwgen.sh)" \
-    --from-literal=password="$(./scripts/pwgen.sh)" \
+    --from-literal=root-password="$("${SCRIPTS_DIR}/pwgen.sh")" \
+    --from-literal=password="$("${SCRIPTS_DIR}/pwgen.sh")" \
     | secret-seal-stdin "${DEST_DIR}/openstack/secret-mariadb.yaml"
 
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 MEMCACHE_SECRET_KEY=$(yq '.endpoints.oslo_cache.auth.memcache_secret_key' < "${DEST_DIR}/secret-openstack.yaml")
-if [[ $? -ne 0 || "x${MEMCACHE_SECRET_KEY}" = "xnull" ]]; then
-    MEMCACHE_SECRET_KEY="$(./scripts/pwgen.sh 64 2>/dev/null)"
+if [[ $? -ne 0 || "${MEMCACHE_SECRET_KEY}" = "null" ]]; then
+    MEMCACHE_SECRET_KEY="$("${SCRIPTS_DIR}/pwgen.sh" 64 2>/dev/null)"
 fi
 export MEMCACHE_SECRET_KEY
 
@@ -266,14 +267,14 @@ load_or_gen_os_secret() {
     local secret_var=$2
 
     if kubectl -n openstack get secret "${secret_var}" > /dev/null; then
-        local data="$(kubectl -n openstack get secret "${secret_var}" -o jsonpath='{.data.password}' | base64 -d)"
+        data="$(kubectl -n openstack get secret "${secret_var}" -o jsonpath='{.data.password}' | base64 -d)"
         # good ol' bash 3 compat for macOS
         eval "${data_var}=\"${data}\""
         # return 1 because we have an existing secret
         return 1
     else
         echo "Generating ${secret_var}"
-        local data="$(./scripts/pwgen.sh 2>/dev/null)"
+        data="$("${SCRIPTS_DIR}/pwgen.sh" 2>/dev/null)"
         # good ol' bash 3 compat for macOS
         eval "${data_var}=\"${data}\""
         # return 0 because we need to write this out
@@ -287,7 +288,7 @@ create_os_secret() {
     local username=$3
     local secret_var="SECRET_${name}"
     local data_var="VARNAME_${name}"
-    local file_suffix=$(convert_to_secret_name "${name}")
+    file_suffix=$(convert_to_secret_name "${name}")
 
     echo "Writing ${component}/secret-${file_suffix}.yaml, please commit"
     kubectl --namespace openstack \
@@ -306,7 +307,7 @@ for component in keystone ironic placement neutron nova glance; do
     echo "Checking ${component}"
     mkdir -p "${DEST_DIR}/${component}/"
     # keystone service account username
-    [ "x${component}" = "xkeystone" ] && keystone_user="admin" || keystone_user="${component}"
+    [ "${component}" = "keystone" ] && keystone_user="admin" || keystone_user="${component}"
 
     # environment variable names
     VARNAME_RABBITMQ_PASSWORD="$(convert_to_var_name "${component}" "RABBITMQ_PASSWORD")"
@@ -368,12 +369,13 @@ echo "Checking undersync"
 # create a placeholder directory for undersync configs
 mkdir -p "${DEST_DIR}/undersync"
 
-for component in $(find "${DEST_DIR}" -maxdepth 1 -mindepth 1 -type d); do
+
+find "${DEST_DIR}" -maxdepth 1 -mindepth 1 -type d | while read -r component; do
     if [ ! -f "${component}/kustomization.yaml" ]; then
-        pushd "${component}" > /dev/null
+        pushd "${component}" > /dev/null || exit 1
         kustomize create --autodetect
         echo "Creating ${component}/kustomization.yaml, don't forget to commit it"
-        popd > /dev/null
+        popd > /dev/null || exit 1
     fi
 done
 
