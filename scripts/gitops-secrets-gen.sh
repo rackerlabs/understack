@@ -254,6 +254,40 @@ convert_to_secret_name() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | tr '_' '-'
 }
 
+load_or_gen_os_secret() {
+    local data_var=$1
+    local secret_var=$2
+
+    if kubectl -n openstack get secret "${secret_var}" > /dev/null; then
+        declare "${data_var}"="$(kubectl -n openstack get secret "${secret_var}" -o jsonpath='{.data.password}' | base64 -d)"
+        # return 1 because we have an existing secret
+        return 1
+    else
+        echo "Generating ${secret_var}"
+        declare "${data_var}"="$(./scripts/pwgen.sh 2>/dev/null)"
+        # return 0 because we need to write this out
+        return 0
+    fi
+}
+
+create_os_secret() {
+    local name=$1
+    local component=$2
+    local username=$3
+    local secret_var="SECRET_${name}"
+    local data_var="VARNAME_${name}"
+    local file_suffix=$(convert_to_secret_name "${name}")
+
+    echo "Writing ${component}/secret-${file_suffix}.yaml, please commit"
+    kubectl --namespace openstack \
+    create secret generic "${!secret_var}" \
+    --type Opaque \
+    --from-literal=username="${username}" \
+    --from-literal=password="${!data_var}" \
+    --dry-run=client -o yaml \
+    | secret-seal-stdin "${DEST_DIR}/${component}/secret-${file_suffix}.yaml"
+}
+
 ## OpenStack component secret generation
 ## each openstack component is very similar to collapse this
 ## into a loop to generate the same thing for each
@@ -275,90 +309,30 @@ for component in keystone ironic placement neutron nova glance; do
 
     # attempt to load the existing secrets from the cluster and use those
     # otherwise generate the passwords and set the variable names
-    if kubectl -n openstack get secret "${SECRET_RABBITMQ_PASSWORD}" > /dev/null; then
-        declare "${VARNAME_RABBITMQ_PASSWORD}"="$(kubectl -n openstack get secret "${SECRET_RABBITMQ_PASSWORD}" -o jsonpath='{.data.password}' | base64 -d)"
-        REPLACE_RABBITMQ_PASSWORD=no
-    else
-        echo "Generating ${SECRET_RABBITMQ_PASSWORD}"
-        declare "${VARNAME_RABBITMQ_PASSWORD}"="$(./scripts/pwgen.sh 2>/dev/null)"
-        REPLACE_RABBITMQ_PASSWORD=yes
-    fi
-    if kubectl -n openstack get secret "${SECRET_DB_PASSWORD}" > /dev/null; then
-        declare "${VARNAME_DB_PASSWORD}"="$(kubectl -n openstack get secret "${SECRET_DB_PASSWORD}" -o jsonpath='{.data.password}' | base64 -d)"
-        REPLACE_DB_PASSWORD=no
-    else
-        echo "Generating ${SECRET_DB_PASSWORD}"
-        declare "${VARNAME_DB_PASSWORD}"="$(./scripts/pwgen.sh 2>/dev/null)"
-        REPLACE_DB_PASSWORD=yes
-    fi
-    if kubectl -n openstack get secret "${SECRET_KEYSTONE_PASSWORD}" > /dev/null; then
-        declare "${VARNAME_KEYSTONE_PASSWORD}"="$(kubectl -n openstack get secret "${SECRET_KEYSTONE_PASSWORD}" -o jsonpath='{.data.password}' | base64 -d)"
-        REPLACE_KEYSTONE_PASSWORD=no
-    else
-        echo "Generating ${SECRET_KEYSTONE_PASSWORD}"
-        declare "${VARNAME_KEYSTONE_PASSWORD}"="$(./scripts/pwgen.sh 2>/dev/null)"
-        REPLACE_KEYSTONE_PASSWORD=yes
-    fi
+    load_or_gen_os_secret "${VARNAME_RABBITMQ_PASSWORD}" "${SECRET_RABBITMQ_PASSWORD}" && \
+        create_os_secret "RABBITMQ_PASSWORD" "${component}" "${component}"
+    load_or_gen_os_secret "${VARNAME_DB_PASSWORD}" "${SECRET_DB_PASSWORD}" && \
+        create_os_secret "DB_PASSWORD" "${component}" "${component}"
+    load_or_gen_os_secret "${VARNAME_KEYSTONE_PASSWORD}" "${SECRET_KEYSTONE_PASSWORD}" && \
+        create_os_secret "KEYSTONE_PASSWORD" "${component}" "${keystone_user}"
+
     # export the variables for templating the openstack secret
     export "${VARNAME_RABBITMQ_PASSWORD?}"
     export "${VARNAME_DB_PASSWORD?}"
     export "${VARNAME_KEYSTONE_PASSWORD?}"
 
-    if [ "x${REPLACE_RABBITMQ_PASSWORD}" = "xyes" ]; then
-        echo "Writing ${component}/secret-rabbitmq-password.yaml, please commit"
-        kubectl --namespace openstack \
-        create secret generic "${SECRET_RABBITMQ_PASSWORD}" \
-        --type Opaque \
-        --from-literal=username="${component}" \
-        --from-literal=password="${!VARNAME_RABBITMQ_PASSWORD}" \
-        --dry-run=client -o yaml \
-        | secret-seal-stdin "${DEST_DIR}/${component}/secret-rabbitmq-password.yaml"
-    fi
-
-    if [ "x${REPLACE_DB_PASSWORD}" = "xyes" ]; then
-        echo "Writing ${component}/secret-db-password.yaml, please commit"
-        kubectl --namespace openstack \
-        create secret generic "${SECRET_DB_PASSWORD}" \
-        --type Opaque \
-        --from-literal=username="${component}" \
-        --from-literal=password="${!VARNAME_DB_PASSWORD}" \
-        --dry-run=client -o yaml \
-        | secret-seal-stdin "${DEST_DIR}/${component}/secret-db-password.yaml"
-    fi
-
-    if [ "x${REPLACE_KEYSTONE_PASSWORD}" = "xyes" ]; then
-        echo "Writing ${component}/secret-keystone-password.yaml, please commit"
-        kubectl --namespace openstack \
-        create secret generic "${SECRET_KEYSTONE_PASSWORD}" \
-        --type Opaque \
-        --from-literal=username="${keystone_user}" \
-        --from-literal=password="${!VARNAME_KEYSTONE_PASSWORD}" \
-        --dry-run=client -o yaml \
-        | secret-seal-stdin "${DEST_DIR}/${component}/secret-keystone-password.yaml"
-    fi
 done
 
 echo "Checking horizon"
 # horizon credentials
 mkdir -p "${DEST_DIR}/horizon"
 # horizon user password for database
-if kubectl -n openstack get secret "horizon-db-password" > /dev/null; then
-    HORIZON_DB_PASSWORD="$(kubectl -n openstack get secret "horizon-db-password" -o jsonpath='{.data.password}' | base64 -d)"
-    REPLACE_HORIZON_DB_PASSWORD=no
-else
-    HORIZON_DB_PASSWORD="$(./scripts/pwgen.sh 2>/dev/null)"
-    REPLACE_HORIZON_DB_PASSWORD=yes
-fi
+VARNAME_DB_PASSWORD="HORIZON_DB_PASSWORD"
+SECRET_DB_PASSWORD="horizon-db-password"
+load_or_gen_os_secret "${VARNAME_DB_PASSWORD}" "${SECRET_DB_PASSWORD}" && \
+    create_os_secret "DB_PASSWORD" "horizon" "horizon"
+# export the variable for templating into the openstack secret / values.yaml
 export HORIZON_DB_PASSWORD
-if [ "x${REPLACE_HORIZON_DB_PASSWORD}" = "xyes" ]; then
-    echo "Writing ${component}/secret-keystone-password.yaml, please commit"
-    kubectl --namespace openstack \
-        create secret generic horizon-db-password \
-        --type Opaque \
-        --from-literal=username="horizon" \
-        --from-literal=password="${HORIZON_DB_PASSWORD}" \
-        --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/horizon/secret-db-password.yaml"
-fi
 
 # generate the secret-openstack.yaml file every time from our secrets data
 # this is a helm values.yaml but it contains secrets because of the lack
