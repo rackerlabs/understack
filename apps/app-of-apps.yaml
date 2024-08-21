@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: cluster-setup
+  name: app-of-apps
 spec:
   syncPolicy:
     preserveResourcesOnDeletion: true
@@ -14,7 +14,7 @@ spec:
             argocd.argoproj.io/secret-type: cluster
   template:
     metadata:
-      name: '{{.name}}-cluster-setup'
+      name: '{{.name}}-app-of-apps'
     spec:
       project: default
       source:
