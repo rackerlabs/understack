@@ -1,9 +1,9 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
-  name: synchronize-server-to-ironic
+  name: sync-server-to-ironic
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/sync-nb-server-to-ironic/synchronize-server-to-ironic.yaml`
+      Defined in `argo-workflows/sync-nb-server-to-ironic/sync-server-to-ironic.yaml`
 kind: WorkflowTemplate
 spec:
   arguments:
@@ -11,11 +11,11 @@ spec:
       - name: interface_update_event
         value: "{}"
   templates:
-    - name: synchronize-server
+    - name: sync-server
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - synchronize-server
+          - sync-server
         args:
           - "{{workflow.parameters.interface_update_event}}"
         volumeMounts:

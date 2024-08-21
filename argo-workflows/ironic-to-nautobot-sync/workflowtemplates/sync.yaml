@@ -1,6 +1,6 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
-  name: synchronize-provision-state-to-nautobot
+  name: sync-provision-state-to-nautobot
   annotations:
     workflows.argoproj.io/description: |
       Defined in `argo-workflows/ironic-to-nautobot-sensor/workflowtemplates/sync.yaml`
@@ -8,11 +8,11 @@ kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow
   templates:
-    - name: synchronize-state
+    - name: sync-state
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - synchronize-provision-state
+          - sync-provision-state
         args:
           - --device-id
           - "{{workflow.parameters.device_uuid}}"

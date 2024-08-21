@@ -4,7 +4,7 @@ The workflow templates in this folder are designed to create device interfaces i
 
 The process begins when a sensor detects updates to Nautobot OBM interfaces, prompting the get-obm-creds action to fetch the necessary OBM credentials. This step is crucial as it serves as a prerequisite for the other workflows in this folder. You can find examples of such dependencies in the `deps` folder.
 
-Following this, the sensor initiates the `synchronize-interfaces-to-nautobot` workflow. This workflow obtains Redfish information from a server and uses it to create new device interfaces in Nautobot.
+Following this, the sensor initiates the `sync-interfaces-to-nautobot` workflow. This workflow obtains Redfish information from a server and uses it to create new device interfaces in Nautobot.
 
 It is also worth noting that embedded/integrated interfaces are omitted for the purposes of the Undercloud project.
 
