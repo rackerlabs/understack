@@ -5,6 +5,9 @@ description = "Ironic hooks for Understack"
 authors = ["Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
 license = "MIT"
 readme = "README.md"
+packages = [
+    { include = "ironic_understack" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -17,3 +20,6 @@ ironic = "^26.0.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.plugins."ironic.inspection.hooks"]
+"resource-class" = "ironic_understack.resource_class:UndercloudResourceClassHook"
