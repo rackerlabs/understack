@@ -5,6 +5,7 @@ from uuid import UUID
 
 from understack_workflows.helpers import boolean_args
 from understack_workflows.helpers import credential
+from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.nautobot import Nautobot
 from understack_workflows.undersync.client import Undersync
@@ -13,11 +14,10 @@ logger = setup_logger(__name__)
 
 
 def update_nautobot(args) -> list[str]:
-    default_nb_url = "http://nautobot-default.nautobot.svc.cluster.local"
     device_uuid = args.device_id
     field_name = "connected_to_network"
     field_value = args.network_name
-    nb_url = args.nautobot_url or default_nb_url
+    nb_url = args.nautobot_url
 
     nb_token = args.nautobot_token or credential("nb-token", "token")
     nautobot = Nautobot(nb_url, nb_token, logger=logger)
@@ -54,12 +54,7 @@ def argument_parser():
         "--device-id", type=UUID, required=True, help="Nautobot device UUID"
     )
     parser.add_argument("--network-name", required=True)
-    parser.add_argument(
-        "--nautobot_url",
-        required=False,
-        default="http://nautobot-default.nautobot.svc.cluster.local",
-    )
-    parser.add_argument("--nautobot_token", required=False)
+    parser = parser_nautobot_args(parser)
     parser.add_argument(
         "--force",
         type=boolean_args,

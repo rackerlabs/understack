@@ -6,6 +6,8 @@ from uuid import UUID
 import pynautobot
 from ironicclient.v1.port import Port
 
+from understack_workflows.helpers import credential
+from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.port_configuration import PortConfiguration
@@ -13,15 +15,12 @@ from understack_workflows.port_configuration import PortConfiguration
 logger = setup_logger(__name__)
 
 
-def get_nautobot_interfaces(device_id: UUID) -> list[PortConfiguration]:
+def get_nautobot_interfaces(nautobot, device_id: UUID) -> list[PortConfiguration]:
     """Provides mapping of Nautobot to Ironic ports.
 
     Return a List of Ironic Ports for all Nautobot Interfaces with a
     MAC address, for the specified Device.
     """
-    nautobot_api = os.environ["NAUTOBOT_API"]
-    nautobot_token = os.environ["NAUTOBOT_TOKEN"]
-    nautobot = pynautobot.api(nautobot_api, nautobot_token)
     interfaces = nautobot.dcim.interfaces.filter(device_id=device_id)
 
     return [
@@ -66,6 +65,7 @@ def main():
         default=logging.WARNING,
     )
     parser.add_argument("--dry-run", action=argparse.BooleanOptionalAction)
+    parser = parser_nautobot_args(parser)
     args = parser.parse_args()
 
     device_id = args.device_id
@@ -74,9 +74,15 @@ def main():
 
     logger.info(f"Syncing Interfaces / Ports for Device {device_id} ...")
 
+    nautobot_api = os.environ.get("NAUTOBOT_API") or args.nautobot_url
+    nautobot_token = os.environ.get(
+        "NAUTOBOT_TOKEN", args.nautobot_token
+    ) or credential("nb-token", "token")
+    nautobot = pynautobot.api(nautobot_api, nautobot_token)
+
     # build ports from nautobot interfaces
     logger.info("Fetching Nautobot Interfaces ...")
-    nautobot_ports = get_nautobot_interfaces(device_id)
+    nautobot_ports = get_nautobot_interfaces(nautobot, device_id)
 
     # get Ironic Ports
     client = IronicClient(
