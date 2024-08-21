@@ -101,6 +101,7 @@ metadata:
   namespace: argocd
   labels:
     argocd.argoproj.io/secret-type: cluster
+    understack.rackspace.com/argocd: enabled
   annotations:
     uc_repo_git_url: "https://github.com/rackerlabs/understack.git"
     uc_repo_ref: "HEAD"

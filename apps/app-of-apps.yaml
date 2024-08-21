@@ -12,6 +12,7 @@ spec:
         selector:
           matchLabels:
             argocd.argoproj.io/secret-type: cluster
+            understack.rackspace.com/argocd: enabled
   template:
     metadata:
       name: '{{.name}}-app-of-apps'
