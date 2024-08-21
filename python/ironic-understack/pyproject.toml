@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "ironic-understack"
+version = "0.0.0"
+description = "Ironic hooks for Understack"
+authors = ["Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+pyyaml = "^6.0.2"
+pytest = "^8.3.2"
+
+[tool.poetry.group.dev.dependencies]
+ironic = "^26.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
