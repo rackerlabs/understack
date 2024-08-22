@@ -1,9 +1,9 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
-  name: synchronize-obm-creds
+  name: sync-obm-creds
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/sync-nb-server-to-ironic/synchronize-obm-creds.yaml`
+      Defined in `argo-workflows/sync-nb-server-to-ironic/sync-obm-creds.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: main
@@ -22,21 +22,21 @@ spec:
               parameters:
                 - name: hostname
                   value: '{{workflow.parameters.hostname}}'
-        - - name: synchronize-obm-creds
-            template: synchronize-obm-creds
+        - - name: sync-obm-creds
+            template: sync-obm-creds
             arguments:
               parameters:
                 - name: obm
                   value: "{{ steps.load-obm-creds.outputs.parameters.secret }}"
 
-    - name: synchronize-obm-creds
+    - name: sync-obm-creds
       inputs:
         parameters:
           - name: obm
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - synchronize-obm-creds
+          - sync-obm-creds
         args:
           - "{{workflow.parameters.interface_update_event}}"
         volumeMounts:

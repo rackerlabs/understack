@@ -59,10 +59,10 @@ spec:
                 templates:
                   - name: start
                     steps:
-                      - - name: synchronize-provision-state-to-nautobot
+                      - - name: sync-provision-state-to-nautobot
                           templateRef:
-                            name: synchronize-provision-state-to-nautobot
-                            template: synchronize-state
+                            name: sync-provision-state-to-nautobot
+                            template: sync-state
                           arguments:
                             parameters:
                               - name: device_uuid

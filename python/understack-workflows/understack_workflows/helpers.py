@@ -2,6 +2,7 @@ import argparse
 import logging
 import pathlib
 from functools import partial
+from urllib.parse import urlparse
 
 import sushy
 
@@ -18,7 +19,7 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG):
     """
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=logging.DEBUG,
+        level=level,
     )
     return logging.getLogger(name)
 
@@ -31,6 +32,25 @@ def boolean_args(val):
         return False
     else:
         raise argparse.ArgumentTypeError("boolean expected")
+
+
+def _valid_url(value):
+    parsed = urlparse(value)
+    if not all([parsed.scheme, parsed.netloc]):
+        raise argparse.ArgumentTypeError(f"Invalid URL: '{value}'")
+    return value
+
+
+def parser_nautobot_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    parser.add_argument(
+        "--nautobot_url",
+        type=_valid_url,
+        required=False,
+        help="Nautobot API %(default)s",
+        default="http://nautobot-default.nautobot.svc.cluster.local",
+    )
+    parser.add_argument("--nautobot_token", type=str, required=False)
+    return parser
 
 
 comma_list_args = partial(str.split, sep=",")

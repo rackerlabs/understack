@@ -16,17 +16,17 @@ spec:
   templates:
     - name: main
       steps:
-        - - name: synchronize-server-to-ironic
+        - - name: sync-server-to-ironic
             templateRef:
-              name: synchronize-server-to-ironic
-              template: synchronize-server
-        - - name: synchronize-server-obm-creds
+              name: sync-server-to-ironic
+              template: sync-server
+        - - name: sync-server-obm-creds
             templateRef:
-              name: synchronize-obm-creds
+              name: sync-obm-creds
               template: main
-        - - name: synchronize-interfaces-to-ironic
+        - - name: sync-interfaces-to-ironic
             templateRef:
-              name: synchronize-interfaces-to-ironic
+              name: sync-interfaces-to-ironic
               template: main
             arguments:
               parameters:

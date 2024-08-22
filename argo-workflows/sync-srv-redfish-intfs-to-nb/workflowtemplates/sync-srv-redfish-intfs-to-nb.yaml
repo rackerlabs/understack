@@ -32,10 +32,10 @@ spec:
               parameters:
                 - name: hostname
                   value: "{{workflow.parameters.hostname}}"
-        - - name: synchronize-interfaces-to-nautobot
+        - - name: sync-interfaces-to-nautobot
             templateRef:
               name: sync-interfaces-to-nautobot
-              template: synchronize-interfaces
+              template: sync-interfaces
             arguments:
               parameters:
                 - name: device_id

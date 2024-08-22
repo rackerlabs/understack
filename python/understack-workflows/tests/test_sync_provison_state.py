@@ -1,14 +1,7 @@
-import uuid
-
 import pytest
 
-from understack_workflows.main.synchronize_provision_state import argument_parser
-from understack_workflows.main.synchronize_provision_state import do_action
-
-
-@pytest.fixture
-def device_id() -> uuid.UUID:
-    return uuid.uuid4()
+from understack_workflows.main.sync_provision_state import argument_parser
+from understack_workflows.main.sync_provision_state import do_action
 
 
 @pytest.fixture

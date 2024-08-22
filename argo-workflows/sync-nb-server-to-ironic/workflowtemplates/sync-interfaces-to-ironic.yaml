@@ -1,9 +1,9 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
-  name: synchronize-interfaces-to-ironic
+  name: sync-interfaces-to-ironic
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/sync-nb-server-to-ironic/synchronize-interfaces-to-ironic.yaml`
+      Defined in `argo-workflows/sync-nb-server-to-ironic/sync-interfaces-to-ironic.yaml`
 kind: WorkflowTemplate
 spec:
   arguments:
@@ -18,7 +18,7 @@ spec:
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - synchronize-interfaces
+          - sync-interfaces
         args:
           - --device-id
           - "{{inputs.parameters.device_id}}"
