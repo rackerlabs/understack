@@ -179,7 +179,7 @@ Finally run the following to have ArgoCD deploy the system:
 
 ```bash
 # from your understack checkout
-kubectl apply -f apps/cluster-setup.yaml
+kubectl apply -f apps/app-of-apps.yaml
 ```
 
 At this point ArgoCD will work to deploy Understack.
