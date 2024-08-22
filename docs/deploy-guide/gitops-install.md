@@ -54,7 +54,12 @@ UC_DEPLOY_GIT_URL=git@github.com:myorg/uc-deploy.git
 UC_DEPLOY_SSH_FILE="$HOME/devel/uc-deploy-key"
 DNS_ZONE=home.lab
 UC_DEPLOY_EMAIL="my@email"
+UC_AIO=yes
 ```
+
+The final one, `UC_AIO` is special for the Quick Start guide because it
+informs the scripts that you are building an All-In-One system. This is
+not a production configuration and is merely there to aid in on boarding.
 
 #### Paths
 

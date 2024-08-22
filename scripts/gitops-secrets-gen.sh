@@ -50,21 +50,6 @@ if [ "x${DEPLOY_NAME}" = "x" ]; then
     usage
 fi
 
-if [ ! -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml" ]; then
-    if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
-        echo "UC_DEPLOY_GIT_URL is not set." >&2
-        usage
-    fi
-    if [ "x${UC_DEPLOY_SSH_FILE}" = "x" ]; then
-        echo "UC_DEPLOY_SSH_FILE is not set." >&2
-        usage
-    fi
-    if [ ! -f "${UC_DEPLOY_SSH_FILE}" ]; then
-        echo "UC_DEPLOY_SSH_FILE at ${UC_DEPLOY_SSH_FILE} does not exist." >&2
-        usage
-    fi
-fi
-
 if [ "x${DNS_ZONE}" = "x" ]; then
     echo "DNS_ZONE is not set." >&2
     usage
@@ -85,11 +70,16 @@ DEST_DIR="${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
 ###
 
 # create ArgoCD configs
-mkdir -p "${DEST_DIR}/argocd"
-echo "Checking argocd"
-if [ ! -f "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml" ]; then
-    echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
-    cat <<- EOF > "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml"
+function gen-argocd() {
+    mkdir -p "${DEST_DIR}/argocd"
+    echo "Checking argocd"
+    if [ ! -f "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml" ]; then
+        echo "Creating ArgoCD ${DEPLOY_NAME} cluster"
+        if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
+            echo "UC_DEPLOY_GIT_URL is not set." >&2
+            usage
+        fi
+        cat <<- EOF > "${DEST_DIR}/argocd/secret-${DEPLOY_NAME}-cluster.yaml"
 apiVersion: v1
 kind: Secret
 data:
@@ -109,11 +99,23 @@ metadata:
     uc_deploy_ref: "HEAD"
     dns_zone: "$DNS_ZONE"
 EOF
-fi
+    fi
 
-if [ ! -f "${DEST_DIR}/argocd/secret-deploy-repo.yaml" ]; then
-    echo "Creating ArgoCD repo-creds"
-    cat << EOF | secret-seal-stdin "${DEST_DIR}/argocd/secret-deploy-repo.yaml"
+    if [ ! -f "${DEST_DIR}/argocd/secret-deploy-repo.yaml" ]; then
+        echo "Creating ArgoCD repo-creds"
+        if [ "x${UC_DEPLOY_GIT_URL}" = "x" ]; then
+            echo "UC_DEPLOY_GIT_URL is not set." >&2
+            usage
+        fi
+        if [ "x${UC_DEPLOY_SSH_FILE}" = "x" ]; then
+            echo "UC_DEPLOY_SSH_FILE is not set." >&2
+            usage
+        fi
+        if [ ! -f "${UC_DEPLOY_SSH_FILE}" ]; then
+            echo "UC_DEPLOY_SSH_FILE at ${UC_DEPLOY_SSH_FILE} does not exist." >&2
+            usage
+        fi
+        cat << EOF | secret-seal-stdin "${DEST_DIR}/argocd/secret-deploy-repo.yaml"
 apiVersion: v1
 kind: Secret
 metadata:
@@ -126,7 +128,10 @@ data:
   type: $(printf "git" | base64)
   url: $(printf "${UC_DEPLOY_GIT_URL}" | base64)
 EOF
-fi
+    fi
+}
+
+[ ! -z ${UC_AIO} ] && gen-argocd || echo "UC_AIO is NOT set so not creating ArgoCD bits"
 
 echo "Checking cert-manager"
 if [ ! -f "${DEST_DIR}/cert-manager/cluster-issuer.yaml" ]; then
