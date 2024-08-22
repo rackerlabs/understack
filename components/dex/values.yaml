@@ -49,6 +49,12 @@ config:
       name: "Undercloud ArgoCD"
       redirectURIs:
         - "https://argocd.$DNS_ZONE/auth/callback"
+    - id: kubernetes
+      name: "Kubernetes API auth"
+      redirectURIs:
+        - "http://localhost:8000/"
+        - "http://localhost:18000/"
+      secret: not-a-secret
 
 envVars:
   - name: NAUTOBOT_SSO_CLIENT_SECRET
