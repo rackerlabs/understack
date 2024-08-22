@@ -55,11 +55,6 @@ if [ "x${DNS_ZONE}" = "x" ]; then
     usage
 fi
 
-if [ "x${UC_DEPLOY_EMAIL}" = "x" ]; then
-    echo "UC_DEPLOY_EMAIL is not set." >&2
-    usage
-fi
-
 export DNS_ZONE
 export DEPLOY_NAME
 mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
@@ -135,6 +130,11 @@ EOF
 
 echo "Checking cert-manager"
 if [ ! -f "${DEST_DIR}/cert-manager/cluster-issuer.yaml" ]; then
+    if [ "${UC_DEPLOY_EMAIL}" = "" ]; then
+        echo "UC_DEPLOY_EMAIL is not set. Unable to generate cert-manager issuer." >&2
+        usage
+    fi
+
     echo "Creating cert-manager ClusterIssuer"
     cat <<- EOF > "${DEST_DIR}/cert-manager/cluster-issuer.yaml"
 apiVersion: cert-manager.io/v1
