@@ -4,6 +4,7 @@ kind: Kustomization
 
 resources:
   - postgres-nautobot.yaml
+  - cloudnative-postgres-nautobot.yaml
   - secretstore-nautobot.yaml
   - external-secret-nautobot-sso.yaml
 

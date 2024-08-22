@@ -1,0 +1,20 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: nautobot-cluster
+spec:
+  imageName: ghcr.io/cloudnative-pg/postgresql:15.5
+  instances: 3
+  storage:
+    size: 20Gi
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: nautobot-backup
+spec:
+  schedule: "0 0 0 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: nautobot-cluster
