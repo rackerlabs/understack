@@ -115,6 +115,8 @@ nav:
     - Quick Start: deploy-guide/gitops-install.md
     - deploy-guide/install-understack-ubuntu-k3s.md
     - deploy-guide/auth.md
+    - deploy-guide/extra-regions.md
+    - deploy-guide/external-argocd.md
   - 'User Guide':
     - user-guide/index.md
     - user-guide/openstack-cli.md
