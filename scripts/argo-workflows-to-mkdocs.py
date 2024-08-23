@@ -151,7 +151,7 @@ def main():
 def make_workflow(w_yaml):
     w_name = w_yaml['metadata']['name']
     workflow_title  = w_yaml['metadata'].get('annotations', {}).get('workflows.argoproj.io/title', 'Title not set in workflow')
-    workflow_description  = w_yaml['metadata'].get('annotations', {}).get('workflows.argoproj.io/description', 'Description not set in workflow')
+    workflow_description  = w_yaml['metadata'].get('annotations', {}).get('workflows.argoproj.io/description', 'Description not set in workflow').strip("\n")
     w = Workflow(id=w_name, name=w_name, title=workflow_title, description=workflow_description, nodes=[])
     for n_yaml in w_yaml['spec']['templates']:
         n_id = w_name + "__" + n_yaml['name']
@@ -355,7 +355,7 @@ def generate_mermaid(workflows, nodes, output_name, output_file, workflow_readme
         if SHOW_WORKFLOW_DESCRIPTIONS:
             bases.append("    subgraph Description")
             bases.append("      direction TB")
-            bases.append(f"      description[{w.description.strip("\n")}]")
+            bases.append(f"      description[{w.description}]")
             bases.append("    end")
 
         for n in w.nodes:
