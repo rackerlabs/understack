@@ -58,10 +58,12 @@ def test_from_yaml_invalid(invalid_yaml):
         FlavorSpec.from_yaml(invalid_yaml)
 
 
-@patch("os.listdir")
+@patch("os.walk")
 @patch("builtins.open", new_callable=mock_open)
-def test_from_directory(mocked_open, mock_listdir, valid_yaml, invalid_yaml):
-    mock_listdir.return_value = ["valid.yaml", "invalid.yaml"]
+def test_from_directory(mocked_open, mock_walk, valid_yaml, invalid_yaml):
+    mock_walk.return_value = [
+        ("/etc/flavors", [], ["valid.yaml", "invalid.yaml"]),
+    ]
     mock_file_handles = [
         mock_open(read_data=valid_yaml).return_value,
         mock_open(read_data=invalid_yaml).return_value,

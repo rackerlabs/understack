@@ -28,16 +28,17 @@ class FlavorSpec:
     @staticmethod
     def from_directory(directory: str = "/etc/flavors/") -> list["FlavorSpec"]:
         flavor_specs = []
-        for filename in os.listdir(directory):
-            if filename.endswith(".yaml") or filename.endswith(".yml"):
-                filepath = os.path.join(directory, filename)
-                try:
-                    with open(filepath, "r") as file:
-                        yaml_content = file.read()
-                        flavor_spec = FlavorSpec.from_yaml(yaml_content)
-                        flavor_specs.append(flavor_spec)
-                except yaml.YAMLError as e:
-                    print(f"Error parsing YAML file {filename}: {e}")
-                except Exception as e:
-                    print(f"Error processing file {filename}: {e}")
+        for root, _, files in os.walk(directory):
+            for filename in files:
+                if filename.endswith(".yaml") or filename.endswith(".yml"):
+                    filepath = os.path.join(root, filename)
+                    try:
+                        with open(filepath, "r") as file:
+                            yaml_content = file.read()
+                            flavor_spec = FlavorSpec.from_yaml(yaml_content)
+                            flavor_specs.append(flavor_spec)
+                    except yaml.YAMLError as e:
+                        print(f"Error parsing YAML file {filename}: {e}")
+                    except Exception as e:
+                        print(f"Error processing file {filename}: {e}")
         return flavor_specs
