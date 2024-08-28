@@ -108,6 +108,8 @@ spec:
                     targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                     path: 'components/argo'
                     kustomize:
+                      components:
+                        - understack
                       patches:
                         - target:
                             kind: ConfigMap
