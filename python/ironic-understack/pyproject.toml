@@ -23,3 +23,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.plugins."ironic.inspection.hooks"]
 "resource-class" = "ironic_understack.resource_class:UndercloudResourceClassHook"
+
+[tool.poetry.plugins."ironic.hardware.interfaces.inspect"]
+"redfish-understack" = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
+"idrac-redfish-understack" = "ironic_understack.redfish_inspect_understack:UnderstackDracRedfishInspect"
