@@ -84,21 +84,9 @@ class UndercloudResourceClassHook(base.InspectionHook):
 
     def classify(self, machine):
         # TODO: read the device types repo later
-        matcher = Matcher([machine], FLAVORS)
-        possible_flavors_for_machine = {
-            k: v for (k, v) in matcher.match().items() if len(v) > 0
-        }
-        try:
-            return self._pick_best_flavor(FLAVORS, possible_flavors_for_machine)
-        except IndexError as e:
-            raise NoMatchError(e)
-
-    def _pick_best_flavor(self, all_flavors, matched_flavors):
-        all_specs = {f.name: f for f in all_flavors}
-
-        # For now choose "best" by memory, but this likely needs to be revisisted.
-        sorted_flavors = sorted(
-            matched_flavors.keys(), key=lambda mf: all_specs[mf].memory_gb, reverse=True
-        )
-        best_flavor = sorted_flavors[0]
-        return best_flavor
+        matcher = Matcher(FLAVORS)
+        flavor = matcher.pick_best_flavor(machine)
+        if not flavor:
+            raise NoMatchError(f"No flavor found for {machine}")
+        else:
+            return flavor

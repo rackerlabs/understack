@@ -3,8 +3,7 @@ from ironic_understack.flavor_spec import FlavorSpec
 
 
 class Matcher:
-    def __init__(self, machines: list[Machine], flavors: list[FlavorSpec]):
-        self.machines = machines
+    def __init__(self, flavors: list[FlavorSpec]):
         self.flavors = flavors
 
     def score_machine_to_flavor(self, machine: Machine, flavor: FlavorSpec) -> int:
@@ -61,24 +60,25 @@ class Matcher:
 
         return score
 
-    def get_eligible_machines_for_flavor(self, flavor: FlavorSpec) -> list[Machine]:
-        scored_machines = []
-
-        for machine in self.machines:
+    def match(self, machine: Machine) -> list[FlavorSpec]:
+        """
+        Find list of all flavors that the machine is eligible for.
+        """
+        results = []
+        for flavor in self.flavors:
             score = self.score_machine_to_flavor(machine, flavor)
             if score > 0:
-                scored_machines.append((machine, score))
-
-        # Sort machines by score, highest first
-        scored_machines.sort(key=lambda x: x[1], reverse=True)
-
-        # Return the machine objects, sorted by desirability
-        return [machine for machine, _ in scored_machines]
-
-    def match(self) -> dict[str, list[Machine]]:
-        results = {}
-        for flavor in self.flavors:
-            eligible_machines = self.get_eligible_machines_for_flavor(flavor)
-            results[flavor.name] = eligible_machines
+                results.append(flavor)
         return results
 
+    def pick_best_flavor(self, machine: Machine) -> FlavorSpec | None:
+        """
+        Obtains list of all flavors that particular machine can be classified
+        as, then tries to select "the best" one.
+        """
+
+        possible = self.match(machine)
+
+        if len(possible) == 0:
+            return None
+        return max(possible, key=lambda flv: flv.memory_gb)
