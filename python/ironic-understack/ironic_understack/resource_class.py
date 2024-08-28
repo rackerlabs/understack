@@ -1,51 +1,23 @@
 # from ironic.drivers.modules.inspector.hooks import base
-from ironic_understack.flavor_spec import FlavorSpec
 from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
+from ironic_understack.flavor_spec import FlavorSpec
 from ironic_understack.machine import Machine
 from ironic_understack.matcher import Matcher
 from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 
-# temporary until we have a code automatically loading these files
-FLAVORS = [
-    FlavorSpec(
-        name="gp2.tiny",
-        memory_gb=32,
-        cpu_cores=8,
-        cpu_models=["AMD EPYC 9124 16-Core Processor"],
-        drives=[200, 200],
-        devices=["PowerEdge R7515", "PowerEdge R7615", "PowerEdge R740xd"],
-    ),
-    FlavorSpec(
-        name="gp2.small",
-        memory_gb=192,
-        cpu_cores=16,
-        cpu_models=["AMD EPYC 9124 16-Core Processor"],
-        drives=[960, 960],
-        devices=["PowerEdge R7515", "PowerEdge R7615", "PowerEdge R740xd"],
-    ),
-    FlavorSpec(
-        name="gp2.medium",
-        memory_gb=384,
-        cpu_cores=24,
-        cpu_models=["AMD EPYC 9254 24-Core Processor"],
-        drives=[960, 960],
-        devices=["PowerEdge R7515", "PowerEdge R7615"],
-    ),
-    FlavorSpec(
-        name="gp2.large",
-        memory_gb=768,
-        cpu_cores=48,
-        cpu_models=["AMD EPYC 9454 48-Core Processor"],
-        drives=[960, 960],
-        devices=["PowerEdge R7615"],
-    ),
-]
+FLAVORS_SYNC_PATH = (
+    "/var/lib/understack/flavors/undercloud-nautobot-device-types.git/flavors"
+)
+FLAVORS = FlavorSpec.from_directory(FLAVORS_SYNC_PATH)
+LOG.info(f"Loaded {len(FLAVORS)} flavor specifications.")
+
 
 class NoMatchError(Exception):
     pass
+
 
 class UndercloudResourceClassHook(base.InspectionHook):
     """Hook to set the node's resource_class based on the inventory."""
@@ -78,12 +50,10 @@ class UndercloudResourceClassHook(base.InspectionHook):
             LOG.error(msg)
             raise exception.InvalidNodeInventory(node=task.node.uuid, reason=msg)
         except NoMatchError:
-            msg = (
-                f"No matching flavor found for {task.node.uuid}"
-            )
+            msg = f"No matching flavor found for {task.node.uuid}"
+            LOG.error(msg)
 
     def classify(self, machine):
-        # TODO: read the device types repo later
         matcher = Matcher(FLAVORS)
         flavor = matcher.pick_best_flavor(machine)
         if not flavor:

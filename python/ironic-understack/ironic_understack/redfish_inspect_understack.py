@@ -13,60 +13,28 @@
 Redfish Inspect Interface modified for Understack
 """
 
-from oslo_utils import units
 from ironic.drivers.drac import IDRACHardware
 from ironic.drivers.modules.drac.inspect import DracRedfishInspect
 from ironic.drivers.modules.inspect_utils import get_inspection_data
-from ironic.drivers.modules.redfish import utils as redfish_utils
 from ironic.drivers.modules.redfish.inspect import RedfishInspect
-from ironic_understack.machine import Machine
 from ironic_understack.flavor_spec import FlavorSpec
+from ironic_understack.machine import Machine
 from ironic_understack.matcher import Matcher
 from oslo_log import log
+from oslo_utils import units
 
 LOG = log.getLogger(__name__)
 
-# temporary until we have a code automatically loading these files
-FLAVORS = [
-    FlavorSpec(
-        name="gp2.tiny",
-        memory_gb=32,
-        cpu_cores=8,
-        cpu_models=["AMD EPYC 9124 16-Core Processor"],
-        drives=[200, 200],
-        devices=["PowerEdge R7515", "PowerEdge R7615", "PowerEdge R740xd"],
-    ),
-    FlavorSpec(
-        name="gp2.small",
-        memory_gb=192,
-        cpu_cores=16,
-        cpu_models=["AMD EPYC 9124 16-Core Processor"],
-        drives=[960, 960],
-        devices=["PowerEdge R7515", "PowerEdge R7615", "PowerEdge R740xd"],
-    ),
-    FlavorSpec(
-        name="gp2.medium",
-        memory_gb=384,
-        cpu_cores=24,
-        cpu_models=["AMD EPYC 9254 24-Core Processor"],
-        drives=[960, 960],
-        devices=["PowerEdge R7515", "PowerEdge R7615"],
-    ),
-    FlavorSpec(
-        name="gp2.large",
-        memory_gb=768,
-        cpu_cores=48,
-        cpu_models=["AMD EPYC 9454 48-Core Processor"],
-        drives=[960, 960],
-        devices=["PowerEdge R7615"],
-    ),
-]
+FLAVORS_SYNC_PATH = (
+    "/var/lib/understack/flavors/undercloud-nautobot-device-types.git/flavors"
+)
+FLAVORS = FlavorSpec.from_directory(FLAVORS_SYNC_PATH)
+LOG.info(f"Loaded {len(FLAVORS)} flavor specifications.")
 
 
 class UnderstackRedfishInspect(RedfishInspect):
     def __init__(self, *args, **kwargs) -> None:
         super(UnderstackRedfishInspect, self).__init__(*args, **kwargs)
-
 
     def inspect_hardware(self, task):
         """Inspect hardware to get the hardware properties.
@@ -109,18 +77,22 @@ class UnderstackRedfishInspect(RedfishInspect):
             LOG.warn(f"No flavor matched for {task.node.uuid}")
             return upstream_state
         else:
-        # TODO: actually set the class
             LOG.info(f"Matched {task.node.uuid} to flavor {best_flavor} ")
+            task.node.resource_class = f"baremetal.{best_flavor.name}"
+            task.node.save()
         return upstream_state
 
-class UnderstackDracRedfishInspect(DracRedfishInspect):
 
+class UnderstackDracRedfishInspect(DracRedfishInspect):
     def __init__(self, *args, **kwargs) -> None:
         super(UnderstackDracRedfishInspect, self).__init__(*args, **kwargs)
         patched_ifaces = IDRACHardware().supported_inspect_interfaces
         patched_ifaces.append(UnderstackDracRedfishInspect)
-        setattr(IDRACHardware, "supported_inspect_interfaces", property(lambda _: patched_ifaces))
-
+        setattr(
+            IDRACHardware,
+            "supported_inspect_interfaces",
+            property(lambda _: patched_ifaces),
+        )
 
     def inspect_hardware(self, task):
         """Inspect hardware to get the hardware properties.
@@ -159,7 +131,9 @@ class UnderstackDracRedfishInspect(DracRedfishInspect):
             LOG.warn("No CPUS detected, skipping flavor setting.")
             return upstream_state
 
-        smallest_disk_gb = min([disk["size"] / units.Gi for disk in properties["disks"]])
+        smallest_disk_gb = min(
+            [disk["size"] / units.Gi for disk in properties["disks"]]
+        )
         machine = Machine(
             memory_mb=properties["memory"]["physical_mb"],
             disk_gb=smallest_disk_gb,
@@ -170,10 +144,8 @@ class UnderstackDracRedfishInspect(DracRedfishInspect):
         best_flavor = matcher.pick_best_flavor(machine)
         if not best_flavor:
             LOG.warn(f"No flavor matched for {task.node.uuid}")
-            print(f"No flavor matched for {task.node.uuid}")
             return upstream_state
         LOG.info(f"Matched {task.node.uuid} to flavor {best_flavor}")
-        print(f"Matched {task.node.uuid} to flavor {best_flavor}")
 
         task.node.resource_class = f"baremetal.{best_flavor.name}"
         task.node.save()
