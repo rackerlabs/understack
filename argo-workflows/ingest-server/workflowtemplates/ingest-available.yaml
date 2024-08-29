@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: ingest-available
+  annotations:
+    workflows.argoproj.io/description: |
+      Ingest a server in to Understack
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: interface_update_event
+        value: Some nautobot interface has changed
+      - name: hostname
+        value: hostname of the device that event is for
+  templates:
+    - name: echo
+      inputs:
+        parameters:
+        - name: message
+      container:
+        image: alpine:3.7
+        command: [echo, "{{inputs.parameters.message}}"]
+    - name: main
+      dag:
+        tasks:
+          - name: run-inspector
+            template: echo
+            arguments:
+              parameters: [{name: message, value: C}]
+          - name: create-ports
+            depends: run-inspector
+            template: echo
+            arguments:
+              parameters: [{name: message, value: D}]

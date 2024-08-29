@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: ingest-enroll
+  annotations:
+    workflows.argoproj.io/description: |
+      Ingest a server in to Understack
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: interface_update_event
+        value: Some nautobot interface has changed
+      - name: hostname
+        value: hostname of the device that event is for
+  templates:
+    - name: echo
+      inputs:
+        parameters:
+        - name: message
+      container:
+        image: alpine:3.7
+        command: [echo, "{{inputs.parameters.message}}"]
+    - name: main
+      dag:
+        tasks:
+          - name: get-expected-firmware
+            template: echo
+            arguments:
+              parameters: [{name: message, value: C}]
+          - name: update-firmware
+            depends: get-expected-firmware
+            template: echo
+            arguments:
+              parameters: [{name: message, value: D}]
+          - name: set-pxe-bootable
+            depends: update-firmware
+            template: echo
+            arguments:
+              parameters: [{name: message, value: D}]

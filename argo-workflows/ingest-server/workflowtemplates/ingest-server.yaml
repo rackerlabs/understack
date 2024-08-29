@@ -1,0 +1,105 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: ingest-server
+  annotations:
+    workflows.argoproj.io/description: |
+      Ingest a server in to Understack
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: interface_update_event
+        value: Some nautobot interface has changed
+      - name: hostname
+        value: hostname of the device that event is for
+  templates:
+    - name: echo
+      inputs:
+        parameters:
+        - name: message
+      container:
+        image: alpine:3.7
+        command: [echo, "{{inputs.parameters.message}}"]
+
+    # randomly choose an ironic state
+    - name: ironic-server-state
+      script:
+        image: python:alpine3.6
+        command: [python]
+        source: |
+          import random
+          choices = ["enroll", "manage", "available"]
+          print(random.choices(choices)[0])
+
+    # gently guides the server through the various ironic states
+    - name: progress-server
+      # retry a couple of times
+      retryStrategy:
+        limit: "10"
+      steps:
+        # get the current state from ironic
+        - - name: get-ironic-server-state
+            template: ironic-server-state
+
+        # if the ironic state is 'enroll', then run other workflow template
+        # which is in the ingest-enroll.yaml file
+        - - name: enroll
+            templateRef:
+              name: ingest-enroll
+              template: main
+            arguments:
+              parameters: [{name: message, value: C}]
+            when: "{{steps.get-ironic-server-state.outputs.result}} == enroll"
+
+        # if the ironic state is 'manage', then run other workflow template
+        # which is in the ingest-manage.yaml file
+        - - name: manage
+            templateRef:
+              name: ingest-manage
+              template: main
+            arguments:
+              parameters: [{name: message, value: C}]
+            when: "{{steps.get-ironic-server-state.outputs.result}} == manage"
+
+        # if the ironic state is 'available', then run other workflow template
+        # which is in the ingest-available.yaml file
+        - - name: available
+            templateRef:
+              name: ingest-available
+              template: main
+            arguments:
+              parameters: [{name: message, value: D}]
+            when: "{{steps.get-ironic-server-state.outputs.result}} == available"
+
+        # if the server hasn't completed the 'available' workflow, then we
+        # will retry the process again, starting with getting the
+        # current ironic state
+        - - name: progress-server-next-status
+            template: progress-server
+            when: "{{steps.available.status}} != Succeeded"
+
+    # this is the main workflow because it's defined as the entrypoint
+    - name: main
+      steps:
+        # debug step to dump the input data
+        - - name: print-input
+            template: echo
+            arguments:
+              parameters: [{name: message, value: A}]
+
+        # make an api call to ironic to add/update/upsert the server
+        - - name: add-or-update-in-ironic
+            template: echo
+            arguments:
+              parameters: [{name: message, value: B}]
+
+        # this template gently guides the server through the various ironic states
+        - - name: progress-server
+            template: progress-server
+
+        # final task to show we're completed
+        - - name: completed
+            template: echo
+            arguments:
+              parameters: [{name: message, value: "server is ready and available"}]
