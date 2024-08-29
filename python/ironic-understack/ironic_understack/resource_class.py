@@ -8,10 +8,7 @@ from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 
-FLAVORS_SYNC_PATH = (
-    "/var/lib/understack/flavors/undercloud-nautobot-device-types.git/flavors"
-)
-FLAVORS = FlavorSpec.from_directory(FLAVORS_SYNC_PATH)
+FLAVORS = FlavorSpec.from_directory(CONF.ironic_understack.flavors_dir)
 LOG.info(f"Loaded {len(FLAVORS)} flavor specifications.")
 
 

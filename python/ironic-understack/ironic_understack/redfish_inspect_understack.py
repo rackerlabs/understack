@@ -21,21 +21,13 @@ from ironic.drivers.redfish import RedfishHardware
 from ironic_understack.flavor_spec import FlavorSpec
 from ironic_understack.machine import Machine
 from ironic_understack.matcher import Matcher
+from ironic_understack.conf import CONF
 from oslo_log import log
 from oslo_utils import units
 
 LOG = log.getLogger(__name__)
-
-FLAVORS_SYNC_PATH = (
-    "/var/lib/understack/flavors/undercloud-nautobot-device-types.git/flavors"
-)
-FLAVORS = FlavorSpec.from_directory(FLAVORS_SYNC_PATH)
+FLAVORS = FlavorSpec.from_directory(CONF.ironic_understack.flavors_dir)
 LOG.info(f"Loaded {len(FLAVORS)} flavor specifications.")
-
-        )
-
-
-
 
 
 class FlavorInspectMixin:
