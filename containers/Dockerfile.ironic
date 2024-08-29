@@ -8,4 +8,6 @@ RUN apt-get update && \
         genisoimage \
         isolinux \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-RUN /var/lib/openstack/bin/python -m pip install --no-cache sushy-oem-idrac==5.0.0
+
+COPY python/ironic-understack /tmp/ironic-understack
+RUN /var/lib/openstack/bin/python -m pip install --no-cache --no-cache-dir /tmp/ironic-understack sushy-oem-idrac==5.0.0
