@@ -17,6 +17,7 @@ from ironic.drivers.drac import IDRACHardware
 from ironic.drivers.modules.drac.inspect import DracRedfishInspect
 from ironic.drivers.modules.inspect_utils import get_inspection_data
 from ironic.drivers.modules.redfish.inspect import RedfishInspect
+from ironic.drivers.redfish import RedfishHardware
 from ironic_understack.flavor_spec import FlavorSpec
 from ironic_understack.machine import Machine
 from ironic_understack.matcher import Matcher
@@ -31,11 +32,13 @@ FLAVORS_SYNC_PATH = (
 FLAVORS = FlavorSpec.from_directory(FLAVORS_SYNC_PATH)
 LOG.info(f"Loaded {len(FLAVORS)} flavor specifications.")
 
+        )
 
-class UnderstackRedfishInspect(RedfishInspect):
-    def __init__(self, *args, **kwargs) -> None:
-        super(UnderstackRedfishInspect, self).__init__(*args, **kwargs)
 
+
+
+
+class FlavorInspectMixin:
     def inspect_hardware(self, task):
         """Inspect hardware to get the hardware properties.
 
@@ -49,95 +52,34 @@ class UnderstackRedfishInspect(RedfishInspect):
         :returns: The resulting state of inspection.
 
         """
-        upstream_state = super().inspect_hardware(task)
-        properties = task.node.properties
-
-        if not properties["memory_mb"]:
-            LOG.debug("No memory_mb property detected, skipping flavor setting.")
-            return upstream_state
-
-        if not properties["disks"]:
-            LOG.debug("No disks detected, skipping flavor setting.")
-            return upstream_state
-
-        if not properties["cpus"]:
-            LOG.debug("No cpus detected, skipping flavor setting.")
-            return upstream_state
-
-        smallest_disk = min([disk["size"] for disk in properties["disks"]])
-        machine = Machine(
-            memory_mb=properties["memory_mb"],
-            disk_gb=smallest_disk,
-            cpu=properties["cpus"][0]["model_name"],
-        )
-
-        matcher = Matcher(FLAVORS)
-        best_flavor = matcher.pick_best_flavor(machine)
-        if not best_flavor:
-            LOG.warn(f"No flavor matched for {task.node.uuid}")
-            return upstream_state
-        else:
-            LOG.info(f"Matched {task.node.uuid} to flavor {best_flavor} ")
-            task.node.resource_class = f"baremetal.{best_flavor.name}"
-            task.node.save()
-        return upstream_state
-
-
-class UnderstackDracRedfishInspect(DracRedfishInspect):
-    def __init__(self, *args, **kwargs) -> None:
-        super(UnderstackDracRedfishInspect, self).__init__(*args, **kwargs)
-        patched_ifaces = IDRACHardware().supported_inspect_interfaces
-        patched_ifaces.append(UnderstackDracRedfishInspect)
-        setattr(
-            IDRACHardware,
-            "supported_inspect_interfaces",
-            property(lambda _: patched_ifaces),
-        )
-
-    def inspect_hardware(self, task):
-        """Inspect hardware to get the hardware properties.
-
-        Inspects hardware to get the essential properties.
-        It fails if any of the essential properties
-        are not received from the node.
-
-        :param task: a TaskManager instance.
-        :raises: HardwareInspectionFailure if essential properties
-                 could not be retrieved successfully.
-        :returns: The resulting state of inspection.
-
-        """
-        upstream_state = super().inspect_hardware(task)
-        # properties = task.node.inventory
+        upstream_state = super().inspect_hardware(task) # pyright: ignore reportAttributeAccessIssue
 
         inspection_data = get_inspection_data(task.node, task.context)
 
-        properties = inspection_data or {}
-        if not properties:
+        inventory = inspection_data or {}
+        if not inventory:
             LOG.warn(f"No inventory found for node {task.node}")
 
-        properties = properties["inventory"]
+        inventory = inventory["inventory"]
         LOG.debug(f"Retrieved {inspection_data=}")
 
-        if not (properties.get("memory") and "physical_mb" in properties["memory"]):
+        if not (inventory.get("memory") and "physical_mb" in inventory["memory"]):
             LOG.warn("No memory_mb property detected, skipping flavor setting.")
             return upstream_state
 
-        if not (properties.get("disks") and properties["disks"][0].get("size")):
+        if not (inventory.get("disks") and inventory["disks"][0].get("size")):
             LOG.warn("No disks detected, skipping flavor setting.")
             return upstream_state
 
-        if not (properties.get("cpu") and properties["cpu"]["model_name"]):
+        if not (inventory.get("cpu") and inventory["cpu"]["model_name"]):
             LOG.warn("No CPUS detected, skipping flavor setting.")
             return upstream_state
 
-        smallest_disk_gb = min(
-            [disk["size"] / units.Gi for disk in properties["disks"]]
-        )
+        smallest_disk_gb = min([disk["size"] / units.Gi for disk in inventory["disks"]])
         machine = Machine(
-            memory_mb=properties["memory"]["physical_mb"],
+            memory_mb=inventory["memory"]["physical_mb"],
             disk_gb=smallest_disk_gb,
-            cpu=properties["cpu"]["model_name"],
+            cpu=inventory["cpu"]["model_name"],
         )
 
         matcher = Matcher(FLAVORS)
@@ -151,3 +93,27 @@ class UnderstackDracRedfishInspect(DracRedfishInspect):
         task.node.save()
 
         return upstream_state
+
+
+class UnderstackRedfishInspect(FlavorInspectMixin, RedfishInspect):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        patched_ifaces = RedfishHardware().supported_inspect_interfaces
+        patched_ifaces.append(UnderstackDracRedfishInspect)
+        setattr(
+            RedfishHardware,
+            "supported_inspect_interfaces",
+            property(lambda _: patched_ifaces),
+        )
+
+
+class UnderstackDracRedfishInspect(FlavorInspectMixin, DracRedfishInspect):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        patched_ifaces = IDRACHardware().supported_inspect_interfaces
+        patched_ifaces.append(UnderstackDracRedfishInspect)
+        setattr(
+            IDRACHardware,
+            "supported_inspect_interfaces",
+            property(lambda _: patched_ifaces),
+        )
