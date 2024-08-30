@@ -12,26 +12,32 @@ from understack_workflows.undersync.client import Undersync
 
 logger = setup_logger(__name__)
 
+network_name_status = {
+    "tenant": "Active",
+    "provisioning": "Provisioning Interface"
+}
 
-def update_nautobot(args) -> list[str]:
-    device_uuid = args.device_id
-    field_name = "connected_to_network"
-    field_value = args.network_name
+def update_nautobot(args) -> UUID:
+    device_id = args.device_id
+    interface_id = args.interface_id
+    network_name = args.network_name
+
     nb_url = args.nautobot_url
-
     nb_token = args.nautobot_token or credential("nb-token", "token")
+
+    new_status = network_name_status[args.network_name]
+
     nautobot = Nautobot(nb_url, nb_token, logger=logger)
-    logger.info(
-        f"Updating Device {device_uuid} and moving it to '{field_value}' network."
-    )
-    nautobot.update_cf(device_uuid, field_name, field_value)
-    logger.debug(f"Updated Device.{field_name} to {field_value}")
-    switches = nautobot.uplink_switches(device_uuid)
-    logger.info(f"Obtained switch IDs: {switches}")
-    return switches
+    logger.info(f"Updating Nautobot {device_id=!s} {interface_id=!s} {network_name=}")
+    interface = nautobot.update_switch_interface_status(interface_id, new_status)
+    logger.info(f"Updated Nautobot {device_id=!s} {interface_id=!s} {network_name=}")
+
+    switch_id = interface.device.id
+    logger.info(f"Interface connected to switch {switch_id!s}")
+    return switch_id
 
 
-def call_undersync(args, switches):
+def call_undersync(args, switch_id: UUID):
     undersync_token = credential("undersync", "token")
     if not undersync_token:
         logger.error("Please provide auth token for Undersync.")
@@ -39,7 +45,7 @@ def call_undersync(args, switches):
     undersync = Undersync(undersync_token)
 
     try:
-        return undersync.sync_devices(switches, dry_run=args.dry_run, force=args.force)
+        return undersync.sync_devices([switch_id], dry_run=args.dry_run, force=args.force)
     except Exception as error:
         logger.error(error)
         sys.exit(2)
@@ -54,7 +60,7 @@ def argument_parser():
         "--interface-id", type=UUID, required=True, help="Nautobot interface UUID"
     )
     parser.add_argument(
-        "--device-id", type=UUID, required=True, help="Nautobot device UUID"
+        "--device-id", type=UUID, required=False, help="Nautobot device UUID"
     )
     parser.add_argument("--network-name", required=True)
     parser = parser_nautobot_args(parser)
@@ -83,8 +89,8 @@ def main():
     """
     args = argument_parser().parse_args()
 
-    switches = update_nautobot(args)
-    response = call_undersync(args, switches)
+    switch_id = update_nautobot(args)
+    response = call_undersync(args, switch_id)
     logger.info(f"Undersync returned: {response.json()}")
 
 

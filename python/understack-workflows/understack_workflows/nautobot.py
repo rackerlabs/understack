@@ -110,6 +110,13 @@ class Nautobot:
             self.exit_with_error(f"Device {device_id!s} not found in Nautobot")
         return device
 
+    def interface_by_id(self, interface_id: UUID) -> NautobotInterface:
+        interface = self.session.dcim.interfaces.get(interface_id)
+        if not interface:
+            self.exit_with_error(f"Interface {interface_id!s} not found in Nautobot")
+        return interface
+
+
     def device_interfaces(self, device_id: UUID):
         return self.session.dcim.interfaces.filter(device_id=device_id)
 
@@ -119,6 +126,22 @@ class Nautobot:
         response = device.save()
         self.logger.info(f"save result: {response}")
         return response
+
+    def update_switch_interface_status(self, server_interface_id: UUID, new_status: str) -> NautobotInterface:
+        server_interface = self.interface_by_id(server_interface_id)
+        connected_endpoint = server_interface.connected_endpoint
+        if not connected_endpoint:
+            raise Exception("Interface {server_interface_id} not connected in Nautobot")
+        switch_interface_id = connected_endpoint.id
+        self.logger.debug(f"Int {server_interface_id} connects to {switch_interface_id}")
+        switch_interface = self.interface_by_id(switch_interface_id)
+        switch_interface.status = new_status
+        result = switch_interface.save()
+
+        self.logger.debug(
+            f"Interface {switch_interface_id} updated to Status {new_status} {result=}"
+        )
+        return switch_interface
 
     def update_device_status(self, device_id: UUID, device_status: str):
         device = self.device_by_id(device_id)
