@@ -3,30 +3,23 @@ apiVersion: rabbitmq.com/v1beta1
 kind: User
 metadata:
   name: argo
-  namespace: openstack
 spec:
-  tags:
-  - management  # available tags are 'management', 'policymaker', 'monitoring' and 'administrator'
-  - policymaker
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
-  importCredentialsSecret:
-    name: argo-rabbitmq-password
 ---
 apiVersion: rabbitmq.com/v1beta1
 kind: Permission
 metadata:
   name: argo-to-ironic-permission
-  namespace: openstack
 spec:
   vhost: "ironic"
   userReference:
     name: "argo"  # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
   permissions:
-    write: ".*"
-    configure: ".*"
-    read: ".*"
+    write: "^$"
+    configure: "^$"
+    read: "^ironic_versioned_notifications.info$"
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack

@@ -12,14 +12,10 @@ resources:
   - argo-server-role.yaml
   - argo-role.yaml
 
-  ## create a RabbitMQ user to access openstack notifications
-  - argo-rabbitmq.yaml
-
 
   ## deploy argo-event components
   - native-eventbus.yaml
   - webhook-event-source.yaml
-  - openstack-event-source.yaml
 
   ## configure webhook Sensor and associated role
   - sensor-workflow-role.yaml

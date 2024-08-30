@@ -167,6 +167,13 @@ spec:
                       name: workflow
                       jsonPointers:
                         - /imagePullSecrets
+                - component: understack-workflows
+                  componentNamespace: argo-events
+                  source:
+                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    path: 'apps/understack-workflows'
+
 
   template:
     metadata:

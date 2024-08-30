@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:
-  name: openstack-amqp
+  name: openstack-ironic
 spec:
   amqp:
     openstack:
@@ -27,8 +27,8 @@ spec:
       # use secret selectors
       auth:
         username:
-          name: argo-rabbitmq-password
+          name: argo-user-credentials
           key: username
         password:
-          name: argo-rabbitmq-password
+          name: argo-user-credentials
           key: password
