@@ -98,7 +98,7 @@ spec:
       project: default
       destination:
         server: '{{.server}}'
-        namespace: '{{.component}}'
+        namespace: '{{coalesce (get . "componentNamespace") .component}}'
       syncPolicy:
         automated:
           prune: true
