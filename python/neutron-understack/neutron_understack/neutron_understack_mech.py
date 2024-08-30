@@ -263,14 +263,16 @@ class UnderstackDriver(MechanismDriver):
             return "tenant"
 
     def _move_to_network(self, context):
+        interface_uuid = context.current["id"]
         device_uuid = context.current["binding:host_id"]
         network_name = self.__network_name(context.current["network_id"])
-        LOG.debug(f"Selected {network_name=} for {device_uuid=}")
+        LOG.debug(f"Selected {network_name=} for {device_uuid=} {interface_id=}")
 
         result = argo_client.submit(
             template_name="undersync-device",
             entrypoint="trigger-undersync",
             parameters={
+                "interface_uuid": interface_uuid,
                 "device_uuid": device_uuid,
                 "network_name": network_name,
                 "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,

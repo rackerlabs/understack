@@ -51,6 +51,9 @@ def argument_parser():
         description="Trigger undersync run for a device",
     )
     parser.add_argument(
+        "--interface-id", type=UUID, required=True, help="Nautobot interface UUID"
+    )
+    parser.add_argument(
         "--device-id", type=UUID, required=True, help="Nautobot device UUID"
     )
     parser.add_argument("--network-name", required=True)
