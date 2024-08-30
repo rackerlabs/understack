@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "ironic-understack"
+version = "0.0.0"
+description = "Ironic hooks for Understack"
+authors = ["Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "ironic_understack" }
+]
+
+[tool.poetry.dependencies]
+ironic = "^24.1"
+python = "^3.8"
+pyyaml = "^6.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.2"
+pytest-github-actions-annotate-failures = "*"
+pytest-cov = "^5.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.plugins."ironic.inspection.hooks"]
+"resource-class" = "ironic_understack.resource_class:UndercloudResourceClassHook"
+
+[tool.poetry.plugins."ironic.hardware.interfaces.inspect"]
+"redfish-understack" = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
+"idrac-redfish-understack" = "ironic_understack.redfish_inspect_understack:UnderstackDracRedfishInspect"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra --cov=ironic_understack"
+testpaths = [
+    "tests",
+]
