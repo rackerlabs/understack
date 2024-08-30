@@ -25,3 +25,14 @@ spec:
 #        storageClassName: standard
 #        accessMode: ReadWriteOnce
 #        volumeSize: 10Gi
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: eventbus-default-pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      controller: eventbus-controller
+      eventbus-name: default
