@@ -19,7 +19,7 @@ network_name_status = {
 
 def update_nautobot(args) -> UUID:
     device_id = args.device_id
-    interface_id = args.interface_id
+    interface_mac = args.interface_mac
     network_name = args.network_name
 
     nb_url = args.nautobot_url
@@ -28,9 +28,9 @@ def update_nautobot(args) -> UUID:
     new_status = network_name_status[args.network_name]
 
     nautobot = Nautobot(nb_url, nb_token, logger=logger)
-    logger.info(f"Updating Nautobot {device_id=!s} {interface_id=!s} {network_name=}")
-    interface = nautobot.update_switch_interface_status(interface_id, new_status)
-    logger.info(f"Updated Nautobot {device_id=!s} {interface_id=!s} {network_name=}")
+    logger.info(f"Updating Nautobot {device_id=!s} {interface_mac=!s} {network_name=}")
+    interface = nautobot.update_switch_interface_status(device_id, interface_mac, new_status)
+    logger.info(f"Updated Nautobot {device_id=!s} {interface_mac=!s} {network_name=}")
 
     switch_id = interface.device.id
     logger.info(f"Interface connected to switch {switch_id!s}")
@@ -57,7 +57,7 @@ def argument_parser():
         description="Trigger undersync run for a device",
     )
     parser.add_argument(
-        "--interface-id", type=UUID, required=True, help="Nautobot interface UUID"
+        "--interface-mac", type=str, required=True, help="Interface MAC address"
     )
     parser.add_argument(
         "--device-id", type=UUID, required=False, help="Nautobot device UUID"

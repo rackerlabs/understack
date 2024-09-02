@@ -116,6 +116,17 @@ class Nautobot:
             self.exit_with_error(f"Interface {interface_id!s} not found in Nautobot")
         return interface
 
+    def non_lag_interface_by_mac(self, device_id: UUID, mac_address: str) -> list[NautobotInterface]:
+        interfaces = self.session.dcim.interfaces.filter(
+            device_id=device_id,
+            mac_address=mac_address,
+            type__n = "lag",
+        )
+        if not interfaces:
+            self.exit_with_error(
+                f"Interface with {device_id=} and {mac_address=} not found in Nautobot"
+            )
+        return interfaces[0]
 
     def device_interfaces(self, device_id: UUID):
         return self.session.dcim.interfaces.filter(device_id=device_id)
@@ -127,13 +138,34 @@ class Nautobot:
         self.logger.info(f"save result: {response}")
         return response
 
-    def update_switch_interface_status(self, server_interface_id: UUID, new_status: str) -> NautobotInterface:
-        server_interface = self.interface_by_id(server_interface_id)
+    def update_switch_interface_status(
+        self, device_id: UUID, server_interface_mac: str, new_status: str
+    ) -> NautobotInterface:
+        """Change the Interface Status in Nautobot for interfaces
+
+        The device_id and interface MAC address parameters identify one or more
+        server interfaces.
+
+        Nautobot Interfaces that are selected that match the device UUID and MAC
+        address, but excluding any parent LAG interfaces - only the member
+        interfaces are considered.
+
+        We then update ONE of the connected switch ports to the appropriate status.
+
+        The interface is returned.
+        """
+        server_interface = self.non_lag_interface_by_mac(device_id, server_interface_mac)
+
         connected_endpoint = server_interface.connected_endpoint
         if not connected_endpoint:
-            raise Exception("Interface {server_interface_id} not connected in Nautobot")
+            raise Exception(
+                f"Interface {server_interface_mac} {server_interface.type} not connected in Nautobot"
+            )
         switch_interface_id = connected_endpoint.id
-        self.logger.debug(f"Int {server_interface_id} connects to {switch_interface_id}")
+        self.logger.debug(
+            f"Interface {server_interface_mac} connects to {switch_interface_id}"
+        )
+
         switch_interface = self.interface_by_id(switch_interface_id)
         switch_interface.status = new_status
         result = switch_interface.save()

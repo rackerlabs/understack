@@ -15,8 +15,8 @@ spec:
         command:
           - undersync-device
         args:
-          - --interface-id
-          - "{{workflow.parameters.interface_uuid}}"
+          - --interface-mac
+          - "{{workflow.parameters.interface_mac}}"
           - --device-id
           - "{{workflow.parameters.device_uuid}}"
           - --network-name
@@ -34,7 +34,7 @@ spec:
             readOnly: true
       inputs:
         parameters:
-          - name: interface_uuid
+          - name: interface_mac
           - name: device_uuid
           - name: network_name
           - name: force
