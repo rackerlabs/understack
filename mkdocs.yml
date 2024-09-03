@@ -110,6 +110,7 @@ nav:
       - component-overview.md
       - component-argo-events.md
       - component-argo-workflows.md
+      - component-understack-workflows.md
   - 'Deployment Guide':
     - deploy-guide/index.md
     - Quick Start: deploy-guide/gitops-install.md
