@@ -1,0 +1,28 @@
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: openstack-svc-acct
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: openstack
+  target:
+    name: openstack-svc-acct
+    template:
+      engineVersion: v2
+      data:
+        clouds.yaml: |
+          clouds:
+            understack:
+              auth_url: http://keystone-api.openstack.svc.cluster.local:5000/v3
+              user_domain_name: {{ .user_domain }}
+              username: {{ .username }}
+              password: {{ .password }}
+              # this should switch to where we will be creating the ironic nodes
+              # in the future
+              project_domain_name: default
+              project_name: undercloud
+  dataFrom:
+    - extract:
+        key: svc-acct-argoworkflow

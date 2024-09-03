@@ -46,6 +46,7 @@ jobs:
             argo-workflows/**/workflowtemplates/*.y*ml
             argo-workflows/**/sensors/*.y*ml
             argo-workflows/**/workflows/*.y*ml
+            apps/understack-workflows/workflows/workflowtemplates/*.y*ml
 
   shellcheck:
     runs-on: ubuntu-latest
