@@ -353,22 +353,9 @@ yq '(.. | select(tag == "!!str")) |= envsubst' \
     "./components/openstack-secrets.tpl.yaml" \
     > "${DEST_DIR}/secret-openstack.yaml"
 
-echo "Checking argo-events"
-# Argo Events access to RabbitMQ - credentials
-for ns in argo-events openstack; do
-  [ ! -f "${DEST_DIR}/secret-argo-rabbitmq-password-$ns.yaml" ] && \
-  kubectl --namespace $ns \
-      create secret generic argo-rabbitmq-password \
-      --type Opaque \
-      --from-literal=username="argo" \
-      --from-literal=password="${ARGO_RABBITMQ_PASSWORD}" \
-      --dry-run=client -o yaml | secret-seal-stdin "${DEST_DIR}/secret-argo-rabbitmq-password-$ns.yaml"
-done
-
 echo "Checking undersync"
 # create a placeholder directory for undersync configs
 mkdir -p "${DEST_DIR}/undersync"
-
 
 find "${DEST_DIR}" -maxdepth 1 -mindepth 1 -type d | while read -r component; do
     if [ ! -f "${component}/kustomization.yaml" ]; then

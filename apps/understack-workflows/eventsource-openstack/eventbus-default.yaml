@@ -1,5 +1,5 @@
-# Default and deprecated NATS EventBus sourced from:
-# https://github.com/argoproj/argo-events/blob/master/examples/eventbus/native.yaml
+# default NATS EventBus sourced from:
+# https://raw.githubusercontent.com/argoproj/argo-events/stable/examples/eventbus/native.yaml
 
 apiVersion: argoproj.io/v1alpha1
 kind: EventBus

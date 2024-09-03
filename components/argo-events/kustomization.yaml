@@ -4,7 +4,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - https://github.com/argoproj/argo-events/releases/download/v1.9.1/namespace-install.yaml
+  - https://github.com/argoproj/argo-events/releases/download/v1.9.1/install.yaml
   - https://github.com/argoproj/argo-events/releases/download/v1.9.1/install-validating-webhook.yaml
 
   ## configure rbac to integrate with argo-workflow
@@ -12,14 +12,10 @@ resources:
   - argo-server-role.yaml
   - argo-role.yaml
 
-  ## create a RabbitMQ user to access openstack notifications
-  - argo-rabbitmq.yaml
-
 
   ## deploy argo-event components
   - native-eventbus.yaml
   - webhook-event-source.yaml
-  - openstack-event-source.yaml
 
   ## configure webhook Sensor and associated role
   - sensor-workflow-role.yaml

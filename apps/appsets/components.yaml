@@ -103,7 +103,7 @@ spec:
                             # path: $understack/components/nautobot/nautobot_config.py
                             path: 'https://raw.githubusercontent.com/rackerlabs/understack/{{index .metadata.annotations "uc_repo_ref" }}/components/nautobot/nautobot_config.py'
                 - component: argo
-                  source: &uc_component
+                  source:
                     repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                     targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                     path: 'components/argo'
@@ -158,7 +158,8 @@ spec:
                               value: '{{.name }}-cluster-issuer'
                 - component: argo-events
                   source:
-                    <<: *uc_component
+                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                     path: 'components/argo-events'
                   ignoreDifferences:
                     - group: ''
@@ -166,6 +167,13 @@ spec:
                       name: workflow
                       jsonPointers:
                         - /imagePullSecrets
+                - component: understack-workflows
+                  componentNamespace: argo-events
+                  source:
+                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    path: 'apps/understack-workflows'
+
 
   template:
     metadata:
@@ -174,7 +182,7 @@ spec:
       project: default
       destination:
         server: '{{.server}}'
-        namespace: '{{.component}}'
+        namespace: '{{coalesce (get . "componentNamespace") .component}}'
       syncPolicy:
         automated:
           selfHeal: true
