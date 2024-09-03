@@ -48,7 +48,7 @@ def main():
             f"Device {node.uuid} is in a {ironic_node.provision_state} "
             f"provision_state, so the updates are not allowed."
         )
-        sys.exit(0)
+        return ironic_node.provision_state
 
     drac_ip = update_data["ip_addresses"][0]["host"]
     expected_address = f"https://{drac_ip}"
@@ -77,3 +77,8 @@ def main():
     response = client.update_node(node.uuid, patches)
     logger.info(f"Patching: {patches}")
     logger.info(f"Updated: {response}")
+    return ironic_node.provision_state
+
+
+if __name__ == "__main__":
+    main()
