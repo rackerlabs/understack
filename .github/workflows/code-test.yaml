@@ -8,51 +8,46 @@ on:
       - "python/ironic-understack/**"
       - "python/understack-workflows/**"
       - ".github/workflows/code-test.yaml"
-  pull_request:
+  pull_request_target:
     paths:
       - "python/ironic-understack/**"
       - "python/understack-workflows/**"
       - ".github/workflows/code-test.yaml"
   workflow_dispatch:
 
+# limit rapid succession from pushes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
-  understack-workflows:
+  python:
+    permissions:
+      contents: read
+      pull-requests: write
+
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        project:
+          - understack-workflows
+          - ironic-understack
+
     defaults:
       run:
-        working-directory: ./python/understack-workflows
+        working-directory: ./python/${{ matrix.project }}
 
     steps:
       - uses: actions/checkout@v4
       - run: pipx install poetry==1.7.1 && poetry self add 'poetry-dynamic-versioning[plugin]'
       - uses: actions/setup-python@v5
         with:
-          python-version-file: python/understack-workflows/pyproject.toml
+          python-version-file: python/${{ matrix.project }}/pyproject.toml
           cache: "poetry"
       - run: poetry install --sync --with test
       - run: poetry build
       - run: "poetry run pytest --cov-report xml:coverage.xml"
       - uses: orgoro/coverage@v3.2
         with:
-          coverageFile: python/understack-workflows/coverage.xml
-          token: ${{ secrets.GITHUB_TOKEN }}
-  ironic-understack:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./python/ironic-understack
-
-    steps:
-      - uses: actions/checkout@v4
-      - run: pipx install poetry==1.7.1 && poetry self add 'poetry-dynamic-versioning[plugin]'
-      - uses: actions/setup-python@v5
-        with:
-          python-version-file: python/ironic-understack/pyproject.toml
-          cache: "poetry"
-      - run: poetry install --sync --with test
-      - run: poetry build
-      - run: "poetry run pytest --cov-report xml:coverage.xml"
-      - uses: orgoro/coverage@v3.2
-        with:
-          coverageFile: python/ironic-understack/coverage.xml
+          coverageFile: python/${{ matrix.project }}/coverage.xml
           token: ${{ secrets.GITHUB_TOKEN }}
