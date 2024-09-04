@@ -5,3 +5,4 @@ kind: Kustomization
 resources:
   - keystone-mariadb-db.yaml
   - keystone-rabbitmq-queue.yaml
+  - external-secret-keystone-sso.yaml

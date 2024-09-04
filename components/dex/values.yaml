@@ -49,6 +49,11 @@ config:
       name: "Undercloud ArgoCD"
       redirectURIs:
         - "https://argocd.$DNS_ZONE/auth/callback"
+    - id: keystone
+      secretEnv: KEYSTONE_SSO_CLIENT_SECRET
+      name: "OpenStack Keystone"
+      redirectURIs:
+        - "https://keystone.$DNS_ZONE/redirect_uri"
 
 envVars:
   - name: NAUTOBOT_SSO_CLIENT_SECRET
@@ -65,6 +70,11 @@ envVars:
     valueFrom:
       secretKeyRef:
         name: argocd-sso
+        key: client-secret
+  - name: KEYSTONE_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: keystone-sso
         key: client-secret
   - name: OIDC_ISSUER
     valueFrom:

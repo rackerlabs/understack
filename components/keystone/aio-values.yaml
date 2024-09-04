@@ -149,6 +149,17 @@ pod:
             initialDelaySeconds: 50
             periodSeconds: 60
             timeoutSeconds: 15
+  mounts:
+    keystone_api:
+      keystone_api:
+        volumeMounts:
+          - name: keystone-sso
+            mountPath: /etc/keystone-sso
+            readOnly: true
+        volumes:
+          - name: keystone-sso
+            secret:
+              secretName: keystone-sso
 
 conf:
   keystone:
@@ -156,6 +167,60 @@ conf:
       methods: password,token,openid,mapped,application_credential
     openid:
       remote_id_attribute: HTTP_OIDC_ISS
+  wsgi_keystone: |
+    {{- $portInt := tuple "identity" "service" "api" $ | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+
+    Listen 0.0.0.0:{{ $portInt }}
+
+    LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+    LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" proxy
+
+    SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
+    CustomLog /dev/stdout combined env=!forwarded
+    CustomLog /dev/stdout proxy env=forwarded
+
+    <VirtualHost *:{{ $portInt }}>
+        WSGIDaemonProcess keystone-public processes=1 threads=1 user=keystone group=keystone display-name=%{GROUP}
+        WSGIProcessGroup keystone-public
+        WSGIScriptAlias / /var/www/cgi-bin/keystone/keystone-wsgi-public
+        WSGIApplicationGroup %{GLOBAL}
+        WSGIPassAuthorization On
+
+        # OIDC
+        OIDCClaimPrefix "OIDC-"
+        OIDCSessionType server-cache
+        OIDCXForwardedHeaders X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
+        OIDCResponseType "code"
+        OIDCScope "openid email profile groups"
+        OIDCProviderMetadataURL http://dex.dex.svc:5556/.well-known/openid-configuration
+        OIDCClientID keystone
+        OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
+        OIDCCryptoPassphrase "exec:/bin/bash -c \"head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32\""
+
+        # avoid redirect issues per the following
+        # https://review.opendev.org/c/openstack/keystone/+/925553
+        OIDCRedirectURI https://{{- tuple "identity" "public" $ | include "helm-toolkit.endpoints.hostname_fqdn_endpoint_lookup" -}}/redirect_uri
+        <Location ~ "/redirect_uri">
+          Require valid-user
+          AuthType openid-connect
+        </Location>
+
+        # add using the identity provider 'sso' with the protocol 'openid'
+        <Location /v3/OS-FEDERATION/identity_providers/sso/protocols/openid/auth>
+          Require valid-user
+          AuthType openid-connect
+        </Location>
+        # websso support
+        <Location /v3/auth/OS-FEDERATION/websso/openid>
+          Require valid-user
+          AuthType openid-connect
+        </Location>
+        <Location /v3/auth/OS-FEDERATION/identity_providers/sso/protocols/openid/websso>
+          Require valid-user
+          AuthType openid-connect
+        </Location>
+    </VirtualHost>
+
 
 # typically overridden by environmental
 # values, but should include all endpoints
