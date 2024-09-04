@@ -1,15 +1,17 @@
 import json
 import logging
-from uuid import UUID
 from pprint import pprint
+from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
 from neutron_lib.plugins.ml2 import api
-from neutron_lib.plugins.ml2.api import MechanismDriver
-from neutron_lib.plugins.ml2.api import NetworkContext
-from neutron_lib.plugins.ml2.api import PortContext
-from neutron_lib.plugins.ml2.api import SubnetContext
+from neutron_lib.plugins.ml2.api import (
+    MechanismDriver,
+    NetworkContext,
+    PortContext,
+    SubnetContext,
+)
 from oslo_config import cfg
 
 from neutron_understack.argo.workflows import ArgoClient
@@ -157,7 +159,7 @@ def _move_to_network(
     network_id: str,
     argo_client: ArgoClient,
 ):
-    """Triggers Argo "trigger-undersync" workflow
+    """Triggers Argo "trigger-undersync" workflow.
 
     This has the effect of connecting our server to the given networks: either
     "provisioning" (for PXE booting) or "tenant" (normal access to customer's
@@ -167,7 +169,6 @@ def _move_to_network(
 
     argo_client is injected by the caller to make testing easier
     """
-
     if vif_type != portbindings.VIF_TYPE_OTHER:
         return
 

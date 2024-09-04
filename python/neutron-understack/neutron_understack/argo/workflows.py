@@ -1,5 +1,6 @@
-import requests
 import time
+
+import requests
 import urllib3
 
 urllib3.disable_warnings()
@@ -11,7 +12,7 @@ class ArgoClient:
         token: str,
         namespace="default",
         api_url="https://argo-server.argo.svc.cluster.local:2746",
-        logger=None
+        logger=None,
     ):
         self.token = token
         self.namespace = namespace
