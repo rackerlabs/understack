@@ -17,9 +17,9 @@ spec:
   userReference:
     name: "argo"  # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
   permissions:
-    write: "^$"
-    configure: "^$"
-    read: "^ironic_versioned_notifications.info$"
+    write: ".*"
+    configure: ".*"
+    read: ".*"
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
