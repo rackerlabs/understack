@@ -1,6 +1,6 @@
 import json
 import logging
-import uuid
+from uuid import UUID
 from pprint import pprint
 
 import neutron_lib.api.definitions.portbindings as portbindings
@@ -149,7 +149,7 @@ def log_call(
 
 class UnderstackDriver(MechanismDriver):
     # See MechanismDriver docs for resource_provider_uuid5_namespace
-    resource_provider_uuid5_namespace = uuid.UUID(
+    resource_provider_uuid5_namespace = UUID(
         "6eae3046-4072-11ef-9bcf-d6be6370a162"
     )
 
