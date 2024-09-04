@@ -1,10 +1,33 @@
+[tool.poetry]
+name = "neutron-understack"
+version = "0.1.0"
+description = "Undercloud's ML2 driver for neutron"
+authors = ["Understack Developers"]
+readme = "README.rst"
 
 [tool.ruff]
 target-version = "py310"
 fix = true
+[tool.poetry.dependencies]
+python = "^3.12"
+pytest = "^8.3.2"
+requests = "^2.32.3"
+neutron-lib = "^3.15.0"
+ruff = "^0.6.3"
+pytest-cov = "^5.0.0"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra"
+filterwarnings = "ignore::DeprecationWarning"
+
+
+[tool.isort]
+profile = "open_stack"
 
 [tool.ruff.lint]
 select = [
+  "D",       # pydocstyle
   "E",       # pycodestyle (error)
   "F",       # pyflakes
   "B",       # flake8-bugbear
@@ -13,5 +36,16 @@ select = [
   "ASYNC",   # flake8-async
 ]
 
-[tool.ruff.lint.isort]
-force-single-line = true
+ignore = [
+    "D100",  # don't require docs for every module
+    "D101",  # don't require docs for every class
+    "D102",  # don't require docs for every class method
+    "D103",  # don't require docs for every function
+    "D104",  # don't require docs for every package
+    "D417"   # don't require docs for every function parameter
+]
+
+[tool.ruff.lint.pydocstyle]
+# enable the google doc style rules by default
+convention = "google"
+
