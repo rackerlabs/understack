@@ -1,0 +1,35 @@
+{
+  "admin_state_up": true,
+  "allowed_address_pairs": [],
+  "binding:host_id": "",
+  "binding:profile": {},
+  "binding:vif_details": {},
+  "binding:vif_type": "unbound",
+  "binding:vnic_type": "normal",
+  "created_at": "2024-07-24T13:42:24Z",
+  "description": "",
+  "device_id": "41d18c6a-5548-4ee9-926f-4e3ebf43153f",
+  "device_owner": "compute:nova",
+  "extra_dhcp_opts": [],
+  "fixed_ips": [
+    {
+      "ip_address": "192.168.17.17",
+      "subnet_id": "7f2f436c-fd65-44b0-9265-6b642cecbec5"
+    }
+  ],
+  "id": "e5d5cd73-ca9a-4b74-9d52-43188d0cdcaa",
+  "mac_address": "fa:16:3e:35:1c:3d",
+  "name": "",
+  "network_id": "c2702769-5592-4555-8ae6-e670db82c31e",
+  "port_security_enabled": true,
+  "project_id": "ebc5b22e420d4dfc9e385a63b4583623",
+  "revision_number": 2,
+  "security_groups": [
+    "684dcc25-f419-44a5-b4e7-fdcad4335ecd"
+  ],
+  "standard_attr_id": 56,
+  "status": "DOWN",
+  "tags": [],
+  "tenant_id": "ebc5b22e420d4dfc9e385a63b4583623",
+  "updated_at": "2024-07-24T13:42:25Z"
+}
