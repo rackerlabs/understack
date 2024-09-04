@@ -8,15 +8,23 @@ on:
       - "python/ironic-understack/**"
       - "python/understack-workflows/**"
       - ".github/workflows/code-test.yaml"
-  pull_request:
+  pull_request_target:
     paths:
       - "python/ironic-understack/**"
       - "python/understack-workflows/**"
       - ".github/workflows/code-test.yaml"
   workflow_dispatch:
 
+# limit rapid succession from pushes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
   python:
+    permissions:
+      contents: read
+      pull-requests: write
+
     runs-on: ubuntu-latest
 
     strategy:
