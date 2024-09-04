@@ -48,7 +48,7 @@ def main():
             f"Device {node.uuid} is in a {ironic_node.provision_state} "
             f"provision_state, so the updates are not allowed."
         )
-        return ironic_node.provision_state
+        sys.exit(0)
 
     drac_ip = update_data["ip_addresses"][0]["host"]
     expected_address = f"https://{drac_ip}"
@@ -81,4 +81,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.stdout.write(main())

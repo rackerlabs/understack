@@ -12,27 +12,26 @@ spec:
         value: "{}"
   templates:
     - name: main
-      input:
-        parameters:
-          - name: interface_update_event
-      output:
-        parameters:
-          - name: server_state
-            valueFrom:
-              expression: "{{ steps.sync-server.outputs.parameters.result }}"
       steps:
         - - name: sync-server
+            input:
+              parameters:
+                - name: interface_update_event
+            output:
+              parameters:
+                - name: server_state
+                  value: "{{ steps.sync-server.outputs.parameters.result.server_state }}"
             container:
-            image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
-            command:
-              - sync-server
-            args:
-              - "{{input.parameters.interface_update_event}}"
-            volumeMounts:
-              - mountPath: /etc/ironic-secrets/
-                name: ironic-secrets
-                readOnly: true
+              image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+              command:
+                - sync-server
+              args:
+                - "{{input.parameters.interface_update_event}}"
+              volumeMounts:
+                - mountPath: /etc/ironic-secrets/
+                  name: ironic-secrets
+                  readOnly: true
             volumes:
               - name: ironic-secrets
                 secret:
-                secretName: production-ironic-for-argo-creds
+                  secretName: production-ironic-for-argo-creds
