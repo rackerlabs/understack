@@ -12,6 +12,11 @@ from understack_workflows.node_configuration import IronicNodeConfiguration
 logger = setup_logger(__name__)
 
 
+def write_ironic_state_to_file(state):
+    with open("/tmp/ironic_state.txt", "w") as f:
+        f.write(state)
+
+
 def main():
     if len(sys.argv) < 1:
         raise ValueError(
@@ -77,8 +82,4 @@ def main():
     response = client.update_node(node.uuid, patches)
     logger.info(f"Patching: {patches}")
     logger.info(f"Updated: {response}")
-    return ironic_node.provision_state
-
-
-if __name__ == "__main__":
-    sys.stdout.write(main())
+    write_ironic_state_to_file(ironic_node.provision_state)
