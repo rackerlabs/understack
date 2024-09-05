@@ -32,3 +32,18 @@ manifests:
 # editing the annotation which deletes the item
 # and wipes our keys.
 helm3_hook: false
+
+annotations:
+  job:
+    placement_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    placement_ks_service:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    placement_ks_user:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    placement_ks_endpoints:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
