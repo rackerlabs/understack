@@ -41,8 +41,10 @@ jobs:
         with:
           images: ghcr.io/rackerlabs/understack/${{ matrix.project }}
           tags: |
-            type=sha,enable={{is_default_branch}}
-            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy
+            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable={{is_default_branch}}
+            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=ref,event=tag
+            type=ref,event=pr
         env:
           # Create the annotations at the index as well since this
           # defaults to manifest only and we have to manually merge
@@ -84,7 +86,8 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=sha,enable={{is_default_branch}}
+            type=ref,event=tag
+            type=ref,event=pr
         env:
           # Create the annotations at the index as well since this
           # defaults to manifest only and we have to manually merge
