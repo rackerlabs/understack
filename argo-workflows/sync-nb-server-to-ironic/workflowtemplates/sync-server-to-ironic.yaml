@@ -12,6 +12,11 @@ spec:
         value: "{}"
   templates:
     - name: sync-server
+      outputs:
+        parameters:
+          - name: server_state
+            valueFrom:
+              path: "/tmp/ironic_state.txt"
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
