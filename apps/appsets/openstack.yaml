@@ -17,19 +17,19 @@ spec:
           - list:
               elements:
                 - component: keystone
-                  chartVersion: 0.3.13
-                - component: ironic
-                  chartVersion: 0.2.15
-                - component: placement
                   chartVersion: 0.3.15
+                - component: ironic
+                  chartVersion: 0.2.18
+                - component: placement
+                  chartVersion: 0.3.16
                 - component: neutron
                   chartVersion: 0.3.47
                 - component: glance
-                  chartVersion: 0.4.26
+                  chartVersion: 0.5.0
                 - component: nova
-                  chartVersion: 0.3.42
+                  chartVersion: 0.3.44
                 - component: horizon
-                  chartVersion: 0.3.26
+                  chartVersion: 0.3.27
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
