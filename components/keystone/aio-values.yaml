@@ -25,6 +25,7 @@ bootstrap:
     openstack project create undercloud --or-show
     openstack user create --project undercloud --password demo argoworkflow --or-show
     openstack role add --user argoworkflow --project undercloud member
+    openstack role add --user argoworkflow --project undercloud admin
     # allow ironic user to see servers in undercloud project
     openstack role add --project undercloud --user ironic --user-domain service  member
     openstack role add --project service --user ironic --user-domain service service
