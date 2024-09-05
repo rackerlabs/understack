@@ -9,11 +9,16 @@ readme = "README.rst"
 target-version = "py310"
 fix = true
 [tool.poetry.dependencies]
-python = "^3.12"
-pytest = "^8.3.2"
+python = "^3.10"
 requests = "^2.32.3"
 neutron-lib = "^3.15.0"
-ruff = "^0.6.3"
+
+[tool.poetry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.2"
+pytest-cov = "^5.0.0"
 pytest-cov = "^5.0.0"
 
 [tool.pytest.ini_options]
