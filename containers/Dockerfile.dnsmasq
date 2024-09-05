@@ -31,6 +31,8 @@ RUN dpkg-buildpackage -rfakeroot
 
 FROM debian:bookworm-20240408-slim as prod
 
+LABEL org.opencontainers.image.description="dnsmasq for Understack's Ironic"
+
 COPY --from=builder /src/dnsmasq-base_2.89-2_amd64.deb /tmp
 COPY --from=builder /src/dnsmasq_2.89-2_all.deb /tmp
 

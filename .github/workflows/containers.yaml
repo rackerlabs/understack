@@ -85,8 +85,6 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
             type=sha,enable={{is_default_branch}}
-          labels: |
-            org.opencontainers.image.title=dnsmasq for Understack's Ironic
         env:
           # Create the annotations at the index as well since this
           # defaults to manifest only and we have to manually merge
@@ -111,7 +109,6 @@ jobs:
       matrix:
         container:
           - name: ironic-nautobot-client
-            title: Understack Ironic Nautobot Clients
 
     steps:
       - name: setup docker buildx
@@ -134,8 +131,6 @@ jobs:
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
             type=ref,event=tag
             type=ref,event=pr
-          labels: |
-            org.opencontainers.image.title=${{ matrix.container.title }}
         env:
           # Create the annotations at the index as well since this
           # defaults to manifest only and we have to manually merge
