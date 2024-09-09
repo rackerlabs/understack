@@ -7,7 +7,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Enable network boot in Dell iDrac BIOS
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/obm-utils/workflowtemplates/idrac-enable-network-boot.yaml`
+      Defined in `argo-workflows/workflows/idrac-enable-network-boot.yaml`
 spec:
   arguments:
     parameters:

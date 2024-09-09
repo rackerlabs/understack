@@ -3,7 +3,7 @@ metadata:
   name: sync-provision-state-to-nautobot
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/ironic-to-nautobot-sensor/workflowtemplates/sync.yaml`
+      Defined in `argo-workflows/workflows/sync-provision-state-to-nautobot.yaml`
 kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow

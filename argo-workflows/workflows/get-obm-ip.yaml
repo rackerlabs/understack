@@ -5,7 +5,7 @@ metadata:
   namespace: argo-events
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/generic/workflowtemplates/get-obm-creds.yaml`.
+      Defined in `argo-workflows/workflows/get-obm-ip.yaml`.
       Get OBM IP address for target Device
 spec:
   serviceAccountName: workflow

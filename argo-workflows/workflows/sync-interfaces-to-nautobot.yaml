@@ -3,7 +3,7 @@ metadata:
   name: sync-interfaces-to-nautobot
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/sync-srv-redfish-intfs-to-nb/sync-interfaces-to-nautobot.yaml`
+      Defined in `argo-workflows/workflows/sync-interfaces-to-nautobot.yaml`
 kind: WorkflowTemplate
 spec:
   arguments:
