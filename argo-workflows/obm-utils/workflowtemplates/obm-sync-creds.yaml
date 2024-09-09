@@ -43,6 +43,17 @@ spec:
                   value: "{{tasks.get-obm-ip.outputs.parameters.ip}}"
                 - name: target_creds_secret_name
                   value: "{{tasks.get-obm-creds.outputs.parameters.secret}}"
+          - name: idrac-enable-network-boot
+            dependencies: [get-obm-ip, get-obm-creds]
+            templateRef:
+              name: idrac-enable-network-boot
+              template: idrac-enable-network-boot
+            arguments:
+              parameters:
+                - name: host
+                  value: "{{tasks.get-obm-ip.outputs.parameters.ip}}"
+                - name: target_creds_secret_name
+                  value: "{{tasks.get-obm-creds.outputs.parameters.secret}}"
 
     - name: obm-sync-creds
       inputs:
