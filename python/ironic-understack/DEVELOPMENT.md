@@ -8,23 +8,25 @@ In order to easily setup the development environment for `ironic_understack`:
 
 That's it.
 
+## Automated method (recommended)
+
+If you want the environment to be started automatically when you `cd` into a
+project directory (without you having to run `devenv shell`), run a one-time
+command:
+
+`devbox generate direnv`
+
+You also need to have [direnv](https://direnv.net/docs/installation.html)
+installed on your system.
+
+The next time you change into the project directory you will have the
+environment ready to use.
+
 ## Manual method
 
 Run `devbox shell` in the project directory every time you want to enter
 development environment.
 
-## Automated method
-
-If you want the environment to be started automatically when you `cd` into a
-project directory (without you having to run `devenv shell`), run:
-
-`devbox generate direnv`
-
-You need to have [direnv](https://direnv.net/docs/installation.html) installed
-on your system.
-
-The next time you change into the project directory you will have the
-environment ready to use.
 
 ## What's available in the environment
 
