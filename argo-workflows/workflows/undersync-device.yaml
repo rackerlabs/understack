@@ -3,7 +3,7 @@ metadata:
   name: undersync-device
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/trigger-undersync/undersync-device.yaml`
+      Defined in `argo-workflows/workflows/undersync-device.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: trigger-undersync

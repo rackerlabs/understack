@@ -4,7 +4,7 @@ metadata:
   name: node-events
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/sync-nb-server-to-ironic/node-events.yaml`
+      Defined in `argo-workflows/workflows/node-events.yaml`
 spec:
   volumes:
     - name: argo-secrets

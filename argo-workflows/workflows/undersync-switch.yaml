@@ -3,7 +3,7 @@ metadata:
   name: undersync-switch
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/trigger-undersync/undersync-switch.yaml`
+      Defined in `argo-workflows/workflows/undersync-switch.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: undersync-switch

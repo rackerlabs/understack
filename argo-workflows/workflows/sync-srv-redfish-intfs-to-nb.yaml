@@ -3,7 +3,7 @@ metadata:
   name: sync-srv-redfish-intfs-to-nb
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/sync-srv-redfish-intfs-to-nb/sync-srv-redfish-intfs-to-nb.yaml`
+      Defined in `argo-workflows/workflows/sync-srv-redfish-intfs-to-nb.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: main
