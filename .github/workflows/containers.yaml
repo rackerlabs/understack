@@ -9,6 +9,7 @@ on:
       - ".github/workflows/containers.yaml"
       - "python/**"
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - "containers/**"
       - ".github/workflows/containers.yaml"
@@ -28,7 +29,6 @@ jobs:
       - name: setup docker buildx
         uses: docker/setup-buildx-action@v3
       - name: login to ghcr.io
-        if: ${{ github.event_name != 'pull_request' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -41,8 +41,10 @@ jobs:
         with:
           images: ghcr.io/rackerlabs/understack/${{ matrix.project }}
           tags: |
-            type=sha,enable={{is_default_branch}}
-            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy
+            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable={{is_default_branch}}
+            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=ref,event=tag
+            type=ref,event=pr
         env:
           # Create the annotations at the index as well since this
           # defaults to manifest only and we have to manually merge
@@ -57,7 +59,7 @@ jobs:
           file: containers/Dockerfile.${{ matrix.project }}
           build-args: OPENSTACK_VERSION=${{ matrix.openstack }}
           pull: true  # ensure we always have an up to date source
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
@@ -69,7 +71,6 @@ jobs:
       - name: setup docker buildx
         uses: docker/setup-buildx-action@v3
       - name: login to ghcr.io
-        if: ${{ github.event_name != 'pull_request' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -84,9 +85,8 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=sha,enable={{is_default_branch}}
-          labels: |
-            org.opencontainers.image.title=dnsmasq for Understack's Ironic
+            type=ref,event=tag
+            type=ref,event=pr
         env:
           # Create the annotations at the index as well since this
           # defaults to manifest only and we have to manually merge
@@ -98,9 +98,8 @@ jobs:
       - name: build and deploy dnsmasq container to registry
         uses: docker/build-push-action@v5
         with:
-          context: "{{defaultContext}}:containers"
-          file: Dockerfile.dnsmasq
-          push: ${{ github.event_name != 'pull_request' }}
+          file: containers/Dockerfile.dnsmasq
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
@@ -111,13 +110,11 @@ jobs:
       matrix:
         container:
           - name: ironic-nautobot-client
-            title: Understack Ironic Nautobot Clients
 
     steps:
       - name: setup docker buildx
         uses: docker/setup-buildx-action@v3
       - name: login to ghcr.io
-        if: ${{ github.event_name != 'pull_request' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -134,8 +131,6 @@ jobs:
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
             type=ref,event=tag
             type=ref,event=pr
-          labels: |
-            org.opencontainers.image.title=${{ matrix.container.title }}
         env:
           # Create the annotations at the index as well since this
           # defaults to manifest only and we have to manually merge
@@ -149,9 +144,59 @@ jobs:
         with:
           file: containers/Dockerfile.${{ matrix.container.name }}
           pull: true  # ensure we always have an up to date source
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
           # prod is the target that has the code installed
           target: prod
+
+  clean_containers:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    strategy:
+      matrix:
+        container:
+          - ironic
+          - neutron
+          - dnsmasq
+          - ironic-nautobot-client
+
+    steps:
+      - name: clean up PR container
+        uses: actions/github-script@v7
+        env:
+          CONTAINER_NAME: '${{ matrix.container }}'
+        with:
+          script: |
+            const container_name = `understack%2F${process.env.CONTAINER_NAME}`;
+            const response = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+              package_type: "container",
+              package_name: process.env.CONTAINER_NAME,
+              org: context.repo.owner,
+            });
+
+            const target_tag = `pr-${context.payload.pull_request.number}`;
+            console.log(`Looking for tag ${target_tag} for container ${container_name}`);
+
+            const versions = response.data || [];
+            const matchingVersion = versions.find(version =>
+              version.metadata.container.tags.includes(target_tag)
+            );
+
+            if (matchingVersion) {
+              console.log(`Found tag to delete "${target_tag}":`, matchingVersion);
+              await github.rest.packages.deletePackageVersionForOrg({
+                package_type: "container",
+                package_name: container_name,
+                org: context.repo.owner,
+                package_version_id: matchingVersion,
+              });
+              console.log("Tag deleted");
+            } else {
+              console.log(`No package version found with the tag "${target_tag}".`);
+            }

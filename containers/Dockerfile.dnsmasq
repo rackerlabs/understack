@@ -22,7 +22,7 @@ RUN apt-get -y build-dep dnsmasq
 RUN apt-get -y source dnsmasq
 WORKDIR /src/dnsmasq-2.89
 RUN mkdir -p debian/patches
-COPY dnsmasq/dhcp-allowed-srvids.patch /src/dnsmasq-2.89/debian/patches/
+COPY containers/dnsmasq/dhcp-allowed-srvids.patch /src/dnsmasq-2.89/debian/patches/
 RUN echo dhcp-allowed-srvids.patch > debian/patches/series
 RUN quilt push -a
 RUN dch -v 2.89-2 "patched for dhcp-allowed-srvids"
@@ -30,6 +30,8 @@ RUN dpkg-buildpackage -rfakeroot
 
 
 FROM debian:bookworm-20240408-slim as prod
+
+LABEL org.opencontainers.image.description="dnsmasq for Understack's Ironic"
 
 COPY --from=builder /src/dnsmasq-base_2.89-2_amd64.deb /tmp
 COPY --from=builder /src/dnsmasq_2.89-2_all.deb /tmp
@@ -40,10 +42,10 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/*.deb
 
-COPY common/helpers.sh /helpers.sh
-COPY dnsmasq/entry-point.sh /entry-point.sh
+COPY containers/common/helpers.sh /helpers.sh
+COPY containers/dnsmasq/entry-point.sh /entry-point.sh
 RUN chmod +x /entry-point.sh
-COPY dnsmasq/dnsmasq.conf.j2 /etc/dnsmasq.conf.j2
+COPY containers/dnsmasq/dnsmasq.conf.j2 /etc/dnsmasq.conf.j2
 # let our entry point write out the script
 RUN ln -sf /etc/dnsmasq.d/dnsmasq.conf /etc/dnsmasq.conf
 

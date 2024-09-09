@@ -23,6 +23,8 @@ RUN cd /app && /opt/poetry/bin/poetry build -f wheel && /opt/poetry/bin/poetry e
 
 FROM ${BASE} AS prod
 
+LABEL org.opencontainers.image.description="UnderStack Workflows"
+
 WORKDIR /app
 
 RUN mkdir -p /opt/venv/wheels/
