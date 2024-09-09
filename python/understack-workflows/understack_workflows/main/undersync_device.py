@@ -83,11 +83,11 @@ def argument_parser():
 
 
 def main():
-    """Updates Interface status in Nautobot triggers Undersync.
+    """Updates Interface Status in Nautobot and triggers Undersync.
 
-    Updates Nautobot Interfaces's status field and follows with request to
-    Undersync service, requesting sync for all of the uplink_switches that the
-    device is connected to.
+    Updates Nautobot Device Interface status field and follows with
+    request to Undersync service, requesting sync for all of the
+    uplink_switches that the device is connected to.
     """
     args = argument_parser().parse_args()
 
