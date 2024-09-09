@@ -5,6 +5,7 @@ metadata:
   name: nautobot-api
   namespace: argo-events
   annotations:
+    workflows.argoproj.io/title: HTTP Template Workflow to query the Nautobot API
     workflows.argoproj.io/description: |
       Defined in `argo-workflows/workflows/nautobot-api.yaml`.
       HTTP Template Workflow to query the Nautobot API

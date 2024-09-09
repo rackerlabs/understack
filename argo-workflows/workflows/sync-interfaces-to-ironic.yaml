@@ -2,6 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 metadata:
   name: sync-interfaces-to-ironic
   annotations:
+    workflows.argoproj.io/title: Sync Nautobot information about a Device's interfaces to Ironic
     workflows.argoproj.io/description: |
       Defined in `argo-workflows/workflows/sync-interfaces-to-ironic.yaml`
 kind: WorkflowTemplate

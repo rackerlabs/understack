@@ -2,6 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 metadata:
   name: undersync-switch
   annotations:
+    workflows.argoproj.io/title: Requests an Undersync run on a pair of switches
     workflows.argoproj.io/description: |
       Defined in `argo-workflows/workflows/undersync-switch.yaml`
 kind: WorkflowTemplate
