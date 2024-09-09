@@ -2,6 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 metadata:
   name: sync-obm-creds
   annotations:
+    workflows.argoproj.io/title: Update a Device's BMC (redfish) username/password in Ironic
     workflows.argoproj.io/description: |
       Defined in `argo-workflows/workflows/sync-obm-creds.yaml`
 kind: WorkflowTemplate

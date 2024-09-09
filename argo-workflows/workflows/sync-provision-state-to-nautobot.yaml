@@ -2,6 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 metadata:
   name: sync-provision-state-to-nautobot
   annotations:
+    workflows.argoproj.io/title: Update Nautobot Device status and custom field ironic_provision_state
     workflows.argoproj.io/description: |
       Defined in `argo-workflows/workflows/sync-provision-state-to-nautobot.yaml`
 kind: WorkflowTemplate
