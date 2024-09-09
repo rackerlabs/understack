@@ -176,7 +176,7 @@ jobs:
             const container_name = `understack%2F${process.env.CONTAINER_NAME}`;
             const response = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
               package_type: "container",
-              package_name: process.env.CONTAINER_NAME,
+              package_name: container_name,
               org: context.repo.owner,
             });
 
