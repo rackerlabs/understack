@@ -15,39 +15,3 @@ select = [
 
 [tool.ruff.lint.isort]
 force-single-line = true
-
-[tool.poetry]
-name = "neutron-understack"
-version = "0.0.0"
-description = "Understack ML2 driver"
-authors = ["Micah Culpepper <micah.culpepper@rackspace.com>", "Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
-repository = "https://github.com/rackerlabs/understack"
-license = "Apache-2.0"
-readme = "README.rst"
-packages = [
-    { include = "neutron_understack" }
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Environment :: OpenStack",
-    "Intended Audience :: System Administrators",
-    "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-]
-
-[tool.poetry.dependencies]
-python = "^3.10"
-requests = "^2"
-neutron-lib = "^3"
-
-[tool.poetry.plugins."neutron.ml2.mechanism_drivers "]
-understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
-
-[tool.poetry.group.test.dependencies]
-pytest = "^8.3.2"

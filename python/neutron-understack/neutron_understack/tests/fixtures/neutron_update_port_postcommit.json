@@ -4,7 +4,7 @@
   "binding:host_id": "",
   "binding:profile": {},
   "binding:vif_details": {},
-  "binding:vif_type": "other",
+  "binding:vif_type": "unbound",
   "binding:vnic_type": "normal",
   "created_at": "2024-07-24T13:42:24Z",
   "description": "",

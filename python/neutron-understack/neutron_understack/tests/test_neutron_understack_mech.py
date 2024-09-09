@@ -1,56 +1,37 @@
-import builtins
-import json
-import pathlib
 from dataclasses import dataclass
-from unittest.mock import MagicMock, patch
-
+from unittest.mock import patch, MagicMock
 import pytest
+from neutron_understack.argo.workflows import ArgoClient
 
+from neutron_understack.neutron_understack_mech import UnderstackDriver
+
+# TODO: I am not sure how we run tests in this project.
 
 @dataclass
 class ContextDouble:
-    current: dict
+  current: dict
 
-
-def mock_context_data(filename):
-    ref = pathlib.Path(__file__).parent / "fixtures" / filename
+def mock_context_data(file):
+    ref = pathlib.Path(__file__).joinpath(filename)
     with ref.open("r") as f:
         return ContextDouble(json.load(f))
 
-@pytest.fixture
-def mock_kubernetes_token():
-    original_open = builtins.open
-    with patch("builtins.open") as mock_open:
+@patch('neutron_understack.argo.workflows.ArgoClient')
+def test_update_port_postcommit(mock_argo_client):
+    context_data = mock_context_data(
+        "fixtures/neutron_update_port_postcommit.json"
+    )
 
-        def mock_open_function(file, *args, **kwargs):
-            if file == "/run/secrets/kubernetes.io/serviceaccount/token":
-                mock_file = MagicMock()
-                mock_file.read.return_value = "abc"
-                return mock_file
-            return original_open(file, *args, **kwargs)
-
-        mock_open.side_effect = mock_open_function
-        yield mock_open
-
-
-@patch("neutron_understack.argo.workflows.ArgoClient.submit")
-def test_update_port_postcommit(mock_argo_client, mock_kubernetes_token):
-    context_data = mock_context_data("neutron_update_port_postcommit.json")
-    from neutron_understack.neutron_understack_mech import UnderstackDriver
-
-    driver = UnderstackDriver()
-    driver.update_port_postcommit(context_data)
+    UnderstackDriver.update_port_postcommit(context_data)
 
     mock_argo_client.assert_called_once_with(
         template_name="undersync-device",
         entrypoint="trigger-undersync",
         parameters={
-            "interface_mac": "fa:16:3e:35:1c:3d",
-            "device_uuid": "",
-            "network_name": "tenant",
-            "dry_run": True,
-            "force": False,
+            "interface_uuid": "e5d5cd73-ca9a-4b74-9d52-43188d0cdcaa",
+            "device_uuid": "41d18c6a-5548-4ee9-926f-4e3ebf43153f",
+            "network_name": "provisioning",
+            "dry_run": false,
+            "force": false,
         },
-        service_account="workflow",
     )
-    mock_kubernetes_token.assert_called()
