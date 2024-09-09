@@ -18,6 +18,7 @@ spec:
           - list:
               elements:
                 - component: dex
+                  skipComponent: '{{has "dex" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
@@ -57,6 +58,7 @@ spec:
                           - $secrets/helm-configs/{{.name}}/dex.yaml
                         ignoreMissingValueFiles: true
                 - component: openstack
+                  skipComponent: '{{has "openstack" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
@@ -65,6 +67,7 @@ spec:
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       path: 'secrets/{{.name}}/openstack'
                 - component: undersync
+                  skipComponent: '{{has "undersync" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
@@ -73,6 +76,7 @@ spec:
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       path: 'secrets/{{.name}}/undersync'
                 - component: nautobot
+                  skipComponent: '{{has "nautobot" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
@@ -103,6 +107,7 @@ spec:
                             # path: $understack/components/nautobot/nautobot_config.py
                             path: 'https://raw.githubusercontent.com/rackerlabs/understack/{{index .metadata.annotations "uc_repo_ref" }}/components/nautobot/nautobot_config.py'
                 - component: argo
+                  skipComponent: '{{has "argo" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   source:
                     repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                     targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
@@ -157,6 +162,7 @@ spec:
                               path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
                               value: '{{.name }}-cluster-issuer'
                 - component: argo-events
+                  skipComponent: '{{has "argo-events" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   source:
                     repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                     targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
@@ -169,12 +175,19 @@ spec:
                         - /imagePullSecrets
                 - component: understack-workflows
                   componentNamespace: argo-events
+                  skipComponent: '{{has "understack-workflows" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   source:
                     repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                     targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                     path: 'apps/understack-workflows'
-
-
+            selector:
+              # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
+              # ArgoCD's templating operates with strings so it's the string "true"
+              matchExpressions:
+                - key: skipComponent
+                  operator: NotIn
+                  values:
+                    - "true"
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
