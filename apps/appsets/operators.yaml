@@ -14,26 +14,104 @@ spec:
               selector:
                 matchLabels:
                   argocd.argoproj.io/secret-type: cluster
-          - git:
-              repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-              revision: '{{index .metadata.annotations "uc_repo_ref"}}'
-              directories:
-                - path: operators/*
+          - list:
+              elements:
+                - component: rook
+                  componentNamespace: rook-ceph
+                  skipComponent: '{{has "rook" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/rook'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
+                    - repoURL: https://charts.rook.io/release
+                      chart: rook-ceph
+                      targetRevision: v1.15.0
+                      helm:
+                        releaseName: rook-ceph
+                        valueFiles:
+                          - $understack/operators/rook/values-operator.yaml
+                          - $deploy/helm-configs/{{.name}}/rook-operator.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: https://charts.rook.io/release
+                      chart: rook-ceph-cluster
+                      targetRevision: v1.15.0
+                      helm:
+                        releaseName: rook-ceph-cluster
+                        valueFiles:
+                          - $understack/operators/rook/values-cluster.yaml
+                          - $deploy/helm-configs/{{.name}}/rook-cluster.yaml
+                        ignoreMissingValueFiles: true
+                - component: cnpg-system
+                  skipComponent: '{{has "cnpg-system" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/cnpg-system'
+                - component: external-secrets
+                  skipComponent: '{{has "external-secrets" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/external-secrets'
+                - component: mariadb-operator
+                  skipComponent: '{{has "mariadb-operator" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/mariadb-operator'
+                - component: postgres-operator
+                  skipComponent: '{{has "postgres-operator" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/postgres-operator'
+                - component: rabbitmq-system
+                  skipComponent: '{{has "rabbitmq-system" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/rabbitmq-system'
+            selector:
+              # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
+              # ArgoCD's templating operates with strings so it's the string "true"
+              matchExpressions:
+                - key: skipComponent
+                  operator: NotIn
+                  values:
+                    - "true"
   template:
     metadata:
-      name: '{{.name}}-{{.path.basename}}'
+      name: '{{.name}}-{{.component}}'
     spec:
       project: operators
-      source:
-        repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-        targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-        path: '{{.path.path}}'
       destination:
         server: '{{.server}}'
-        namespace: '{{.path.basename}}'
+        namespace: '{{coalesce (get . "componentNamespace") .component}}'
       syncPolicy:
         automated:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
           - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+  templatePatch: |
+    spec:
+      {{- if hasKey . "source" }}
+      # indentation matters here. need to collapse to a single line to preserve it
+      source: {{ .source | toJson }}
+      {{- end }}
+      {{- if hasKey . "sources" }}
+      sources:
+        {{- range $source := .sources }}
+        # indentation matters so collapse to single line with toJson to keep it
+        - {{ $source | toJson }}
+        {{- end }}
+      {{- end }}
+      {{- if hasKey . "ignoreDifferences" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      ignoreDifferences: {{ .ignoreDifferences | toJson }}
+      {{- end }}

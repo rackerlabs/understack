@@ -1,29 +1,13 @@
 # Defaults:
 # https://github.com/rook/rook/blob/release-1.15/deploy/charts/rook-ceph-cluster/values.yaml
 
-# TODO: adjust or remove this section when we have 3rd node
-cephClusterSpec:
-  mon:
-    # Set the number of mons to be started. Generally recommended to be 3.
-    # For highest availability, an odd number of mons should be specified.
-    count: 2
-    # The mons should be on unique nodes. For production, at least 3 nodes are recommended for this reason.
-    # Mons should only be allowed on the same node for test environments where data loss is acceptable.
-    allowMultiplePerNode: false
 
-  mgr:
-    # When higher availability of the mgr is needed, increase the count to 2.
-    # In that case, one mgr will be active and one in standby. When Ceph updates which
-    # mgr is active, Rook will update the mgr services to match the active mgr.
-    count: 2
-    allowMultiplePerNode: false
-
-
-# We offer 4 different storage tiers:
+# We offer 5 different storage tiers:
 # 1. Block-Storage with replication to 3 places. For most important data.
 # 2. Block storage with 2+1 EC, for most things that don't have big performance requirements
 # 3. Filesystem type storage with 2+1 EC, for pods that need shared storage
 # 4. Object storage with 2+1 EC
+# 5. Block storage without replication. For throwaway data.
 
 # -- A list of CephBlockPool configurations to deploy
 cephBlockPools:
@@ -87,6 +71,29 @@ cephBlockPools:
         # needed because we are running kernel 4.x which does not support fast-diff
         # see  https://docs.ceph.com/en/latest/rbd/rbd-config-ref/ for things supported
         # in particular kernel version
+        imageFeatures: layering
+  - name: ceph-block-unreplicated
+    spec:
+      failureDomain: host
+      replicated:
+        size: 1
+    storageClass:
+      enabled: true
+      name: ceph-block-unreplicated
+      isDefault: false
+      reclaimPolicy: Retain
+      allowVolumeExpansion: true
+      volumeBindingMode: "Immediate"
+      mountOptions: []
+      # see https://kubernetes.io/docs/concepts/storage/storage-classes/#allowed-topologies
+      allowedTopologies: []
+      parameters:
+        csi.storage.k8s.io/provisioner-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/provisioner-secret-namespace: "{{ .Release.Namespace }}"
+        csi.storage.k8s.io/controller-expand-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/controller-expand-secret-namespace: "{{ .Release.Namespace }}"
+        csi.storage.k8s.io/node-stage-secret-name: rook-csi-rbd-node
+        csi.storage.k8s.io/node-stage-secret-namespace: "{{ .Release.Namespace }}"
         imageFeatures: layering
 
 # -- A list of CephFileSystem configurations to deploy
