@@ -5,13 +5,6 @@ nautobot:
   db:
     engine: "django.db.backends.postgresql"
 
-    # Using Crunchy postgres operator:
-    # host: "nautobot-primary.nautobot.svc"
-    # name: "nautobot"
-    # user: "nautobot"
-    # existingSecret: "nautobot-pguser-nautobot"
-    # existingSecretPasswordKey: "password"
-
     # Using CloudNative postgres operator:
     host: "nautobot-cluster-rw.nautobot.svc"
     name: "app"
