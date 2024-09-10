@@ -143,7 +143,7 @@ jobs:
       - name: build and deploy container image to registry
         uses: docker/build-push-action@v5
         with:
-          file: containers/Dockerfile.${{ matrix.container.name }}
+          file: containers/${{ matrix.container.name }}/Dockerfile.${{ matrix.container.name }}
           pull: true  # ensure we always have an up to date source
           push: true
           tags: ${{ steps.meta.outputs.tags }}
