@@ -179,7 +179,7 @@ spec:
                   source:
                     repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                     targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                    path: 'apps/understack-workflows'
+                    path: 'workflows'
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
