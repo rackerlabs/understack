@@ -6,7 +6,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Output OBM IP address for the Device with the given hostname
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflows/get-obm-ip.yaml`.
+      Defined in `argo-workflows/workflowtemplates/get-obm-ip.yaml`.
       Get OBM IP address for target Device
 spec:
   serviceAccountName: workflow

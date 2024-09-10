@@ -1,23 +1,27 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
-  name: undersync-switch
+  name: undersync-device
   annotations:
-    workflows.argoproj.io/title: Requests an Undersync run on a pair of switches
+    workflows.argoproj.io/title: Updates Interface Status in Nautobot and triggers Undersync
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflows/undersync-switch.yaml`
+      Defined in `argo-workflows/workflowtemplates/undersync-device.yaml`
 kind: WorkflowTemplate
 spec:
-  entrypoint: undersync-switch
+  entrypoint: trigger-undersync
   serviceAccountName: workflow
   templates:
-    - name: undersync-switch
+    - name: trigger-undersync
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - undersync-switch
+          - undersync-device
         args:
-          - --switch_uuids
-          - "{{workflow.parameters.switch_uuids}}"
+          - --interface-mac
+          - "{{workflow.parameters.interface_mac}}"
+          - --device-id
+          - "{{workflow.parameters.device_uuid}}"
+          - --network-name
+          - "{{workflow.parameters.network_name}}"
           - --dry-run
           - "{{workflow.parameters.dry_run}}"
           - --force
@@ -31,7 +35,9 @@ spec:
             readOnly: true
       inputs:
         parameters:
-          - name: switch_uuids
+          - name: interface_mac
+          - name: device_uuid
+          - name: network_name
           - name: force
           - name: dry_run
       volumes:
