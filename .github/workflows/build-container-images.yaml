@@ -5,16 +5,18 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'argo-workflows/*/containers/*'
-      - 'argo-workflows/*/code/**'
-      - '!argo-workflows/example-feature/**'
+      - "containers/argo_utils/**"
+      - "containers/obm-utils/**"
+      - "containers/python311_alpine/**"
+      - "containers/python312_alpine/**"
   push:
     branches:
       - main
     paths:
-      - 'argo-workflows/*/containers/*'
-      - 'argo-workflows/*/code/**'
-      - '!argo-workflows/example-feature/**'
+      - "containers/argo_utils/**"
+      - "containers/obm-utils/**"
+      - "containers/python311_alpine/**"
+      - "containers/python312_alpine/**"
 
 # bump container versions here, they will be populated to tags and labels
 env:
@@ -46,8 +48,8 @@ jobs:
       - name: Build and deploy Python 3.11 image
         uses: docker/build-push-action@v5
         with:
-          context: argo-workflows/containers/python311_alpine/
-          file: argo-workflows/containers/python311_alpine/Dockerfile.python311_alpine
+          context: containers/python311_alpine/
+          file: containers/python311_alpine/Dockerfile.python311_alpine
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest,ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:${{ env.VERSION_PYTHON311 }}
@@ -57,8 +59,8 @@ jobs:
       - name: Build and deploy Python 3.12 image
         uses: docker/build-push-action@v5
         with:
-          context: argo-workflows/containers/python312_alpine/
-          file: argo-workflows/containers/python312_alpine/Dockerfile.python312_alpine
+          context: containers/python312_alpine/
+          file: containers/python312_alpine/Dockerfile.python312_alpine
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19:latest,ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19:${{ env.VERSION_PYTHON312 }}
@@ -68,8 +70,8 @@ jobs:
       - name: Build and deploy Argo Utils image
         uses: docker/build-push-action@v5
         with:
-          context: argo-workflows/containers/argo_utils/
-          file: argo-workflows/containers/argo_utils/Dockerfile.argo_utils
+          context: containers/argo_utils/
+          file: containers/argo_utils/Dockerfile.argo_utils
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/argo-utils-python3.11.8:latest,ghcr.io/rackerlabs/understack/argo-utils-python3.11.8:${{ env.VERSION_ARGO_UTILS }}
@@ -79,8 +81,8 @@ jobs:
       - name: Build and deploy OBM Utils image
         uses: docker/build-push-action@v5
         with:
-          context: argo-workflows/containers/obm-utils/
-          file: argo-workflows/containers/obm-utils/Dockerfile.obm_utils
+          context: containers/obm-utils/
+          file: containers/obm-utils/Dockerfile.obm_utils
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:latest,ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:${{ env.VERSION_OBM_UTILS }}
