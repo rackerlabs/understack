@@ -4,7 +4,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Sync Server Information from Nautobot to Ironic
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflowtemplates/sync-nb-server-to-ironic.yaml`
+      Defined in `workflows/argo-events/workflowtemplates/sync-nb-server-to-ironic.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: main

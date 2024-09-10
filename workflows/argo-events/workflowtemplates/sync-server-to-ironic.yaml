@@ -4,7 +4,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Update a Device name, driver and BMC URL in Ironic
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflowtemplates/sync-server-to-ironic.yaml`
+      Defined in `workflows/argo-events/workflowtemplates/sync-server-to-ironic.yaml`
 kind: WorkflowTemplate
 spec:
   arguments:

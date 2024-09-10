@@ -10,7 +10,7 @@ metadata:
   namespace: argo-events
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/sensors/ironic-node-update.yaml`
+      Defined in `workflows/argo-events/sensors/ironic-node-update.yaml`
 spec:
   dependencies:
   - eventName: openstack

@@ -15,7 +15,7 @@ metadata:
   namespace: argo-events
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `apps/understack-workflows/sensors/sensor-keystone-event-project.yaml`
+      Defined in `workflows/openstack/sensor-keystone-event-project.yaml`
 spec:
   dependencies:
   - eventName: notifications
