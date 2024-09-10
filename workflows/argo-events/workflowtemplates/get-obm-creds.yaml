@@ -6,7 +6,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Create a k8s secret containing OBM creds for given device hostname
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflowtemplates/get-obm-creds.yaml`.
+      Defined in `workflows/argo-events/workflowtemplates/get-obm-creds.yaml`.
       An example template to return the name of a Kubernetes Secret which containing device's OBM credentials.
 spec:
   # garbage collection on the secret is tied to this pod. we remove this pod only after workflow completion to

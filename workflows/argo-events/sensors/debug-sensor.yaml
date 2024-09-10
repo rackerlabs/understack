@@ -5,7 +5,7 @@ metadata:
   namespace: argo-events
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/sensors/debug-sensor.yaml`
+      Defined in `workflows/argo-events/sensors/debug-sensor.yaml`
 spec:
   dependencies:
   - eventName: interface-update

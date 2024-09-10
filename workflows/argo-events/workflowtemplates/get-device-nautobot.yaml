@@ -7,7 +7,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Output JSON blob of Nautobot data for given device hostname
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflowtemplates/get-device-nautobot.yaml`. Return Device Information from Nautobot
+      Defined in `workflows/argo-events/workflowtemplates/get-device-nautobot.yaml`. Return Device Information from Nautobot
 spec:
   serviceAccountName: workflow
   entrypoint: main

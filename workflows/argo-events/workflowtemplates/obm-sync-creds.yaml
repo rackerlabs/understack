@@ -7,7 +7,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Sync's a devices OBM password with what we have on record
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflowtemplates/obm-sync-creds.yaml`
+      Defined in `workflows/argo-events/workflowtemplates/obm-sync-creds.yaml`
 spec:
   arguments:
     parameters:

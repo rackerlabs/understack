@@ -4,7 +4,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Updates Interface Status in Nautobot and triggers Undersync
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflowtemplates/undersync-device.yaml`
+      Defined in `workflows/argo-events/workflowtemplates/undersync-device.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: trigger-undersync

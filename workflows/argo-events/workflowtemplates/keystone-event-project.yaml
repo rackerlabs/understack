@@ -3,7 +3,7 @@ metadata:
   name: keystone-event-project
   annotations:
     workflows.argoproj.io/description: |
-      Defined in `apps/understack-workflows/workflowtemplates/wf-keystone-event-project.yaml`
+      Defined in `workflows/argo-events/workflowtemplates/wf-keystone-event-project.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: sync-keystone
