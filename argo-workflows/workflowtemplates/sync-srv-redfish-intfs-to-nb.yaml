@@ -4,7 +4,7 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Sync Redfish interface data to Nautobot
     workflows.argoproj.io/description: |
-      Defined in `argo-workflows/workflows/sync-srv-redfish-intfs-to-nb.yaml`
+      Defined in `argo-workflows/workflowtemplates/sync-srv-redfish-intfs-to-nb.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: main
