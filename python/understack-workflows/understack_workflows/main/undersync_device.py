@@ -12,10 +12,8 @@ from understack_workflows.undersync.client import Undersync
 
 logger = setup_logger(__name__)
 
-network_name_status = {
-    "tenant": "Active",
-    "provisioning": "Provisioning Interface"
-}
+network_name_status = {"tenant": "Active", "provisioning": "Provisioning Interface"}
+
 
 def update_nautobot(args) -> UUID:
     device_id = args.device_id
@@ -29,7 +27,9 @@ def update_nautobot(args) -> UUID:
 
     nautobot = Nautobot(nb_url, nb_token, logger=logger)
     logger.info(f"Updating Nautobot {device_id=!s} {interface_mac=!s} {network_name=}")
-    interface = nautobot.update_switch_interface_status(device_id, interface_mac, new_status)
+    interface = nautobot.update_switch_interface_status(
+        device_id, interface_mac, new_status
+    )
     logger.info(f"Updated Nautobot {device_id=!s} {interface_mac=!s} {network_name=}")
 
     switch_id = interface.device.id
@@ -45,7 +45,9 @@ def call_undersync(args, switch_id: UUID):
     undersync = Undersync(undersync_token)
 
     try:
-        return undersync.sync_devices([switch_id], dry_run=args.dry_run, force=args.force)
+        return undersync.sync_devices(
+            [str(switch_id)], dry_run=args.dry_run, force=args.force
+        )
     except Exception as error:
         logger.error(error)
         sys.exit(2)
@@ -81,11 +83,11 @@ def argument_parser():
 
 
 def main():
-    """Updates connected_to_network and triggers Undersync.
+    """Updates Interface status in Nautobot triggers Undersync.
 
-    Updates Nautobot Device's 'connected_to_network' field and follows with
-    request to Undersync service, requesting sync for all of the
-    uplink_switches that the device is connected to.
+    Updates Nautobot Interfaces's status field and follows with request to
+    Undersync service, requesting sync for all of the uplink_switches that the
+    device is connected to.
     """
     args = argument_parser().parse_args()
 
