@@ -56,7 +56,7 @@ jobs:
       - name: build and deploy container image to registry
         uses: docker/build-push-action@v5
         with:
-          file: containers/Dockerfile.${{ matrix.project }}
+          file: containers/${{ matrix.project }}/Dockerfile.${{ matrix.project }}
           build-args: OPENSTACK_VERSION=${{ matrix.openstack }}
           pull: true  # ensure we always have an up to date source
           push: true
