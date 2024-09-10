@@ -4,10 +4,25 @@ version = "0.1.0"
 description = "Undercloud's ML2 driver for neutron"
 authors = ["Understack Developers"]
 readme = "README.rst"
+license = "Apache-2.0"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: OpenStack",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+]
 
 [tool.ruff]
 target-version = "py310"
 fix = true
+
 [tool.poetry.dependencies]
 python = "^3.10"
 requests = "^2"
@@ -49,4 +64,3 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 # enable the google doc style rules by default
 convention = "google"
-
