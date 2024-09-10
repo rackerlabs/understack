@@ -71,7 +71,6 @@
       "natural_slug": "1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_0ccd",
       "custom_fields": {
         "core_number": 1327198,
-        "connected_to_network": "provisioning",
         "ironic_provision_state": ""
       },
       "secrets_group": null,
@@ -231,7 +230,6 @@
         "natural_slug": "1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_0ccd",
         "custom_fields": {
           "core_number": 1327198,
-          "connected_to_network": "provisioning",
           "ironic_provision_state": ""
         },
         "secrets_group": null,
@@ -391,7 +389,6 @@
           "natural_slug": "1327198-gp2s-3-understack-iad3_core-5836965_spine1-1_iad3_iad_company_global_0ccd",
           "custom_fields": {
             "core_number": 1327198,
-            "connected_to_network": "provisioning",
             "ironic_provision_state": ""
           },
           "secrets_group": null,
