@@ -1,0 +1,15 @@
+name: kind cluster
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  argo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1
+      - run: |
+          kubectl apply -k components/argo
