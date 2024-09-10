@@ -7,3 +7,4 @@ resources:
   - argo-rabbitmq.yaml
   - eventbus-default.yaml
   - openstack-event-source.yaml
+  - sensor-keystone-event-project.yaml

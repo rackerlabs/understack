@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# this is where our workflows currently run
+namespace: argo-events
+
+resources:
+  - openstack-svc-acct.yaml
+  - sensor-submit-rbac.yaml
+  - workflowtemplates/keystone-event-project.yaml

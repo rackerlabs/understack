@@ -6,6 +6,11 @@ resources:
   - mariadb-configmap.yaml
   - mariadb-instance.yaml
   - openstack-cluster.yaml
+  # a secret store that let's us copy creds to other namespaces
+  # for service accounts
+  - secretstore-openstack.yaml
+  # defines the service account 'argoworkflow' used by our workflows
+  - svc-acct-argoworkflow.yaml
 
 helmCharts:
   - name: memcached
