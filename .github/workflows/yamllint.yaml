@@ -43,11 +43,9 @@ jobs:
         with:
           jsonSchemaFile: argo-workflows/.workflow_with_description.schema.json
           yamlFiles: |
-            argo-workflows/**/workflowtemplates/*.y*ml
-            argo-workflows/**/sensors/*.y*ml
-            argo-workflows/**/workflows/*.y*ml
+            argo-workflows/workflowtemplates/*.y*ml
+            argo-workflows/sensors/*.y*ml
             apps/understack-workflows/workflows/workflowtemplates/*.y*ml
-
   shellcheck:
     runs-on: ubuntu-latest
     steps:
