@@ -1,0 +1,9 @@
+# syntax=docker/dockerfile:1
+
+ARG OPENSTACK_VERSION
+FROM docker.io/openstackhelm/keystone:${OPENSTACK_VERSION}-ubuntu_jammy
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libapache2-mod-auth-openidc \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
