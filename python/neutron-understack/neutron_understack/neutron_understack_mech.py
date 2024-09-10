@@ -59,13 +59,6 @@ def setup_conf():
 setup_conf()
 
 
-def argo_client():
-    return ArgoClient(
-        logger=LOG,
-        api_url=cfg.CONF.ml2_type_understack.argo_api_url,
-        namespace=cfg.CONF.ml2_type_understack.argo_namespace,
-    )
-
 def dump_context(
     context: NetworkContext | SubnetContext | PortContext,
 ) -> dict:
@@ -242,12 +235,18 @@ class UnderstackDriver(MechanismDriver):
     def update_port_postcommit(self, context):
         log_call("update_port_postcommit", context)
 
+        argo_client = ArgoClient(
+            logger=LOG,
+            api_url=cfg.CONF.ml2_type_understack.argo_api_url,
+            namespace=cfg.CONF.ml2_type_understack.argo_namespace,
+        )
+
         _move_to_network(
             vif_type=context.current["binding:vif_type"],
             mac_address=context.current["mac_address"],
             device_uuid=context.current["binding:host_id"],
             network_id=context.current["network_id"],
-            argo_client=argo_client(),
+            argo_client=argo_client,
         )
 
     def delete_port_precommit(self, context):
