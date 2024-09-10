@@ -59,19 +59,12 @@ def setup_conf():
 setup_conf()
 
 
-def argo_token():
-    with open("/run/secrets/kubernetes.io/serviceaccount/token") as token_file:
-        return token_file.read()
-
-
 def argo_client():
     return ArgoClient(
-        argo_token(),
         logger=LOG,
         api_url=cfg.CONF.ml2_type_understack.argo_api_url,
         namespace=cfg.CONF.ml2_type_understack.argo_namespace,
     )
-
 
 def dump_context(
     context: NetworkContext | SubnetContext | PortContext,
