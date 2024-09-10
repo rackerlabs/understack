@@ -189,12 +189,12 @@ jobs:
             );
 
             if (matchingVersion) {
-              console.log(`Found tag to delete "${target_tag}":`, matchingVersion);
+              console.log(`Found tag to delete "${target_tag}":`, matchingVersion.html_url);
               await github.rest.packages.deletePackageVersionForOrg({
                 package_type: "container",
                 package_name: container_name,
                 org: context.repo.owner,
-                package_version_id: matchingVersion,
+                package_version_id: matchingVersion.id,
               });
               console.log("Tag deleted");
             } else {
