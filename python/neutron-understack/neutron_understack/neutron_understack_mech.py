@@ -138,48 +138,6 @@ def log_call(
     pprint(context.current)
 
 
-def _move_to_network(
-    vif_type: str,
-    mac_address: str,
-    device_uuid: UUID,
-    network_id: str,
-    argo_client: ArgoClient,
-):
-    """Triggers Argo "trigger-undersync" workflow.
-
-    This has the effect of connecting our server to the given networks: either
-    "provisioning" (for PXE booting) or "tenant" (normal access to customer's
-    networks).  The choice of network is based on the network ID.
-
-    This only happens when vif_type is VIF_TYPE_OTHER.
-
-    argo_client is injected by the caller to make testing easier
-    """
-    if vif_type != portbindings.VIF_TYPE_OTHER:
-        return
-
-    if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
-        network_name = "provisioning"
-    else:
-        network_name = "tenant"
-
-    LOG.debug(f"Selected {network_name=} for {device_uuid=} {mac_address=}")
-
-    result = argo_client.submit(
-        template_name="undersync-device",
-        entrypoint="trigger-undersync",
-        parameters={
-            "interface_mac": mac_address,
-            "device_uuid": device_uuid,
-            "network_name": network_name,
-            "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
-            "force": cfg.CONF.ml2_type_understack.argo_force,
-        },
-        service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
-    )
-    LOG.info(f"Binding workflow submitted: {result}")
-
-
 class UnderstackDriver(MechanismDriver):
     # See MechanismDriver docs for resource_provider_uuid5_namespace
     resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
@@ -241,7 +199,7 @@ class UnderstackDriver(MechanismDriver):
             namespace=cfg.CONF.ml2_type_understack.argo_namespace,
         )
 
-        _move_to_network(
+        self._move_to_network(
             vif_type=context.current["binding:vif_type"],
             mac_address=context.current["mac_address"],
             device_uuid=context.current["binding:host_id"],
@@ -297,3 +255,45 @@ class UnderstackDriver(MechanismDriver):
 
     def check_vlan_transparency(self, context):
         log_call("check_vlan_transparency", context)
+
+    def _move_to_network(
+        self,
+        vif_type: str,
+        mac_address: str,
+        device_uuid: UUID,
+        network_id: str,
+        argo_client: ArgoClient,
+    ):
+        """Triggers Argo "trigger-undersync" workflow.
+
+        This has the effect of connecting our server to the given networks: either
+        "provisioning" (for PXE booting) or "tenant" (normal access to customer's
+        networks).  The choice of network is based on the network ID.
+
+        This only happens when vif_type is VIF_TYPE_OTHER.
+
+        argo_client is injected by the caller to make testing easier
+        """
+        if vif_type != portbindings.VIF_TYPE_OTHER:
+            return
+
+        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+            network_name = "provisioning"
+        else:
+            network_name = "tenant"
+
+        LOG.debug(f"Selected {network_name=} for {device_uuid=} {mac_address=}")
+
+        result = argo_client.submit(
+            template_name="undersync-device",
+            entrypoint="trigger-undersync",
+            parameters={
+                "interface_mac": mac_address,
+                "device_uuid": device_uuid,
+                "network_name": network_name,
+                "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
+                "force": cfg.CONF.ml2_type_understack.argo_force,
+            },
+            service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
+        )
+        LOG.info(f"Binding workflow submitted: {result}")

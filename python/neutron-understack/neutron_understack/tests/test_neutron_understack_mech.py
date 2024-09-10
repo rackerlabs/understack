@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from neutron_understack import neutron_understack_mech
+from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.argo.workflows import ArgoClient
 
 
@@ -12,7 +12,8 @@ def argo_client() -> ArgoClient:
 
 
 def test_move_to_network__provisioning(argo_client):
-    neutron_understack_mech._move_to_network(
+    driver = UnderstackDriver()
+    driver._move_to_network(
         vif_type="other",
         mac_address="fa:16:3e:35:1c:3d",
         device_uuid="41d18c6a-5548-4ee9-926f-4e3ebf43153f",
