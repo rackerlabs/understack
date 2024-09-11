@@ -52,7 +52,7 @@ jobs:
           file: containers/python311_alpine/Dockerfile.python311_alpine
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest,ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:${{ env.VERSION_PYTHON311 }}
+          tags: ghcr.io/${{ github.repository }}/argo-python3.11.8-alpine3.19:latest,ghcr.io/${{ github.repository }}/argo-python3.11.8-alpine3.19:${{ env.VERSION_PYTHON311 }}
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_PYTHON311 }}
 
@@ -63,7 +63,7 @@ jobs:
           file: containers/python312_alpine/Dockerfile.python312_alpine
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19:latest,ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19:${{ env.VERSION_PYTHON312 }}
+          tags: ghcr.io/${{ github.repository }}/argo-python3.12.2-alpine3.19:latest,ghcr.io/${{ github.repository }}/argo-python3.12.2-alpine3.19:${{ env.VERSION_PYTHON312 }}
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_PYTHON312 }}
 
@@ -74,7 +74,7 @@ jobs:
           file: containers/argo_utils/Dockerfile.argo_utils
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/rackerlabs/understack/argo-utils-python3.11.8:latest,ghcr.io/rackerlabs/understack/argo-utils-python3.11.8:${{ env.VERSION_ARGO_UTILS }}
+          tags: ghcr.io/${{ github.repository }}/argo-utils-python3.11.8:latest,ghcr.io/${{ github.repository }}/argo-utils-python3.11.8:${{ env.VERSION_ARGO_UTILS }}
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_ARGO_UTILS }}
 
@@ -85,6 +85,6 @@ jobs:
           file: containers/obm-utils/Dockerfile.obm_utils
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:latest,ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:${{ env.VERSION_OBM_UTILS }}
+          tags: ghcr.io/${{ github.repository }}/argo-obm-utils-python3.11.8:latest,ghcr.io/${{ github.repository }}/argo-obm-utils-python3.11.8:${{ env.VERSION_OBM_UTILS }}
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_OBM_UTILS }}
