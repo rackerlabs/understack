@@ -8,3 +8,4 @@ resources:
   - eventbus-default.yaml
   - openstack-event-source.yaml
   - sensor-keystone-event-project.yaml
+  - serviceaccount-sensor-submit-workflow.yaml

@@ -23,7 +23,7 @@ spec:
           path: 'workflows/argo-events'
           directory:
             recurse: true
-            include: '{roles/*.yaml,secrets/*.yaml,sensors/*yaml,eventsources/*.yaml,workflowtemplates/*.yaml}'
+            include: '{roles/*.yaml,rolebindings/*.yaml,secrets/*.yaml,sensors/*yaml,eventsources/*.yaml,workflowtemplates/*.yaml}'
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
           path: 'argo-workflows'

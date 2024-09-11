@@ -47,6 +47,7 @@ jobs:
             workflows/argo-events/sensors/*.y*ml
             workflows/argo-events/eventsources/*.y*ml
             workflows/argo-events/roles/*.y*ml
+            workflows/argo-events/rolebindings/*.y*ml
             workflows/argo-events/workflowtemplates/*.y*ml
             workflows/openstack/*.y*ml
 
