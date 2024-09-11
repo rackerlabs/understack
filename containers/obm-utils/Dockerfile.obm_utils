@@ -8,7 +8,7 @@ ARG APP_GROUP=appgroup
 ARG APP_USER_UID=1000
 ARG APP_GROUP_GID=1000
 
-COPY --chown=${APP_USER}:${APP_GROUP} containers/requirements.txt /app
+COPY --chown=${APP_USER}:${APP_GROUP} requirements.txt /app
 RUN --mount=type=cache,target=/root/.cache/.pip pip install --no-cache-dir -r /app/requirements.txt
 
 FROM ${BASE} as prod
