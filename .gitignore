@@ -23,3 +23,7 @@ __pycache__
 # auto-generated argo-workflows docs
 # see .github/workflows/mkdocs.yaaml
 docs/workflows/
+
+# devbox's envrc
+.envrc
+.direnv

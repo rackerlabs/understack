@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.12.0/.schema/devbox.schema.json",
+  "packages": [
+    "yq-go@latest",
+    "python3@3.11",
+    "zsh@latest",
+    "argo@latest",
+    "argocd@latest",
+    "kubectl@latest",
+    "kubeseal@latest",
+    "kustomize@latest",
+    "telepresence2@latest",
+    "jq@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to Understack understack_workflows devbox!' > /dev/null",
+      ". $VENV_DIR/bin/activate",
+      "poetry install --with=test"
+    ],
+    "scripts": {
+      "test": [
+        "pytest"
+      ]
+    }
+  }
+}

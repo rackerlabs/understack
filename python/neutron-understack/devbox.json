@@ -1,0 +1,23 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.12.0/.schema/devbox.schema.json",
+  "packages": [
+    "python@3.11",
+    "poetry@latest",
+    "argo@latest",
+    "difftastic@latest",
+    "yq-go@latest",
+    "jq@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to Understack neutron devbox!' > /dev/null",
+      ". $VENV_DIR/bin/activate",
+      "poetry install"
+    ],
+    "scripts": {
+      "test": [
+        "pytest"
+      ]
+    }
+  }
+}
