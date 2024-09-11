@@ -215,7 +215,7 @@ echo "Checking dex"
 mkdir -p "${DEST_DIR}/dex/"
 # clients generated are in the list below
 for client in nautobot argo argocd keystone; do
-    if [ ! -f "${DEST_DIR}/dex/secret-nautobot-sso-dex.yaml" ]; then
+    if [ ! -f "${DEST_DIR}/dex/secret-${client}-sso-dex.yaml" ]; then
         SSO_SECRET=$("${SCRIPTS_DIR}/pwgen.sh")
         kubectl --namespace dex \
             create secret generic "${client}-sso" \
