@@ -39,7 +39,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/rackerlabs/understack/${{ matrix.project }}
+          images: ghcr.io/${{ github.repository }}/${{ matrix.project }}
           tags: |
             type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable={{is_default_branch}}
             type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable=${{ github.event_name == 'workflow_dispatch' }}
@@ -81,7 +81,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/rackerlabs/understack/dnsmasq
+          images: ghcr.io/${{ github.repository }}/dnsmasq
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
@@ -125,7 +125,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/rackerlabs/understack/${{ matrix.container.name }}
+          images: ghcr.io/${{ github.repository }}/${{ matrix.container.name }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
@@ -173,7 +173,7 @@ jobs:
           CONTAINER_NAME: '${{ matrix.container }}'
         with:
           script: |
-            const container_name = `understack/${process.env.CONTAINER_NAME}`;
+            const container_name = `${context.repo.repo}/${process.env.CONTAINER_NAME}`;
             const response = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
               package_type: "container",
               package_name: container_name,
