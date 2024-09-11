@@ -6,11 +6,13 @@ on:
       - main
     paths:
       - "python/ironic-understack/**"
+      - "python/neutron-understack/**"
       - "python/understack-workflows/**"
       - ".github/workflows/code-test.yaml"
   pull_request_target:
     paths:
       - "python/ironic-understack/**"
+      - "python/neutron-understack/**"
       - "python/understack-workflows/**"
       - ".github/workflows/code-test.yaml"
   workflow_dispatch:
@@ -50,4 +52,25 @@ jobs:
       - uses: orgoro/coverage@v3.2
         with:
           coverageFile: python/${{ matrix.project }}/coverage.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  neutron-understack:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./python/neutron-understack
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install poetry==1.7.1 && poetry self add 'poetry-dynamic-versioning[plugin]'
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: python/neutron-understack/pyproject.toml
+          cache: "poetry"
+      - run: poetry install --sync --with test
+      - run: poetry build
+      - run: "poetry run pytest --cov-report xml:coverage.xml"
+      - uses: orgoro/coverage@v3.2
+        with:
+          coverageFile: python/ironic-understack/coverage.xml
           token: ${{ secrets.GITHUB_TOKEN }}

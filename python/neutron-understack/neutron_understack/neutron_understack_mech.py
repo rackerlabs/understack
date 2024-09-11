@@ -1,15 +1,17 @@
 import json
 import logging
-import uuid
 from pprint import pprint
+from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
 from neutron_lib.plugins.ml2 import api
-from neutron_lib.plugins.ml2.api import MechanismDriver
-from neutron_lib.plugins.ml2.api import NetworkContext
-from neutron_lib.plugins.ml2.api import PortContext
-from neutron_lib.plugins.ml2.api import SubnetContext
+from neutron_lib.plugins.ml2.api import (
+    MechanismDriver,
+    NetworkContext,
+    PortContext,
+    SubnetContext,
+)
 from oslo_config import cfg
 
 from neutron_understack.argo.workflows import ArgoClient
@@ -55,17 +57,6 @@ def setup_conf():
 
 
 setup_conf()
-
-argo_token = None
-with open("/run/secrets/kubernetes.io/serviceaccount/token") as token_file:
-    argo_token = token_file.read()
-
-argo_client = ArgoClient(
-    argo_token,
-    logger=LOG,
-    api_url=cfg.CONF.ml2_type_understack.argo_api_url,
-    namespace=cfg.CONF.ml2_type_understack.argo_namespace,
-)
 
 
 def dump_context(
@@ -149,9 +140,7 @@ def log_call(
 
 class UnderstackDriver(MechanismDriver):
     # See MechanismDriver docs for resource_provider_uuid5_namespace
-    resource_provider_uuid5_namespace = uuid.UUID(
-        "6eae3046-4072-11ef-9bcf-d6be6370a162"
-    )
+    resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
 
     def initialize(self):
         pass
@@ -204,8 +193,19 @@ class UnderstackDriver(MechanismDriver):
     def update_port_postcommit(self, context):
         log_call("update_port_postcommit", context)
 
-        if context.current["binding:vif_type"] == portbindings.VIF_TYPE_OTHER:
-            self._move_to_network(context)
+        argo_client = ArgoClient(
+            logger=LOG,
+            api_url=cfg.CONF.ml2_type_understack.argo_api_url,
+            namespace=cfg.CONF.ml2_type_understack.argo_namespace,
+        )
+
+        self._move_to_network(
+            vif_type=context.current["binding:vif_type"],
+            mac_address=context.current["mac_address"],
+            device_uuid=context.current["binding:host_id"],
+            network_id=context.current["network_id"],
+            argo_client=argo_client,
+        )
 
     def delete_port_precommit(self, context):
         log_call("delete_port_precommit", context)
@@ -256,23 +256,39 @@ class UnderstackDriver(MechanismDriver):
     def check_vlan_transparency(self, context):
         log_call("check_vlan_transparency", context)
 
-    def __network_name(self, network_id: str):
-        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
-            return "provisioning"
-        else:
-            return "tenant"
+    def _move_to_network(
+        self,
+        vif_type: str,
+        mac_address: str,
+        device_uuid: UUID,
+        network_id: str,
+        argo_client: ArgoClient,
+    ):
+        """Triggers Argo "trigger-undersync" workflow.
 
-    def _move_to_network(self, context):
-        interface_mac = context.current["mac_address"]
-        device_uuid = context.current["binding:host_id"]
-        network_name = self.__network_name(context.current["network_id"])
-        LOG.debug(f"Selected {network_name=} for {device_uuid=} {interface_mac=}")
+        This has the effect of connecting our server to the given networks: either
+        "provisioning" (for PXE booting) or "tenant" (normal access to customer's
+        networks).  The choice of network is based on the network ID.
+
+        This only happens when vif_type is VIF_TYPE_OTHER.
+
+        argo_client is injected by the caller to make testing easier
+        """
+        if vif_type != portbindings.VIF_TYPE_OTHER:
+            return
+
+        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+            network_name = "provisioning"
+        else:
+            network_name = "tenant"
+
+        LOG.debug(f"Selected {network_name=} for {device_uuid=} {mac_address=}")
 
         result = argo_client.submit(
             template_name="undersync-device",
             entrypoint="trigger-undersync",
             parameters={
-                "interface_mac": interface_mac,
+                "interface_mac": mac_address,
                 "device_uuid": device_uuid,
                 "network_name": network_name,
                 "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
@@ -281,4 +297,3 @@ class UnderstackDriver(MechanismDriver):
             service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
         )
         LOG.info(f"Binding workflow submitted: {result}")
-        return context

@@ -1,23 +1,30 @@
-import requests
 import time
+
+import requests
 import urllib3
 
 urllib3.disable_warnings()
 
 
 class ArgoClient:
+    DEFAULT_TOKEN_FILENAME = "/run/secrets/kubernetes.io/serviceaccount/token"
+
     def __init__(
         self,
-        token: str,
+        token: str = None,
         namespace="default",
         api_url="https://argo-server.argo.svc.cluster.local:2746",
-        logger=None
+        logger=None,
     ):
         self.token = token
         self.namespace = namespace
         self.api_url = api_url
         self.headers = {"Authorization": f"Bearer {self.token}"}
         self.logger = logger
+
+        if token is None:
+            with open(DEFAULT_TOKEN_FILENAME) as token_file:
+                token = token_file.read()
 
     def submit(
         self,
