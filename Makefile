@@ -28,7 +28,7 @@ $(ACTIVATE): requirements-docs.txt
 
 docs/workflows: $(ACTIVATE)
 	@mkdir -p docs/workflows
-	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py argo-workflows docs/workflows
+	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py workflows docs/workflows
 
 .PHONY: docs
 docs: $(ACTIVATE) docs/workflows ## Builds the documentation
