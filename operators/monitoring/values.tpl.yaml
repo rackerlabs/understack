@@ -1,0 +1,39 @@
+grafana:
+  envValueFrom:
+    GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
+      secretKeyRef:
+        name: grafana-sso
+        key: client-id
+    GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+      secretKeyRef:
+        name: grafana-sso
+        key: client-secret
+    GF_AUTH_GENERIC_OAUTH_ISSUER:
+      secretKeyRef:
+        name: grafana-sso
+        key: issuer
+  grafana.ini:
+    auth.generic_oauth:
+      name: Dex
+      enabled: true
+      client_id: $__env{GF_AUTH_GENERIC_OAUTH_CLIENT_ID}
+      client_secret: $__env{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}
+      scopes: openid email profile groups offline_access
+      auth_url: $__env{GF_AUTH_GENERIC_OAUTH_ISSUER}/auth
+      token_url: $__env{GF_AUTH_GENERIC_OAUTH_ISSUER}/token
+      api_url: $__env{GF_AUTH_GENERIC_OAUTH_ISSUER}/userinfo
+    server:
+      root_url: https://%(domain)s
+
+  ingress:
+    enabled: true
+    ingressClassName: "nginx"
+    hosts:
+      - grafana.${DNS_ZONE}
+    tls:
+      - hosts:
+          - grafana.${DNS_ZONE}
+        secretName: grafana-ingress-tls
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+      cert-manager.io/cluster-issuer: ${DEPLOY_NAME}-cluster-issuer

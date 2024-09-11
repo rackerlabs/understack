@@ -54,6 +54,11 @@ config:
       name: "OpenStack Keystone"
       redirectURIs:
         - "https://keystone.$DNS_ZONE/redirect_uri"
+    - id: grafana
+      secretEnv: GRAFANA_SSO_CLIENT_SECRET
+      name: "Undercloud Grafana"
+      redirectURIs:
+        - "https://grafana.$DNS_ZONE/login/generic_oauth"
 
 envVars:
   - name: NAUTOBOT_SSO_CLIENT_SECRET
@@ -100,3 +105,8 @@ envVars:
         name: oidc-sso
         key: redirect-uri
         optional: true
+  - name: GRAFANA_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: grafana-sso
+        key: client-secret
