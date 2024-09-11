@@ -14,8 +14,7 @@ if ! type -p kubeseal kubectl > /dev/null; then
     echo "You must have kubeseal & kubectl installed to use this script" >&2
     exit 1
 fi
-
-if ! kubectl api-resources | grep -q sealedsecrets; then
+if ! kubectl wait --for condition=established --timeout=30s crd/sealedsecrets.bitnami.com ; then
     echo "Your cluster doesn't appear to have the sealed secrets operator installed." >&2
     exit 1
 fi
