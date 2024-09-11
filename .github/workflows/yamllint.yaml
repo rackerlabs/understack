@@ -43,7 +43,6 @@ jobs:
         with:
           jsonSchemaFile: workflows/.workflow_with_description.schema.json
           yamlFiles: |
-            workflows/argo-events/secrets/*.y*ml
             workflows/argo-events/sensors/*.y*ml
             workflows/argo-events/eventsources/*.y*ml
             workflows/argo-events/roles/*.y*ml

@@ -4,8 +4,12 @@ kind: Kustomization
 namespace: openstack
 
 resources:
-  - argo-rabbitmq.yaml
   - eventbus-default.yaml
-  - openstack-event-source.yaml
+  - eventsource-openstack-ironic.yaml
+  - eventsource-openstack-keystone.yaml
+  - poddisruptionbudget-eventbus-default-pdb.yaml
+  - rabbitmq-permission-argo-to-ironic-permission.yaml
+  - rabbitmq-permission-argo-to-keystone-permission.yaml
+  - rabbitmq-user-argo.yaml
   - sensor-keystone-event-project.yaml
   - serviceaccount-sensor-submit-workflow.yaml
