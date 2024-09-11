@@ -42,7 +42,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/*.deb
 
-COPY containers/common/helpers.sh /helpers.sh
+COPY containers/dnsmasq/common/helpers.sh /helpers.sh
 COPY containers/dnsmasq/entry-point.sh /entry-point.sh
 RUN chmod +x /entry-point.sh
 COPY containers/dnsmasq/dnsmasq.conf.j2 /etc/dnsmasq.conf.j2
