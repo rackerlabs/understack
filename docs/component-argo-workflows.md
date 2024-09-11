@@ -53,7 +53,7 @@ the Pod's uid can be passed via the `KUBERNETES_POD_UID` environment variable. T
 completion of the Workflow `.spec.podGC.strategy` can be set to `OnWorkflowCompletion`.
 
 An example WorkflowTemplate demonstrating argo-python usage can be found
-[here](https://github.com/rackerlabs/understack/blob/main/argo-workflows/generic/workflowtemplates/get-obm-creds.yaml).
+[here](https://github.com/rackerlabs/understack/blob/main/workflows/argo-events/workflowtemplates/get-obm-creds.yaml).
 
 ### Argo CLI
 
