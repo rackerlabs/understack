@@ -124,5 +124,6 @@ nav:
     - user-guide/openstack-cli.md
     - user-guide/openstack-image.md
     - user-guide/rabbitmq-cheat-sheet.md
+    - user-guide/mariadb-operator-cheat-sheet.md
     - user-guide/postgres-operator-cheat-sheet.md
   - Workflows: workflows/
