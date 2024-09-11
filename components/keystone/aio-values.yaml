@@ -33,6 +33,39 @@ bootstrap:
     # add 'demo' user to have 'member' role, needed for horizon dashboard use
     openstack role add --user demo --project undercloud member
 
+    # OIDC integration
+    RULES_FILE=$(mktemp)
+    cat <<EOF > ${RULES_FILE}
+    [
+        {
+            "local": [
+                {
+                    "user": {
+                        "name": "{0}"
+                    },
+                    "group": {
+                        "domain": {
+                            "name": "Default"
+                        },
+                        "name": "federated_users"
+                    }
+                }
+            ],
+            "remote": [
+                {
+                    "type": "REMOTE_USER"
+                }
+            ]
+        }
+    ]
+    EOF
+    openstack identity provider show sso 2>/dev/null || openstack identity provider create --remote-id https://dex.dev.undercloud.rackspace.net sso
+    openstack group create federated_users --or-show
+    openstack project create federated_project --or-show
+    openstack role add --group federated_users --project federated_project member
+    openstack mapping show dex_mapping 2>/dev/null || openstack mapping create --rules ${RULES_FILE} dex_mapping
+    openstack federation protocol show openid --identity-provider sso || openstack federation protocol create openid --mapping dex_mapping --identity-provider sso
+    rm ${RULES_FILE}
 network:
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
@@ -167,6 +200,14 @@ conf:
       methods: password,token,openid,mapped,application_credential
     openid:
       remote_id_attribute: HTTP_OIDC_ISS
+    federation:
+      trusted_dashboard:
+        type: multistring
+        values:
+          - http://localhost:9990/auth/websso/
+        # - https://yourinstance.of.horizon.example.com/auth/websso/
+    DEFAULT:
+      max_token_size: 512
   wsgi_keystone: |
     {{- $portInt := tuple "identity" "service" "api" $ | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
 
