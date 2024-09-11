@@ -20,11 +20,10 @@ spec:
       sources:
         - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-          path: 'argo-workflows'
+          path: 'workflows/argo-events'
           directory:
             recurse: true
-            include: '{generic/deps/*.yaml,shared-sensors/*.yaml,*/sensors/*.yaml,*/workflowtemplates/*.yaml}'
-            exclude: '{example-feature/*,*/*/*example*}'
+            include: '{roles/*.yaml,secrets/*.yaml,sensors/*yaml,eventsources/*.yaml,workflowtemplates/*.yaml}'
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
           path: 'argo-workflows'
