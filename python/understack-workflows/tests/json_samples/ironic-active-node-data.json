@@ -1,0 +1,99 @@
+ {
+  "uuid": "5540e25c-71a2-4d40-bb9b-b680e0226937",
+  "created_at": "2024-07-12T20:21:02+00:00",
+  "updated_at": "2024-08-05T17:55:23+00:00",
+  "automated_clean": false,
+  "bios_interface": "redfish",
+  "boot_interface": "ipxe",
+  "boot_mode": "uefi",
+  "clean_step": {},
+  "conductor_group": "",
+  "console_enabled": false,
+  "console_interface": "no-console",
+  "deploy_interface": "direct",
+  "deploy_step": {},
+  "description": null,
+  "driver": "redfish",
+  "driver_info": {
+    "redfish_address": "https://10.46.96.153",
+    "redfish_verify_ca": false,
+    "redfish_username": "root",
+    "redfish_password": "******"
+  },
+  "driver_internal_info": {
+    "deploy_steps": null,
+    "last_power_state_change": "2024-07-17T17:23:37.750722",
+    "agent_version": "9.11.0.dev5",
+    "agent_last_heartbeat": "2024-07-17T17:23:16.904131",
+    "hardware_manager_version": {
+      "generic_hardware_manager": "1.2"
+    },
+    "agent_cached_deploy_steps_refreshed": "2024-07-17T17:23:01.931895",
+    "is_whole_disk_image": true,
+    "dnsmasq_tag": "19fa0a49-380c-4a8c-b1bd-9c47c5bcd2f9",
+    "deploy_boot_mode": "uefi",
+    "agent_secret_token": "******",
+    "agent_url": "https://192.168.200.5:9999",
+    "agent_verify_ca": "/var/lib/ironic/certificates/5540e25c-71a2-4d40-bb9b-b680e0226937.crt"
+  },
+  "extra": {},
+  "fault": null,
+  "inspection_finished_at": null,
+  "inspection_started_at": null,
+  "inspect_interface": "redfish",
+  "instance_info": {
+    "image_source": "http://10.4.204.2/keekz-ubuntu-extras.qcow2",
+    "image_os_hash_value": "45e8ec2a058b10adcdf130065f78b75fc708f9a5525f6fbf70d3134f1da2472c",
+    "image_os_hash_algo": "sha256",
+    "image_type": "whole-disk",
+    "root_gb": 400,
+    "configdrive": "******",
+    "image_url": "******"
+  },
+  "instance_uuid": null,
+  "last_error": "During sync_power_state, max retries exceeded for node 5540e25c-71a2-4d40-bb9b-b680e0226937, node state None does not match expected state 'power on'. Updating DB state to 'None' Switching node to maintenance mode. Error: Redfish connection failed for node 5540e25c-71a2-4d40-bb9b-b680e0226937: Unable to connect to https://10.46.96.153/redfish/v1/. Error: HTTPSConnectionPool(host='10.46.96.153', port=443): Max retries exceeded with url: /redfish/v1/ (Caused by ConnectTimeoutError(<urllib3.connection.HTTPSConnection object at 0x7f9658fec1f0>, 'Connection to 10.46.96.153 timed out. (connect timeout=60)'))",
+  "lessee": null,
+  "maintenance": false,
+  "maintenance_reason": null,
+  "management_interface": "redfish",
+  "name": "1327197-GP2S.2.undercloud.iad3",
+  "network_data": {},
+  "network_interface": "noop",
+  "owner": "ebc5b22e420d4dfc9e385a63b4583623",
+  "power_interface": "redfish",
+  "power_state": "power on",
+  "properties": {
+    "vendor": "Dell Inc."
+  },
+  "protected": false,
+  "protected_reason": null,
+  "provision_state": "active",
+  "provision_updated_at": "2024-07-17T17:24:08+00:00",
+  "raid_config": {},
+  "raid_interface": "redfish",
+  "rescue_interface": "no-rescue",
+  "reservation": null,
+  "resource_class": "unconfigured",
+  "retired": false,
+  "retired_reason": null,
+  "secure_boot": false,
+  "shard": null,
+  "storage_interface": "noop",
+  "target_power_state": null,
+  "target_provision_state": null,
+  "target_raid_config": {
+    "logical_disks": [
+      {
+        "size_gb": 400,
+        "raid_level": "1",
+        "is_root_volume": true,
+        "controller": "RAID.Integrated.1-1"
+      }
+    ]
+  },
+  "traits": [],
+  "vendor_interface": "redfish",
+  "conductor": null,
+  "allocation_uuid": null,
+  "chassis_uuid": null
+}
