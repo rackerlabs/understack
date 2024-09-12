@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: keystone-event-project
+  annotations:
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/wf-keystone-event-project.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: sync-keystone
+  templates:
+    - name: sync-keystone
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - sync-keystone
+        args:
+          - "--only-domain"
+          - "default"
+          - "{{workflow.parameters.event_type}}"
+          - "{{workflow.parameters.project_uuid}}"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      inputs:
+        parameters:
+          - name: project_uuid
+      volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct

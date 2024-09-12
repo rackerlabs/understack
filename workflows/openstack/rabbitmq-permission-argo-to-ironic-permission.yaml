@@ -1,0 +1,16 @@
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: argo-to-ironic-permission
+spec:
+  vhost: "ironic"
+  userReference:
+    name: "argo"  # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
+  permissions:
+    write: ".*"
+    configure: ".*"
+    read: ".*"
+  rabbitmqClusterReference:
+    name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
+    namespace: openstack

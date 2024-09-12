@@ -1,0 +1,37 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: get-device-nautobot
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/title: Output JSON blob of Nautobot data for given device hostname
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/get-device-nautobot.yaml`. Return Device Information from Nautobot
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: hostname
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: hostname
+            value: "{{workflow.parameters.hostname}}"
+      outputs:
+        parameters:
+          - name: device
+            secret: true
+            valueFrom:
+              expression: "jsonpath(steps['nautobot-query'].outputs.parameters.result, '$.results.[0]')"
+      steps:
+        - - name: nautobot-query
+            templateRef:
+              name: nautobot-api
+              template: main
+            arguments:
+              parameters:
+                - name: uri
+                  value: "/dcim/devices/?name={{inputs.parameters.hostname}}"

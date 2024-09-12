@@ -1,0 +1,36 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: openstack-keystone
+spec:
+  amqp:
+    notifications:
+      # amqp server url
+      url: amqp://rabbitmq-server-0.rabbitmq-nodes.openstack.svc.cluster.local:5672/keystone
+      # jsonBody specifies that all event body payload coming from this
+      # source will be JSON
+      jsonBody: true
+      # name of the exchange.
+      exchangeName: keystone
+      exchangeType: topic
+      exchangeDeclare:
+        durable: false
+      # routing key for messages within the exchange
+      routingKey: 'notifications.info'
+      # optional consume settings
+      # if not provided, default values will be used
+      consume:
+        consumerTag: "argo-events"
+        autoAck: true
+        exclusive: false
+        noLocal: false
+      # username and password for authentication
+      # use secret selectors
+      auth:
+        username:
+          name: argo-user-credentials
+          key: username
+        password:
+          name: argo-user-credentials
+          key: password

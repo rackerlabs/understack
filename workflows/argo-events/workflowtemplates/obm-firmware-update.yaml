@@ -1,0 +1,69 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: obm-firmware-update
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/title: Update OBM firmware on target Device
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/obm-firmware-update.yaml`
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: hostname
+      - name: firmware-url
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: get-obm-ip
+            templateRef:
+              name: get-obm-ip
+              template: main
+            arguments:
+              parameters:
+                - name: hostname
+                  value: "{{workflow.parameters.hostname}}"
+          - name: get-obm-creds
+            templateRef:
+              name: get-obm-creds
+              template: main
+            arguments:
+              parameters:
+                - name: hostname
+                  value: "{{workflow.parameters.hostname}}"
+          - name: update-firmware
+            dependencies: [get-obm-ip, get-obm-creds]
+            template: obm-firmware-update
+            arguments:
+              parameters:
+                - name: ip
+                  value: "{{tasks.get-obm-ip.outputs.parameters.ip}}"
+                - name: creds
+                  value: "{{tasks.get-obm-creds.outputs.parameters.secret}}"
+                - name: firmware_url
+                  value: "{{workflow.parameters.firmware-url}}"
+
+    - name: obm-firmware-update
+      inputs:
+        parameters:
+          - name: ip
+          - name: creds
+          - name: firmware_url
+      container:
+        image: ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:latest
+        command: [python]
+        args: ["/app/obm_firmware_update.py", "--host", "{{inputs.parameters.ip}}", "--firmware-url", "{{inputs.parameters.firmware_url}}"]
+        env:
+        - name: OBM_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: "{{inputs.parameters.creds}}"
+              key: username
+        - name: OBM_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: "{{inputs.parameters.creds}}"
+              key: password

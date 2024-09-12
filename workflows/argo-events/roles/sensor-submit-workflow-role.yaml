@@ -1,0 +1,27 @@
+---
+# Similarly you can use a ClusterRole and ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sensor-submit-workflow-role
+rules:
+  - apiGroups:
+      - argoproj.io
+    verbs:
+      - get
+      - watch
+      - list
+    resources:
+      - workflowtemplates
+      - clusterworkflowtemplates
+  - apiGroups:
+      - argoproj.io
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+      - patch
+    resources:
+      - workflows

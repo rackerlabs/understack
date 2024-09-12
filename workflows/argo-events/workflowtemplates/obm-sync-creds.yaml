@@ -1,0 +1,82 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: obm-sync-creds
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/title: Sync's a devices OBM password with what we have on record
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/obm-sync-creds.yaml`
+spec:
+  arguments:
+    parameters:
+      - name: hostname
+  serviceAccountName: workflow
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: get-obm-ip
+            templateRef:
+              name: get-obm-ip
+              template: main
+            arguments:
+              parameters:
+                - name: hostname
+                  value: "{{workflow.parameters.hostname}}"
+          - name: get-obm-creds
+            templateRef:
+              name: get-obm-creds
+              template: main
+            arguments:
+              parameters:
+                - name: hostname
+                  value: "{{workflow.parameters.hostname}}"
+          - name: obm-sync-creds
+            dependencies: [get-obm-ip, get-obm-creds]
+            template: obm-sync-creds
+            arguments:
+              parameters:
+                - name: host
+                  value: "{{tasks.get-obm-ip.outputs.parameters.ip}}"
+                - name: target_creds_secret_name
+                  value: "{{tasks.get-obm-creds.outputs.parameters.secret}}"
+          - name: idrac-enable-network-boot
+            dependencies: [get-obm-ip, get-obm-creds]
+            templateRef:
+              name: idrac-enable-network-boot
+              template: idrac-enable-network-boot
+            arguments:
+              parameters:
+                - name: host
+                  value: "{{tasks.get-obm-ip.outputs.parameters.ip}}"
+                - name: target_creds_secret_name
+                  value: "{{tasks.get-obm-creds.outputs.parameters.secret}}"
+
+    - name: obm-sync-creds
+      inputs:
+        parameters:
+          - name: host
+          - name: target_creds_secret_name
+      container:
+        image: ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:latest
+        command: [python]
+        args: ["/app/obm_sync_creds.py", "--host", "{{ inputs.parameters.host }}"]
+        env:
+          - name: OBM_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: "{{inputs.parameters.target_creds_secret_name}}"
+                key: username
+          - name: OBM_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: "{{inputs.parameters.target_creds_secret_name}}"
+                key: password
+          - name: OBM_LEGACY_PASSWORDS
+            valueFrom:
+              secretKeyRef:
+                name: obm-legacy-passwords
+                key: passwords

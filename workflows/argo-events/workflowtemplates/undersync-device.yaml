@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: undersync-device
+  annotations:
+    workflows.argoproj.io/title: Updates Interface Status in Nautobot and triggers Undersync
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/undersync-device.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: trigger-undersync
+  serviceAccountName: workflow
+  templates:
+    - name: trigger-undersync
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - undersync-device
+        args:
+          - --interface-mac
+          - "{{workflow.parameters.interface_mac}}"
+          - --device-id
+          - "{{workflow.parameters.device_uuid}}"
+          - --network-name
+          - "{{workflow.parameters.network_name}}"
+          - --dry-run
+          - "{{workflow.parameters.dry_run}}"
+          - --force
+          - "{{workflow.parameters.force}}"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/undersync/
+            name: undersync-token
+            readOnly: true
+      inputs:
+        parameters:
+          - name: interface_mac
+          - name: device_uuid
+          - name: network_name
+          - name: force
+          - name: dry_run
+      volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
+        - name: undersync-token
+          secret:
+            secretName: undersync-token

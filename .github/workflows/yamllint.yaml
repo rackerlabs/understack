@@ -41,12 +41,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: thiagodnf/yaml-schema-checker@v0.0.12
         with:
-          jsonSchemaFile: argo-workflows/.workflow_with_description.schema.json
+          jsonSchemaFile: workflows/.workflow_with_description.schema.json
           yamlFiles: |
-            argo-workflows/**/workflowtemplates/*.y*ml
-            argo-workflows/**/sensors/*.y*ml
-            argo-workflows/**/workflows/*.y*ml
-            apps/understack-workflows/workflows/workflowtemplates/*.y*ml
+            workflows/argo-events/sensors/*.y*ml
+            workflows/argo-events/workflowtemplates/*.y*ml
 
   shellcheck:
     runs-on: ubuntu-latest
