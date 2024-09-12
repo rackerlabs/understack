@@ -1,6 +1,8 @@
 extends: default
 
 rules:
+  comments:
+    ignore: .github/workflows/
   document-start: disable
   indentation:
     indent-sequences: whatever
