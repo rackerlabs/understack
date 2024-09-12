@@ -15,11 +15,9 @@ resources:
 
   ## deploy argo-event components
   - native-eventbus.yaml
-  - webhook-event-source.yaml
 
   ## configure webhook Sensor and associated role
   - sensor-workflow-role.yaml
-  - webhook-sensor.yaml
   - workflow-role.yaml
 
   - configmaps.yaml
