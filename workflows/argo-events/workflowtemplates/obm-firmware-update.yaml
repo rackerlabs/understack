@@ -12,7 +12,7 @@ spec:
   entrypoint: main
   arguments:
     parameters:
-      - name: hostname
+      - name: device_id
       - name: firmware-url
   templates:
     - name: main
@@ -24,16 +24,16 @@ spec:
               template: main
             arguments:
               parameters:
-                - name: hostname
-                  value: "{{workflow.parameters.hostname}}"
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
           - name: get-obm-creds
             templateRef:
               name: get-obm-creds
               template: main
             arguments:
               parameters:
-                - name: hostname
-                  value: "{{workflow.parameters.hostname}}"
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
           - name: update-firmware
             dependencies: [get-obm-ip, get-obm-creds]
             template: obm-firmware-update

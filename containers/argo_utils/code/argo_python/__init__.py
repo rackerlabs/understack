@@ -45,7 +45,7 @@ class ArgoWorkflow:
             try:
                 # if KUBERNETES_POD_UID is not explicitly defined in the container env, pod get permissions will need
                 # be set for the service account running this workflow
-                owner_name = os.environ["HOSTNAME"]
+                owner_name = os.environ["DEVICE_ID"]
                 owner_id = os.getenv("KUBERNETES_POD_UID")
                 if not owner_id:
                     owner_metadata = self.get_pod(owner_name)

@@ -24,7 +24,7 @@ however they will likely fail until a proper get-obm-creds Workflow is created.
 
 ## Example
 ```bash
-argo -n argo-events submit --from workflowtemplate/get-device-nautobot --parameter hostname=host.domain.local
+argo -n argo-events submit --from workflowtemplate/get-device-nautobot --parameter device_id=1de4f169-9848-4d8e-921b-65338c1e00ca
 
 Name:                get-device-nautobot-g5wlz
 Namespace:           argo-events
@@ -33,7 +33,7 @@ Status:              Pending
 Created:             Tue Apr 23 13:50:57 -0400 (now)
 Progress:
 Parameters:
-  hostname:          some-host.domain.local
+  device_id:         1de4f169-9848-4d8e-921b-65338c1e00ca
 ```
 
 ```bash
@@ -52,7 +52,7 @@ Finished:            Tue Apr 23 13:51:27 -0400 (8 seconds ago)
 Duration:            30 seconds
 Progress:            1/1
 Parameters:
-  hostname:          some-host.domain.local
+  device_id:         1de4f169-9848-4d8e-921b-65338c1e00ca
 
 STEP                          TEMPLATE           PODNAME  DURATION  MESSAGE
  ✔ get-device-nautobot-g5wlz  main

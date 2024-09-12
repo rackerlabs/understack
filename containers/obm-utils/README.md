@@ -8,7 +8,7 @@ The WorkflowTemplates provided in this directory were created to provide common 
 
 ## Example
 ```bash
-argo -n argo-events submit --from  workflowtemplate/obm-sync-creds --parameter hostname=host.domain.local
+argo -n argo-events submit --from  workflowtemplate/obm-sync-creds --parameter device_id=1de4f169-9848-4d8e-921b-65338c1e00ca
 
 Name:                obm-sync-creds-wrn2c
 Namespace:           argo-events
@@ -17,7 +17,7 @@ Status:              Pending
 Created:             Tue Apr 23 14:24:07 -0400 (now)
 Progress:
 Parameters:
-  hostname:          host.domain.local
+  device_id:         1de4f169-9848-4d8e-921b-65338c1e00ca
 ```
 
 ```bash
@@ -34,7 +34,7 @@ Duration:            58 seconds
 Progress:            2/3
 ResourcesDuration:   0s*(1 cpu),5s*(100Mi memory)
 Parameters:
-  hostname:          host.domain.local
+  device_id:         1de4f169-9848-4d8e-921b-65338c1e00ca
 
 STEP                         TEMPLATE                 PODNAME                                         DURATION  MESSAGE
  ● obm-sync-creds-wrn2c      main

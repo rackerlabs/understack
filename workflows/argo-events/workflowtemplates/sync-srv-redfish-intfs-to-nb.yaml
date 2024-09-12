@@ -12,8 +12,6 @@ spec:
     parameters:
       - name: device_id
         value: "{}"
-      - name: hostname
-        value: "{}"
   templates:
     - name: main
       steps:
@@ -23,16 +21,16 @@ spec:
               template: main
             arguments:
               parameters:
-                - name: hostname
-                  value: "{{workflow.parameters.hostname}}"
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
         - - name: get-obm-creds-secret
             templateRef:
               name: get-obm-creds
               template: main
             arguments:
               parameters:
-                - name: hostname
-                  value: "{{workflow.parameters.hostname}}"
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
         - - name: sync-interfaces-to-nautobot
             templateRef:
               name: sync-interfaces-to-nautobot

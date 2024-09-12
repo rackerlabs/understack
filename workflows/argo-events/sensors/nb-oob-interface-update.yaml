@@ -68,8 +68,6 @@ spec:
                       value: Some nautobot interface has changed
                     - name: device_id
                       value: device id that event is for
-                    - name: hostname
-                      value: to support other workflows that references hostname
                 entrypoint: start
                 serviceAccountName: workflow
                 templates:
