@@ -9,17 +9,17 @@ jobs:
   lint-yaml:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - run: pip install yamllint
       - run: yamllint -c .yamllint.yaml --format github .
 
   kustomize:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-kubectl@v3
-      - uses: azure/setup-helm@v4.0.0
-      - uses: bmuschko/setup-kubeconform@v1
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: azure/setup-kubectl@901a10e89ea615cf61f57ac05cecdf23e7de06d8 # v3
+      - uses: azure/setup-helm@29960d0f5f19214b88e1d9ba750a9914ab0f1a2f # v4.0.0
+      - uses: bmuschko/setup-kubeconform@5ccaecbbf012bcb1eeeab66e649db64a477ade8f # v1
       - name: validate kustomize with kubeconform
         run: |
           set -o errexit
@@ -38,8 +38,8 @@ jobs:
   workflows-description:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: thiagodnf/yaml-schema-checker@v0.0.12
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: thiagodnf/yaml-schema-checker@3c4a632d4124b6c00e38b492b2eb35dea715e1ae # v0.0.12
         with:
           jsonSchemaFile: workflows/.workflow_with_description.schema.json
           yamlFiles: |
@@ -49,5 +49,5 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: reviewdog/action-shellcheck@v1
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: reviewdog/action-shellcheck@d99499e855260c9c56f7a1d066933b57326e9e7c # v1
