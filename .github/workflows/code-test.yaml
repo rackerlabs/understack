@@ -37,16 +37,16 @@ jobs:
         working-directory: ./python/${{ matrix.project }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
       - run: pipx install poetry==1.7.1 && poetry self add 'poetry-dynamic-versioning[plugin]'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5
         with:
           python-version-file: python/${{ matrix.project }}/pyproject.toml
           cache: "poetry"
       - run: poetry install --sync --with test
       - run: poetry build
       - run: "poetry run pytest --cov-report xml:coverage.xml"
-      - uses: orgoro/coverage@v3.2
+      - uses: orgoro/coverage@3f13a558c5af7376496aa4848bf0224aead366ac # v3.2
         with:
           coverageFile: python/${{ matrix.project }}/coverage.xml
           token: ${{ secrets.GITHUB_TOKEN }}
