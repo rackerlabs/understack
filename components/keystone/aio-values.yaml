@@ -47,22 +47,31 @@ bootstrap:
                         "domain": {
                             "name": "Default"
                         },
-                        "name": "federated_users"
+                        "name": "{1}"
                     }
                 }
             ],
             "remote": [
                 {
                     "type": "REMOTE_USER"
+                },
+                {
+                    "type": "HTTP_OIDC_GROUPS"
                 }
             ]
         }
     ]
     EOF
     openstack identity provider show sso 2>/dev/null || openstack identity provider create --remote-id https://dex.dev.undercloud.rackspace.net sso
-    openstack group create federated_users --or-show
     openstack project create federated_project --or-show
-    openstack role add --group federated_users --project federated_project member
+
+    for group in ucadmin ucuser ucneteng ucdctech; do
+      openstack group create ${group} --or-show
+      openstack role add --group ${group} --domain default member
+    done
+    openstack role add --group ucadmin --domain default admin
+    openstack role add --group ucadmin --project undercloud admin
+
     openstack mapping show dex_mapping 2>/dev/null || openstack mapping create --rules ${RULES_FILE} dex_mapping
     openstack federation protocol show openid --identity-provider sso || openstack federation protocol create openid --mapping dex_mapping --identity-provider sso
     rm ${RULES_FILE}
