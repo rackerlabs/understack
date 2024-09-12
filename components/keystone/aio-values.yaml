@@ -12,8 +12,9 @@ bootstrap:
           "admin"
     # create groups which will stand in for permissions since dex cannot use roles yet
     openstack group create --or-show ucadmin
-    openstack group create --or-show dctech
-    openstack group create --or-show user
+    openstack group create --or-show ucdctech
+    openstack group create --or-show ucneteng
+    openstack group create --or-show ucuser
     # TODO: only create this actually requested
     # create 'demo' user with sufficient permissions
     openstack user create --or-show --password demo --email 'demo@example.com' demo
