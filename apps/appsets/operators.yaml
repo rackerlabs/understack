@@ -63,12 +63,6 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'operators/mariadb-operator'
-                - component: postgres-operator
-                  skipComponent: '{{has "postgres-operator" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
-                  sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                      path: 'operators/postgres-operator'
                 - component: rabbitmq-system
                   skipComponent: '{{has "rabbitmq-system" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
