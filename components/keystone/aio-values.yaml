@@ -214,7 +214,7 @@ conf:
         type: multistring
         values:
           - http://localhost:9990/auth/websso/
-        # - https://yourinstance.of.horizon.example.com/auth/websso/
+          # - https://yourinstance.of.horizon.example.com/auth/websso/
     DEFAULT:
       max_token_size: 512
   wsgi_keystone: |
