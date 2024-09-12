@@ -10,14 +10,14 @@ images:
     ks_endpoints: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
 
     # keystone
-    keystone_api: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+    keystone_api: "ghcr.io/rackerlabs/understack/keystone:2024.1-ubuntu_jammy"
     keystone_bootstrap: "docker.io/openstackhelm/heat:2024.1-ubuntu_jammy"
-    keystone_credential_rotate: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
-    keystone_credential_setup: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
-    keystone_db_sync: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
-    keystone_domain_manage: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
-    keystone_fernet_rotate: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
-    keystone_fernet_setup: "docker.io/openstackhelm/keystone:2024.1-ubuntu_jammy"
+    keystone_credential_rotate: "ghcr.io/rackerlabs/understack/keystone:2024.1-ubuntu_jammy"
+    keystone_credential_setup: "ghcr.io/rackerlabs/understack/keystone:2024.1-ubuntu_jammy"
+    keystone_db_sync: "ghcr.io/rackerlabs/understack/keystone:2024.1-ubuntu_jammy"
+    keystone_domain_manage: "ghcr.io/rackerlabs/understack/keystone:2024.1-ubuntu_jammy"
+    keystone_fernet_rotate: "ghcr.io/rackerlabs/understack/keystone:2024.1-ubuntu_jammy"
+    keystone_fernet_setup: "ghcr.io/rackerlabs/understack/keystone:2024.1-ubuntu_jammy"
 
     # ironic
     ironic_api: "docker.io/openstackhelm/ironic:2024.1-ubuntu_jammy"

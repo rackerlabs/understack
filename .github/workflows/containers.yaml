@@ -22,7 +22,7 @@ jobs:
 
     strategy:
       matrix:
-        project: [ironic, neutron]
+        project: [ironic, neutron, keystone]
         openstack: [2024.1]
 
     steps:

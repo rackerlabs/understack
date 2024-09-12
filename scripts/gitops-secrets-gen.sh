@@ -14,8 +14,7 @@ if ! type -p kubeseal kubectl > /dev/null; then
     echo "You must have kubeseal & kubectl installed to use this script" >&2
     exit 1
 fi
-
-if ! kubectl api-resources | grep -q sealedsecrets; then
+if ! kubectl wait --for condition=established --timeout=30s crd/sealedsecrets.bitnami.com ; then
     echo "Your cluster doesn't appear to have the sealed secrets operator installed." >&2
     exit 1
 fi
@@ -215,8 +214,8 @@ echo "Checking dex"
 ## Dex based SSO Auth. Client Configurations
 mkdir -p "${DEST_DIR}/dex/"
 # clients generated are in the list below
-for client in nautobot argo argocd; do
-    if [ ! -f "${DEST_DIR}/dex/secret-nautobot-sso-dex.yaml" ]; then
+for client in nautobot argo argocd keystone; do
+    if [ ! -f "${DEST_DIR}/dex/secret-${client}-sso-dex.yaml" ]; then
         SSO_SECRET=$("${SCRIPTS_DIR}/pwgen.sh")
         kubectl --namespace dex \
             create secret generic "${client}-sso" \
