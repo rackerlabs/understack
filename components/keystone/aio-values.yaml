@@ -248,6 +248,7 @@ conf:
         OIDCClientID keystone
         OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
         OIDCCryptoPassphrase "exec:/bin/bash -c \"head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32\""
+        OIDCClaimDelimiter ;
 
         # avoid redirect issues per the following
         # https://review.opendev.org/c/openstack/keystone/+/925553
