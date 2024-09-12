@@ -1,6 +1,7 @@
 # from ironic.drivers.modules.inspector.hooks import base
 from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
+from ironic_understack.conf import CONF
 from ironic_understack.flavor_spec import FlavorSpec
 from ironic_understack.machine import Machine
 from ironic_understack.matcher import Matcher
