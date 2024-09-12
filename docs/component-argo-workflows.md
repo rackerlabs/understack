@@ -9,16 +9,16 @@ set of WorkflowTemplates below.
 | WorkflowTemplate      | Description                                               | Input                   | Output     |   |
 |---------------------- |-----------------------------------------------------------|-------------------------|------------|---|
 | get-device-nautobot   | Return Device Information from Nautobot                   | device_id               | device     |   |
-| get-obm-creds         | Get the credentials for the target Device                 | device_id               | secret     | * |
-| get-obm-ip            | Get OBM IP address for target Device                      | device_id               | ip         |   |
+| get-bmc-creds         | Get the credentials for the target Device                 | device_id               | secret     | * |
+| get-bmc-ip            | Get BMC IP address for target Device                      | device_id               | ip         |   |
 | nautobot-api          | HTTP Template Workflow to query the Nautobot API          | method,nautobot_url,uri | result     |   |
-| obm-firmware-update   | Update OBM firmware on target Device                      | device_id               |            |   |
-| obm-sync-creds        | Sync's a devices OBM password with what we have on record | device_id               |            |   |
+| bmc-firmware-update   | Update BMC firmware on target Device                      | device_id               |            |   |
+| bmc-sync-creds        | Sync's a devices BMC password with what we have on record | device_id               |            |   |
 
 \* WorkflowTemplate which requires a manual / custom implementation.
 
 As Understack develops, there may be underlying / dependant services which are not included, and require some of the
-included WorkflowTemplates to be manually implemented to work in your environment. For example, the get-obm-creds
+included WorkflowTemplates to be manually implemented to work in your environment. For example, the get-bmc-creds
 WorkflowTemplate will need to be written to communicate with whatever service you're using to store your device
 credentials.
 
@@ -53,7 +53,7 @@ the Pod's uid can be passed via the `KUBERNETES_POD_UID` environment variable. T
 completion of the Workflow `.spec.podGC.strategy` can be set to `OnWorkflowCompletion`.
 
 An example WorkflowTemplate demonstrating argo-python usage can be found
-[here](https://github.com/rackerlabs/understack/blob/main/workflows/argo-events/workflowtemplates/get-obm-creds.yaml).
+[here](https://github.com/rackerlabs/understack/blob/main/workflows/argo-events/workflowtemplates/get-bmc-creds.yaml).
 
 ### Argo CLI
 

@@ -10,7 +10,7 @@ We initially wanted to listen on the `dcim.Device` record creation events, but
 it is more efficient to listen for the updates on the `dcim.Interface` and
 perform additional checks to see:
 
-- if the updated Interface is an OBM interface
+- if the updated Interface is an BMC interface
 - if the updated Interface's device is a Server (currently we determine this by an interface name, since the Network devices don't have DRAC/iLo cards)
 
 ## Caveats

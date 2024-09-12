@@ -42,9 +42,9 @@ def main():
         )
         sys.exit(0)
 
-    # Update OBM credentials
-    expected_username = credential("obm", "username")
-    expected_password = credential("obm", "password")
+    # Update BMC credentials
+    expected_username = credential("bmc", "username")
+    expected_password = credential("bmc", "password")
 
     updates = [
         f"driver_info/redfish_username={expected_username}",

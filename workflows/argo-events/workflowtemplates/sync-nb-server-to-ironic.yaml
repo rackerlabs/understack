@@ -21,9 +21,9 @@ spec:
             templateRef:
               name: sync-server-to-ironic
               template: sync-server
-        - - name: sync-server-obm-creds
+        - - name: sync-server-bmc-creds
             templateRef:
-              name: sync-obm-creds
+              name: sync-bmc-creds
               template: main
         - - name: sync-interfaces-to-ironic
             templateRef:

@@ -19,8 +19,8 @@ Currently Understack is not including any sort of secret store, outside of what 
 - Credentials will be mounted from a Kubernetes Secret.
 - How those credential Secrets are created is up to you.
 
-`workflowtemplates/get-obm-creds.yaml` and the placeholder secret provided in `deps/` are strictly that, placeholder. They have been provided to allow the workflows to execute,
-however they will likely fail until a proper get-obm-creds Workflow is created.
+`workflowtemplates/get-bmc-creds.yaml` and the placeholder secret provided in `deps/` are strictly that, placeholder. They have been provided to allow the workflows to execute,
+however they will likely fail until a proper get-bmc-creds Workflow is created.
 
 ## Example
 ```bash
