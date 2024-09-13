@@ -5,6 +5,9 @@
     "config:recommended",
     "customManagers:dockerfileVersions",
     "customManagers:githubActionsVersions",
-    "helpers:pinGitHubActionDigests"
+    "helpers:pinGitHubActionDigests",
+    ":approveMajorUpdates",
+    ":prNotPending",
+    ":rebaseStalePrs"
   ]
 }
