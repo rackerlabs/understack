@@ -40,11 +40,9 @@ bootstrap:
                         "name": "{1}",
                         "email": "{2}"
                     },
-                    "group": {
-                        "domain": {
-                            "id": "default"
-                        },
-                        "name": "{3}"
+                    "groups": "{3}",
+                     "domain": {
+                        "id": "default"
                     }
                 }
             ],
