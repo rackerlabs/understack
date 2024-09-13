@@ -47,7 +47,7 @@ bootstrap:
                     },
                     "group": {
                         "domain": {
-                            "name": "Default"
+                            "id": "default"
                         },
                         "name": "{3}"
                     }
