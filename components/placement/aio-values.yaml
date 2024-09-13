@@ -17,6 +17,12 @@ dependencies:
     db_sync:
       jobs:
 
+pod:
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+
 manifests:
   job_db_init: false
 

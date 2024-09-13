@@ -217,6 +217,10 @@ pod:
           - name: keystone-sso
             secret:
               secretName: keystone-sso
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
 
 conf:
   keystone:

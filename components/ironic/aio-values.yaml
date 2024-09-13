@@ -151,6 +151,10 @@ pod:
           - name: host-var-lib-understack
             hostPath:
               path: /var/lib/understack
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
 
 # we don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as

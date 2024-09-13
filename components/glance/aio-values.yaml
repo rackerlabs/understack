@@ -45,6 +45,12 @@ dependencies:
         - glance-ks-user
         - glance-ks-endpoints
 
+pod:
+  lifecycle:
+    disruption_budget:
+      api:
+        min_available: 1
+
 manifests:
   job_db_init: false
   job_rabbit_init: false

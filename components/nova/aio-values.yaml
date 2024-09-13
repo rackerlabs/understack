@@ -101,6 +101,12 @@ dependencies:
       jobs:
         - nova-db-sync
 
+pod:
+  lifecycle:
+    disruption_budget:
+      osapi:
+        min_available: 1
+
 manifests:
   job_db_init: false
   job_rabbit_init: false

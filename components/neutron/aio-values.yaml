@@ -43,6 +43,10 @@ conf:
 pod:
   use_fqdn:
     neutron_agent: false
+  lifecycle:
+    disruption_budget:
+      server:
+        min_available: 1
 
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:
