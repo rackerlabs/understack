@@ -63,10 +63,26 @@ bootstrap:
         }
     ]
     EOF
-    openstack identity provider show sso 2>/dev/null || openstack identity provider create --remote-id https://dex.dev.undercloud.rackspace.net sso
-    openstack project create federated_project --or-show
+    # look up or create our domain for SSO integration, called 'sso'
+    sso_domain_id=$(openstack domain create --or-show --description "Domain for 'sso' identity provider" -f value -c id sso)
 
-    # create groups which will stand in for permissions since dex cannot use roles yet
+    # define our identity provider 'sso' for the domain 'sso'
+    openstack identity provider show sso 2>/dev/null || openstack identity provider create --domain "${sso_domain_id}" --description "Identity Provider to our dex" --remote-id https://dex.dev.undercloud.rackspace.net sso
+
+    # create or update the mapping that we'll use for the 'sso' identity
+    if openstack mapping show sso_mapping 2>/dev/null; then
+      openstack mapping set --rules ${RULES_FILE} sso_mapping;
+    else
+      openstack mapping create --rules ${RULES_FILE} sso_mapping;
+    fi
+
+    # clean up
+    rm -f "${RULES_FILE}"
+
+    # create the federation protocol 'openid' to use the identity provider 'sso' with the 'sso_mapping'
+    openstack federation protocol show openid --identity-provider sso || openstack federation protocol create openid --mapping sso_mapping --identity-provider sso
+
+    # create groups which map to our groups claim from dex which can be mapped to permissions
     for group in ucadmin ucuser ucneteng ucdctech; do
       openstack group create ${group} --or-show
       openstack role add --group ${group} --domain default member
@@ -74,13 +90,6 @@ bootstrap:
     openstack role add --group ucadmin --domain default admin
     openstack role add --group ucadmin --project undercloud admin
 
-    if openstack mapping show dex_mapping 2>/dev/null; then
-      openstack mapping set --rules ${RULES_FILE} dex_mapping;
-    else
-      openstack mapping create --rules ${RULES_FILE} dex_mapping;
-    fi
-    openstack federation protocol show openid --identity-provider sso || openstack federation protocol create openid --mapping dex_mapping --identity-provider sso
-    rm ${RULES_FILE}
 network:
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
