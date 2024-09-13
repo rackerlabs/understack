@@ -41,19 +41,27 @@ bootstrap:
             "local": [
                 {
                     "user": {
-                        "name": "{0}"
+                        "id": "{0}",
+                        "name": "{1}",
+                        "email": "{2}"
                     },
                     "group": {
                         "domain": {
                             "name": "Default"
                         },
-                        "name": "{1}"
+                        "name": "{3}"
                     }
                 }
             ],
             "remote": [
                 {
+                    "type": "HTTP_OIDC_SUB"
+                },
+                {
                     "type": "REMOTE_USER"
+                },
+                {
+                    "type": "HTTP_OIDC_EMAIL"
                 },
                 {
                     "type": "HTTP_OIDC_GROUPS"
