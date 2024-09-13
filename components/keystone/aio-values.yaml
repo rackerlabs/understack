@@ -76,7 +76,11 @@ bootstrap:
     openstack role add --group ucadmin --domain default admin
     openstack role add --group ucadmin --project undercloud admin
 
-    openstack mapping show dex_mapping 2>/dev/null || openstack mapping create --rules ${RULES_FILE} dex_mapping
+    if openstack mapping show dex_mapping 2>/dev/null; then
+      openstack mapping set --rules ${RULES_FILE} dex_mapping;
+    else
+      openstack mapping create --rules ${RULES_FILE} dex_mapping;
+    fi
     openstack federation protocol show openid --identity-provider sso || openstack federation protocol create openid --mapping dex_mapping --identity-provider sso
     rm ${RULES_FILE}
 network:
