@@ -10,11 +10,6 @@ bootstrap:
           --user="${OS_USERNAME}" \
           --domain="${OS_DEFAULT_DOMAIN}" \
           "admin"
-    # create groups which will stand in for permissions since dex cannot use roles yet
-    openstack group create --or-show ucadmin
-    openstack group create --or-show ucdctech
-    openstack group create --or-show ucneteng
-    openstack group create --or-show ucuser
     # TODO: only create this actually requested
     # create 'demo' user with sufficient permissions
     openstack user create --or-show --password demo --email 'demo@example.com' demo
@@ -73,6 +68,7 @@ bootstrap:
     openstack identity provider show sso 2>/dev/null || openstack identity provider create --remote-id https://dex.dev.undercloud.rackspace.net sso
     openstack project create federated_project --or-show
 
+    # create groups which will stand in for permissions since dex cannot use roles yet
     for group in ucadmin ucuser ucneteng ucdctech; do
       openstack group create ${group} --or-show
       openstack role add --group ${group} --domain default member
