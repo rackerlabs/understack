@@ -125,12 +125,10 @@ has been chosen; other tools like Vault, SOPS, etc should be considered
 for production deployments.
 
 ```bash
-# from your understack checkout
-./scripts/gitops-secrets-gen.sh ${UC_DEPLOY}/my-k3s.env
-pushd "${UC_DEPLOY}"
+cd /path/to/uc-deploy
+/path/to/understack/scripts/gitops-secrets-gen.sh ./my-k3s.env
 git add secrets/my-k3s
 git commit -m "my-k3s: secrets generation"
-popd
 ```
 
 ### Defining the app deployment
@@ -139,13 +137,11 @@ In this section we will use the [App of Apps][app-of-apps] pattern to define
 the deployment of all the components of UnderStack.
 
 ```bash
-# from your understack checkout
-./scripts/gitops-deploy.sh ${UC_DEPLOY}/my-k3s.env
-pushd "${UC_DEPLOY}"
+cd /path/to/uc-deploy
+/path/to/understack/scripts/gitops-deploy.sh ${UC_DEPLOY}/my-k3s.env
 git add clusters/my-k3s
 git add helm-configs/my-k3s
 git commit -m "my-k3s: initial cluster config"
-popd
 ```
 
 ## Final modifications of your deployment
@@ -171,20 +167,21 @@ to your git server so that ArgoCD can access it.
 Configure your ArgoCD to be aware of your cluster:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-*-cluster.yaml"
+cd /path/to/uc-deploy
+kubectl -n argocd apply -f "secrets/${DEPLOY_NAME}/argocd/secret-*-cluster.yaml"
 ```
 
 Now configure your ArgoCD to have the credential access to your deploy repo:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
+cd /path/to/uc-deploy
+kubectl -n argocd apply -f "secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
 ```
 
 Finally run the following to have ArgoCD deploy the system:
 
 ```bash
-# from your understack checkout
-kubectl apply -f apps/aio-app-of-apps.yaml
+kubectl -n argocd apply -f https://raw.githubusercontent.com/rackerlabs/understack/main/apps/aio-app-of-apps.yaml
 ```
 
 At this point ArgoCD will work to deploy Understack.
