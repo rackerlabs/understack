@@ -291,6 +291,7 @@ class UnderstackDriver(MechanismDriver):
                 "interface_mac": mac_address,
                 "device_uuid": device_uuid,
                 "network_name": network_name,
+                "network_id": network_id,
                 "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
                 "force": cfg.CONF.ml2_type_understack.argo_force,
             },

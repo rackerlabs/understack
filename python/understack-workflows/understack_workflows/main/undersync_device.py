@@ -65,6 +65,9 @@ def argument_parser():
         "--device-id", type=UUID, required=False, help="Nautobot device UUID"
     )
     parser.add_argument("--network-name", required=True)
+    parser.add_argument(
+        "--network-id", type=UUID, required=True, help="Nautobot network UUID"
+    )
     parser = parser_nautobot_args(parser)
     parser.add_argument(
         "--force",

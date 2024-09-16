@@ -22,6 +22,8 @@ spec:
           - "{{workflow.parameters.device_uuid}}"
           - --network-name
           - "{{workflow.parameters.network_name}}"
+          - --network-id
+          - "{{workflow.parameters.network_id}}"
           - --dry-run
           - "{{workflow.parameters.dry_run}}"
           - --force
