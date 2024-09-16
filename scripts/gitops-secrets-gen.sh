@@ -351,7 +351,7 @@ export HORIZON_DB_PASSWORD
 # this is a helm values.yaml but it contains secrets because of the lack
 # of secrets references in OpenStack Helm
 yq '(.. | select(tag == "!!str")) |= envsubst' \
-    "./components/openstack-secrets.tpl.yaml" \
+    "${SCRIPTS_DIR}/../components/openstack-secrets.tpl.yaml" \
     > "${DEST_DIR}/secret-openstack.yaml"
 
 echo "Checking undersync"
