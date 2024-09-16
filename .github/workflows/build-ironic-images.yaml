@@ -1,0 +1,47 @@
+---
+name: build-ironic-images
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'ironic-images/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'ironic-images/**'
+
+jobs:
+  build-ironic-images:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ironic-images/ipa-debian-bookworm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        id: setup-python
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: sudo apt update && sudo apt install -y debootstrap qemu-utils
+      - run: pip install -r requirements.txt
+        working-directory: ironic-images
+      - name: Build the IPA image
+        run: bash ipa-debian-bookworm.sh
+        env:
+          ELEMENTS_PATH: ${{ env.pythonLocation }}/share/ironic-python-agent-builder/dib:${{ github.workspace }}/ironic-images/custom_elements
+      - name: Dynamically set timestamp environment variable
+        run: echo "TIMESTAMP=$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
+      - name: Publish IPA Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: undercloud-ironic-ipa
+          tag_name: undercloud-ironic-ipa-${{ env.TIMESTAMP }}
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: |
+            ironic-images/ipa-debian-bookworm/ipa-debian-bookworm.initramfs
+            ironic-images/ipa-debian-bookworm/ipa-debian-bookworm.kernel
+        if: ${{ github.ref == 'refs/heads/main' }}

@@ -1,0 +1,7 @@
+- imagename: ipa-debian-bookworm
+  elements:
+  - ironic-python-agent-ramdisk
+  - debian-minimal
+  - dynamic-login
+  - journal-to-console
+  - undercloud-ipa
