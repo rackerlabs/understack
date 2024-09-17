@@ -2,8 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.argo.workflows import ArgoClient
+from neutron_understack.neutron_understack_mech import UnderstackDriver
 
 
 @pytest.fixture
@@ -11,13 +11,13 @@ def argo_client() -> ArgoClient:
     return MagicMock(spec_set=ArgoClient)
 
 
-def test_move_to_network__provisioning(argo_client):
+def test_move_to_network__provisioning(argo_client, device_id, network_id, mac_address):
     driver = UnderstackDriver()
     driver._move_to_network(
         vif_type="other",
-        mac_address="fa:16:3e:35:1c:3d",
-        device_uuid="41d18c6a-5548-4ee9-926f-4e3ebf43153f",
-        network_id="c2702769-5592-4555-8ae6-e670db82c31e",
+        mac_address=mac_address,
+        device_uuid=str(device_id),
+        network_id=str(network_id),
         argo_client=argo_client,
     )
 
@@ -25,8 +25,8 @@ def test_move_to_network__provisioning(argo_client):
         template_name="undersync-device",
         entrypoint="trigger-undersync",
         parameters={
-            "interface_mac": "fa:16:3e:35:1c:3d",
-            "device_uuid": "41d18c6a-5548-4ee9-926f-4e3ebf43153f",
+            "interface_mac": mac_address,
+            "device_uuid": str(device_id),
             "network_name": "tenant",
             "dry_run": True,
             "force": False,
