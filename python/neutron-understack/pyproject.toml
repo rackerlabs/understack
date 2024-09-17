@@ -64,3 +64,6 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 # enable the google doc style rules by default
 convention = "google"
+
+[tool.poetry.plugins."neutron.ml2.mechanism_drivers"]
+understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
