@@ -163,16 +163,14 @@ spec:
                               value: '{{.name }}-cluster-issuer'
                 - component: argo-events
                   skipComponent: '{{has "argo-events" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
-                  source:
-                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                    path: 'components/argo-events'
-                  ignoreDifferences:
-                    - group: ''
-                      kind: ServiceAccount
-                      name: workflow
-                      jsonPointers:
-                        - /imagePullSecrets
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/argo-events'
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: secrets
+                      path: 'secrets/{{.name}}/argo-events'
                 - component: understack-workflows
                   componentNamespace: argo-events
                   skipComponent: '{{has "understack-workflows" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
