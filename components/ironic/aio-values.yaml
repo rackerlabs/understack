@@ -18,6 +18,11 @@ conductor:
     # at this time we are running our own dnsmasq container and statefulset
     enabled: false
 
+labels:
+  conductor:
+    node_selector_key: ironic_role
+    node_selector_value: conductor
+
 conf:
   ironic:
     DEFAULT:

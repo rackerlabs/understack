@@ -33,6 +33,9 @@ spec:
       labels:
         application: ironic-dnsmasq
     spec:
+      nodeSelector:
+        ironic_role: conductor
+
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
