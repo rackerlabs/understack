@@ -8,6 +8,7 @@
     "helpers:pinGitHubActionDigests",
     ":approveMajorUpdates",
     ":prNotPending",
-    ":rebaseStalePrs"
+    ":rebaseStalePrs",
+    ":automergeDigest"
   ]
 }
