@@ -6,4 +6,3 @@ resources:
 - appsets/operators.yaml
 - appsets/components.yaml
 - appsets/openstack.yaml
-- appsets/workflows.yaml
