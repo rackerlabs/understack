@@ -28,6 +28,7 @@ def test_move_to_network__provisioning(argo_client, device_id, network_id, mac_a
             "interface_mac": mac_address,
             "device_uuid": str(device_id),
             "network_name": "tenant",
+            "network_id": str(network_id),
             "dry_run": True,
             "force": False,
         },
