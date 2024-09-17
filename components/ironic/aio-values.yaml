@@ -145,7 +145,7 @@ pod:
             mountPath: /etc/dnsmasq.d/
           - name: dnsmasq-dhcp
             mountPath: /var/lib/dnsmasq/
-          - name: host-var-lib-understack
+          - name: understack-data
             mountPath: /var/lib/understack
         volumes:
           - name: dnsmasq-ironic
@@ -154,9 +154,9 @@ pod:
           - name: dnsmasq-dhcp
             persistentVolumeClaim:
               claimName: dnsmasq-dhcp
-          - name: host-var-lib-understack
-            hostPath:
-              path: /var/lib/understack
+          - name: understack-data
+            persistentVolumeClaim:
+              claimName: understack-data
   lifecycle:
     disruption_budget:
       api:
