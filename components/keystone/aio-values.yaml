@@ -10,12 +10,6 @@ bootstrap:
           --user="${OS_USERNAME}" \
           --domain="${OS_DEFAULT_DOMAIN}" \
           "admin"
-    # TODO: only create this actually requested
-    # create 'demo' user with sufficient permissions
-    openstack user create --or-show --password demo --email 'demo@example.com' demo
-    openstack user set --email 'demo@example.com' demo
-    # add 'demo' user to 'ucadmin' group
-    openstack group add user ucadmin demo
     # create 'argoworkflow' user
     # credentials for ironic-nautobot-sync and other argo workflows
     openstack project create undercloud --or-show
@@ -89,6 +83,13 @@ bootstrap:
     done
     openstack role add --group ucadmin --domain default admin
     openstack role add --group ucadmin --project undercloud admin
+
+    # TODO: only create this actually requested
+    # create 'demo' user with sufficient permissions
+    openstack user create --or-show --password demo --email 'demo@example.com' demo
+    openstack user set --email 'demo@example.com' demo
+    # add 'demo' user to 'ucadmin' group
+    openstack group add user ucadmin demo
 
 network:
   # configure OpenStack Helm to use Undercloud's ingress
