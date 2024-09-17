@@ -116,6 +116,8 @@ manifests:
   secret_db_cell0: true
   secret_db: true
   secret_keystone: true
+  service_ingress_metadata: false
+  service_ingress_osapi: false
   daemonset_compute: false
   statefulset_compute_ironic: true
 

@@ -33,6 +33,7 @@ dependencies:
 manifests:
   job_db_init: false
   secret_db: false
+  service_ingress: false
 
 # We don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as

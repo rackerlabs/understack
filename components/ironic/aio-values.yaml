@@ -129,6 +129,7 @@ manifests:
   secret_db: false
   secret_rabbitmq: false
   secret_registry: false
+  service_ingress_api: false
 
 pod:
   mounts:
