@@ -176,10 +176,13 @@ spec:
                 - component: understack-workflows
                   componentNamespace: argo-events
                   skipComponent: '{{has "understack-workflows" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
-                  source:
-                    repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                    targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                    path: 'workflows'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'workflows'
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: 'workflows'
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
