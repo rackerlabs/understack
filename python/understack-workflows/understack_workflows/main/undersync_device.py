@@ -68,7 +68,7 @@ def update_nautobot_for_tenant(
     # Making this http request directly because it was not clear how to get
     # the pynautobot api client to call an arbitrary endpoint:
 
-    uri = f"{nb_url}api/plugins/undercloud-vni/ucvni_jobs/prep_switch_interface"
+    uri = f"{nb_url}/api/plugins/undercloud-vni/ucvni_jobs/prep_switch_interface"
     payload = {
         "ucvni_id": str(ucvni_id),
         "server_interface_mac": str(server_interface_mac),
