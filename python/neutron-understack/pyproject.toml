@@ -1,3 +1,7 @@
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
+
 [tool.poetry]
 name = "neutron-understack"
 version = "0.1.0"
@@ -64,3 +68,6 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 # enable the google doc style rules by default
 convention = "google"
+
+[tool.poetry.plugins."neutron.ml2.mechanism_drivers"]
+understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"

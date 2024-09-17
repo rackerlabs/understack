@@ -132,6 +132,7 @@ EOF
 [ -n "${UC_AIO}" ] && gen-argocd || echo "UC_AIO is NOT set so not creating ArgoCD bits"
 
 echo "Checking cert-manager"
+mkdir -p "${DEST_DIR}/cert-manager"
 if [ ! -f "${DEST_DIR}/cert-manager/cluster-issuer.yaml" ]; then
     if [ "${UC_DEPLOY_EMAIL}" = "" ]; then
         echo "UC_DEPLOY_EMAIL is not set. Unable to generate cert-manager issuer." >&2
@@ -287,6 +288,7 @@ create_os_secret() {
     local username=$3
     local secret_var="SECRET_${name}"
     local data_var="VARNAME_${name}"
+    local password_var="${!data_var}"
     file_suffix=$(convert_to_secret_name "${name}")
 
     echo "Writing ${component}/secret-${file_suffix}.yaml, please commit"
@@ -294,7 +296,7 @@ create_os_secret() {
     create secret generic "${!secret_var}" \
     --type Opaque \
     --from-literal=username="${username}" \
-    --from-literal=password="${!data_var}" \
+    --from-literal=password="${!password_var}" \
     --dry-run=client -o yaml \
     | secret-seal-stdin "${DEST_DIR}/${component}/secret-${file_suffix}.yaml"
 }
