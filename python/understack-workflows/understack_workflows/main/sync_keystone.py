@@ -3,15 +3,14 @@ import logging
 import uuid
 from enum import StrEnum
 
-import openstack
-from openstack.connection import Connection
-
 from understack_workflows.domain import DefaultDomain
 from understack_workflows.domain import domain_id
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.nautobot import Nautobot
+from understack_workflows.openstack.client import Connection
+from understack_workflows.openstack.client import get_openstack_client
 
 logger = setup_logger(__name__, level=logging.INFO)
 
@@ -123,7 +122,7 @@ def do_action(
 def main():
     args = argument_parser().parse_args()
 
-    conn = openstack.connect(cloud=args.os_cloud)
+    conn = get_openstack_client(cloud=args.os_cloud)
     nb_token = args.nautobot_token or credential("nb-token", "token")
     nautobot = Nautobot(args.nautobot_url, nb_token, logger=logger)
 

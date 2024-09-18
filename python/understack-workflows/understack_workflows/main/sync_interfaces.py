@@ -85,13 +85,7 @@ def main():
     nautobot_ports = get_nautobot_interfaces(nautobot, device_id)
 
     # get Ironic Ports
-    client = IronicClient(
-        svc_url=os.environ["IRONIC_SVC_URL"],
-        username=os.environ["IRONIC_USERNAME"],
-        password=os.environ["IRONIC_PASSWORD"],
-        auth_url=os.environ["IRONIC_AUTH_URL"],
-        tenant_name=os.environ["IRONIC_TENANT"],
-    )
+    client = IronicClient()
 
     logger.info("Fetching Ironic Ports ...")
     ironic_ports = client.list_ports(device_id)

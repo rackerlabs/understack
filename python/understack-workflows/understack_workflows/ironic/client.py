@@ -4,11 +4,6 @@ from understack_workflows.openstack.client import get_ironic_client
 class IronicClient:
     def __init__(
         self,
-        svc_url: str,
-        username: str,
-        password: str,
-        auth_url: str,
-        tenant_name: str,
     ) -> None:
         """Initialize our ironicclient wrapper."""
         self.logged_in = False

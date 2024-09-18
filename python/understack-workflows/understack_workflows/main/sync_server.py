@@ -6,7 +6,6 @@ from ironicclient.common.utils import args_array_to_patch
 
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
-from understack_workflows.ironic.secrets import read_secret
 from understack_workflows.node_configuration import IronicNodeConfiguration
 
 logger = setup_logger(__name__)
@@ -24,16 +23,6 @@ def get_args():
         )
 
     return json.loads(sys.argv[1])
-
-
-def get_ironic_client():
-    return IronicClient(
-        svc_url=read_secret("IRONIC_SVC_URL"),
-        username=read_secret("IRONIC_USERNAME"),
-        password=read_secret("IRONIC_PASSWORD"),
-        auth_url=read_secret("IRONIC_AUTH_URL"),
-        tenant_name=read_secret("IRONIC_TENANT"),
-    )
 
 
 def get_ironic_node(node, ironic_client):
@@ -82,7 +71,7 @@ def main():
     update_data = interface_update_event["data"]
 
     logger.info("Pushing device new node to Ironic.")
-    ironic_client = get_ironic_client()
+    ironic_client = IronicClient()
 
     node = IronicNodeConfiguration.from_event(interface_update_event)
     ironic_node = get_ironic_node(node, ironic_client)
