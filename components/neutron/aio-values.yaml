@@ -98,6 +98,7 @@ manifests:
   daemonset_bgp_dragent: false
   daemonset_netns_cleanup_cron: false
   deployment_ironic_agent: true
+  service_ingress_server: false
 
 # We don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as

@@ -20,7 +20,7 @@ cephBlockPools:
     storageClass:
       enabled: true
       name: ceph-block-replicated
-      isDefault: false
+      isDefault: true
       reclaimPolicy: Retain
       allowVolumeExpansion: true
       volumeBindingMode: "Immediate"

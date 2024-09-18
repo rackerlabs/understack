@@ -59,6 +59,7 @@ manifests:
   pod_rally_test: false
   secret_db: false
   secret_keystone: true
+  service_ingress_api: false
 
 # We don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as

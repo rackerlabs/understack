@@ -305,6 +305,11 @@ endpoints:
       name: rabbitmq-server
     hosts:
       default: rabbitmq-nodes
+  identity:
+    # upstream uses 'keystone' here which causes traffic to go via an internal ingress
+    # which is wired back to keystone-api via the service_ingress_api manifest. just
+    # go direct to the service
+    default: keystone-api
 
 manifests:
   job_credential_cleanup: false
@@ -313,6 +318,7 @@ manifests:
   pod_rally_test: false
   secret_db: false
   secret_keystone: true
+  service_ingress_api: false
 
 # we don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as
