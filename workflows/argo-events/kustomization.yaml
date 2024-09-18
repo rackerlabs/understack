@@ -9,7 +9,6 @@ resources:
   - secrets/obm-creds.yaml
   - secrets/placeholder-obm-creds.yaml
   - secrets/operate-workflow-sa.token.yaml
-  - secrets/production-ironic-for-argo-creds.yaml
   - secrets/nautobot-token.yaml
   - secrets/placeholder-obm-legacy-passwords.yaml
   - sensors/ironic-node-update.yaml

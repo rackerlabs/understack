@@ -28,9 +28,6 @@ spec:
           - mountPath: /etc/openstack
             name: openstack-svc-acct
             readOnly: true
-        envFrom:
-          - secretRef:
-              name: production-ironic-for-argo-creds
         env:
           - name: NAUTOBOT_API
             valueFrom:
