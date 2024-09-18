@@ -24,9 +24,10 @@ spec:
           - --device-id
           - "{{inputs.parameters.device_id}}"
           - --debug
-        envFrom:
-          - secretRef:
-              name: production-ironic-for-argo-creds
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
         env:
           - name: NAUTOBOT_API
             valueFrom:
@@ -38,3 +39,7 @@ spec:
               secretKeyRef:
                 name: nautobot-token
                 key: token
+      volumes:
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct

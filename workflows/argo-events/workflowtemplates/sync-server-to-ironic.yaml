@@ -25,10 +25,10 @@ spec:
         args:
           - "{{workflow.parameters.interface_update_event}}"
         volumeMounts:
-          - mountPath: /etc/ironic-secrets/
-            name: ironic-secrets
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
             readOnly: true
       volumes:
-        - name: ironic-secrets
+        - name: openstack-svc-acct
           secret:
-            secretName: production-ironic-for-argo-creds
+            secretName: openstack-svc-acct
