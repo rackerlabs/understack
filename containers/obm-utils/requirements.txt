@@ -1,4 +1,4 @@
 requests==2.32.3
-pynautobot==2.1.1
+pynautobot==2.2.1
 sushy==5.2.0
 IdracRedfishSupport==0.0.8
