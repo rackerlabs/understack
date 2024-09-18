@@ -4,7 +4,7 @@ metadata:
   name: get-obm-ip
   namespace: argo-events
   annotations:
-    workflows.argoproj.io/title: Output OBM IP address for the Device with the given hostname
+    workflows.argoproj.io/title: Output OBM IP address for the Device with the given device_id
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/get-obm-ip.yaml`.
       Get OBM IP address for target Device
@@ -13,12 +13,12 @@ spec:
   entrypoint: main
   arguments:
     parameters:
-      - name: hostname
+      - name: device_id
   templates:
     - name: main
       inputs:
         parameters:
-          - name: hostname
+          - name: device_id
       outputs:
         parameters:
           - name: ip
@@ -32,4 +32,4 @@ spec:
             arguments:
               parameters:
                 - name: uri
-                  value: "/ipam/ip-addresses/?device={{inputs.parameters.hostname}}&interfaces=iDRAC&interfaces=iLO"
+                  value: "/ipam/ip-addresses/?device_id={{inputs.parameters.device_id}}&interfaces=iDRAC&interfaces=iLO"

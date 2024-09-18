@@ -8,12 +8,12 @@ set of WorkflowTemplates below.
 
 | WorkflowTemplate      | Description                                               | Input                   | Output     |   |
 |---------------------- |-----------------------------------------------------------|-------------------------|------------|---|
-| get-device-nautobot   | Return Device Information from Nautobot                   | hostname                | device     |   |
-| get-obm-creds         | Get the credentials for the target Device                 | hostname                | secret     | * |
-| get-obm-ip            | Get OBM IP address for target Device                      | hostname                | ip         |   |
+| get-device-nautobot   | Return Device Information from Nautobot                   | device_id               | device     |   |
+| get-obm-creds         | Get the credentials for the target Device                 | device_id               | secret     | * |
+| get-obm-ip            | Get OBM IP address for target Device                      | device_id               | ip         |   |
 | nautobot-api          | HTTP Template Workflow to query the Nautobot API          | method,nautobot_url,uri | result     |   |
-| obm-firmware-update   | Update OBM firmware on target Device                      | hostname                |            |   |
-| obm-sync-creds        | Sync's a devices OBM password with what we have on record | hostname                |            |   |
+| obm-firmware-update   | Update OBM firmware on target Device                      | device_id               |            |   |
+| obm-sync-creds        | Sync's a devices OBM password with what we have on record | device_id               |            |   |
 
 \* WorkflowTemplate which requires a manual / custom implementation.
 
@@ -62,7 +62,7 @@ Argo Workflows has a CLI and the installation instrucutions can be found [here](
 Usage:
 
 ```bash
-argo -n argo-events submit --from workflowtemplate/get-device-nautobot --parameter hostname=host.domain.local
+argo -n argo-events submit --from workflowtemplate/get-device-nautobot --parameter device_id=1de4f169-9848-4d8e-921b-65338c1e00ca
 
 Name:                get-device-nautobot-g5wlz
 Namespace:           argo-events
@@ -71,7 +71,7 @@ Status:              Pending
 Created:             Tue Apr 23 13:50:57 -0400 (now)
 Progress:
 Parameters:
-  hostname:          host.domain.local
+  device_id:         1de4f169-9848-4d8e-921b-65338c1e00ca
 ```
 
 ```bash
@@ -90,7 +90,7 @@ Finished:            Tue Apr 23 13:51:27 -0400 (8 seconds ago)
 Duration:            30 seconds
 Progress:            1/1
 Parameters:
-  hostname:          host.domain.local
+  device_id:         1de4f169-9848-4d8e-921b-65338c1e00ca
 
 STEP                          TEMPLATE           PODNAME  DURATION  MESSAGE
  ✔ get-device-nautobot-g5wlz  main

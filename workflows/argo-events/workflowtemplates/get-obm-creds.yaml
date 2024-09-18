@@ -4,7 +4,7 @@ metadata:
   name: get-obm-creds
   namespace: argo-events
   annotations:
-    workflows.argoproj.io/title: Create a k8s secret containing OBM creds for given device hostname
+    workflows.argoproj.io/title: Create a k8s secret containing OBM creds for given device_id
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/get-obm-creds.yaml`.
       An example template to return the name of a Kubernetes Secret which containing device's OBM credentials.
@@ -17,12 +17,12 @@ spec:
   entrypoint: main
   arguments:
     parameters:
-      - name: hostname
+      - name: device_id
   templates:
     - name: main
       inputs:
         parameters:
-          - name: hostname
+          - name: device_id
       outputs:
         parameters:
           - name: secret

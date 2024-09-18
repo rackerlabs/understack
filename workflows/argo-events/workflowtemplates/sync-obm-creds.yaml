@@ -21,8 +21,8 @@ spec:
               template: main
             arguments:
               parameters:
-                - name: hostname
-                  value: '{{workflow.parameters.hostname}}'
+                - name: device_id
+                  value: '{{workflow.parameters.device_id}}'
         - - name: sync-obm-creds
             template: sync-obm-creds
             arguments:

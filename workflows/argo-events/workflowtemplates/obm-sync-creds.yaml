@@ -11,7 +11,7 @@ metadata:
 spec:
   arguments:
     parameters:
-      - name: hostname
+      - name: device_id
   serviceAccountName: workflow
   entrypoint: main
   templates:
@@ -24,16 +24,16 @@ spec:
               template: main
             arguments:
               parameters:
-                - name: hostname
-                  value: "{{workflow.parameters.hostname}}"
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
           - name: get-obm-creds
             templateRef:
               name: get-obm-creds
               template: main
             arguments:
               parameters:
-                - name: hostname
-                  value: "{{workflow.parameters.hostname}}"
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
           - name: obm-sync-creds
             dependencies: [get-obm-ip, get-obm-creds]
             template: obm-sync-creds
