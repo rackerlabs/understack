@@ -48,7 +48,11 @@ To avoid defining many environment variables we'll simplify by creating an
 place it where we've cloned understack. A complete file would like like
 
 ```bash title="/path/to/uc-deploy/my-k3s.env"
-UC_DEPLOY="$(cd "$(dirname ${BASH_SOURCE[0]})" && git rev-parse --show-toplevel)"
+if [ -n "$BASH_SOURCE" ]; then # bash
+    UC_DEPLOY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && git rev-parse --show-toplevel)"
+elif [ -n "$ZSH_VERSION" ]; then # zsh
+    UC_DEPLOY="$(cd "$(dirname "${(%):-%x}")" && git rev-parse --show-toplevel)"
+fi
 DEPLOY_NAME="my-k3s"
 UC_DEPLOY_GIT_URL=git@github.com:myorg/uc-deploy.git
 UC_DEPLOY_SSH_FILE="$HOME/devel/uc-deploy-key"
