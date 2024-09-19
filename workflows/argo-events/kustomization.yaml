@@ -6,11 +6,11 @@ namespace: argo-events
 
 resources:
   - secrets/openstack-svc-acct.yaml
-  - secrets/obm-creds.yaml
-  - secrets/placeholder-obm-creds.yaml
+  - secrets/bmc-creds.yaml
+  - secrets/placeholder-bmc-creds.yaml
   - secrets/operate-workflow-sa.token.yaml
   - secrets/nautobot-token.yaml
-  - secrets/placeholder-obm-legacy-passwords.yaml
+  - secrets/placeholder-bmc-legacy-passwords.yaml
   - sensors/ironic-node-update.yaml
   - sensors/debug-sensor.yaml
   - sensors/nb-oob-interface-update.yaml
@@ -21,7 +21,7 @@ resources:
   - workflowtemplates/get-device-nautobot.yaml
   - workflowtemplates/sync-interfaces-to-nautobot.yaml
   - workflowtemplates/sync-nb-server-to-ironic.yaml
-  - workflowtemplates/get-obm-ip.yaml
+  - workflowtemplates/get-bmc-ip.yaml
   - workflowtemplates/sync-provision-state-to-nautobot.yaml
   - workflowtemplates/node-events.yaml
   - workflowtemplates/sync-interfaces-to-ironic.yaml
@@ -29,9 +29,9 @@ resources:
   - workflowtemplates/sync-server-to-ironic.yaml
   - workflowtemplates/undersync-switch.yaml
   - workflowtemplates/keystone-event-project.yaml
-  - workflowtemplates/get-obm-creds.yaml
+  - workflowtemplates/get-bmc-creds.yaml
   - workflowtemplates/idrac-enable-network-boot.yaml
-  - workflowtemplates/obm-sync-creds.yaml
+  - workflowtemplates/bmc-sync-creds.yaml
   - workflowtemplates/sync-srv-redfish-intfs-to-nb.yaml
-  - workflowtemplates/obm-firmware-update.yaml
-  - workflowtemplates/sync-obm-creds.yaml
+  - workflowtemplates/bmc-firmware-update.yaml
+  - workflowtemplates/sync-bmc-creds.yaml

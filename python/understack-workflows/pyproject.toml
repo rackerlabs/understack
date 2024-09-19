@@ -45,7 +45,7 @@ requests-mock = "^1.12.1"
 [tool.poetry.scripts]
 sync-keystone = "understack_workflows.main.sync_keystone:main"
 sync-interfaces = "understack_workflows.main.sync_interfaces:main"
-sync-obm-creds = "understack_workflows.main.sync_obm_creds:main"
+sync-bmc-creds = "understack_workflows.main.sync_bmc_creds:main"
 sync-server = "understack_workflows.main.sync_server:main"
 sync-provision-state = "understack_workflows.main.sync_provision_state:main"
 sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"

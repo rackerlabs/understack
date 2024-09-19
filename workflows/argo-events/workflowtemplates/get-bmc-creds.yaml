@@ -1,13 +1,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: get-obm-creds
+  name: get-bmc-creds
   namespace: argo-events
   annotations:
-    workflows.argoproj.io/title: Create a k8s secret containing OBM creds for given device_id
+    workflows.argoproj.io/title: Create a k8s secret containing BMC creds for given device_id
     workflows.argoproj.io/description: |
-      Defined in `workflows/argo-events/workflowtemplates/get-obm-creds.yaml`.
-      An example template to return the name of a Kubernetes Secret which containing device's OBM credentials.
+      Defined in `workflows/argo-events/workflowtemplates/get-bmc-creds.yaml`.
+      An example template to return the name of a Kubernetes Secret which containing device's BMC credentials.
 spec:
   # garbage collection on the secret is tied to this pod. we remove this pod only after workflow completion to
   # allow access to this secret from subsequent workflow/steps.

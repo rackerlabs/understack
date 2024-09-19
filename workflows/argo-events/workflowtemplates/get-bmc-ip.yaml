@@ -1,13 +1,13 @@
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
-  name: get-obm-ip
+  name: get-bmc-ip
   namespace: argo-events
   annotations:
-    workflows.argoproj.io/title: Output OBM IP address for the Device with the given device_id
+    workflows.argoproj.io/title: Output BMC IP address for the Device with the given device_id
     workflows.argoproj.io/description: |
-      Defined in `workflows/argo-events/workflowtemplates/get-obm-ip.yaml`.
-      Get OBM IP address for target Device
+      Defined in `workflows/argo-events/workflowtemplates/get-bmc-ip.yaml`.
+      Get BMC IP address for target Device
 spec:
   serviceAccountName: workflow
   entrypoint: main

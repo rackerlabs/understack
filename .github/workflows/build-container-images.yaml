@@ -6,7 +6,7 @@ on:
   pull_request:
     paths:
       - "containers/argo_utils/**"
-      - "containers/obm-utils/**"
+      - "containers/bmc-utils/**"
       - "containers/python311_alpine/**"
       - "containers/python312_alpine/**"
   push:
@@ -14,7 +14,7 @@ on:
       - main
     paths:
       - "containers/argo_utils/**"
-      - "containers/obm-utils/**"
+      - "containers/bmc-utils/**"
       - "containers/python311_alpine/**"
       - "containers/python312_alpine/**"
 
@@ -23,7 +23,7 @@ env:
   VERSION_PYTHON311: 0.0.1
   VERSION_PYTHON312: 0.0.1
   VERSION_ARGO_UTILS: 0.0.1
-  VERSION_OBM_UTILS: 0.0.1
+  VERSION_BMC_UTILS: 0.0.1
   VERSION_PYTHON_NAUTOBOT: 0.0.1
 
 jobs:
@@ -78,13 +78,13 @@ jobs:
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_ARGO_UTILS }}
 
-      - name: Build and deploy OBM Utils image
+      - name: Build and deploy BMC Utils image
         uses: docker/build-push-action@5cd11c3a4ced054e52742c5fd54dca954e0edd85 # v6
         with:
-          context: containers/obm-utils/
-          file: containers/obm-utils/Dockerfile.obm_utils
+          context: containers/bmc-utils/
+          file: containers/bmc-utils/Dockerfile.bmc_utils
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository }}/argo-obm-utils-python3.11.8:latest,ghcr.io/${{ github.repository }}/argo-obm-utils-python3.11.8:${{ env.VERSION_OBM_UTILS }}
+          tags: ghcr.io/${{ github.repository }}/argo-bmc-utils-python3.11.8:latest,ghcr.io/${{ github.repository }}/argo-bmc-utils-python3.11.8:${{ env.VERSION_BMC_UTILS }}
           labels: |
-              org.opencontainers.image.version=${{ env.VERSION_OBM_UTILS }}
+              org.opencontainers.image.version=${{ env.VERSION_BMC_UTILS }}

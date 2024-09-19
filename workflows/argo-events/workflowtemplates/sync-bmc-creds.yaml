@@ -1,10 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 metadata:
-  name: sync-obm-creds
+  name: sync-bmc-creds
   annotations:
     workflows.argoproj.io/title: Update a Device's BMC (redfish) username/password in Ironic
     workflows.argoproj.io/description: |
-      Defined in `workflows/argo-events/workflowtemplates/sync-obm-creds.yaml`
+      Defined in `workflows/argo-events/workflowtemplates/sync-bmc-creds.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: main
@@ -15,42 +15,42 @@ spec:
   templates:
     - name: main
       steps:
-        - - name: load-obm-creds
+        - - name: load-bmc-creds
             templateRef:
-              name: get-obm-creds
+              name: get-bmc-creds
               template: main
             arguments:
               parameters:
                 - name: device_id
                   value: '{{workflow.parameters.device_id}}'
-        - - name: sync-obm-creds
-            template: sync-obm-creds
+        - - name: sync-bmc-creds
+            template: sync-bmc-creds
             arguments:
               parameters:
-                - name: obm
-                  value: "{{ steps.load-obm-creds.outputs.parameters.secret }}"
+                - name: bmc
+                  value: "{{ steps.load-bmc-creds.outputs.parameters.secret }}"
 
-    - name: sync-obm-creds
+    - name: sync-bmc-creds
       inputs:
         parameters:
-          - name: obm
+          - name: bmc
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - sync-obm-creds
+          - sync-bmc-creds
         args:
           - "{{workflow.parameters.interface_update_event}}"
         volumeMounts:
           - mountPath: /etc/openstack
             name: openstack-svc-acct
             readOnly: true
-          - mountPath: /etc/obm
-            name: obm-secret
+          - mountPath: /etc/bmc
+            name: bmc-secret
             readOnly: true
       volumes:
         - name: openstack-svc-acct
           secret:
             secretName: openstack-svc-acct
-        - name: obm-secret
+        - name: bmc-secret
           secret:
-            secretName: "{{ inputs.parameters.obm }}"
+            secretName: "{{ inputs.parameters.bmc }}"

@@ -18,17 +18,17 @@ logger.setLevel(logging.DEBUG)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog=os.path.basename(__file__), description="Update OBM firmware")
-    parser.add_argument("--host", required=True, help="The address of the OBM interface")
+    parser = argparse.ArgumentParser(prog=os.path.basename(__file__), description="Update BMC firmware")
+    parser.add_argument("--host", required=True, help="The address of the BMC interface")
     parser.add_argument("--firmware-url", required=True, help="URL of firmware")
 
     args = parser.parse_args()
     host = args.host
     firmware_url = args.firmware_url
-    username = os.environ["OBM_USERNAME"]
-    password = os.environ["OBM_PASSWORD"]
+    username = os.environ["BMC_USERNAME"]
+    password = os.environ["BMC_PASSWORD"]
 
-    logger.info("Fetching OBM update service ...")
+    logger.info("Fetching BMC update service ...")
 
     authn = sushy.auth.SessionOrBasicAuth(username, password)
     c = sushy.Sushy(f"https://{host}/redfish/v1/", verify=False, auth=authn)

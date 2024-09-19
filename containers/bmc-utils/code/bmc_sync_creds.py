@@ -43,8 +43,8 @@ def verify_auth(host: str, username: str = "root", password: str = "") -> bool:
         return False
 
 
-def get_obm_accounts(host: str, username: str, password: str) -> List[Dict]:
-    """A vendor agnostic approach to crawling the API for OBM accounts"""
+def get_bmc_accounts(host: str, username: str, password: str) -> List[Dict]:
+    """A vendor agnostic approach to crawling the API for BMC accounts"""
     try:
         # get account service
         r = redfish_request(host, "/redfish/v1", username, password)
@@ -67,10 +67,10 @@ def get_obm_accounts(host: str, username: str, password: str) -> List[Dict]:
         raise
 
 
-def set_obm_creds(host: str, username: str, password: str, expected_username: str, expected_password: str) -> bool:
+def set_bmc_creds(host: str, username: str, password: str, expected_username: str, expected_password: str) -> bool:
     """Find the account associated with the username in question"""
     try:
-        accounts = get_obm_accounts(host, username, password)
+        accounts = get_bmc_accounts(host, username, password)
 
         matched_account = None
         for account in accounts:
@@ -83,7 +83,7 @@ def set_obm_creds(host: str, username: str, password: str, expected_username: st
                 break
 
         if not matched_account:
-            raise Exception(f"Unable to find OBM account for {expected_username}")
+            raise Exception(f"Unable to find BMC account for {expected_username}")
 
         account_uri = matched_account["@odata.id"]
 
@@ -97,39 +97,39 @@ def set_obm_creds(host: str, username: str, password: str, expected_username: st
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=os.path.basename(__file__), description="Attempts to find the correct OBM credentials for a device"
+        prog=os.path.basename(__file__), description="Attempts to find the correct BMC credentials for a device"
     )
-    parser.add_argument("--host", required=True, help="the address of the obm interface for the device")
+    parser.add_argument("--host", required=True, help="the address of the bmc interface for the device")
 
     args = parser.parse_args()
     host = args.host
-    expected_username = os.environ["OBM_USERNAME"]
-    expected_password = os.environ["OBM_PASSWORD"]
+    expected_username = os.environ["BMC_USERNAME"]
+    expected_password = os.environ["BMC_PASSWORD"]
 
-    legacy_passwords = json.loads(os.getenv("OBM_LEGACY_PASSWORDS", "[]"))
+    legacy_passwords = json.loads(os.getenv("BMC_LEGACY_PASSWORDS", "[]"))
     if not legacy_passwords:
-        logger.info("env variable OBM_LEGACY_PASSWORDS was not set.")
+        logger.info("env variable BMC_LEGACY_PASSWORDS was not set.")
         sys.exit(1)
 
-    logger.info("Ensuring OBM credentials are synced correctly ...")
+    logger.info("Ensuring BMC credentials are synced correctly ...")
 
     if verify_auth(host, expected_username, expected_password):
-        logger.info("OBM credentials are in sync.")
+        logger.info("BMC credentials are in sync.")
         sys.exit(0)
     else:
-        logger.info("OBM credentials are NOT in sync. Trying known legacy/vendor credentials ...")
+        logger.info("BMC credentials are NOT in sync. Trying known legacy/vendor credentials ...")
 
         # iDRAC defaults to blocking an IP address after 3 bad login attempts within 60 second. Since we have the
         # initial attempt above, we will sleep 35 seconds between any additional attempts.
         delay = 60
-        username = os.getenv("OBM_LEGACY_USER", "root")
+        username = os.getenv("BMC_LEGACY_USER", "root")
         for password in legacy_passwords:
             logger.info(f"Delaying for {delay} seconds to prevent failed auth lockouts ...")
             time.sleep(delay)
             if verify_auth(host, username, password):
-                if set_obm_creds(host, username, password, expected_username, expected_password):
-                    logger.info("OBM password has been synced.")
+                if set_bmc_creds(host, username, password, expected_username, expected_password):
+                    logger.info("BMC password has been synced.")
                     sys.exit(0)
 
-    logger.info("Unable to sync the OBM password.")
+    logger.info("Unable to sync the BMC password.")
     sys.exit(1)

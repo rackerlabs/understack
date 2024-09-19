@@ -15,17 +15,17 @@ spec:
   templates:
     - name: main
       steps:
-        - - name: sync-obm-creds-to-server
+        - - name: sync-bmc-creds-to-server
             templateRef:
-              name: obm-sync-creds
+              name: bmc-sync-creds
               template: main
             arguments:
               parameters:
                 - name: device_id
                   value: "{{workflow.parameters.device_id}}"
-        - - name: get-obm-creds-secret
+        - - name: get-bmc-creds-secret
             templateRef:
-              name: get-obm-creds
+              name: get-bmc-creds
               template: main
             arguments:
               parameters:
@@ -40,4 +40,4 @@ spec:
                 - name: device_id
                   value: "{{workflow.parameters.device_id}}"
                 - name: oob_secret
-                  value: "{{steps.get-obm-creds-secret.outputs.parameters.secret}}"
+                  value: "{{steps.get-bmc-creds-secret.outputs.parameters.secret}}"

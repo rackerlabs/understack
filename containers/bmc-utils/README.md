@@ -1,16 +1,16 @@
 # Overview
 
-The WorkflowTemplates provided in this directory were created to provide common lifecycle and maintenance functions on OBM controllers.
+The WorkflowTemplates provided in this directory were created to provide common lifecycle and maintenance functions on BMC controllers.
 
 ## Caveats
 
-- TODO: the obm-sync-creds workflow logic should probably be broken to include an obm-update-password workflow, which then likely has more utility.
+- TODO: the bmc-sync-creds workflow logic should probably be broken to include a bmc-update-password workflow, which then likely has more utility.
 
 ## Example
 ```bash
-argo -n argo-events submit --from  workflowtemplate/obm-sync-creds --parameter device_id=1de4f169-9848-4d8e-921b-65338c1e00ca
+argo -n argo-events submit --from  workflowtemplate/bmc-sync-creds --parameter device_id=1de4f169-9848-4d8e-921b-65338c1e00ca
 
-Name:                obm-sync-creds-wrn2c
+Name:                bmc-sync-creds-wrn2c
 Namespace:           argo-events
 ServiceAccount:      unset
 Status:              Pending
@@ -22,7 +22,7 @@ Parameters:
 
 ```bash
 argo -n argo-events get @latest
-Name:                obm-sync-creds-wrn2c
+Name:                bmc-sync-creds-wrn2c
 Namespace:           argo-events
 ServiceAccount:      workflow
 Status:              Running
@@ -37,14 +37,14 @@ Parameters:
   device_id:         1de4f169-9848-4d8e-921b-65338c1e00ca
 
 STEP                         TEMPLATE                 PODNAME                                         DURATION  MESSAGE
- ● obm-sync-creds-wrn2c      main
- ├─✔ get-obm-creds           get-obm-creds/main
- │ └─✔ get-obm-creds         get-obm-creds-ext/main
- │   └─✔ get-obm-creds-ext   get-creds-ext/main
+ ● bmc-sync-creds-wrn2c      main
+ ├─✔ get-bmc-creds           get-bmc-creds/main
+ │ └─✔ get-bmc-creds         get-bmc-creds-ext/main
+ │   └─✔ get-bmc-creds-ext   get-creds-ext/main
  │     ├─✔ get-ext-num       get-ext-num/main
- │     └─✔ get-creds-ext     get-creds-ext           obm-sync-creds-wrn2c-get-creds-ext-2059517959  5s
- ├─✔ get-obm-ip              get-obm-ip/main
+ │     └─✔ get-creds-ext     get-creds-ext           bmc-sync-creds-wrn2c-get-creds-ext-2059517959  5s
+ ├─✔ get-bmc-ip              get-bmc-ip/main
  │ └───✔ nautobot-query      nautobot-api/main
  │     └───✔ send-request    http
- └─◷ obm-sync-creds          obm-sync-creds           obm-sync-creds-wrn2c-obm-sync-creds-2727609696  28s
+ └─◷ bmc-sync-creds          bmc-sync-creds           bmc-sync-creds-wrn2c-bmc-sync-creds-2727609696  28s
 ```

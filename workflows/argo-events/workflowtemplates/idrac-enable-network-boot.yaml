@@ -18,31 +18,31 @@ spec:
     - name: main
       dag:
         tasks:
-          - name: get-obm-ip
+          - name: get-bmc-ip
             templateRef:
-              name: get-obm-ip
+              name: get-bmc-ip
               template: main
             arguments:
               parameters:
                 - name: device_id
                   value: "{{workflow.parameters.device_id}}"
-          - name: get-obm-creds
+          - name: get-bmc-creds
             templateRef:
-              name: get-obm-creds
+              name: get-bmc-creds
               template: main
             arguments:
               parameters:
                 - name: device_id
                   value: "{{workflow.parameters.device_id}}"
           - name: idrac-enable-network-boot
-            dependencies: [get-obm-ip, get-obm-creds]
+            dependencies: [get-bmc-ip, get-bmc-creds]
             template: idrac-enable-network-boot
             arguments:
               parameters:
                 - name: host
-                  value: "{{tasks.get-obm-ip.outputs.parameters.ip}}"
+                  value: "{{tasks.get-bmc-ip.outputs.parameters.ip}}"
                 - name: target_creds_secret_name
-                  value: "{{tasks.get-obm-creds.outputs.parameters.secret}}"
+                  value: "{{tasks.get-bmc-creds.outputs.parameters.secret}}"
 
     - name: idrac-enable-network-boot
       inputs:
@@ -50,16 +50,16 @@ spec:
           - name: host
           - name: target_creds_secret_name
       container:
-        image: ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8:latest
+        image: ghcr.io/rackerlabs/understack/argo-bmc-utils-python3.11.8:latest
         command: [GetSetBiosAttributesREDFISH.py]
-        args: ["-ip", "{{ inputs.parameters.host }}", "-u", "$OBM_USERNAME", "-p", "$OBM_PASSWORD", "--attribute-names", "PxeDev1EnDis,PxeDev1Interface,HttpDev1Interface", "--attribute-values", "Enabled,NIC.Slot.1-1,NIC.Slot.1-1", "--reboot"]
+        args: ["-ip", "{{ inputs.parameters.host }}", "-u", "$BMC_USERNAME", "-p", "$BMC_PASSWORD", "--attribute-names", "PxeDev1EnDis,PxeDev1Interface,HttpDev1Interface", "--attribute-values", "Enabled,NIC.Slot.1-1,NIC.Slot.1-1", "--reboot"]
         env:
-          - name: OBM_USERNAME
+          - name: BMC_USERNAME
             valueFrom:
               secretKeyRef:
                 name: "{{inputs.parameters.target_creds_secret_name}}"
                 key: username
-          - name: OBM_PASSWORD
+          - name: BMC_PASSWORD
             valueFrom:
               secretKeyRef:
                 name: "{{inputs.parameters.target_creds_secret_name}}"

@@ -13,8 +13,8 @@ RUN --mount=type=cache,target=/root/.cache/.pip pip install --no-cache-dir -r /a
 
 FROM ${BASE} as prod
 
-LABEL org.opencontainers.image.title="Python 3.11 image with OBM utils"
-LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/argo-obm-utils-python3.11.8"
+LABEL org.opencontainers.image.title="Python 3.11 image with BMC utils"
+LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/argo-bmc-utils-python3.11.8"
 LABEL org.opencontainers.image.source=https://github.com/rackerlabs/understack
 
 ENV PATH="/opt/venv/bin:$PATH"

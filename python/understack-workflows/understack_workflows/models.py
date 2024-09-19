@@ -112,7 +112,7 @@ class Chassis:
             )
 
     @classmethod
-    def obm_is_ilo4(cls, chassis_data: SushyChassis) -> bool:
+    def bmc_is_ilo4(cls, chassis_data: SushyChassis) -> bool:
         return (
             chassis_data.redfish_version == "1.0.0"
             and chassis_data.manufacturer == "HPE"
@@ -126,7 +126,7 @@ class Chassis:
 
         cls.check_manufacturer(chassis_data.manufacturer)
 
-        if cls.obm_is_ilo4(chassis_data):
+        if cls.bmc_is_ilo4(chassis_data):
             return cls.from_hp_json(oob_obj, chassis_data.name)
 
         chassis = cls(chassis_data.name, [], [])
