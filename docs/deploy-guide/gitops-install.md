@@ -180,6 +180,12 @@ Now configure your ArgoCD to have the credential access to your deploy repo:
 kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
 ```
 
+Label the node(s) to allow OpenStack control plane installation:
+
+```bash
+kubectl label node $(kubectl get nodes -o 'jsonpath={.items[*].metadata.name}') openstack-control-plane=enabled
+```
+
 Finally run the following to have ArgoCD deploy the system:
 
 ```bash
