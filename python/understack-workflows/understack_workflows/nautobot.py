@@ -15,6 +15,12 @@ class Interface(Protocol):
     location: str
 
 
+class Systeminfo(Protocol):
+    asset_tag: str
+    serial_number: str
+    platform: str
+
+
 class Nautobot:
     def __init__(self, url, token, logger=None, session=None):
         """Initialize our Nautobot API wrapper."""
@@ -202,3 +208,12 @@ class Nautobot:
             ids.add(remote_switch.id)
 
         return list(ids)
+
+    def update_system_info(self, device_id: UUID, system_info: Systeminfo):
+        device = self.device_by_id(device_id)
+        device.serial = system_info.serial_number
+        device.platform = system_info.platform
+        device.asset_tag = system_info.asset_tag
+        response = device.save()
+        self.logger.info(f"save result: {response}")
+        return response
