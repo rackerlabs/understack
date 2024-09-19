@@ -266,7 +266,7 @@ load_or_gen_os_secret() {
     local data_var=$1
     local secret_var=$2
 
-    if kubectl -n openstack get secret "${secret_var}" > /dev/null; then
+    if kubectl -n openstack get secret "${secret_var}" &>/dev/null; then
         data="$(kubectl -n openstack get secret "${secret_var}" -o jsonpath='{.data.password}' | base64 -d)"
         # good ol' bash 3 compat for macOS
         eval "${data_var}=\"${data}\""
