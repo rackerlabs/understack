@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# dib-lint: disable=set setu setpipefail indent
+if [ ${DIB_DEBUG_TRACE:-0} -gt 0 ]; then
+    set -x
+fi
+set -e
+
+cat > /etc/sysctl.d/99-undercloud-ipa-sysctl-arp-ignore.conf <<EOF
+# arp_ignore - INTEGER
+#   Define different modes for sending replies in response to
+#   received ARP requests that resolve local target IP addresses:
+#   0 - (default): reply for any local target IP address, configured
+#   on any interface
+#   1 - reply only if the target IP address is local address
+#   configured on the incoming interface
+#   2 - reply only if the target IP address is local address
+#   configured on the incoming interface and both with the
+#   sender's IP address are part from same subnet on this interface
+#   3 - do not reply for local addresses configured with scope host,
+#   only resolutions for global and link addresses are replied
+net.ipv4.conf.all.arp_ignore=2
+EOF
