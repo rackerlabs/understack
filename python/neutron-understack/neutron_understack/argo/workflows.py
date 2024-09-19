@@ -12,7 +12,7 @@ DEFAULT_TOKEN_FILENAME = "/run/secrets/kubernetes.io/serviceaccount/token"
 class ArgoClient:
     def __init__(
         self,
-        token: str = None,
+        token: str | None = None,
         namespace="default",
         api_url="https://argo-server.argo.svc.cluster.local:2746",
         logger=None,
