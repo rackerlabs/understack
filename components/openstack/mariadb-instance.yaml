@@ -1,5 +1,5 @@
 ---
-apiVersion: mariadb.mmontes.io/v1alpha1
+apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
 metadata:
   name: mariadb  # this name is referenced by other resource kinds
@@ -8,16 +8,15 @@ spec:
     name: mariadb
     key: root-password
 
+  # renovate: image:mariadb
   image: mariadb:11.0.3
   imagePullPolicy: IfNotPresent
 
   port: 3306
-  volumeClaimTemplate:
-    resources:
-      requests:
-        storage: 10Gi
-    accessModes:
-      - ReadWriteOnce
+  storage:
+    size: 10Gi
+    resizeInUseVolumes: true
+    waitForVolumeResize: true
 
   service:
     type: ClusterIP
@@ -29,6 +28,19 @@ spec:
     binlog_format=row
     innodb_autoinc_lock_mode=2
     max_allowed_packet=256M
+  # ArgoCD diff for server side apply
+  myCnfConfigMapKeyRef:
+    key: my.cnf
+    name: mariadb-config
 
   metrics:
     enabled: true
+    # ArgoCD diff due to server side apply
+    exporter:
+      image: prom/mysqld-exporter:v0.15.1
+      port: 9104
+    passwordSecretKeyRef:
+      key: password
+      name: mariadb-metrics-password
+    serviceMonitor: {}
+    username: mariadb-metrics
