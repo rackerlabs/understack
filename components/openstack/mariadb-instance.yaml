@@ -12,12 +12,16 @@ spec:
   imagePullPolicy: IfNotPresent
 
   port: 3306
-  volumeClaimTemplate:
-    resources:
-      requests:
-        storage: 10Gi
-    accessModes:
-      - ReadWriteOnce
+  # volumeClaimTemplate:
+  #   resources:
+  #     requests:
+  #       storage: 10Gi
+  #   accessModes:
+  #     - ReadWriteOnce
+  storage:
+    size: 10Gi
+    resizeInUseVolumes: true
+    waitForVolumeResize: true
 
   service:
     type: ClusterIP
