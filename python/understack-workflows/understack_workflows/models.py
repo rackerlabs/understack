@@ -97,10 +97,24 @@ class Interface:
 
 
 @dataclass
+class Systeminfo:
+    asset_tag: str
+    serial_number: str
+    platform: str
+
+    @classmethod
+    def from_redfish(cls, chassis_data) -> Systeminfo:
+        return cls(asset_tag=chassis_data.sku,
+                   serial_number=chassis_data.serial_number,
+                   platform=chassis_data.model)
+
+
+@dataclass
 class Chassis:
     name: str
     nics: list[NIC]
     network_interfaces: list[Interface]
+    system_info: Systeminfo
 
     @classmethod
     def check_manufacturer(cls, manufacturer: str) -> None:
@@ -129,11 +143,12 @@ class Chassis:
         if cls.bmc_is_ilo4(chassis_data):
             return cls.from_hp_json(oob_obj, chassis_data.name)
 
-        chassis = cls(chassis_data.name, [], [])
+        chassis = cls(chassis_data.name, [], [], [])
         chassis.nics = [
             NIC.from_redfish(i) for i in chassis_data.network_adapters.get_members()
         ]
         chassis.network_interfaces = cls.interfaces_from_nics(chassis.nics)
+        chassis.system_info = Systeminfo.from_redfish(chassis_data)
         return chassis
 
     @classmethod
