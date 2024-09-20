@@ -8,3 +8,4 @@ resources:
   - dnsmasq-pvc.yaml
   - dnsmasq-cm.yaml
   - dnsmasq-ss.yaml
+  - understack-data-pvc.yaml

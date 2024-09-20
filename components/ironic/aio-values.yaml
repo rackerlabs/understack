@@ -18,6 +18,11 @@ conductor:
     # at this time we are running our own dnsmasq container and statefulset
     enabled: false
 
+labels:
+  conductor:
+    node_selector_key: ironic_role
+    node_selector_value: conductor
+
 conf:
   ironic:
     DEFAULT:
@@ -140,7 +145,7 @@ pod:
             mountPath: /etc/dnsmasq.d/
           - name: dnsmasq-dhcp
             mountPath: /var/lib/dnsmasq/
-          - name: host-var-lib-understack
+          - name: understack-data
             mountPath: /var/lib/understack
         volumes:
           - name: dnsmasq-ironic
@@ -149,9 +154,9 @@ pod:
           - name: dnsmasq-dhcp
             persistentVolumeClaim:
               claimName: dnsmasq-dhcp
-          - name: host-var-lib-understack
-            hostPath:
-              path: /var/lib/understack
+          - name: understack-data
+            persistentVolumeClaim:
+              claimName: understack-data
   lifecycle:
     disruption_budget:
       api:

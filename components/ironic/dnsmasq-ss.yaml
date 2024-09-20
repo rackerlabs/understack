@@ -33,6 +33,9 @@ spec:
       labels:
         application: ironic-dnsmasq
     spec:
+      nodeSelector:
+        ironic_role: conductor
+
       affinity:
         podAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -73,7 +76,7 @@ spec:
               mountPath: /etc/dnsmasq.d
             - name: pod-dhcp
               mountPath: /var/lib/misc
-            - name: understack-images
+            - name: understack-data
               mountPath: /var/lib/understack/master_iso_images
               readOnly: true
       volumes:
@@ -85,6 +88,6 @@ spec:
         - name: pod-dhcp
           persistentVolumeClaim:
             claimName: dnsmasq-dhcp
-        - name: understack-images
-          hostPath:
-            path: /var/lib/understack/master_iso_images
+        - name: understack-data
+          persistentVolumeClaim:
+            claimName: understack-data
