@@ -19,8 +19,8 @@ jobs:
       run:
         working-directory: ironic-images/ipa-debian-bookworm
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5
         id: setup-python
         with:
           python-version: '3.11'
@@ -35,7 +35,7 @@ jobs:
       - name: Dynamically set timestamp environment variable
         run: echo "TIMESTAMP=$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
       - name: Publish IPA Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2
         with:
           name: undercloud-ironic-ipa
           tag_name: undercloud-ironic-ipa-${{ env.TIMESTAMP }}
