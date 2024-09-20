@@ -39,6 +39,11 @@ conf:
     # config_drive to pass data. To avoid users having to remember this, just
     # force it on always.
     force_config_drive: true
+  nova_ironic:
+    ironic:
+      # this is where we populate our hardware
+      project_domain_name: infra
+      project_name: baremetal
 
 
 console:
