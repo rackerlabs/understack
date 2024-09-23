@@ -15,7 +15,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG, format="%(asctime)s 
 
 
 SHOW_ARTIFACTS = True
-SHOW_ALL_TEMPLATES = True
+SHOW_ALL_TEMPLATES = False
 SHOW_SHARED_TEMPLATES = False
 SHOW_WORKFLOW_DESCRIPTIONS = False
 
@@ -189,8 +189,12 @@ def make_workflow(w_yaml):
             tasks=[],
             steps=[],
         )
+
         tasks_yaml = n_yaml.get('dag', {}).get('tasks', [])
+        log.debug(f"tasks_yaml: {tasks_yaml}")
+
         for t_yaml in tasks_yaml or []:
+            log.debug(f"processing task: {t_yaml}")
             t_id = n_id + "__" + t_yaml['name']
             dependencies = [n_id + "__" + d for d in t_yaml.get('dependencies', [])]
             if 'depends' in t_yaml:
@@ -254,7 +258,6 @@ def make_workflow(w_yaml):
         log.debug(f"steps_yaml: {steps_yaml}")
 
         counter = 0
-        previous_yaml = None
         for t_yaml in steps_yaml or []:
             log.debug(f"processing step: {t_yaml}")
             if type(t_yaml) == list:
@@ -319,15 +322,12 @@ def make_workflow(w_yaml):
                 input_artifacts=input_artifacts
             )
             n.steps.append(t)
-            n.steps.sort(key=lambda t: t.name)
             counter += 1
-            previous_yaml = t_yaml
 
         if w_yaml.get('spec', {}).get('entrypoint') == n_yaml['name']:
             n.is_entrypoint = True
 
         n.tasks.sort(key=lambda t: t.name)
-        n.steps.sort(key=lambda t: t.name)
         w.nodes.append(n)
     return w
 
@@ -359,6 +359,7 @@ def generate_mermaid(workflows, nodes, output_name, output_file, workflow_readme
             bases.append("    end")
 
         for n in w.nodes:
+            log.debug(f"working on node: {n}")
             if show_node(n):
                 # render the node itself
                 name = f"<span style=\"font-size:20px\">{n.name}</span>"
@@ -370,7 +371,7 @@ def generate_mermaid(workflows, nodes, output_name, output_file, workflow_readme
                     name += f"<pre style=\"color:blue;margin-top:8px\">"
                     for p in n.input_params:
                         # some of our input param values are '{}' which mermaid doesn't like
-                        convert_input_params = n.input_params[p].replace("{", "&#123;").replace("}", "&#123;")
+                        convert_input_params = n.input_params[p].replace("{", "&#123;").replace("}", "&#125;")
                         name += f"{p}={convert_input_params}<br>"
                     name += "</pre>"
                 bases.append("    "+n.id+"{{"+name+"}}")
@@ -387,6 +388,7 @@ def generate_mermaid(workflows, nodes, output_name, output_file, workflow_readme
                 name = f"<span style=\"font-size:20px\">{t.name}</span>"
                 if t.when:
                     when = t.when.replace("{{", "").replace("}}", "")
+                    when = when.replace("||", "#124;#124;")
                     name += f"<pre style=\"color:red\">when: {when}</pre>"
                 if t.ref_node and nodes.get(t.ref_node) and not show_node(nodes[t.ref_node]):
                     if nodes[t.ref_node].image:
@@ -419,6 +421,7 @@ def generate_mermaid(workflows, nodes, output_name, output_file, workflow_readme
                 name = f"<span style=\"font-size:20px\">{t.name}</span>"
                 if t.when:
                     when = t.when.replace("{{", "").replace("}}", "")
+                    when = when.replace("||", "#124;#124;")
                     name += f"<pre style=\"color:red\">when: {when}</pre>"
                 if t.ref_node and nodes.get(t.ref_node) and not show_node(nodes[t.ref_node]):
                     if nodes[t.ref_node].image:
