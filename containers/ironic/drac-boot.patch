@@ -1,0 +1,23 @@
+diff --git a/ironic/drivers/drac.py b/ironic/drivers/drac.py
+index a4ca8004b..2f8f65db9 100644
+--- a/ironic/drivers/drac.py
++++ b/ironic/drivers/drac.py
+@@ -28,6 +28,7 @@ from ironic.drivers.modules.drac import vendor_passthru
+ from ironic.drivers.modules import ipxe
+ from ironic.drivers.modules import noop
+ from ironic.drivers.modules import pxe
++from ironic.drivers.modules.redfish import boot as redfish_boot
+ from ironic.drivers.modules.redfish import firmware as redfish_firmware
+ 
+ 
+@@ -42,7 +43,9 @@ class IDRACHardware(generic.GenericHardware):
+     @property
+     def supported_boot_interfaces(self):
+         """List of supported boot interfaces."""
+-        return [ipxe.iPXEBoot, pxe.PXEBoot, boot.DracRedfishVirtualMediaBoot]
++        return [ipxe.iPXEBoot, pxe.PXEBoot, ipxe.iPXEHttpBoot,
++                boot.DracRedfishVirtualMediaBoot,
++                redfish_boot.RedfishHttpsBoot]
+ 
+     @property
+     def supported_management_interfaces(self):
