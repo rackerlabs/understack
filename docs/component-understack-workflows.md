@@ -1,18 +1,19 @@
 # Understack Workflows
 
-This is the Kubernetes installation of the Argo Workflows
-and their associated support bits to add the actual workflows,
-sensors and triggers into a Kubernetes cluster.
+Understack Workflows is a collection of code, scripts, container definitions
+centered around [Argo Workflows][argo-wf] to drive automated operations
+based on events and other triggers in the system.
 
-Due to the scoping of resources into different namespaces, this
-must also be split into multiple namespaces.
+Due to the scoping of resources into different namespaces in the deployment
+it is also split into multiple namespaces.
 
-This code lives in `apps/understack-workflows` of this repo.
-
-Specifics about the workflows can be seen in the Workflows
+Specifics about each workflow can be seen in the Workflows
 section.
 
-## eventsource-openstack
+## workflows/openstack
+
+This is where Kubernetes manifests are stored for interacting with
+resources in the `openstack` namespace.
 
 The resources managed here are:
 
@@ -34,11 +35,19 @@ execute a Workflow.
 1. An [Argo Events][argo-events] Sensors and Triggers that
 execute workflows.
 
-## workflowtemplates
+## workflows/argo-events
+
+This is where Kubernetes manifests are stored for the actual workflow
+templates.
 
 1. A Kubernetes Role Binding allowing the `sensor-submit-workflow`
 the access it needs to run Workflows.
-1. A number of Workflow Templates.
+1. [Workflow Templates](./workflows/argo-events.md)
+
+## python/understack-workflows
+
+The code that is installed into the `ironic-nautobot-client` container
+which is used for many of the workflows lives here.
 
 [argo-events]: <https://argoproj.github.io/argo-events/>
 [argo-wf]: <https://argo-workflows.readthedocs.io/en/latest/>
