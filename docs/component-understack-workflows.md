@@ -57,6 +57,21 @@ execute a Workflow.
 1. An [Argo Events][argo-events] Sensors and Triggers that
 execute workflows.
 
+### workflows/nautobot
+
+This is where Kubernetes manifests are stored for interacting with
+resources in the `nautobot` namespace.
+
+The resources managed here are:
+
+1. A webhook for a [Nautobot Webhook][nb-webhook] to submit events to [Argo Workflows][argo-wf].
+1. A Kubernetes Service account `sensor-submit-workflow` which
+allows an Argo Events Trigger from a Sensor to read look up
+[Argo Workflows][argo-wf] Workflow Templates and use them to
+execute a Workflow.
+1. An [Argo Events][argo-events] Sensors and Triggers that
+execute workflows.
+
 ### workflows/argo-events
 
 This is where Kubernetes manifests are stored for the actual workflow
@@ -79,3 +94,4 @@ which is used for many of the workflows lives here.
 [argo-events]: <https://argoproj.github.io/argo-events/>
 [argo-wf]: <https://argo-workflows.readthedocs.io/en/latest/>
 [eso]: <https://external-secrets.io>
+[nb-webhook]: <https://docs.nautobot.com/projects/core/en/stable/user-guide/platform-functionality/webhook/>

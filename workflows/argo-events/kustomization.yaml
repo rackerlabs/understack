@@ -17,6 +17,7 @@ resources:
   - eventsources/nautobot-webhook.yaml
   - serviceaccounts/sensor-submit-workflow-role.yaml
   - serviceaccounts/openstack-sensor-submit-workflow.yaml
+  - serviceaccounts/nautobot-sensor-submit-workflow.yaml
   - workflowtemplates/nautobot-api.yaml
   - workflowtemplates/get-device-nautobot.yaml
   - workflowtemplates/sync-interfaces-to-nautobot.yaml
