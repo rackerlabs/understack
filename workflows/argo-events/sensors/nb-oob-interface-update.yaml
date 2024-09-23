@@ -51,10 +51,6 @@ spec:
               src:
                 dataKey: body.data.device.id
                 dependencyName: nautobot-dep
-            - dest: spec.arguments.parameters.2.value
-              src:
-                dataKey: body.data.device.name
-                dependencyName: nautobot-dep
           source:
             resource:
               apiVersion: argoproj.io/v1alpha1
