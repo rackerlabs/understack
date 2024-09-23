@@ -1,16 +1,21 @@
 # Understack Workflows
 
 Understack Workflows is a collection of code, scripts, container definitions
-centered around [Argo Workflows][argo-wf] to drive automated operations
-based on events and other triggers in the system.
+centered around [Argo Workflows][argo-wf] and [Argo Events][argo-events] to
+drive automated operations based on events and other triggers in the system.
+
+## Tools/Applications Used
+
+### Argo Events
+
+[Argo Events][argo-events] is a Kubernetes-native event-driven automation framework.
+We can use Argo Events to trigger automations processes from any of the internal
+Understack and external sources.
+
+## Kubernetes Resources
 
 Due to the scoping of resources into different namespaces in the deployment
 it is also split into multiple namespaces.
-
-Specifics about each workflow can be seen in the Workflows
-section.
-
-## Kubernetes Resources
 
 The resources here are grouped together by function.
 
@@ -18,13 +23,16 @@ The resources here are grouped together by function.
 : [Argo Events][argo-events] uses an event bus to enqueue messages to process.
 
 **eventsources**
-: Defines how [Argo Events][argo-events] reads or receives messages to process.
+: These define how [Argo Events][argo-events] will receive or consume messages,
+  transform them into cloud events, and post them on the eventbus.
 
 **serviceaccounts**
 : Kubernetes Service Accounts that workflows will run as.
 
 **sensors**
-: Defines messages of interest and what action to take on them. e.g. run a workflow.
+: Defines how events are processed on the eventbus and the triggers, like workflow
+  execution, happens as a result. Sensors define what rules an event must match to
+  cause a trigger to occur.
 
 **secrets**
 : Defines secrets needed by sensors or workflows.
