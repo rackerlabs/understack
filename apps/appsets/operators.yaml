@@ -69,6 +69,26 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'operators/rabbitmq-system'
+                - component: monitoring
+                  componentNamespace: monitoring
+                  skipComponent: '{{has "monitoring" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/monitoring'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
+                    - repoURL: https://prometheus-community.github.io/helm-charts
+                      chart: kube-prometheus-stack
+                      targetRevision: 62.6.0
+                      helm:
+                        releaseName: kube-prometheus-stack
+                        valueFiles:
+                          - $understack/operators/monitoring/values.yaml
+                          - $deploy/helm-configs/{{.name}}/monitoring.yaml
+                        ignoreMissingValueFiles: true
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"

@@ -126,4 +126,5 @@ nav:
     - user-guide/rabbitmq-cheat-sheet.md
     - user-guide/mariadb-operator-cheat-sheet.md
     - user-guide/postgres-operator-cheat-sheet.md
+    - user-guide/monitoring.md
   - Workflows: workflows/

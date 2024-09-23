@@ -20,6 +20,11 @@ spec:
     server: '*'
   - namespace: 'rook-ceph'
     server: '*'
+  - namespace: 'monitoring'
+    server: '*'
+  # kube-system is used by kube-prometheus-stack
+  - namespace: 'kube-system'
+    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
