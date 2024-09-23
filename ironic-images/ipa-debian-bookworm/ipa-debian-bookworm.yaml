@@ -4,4 +4,5 @@
   - debian-minimal
   - dynamic-login
   - journal-to-console
+  - package-installs
   - undercloud-ipa
