@@ -15,8 +15,8 @@ resources:
   - sensors/debug-sensor.yaml
   - sensors/nb-oob-interface-update.yaml
   - eventsources/nautobot-webhook.yaml
-  - roles/sensor-submit-workflow-role.yaml
-  - rolebindings/openstack-sensor-submit-workflow.yaml
+  - serviceaccounts/sensor-submit-workflow-role.yaml
+  - serviceaccounts/openstack-sensor-submit-workflow.yaml
   - workflowtemplates/nautobot-api.yaml
   - workflowtemplates/get-device-nautobot.yaml
   - workflowtemplates/sync-interfaces-to-nautobot.yaml

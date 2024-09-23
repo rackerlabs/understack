@@ -10,7 +10,29 @@ it is also split into multiple namespaces.
 Specifics about each workflow can be seen in the Workflows
 section.
 
-## workflows/openstack
+## Kubernetes Resources
+
+The resources here are grouped together by function.
+
+**eventbus**
+: [Argo Events][argo-events] uses an event bus to enqueue messages to process.
+
+**eventsources**
+: Defines how [Argo Events][argo-events] reads or receives messages to process.
+
+**serviceaccounts**
+: Kubernetes Service Accounts that workflows will run as.
+
+**sensors**
+: Defines messages of interest and what action to take on them. e.g. run a workflow.
+
+**secrets**
+: Defines secrets needed by sensors or workflows.
+
+**workflowtemplates**
+: Defines the workflows that are provided to be executed in the system.
+
+### workflows/openstack
 
 This is where Kubernetes manifests are stored for interacting with
 resources in the `openstack` namespace.
@@ -35,7 +57,7 @@ execute a Workflow.
 1. An [Argo Events][argo-events] Sensors and Triggers that
 execute workflows.
 
-## workflows/argo-events
+### workflows/argo-events
 
 This is where Kubernetes manifests are stored for the actual workflow
 templates.
@@ -44,7 +66,12 @@ templates.
 the access it needs to run Workflows.
 1. [Workflow Templates](./workflows/argo-events.md)
 
-## python/understack-workflows
+## Containers and Source Code
+
+There are a number of containers built and used which are defined under
+the `containers` top level path.
+
+### python/understack-workflows
 
 The code that is installed into the `ironic-nautobot-client` container
 which is used for many of the workflows lives here.
