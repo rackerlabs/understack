@@ -12,13 +12,13 @@ to run the [db-init][db-init] and [db-drop][db-drop] jobs by utilizing the
 correct operator resources.
 
 ```yaml
-apiVersion: mariadb.mmontes.io/v1alpha1
+apiVersion: k8s.mariadb.com/v1alpha1
 kind: Database
 ---
-apiVersion: mariadb.mmontes.io/v1alpha1
+apiVersion: k8s.mariadb.com/v1alpha1
 kind: User
 ---
-apiVersion: mariadb.mmontes.io/v1alpha1
+apiVersion: k8s.mariadb.com/v1alpha1
 kind: Grant
 ```
 
