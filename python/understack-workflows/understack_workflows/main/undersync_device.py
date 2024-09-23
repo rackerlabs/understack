@@ -44,7 +44,7 @@ def update_nautobot(args) -> UUID:
 def update_nautobot_for_provisioning(
     nb_url, nb_token, device_id: UUID, interface_mac: str
 ):
-    new_status = "Provisioning Interface"
+    new_status = "Provisioning-Interface"
     nautobot = Nautobot(nb_url, nb_token, logger=logger)
 
     interface = nautobot.update_switch_interface_status(
