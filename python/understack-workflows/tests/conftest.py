@@ -24,6 +24,16 @@ def project_id() -> uuid.UUID:
 
 
 @pytest.fixture
+def bmc_username() -> str:
+    return 'root'
+
+
+@pytest.fixture
+def bmc_password() -> str:
+    return 'password'
+
+
+@pytest.fixture
 def project_data(domain_id: uuid.UUID, project_id: uuid.UUID):
     return {
         "id": project_id,

@@ -12,17 +12,21 @@ from understack_workflows.node_configuration import IronicNodeConfiguration
 logger = setup_logger(__name__)
 
 
-def main():
+def get_args():
     if len(sys.argv) < 1:
         raise ValueError(
             "Please provide node configuration in JSON format as first argument."
         )
 
+    return json.loads(sys.argv[1])
+
+
+def main():
+    interface_update_event = get_args()
+    logger.debug(f"Received: {json.dumps(interface_update_event, indent=2)}")
+
     logger.info("Pushing device new node to Ironic.")
     client = IronicClient()
-
-    interface_update_event = json.loads(sys.argv[1])
-    logger.debug(f"Received: {interface_update_event}")
 
     node = IronicNodeConfiguration.from_event(interface_update_event)
     logger.debug(f"Checking if node with UUID {node.uuid} exists in Ironic.")
