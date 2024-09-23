@@ -77,7 +77,7 @@ spec:
             - name: pod-dhcp
               mountPath: /var/lib/misc
             - name: understack-data
-              mountPath: /var/lib/understack/master_iso_images
+              mountPath: /var/lib/understack/
               readOnly: true
       volumes:
         - name: pod-tmp
