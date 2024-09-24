@@ -165,11 +165,11 @@ class Nautobot:
         connected_endpoint = server_interface.connected_endpoint
         if not connected_endpoint:
             raise Exception(
-                f"Interface {server_interface_mac} {server_interface.type} not connected in Nautobot"
+                f"Interface {server_interface_mac=} {server_interface.type} is not connected in Nautobot"
             )
         switch_interface_id = connected_endpoint.id
         self.logger.debug(
-            f"Interface {server_interface_mac} connects to {switch_interface_id}"
+            f"Interface {server_interface_mac=} connects to {switch_interface_id=}"
         )
 
         switch_interface = self.interface_by_id(switch_interface_id)
@@ -177,7 +177,7 @@ class Nautobot:
         result = switch_interface.save()
 
         self.logger.debug(
-            f"Interface {switch_interface_id} updated to Status {new_status} {result=}"
+            f"Interface {switch_interface_id=} updated to Status {new_status} {result=}"
         )
         return switch_interface
 

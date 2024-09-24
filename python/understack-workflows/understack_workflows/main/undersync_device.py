@@ -25,20 +25,18 @@ def update_nautobot(args) -> UUID:
     logger.info(f"Updating Nautobot {device_id=!s} {interface_mac=!s} {network_name=}")
 
     if network_name == "tenant":
-        switch_id = update_nautobot_for_tenant(
+        vlan_group_id = update_nautobot_for_tenant(
             nb_url, nb_token, interface_mac, args.network_id
         )
     elif network_name == "provisioning":
-        switch_id = update_nautobot_for_provisioning(
+        vlan_group_id = update_nautobot_for_provisioning(
             nb_url, nb_token, device_id, interface_mac
         )
     else:
         raise ValueError(f"need provisioning or tenant, not {network_name=}")
 
     logger.info(f"Updated Nautobot {device_id=!s} {interface_mac=!s} {network_name=}")
-
-    logger.info(f"Interface connected to switch {switch_id!s}")
-    return switch_id
+    return vlan_group_id
 
 
 def update_nautobot_for_provisioning(
@@ -50,8 +48,17 @@ def update_nautobot_for_provisioning(
     interface = nautobot.update_switch_interface_status(
         device_id, interface_mac, new_status
     )
-    switch_id = interface.device.id
-    return switch_id
+    vlan_group_id = vlan_group_id_for(interface.device.id, nautobot)
+    logger.debug(f"Switch interface {interface.device} {interface} found in {vlan_group_id=}")
+    return vlan_group_id
+
+def vlan_group_id_for(device_id, nautobot):
+    result = nautobot.session.graphql.query(
+        '{device(id: "%s") { rel_vlan_group_to_devices {id}}}' % device_id
+    )
+    if not result.json or result.json.get("errors"):
+        raise Exception(f"Nautobot vlan_group graphql query failed: {result}")
+    return result.json["data"]["device"]["rel_vlan_group_to_devices"]["id"]
 
 
 def update_nautobot_for_tenant(
@@ -62,7 +69,7 @@ def update_nautobot_for_tenant(
     The nautobot job will assign vlans as required and set the interface
     into the correct mode for "normal" tenant operation.
 
-    The switch ID is returned.
+    The vlan group ID is returned.
     """
 
     # Making this http request directly because it was not clear how to get
@@ -82,14 +89,14 @@ def update_nautobot_for_tenant(
     logger.debug(f"Running Nautobot prep_switch_interface job {uri=} {payload=}")
 
     response = requests.request("POST", uri, headers=headers, json=payload)
+    response_data = response.json()
+    logger.debug(f"Nautobot prep_switch_interface result: {response} {response_data=}")
     response.raise_for_status()
-    response = response.json()
-    logger.debug(f"Nautobot prep_switch_interface job {response=}")
 
-    return response["switch_id"]
+    return response_data["vlan_group_id"]
 
 
-def call_undersync(args, switch_id: UUID):
+def call_undersync(args, vlan_group_id: UUID):
     undersync_token = credential("undersync", "token")
     if not undersync_token:
         logger.error("Please provide auth token for Undersync.")
@@ -98,7 +105,7 @@ def call_undersync(args, switch_id: UUID):
 
     try:
         return undersync.sync_devices(
-            [str(switch_id)], dry_run=args.dry_run, force=args.force
+            [str(vlan_group_id)], dry_run=args.dry_run, force=args.force
         )
     except Exception as error:
         logger.error(error)
@@ -146,8 +153,8 @@ def main():
     """
     args = argument_parser().parse_args()
 
-    switch_id = update_nautobot(args)
-    response = call_undersync(args, switch_id)
+    vlan_group_id = update_nautobot(args)
+    response = call_undersync(args, vlan_group_id)
     logger.info(f"Undersync returned: {response.json()}")
 
 
