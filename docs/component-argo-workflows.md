@@ -46,11 +46,10 @@ To facilitate the ability to pass data securely between Workflows the [argo-pyth
 This Python Class writes Kubernetes Secrets directly to the Kubernetes API from the Workflow's Pod, allowing these
 Secrets to be securely mounted into a subsequent Workflow's environment.
 
-By default these Secrets are created with an ownerReference set to the Pod which created them, which allows them to be
-garbage collected when that Pod is terminated. This ownerReference requires a Kubernetes Pod uid which can be obtained
-from the Kubernetes API, requiring Pod `get` permissions to be granted to the Workflow's Service Account. Alternatively
-the Pod's uid can be passed via the `KUBERNETES_POD_UID` environment variable. To allow the owner Pod to be removed at
-completion of the Workflow `.spec.podGC.strategy` can be set to `OnWorkflowCompletion`.
+By default these Secrets are created with an ownerReference set to the Workflow which created them, which allows
+them to be garbage collected when that Workflow is terminated. The ownerReference requires details about the
+Workflow to be passed in. This is available in the Workflow from the
+[workflow variable](https://argo-workflows.readthedocs.io/en/latest/variables/#global).
 
 An example WorkflowTemplate demonstrating argo-python usage can be found
 [here](https://github.com/rackerlabs/understack/blob/main/workflows/argo-events/workflowtemplates/get-bmc-creds.yaml).
