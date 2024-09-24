@@ -1,6 +1,7 @@
 spec:
   podGC:
     strategy: OnWorkflowSuccess  # to allow garbage collection of secrets (created by pods) upon workflow completion
+    deleteDelayDuration: 72h
   ttlStrategy:
     secondsAfterSuccess: 300
     secondsAfterFailure: 259200  # 3 days
