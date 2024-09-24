@@ -2,5 +2,4 @@ inetutils-ping:
 inetutils-telnet:
 mtr-tiny:
 tcpdump:
-systemd-timesyncd:
 bind9-dnsutils:
