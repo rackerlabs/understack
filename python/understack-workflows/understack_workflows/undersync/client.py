@@ -33,16 +33,16 @@ class Undersync:
         return session
 
     def sync(self, uuids: str) -> requests.Response:
-        response = self.client.post(f"{self.api_url}/v1/devices/{uuids}/sync")
+        response = self.client.post(f"{self.api_url}/v1/vlan-group/{uuids}/sync")
         response.raise_for_status()
         return response
 
     def dry_run(self, uuids: str) -> requests.Response:
-        response = self.client.post(f"{self.api_url}/v1/devices/{uuids}/dry-run")
+        response = self.client.post(f"{self.api_url}/v1/vlan-group/{uuids}/dry-run")
         response.raise_for_status()
         return response
 
     def force(self, uuids: str) -> requests.Response:
-        response = self.client.post(f"{self.api_url}/v1/devices/{uuids}/force")
+        response = self.client.post(f"{self.api_url}/v1/vlan-group/{uuids}/force")
         response.raise_for_status()
         return response
