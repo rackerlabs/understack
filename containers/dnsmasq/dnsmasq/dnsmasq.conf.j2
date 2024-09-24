@@ -67,7 +67,7 @@ shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_pro
 {% set option_prefix = 'option:' -%}
 {% endif -%}
 dhcp-option={{ tag }}{{ option_prefix }}{{ option|replace('_', '-')|lower }},{{ value }}
-{%- endfor %}
+{% endfor %}
 {% if env[dhcp_allowed] is defined and env[dhcp_allowed] %}
 {{ dhcp_allowed_srvids_list.append(env[dhcp_allowed]) or '' }}
 {%- endif %}
