@@ -1,0 +1,23 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chrony
+spec:
+  selector:
+    matchLabels:
+      app: chrony
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: chrony
+    spec:
+      containers:
+      - name: chrony
+        image: dockurr/chrony:latest
+        env:
+        - name: NTP_SERVERS
+          value: time.rackspace.net
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
