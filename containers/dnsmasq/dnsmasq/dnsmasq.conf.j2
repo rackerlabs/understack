@@ -42,10 +42,10 @@ no-hosts
 {% set dhcp_proxy = "DHCP_PROXY_" ~ name|upper -%}
 # {{ dhcp_proxy }}
 {% set dhcp_option = "DHCP_OPTION_" ~ name|upper ~ "_" -%}
-# {{ dhcp_option }}_$OPTION
+# {{ dhcp_option }}$OPTION where $OPTION is any valid dnsmasq option. underscores will be converted to hyphens
 {% set dhcp_allowed = "DHCP_ALLOWED_SRVIDS_" ~ name|upper -%}
 # {{ dhcp_allowed }}
-{% if env[dhcp_circuitid] is defined and env[dhcp_circuitid] %}
+{% if env[dhcp_circuitid] is defined and env[dhcp_circuitid] -%}
 # tag the traffic with the PXE relay MAC
 {% set tag = name|lower ~ "," -%}
 dhcp-circuitid=set:{{ tag }}{{ env[dhcp_circuitid] }}
@@ -68,7 +68,7 @@ shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_pro
 {% endif -%}
 dhcp-option={{ tag }}{{ option_prefix }}{{ option|replace('_', '-')|lower }},{{ value }}
 {% endfor %}
-{% if env[dhcp_allowed] is defined and env[dhcp_allowed] %}
+{% if env[dhcp_allowed] is defined and env[dhcp_allowed] -%}
 {{ dhcp_allowed_srvids_list.append(env[dhcp_allowed]) or '' }}
 {%- endif %}
 {%- endmacro %}
@@ -82,12 +82,12 @@ dhcp-authoritative
 {%- endif %}
 {% set dhcp_tags_str = env.DHCP_TAGS|default('default') -%}
 {% set dhcp_tags = dhcp_tags_str.split(',') -%}
-{% for name in dhcp_tags %}
+{% for name in dhcp_tags -%}
 # pool {{ name }}
 {{ dhcp_config(name) }}
 {% endfor %}
 # dhcp_proxy_list '{{ dhcp_proxy_list }}'
-{% if dhcp_proxy_list | length > 0 %}
+{% if dhcp_proxy_list | length > 0 -%}
 dhcp-proxy={{ dhcp_proxy_list|join(',') }}
 {% endif %}
 {% if dhcp_allowed_srvids_list | length > 0 %}
@@ -126,10 +126,7 @@ dhcp-hostsdir=/etc/dnsmasq.d/hostsdir.d
 dhcp-optsdir=/etc/dnsmasq.d/optsdir.d
 
 # static DNS entries to reach UnderStack components
-{% set components = env.get('COMPONENTS', ['argocd', 'dex', 'ironic', 'keystone', 'nautobot', 'workflows', ]) -%}
-{% for component in components -%}
-address=/{{ component }}.{{ env.DNS_ZONE }}/{{ env.INGRESS_IP }}
-{% endfor %}
+address=/.{{ env.DNS_ZONE }}/{{ env.INGRESS_IP }}
 
 dhcp-option=option:dns-server,{{ env.get('DNS_IP', env['INGRESS_IP']) }}
 # end of template

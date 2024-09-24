@@ -52,7 +52,8 @@ spec:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
-              add: ["NET_ADMIN"]
+              # needed for privileged ports and to send ICMP packets
+              add: ["NET_ADMIN", "NET_RAW"]
           args:
             - /usr/sbin/dnsmasq
             - '--no-daemon'
