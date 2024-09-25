@@ -6,6 +6,8 @@ from dataclasses import field
 
 from ironicclient.v1.node import Node
 
+from understack_workflows.bmc_password_standard import standard_password
+from understack_workflows.helpers import credential
 from understack_workflows.redfish_driver_info import RedfishDriverInfo
 
 
@@ -177,7 +179,14 @@ class IronicNodeConfiguration:
 
     @staticmethod
     def from_event(event: dict) -> IronicNodeConfiguration:
-        # check for events we support
+        """Create an instance from Nautobot webhook event data.
+
+        Here we consume the event that Nautobot publishes whenever an ethernet
+        interface is updated.  (Other types of event will raise an error)
+
+        The IronicNodeConfiguration is populated with minimal amount of
+        information, including id, name and BMC driver information.
+        """
         model = event.get("model")
         if model not in ["interface"]:
             raise ValueError(f"'{model}' events not supported")
@@ -188,10 +197,17 @@ class IronicNodeConfiguration:
         # the idrac driver otherwise redfish
         driver = "idrac" if data["name"] == "iDRAC" else "redfish"
 
+        bmc_master_key = credential("bmc_master", "key")
+        bmc_ip_address = data['ip_addresses'][0]['host']
+        bmc_username = "root"
+        bmc_password = standard_password(bmc_ip_address, bmc_master_key)
+
         di = RedfishDriverInfo(
-            redfish_address=f"https://{data['ip_addresses'][0]['host']}",
+            redfish_address=f"https://{bmc_ip_address}",
             redfish_verify_ca=False,
-        )
+            redfish_username=bmc_username,
+            redfish_password=bmc_password,
+            )
 
         return IronicNodeConfiguration(
             data["device"]["id"],
