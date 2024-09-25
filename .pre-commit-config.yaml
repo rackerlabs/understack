@@ -18,22 +18,6 @@ repos:
     hooks:
       - id: yamllint
         args: [-c, .yamllint.yaml]
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-        exclude: '^python/'
-        args:
-          - --max-line-length=120
-  - repo: https://github.com/psf/black
-    rev: 24.4.2
-    hooks:
-      - id: black
-        exclude: '^python/'
-        args:
-          - --line-length=120
-          - --check
-          - --diff
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.28.4
     hooks:
@@ -56,10 +40,8 @@ repos:
     rev: v0.5.4
     hooks:
       - id: ruff
-        files: '^python/'
         args: [--fix]
       - id: ruff-format
-        files: '^python/'
   - repo: https://github.com/python-poetry/poetry
     rev: '1.7.1'
     hooks:
