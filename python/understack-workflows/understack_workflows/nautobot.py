@@ -122,11 +122,13 @@ class Nautobot:
             self.exit_with_error(f"Interface {interface_id!s} not found in Nautobot")
         return interface
 
-    def non_lag_interface_by_mac(self, device_id: UUID, mac_address: str) -> list[NautobotInterface]:
+    def non_lag_interface_by_mac(
+        self, device_id: UUID, mac_address: str
+    ) -> list[NautobotInterface]:
         interfaces = self.session.dcim.interfaces.filter(
             device_id=device_id,
             mac_address=mac_address,
-            type__n = "lag",
+            type__n="lag",
         )
         if not interfaces:
             self.exit_with_error(
@@ -147,7 +149,7 @@ class Nautobot:
     def update_switch_interface_status(
         self, device_id: UUID, server_interface_mac: str, new_status: str
     ) -> NautobotInterface:
-        """Change the Interface Status in Nautobot for interfaces
+        """Change the Interface Status in Nautobot for interfaces.
 
         The device_id and interface MAC address parameters identify one or more
         server interfaces.
@@ -160,12 +162,15 @@ class Nautobot:
 
         The interface is returned.
         """
-        server_interface = self.non_lag_interface_by_mac(device_id, server_interface_mac)
+        server_interface = self.non_lag_interface_by_mac(
+            device_id, server_interface_mac
+        )
 
         connected_endpoint = server_interface.connected_endpoint
         if not connected_endpoint:
             raise Exception(
-                f"Interface {server_interface_mac=} {server_interface.type} is not connected in Nautobot"
+                f"Interface {server_interface_mac=} {server_interface.type} "
+                "is not connected in Nautobot"
             )
         switch_interface_id = connected_endpoint.id
         self.logger.debug(

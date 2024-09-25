@@ -9,6 +9,7 @@ class Undersync:
         auth_token: str,
         api_url="http://undersync-service.undersync.svc.cluster.local:8080",
     ) -> None:
+        """Simple client for Undersync."""
         self.token = auth_token
         self.api_url = api_url
 

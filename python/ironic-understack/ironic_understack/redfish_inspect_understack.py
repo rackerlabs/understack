@@ -44,7 +44,7 @@ class FlavorInspectMixin:
         :returns: The resulting state of inspection.
 
         """
-        upstream_state = super().inspect_hardware(task) # pyright: ignore reportAttributeAccessIssue
+        upstream_state = super().inspect_hardware(task)  # pyright: ignore reportAttributeAccessIssue
 
         inspection_data = get_inspection_data(task.node, task.context)
 

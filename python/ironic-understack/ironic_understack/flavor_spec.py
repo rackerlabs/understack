@@ -61,12 +61,11 @@ class FlavorSpec:
         #     but more memory space it is less desirable than the machine that
         #     matches exactly on both disk and memory.
 
-
         # Rule 1: 100% match gets the highest priority
         if (
-            machine.memory_gb == self.memory_gb and
-            machine.disk_gb in self.drives and
-            machine.cpu in self.cpu_models
+            machine.memory_gb == self.memory_gb
+            and machine.disk_gb in self.drives
+            and machine.cpu in self.cpu_models
         ):
             return 100
 

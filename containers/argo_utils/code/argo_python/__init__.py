@@ -6,7 +6,14 @@ logger = logging.getLogger(__name__)
 
 
 class ArgoWorkflow:
-    def __init__(self, namespace: str, name: str, uid: str, api_version="argoproj.io/v1alpha1", config_file=None):
+    def __init__(
+        self,
+        namespace: str,
+        name: str,
+        uid: str,
+        api_version="argoproj.io/v1alpha1",
+        config_file=None,
+    ):
         if config_file:
             config.load_kube_config(config_file)
         else:

@@ -18,8 +18,12 @@ logger.setLevel(logging.DEBUG)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog=os.path.basename(__file__), description="Update BMC firmware")
-    parser.add_argument("--host", required=True, help="The address of the BMC interface")
+    parser = argparse.ArgumentParser(
+        prog=os.path.basename(__file__), description="Update BMC firmware"
+    )
+    parser.add_argument(
+        "--host", required=True, help="The address of the BMC interface"
+    )
     parser.add_argument("--firmware-url", required=True, help="URL of firmware")
 
     args = parser.parse_args()
@@ -41,7 +45,12 @@ if __name__ == "__main__":
         "Content-Type": "multipart/form-data",
     }
 
-    update_data = {"UpdateRepository": True, "UpdateTarget": True, "ETag": "atag", "Section": 0}
+    update_data = {
+        "UpdateRepository": True,
+        "UpdateTarget": True,
+        "ETag": "atag",
+        "Section": 0,
+    }
 
     upd_url = urlparse.urljoin(c._conn._url, updsvc.http_push_uri)
 
@@ -57,7 +66,9 @@ if __name__ == "__main__":
                 ("parameters", json.dumps(update_data)),
                 ("file", (filename, r.raw, "application/octet-stream")),
             ]
-            rsp = c._conn._session.post(upd_url, files=multipart, verify=False, headers=headers)
+            rsp = c._conn._session.post(
+                upd_url, files=multipart, verify=False, headers=headers
+            )
             logger.info(rsp.json())
     except Exception as e:
         logger.error(e)

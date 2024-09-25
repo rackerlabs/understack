@@ -104,9 +104,11 @@ class Systeminfo:
 
     @classmethod
     def from_redfish(cls, chassis_data) -> Systeminfo:
-        return cls(asset_tag=chassis_data.sku,
-                   serial_number=chassis_data.serial_number,
-                   platform=chassis_data.model)
+        return cls(
+            asset_tag=chassis_data.sku,
+            serial_number=chassis_data.serial_number,
+            platform=chassis_data.model,
+        )
 
 
 @dataclass

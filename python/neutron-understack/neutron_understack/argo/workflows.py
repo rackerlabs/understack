@@ -17,6 +17,7 @@ class ArgoClient:
         api_url="https://argo-server.argo.svc.cluster.local:2746",
         logger=None,
     ):
+        """Simple Argo Workflows Client."""
         if token is None:
             with open(DEFAULT_TOKEN_FILENAME) as token_file:
                 token = token_file.read()
@@ -25,7 +26,6 @@ class ArgoClient:
         self.api_url = api_url
         self.headers = {"Authorization": f"Bearer {self.token}"}
         self.logger = logger
-
 
     def submit(
         self,
