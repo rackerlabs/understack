@@ -9,10 +9,6 @@ metadata:
       Defined in `workflows/argo-events/workflowtemplates/get-bmc-creds.yaml`.
       An example template to return the name of a Kubernetes Secret which containing device's BMC credentials.
 spec:
-  # garbage collection on the secret is tied to this pod. we remove this pod only after workflow completion to
-  # allow access to this secret from subsequent workflow/steps.
-  podGC:
-    strategy: OnWorkflowCompletion
   serviceAccountName: workflow
   entrypoint: main
   arguments:
@@ -34,7 +30,11 @@ spec:
         source: |
           from argo_python import ArgoWorkflow
           import base64
+          import os
 
+          WF_NS = os.getenv("WF_NS")
+          WF_NAME = os.getenv("WF_NAME")
+          WF_UID = os.getenv("WF_UID")
           SECRET_NAME="example-secret"
           USERNAME="foo"
           PASSWORD="bar"
@@ -44,17 +44,17 @@ spec:
               'password': base64.b64encode(PASSWORD.encode("utf-8")).decode(),
           }
 
-          workflow = ArgoWorkflow()
+          workflow = ArgoWorkflow(WF_NS, WF_NAME, WF_UID)
           secret_name = workflow.create_secret(SECRET_NAME, data)
           with open("/tmp/output.txt", "w") as f:
               f.write(secret_name)
         env:
-        # pass this Pod's uid into the pod env to make it available to the argo secrets method, otherwise pod get
-        # permissions are required for the service account specified above.
-        - name: KUBERNETES_POD_UID
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.uid
+        - name: WF_UID
+          value: "{{workflow.uid}}"
+        - name: WF_NAME
+          value: "{{workflow.name}}"
+        - name: WF_NS
+          value: "{{workflow.namespace}}"
         # only needed in this example Template as it's written using a ScriptTemplate which apparently doesn't seem
         # to honor the workingDir directive, and mounts the above script at /argo/staging/script.
         - name: PYTHONPATH
