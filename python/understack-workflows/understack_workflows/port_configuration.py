@@ -14,6 +14,6 @@ class PortConfiguration(BaseModel):
     name: str  # port name
 
     # Ironic requires the port names to be globally unique
-    @field_serializer('name')
+    @field_serializer("name")
     def serialize_name(self, name: str):
         return f"{self.uuid} {name}"

@@ -1,5 +1,5 @@
-import pytest
 from ironic_understack.machine import Machine
+
 
 def test_memory_gb_property():
     # Test a machine with exactly 1 GB of memory

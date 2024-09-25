@@ -21,9 +21,7 @@ SUPERUSER_GROUPS = _env_list("DEX_SUPERUSER_GROUPS", "ucadmin")
 STAFF_GROUPS = _env_list("DEX_STAFF_GROUPS", "ucadmin")
 
 
-def group_sync(
-    uid, user=None, response=None, *args, **kwargs
-):  # pylint: disable=keyword-arg-before-vararg, unused-argument
+def group_sync(uid, user=None, response=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg, unused-argument
     """Sync the users groups from the response and set staff/superuser as
     appropriate"""
     if user and response and response.get(GROUPS_ATTR_NAME, False):

@@ -19,11 +19,21 @@ logger.setLevel(logging.DEBUG)
 
 
 def redfish_request(
-    host: str, uri: str, username: str, password: str, method: str = "GET", payload: Dict | None = None
+    host: str,
+    uri: str,
+    username: str,
+    password: str,
+    method: str = "GET",
+    payload: Dict | None = None,
 ) -> dict:
     try:
         r = requests.request(
-            method, f"https://{host}{uri}", verify=False, auth=(username, password), timeout=15, json=payload
+            method,
+            f"https://{host}{uri}",
+            verify=False,
+            auth=(username, password),
+            timeout=15,
+            json=payload,
         )
         r.raise_for_status()
         return r.json()
@@ -67,7 +77,13 @@ def get_bmc_accounts(host: str, username: str, password: str) -> List[Dict]:
         raise
 
 
-def set_bmc_creds(host: str, username: str, password: str, expected_username: str, expected_password: str) -> bool:
+def set_bmc_creds(
+    host: str,
+    username: str,
+    password: str,
+    expected_username: str,
+    expected_password: str,
+) -> bool:
     """Find the account associated with the username in question"""
     try:
         accounts = get_bmc_accounts(host, username, password)
@@ -97,9 +113,12 @@ def set_bmc_creds(host: str, username: str, password: str, expected_username: st
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog=os.path.basename(__file__), description="Attempts to find the correct BMC credentials for a device"
+        prog=os.path.basename(__file__),
+        description="Attempts to find the correct BMC credentials for a device",
     )
-    parser.add_argument("--host", required=True, help="the address of the bmc interface for the device")
+    parser.add_argument(
+        "--host", required=True, help="the address of the bmc interface for the device"
+    )
 
     args = parser.parse_args()
     host = args.host
@@ -117,17 +136,23 @@ if __name__ == "__main__":
         logger.info("BMC credentials are in sync.")
         sys.exit(0)
     else:
-        logger.info("BMC credentials are NOT in sync. Trying known legacy/vendor credentials ...")
+        logger.info(
+            "BMC credentials are NOT in sync. Trying known legacy/vendor credentials ..."
+        )
 
         # iDRAC defaults to blocking an IP address after 3 bad login attempts within 60 second. Since we have the
         # initial attempt above, we will sleep 35 seconds between any additional attempts.
         delay = 60
         username = os.getenv("BMC_LEGACY_USER", "root")
         for password in legacy_passwords:
-            logger.info(f"Delaying for {delay} seconds to prevent failed auth lockouts ...")
+            logger.info(
+                f"Delaying for {delay} seconds to prevent failed auth lockouts ..."
+            )
             time.sleep(delay)
             if verify_auth(host, username, password):
-                if set_bmc_creds(host, username, password, expected_username, expected_password):
+                if set_bmc_creds(
+                    host, username, password, expected_username, expected_password
+                ):
                     logger.info("BMC password has been synced.")
                     sys.exit(0)
 

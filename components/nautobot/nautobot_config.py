@@ -348,7 +348,9 @@ SECRET_KEY = os.getenv("NAUTOBOT_SECRET_KEY", "celery-does-not-need-this")
 
 # Send anonymized installation metrics when `nautobot-server post_upgrade` command is run.
 #
-INSTALLATION_METRICS_ENABLED = is_truthy(os.getenv("NAUTOBOT_INSTALLATION_METRICS_ENABLED", "True"))
+INSTALLATION_METRICS_ENABLED = is_truthy(
+    os.getenv("NAUTOBOT_INSTALLATION_METRICS_ENABLED", "True")
+)
 
 # Storage backend to use for Job input files and Job output files.
 #
@@ -467,7 +469,9 @@ def _read_cred(filename):
 
 
 # configure our SSO login from our secret
-SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = _read_cred("/opt/nautobot/sso/issuer") or os.getenv("SOCIAL_AUTH_OIDC_OIDC_ENDPOINT")
+SOCIAL_AUTH_OIDC_OIDC_ENDPOINT = _read_cred("/opt/nautobot/sso/issuer") or os.getenv(
+    "SOCIAL_AUTH_OIDC_OIDC_ENDPOINT"
+)
 SOCIAL_AUTH_OIDC_KEY = _read_cred("/opt/nautobot/sso/client-id") or "nautobot"
 SOCIAL_AUTH_OIDC_SECRET = _read_cred("/opt/nautobot/sso/client-secret")
 # The “openid”, “profile” and “email” are requested by default,

@@ -1,7 +1,7 @@
 import argparse
 import os
-from pprint import pprint
 import sys
+from pprint import pprint
 from uuid import UUID
 
 import requests
@@ -59,7 +59,7 @@ def update_nautobot_for_provisioning(
 
 def vlan_group_id_for(device_id, nautobot):
     result = nautobot.session.graphql.query(
-        '{device(id: "%s") { rel_vlan_group_to_devices {id}}}' % device_id
+        f'{{device(id: "{device_id}") {{ rel_vlan_group_to_devices {{id}}}}}}'
     )
     if not result.json or result.json.get("errors"):
         raise Exception(f"Nautobot vlan_group graphql query failed: {result}")
@@ -69,14 +69,13 @@ def vlan_group_id_for(device_id, nautobot):
 def update_nautobot_for_tenant(
     nb_url, nb_token, server_interface_mac: str, ucvni_id: UUID
 ) -> UUID:
-    """Runs a Nautobot Job to update a switch interface for tenant mode
+    """Runs a Nautobot Job to update a switch interface for tenant mode.
 
     The nautobot job will assign vlans as required and set the interface
     into the correct mode for "normal" tenant operation.
 
     The vlan group ID is returned.
     """
-
     # Making this http request directly because it was not clear how to get
     # the pynautobot api client to call an arbitrary endpoint:
 
