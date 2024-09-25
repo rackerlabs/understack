@@ -1,7 +1,9 @@
 import argparse
 import os
+from pprint import pprint
 import sys
 from uuid import UUID
+
 import requests
 
 from understack_workflows.helpers import boolean_args
@@ -49,8 +51,11 @@ def update_nautobot_for_provisioning(
         device_id, interface_mac, new_status
     )
     vlan_group_id = vlan_group_id_for(interface.device.id, nautobot)
-    logger.debug(f"Switch interface {interface.device} {interface} found in {vlan_group_id=}")
+    logger.debug(
+        f"Switch interface {interface.device} {interface} found in {vlan_group_id=}"
+    )
     return vlan_group_id
+
 
 def vlan_group_id_for(device_id, nautobot):
     result = nautobot.session.graphql.query(
@@ -155,7 +160,7 @@ def main():
 
     vlan_group_id = update_nautobot(args)
     response = call_undersync(args, vlan_group_id)
-    logger.info(f"Undersync returned: {response.json()}")
+    logger.info(f"Undersync returned: {pprint(response.json())}")
 
 
 if __name__ == "__main__":
