@@ -13,6 +13,7 @@ spec:
   # allow access to this secret from subsequent workflow/steps.
   podGC:
     strategy: OnWorkflowCompletion
+    deleteDelayDuration: 1h
   serviceAccountName: workflow
   entrypoint: main
   arguments:
