@@ -61,15 +61,3 @@ def credential(subpath, item):
     with ref.open() as f:
         return f.read().strip()
 
-
-def oob_sushy_session(oob_ip, oob_username, oob_password):
-    return sushy.Sushy(
-        f"https://{oob_ip}",
-        username=oob_username,
-        password=oob_password,
-        verify=False,
-    )
-
-
-def is_off_board(interface):
-    return "Embedded ALOM" in interface.location or "Embedded" not in interface.location
