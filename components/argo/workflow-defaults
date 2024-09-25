@@ -3,5 +3,5 @@ spec:
     strategy: OnWorkflowSuccess  # to allow garbage collection of secrets (created by pods) upon workflow completion
     deleteDelayDuration: 72h
   ttlStrategy:
-    secondsAfterSuccess: 300
+    secondsAfterSuccess: 129600  # 36 hours
     secondsAfterFailure: 259200  # 3 days
