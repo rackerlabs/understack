@@ -4,6 +4,7 @@ import sys
 import ironicclient.common.apiclient.exceptions
 from ironicclient.common.utils import args_array_to_patch
 
+from understack_workflows.bmc_password_standard import standard_password
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
@@ -17,11 +18,11 @@ def get_args():
         raise ValueError(
             "Please provide node configuration in JSON format as first argument."
         )
-
     return json.loads(sys.argv[1])
 
 
 def main():
+    """Update baremetal node BMC credentials in Ironic."""
     interface_update_event = get_args()
     logger.debug(f"Received: {json.dumps(interface_update_event, indent=2)}")
 
@@ -47,8 +48,10 @@ def main():
         sys.exit(0)
 
     # Update BMC credentials
-    expected_username = credential("bmc", "username")
-    expected_password = credential("bmc", "password")
+    bmc_ip_address = interface_update_event['data']['ip_addresses'][0]['host']
+    master_secret = credential("bmc_master", "key")
+    expected_username = "root"
+    expected_password = standard_password(bmc_ip_address, master_secret)
 
     updates = [
         f"driver_info/redfish_username={expected_username}",
