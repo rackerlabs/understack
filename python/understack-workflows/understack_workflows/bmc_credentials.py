@@ -8,7 +8,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 FACTORY_PASSWORD = "calvin"
 FACTORY_USER = "root"
 
-def sync_creds(ip_address, required_password, logger, username="root"):
+def set_bmc_password(ip_address, required_password, logger, username="root"):
     """Access BMC via redfish and change password from factory default if needed
 
     We try the standard password.

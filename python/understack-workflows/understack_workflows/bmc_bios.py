@@ -15,7 +15,7 @@ REQUIRED_BIOS_SETTINGS = {
 }
 
 
-def update_dell_bios(bmc: Bmc) -> dict:
+def update_dell_bios_settings(bmc: Bmc) -> dict:
     """Check and update BIOS settings to standard as required
 
     Any changes take effect on next server reboot.

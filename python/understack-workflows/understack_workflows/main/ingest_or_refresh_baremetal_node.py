@@ -2,11 +2,11 @@ import json
 import sys
 
 from understack_workflows.helpers import setup_logger
-from understack_workflows.helpers import credential
-
-import understack_workflows.bmc_sync_creds
-import understack_workflows.bmc_update_bios_settings
-import understack_workflows.ironic_node_action
+from understack_workflows.bmc_credentials import set_bmc_password
+from understack_workflows.bmc_bios import update_dell_bios_settings
+from understack_workflows.nautobot_event_parser import parse_event
+from understack_workflows import bmc
+import understack_workflows.ironic_node
 
 logger = setup_logger(__name__)
 
@@ -32,7 +32,8 @@ def main():
 
        - serial number, etc
        - enumerate ethernet interfaces with MACs
-       - what did prashant just do?
+       - what else did prashant just do?
+       - can we get LLDP connections?
 
     -  Find or create this server in Nautobot
 
@@ -41,6 +42,7 @@ def main():
        - interface mac addresses
        - BMC interface IP addresses
        - device type?  What else?
+       - if we have LLDP info, connect up switchports.  Error if switches don't exist
 
     -  Find or create this baremetal node in Ironic
        - create ports with MACs
@@ -49,19 +51,23 @@ def main():
 
     """
 
-    device_id, device_hostname, interface_name, bmc = event_payload(get_args())
-    logger.info(f"{__file__} starting for {bmc.ip_address} {device_id=}")
+    device_id, device_hostname, bmc_ip_address, bmc_type = parse_event(get_args())
 
-    bmc_sync_creds.sync_creds(bmc.ip_address, bmc.password, logger)
+    logger.info(f"{__file__} starting for {device_id=} {device_hostname=}")
+    logger.info(f"Parsed event: {bmc_type=} {bmc_ip_address=}")
 
-    bmc_update_bios_settings.update_dell_bios(bmc, logger)
+    bmc = bmc.from_ip_address(bmc_ip_address, bmc_type)
+
+    set_bmc_password(bmc.ip_address, bmc.password, logger)
+
+    update_dell_bios_settings(bmc, logger)
+
+    device_info = redfish_device_discovery.device_info(bmc)
 
     # well, it already exists in nautobot
     # create_in_nautobot()
 
-    _ironic_provision_state = ironic_node_action.create_or_update(device_id, bmc, logger)
-
-    device_info = redfish_device_discovery.device_info(bmc)
+    _ironic_provision_state = ironic_node.create_or_update(device_id, bmc, logger)
 
     sync_interfaces.from_nautobot_to_ironic(device_id)
 
@@ -75,33 +81,3 @@ def get_args() -> dict:
         )
     return json.loads(sys.argv[1])
 
-def event_payload(payload) -> (str, str, Bmc):
-    """Parse Nautobot webhook event data
-
-    Here we consume the event that Nautobot publishes whenever an ethernet
-    interface is updated.  (Other types of event will raise an error)
-
-    returns (device_uuid: str, hostname: str, bmc: Bmc)
-    """
-    logger.debug(f"Received Event: {json.dumps(payload, indent=2)}")
-
-    data = payload.get("data")
-    model = payload.get("model")
-
-    if model not in ["interface"]:
-        raise ValueError(f"'{model}' events not supported")
-
-    device_uuid = data["device"]["id"]
-    device_hostname = data["device"]["name"]
-    interface_name = data["name"]
-    bmc_ip_address = data['ip_addresses'][0]['host']
-
-    the_bmc = bmc(bmc_ip_address, bmc_type = interface_name)
-
-    return device_uuid, device_hostname, the_bmc
-
-
-def bmc(ip_address, bmc_type) -> Bmc:
-    bmc_master_key = credential("bmc_master", "key")
-    password = standard_password(self.ip_address, bmc_master_key)
-    return Bmc(bmc_type=bmc_type, ip_address=ip_address, password=password)
