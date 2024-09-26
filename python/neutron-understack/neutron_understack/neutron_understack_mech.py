@@ -14,49 +14,12 @@ from neutron_lib.plugins.ml2.api import (
 )
 from oslo_config import cfg
 
+from neutron_understack import config
 from neutron_understack.argo.workflows import ArgoClient
 
 LOG = logging.getLogger(__name__)
 
-
-def setup_conf():
-    grp = cfg.OptGroup("ml2_type_understack")
-    opts = [
-        cfg.StrOpt(
-            "provisioning_network",
-            help="provisioning_network ID as configured in ironic.conf",
-        ),
-        cfg.StrOpt(
-            "argo_workflow_sa",
-            default="workflow",
-            help="ServiceAccount to submit Workflow as",
-        ),
-        cfg.StrOpt(
-            "argo_api_url",
-            default="https://argo-server.argo.svc.cluster.local:2746",
-            help="URL of the Argo Server API",
-        ),
-        cfg.StrOpt(
-            "argo_namespace",
-            default="argo-events",
-            help="Namespace to submit the Workflows to",
-        ),
-        cfg.IntOpt(
-            "argo_max_attempts",
-            default=15,
-            help="Number of tries to retrieve the Workflow run result. "
-            "Sleeps 5 seconds between attempts.",
-        ),
-        cfg.BoolOpt(
-            "argo_dry_run", default=True, help="Call Undersync with dry-run mode"
-        ),
-        cfg.BoolOpt("argo_force", default=False, help="Call Undersync with force mode"),
-    ]
-    cfg.CONF.register_group(grp)
-    cfg.CONF.register_opts(opts, group=grp)
-
-
-setup_conf()
+config.register_ml2_type_understack_opts(cfg.CONF)
 
 
 def dump_context(
