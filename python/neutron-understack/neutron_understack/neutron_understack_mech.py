@@ -5,6 +5,7 @@ from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
+from neutron_lib import exceptions as exc
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import (
     MechanismDriver,
@@ -116,6 +117,32 @@ class UnderstackDriver(MechanismDriver):
 
     def create_network_postcommit(self, context):
         log_call("create_network_postcommit", context)
+
+        network = context.current
+        network_id = network["id"]
+        network_name = network["name"]
+        provider_type = network.get("provider:network_type")
+        segmentation_id = network.get("provider:segmentation_id")
+        physnet = network.get("provider:physical_network")
+
+        if provider_type == p_const.TYPE_VXLAN and segmentation_id:
+            conf = cfg.CONF.ml2_understack
+            ucvni_group = conf.ucvni_group
+            try:
+                self.nb.ucvni_create(
+                    network_id, segmentation_id, ucvni_group, network_name
+                )
+            except Exception as e:
+                LOG.exception(
+                    "unable to create network %(net_id)s", {"net_id": network_id}
+                )
+                raise exc.NetworkNotFound(net_id=network_id) from e
+
+            LOG.info(
+                "network %(net_id)s has been added on ucvni_group %(ucvni_group) "
+                "/ physnet %(physnet)",
+                {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
+            )
 
     def update_network_precommit(self, context):
         log_call("update_network_precommit", context)

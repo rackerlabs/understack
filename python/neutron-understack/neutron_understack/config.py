@@ -39,6 +39,10 @@ mech_understack_opts = [
         "nb_token",
         help="Nautobot API token",
     ),
+    cfg.StrOpt(
+        "ucvni_group",
+        help="hack",
+    ),
 ]
 
 
