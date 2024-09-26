@@ -1,8 +1,11 @@
 from dataclasses import dataclass
-from understack_workflows.helpers import credential
+import sushy
 from understack_workflows.bmc_password_standard import standard_password
-from sushy import Sushy
 
+def from_ip_address(ip_address: str, bmc_type: str) -> Bmc:
+    bmc_master_key = credential("bmc_master", "key")
+    password = standard_password(self.ip_address, bmc_master_key)
+    return Bmc(bmc_type=bmc_type, ip_address=ip_address, password=password)
 
 @dataclass
 class Bmc
@@ -13,14 +16,6 @@ class Bmc
 
     def url(self):
         return f"https://{self.ip_address}"
-
-    def sushy_session(self, verify=False) -> Sushy:
-        return Sushy(
-            self.url()
-            verify=verify,
-            username=self.username,
-            password=self.password,
-        )
 
     def redfish_request(self,
         path: str,
