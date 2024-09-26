@@ -30,6 +30,21 @@ type_understack_opts = [
     cfg.BoolOpt("argo_force", default=False, help="Call Undersync with force mode"),
 ]
 
+mech_understack_opts = [
+    cfg.StrOpt(
+        "nb_url",
+        help="Nautobot URL",
+    ),
+    cfg.StrOpt(
+        "nb_token",
+        help="Nautobot API token",
+    ),
+]
+
 
 def register_ml2_type_understack_opts(config):
     config.register_opts(type_understack_opts, "ml2_type_understack")
+
+
+def register_ml2_understack_opts(config):
+    config.register_opts(mech_understack_opts, "ml2_understack")

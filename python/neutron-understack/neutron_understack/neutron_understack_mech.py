@@ -16,10 +16,12 @@ from oslo_config import cfg
 
 from neutron_understack import config
 from neutron_understack.argo.workflows import ArgoClient
+from neutron_understack.nautobot import Nautobot
 
 LOG = logging.getLogger(__name__)
 
 config.register_ml2_type_understack_opts(cfg.CONF)
+config.register_ml2_understack_opts(cfg.CONF)
 
 
 def dump_context(
@@ -106,7 +108,8 @@ class UnderstackDriver(MechanismDriver):
     resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
 
     def initialize(self):
-        pass
+        conf = cfg.CONF.ml2_understack
+        self.nb = Nautobot(conf.nb_url, conf.nb_token)
 
     def create_network_precommit(self, context):
         log_call("create_network_precommit", context)
