@@ -20,7 +20,7 @@ class Nautobot:
             "id": network_id,
             "ucvni_id": segment_id,
             "name": network_name,
-            "ucvni_group": {"id": ucvni_group},
+            "ucvni_group": ucvni_group,
             "status": "Active",
         }
 
