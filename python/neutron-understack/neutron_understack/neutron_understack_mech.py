@@ -139,8 +139,8 @@ class UnderstackDriver(MechanismDriver):
                 raise exc.NetworkNotFound(net_id=network_id) from e
 
             LOG.info(
-                "network %(net_id)s has been added on ucvni_group %(ucvni_group) "
-                "/ physnet %(physnet)",
+                "network %(net_id)s has been added on ucvni_group %(ucvni_group), "
+                "physnet %(physnet)",
                 {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
             )
 
