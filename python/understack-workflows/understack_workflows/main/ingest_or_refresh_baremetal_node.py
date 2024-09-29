@@ -5,7 +5,7 @@ from understack_workflows.helpers import setup_logger
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.nautobot_event_parser import parse_event
-from understack_workflows import bmc
+from understack_workflows.bmc import bmc_for_ip_address
 import understack_workflows.ironic_node
 
 logger = setup_logger(__name__)
@@ -56,9 +56,9 @@ def main():
     logger.info(f"{__file__} starting for {device_id=} {device_hostname=}")
     logger.info(f"Parsed event: {bmc_type=} {bmc_ip_address=}")
 
-    bmc = bmc.from_ip_address(bmc_ip_address, bmc_type)
+    bmc = bmc_for_ip_address(bmc_ip_address, bmc_type)
 
-    set_bmc_password(bmc.ip_address, bmc.password, logger)
+    set_bmc_password(bmc.ip_address, bmc.password)
 
     update_dell_bios_settings(bmc, logger)
 
@@ -77,7 +77,7 @@ def main():
 def get_args() -> dict:
     if len(sys.argv) < 1:
         raise ValueError(
-            "Please provide node configuration in JSON format as first argument."
+            "Please provide event in JSON format as first argument"
         )
     return json.loads(sys.argv[1])
 

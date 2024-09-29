@@ -2,19 +2,30 @@ import requests
 import json
 from typing import List, Dict
 import urllib3
+from understack_workflows.helpers import setup_logger
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 FACTORY_PASSWORD = "calvin"
 FACTORY_USER = "root"
 
-def set_bmc_password(ip_address, required_password, logger, username="root"):
+logger = setup_logger(__name__)
+
+class HttpAuthorisationFailed(Exception):
+    """Specifically for 401 errors"""
+
+def set_bmc_password(ip_address, required_password, username="root"):
     """Access BMC via redfish and change password from factory default if needed
 
-    We try the standard password.
+    Check that we can log in using the standard password.
 
-    If that doesn't work we try the factory default password, if that succeeds
-    then we set the password to our standard one.
+    If that doesn't work, try the factory default password, if that succeeds
+    then we change the BMC password to our standard one.
+
+    Once the password has been changed then we check that it works by logging in
+    again.
+
+    Raises an Exception if the password is not confirmed working.
     """
     if _verify_auth(ip_address, username, required_password):
         logger.info("Production BMC credentials are working on this BMC.")
@@ -40,14 +51,22 @@ def set_bmc_password(ip_address, required_password, logger, username="root"):
 
 
 def _verify_auth(host: str, username: str = "root", password: str = "") -> bool:
-    """Test whether provided credentials work against a secured API endpoint"""
+    """Test whether provided credentials work against a secured API endpoint
+
+    Returns true on success, False on authorisation failure and raises an
+    Exception for  other kinds of errors (e.g. timeout, etc)
+    """
     try:
         r = _redfish_request(host, "/redfish/v1", username, password)
-        account_service_uri = r["AccountService"]["@odata.id"]
+        account_service_uri = r.get("AccountService", {}).get("@odata.id")
+        if account_service_uri is None:
+            raise Exception(
+                "Unrecognised redfish response, missing AccountService URI"
+            )
         _redfish_request(host, account_service_uri, username, password)
         return True
-    except Exception as e:
-        logger.warning(f"Exception: {e}")
+    except HttpAuthorisationFailed as e:
+        logger.warning(e)
         return False
 
 
@@ -77,35 +96,38 @@ def _get_bmc_accounts(host: str, username: str, password: str) -> List[Dict]:
 
 def _set_bmc_creds(host: str, username: str, password: str, required_username: str, required_password: str):
     """Find the account associated with the username in question"""
-    try:
-        accounts = _get_bmc_accounts(host, username, password)
+    accounts = _get_bmc_accounts(host, username, password)
 
-        matched_account = None
-        for account in accounts:
-            account_url = account["@odata.id"]
+    matched_account = None
+    for account in accounts:
+        account_url = account["@odata.id"]
 
-            a = _redfish_request(host, account_url, username, password)
-            if required_username == a["UserName"]:
-                logger.debug(f"found account: {a}")
-                matched_account = a
-                break
+        a = _redfish_request(host, account_url, username, password)
+        if required_username == a["UserName"]:
+            logger.debug(f"found account: {a}")
+            matched_account = a
+            break
 
-        if not matched_account:
-            raise Exception(f"Unable to find BMC account for {required_username}")
+    if not matched_account:
+        raise Exception(f"Unable to find BMC account for {required_username}")
 
-        account_uri = matched_account["@odata.id"]
+    account_uri = matched_account["@odata.id"]
 
-        payload = {"Password": required_password}
-        _redfish_request(host, account_uri, username, password, "PATCH", payload)
+    payload = {"Password": required_password}
+    _redfish_request(host, account_uri, username, password, "PATCH", payload)
 
 def _redfish_request(
     host: str, uri: str, username: str, password: str, method: str = "GET", payload: Dict | None = None
 ) -> dict:
+    url = f"https://{host}{uri}"
     try:
-        r = requests.request(
-            method, f"https://{host}{uri}", verify=False, auth=(username, password), timeout=15, json=payload
+        response = requests.request(
+            method, url, verify=False, auth=(username, password), timeout=15, json=payload
         )
-        r.raise_for_status()
-        return r.json()
+        if response.status_code == 401:
+            raise HttpAuthorisationFailed(f"Redfish HTTP 401 from {uri}")
+
+        response.raise_for_status()
+        return response.json()
     except Exception:
         raise
