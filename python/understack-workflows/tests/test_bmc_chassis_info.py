@@ -1,0 +1,68 @@
+import os
+import sys
+import pytest
+import pathlib
+import json
+
+from understack_workflows.main.sync_bmc_creds import get_args
+from understack_workflows import bmc_chassis_info
+
+FIXTURE_PATH = "json_samples/bmc_chassis_info"
+
+class FakeBmc():
+    def __init__(self, fixtures):
+        self.fixtures = fixtures
+        self.ip_address = "1.2.3.4"
+
+    def redfish_request(self, path: str) -> dict:
+        path = path.replace("/", "_") + ".json"
+        return self.fixtures[path]
+
+
+    
+def redfish_fixtures_by_platform() -> dict:
+    return {platform : read_fixtures(fixture_path.joinpath(platform))
+            for platform in sorted(os.listdir(fixture_path))}
+
+def read_fixtures(path) -> dict:
+    path = pathlib.Path(__file__).parent.joinpath(path)
+    return {filename: read_fixture(path, filename)
+                for filename in sorted(os.listdir(path))
+                    if filename.endswith("json")}
+
+def read_fixture(path, filename):
+    with path.joinpath(filename).open("r") as f:
+        return json.loads(f.read())
+
+def test_chassis_info_R7615():
+    bmc = FakeBmc(read_fixtures("json_samples/bmc_chassis_info/R7615"))
+    assert bmc_chassis_info.chassis_info(bmc) == bmc_chassis_info.ChassisInfo(
+        manufacturer='Dell Inc.',
+        model_number='PowerEdge R7615',
+        serial_number='33GSW04',
+        bios_version="1.6.10",
+        bmc_ip_address='1.2.3.4',
+        interfaces=[
+            bmc_chassis_info.InterfaceInfo(
+                name= 'iDRAC',
+                description= 'Dedicated iDRAC interface',
+                mac_address= 'A8:3C:A5:35:43:86',
+                remote_switch_mac_address= 'C4:4D:84:48:61:80',
+                remote_switch_port_name= 'GigabitEthernet1/0/3',
+            ),
+            bmc_chassis_info.InterfaceInfo(
+                description= 'NIC in Slot 1 Port 1',
+                mac_address= '14:23:F3:F5:25:F0',
+                name= 'NIC.Slot.1-1',
+                remote_switch_mac_address= 'C4:7E:E0:E4:32:DF',
+                remote_switch_port_name= 'Ethernet1/6',
+            ),
+            bmc_chassis_info.InterfaceInfo(
+                description= 'NIC in Slot 1 Port 2',
+                mac_address= '14:23:F3:F5:25:F1',
+                name= 'NIC.Slot.1-2',
+                remote_switch_mac_address= 'C4:7E:E0:E4:10:7F',
+                remote_switch_port_name= 'Ethernet1/6',
+            ),
+        ]
+    )

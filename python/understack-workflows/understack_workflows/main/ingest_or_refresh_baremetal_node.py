@@ -4,9 +4,10 @@ import sys
 from understack_workflows.helpers import setup_logger
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_bios import update_dell_bios_settings
-from understack_workflows.nautobot_event_parser import parse_event
 from understack_workflows.bmc import bmc_for_ip_address
 import understack_workflows.ironic_node
+from understack_workflows import bmc_chassis_info
+from understack_workflows import nautobot_device
 
 logger = setup_logger(__name__)
 
@@ -24,25 +25,27 @@ def main():
     - TODO: set NTP Server IPs for DRAC (IP addresses different per region)
 
     -  Using BMC, configure our standard BIOS settings
-
        - set PXE boot device
        - set timezone to UTC
 
     -  from BMC, discover basic hardware info:
+       - manufacturer, model number, serial number
+       - list ethernet interfaces with:
+          - name like BMC or SLOT.NIC.1-1
+          - MAC address
+          - LLDP connections [{remote_mac, remote_interface_name}]
 
-       - serial number, etc
-       - enumerate ethernet interfaces with MACs
-       - what else did prashant just do?
-       - can we get LLDP connections?
+    - Find or create this server in Nautobot
+        - locate server by serial number.
+        - set manufacturer, model number, serial number
+        - Find or create BMC interface with IP address
 
-    -  Find or create this server in Nautobot
-
-       locate server by serial number.  Ensure correct:
-       - interfaces, including BMC
-       - interface mac addresses
-       - BMC interface IP addresses
-       - device type?  What else?
-       - if we have LLDP info, connect up switchports.  Error if switches don't exist
+    - For each server interface
+        - find or create server interface by name in nautobot
+        - set interface mac addresses
+        - look up remote mac in nautobot
+        - add interface to switch if missing
+        - make cable
 
     -  Find or create this baremetal node in Ironic
        - create ports with MACs
@@ -51,33 +54,39 @@ def main():
 
     """
 
-    device_id, device_hostname, bmc_ip_address, bmc_type = parse_event(get_args())
+    bmc_ip_address, bmc_mac = get_args()
+    logger.info(f"{__file__} starting for {bmc_ip_address=}")
 
-    logger.info(f"{__file__} starting for {device_id=} {device_hostname=}")
-    logger.info(f"Parsed event: {bmc_type=} {bmc_ip_address=}")
+    url = "https://nautobot.dev.undercloud.rackspace.net/"
+    token = credential("nb-token", "token")
+    nautobot = pynautobot.api(url, token=token)
 
     bmc = bmc_for_ip_address(bmc_ip_address, bmc_type)
-
     set_bmc_password(bmc.ip_address, bmc.password)
-
     update_dell_bios_settings(bmc, logger)
 
-    device_info = redfish_device_discovery.device_info(bmc)
+    device_info = chassis_info(bmc)
+    device_uuid = nautobot_device.find_or_create(device_info, nautobot)
 
-    # well, it already exists in nautobot
-    # create_in_nautobot()
+    # update server BMC IP address
 
-    _ironic_provision_state = ironic_node.create_or_update(device_id, bmc, logger)
+    # get nautobot interfaces with connections for this server (graphql)
+    #
+    # compare with discovered connections (have nautobot get switch macs for
+    # easier comparison)
+    #
+    # update interfaces+connections as required.  What to do about interfaces or
+    # cables that disappeared?  Cables that disapperared that were in a
+    # different rack?
 
-    sync_interfaces.from_nautobot_to_ironic(device_id)
-
+    #_ironic_provision_state = ironic_node.create_or_update(device_uuid, bmc, logger)
+    #sync_interfaces.from_nautobot_to_ironic(device_id)
 
     logger.info(f"{__file__} complete successfully for {bmc.ip_address}")
 
-def get_args() -> dict:
+def get_args() -> str:
     if len(sys.argv) < 1:
         raise ValueError(
-            "Please provide event in JSON format as first argument"
+            "Please provide BMC IP Address as first argument"
         )
-    return json.loads(sys.argv[1])
-
+    return sys.argv[1], sys.argv[2]
