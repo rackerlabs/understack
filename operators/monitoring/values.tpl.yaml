@@ -36,4 +36,4 @@ grafana:
         secretName: grafana-ingress-tls
     annotations:
       nginx.ingress.kubernetes.io/rewrite-target: /
-      cert-manager.io/cluster-issuer: ${DEPLOY_NAME}-cluster-issuer
+      cert-manager.io/cluster-issuer: understack-cluster-issuer
