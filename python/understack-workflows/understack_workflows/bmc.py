@@ -2,6 +2,7 @@ import requests
 from dataclasses import dataclass
 from understack_workflows.helpers import credential
 from understack_workflows.bmc_password_standard import standard_password
+from sushy import Sushy
 
 @dataclass
 class Bmc:
@@ -31,6 +32,9 @@ class Bmc:
         )
         r.raise_for_status()
         return r.json()
+
+    def sushy(self):
+        return Sushy(self.url(), username=self.username, password=self.password, verify=False)
 
 def bmc_for_ip_address(ip_address: str, bmc_type: str, username: str = "root") -> Bmc:
     bmc_master_key = credential("bmc_master", "key")
