@@ -11,6 +11,9 @@ class Bmc:
     username: str
     password: str
 
+    def __str__(self):
+        return f"BMC {self.url()}"
+
     def url(self):
         return f"https://{self.ip_address}"
 
@@ -30,13 +33,25 @@ class Bmc:
             timeout=timeout,
             json=payload
         )
-        r.raise_for_status()
-        return r.json()
+        if r.status_code >= 400:
+            raise Exception(
+                f"BMC communications failure HTTP {r.status_code} "
+                f"{r.reason} from {url} - {r.text}"
+            )
+        if r.text:
+            return r.json()
 
     def sushy(self):
         return Sushy(self.url(), username=self.username, password=self.password, verify=False)
 
-def bmc_for_ip_address(ip_address: str, bmc_type: str, username: str = "root") -> Bmc:
-    bmc_master_key = credential("bmc_master", "key")
-    password = standard_password(ip_address, bmc_master_key)
+def bmc_for_ip_address(
+        ip_address: str,
+        bmc_type: str = None,
+        username: str = "root",
+        password: str|None = None) -> Bmc:
+
+    if password is None:
+        bmc_master_key = credential("bmc_master", "key")
+        password = standard_password(ip_address, bmc_master_key)
+
     return Bmc(bmc_type=bmc_type, ip_address=ip_address, password=password, username=username)

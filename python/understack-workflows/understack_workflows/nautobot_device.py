@@ -12,32 +12,34 @@ logger = setup_logger(__name__)
 DEVICE_INITIAL_STATUS = "Staged"
 DEVICE_ROLE="server"
 
-@dataclass
-class Switch():
-    name: str
-    data_centre_id: str
-    data_centre_name: str
-    rack_id: str
-    rack_name: str
-
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
     """Update exsiting or create new device using the Nautobot API"""
-    device = device_by_serial_number(nautobot, chassis_info.serial_number)
-    if device is not None:
-        raise Exception(f"Server already exists {chassis_info.serial_number=}")
+    device = nautobot.dcim.devices.get(serial=chassis_info.serial_number)
+    if device:
+        raise Exception(
+            f"Updating existing Device not yet implemeted"
+            f"Device {device.id} in Nautobot"
+        )
+    else:
+        logger.info(
+            f"Device {chassis_info.serial_number} not in Nautobot, creating"
+        )
 
     switches = switches_for(nautobot, chassis_info)
-    data_centre_name, rack_name = location_from(switches.values())
+    location_id, rack_id = location_from(switches.values())
 
-    payload = server_device_payload(data_centre_name, rack_name, chassis_info)
+    payload = server_device_payload(location_id, rack_id, chassis_info)
 
     logger.info(f"Server device: {payload}")
     new_device = nautobot.dcim.devices.create(**payload)
+
+    find_or_create_interfaces(nautobot, new_device.id, chassis_info, switches)
+
     return dict(new_device)
 
 
 def location_from(switches):
-    locations = {(switch.data_centre_name, switch.rack_name) for switch in switches}
+    locations = {(switch["location"]["id"], switch["rack"]["id"]) for switch in switches}
     if not locations:
         raise Exception(f"Can't find locations for {switches}")
     if len(locations) > 1:
@@ -51,7 +53,7 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
     return {mac: nautobot_switch(nautobot, mac) for mac in switch_macs}
 
 
-def server_device_payload(data_centre_name, rack_name, chassis_info):
+def server_device_payload(location_id, rack_id, chassis_info):
     manufacturer = _parse_manufacturer(chassis_info.manufacturer)
     name = f"{manufacturer}-{chassis_info.serial_number}"
 
@@ -64,20 +66,17 @@ def server_device_payload(data_centre_name, rack_name, chassis_info):
         },
         "name": name,
         "serial": chassis_info.serial_number,
-        "rack": { "name": rack_name },
-        "location": {
-            "name": data_centre_name,
-            "location_type": { "name": "Site" },
-        },
+        "rack": rack_id,
+        "location": location_id,
     }
 
 
 def device_by_serial_number(nautobot, serial_number: str) -> dict:
     device = nautobot.dcim.devices.get(serial=serial_number)
     if device:
-        logger.info("Updating existing Device with {serial_number} in Nautobot")
+        logger.info(f"Updating existing Device with {serial_number} in Nautobot")
     else:
-        logger.info("Device with {serial_number} not in Nautobot, creating")
+        logger.info(f"Device with {serial_number} not in Nautobot, creating")
 
     return device
 
@@ -100,7 +99,8 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
     """
     query = """{
         devices(asset_tag: "%s"){
-            name location { id name }
+            name
+            location { id name }
             rack { id name }
         }
     }""" % mac_address
@@ -111,14 +111,48 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
     devices = result.json["data"]["devices"]
 
     if not devices:
-        raise Exception(f"No device found in nautobot with asset_tag {mac_address}")
+        raise Exception(
+            f"Looking for a switch in nautobot that matches the LLDP "
+            f"info reported by server BMC - "
+            f"No device found in nautobot with asset_tag {mac_address}"
+        )
     if len(devices) > 1:
-        raise Exception(f"Multiple devices found with asset_tag {mac_address}")
+        raise Exception(
+            f"Looking for a switch in nautobot that matches the LLDP "
+            f"info reported by server BMC - "
+            f"Multiple devices found with asset_tag {mac_address}"
+        )
 
-    return Switch(
-        name=devices[0]["name"],
-        data_centre_id=devices[0]["location"]["id"],
-        data_centre_name=devices[0]["location"]["name"],
-        rack_id=devices[0]["rack"]["id"],
-        rack_name=devices[0]["rack"]["name"],
-    )
+    return devices[0]
+
+
+def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
+    """Update Nautobot Device Interfaces using the Nautobot API"""
+    for interface in chassis_info.interfaces:
+        server_nautobot_interface = nautobot.dcim.interfaces.create(
+            device=device_id,
+            name=interface.name,
+            type="25gbase-x-sfp28",
+            status="Active",
+            description=interface.description,
+        )
+
+        connected_switch = switches[interface.remote_switch_mac_address]
+        switch_port_name = interface.remote_switch_port_name
+
+        switch_interface = nautobot.dcim.interfaces.get(
+            device=connected_switch.id,
+            name=switch_port_name,
+        )
+        if switch_interface is None:
+            raise Exception(
+                f"{connected_switch.name} has no interface called {switch_port_name}"
+            )
+
+        nautobot.dcim.cables.create(
+            status="Active",
+            termination_a_type="dcim.interface",
+            termination_b_type="dcim.interface",
+            termination_a=connected_interface,
+            termination_z=server_nautobot_interface,
+        )
