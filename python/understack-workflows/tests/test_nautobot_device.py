@@ -26,7 +26,7 @@ class FakeNautobot():
 
     class RestApiEndpoint():
         def create(self, **kw):
-            return {"device": kw}
+            return "new device here"
 
         def get(self, **kw):
             match kw:
@@ -50,7 +50,7 @@ class FakeNautobot():
                                 "name": "IAD3",
                             },
                             "rack": {
-                                "id": "38942077-19b3-406b-910e-71752105c120",
+                                "id": "3dd3c0f6-c6cd-42ff-8e34-763d0795ea16",
                                 "name": "F20-3",
                             }
                         }
@@ -68,7 +68,7 @@ def test_find_or_create():
         bmc_ip_address='1.2.3.4',
         interfaces=[
             InterfaceInfo(
-                name= 'BMC',
+                name= 'iDRAC',
                 description= 'Dedicated iDRAC interface',
                 mac_address= 'A8:3C:A5:35:43:86',
                 remote_switch_mac_address= 'C4:4D:84:48:61:80',
@@ -91,4 +91,4 @@ def test_find_or_create():
         ]
     )
 
-    assert nautobot_device.find_or_create(chassis_info, nautobot) == []
+    assert nautobot_device.find_or_create(chassis_info, nautobot) == "new device here"

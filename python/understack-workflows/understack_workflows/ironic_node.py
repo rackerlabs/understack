@@ -1,6 +1,7 @@
 import ironicclient.common.apiclient.exceptions
 from ironicclient.common.utils import args_array_to_patch
 
+from understack_workflows.bmc import Bmc
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.node_configuration import IronicNodeConfiguration
 
