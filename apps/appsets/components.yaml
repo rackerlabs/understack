@@ -188,6 +188,15 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'components/chrony'
+                - component: openstack-exporter
+                  componentNamespace: monitoring
+                  skipComponent: '{{has "openstack-exporter" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: registry.scs.community/openstack-exporter
+                      chart: prometheus-openstack-exporter
+                      targetRevision: 0.4.5
+                      helm:
+                        releaseName: prometheus-openstack-exporter
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
