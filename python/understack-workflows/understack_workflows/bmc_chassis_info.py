@@ -111,11 +111,11 @@ def lldp_data_by_name(bmc) -> dict:
 
     {
         "iDRAC": {
-            "remote_switch_mac_address" : "c4:4d:84:48:61:80",
+            "remote_switch_mac_address" : "C4:4D:84:48:61:80",
             "remote_switch_port_name" : "GigabitEthernet1/0/3",
         },
         'NIC.Slot.1-1': {
-            "remote_switch_mac_address": "c4:7e:e0:e4:32:df",
+            "remote_switch_mac_address": "C4:7E:E0:E4:32:DF",
             "remote_switch_port_name": "Ethernet1/6",
         },
     }

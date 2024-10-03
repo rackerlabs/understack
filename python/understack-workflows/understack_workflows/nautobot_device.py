@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
 from understack_workflows.bmc_chassis_info import ChassisInfo
+from understack_workflows.bmc_chassis_info import InterfaceInfo
 from understack_workflows.nautobot import Nautobot
 
 logger = setup_logger(__name__)
@@ -16,6 +17,8 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
     """Update exsiting or create new device using the Nautobot API"""
     device = nautobot.dcim.devices.get(serial=chassis_info.serial_number)
     if device:
+        # TODO: a graphql query here could fetch the device with all existing
+        # interfaces, cable and connected switches:
         raise Exception(
             f"Updating existing Device not yet implemeted"
             f"Device {device.id} in Nautobot"
@@ -27,13 +30,15 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
 
     switches = switches_for(nautobot, chassis_info)
     location_id, rack_id = location_from(switches.values())
+    for mac, switch in switches.items():
+        logger.info(f"Server {chassis_info.serial_number} -> {mac} -> {switch['name']}")
 
     payload = server_device_payload(location_id, rack_id, chassis_info)
 
     logger.info(f"Server device: {payload}")
     new_device = nautobot.dcim.devices.create(**payload)
 
-    find_or_create_interfaces(nautobot, new_device.id, chassis_info, switches)
+    find_or_create_interfaces(nautobot, chassis_info, new_device.id, switches)
 
     return dict(new_device)
 
@@ -99,7 +104,7 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
     """
     query = """{
         devices(asset_tag: "%s"){
-            name
+            id name
             location { id name }
             rack { id name }
         }
@@ -128,31 +133,55 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
 
 def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
     """Update Nautobot Device Interfaces using the Nautobot API"""
+
     for interface in chassis_info.interfaces:
+        find_or_create_interface(nautobot, interface, device_id, switches)
+
+def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str, switches):
+    if interface.name == "iDRAC":
+        server_nautobot_interface = nautobot.dcim.interfaces.get(
+            device=device_id,
+            name=interface.name,
+        )
+        logger.info(
+            f"Using existing interface {interface.name} "
+            f"{server_nautobot_interface.id} in Nautobot"
+        )
+    else:
         server_nautobot_interface = nautobot.dcim.interfaces.create(
             device=device_id,
             name=interface.name,
             type="25gbase-x-sfp28",
             status="Active",
             description=interface.description,
+            mac_address=interface.mac_address,
+        )
+        logger.info(
+            f"Created interface {interface.name} "
+            f"{server_nautobot_interface.id} in Nautobot"
         )
 
-        connected_switch = switches[interface.remote_switch_mac_address]
-        switch_port_name = interface.remote_switch_port_name
+    connected_switch = switches[interface.remote_switch_mac_address]
+    switch_port_name = interface.remote_switch_port_name
 
-        switch_interface = nautobot.dcim.interfaces.get(
-            device=connected_switch.id,
-            name=switch_port_name,
+    switch_interface = nautobot.dcim.interfaces.get(
+        device=connected_switch["id"],
+        name=switch_port_name,
+    )
+    if switch_interface is None:
+        raise Exception(
+            f"{connected_switch['name']} has no interface called {switch_port_name}"
         )
-        if switch_interface is None:
-            raise Exception(
-                f"{connected_switch.name} has no interface called {switch_port_name}"
-            )
+    else:
+        logger.info(
+            f"Interface {interface.name} connected to "
+            f"{connected_switch['name']} {switch_port_name}"
+        )
 
-        nautobot.dcim.cables.create(
-            status="Active",
-            termination_a_type="dcim.interface",
-            termination_b_type="dcim.interface",
-            termination_a=connected_interface,
-            termination_z=server_nautobot_interface,
-        )
+    nautobot.dcim.cables.create(
+        status="Connected",
+        termination_a_type="dcim.interface",
+        termination_b_type="dcim.interface",
+        termination_a_id=switch_interface.id,
+        termination_b_id=server_nautobot_interface.id,
+    )
