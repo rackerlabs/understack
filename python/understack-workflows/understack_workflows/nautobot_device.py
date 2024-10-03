@@ -135,7 +135,8 @@ def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, sw
     """Update Nautobot Device Interfaces using the Nautobot API"""
 
     for interface in chassis_info.interfaces:
-        find_or_create_interface(nautobot, interface, device_id, switches)
+        if interface.remote_switch_mac_address:
+            find_or_create_interface(nautobot, interface, device_id, switches)
 
 def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str, switches):
     if interface.name == "iDRAC":
