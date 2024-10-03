@@ -82,11 +82,13 @@ def main():
         logger.info("Setting BMC password to bmc.password")
         set_bmc_password(bmc.ip_address, bmc.password)
 
-    #update_dell_bios_settings(bmc)
+    # TODO: make this pseudo-idempotent by ignoring the error when a job is already scheduled:
+    # update_dell_bios_settings(bmc)
 
     device_info = chassis_info(bmc)
+
+    logger.info(f"Discovered {device_info}")
     device_id = nautobot_device.find_or_create(device_info, nautobot)
-    nautobot_interfaces.find_or_create(device_info, nautobot, device_id)
 
     # update server BMC IP address
 
