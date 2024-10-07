@@ -47,34 +47,26 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
     #
     # Assert device rack/location matches switch rack/location
 
-    device = nautobot.dcim.devices.get(serial=chassis_info.serial_number)
-    if device:
-        raise Exception(
-            f"Updating existing Device not yet implemeted"
-            f"Device {device.id} in Nautobot"
-        )
-    else:
+    device = nautobot_server(nautobot, serial=chassis_info.serial_number)
+    if not device:
         logger.info(
             f"Device {chassis_info.serial_number} not in Nautobot, creating"
         )
 
         switches = switches_for(nautobot, chassis_info)
         location_id, rack_id = location_from(switches.values())
-        for mac, switch in switches.items():
-            logger.info(f"Server {chassis_info.serial_number} -> {mac} -> {switch['name']}")
-
         payload = server_device_payload(location_id, rack_id, chassis_info)
-
         logger.info(f"Server device: {payload}")
-        new_device = nautobot.dcim.devices.create(**payload)
-        # TODO in the case device does not exist, create it then re-run the
-        # graphql query.   This fetches any auto-created defaults from nautobot
-        # (e.g. obm interface) and also gives us the data in the same format no
-        # matter which code path is taken.
+        nautobot.dcim.devices.create(**payload)
+        # Re-run the graphql query to fetch any auto-created defaults from
+        # nautobot (e.g. it automatically creates a BMC interface):
+        device = nautobot_server(nautobot, serial=chassis_info.serial_number)
+    else:
+        switches = switches_for(nautobot, chassis_info)
 
-    find_or_create_interfaces(nautobot, chassis_info, new_device.id, switches)
+    find_or_create_interfaces(nautobot, chassis_info, device['id'], switches)
 
-    return new_device
+    return device
 
 
 def location_from(switches):
@@ -172,6 +164,9 @@ def nautobot_server(nautobot, serial: str) -> dict:
                         id name
                         location {id name }
                         rack { id name }
+                        rel_vlan_group_to_devices {
+                            rel_vlan_group_to_devices { id name }
+                        }
                     }
                 }
                 ip_addresses {
