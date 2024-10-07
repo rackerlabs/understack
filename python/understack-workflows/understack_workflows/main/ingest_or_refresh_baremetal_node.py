@@ -21,6 +21,20 @@ def main():
 
     We have been invoked because a baremetal node is available.
 
+    Pre-requisites in Nautobot:
+
+    All connected switches must have a device with the base MAC address stored
+    in the asset tag field.
+
+    The Rack and Location of the switches must be correct as they will be copied
+    to the newly created server Device.
+
+    The server Device type must exist, with a name that matches the "model" as
+    reported by the BMC.
+
+    The DRAC IP Prefix must exist.
+
+
     - connect to the BMC, trying standard password then factory default
 
     - ensure standard BMC password is set
@@ -49,18 +63,18 @@ def main():
 
     - Find BMC interface
 
-    - Create DRAC network prefix
+    - TODO Find or create DRAC network prefix
 
-    - create BMC IP address assignment for BMC interface
+    - TODO create BMC IP address assignment for BMC interface
 
     - For each server interface
         - find or create server interface by name in nautobot
         - set interface mac addresses
-        - look up switch by mac address which is stored in asset tag field in nautobot
+        - look up switch by mac addr (is stored in Nautobot's asset tag field)
         - look up switch interface by name
         - find or create cable
 
-    -  Find or create this baremetal node in Ironic
+    -  TODO Find or create this baremetal node in Ironic
        - create ports with MACs
        - advance to available state
        - set flavor?  what else?
@@ -89,17 +103,6 @@ def main():
 
     logger.info(f"Discovered {device_info}")
     device_id = nautobot_device.find_or_create(device_info, nautobot)
-
-    # update server BMC IP address
-
-    # get nautobot interfaces with connections for this server (graphql)
-    #
-    # compare with discovered connections (have nautobot get switch macs for
-    # easier comparison)
-    #
-    # update interfaces+connections as required.  What to do about interfaces or
-    # cables that disappeared?  Cables that disapperared that were in a
-    # different rack?
 
     #_ironic_provision_state = ironic_node.create_or_update(device_uuid, bmc, logger)
     #sync_interfaces.from_nautobot_to_ironic(device_id)
