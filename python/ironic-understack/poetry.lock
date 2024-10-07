@@ -777,13 +777,13 @@ files = [
 
 [[package]]
 name = "ironic"
-version = "24.1.2"
+version = "24.1.3"
 description = "OpenStack Bare Metal Provisioning"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "ironic-24.1.2-py3-none-any.whl", hash = "sha256:5de48dd05ecf2353eb2e367be6b4a843ac662641b26ed7f1c337513575059354"},
-    {file = "ironic-24.1.2.tar.gz", hash = "sha256:cd3182df1f789d79b5f05457d781c2cf4169483f97cea66dad168d5b03ed7b78"},
+    {file = "ironic-24.1.3-py3-none-any.whl", hash = "sha256:749e3761130a2fb6fc69a3698ee5aa5e0fe5279bdda820941580da4c9750ffbb"},
+    {file = "ironic-24.1.3.tar.gz", hash = "sha256:32c8aefcb512b2b267162cdf9d840627651783c343a9a199194622a4b74c62b6"},
 ]
 
 [package.dependencies]
