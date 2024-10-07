@@ -1,7 +1,7 @@
 import re
 from uuid import UUID
 from dataclasses import dataclass
-import ipaddress
+from ipaddress import IPv4Interface
 import pynautobot
 
 from understack_workflows.helpers import credential
@@ -188,7 +188,9 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str,
             f"{server_nautobot_interface.id} in Nautobot"
         )
 
-    set_interface_ip_address(nautobot, server_nautobot_interface, interface)
+    if interface.ipv4_address:
+        set_interface_ip_address(
+            nautobot, server_nautobot_interface, interface.ipv4_address)
 
     connected_switch = switches[interface.remote_switch_mac_address]
     switch_port_name = interface.remote_switch_port_name
@@ -215,19 +217,17 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str,
         termination_b_id=server_nautobot_interface.id,
     )
 
-def set_interface_ip_address(nautobot, nautobot_interface, interface: InterfaceInfo):
-    if not interface.ipv4_address:  return
-
+def set_interface_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface):
     try:
         ip = nautobot.ipam.ip_addresses.create(
-            address=str(interface.ipv4_address.ip),
+            address=str(ipv4_address.ip),
             status="Active",
             parent={
                 "type": "network",
-                "prefix": str(interface.ipv4_address.network),
+                "prefix": str(ipv4_address.network),
             },
         )
-        logger.info(f"Created Nautobot IP {ip.id} for {interface.ipv4_address}")
+        logger.info(f"Created Nautobot IP {ip.id} for {ipv4_address}")
         nautobot.ipam.ip_address_to_interface.create(
             is_primary=True,
             ip_address=ip.id,
@@ -236,5 +236,5 @@ def set_interface_ip_address(nautobot, nautobot_interface, interface: InterfaceI
         logger.info(f"Associated IP address {ip.id} with {interface.name}")
     except pynautobot.core.query.RequestError as e:
         raise Exception(
-            f"Failed to assign {interface.ipv4_address=} in Nautobot: {e}"
+            f"Failed to assign {ipv4_address=} in Nautobot: {e}"
         )
