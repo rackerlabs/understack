@@ -156,6 +156,46 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
     return devices[0]
 
 
+def nautobot_server(nautobot, serial: str) -> dict:
+    query = """{
+        devices(serial: ["%s"]){
+            id name
+            location { id name }
+            rack { id name }
+            interfaces {
+                id name
+                type description mac_address
+                status { name }
+                connected_interface {
+                    id name
+                    device {
+                        id name
+                        location {id name }
+                        rack { id name }
+                    }
+                }
+                ip_addresses {
+                    id host
+                    parent { prefix }
+                }
+            }
+        }""" % serial
+
+    result = nautobot.graphql.query(query)
+    if not result.json or result.json.get("errors"):
+        raise Exception(f"Nautobot server graphql query failed: {result}")
+
+    devices = result.json["data"]["devices"]
+
+    if not devices:
+        return None
+
+    if len(devices) > 1:
+        raise Exception(f"Multiple nautobot devices found with serial {serial}")
+
+    return devices[0]
+
+
 def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
     """Update Nautobot Device Interfaces using the Nautobot API"""
 
