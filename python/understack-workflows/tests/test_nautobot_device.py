@@ -10,6 +10,12 @@ class FakeNautobot():
         self.graphql = FakeNautobot.Graphql()
         self.dcim = FakeNautobot.Dcim()
 
+    class ApiRecord():
+        def __init__(self):
+            self.id = "qwerty-1234-qwerty-1234"
+        def update(self, *_):
+            pass
+
     class Graphql():
         def query(self, graphql):
             if "61:80" in graphql:
@@ -23,17 +29,21 @@ class FakeNautobot():
     class Dcim():
         def __init__(self):
             self.devices = FakeNautobot.RestApiEndpoint()
+            self.interfaces = FakeNautobot.RestApiEndpoint()
+            self.cables = FakeNautobot.RestApiEndpoint()
 
     class RestApiEndpoint():
         def create(self, **kw):
-            return "new device here"
+            return FakeNautobot.ApiRecord()
 
         def get(self, **kw):
             match kw:
                 case {'serial': '33GSW04'}:
                     return None
+                case {'device': 'qwerty-1234-qwerty-1234', 'name': 'iDRAC'}:
+                    return None
                 case _:
-                    raise Exception(f"implement me {kw}")
+                    return FakeNautobot.ApiRecord()
 
     class GraphqlResponse():
         def __init__(self, name):
@@ -41,6 +51,7 @@ class FakeNautobot():
                 "data": {
                     "devices": [
                         {
+                            "id": "leafsw-1234-3456-1234",
                             "name": f"{name}.iad3.rackspace.net",
                             "role": {
                                 "name": "Tenant leaf"
@@ -91,4 +102,5 @@ def test_find_or_create():
         ]
     )
 
-    assert nautobot_device.find_or_create(chassis_info, nautobot) == "new device here"
+    device = nautobot_device.find_or_create(chassis_info, nautobot)
+    assert device.id == "qwerty-1234-qwerty-1234"

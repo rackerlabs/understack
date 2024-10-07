@@ -3,6 +3,7 @@ import sys
 import pytest
 import pathlib
 import json
+from ipaddress import IPv4Interface
 
 from understack_workflows.main.sync_bmc_creds import get_args
 from understack_workflows import bmc_chassis_info
@@ -47,13 +48,31 @@ def test_chassis_info_R7615():
                 name= 'iDRAC',
                 description= 'Dedicated iDRAC interface',
                 mac_address= 'A8:3C:A5:35:43:86',
+                ipv4_address=IPv4Interface('10.46.96.156/26'),
                 remote_switch_mac_address= 'C4:4D:84:48:61:80',
                 remote_switch_port_name= 'GigabitEthernet1/0/3',
+            ),
+            bmc_chassis_info.InterfaceInfo(
+                name='NIC.Integrated.1-1',
+                description='Integrated NIC 1 Port 1',
+                mac_address='D4:04:E6:4F:8D:B4',
+                ipv4_address=None,
+                remote_switch_mac_address='C4:7E:E0:E4:10:7F',
+                remote_switch_port_name='Ethernet1/5',
+            ),
+            bmc_chassis_info.InterfaceInfo(
+                name='NIC.Integrated.1-2',
+                description='Integrated NIC 1 Port 2',
+                mac_address='D4:04:E6:4F:8D:B5',
+                ipv4_address=None,
+                remote_switch_mac_address='C4:7E:E0:E4:32:DF',
+                remote_switch_port_name='Ethernet1/5',
             ),
             bmc_chassis_info.InterfaceInfo(
                 description= 'NIC in Slot 1 Port 1',
                 mac_address= '14:23:F3:F5:25:F0',
                 name= 'NIC.Slot.1-1',
+                ipv4_address=None,
                 remote_switch_mac_address= 'C4:7E:E0:E4:32:DF',
                 remote_switch_port_name= 'Ethernet1/6',
             ),
@@ -61,6 +80,7 @@ def test_chassis_info_R7615():
                 description= 'NIC in Slot 1 Port 2',
                 mac_address= '14:23:F3:F5:25:F1',
                 name= 'NIC.Slot.1-2',
+                ipv4_address=None,
                 remote_switch_mac_address= 'C4:7E:E0:E4:10:7F',
                 remote_switch_port_name= 'Ethernet1/6',
             ),

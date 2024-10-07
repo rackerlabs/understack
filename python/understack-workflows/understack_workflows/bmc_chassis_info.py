@@ -1,6 +1,7 @@
 import json
 import re
 import urllib3
+from ipaddress import IPv4Interface
 from typing import List, Dict
 from dataclasses import dataclass
 from understack_workflows.bmc_sushy import bmc_sushy_session
@@ -14,9 +15,9 @@ class InterfaceInfo:
     name: str
     description: str
     mac_address: str
+    ipv4_address: IPv4Interface|None = None
     remote_switch_mac_address: str|None = None
     remote_switch_port_name: str|None = None
-
 
 @dataclass(frozen=True)
 class ChassisInfo:
@@ -61,19 +62,32 @@ def combine_lldp(lldp, interface):
 
 
 def bmc_interface(bmc) -> dict:
-    """Retrieve DRAC BMC interface info via redfish API
-
-    Also available here are:
-        data['HostName'] => idrac hostname,
-        data['IPv4Addresses'] => ip and gateway info,
-    """
+    """Retrieve DRAC BMC interface info via redfish API"""
     url = "/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces/NIC.1"
     data = bmc.redfish_request(url)
     return {
         "name": "iDRAC",
         "description": "Dedicated iDRAC interface",
         "mac_address": data['MACAddress'].upper(),
+        "ipv4_address": parse_ipv4(data['IPv4Addresses']),
     }
+
+def parse_ipv4(data: list[dict]) -> IPv4Interface|None:
+    """ Parse the iDRAC's representation of network interface configuration
+    "IPv4Addresses": [
+        {
+        "Address": "10.46.96.156",
+        "AddressOrigin": "Static",
+        "Gateway": "10.46.96.129",
+        "SubnetMask": "255.255.255.192"
+        }
+    ]
+    Only the first address is returned
+    """
+    if data:
+        address = data[0]['Address']
+        netmask = data[0]['SubnetMask']
+        return IPv4Interface(f"{address}/{netmask}")
 
 def in_band_interfaces(bmc: Bmc) -> List[dict]:
     """A Collection of Ethernet Interfaces for this System"""
@@ -81,7 +95,8 @@ def in_band_interfaces(bmc: Bmc) -> List[dict]:
     index_data = bmc.redfish_request(url)
     urls = [member['@odata.id'] for member in index_data['Members']]
 
-    return [interface_detail(bmc, url) for url in urls if interface_is_relevant(url)]
+    return [interface_detail(bmc, url) for url in urls
+                if interface_is_relevant(url)]
 
 
 def interface_detail(bmc, path) -> dict:

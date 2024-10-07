@@ -1,6 +1,8 @@
 import re
 from uuid import UUID
 from dataclasses import dataclass
+import ipaddress
+import pynautobot
 
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
@@ -11,14 +13,42 @@ from understack_workflows.nautobot import Nautobot
 logger = setup_logger(__name__)
 
 DEVICE_INITIAL_STATUS = "Staged"
-DEVICE_ROLE="server"
+DEVICE_ROLE = "server"
+INTERFACE_TYPE = "25gbase-x-sfp28"
 
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
     """Update exsiting or create new device using the Nautobot API"""
+
+    # TODO: a graphql query here could fetch the device with all existing
+    # interfaces, macs, cable and connected switches.  We would want to change
+    # all the "create" operations below to a "find or create", update the
+    # attributes of existing objects as required, then delete any extra items
+    # from nautobot (perhaps only remove connections to switches in a diffrent
+    # rack?)  There is no point keepiong old stuff (need a proper way to manage
+    # cables in the DC) but we don't want to delete cables that temporarily
+    # went down.
+    #
+    #
+    # For each interface on the server:
+    # - find matching interface by name in nautobot
+    #  - set attrs if already exist
+    #  - create missing ones
+    #  - delete extra interfaces from nautobot
+    #
+    # - remove existing connection in nautobot that goes to wrong place
+    #
+    # - if int not already connected, find switch by MAC and create connection
+    #  - fail if swith port is occupied, in future, delete old device
+    #
+    # - could also check topology: has connection to both devices in vlan group
+    #
+    # - if exiting IP check it matches, FAIL otherwise
+    # - assign IP and associate with interface
+    #
+    # Assert device rack/location matches switch rack/location
+
     device = nautobot.dcim.devices.get(serial=chassis_info.serial_number)
     if device:
-        # TODO: a graphql query here could fetch the device with all existing
-        # interfaces, cable and connected switches:
         raise Exception(
             f"Updating existing Device not yet implemeted"
             f"Device {device.id} in Nautobot"
@@ -28,19 +58,23 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
             f"Device {chassis_info.serial_number} not in Nautobot, creating"
         )
 
-    switches = switches_for(nautobot, chassis_info)
-    location_id, rack_id = location_from(switches.values())
-    for mac, switch in switches.items():
-        logger.info(f"Server {chassis_info.serial_number} -> {mac} -> {switch['name']}")
+        switches = switches_for(nautobot, chassis_info)
+        location_id, rack_id = location_from(switches.values())
+        for mac, switch in switches.items():
+            logger.info(f"Server {chassis_info.serial_number} -> {mac} -> {switch['name']}")
 
-    payload = server_device_payload(location_id, rack_id, chassis_info)
+        payload = server_device_payload(location_id, rack_id, chassis_info)
 
-    logger.info(f"Server device: {payload}")
-    new_device = nautobot.dcim.devices.create(**payload)
+        logger.info(f"Server device: {payload}")
+        new_device = nautobot.dcim.devices.create(**payload)
+        # TODO in the case device does not exist, create it then re-run the
+        # graphql query.   This fetches any auto-created defaults from nautobot
+        # (e.g. obm interface) and also gives us the data in the same format no
+        # matter which code path is taken.
 
     find_or_create_interfaces(nautobot, chassis_info, new_device.id, switches)
 
-    return dict(new_device)
+    return new_device
 
 
 def location_from(switches):
@@ -76,20 +110,8 @@ def server_device_payload(location_id, rack_id, chassis_info):
     }
 
 
-def device_by_serial_number(nautobot, serial_number: str) -> dict:
-    device = nautobot.dcim.devices.get(serial=serial_number)
-    if device:
-        logger.info(f"Updating existing Device with {serial_number} in Nautobot")
-    else:
-        logger.info(f"Device with {serial_number} not in Nautobot, creating")
-
-    return device
-
-
 def _parse_manufacturer(name: str) -> str:
-    name = name.upper()
-    if "DELL" in name: return "Dell"
-    if "HP" in name: return "HPE"
+    if "DELL" in name.upper(): return "Dell"
     raise ValueError(f"Server manufacturer {name} not supported")
 
 
@@ -101,6 +123,9 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
     We store the MAC address in the "asset tag" field because there was nowhere
     else to put it.  Retrieving switches this way is really slow, could do with
     a better solution for storing mac addresses here.
+
+    TODO: can we pass an array of MAC addresses to this query and get all
+    the switches in one go?
     """
     query = """{
         devices(asset_tag: "%s"){
@@ -139,28 +164,31 @@ def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, sw
             find_or_create_interface(nautobot, interface, device_id, switches)
 
 def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str, switches):
-    if interface.name == "iDRAC":
-        server_nautobot_interface = nautobot.dcim.interfaces.get(
-            device=device_id,
-            name=interface.name,
-        )
+    id = {
+        "device": device_id,
+        "name": interface.name,
+    }
+    attrs = {
+        "type": INTERFACE_TYPE,
+        "status": "Active",
+        "description": interface.description,
+        "mac_address": interface.mac_address,
+    }
+    server_nautobot_interface = nautobot.dcim.interfaces.get(**id)
+    if server_nautobot_interface:
         logger.info(
-            f"Using existing interface {interface.name} "
+            f"Updating existing interface {interface.name} "
             f"{server_nautobot_interface.id} in Nautobot"
         )
+        server_nautobot_interface.update(attrs)
     else:
-        server_nautobot_interface = nautobot.dcim.interfaces.create(
-            device=device_id,
-            name=interface.name,
-            type="25gbase-x-sfp28",
-            status="Active",
-            description=interface.description,
-            mac_address=interface.mac_address,
-        )
+        server_nautobot_interface = nautobot.dcim.interfaces.create(**id, **attrs)
         logger.info(
             f"Created interface {interface.name} "
             f"{server_nautobot_interface.id} in Nautobot"
         )
+
+    set_interface_ip_address(nautobot, server_nautobot_interface, interface)
 
     connected_switch = switches[interface.remote_switch_mac_address]
     switch_port_name = interface.remote_switch_port_name
@@ -186,3 +214,27 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str,
         termination_a_id=switch_interface.id,
         termination_b_id=server_nautobot_interface.id,
     )
+
+def set_interface_ip_address(nautobot, nautobot_interface, interface: InterfaceInfo):
+    if not interface.ipv4_address:  return
+
+    try:
+        ip = nautobot.ipam.ip_addresses.create(
+            address=str(interface.ipv4_address.ip),
+            status="Active",
+            parent={
+                "type": "network",
+                "prefix": str(interface.ipv4_address.network),
+            },
+        )
+        logger.info(f"Created Nautobot IP {ip.id} for {interface.ipv4_address}")
+        nautobot.ipam.ip_address_to_interface.create(
+            is_primary=True,
+            ip_address=ip.id,
+            interface=nautobot_interface.id,
+        )
+        logger.info(f"Associated IP address {ip.id} with {interface.name}")
+    except pynautobot.core.query.RequestError as e:
+        raise Exception(
+            f"Failed to assign {interface.ipv4_address=} in Nautobot: {e}"
+        )
