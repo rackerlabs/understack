@@ -43,5 +43,6 @@ spec:
     passwordSecretKeyRef:
       key: password
       name: mariadb-metrics-password
+      generate: true
     serviceMonitor: {}
     username: mariadb-metrics
