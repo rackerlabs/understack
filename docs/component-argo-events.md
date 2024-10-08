@@ -1,7 +1,7 @@
 # Argo Events
 
 [Argo Events][argo-events] is a Kubernetes-native event-driven automation framework. We can use Argo Events to trigger
-autmoations processes from any of the internal Understack (and potentially external) components. Currently we leverage a
+automations processes from any of the internal Understack (and potentially external) components. Currently we leverage a
 few of the Argo Events components:
 
 ## EventSource
