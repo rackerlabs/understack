@@ -7,8 +7,7 @@ spec:
     # this provider needs to go away for a generated account
     # but it currently must be in sync with the keystone bootstrap
     # script
-    # this should be the 'service' domain in the future
-    user_domain: default
+    user_domain: infra
     username: argoworkflow
     password: demo
 ---

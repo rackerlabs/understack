@@ -10,17 +10,17 @@ bootstrap:
           --user="${OS_USERNAME}" \
           --domain="${OS_DEFAULT_DOMAIN}" \
           "admin"
-    # create 'argoworkflow' user
-    # credentials for ironic-nautobot-sync and other argo workflows
-    openstack project create undercloud --or-show
-    openstack user create --project undercloud --password demo argoworkflow --or-show
-    openstack role add --user argoworkflow --project undercloud member
-    openstack role add --user argoworkflow --project undercloud admin
-    # allow ironic user to see servers in undercloud project
-    openstack role add --project undercloud --user ironic --user-domain service  member
+    # create 'infra' domain
+    openstack domain create --or-show infra
+    # create 'baremetal' project for our ironic nodes to live in
+    openstack project create --or-show --domain infra baremetal
+    # create 'argoworkflow' user for automation
+    openstack user create --or-show --domain infra --password demo argoworkflow
+    # give 'argoworkflow' 'admin' over the 'baremetal' project
+    openstack role add --user-domain infra --project-domain infra --user argoworkflow --project baremetal admin
+
+    # this is too early because ironic won't exist
     openstack role add --project service --user ironic --user-domain service service
-    # add 'demo' user to have 'member' role, needed for horizon dashboard use
-    openstack role add --user demo --project undercloud member
 
     # OIDC integration
     RULES_FILE=$(mktemp)
@@ -82,14 +82,14 @@ bootstrap:
       openstack role add --group ${group} --domain default member
     done
     openstack role add --group ucadmin --domain default admin
-    openstack role add --group ucadmin --project undercloud admin
+    openstack role add --group ucadmin --domain infra admin
 
     # TODO: only create this actually requested
     # create 'demo' user with sufficient permissions
     openstack user create --or-show --password demo --email 'demo@example.com' demo
     openstack user set --email 'demo@example.com' demo
-    # add 'demo' user to 'ucadmin' group
-    openstack group add user ucadmin demo
+    # add 'demo' user to 'ucuser' group
+    openstack group add user ucuser demo
 
 network:
   # configure OpenStack Helm to use Undercloud's ingress
