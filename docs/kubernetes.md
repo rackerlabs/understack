@@ -46,7 +46,7 @@ upstream Helm charts.
 ### Kubeseal
 
 [Sealed Secrets](https://github.com/bitnami-labs/sealed-secrets) and the `kubeseal` cli tool make it possible to
-store sescrets in a public repository.
+store secrets in a public repository.
 
 <!-- markdownlint-capture -->
 <!-- markdownlint-disable MD046 -->
