@@ -1,6 +1,6 @@
 # Vision
 
-Understack aims to provide an opinoniated installation of OpenStack Ironic and related
+Understack aims to provide an opinionated installation of OpenStack Ironic and related
 services to allow management of bare metal environments efficiently, rapidly, consistently and cost-effectively.
 
 ## Components
@@ -29,5 +29,5 @@ assets and if they are consumed or not consumed.
 ## Scale
 
 The overall scale of one system is expected to be at a multiple data center with multiple
-fabrics in each data center. This is the differiator between other tools available
+fabrics in each data center. This is the differentiator between other tools available
 today.

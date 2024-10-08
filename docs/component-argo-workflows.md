@@ -26,7 +26,7 @@ credentials.
 
 The included Workflows include references to configuration ConfigMaps and Secrets.
 
-### Nautbot
+### Nautobot
 
 The Secret will be defined by the External Secret.
 
@@ -56,7 +56,7 @@ An example WorkflowTemplate demonstrating argo-python usage can be found
 
 ### Argo CLI
 
-Argo Workflows has a CLI and the installation instrucutions can be found [here](https://github.com/argoproj/argo-workflows/releases/).
+Argo Workflows has a CLI and the installation instructions can be found [here](https://github.com/argoproj/argo-workflows/releases/).
 
 Usage:
 

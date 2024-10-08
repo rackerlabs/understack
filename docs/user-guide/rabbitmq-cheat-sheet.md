@@ -1,6 +1,6 @@
 # RabbitMQ Cheat Sheet
 
-## Get Admin Username and Pasasword
+## Get Admin Username and Password
 
 ```bash
 # Username
