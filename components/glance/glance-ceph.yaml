@@ -2,19 +2,74 @@
 apiVersion: ceph.rook.io/v1
 kind: CephBlockPool
 metadata:
-  name: images
-  namespace: rook-ceph # namespace:cluster
+  name: glance-rgw-root
+  namespace: rook-ceph
 spec:
+  name: .glance.rgw.root
+  failureDomain: host
   replicated:
     size: 3
+    requireSafeReplicaSize: false
+  parameters:
+    pg_num: "8"
+  application: rgw
 ---
 apiVersion: ceph.rook.io/v1
-kind: CephClient
+kind: CephBlockPool
+metadata:
+  name: glance-rgw-meta-pool
+  namespace: rook-ceph
+spec:
+  failureDomain: host
+  replicated:
+    size: 3
+    requireSafeReplicaSize: false
+  parameters:
+    pg_num: "8"
+  application: rgw
+---
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: glance-rgw-data-pool
+  namespace: rook-ceph
+spec:
+  failureDomain: osd
+  erasureCoded:
+    dataChunks: 2
+    codingChunks: 1
+  application: rgw
+---
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStore
+metadata:
+  name: glance-images
+  namespace: rook-ceph
+spec:
+  sharedPools:
+    metadataPoolName: glance-rgw-meta-pool
+    dataPoolName: glance-rgw-data-pool
+    preserveRadosNamespaceDataOnDelete: true
+  gateway:
+    # sslCertificateRef:
+    port: 80
+    instances: 1
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+   name: glance-images-bucket
+provisioner: rook-ceph.ceph.rook.io/bucket
+reclaimPolicy: Delete
+parameters:
+  objectStoreName: glance-images
+  objectStoreNamespace: rook-ceph
+---
+apiVersion: ceph.rook.io/v1
+kind: CephObjectStoreUser
 metadata:
   name: glance
-  namespace: rook-ceph # namespace:cluster
+  namespace: rook-ceph
 spec:
-  caps:
-    mon: 'profile rbd'
-    osd: 'profile rbd pool=images'
----
+  store: glance-images
+  displayName: "glance"
