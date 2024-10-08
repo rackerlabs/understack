@@ -1,6 +1,6 @@
 # Vision
 
-Understack aims to provide an opinoniated installation of OpenStack Ironic and related
+Understack aims to provide an opinionated installation of OpenStack Ironic and related
 services to allow management of bare metal environments efficiently, rapidly, consistently and cost-effectively.
 
 ## Components
