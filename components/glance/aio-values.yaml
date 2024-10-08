@@ -19,8 +19,7 @@ network:
   use_external_ingress_controller: true
 
 # Glance storage backend
-# we'll switch to radosgw in the future
-storage: pvc
+storage: radosgw
 
 # leave it empty to use the default
 volume:

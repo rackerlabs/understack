@@ -1,0 +1,20 @@
+---
+apiVersion: ceph.rook.io/v1
+kind: CephBlockPool
+metadata:
+  name: images
+  namespace: rook-ceph # namespace:cluster
+spec:
+  replicated:
+    size: 3
+---
+apiVersion: ceph.rook.io/v1
+kind: CephClient
+metadata:
+  name: glance
+  namespace: rook-ceph # namespace:cluster
+spec:
+  caps:
+    mon: 'profile rbd'
+    osd: 'profile rbd pool=images'
+---
