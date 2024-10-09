@@ -5,3 +5,4 @@ kind: Kustomization
 resources:
   - glance-mariadb-db.yaml
   - glance-rabbitmq-queue.yaml
+  - glance-ceph.yaml
