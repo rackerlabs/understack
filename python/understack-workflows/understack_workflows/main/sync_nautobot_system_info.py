@@ -14,7 +14,7 @@ logger = setup_logger(__name__)
 
 def argument_parser(name):
     parser = argparse.ArgumentParser(
-        prog=os.path.basename(name), description="Nautobot Interface sync"
+        prog=os.path.basename(name), description="Nautobot Device Info sync"
     )
     parser.add_argument(
         "--device-id", type=UUID, required=True, help="Nautobot device ID"
