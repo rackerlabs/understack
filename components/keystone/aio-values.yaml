@@ -88,13 +88,6 @@ bootstrap:
     # ucadmin can manage the infra domain
     openstack role add --group-domain "${sso_domain_id}" --group ucadmin --inherited --domain infra manager
 
-    # TODO: only create this actually requested
-    # create 'demo' user with sufficient permissions
-    openstack user create --or-show --password demo --email 'demo@example.com' demo
-    openstack user set --email 'demo@example.com' demo
-    # add 'demo' user to 'ucuser' group
-    openstack group add user ucuser demo
-
 network:
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
