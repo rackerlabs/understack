@@ -15,33 +15,16 @@ INTERFACE_TYPE = "25gbase-x-sfp28"
 
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
     """Update exsiting or create new device using the Nautobot API."""
-    # TODO: a graphql query here could fetch the device with all existing
-    # interfaces, macs, cable and connected switches.  We would want to change
-    # all the "create" operations below to a "find or create", update the
-    # attributes of existing objects as required, then delete any extra items
-    # from nautobot (perhaps only remove connections to switches in a diffrent
-    # rack?)  There is no point keepiong old stuff (need a proper way to manage
-    # cables in the DC) but we don't want to delete cables that temporarily
-    # went down.
+
+    # TODO: if this is too slow, a graphql query here could fetch the device
+    # with all existing interfaces, macs, cable and connected switches.
     #
+    # TODO: delete any extra items however we don't want to delete cables that
+    # temporarily went down.
     #
-    # For each interface on the server:
-    # - find matching interface by name in nautobot
-    #  - set attrs if already exist
-    #  - create missing ones
-    #  - delete extra interfaces from nautobot
-    #
-    # - remove existing connection in nautobot that goes to wrong place
-    #
-    # - if int not already connected, find switch by MAC and create connection
-    #  - fail if swith port is occupied, in future, delete old device
-    #
-    # - could also check topology: has connection to both devices in vlan group
-    #
-    # - if exiting IP check it matches, FAIL otherwise
-    # - assign IP and associate with interface
-    #
-    # Assert device rack/location matches switch rack/location
+    # TODO: could also verify compliant topology:
+    # - has connection to both devices in vlan group
+    # - device rack/location matches switch rack/location
 
     device = nautobot_server(nautobot, serial=chassis_info.serial_number)
     if not device:
@@ -111,7 +94,7 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
 
     We store the MAC address in the "asset tag" field because there was nowhere
     else to put it.  Retrieving switches this way is really slow, could do with
-    a better solution for storing mac addresses here.
+    a better solution for storing switches' base mac addresses in Nautobot.
 
     TODO: can we pass an array of MAC addresses to this query and get all
     the switches in one go?
@@ -193,7 +176,15 @@ def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, sw
     """Update Nautobot Device Interfaces using the Nautobot API."""
     for interface in chassis_info.interfaces:
         if interface.remote_switch_mac_address:
-            find_or_create_interface(nautobot, interface, device_id, switches)
+            setup_nautobot_interface(nautobot, interface, device_id, switches)
+
+def setup_nautobot_interface(nautobot, interface, device_id, switches)
+    nautobot_int = find_or_create_interface(nautobot, interface, device_id, switches)
+
+    if interface.ipv4_address:
+        set_interface_ip_address(nautobot, nautobot_int, interface.ipv4_address)
+
+    connect_interface_to_switch(nautobot, interface, nautobot_int, switches)
 
 def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str, switches):
     id = {
@@ -219,11 +210,9 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str,
             f"Created interface {interface.name} "
             f"{server_nautobot_interface.id} in Nautobot"
         )
+    return server_nautobot_interface
 
-    if interface.ipv4_address:
-        set_interface_ip_address(
-            nautobot, server_nautobot_interface, interface.ipv4_address)
-
+def connect_interface_to_switch(nautobot, interface, server_nautobot_interface, switches):
     connected_switch = switches[interface.remote_switch_mac_address]
     switch_port_name = interface.remote_switch_port_name
 
@@ -237,35 +226,58 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str,
         )
     else:
         logger.info(
-            f"Interface {interface.name} connected to "
+            f"Interface {interface.name} connects to "
             f"{connected_switch['name']} {switch_port_name}"
         )
 
-    nautobot.dcim.cables.create(
-        status="Connected",
-        termination_a_type="dcim.interface",
-        termination_b_type="dcim.interface",
-        termination_a_id=switch_interface.id,
-        termination_b_id=server_nautobot_interface.id,
-    )
+    identity = {
+        "termination_a_id": switch_interface.id,
+        "termination_b_id": server_nautobot_interface.id,
+    }
+    attrs = {
+        "status": "Connected",
+        "termination_a_type": "dcim.interface",
+        "termination_b_type": "dcim.interface",
+    }
+
+    cable = nautobot.dcim.cables.get(**identity)
+    if cable is None:
+        cable = nautobot.dcim.cables.create(**identity, **attrs)
+        logger.info(f"Created cable {cable.id} in Nautobot")
+    else:
+        logger.info(f"Cable {cable.id} already exists in Nautobot")
 
 def set_interface_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface):
     try:
-        ip = nautobot.ipam.ip_addresses.create(
-            address=str(ipv4_address.ip),
-            status="Active",
-            parent={
-                "type": "network",
-                "prefix": str(ipv4_address.network),
-            },
-        )
-        logger.info(f"Created Nautobot IP {ip.id} for {ipv4_address}")
-        nautobot.ipam.ip_address_to_interface.create(
-            is_primary=True,
+        ip = nautobot.ipam.ip_addresses.get(address=str(ipv4_address.ip))
+        if ip is None:
+            ip = nautobot.ipam.ip_addresses.create(
+                address=str(ipv4_address.ip),
+                status="Active",
+                parent={
+                    "type": "network",
+                    "prefix": str(ipv4_address.network),
+                },
+            )
+            logger.info(f"Created Nautobot IP {ip.id} for {ipv4_address}")
+        else:
+            logger.info(f"Nautobot IP {ip.id} already exists for {ipv4_address}")
+
+
+        ip_to_interface = nautobot.ipam.ip_address_to_interface.get(
             ip_address=ip.id,
             interface=nautobot_interface.id,
         )
-        logger.info(f"Associated IP address {ip.id} with {nautobot_interface.name}")
+
+        if ip_to_interface is None:
+            nautobot.ipam.ip_address_to_interface.create(
+                is_primary=True,
+                ip_address=ip.id,
+                interface=nautobot_interface.id,
+            )
+            logger.info(f"Associated IP address {ip.id} with {nautobot_interface.name}")
+        else:
+            logger.info(f"IP address {ip.id} is already on {nautobot_interface.name}")
     except pynautobot.core.query.RequestError as e:
         raise Exception(
             f"Failed to assign {ipv4_address=} in Nautobot: {e}"
