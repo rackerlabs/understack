@@ -19,8 +19,8 @@ class FakeBmc:
 
     
 def redfish_fixtures_by_platform() -> dict:
-    return {platform : read_fixtures(fixture_path.joinpath(platform))
-            for platform in sorted(os.listdir(fixture_path))}
+    return {platform : read_fixtures(FIXTURE_PATH.joinpath(platform))
+            for platform in sorted(os.listdir(FIXTURE_PATH))}
 
 def read_fixtures(path) -> dict:
     path = pathlib.Path(__file__).parent.joinpath(path)

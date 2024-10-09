@@ -14,7 +14,7 @@ DEVICE_ROLE = "server"
 INTERFACE_TYPE = "25gbase-x-sfp28"
 
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
-    """Update exsiting or create new device using the Nautobot API"""
+    """Update exsiting or create new device using the Nautobot API."""
     # TODO: a graphql query here could fetch the device with all existing
     # interfaces, macs, cable and connected switches.  We would want to change
     # all the "create" operations below to a "find or create", update the
@@ -99,12 +99,13 @@ def server_device_payload(location_id, rack_id, chassis_info):
 
 
 def _parse_manufacturer(name: str) -> str:
-    if "DELL" in name.upper(): return "Dell"
+    if "DELL" in name.upper():
+        return "Dell"
     raise ValueError(f"Server manufacturer {name} not supported")
 
 
 def nautobot_switch(nautobot, mac_address: str) -> dict:
-    """Get switch by its MAC address
+    """Get switch by its MAC address.
 
     MAC addresses in SOT are normalized to upcase AA:BB:CC:DD:EE form.
 
@@ -115,13 +116,13 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
     TODO: can we pass an array of MAC addresses to this query and get all
     the switches in one go?
     """
-    query = """{
-        devices(asset_tag: "%s"){
+    query = f"""{{
+        devices(asset_tag: "{mac_address}"){{
             id name
-            location { id name }
-            rack { id name }
-        }
-    }""" % mac_address
+            location {{ id name }}
+            rack {{ id name }}
+        }}
+    }}"""
 
     result = nautobot.graphql.query(query)
     if not result.json or result.json.get("errors"):
@@ -145,32 +146,32 @@ def nautobot_switch(nautobot, mac_address: str) -> dict:
 
 
 def nautobot_server(nautobot, serial: str) -> dict:
-    query = """{
-        devices(serial: ["%s"]){
+    query = f"""{{
+        devices(serial: ["{serial}"]){{
             id name
-            location { id name }
-            rack { id name }
-            interfaces {
+            location {{ id name }}
+            rack {{ id name }}
+            interfaces {{
                 id name
                 type description mac_address
-                status { name }
-                connected_interface {
+                status {{ name }}
+                connected_interface {{
                     id name
-                    device {
+                    device {{
                         id name
-                        location {id name }
-                        rack { id name }
-                        rel_vlan_group_to_devices {
-                            rel_vlan_group_to_devices { id name }
-                        }
-                    }
-                }
-                ip_addresses {
+                        location {{id name }}
+                        rack {{ id name }}
+                        rel_vlan_group_to_devices {{
+                            rel_vlan_group_to_devices {{ id name }}
+                        }}
+                    }}
+                }}
+                ip_addresses {{
                     id host
-                    parent { prefix }
-                }
-            }
-        }""" % serial
+                    parent {{ prefix }}
+                }}
+            }}
+        }}"""
 
     result = nautobot.graphql.query(query)
     if not result.json or result.json.get("errors"):
@@ -188,7 +189,7 @@ def nautobot_server(nautobot, serial: str) -> dict:
 
 
 def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
-    """Update Nautobot Device Interfaces using the Nautobot API"""
+    """Update Nautobot Device Interfaces using the Nautobot API."""
     for interface in chassis_info.interfaces:
         if interface.remote_switch_mac_address:
             find_or_create_interface(nautobot, interface, device_id, switches)
@@ -263,8 +264,8 @@ def set_interface_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Int
             ip_address=ip.id,
             interface=nautobot_interface.id,
         )
-        logger.info(f"Associated IP address {ip.id} with {interface.name}")
+        logger.info(f"Associated IP address {ip.id} with {nautobot_interface.name}")
     except pynautobot.core.query.RequestError as e:
         raise Exception(
             f"Failed to assign {ipv4_address=} in Nautobot: {e}"
-        )
+        ) from None
