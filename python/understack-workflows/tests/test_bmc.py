@@ -11,5 +11,5 @@ def test_bmc_for_ip_address(mock_creds):
     bmc = bmc_for_ip_address("1.2.3.4", "iDRAC")
     assert bmc.ip_address == "1.2.3.4"
     assert bmc.url() == "https://1.2.3.4"
-    assert bmc.username == "root"
-    assert bmc.password == "pjMACDMNMX4w+6bpgk6DXVXy"
+    assert bmc.username == "ultra-secret credential value"
+    assert bmc.password == "ultra-secret credential value"
