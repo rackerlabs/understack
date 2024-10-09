@@ -7,7 +7,7 @@ from understack_workflows.node_configuration import IronicNodeConfiguration
 
 STATES_ALLOWING_UPDATES = ["enroll", "manageable"]
 
-def create_or_update(node_uuid: str, bmc: Bmc, logger):
+def create_or_update(node_uuid: str, device_hostname: str, bmc: Bmc, logger):
     client = IronicClient()
 
     logger.debug(f"Ensuring node with UUID {node_uuid} exists in Ironic")
@@ -16,7 +16,7 @@ def create_or_update(node_uuid: str, bmc: Bmc, logger):
     except ironicclient.common.apiclient.exceptions.NotFound:
         logger.debug(f"Node: {node_uuid} not found in Ironic, creating.")
         ironic_node = create_ironic_node(
-            client, interface_name, node_uuid, device_hostname, bmc
+            client, node_uuid, device_hostname, bmc
         )
         return
 
@@ -37,19 +37,19 @@ def create_or_update(node_uuid: str, bmc: Bmc, logger):
     logger.info(f"Updating Ironic node {node_uuid} {patches=}")
 
     response = client.update_node(node_uuid, patches)
-    logger.info(f"Ironic node {uuid} Updated: {response=}")
+    logger.info(f"Ironic node {node_uuid} Updated: {response=}")
 
     return ironic_node.provision_state
 
 
 def create_ironic_node(
         client: IronicClient,
-        interface_name: str,
         node_uuid: str,
         device_hostname: str,
         bmc: Bmc,
 ) -> IronicNodeConfiguration:
         driver = "idrac" if bmc.bmc_type == "iDRAC" else "redfish"
+        # TODO: are we supposed to set something to do with interface here?
 
         return client.create_node(
             {
