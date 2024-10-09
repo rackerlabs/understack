@@ -1,0 +1,126 @@
+import argparse
+import os
+
+import pynautobot
+
+from understack_workflows import nautobot_device
+from understack_workflows.bmc import bmc_for_ip_address
+from understack_workflows.bmc_chassis_info import chassis_info
+from understack_workflows.bmc_credentials import set_bmc_password
+from understack_workflows.helpers import credential
+from understack_workflows.helpers import parser_nautobot_args
+from understack_workflows.helpers import setup_logger
+
+logger = setup_logger(__name__)
+
+def main():
+    """On-board new or Refresh existing baremetal node.
+
+    We have been invoked because a baremetal node is available.
+
+    Pre-requisites in Nautobot:
+
+    All connected switches must have a device with the base MAC address stored
+    in the asset tag field.
+
+    The Rack and Location of the switches must be correct as they will be copied
+    to the newly created server Device.
+
+    The server Device type must exist, with a name that matches the "model" as
+    reported by the BMC.
+
+    The DRAC IP Prefix must exist.
+
+
+    - connect to the BMC, trying standard password then factory default
+
+    - ensure standard BMC password is set
+
+    - TODO: create and install SSL certificate
+
+    - TODO: update BMC firmware
+
+    - TODO: set NTP Server IPs for DRAC
+      (NTP server IP addresses are different per region)
+
+    -  Using BMC, configure our standard BIOS settings
+       - set PXE boot device
+       - set timezone to UTC
+
+    -  from BMC, discover basic hardware info:
+       - manufacturer, model number, serial number
+       - list ethernet interfaces with:
+          - name like BMC or SLOT.NIC.1-1
+          - MAC address
+          - LLDP connections [{remote_mac, remote_interface_name}]
+
+    - Find or create this server in Nautobot by serial number.
+
+    - set name, manufacturer, model, serial, location, rack
+
+    - Find BMC interface
+
+    - TODO Find or create DRAC network prefix
+
+    - TODO create BMC IP address assignment for BMC interface
+
+    - For each server interface
+        - find or create server interface by name in nautobot
+        - set interface mac addresses
+        - look up switch by mac addr (is stored in Nautobot's asset tag field)
+        - look up switch interface by name
+        - find or create cable
+
+    -  TODO Find or create this baremetal node in Ironic
+       - create ports with MACs
+       - advance to available state
+       - set flavor?  what else?
+
+    """
+    args = argument_parser().parse_args()
+
+    bmc_ip_address = args.bmc_ip_address
+    logger.info(f"{__file__} starting for {bmc_ip_address=}")
+
+    url = args.nautobot_url
+    token = args.nautobot_token or credential("nb-token", "token")
+    nautobot = pynautobot.api(url, token=token)
+
+
+    bmc = bmc_for_ip_address(bmc_ip_address, password=args.bmc_password)
+    if args.bmc_password is None:
+        logger.info("Setting BMC password to bmc.password")
+        set_bmc_password(bmc.ip_address, bmc.password)
+
+    # TODO: make this pseudo-idempotent by ignoring the error when a job is already scheduled:
+    # update_dell_bios_settings(bmc)
+
+    device_info = chassis_info(bmc)
+
+    logger.info(f"Discovered {device_info}")
+    nautobot_device.find_or_create(device_info, nautobot)
+
+    #_ironic_provision_state = ironic_node.create_or_update(device_uuid, bmc, logger)
+    #sync_interfaces.from_nautobot_to_ironic(device_id)
+
+    logger.info(f"{__file__} complete successfully for {bmc.ip_address}")
+
+
+def argument_parser():
+    parser = argparse.ArgumentParser(
+        prog=os.path.basename(__file__), description="Ingest Baremetal"
+    )
+    parser.add_argument(
+        "--bmc-ip-address", type=str, required=True, help="BMC IP"
+    )
+    parser.add_argument(
+        "--bmc-password", type=str, required=False, help="BMC Pass"
+    )
+    parser.add_argument(
+        "--bmc-mac-address", type=str, required=False, help="BMC MAC Addr"
+    )
+    parser = parser_nautobot_args(parser)
+    return parser
+
+if __name__ == "__main__":
+    main()
