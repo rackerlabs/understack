@@ -30,6 +30,12 @@ def mock_args(monkeypatch):
 def fake_client(mocker):
     return mocker.patch("understack_workflows.ironic.client.IronicClient")
 
+@pytest.fixture
+def mock_creds(mocker):
+    mock = mocker.patch("understack_workflows.node_configuration.credential")
+    mock.return_value = "ultra-secret credential value"
+    return mock
+
 
 def get_ironic_node_state(fake_client, node_data):
     node = IronicNodeConfiguration.from_event(
@@ -47,7 +53,7 @@ def test_args():
     assert var["data"]["ip_addresses"][0]["host"] == "10.46.96.156"
 
 
-def test_ironic_node_allowing_states(fake_client):
+def test_ironic_node_allowing_states(fake_client, mock_creds):
     ironic_node_state = get_ironic_node_state(
         fake_client,
         json.loads(read_json_samples("json_samples/ironic-enroll-node-data.json")),
@@ -55,7 +61,7 @@ def test_ironic_node_allowing_states(fake_client):
     assert ironic_node_state in ["enroll", "manageable"]
 
 
-def test_ironic_non_allowing_states(fake_client):
+def test_ironic_non_allowing_states(fake_client, mock_creds):
     ironic_node_state = get_ironic_node_state(
         fake_client,
         json.loads(read_json_samples("json_samples/ironic-active-node-data.json")),
@@ -63,7 +69,7 @@ def test_ironic_non_allowing_states(fake_client):
     assert ironic_node_state not in ["enroll", "manageable"]
 
 
-def test_update_ironic_node(fake_client):
+def test_update_ironic_node(fake_client, mock_creds):
     node = IronicNodeConfiguration.from_event(
         json.loads(read_json_samples("json_samples/event-interface-update.json"))
     )

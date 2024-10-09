@@ -28,6 +28,11 @@ def mock_args(monkeypatch):
 def fake_ironic_client(mocker):
     return mocker.patch("understack_workflows.ironic.client.IronicClient")
 
+@pytest.fixture
+def mock_creds(mocker):
+    mock = mocker.patch("understack_workflows.node_configuration.credential")
+    mock.return_value = "ultra-secret credential value"
+    return mock
 
 def get_ironic_node_state(fake_ironic_client, node_data):
     node = IronicNodeConfiguration.from_event(
