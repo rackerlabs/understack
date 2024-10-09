@@ -36,7 +36,7 @@ bootstrap:
                     },
                     "groups": "{3}",
                      "domain": {
-                        "id": "default"
+                        "name": "sso"
                     }
                 }
             ],
@@ -76,13 +76,17 @@ bootstrap:
     # create the federation protocol 'openid' to use the identity provider 'sso' with the 'sso_mapping'
     openstack federation protocol show openid --identity-provider sso || openstack federation protocol create openid --mapping sso_mapping --identity-provider sso
 
-    # create groups which map to our groups claim from dex which can be mapped to permissions
     for group in ucadmin ucuser ucneteng ucdctech; do
-      openstack group create ${group} --or-show
-      openstack role add --group ${group} --domain default member
+      # create groups which map to our groups claim from dex which can be mapped to permissions
+      openstack group create --domain "${sso_domain_id}" ${group} --or-show
+      # give each of the groups the member role on the domain and have them inherit it to each project
+      # in the domain
+      openstack role add --group-domain "${sso_domain_id}" --group ${group} --inherited --domain default member
     done
-    openstack role add --group ucadmin --domain default admin
-    openstack role add --group ucadmin --domain infra admin
+    # ucadmin can manage the standard project domain
+    openstack role add --group-domain "${sso_domain_id}" --group ucadmin --inherited --domain default manager
+    # ucadmin can manage the infra domain
+    openstack role add --group-domain "${sso_domain_id}" --group ucadmin --inherited --domain infra manager
 
     # TODO: only create this actually requested
     # create 'demo' user with sufficient permissions
