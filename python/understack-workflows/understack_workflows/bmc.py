@@ -1,7 +1,10 @@
-import requests
 from dataclasses import dataclass
-from understack_workflows.helpers import credential
+
+import requests
 from sushy import Sushy
+
+from understack_workflows.helpers import credential
+
 
 @dataclass
 class Bmc:

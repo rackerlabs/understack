@@ -1,22 +1,24 @@
-import json
 import re
-import urllib3
-from ipaddress import IPv4Interface
-from typing import List, Dict
 from dataclasses import dataclass
+from ipaddress import IPv4Interface
+
+import urllib3
+
 from understack_workflows.bmc import Bmc
 from understack_workflows.interface_normalization import normalize_interface_name
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 @dataclass(frozen=True)
 class InterfaceInfo:
     name: str
     description: str
     mac_address: str
-    ipv4_address: IPv4Interface|None = None
-    remote_switch_mac_address: str|None = None
-    remote_switch_port_name: str|None = None
+    ipv4_address: IPv4Interface | None = None
+    remote_switch_mac_address: str | None = None
+    remote_switch_port_name: str | None = None
+
 
 @dataclass(frozen=True)
 class ChassisInfo:
@@ -25,13 +27,13 @@ class ChassisInfo:
     serial_number: str
     bmc_ip_address: str
     bios_version: str
-    interfaces: List[InterfaceInfo]
+    interfaces: list[InterfaceInfo]
 
 
 def chassis_info(bmc: Bmc) -> ChassisInfo:
-    """Query DRAC for basic system info via redfish
+    """Query DRAC for basic system info via redfish.
 
-    See also:
+    See Also:
         ProcessorSummary.Model and .CoreCount
         MemorySummary.TotalSystemMemoryGiB
 
@@ -40,39 +42,42 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
     chassis_data = bmc.redfish_request(url)
 
     return ChassisInfo(
-        manufacturer = chassis_data["Manufacturer"],
-        model_number = chassis_data["Model"],
-        serial_number = chassis_data["SKU"],
-        bios_version = chassis_data["BiosVersion"],
-        bmc_ip_address = bmc.ip_address,
-        interfaces = interface_data(bmc),
+        manufacturer=chassis_data["Manufacturer"],
+        model_number=chassis_data["Model"],
+        serial_number=chassis_data["SKU"],
+        bios_version=chassis_data["BiosVersion"],
+        bmc_ip_address=bmc.ip_address,
+        interfaces=interface_data(bmc),
     )
 
 
-def interface_data(bmc: Bmc) -> List[Dict]:
+def interface_data(bmc: Bmc) -> list[InterfaceInfo]:
     interfaces = [bmc_interface(bmc)] + in_band_interfaces(bmc)
     lldp = lldp_data_by_name(bmc)
     return [combine_lldp(lldp, interface) for interface in interfaces]
 
-def combine_lldp(lldp, interface):
+
+def combine_lldp(lldp, interface) -> InterfaceInfo:
     name = interface["name"]
     lldp_entry = lldp[name]
     return InterfaceInfo(**interface, **lldp_entry)
 
 
 def bmc_interface(bmc) -> dict:
-    """Retrieve DRAC BMC interface info via redfish API"""
+    """Retrieve DRAC BMC interface info via redfish API."""
     url = "/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces/NIC.1"
     data = bmc.redfish_request(url)
     return {
         "name": "iDRAC",
         "description": "Dedicated iDRAC interface",
-        "mac_address": data['MACAddress'].upper(),
-        "ipv4_address": parse_ipv4(data['IPv4Addresses']),
+        "mac_address": data["MACAddress"].upper(),
+        "ipv4_address": parse_ipv4(data["IPv4Addresses"]),
     }
 
-def parse_ipv4(data: list[dict]) -> IPv4Interface|None:
-    """ Parse the iDRAC's representation of network interface configuration
+
+def parse_ipv4(data: list[dict]) -> IPv4Interface | None:
+    """Parse the iDRAC's representation of network interface configuration.
+
     "IPv4Addresses": [
         {
         "Address": "10.46.96.156",
@@ -84,22 +89,22 @@ def parse_ipv4(data: list[dict]) -> IPv4Interface|None:
     Only the first address is returned
     """
     if data:
-        address = data[0]['Address']
-        netmask = data[0]['SubnetMask']
+        address = data[0]["Address"]
+        netmask = data[0]["SubnetMask"]
         return IPv4Interface(f"{address}/{netmask}")
 
-def in_band_interfaces(bmc: Bmc) -> List[dict]:
-    """A Collection of Ethernet Interfaces for this System"""
+
+def in_band_interfaces(bmc: Bmc) -> list[dict]:
+    """A Collection of Ethernet Interfaces for this System."""
     url = "/redfish/v1/Systems/System.Embedded.1/EthernetInterfaces/"
     index_data = bmc.redfish_request(url)
-    urls = [member['@odata.id'] for member in index_data['Members']]
+    urls = [member["@odata.id"] for member in index_data["Members"]]
 
-    return [interface_detail(bmc, url) for url in urls
-                if interface_is_relevant(url)]
+    return [interface_detail(bmc, url) for url in urls if interface_is_relevant(url)]
 
 
 def interface_detail(bmc, path) -> dict:
-    """Data about the given NIC
+    """Data about the given NIC.
 
     Interface names are standardised.
 
@@ -111,13 +116,14 @@ def interface_detail(bmc, path) -> dict:
     """
     data = bmc.redfish_request(path)
     return {
-        "name": server_interface_name(data['Id']),
-        "description": data['Description'],
-        "mac_address": data['MACAddress'].upper(),
+        "name": server_interface_name(data["Id"]),
+        "description": data["Description"],
+        "mac_address": data["MACAddress"].upper(),
     }
 
+
 def lldp_data_by_name(bmc) -> dict:
-    """Retrieve LLDP information from DRAC using redfish API
+    """Retrieve LLDP information from DRAC using redfish API.
 
     Local interface names are standardised
 
@@ -139,30 +145,26 @@ def lldp_data_by_name(bmc) -> dict:
     `show mac address-table static | in Lo0`
     """
     url = "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/"
-    ports = bmc.redfish_request(url)['Members']
+    ports = bmc.redfish_request(url)["Members"]
 
-    return {server_interface_name(port['Id']) : parse_lldp_port(port)
-                for port in ports}
+    return {server_interface_name(port["Id"]): parse_lldp_port(port) for port in ports}
 
-def parse_lldp_port(port: dict) -> dict:
-    """Adapt the Dell Redfish LLDP fields to our internal format
+
+def parse_lldp_port(port_data: dict[str, str]) -> dict:
+    """Adapt the Dell Redfish LLDP fields to our internal format.
 
     Remote Switch interface names have abbreviations expanded to cisco standard
     """
-    mac = port['SwitchConnectionID']
-    port = normalize_interface_name(port['SwitchPortConnectionID'])
+    mac = port_data["SwitchConnectionID"]
+    port_name = normalize_interface_name(port_data["SwitchPortConnectionID"])
 
     if mac == "No Link":
-        return {
-            "remote_switch_mac_address": None,
-            "remote_switch_port_name": None
-        }
+        return {"remote_switch_mac_address": None, "remote_switch_port_name": None}
     else:
         return {
             "remote_switch_mac_address": mac.upper(),
-            "remote_switch_port_name": port
+            "remote_switch_port_name": port_name,
         }
-
 
 
 def interface_is_relevant(url: str) -> bool:

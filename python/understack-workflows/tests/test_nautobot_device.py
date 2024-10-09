@@ -1,12 +1,10 @@
-import re
-import pytest
-import pathlib
-import io
 import json
+import pathlib
 
+from understack_workflows import nautobot_device
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import InterfaceInfo
-from understack_workflows import nautobot_device
+
 
 def read_json_samples(file_path):
     here = pathlib.Path(__file__).parent
@@ -15,18 +13,18 @@ def read_json_samples(file_path):
         return json.loads(f.read())
 
 
-class FakeNautobot():
+class FakeNautobot:
     def __init__(self):
         self.graphql = FakeNautobot.Graphql()
         self.dcim = FakeNautobot.Dcim()
 
-    class ApiRecord():
+    class ApiRecord:
         def __init__(self):
             self.id = "qwerty-1234-qwerty-1234"
         def update(self, *_):
             pass
 
-    class Graphql():
+    class Graphql:
         def query(self, graphql):
             if "61:80" in graphql:
                 return FakeNautobot.SwitchResponse("f20-3-1.iad3")
@@ -38,13 +36,13 @@ class FakeNautobot():
                 return FakeNautobot.GraphqlResponse("json_samples/bmc_chassis_info/R7615/nautobot_graphql_response_server_device_33GSW04.json")
             raise Exception(f"implement graphql faker {graphql}")
 
-    class Dcim():
+    class Dcim:
         def __init__(self):
             self.devices = FakeNautobot.RestApiEndpoint()
             self.interfaces = FakeNautobot.RestApiEndpoint()
             self.cables = FakeNautobot.RestApiEndpoint()
 
-    class RestApiEndpoint():
+    class RestApiEndpoint:
         def create(self, **kw):
             return FakeNautobot.ApiRecord()
 
@@ -57,11 +55,11 @@ class FakeNautobot():
                 case _:
                     return FakeNautobot.ApiRecord()
 
-    class GraphqlResponse():
+    class GraphqlResponse:
         def __init__(self, name):
             self.json = read_json_samples(name)
 
-    class SwitchResponse():
+    class SwitchResponse:
         def __init__(self, name):
             self.json = {
                 "data": {

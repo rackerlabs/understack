@@ -1,7 +1,6 @@
-import pytest
 import json
-from understack_workflows.nautobot_event_parser import parse_event
 
+from understack_workflows.nautobot_event_parser import parse_event
 
 EVENT_JSON = """{
   "event": "updated",

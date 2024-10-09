@@ -1,13 +1,12 @@
 
 def parse_event(payload) -> (str, str, str, str):
-    """Parse Nautobot webhook event data
+    """Parse Nautobot webhook event data.
 
     Here we consume the event that Nautobot publishes whenever an ethernet
     interface is updated.  (Other types of event will raise an error)
 
     returns device_uuid: str, hostname: str, bmc_ip_address: str, bmc_type: str
     """
-
     data = payload.get("data")
     model = payload.get("model")
 

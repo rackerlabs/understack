@@ -1,6 +1,9 @@
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from understack_workflows.bmc_credentials import set_bmc_password
+
 
 @pytest.fixture
 def mock_redfish(mocker):

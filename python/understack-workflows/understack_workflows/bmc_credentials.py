@@ -1,7 +1,7 @@
+
 import requests
-import json
-from typing import List, Dict
 import urllib3
+
 from understack_workflows.helpers import setup_logger
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -70,7 +70,7 @@ def _verify_auth(host: str, username: str = "root", password: str = "") -> bool:
         return False
 
 
-def _get_bmc_accounts(host: str, username: str, password: str) -> List[Dict]:
+def _get_bmc_accounts(host: str, username: str, password: str) -> list[dict]:
     """A vendor agnostic approach to crawling the API for BMC accounts"""
     try:
         # get account service
@@ -117,7 +117,7 @@ def _set_bmc_creds(host: str, username: str, password: str, required_username: s
     _redfish_request(host, account_uri, username, password, "PATCH", payload)
 
 def _redfish_request(
-    host: str, uri: str, username: str, password: str, method: str = "GET", payload: Dict | None = None
+    host: str, uri: str, username: str, password: str, method: str = "GET", payload: dict | None = None
 ) -> dict:
     url = f"https://{host}{uri}"
     try:

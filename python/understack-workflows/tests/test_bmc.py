@@ -1,5 +1,7 @@
 import pytest
+
 from understack_workflows.bmc import bmc_for_ip_address
+
 
 @pytest.fixture
 def mock_creds(mocker):
