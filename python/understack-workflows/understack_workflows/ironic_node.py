@@ -10,7 +10,7 @@ STATES_ALLOWING_UPDATES = ["enroll", "manageable"]
 def create_or_update(node_uuid: str, bmc: Bmc, logger):
     client = IronicClient()
 
-    logger.debug(f"Ensuring node with UUID {device_id} exists in Ironic")
+    logger.debug(f"Ensuring node with UUID {node_uuid} exists in Ironic")
     try:
         ironic_node = client.get_node(node_uuid)
     except ironicclient.common.apiclient.exceptions.NotFound:

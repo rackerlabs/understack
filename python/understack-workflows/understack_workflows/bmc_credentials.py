@@ -12,10 +12,10 @@ FACTORY_USER = "root"
 logger = setup_logger(__name__)
 
 class HttpAuthorisationFailed(Exception):
-    """Specifically for 401 errors"""
+    """Specifically for 401 errors."""
 
 def set_bmc_password(ip_address, required_password, username="root"):
-    """Access BMC via redfish and change password from factory default if needed
+    """Access BMC via redfish and change password from factory default if needed.
 
     Check that we can log in using the standard password.
 
@@ -51,7 +51,7 @@ def set_bmc_password(ip_address, required_password, username="root"):
 
 
 def _verify_auth(host: str, username: str = "root", password: str = "") -> bool:
-    """Test whether provided credentials work against a secured API endpoint
+    """Test whether provided credentials work against a secured API endpoint.
 
     Returns true on success, False on authorisation failure and raises an
     Exception for  other kinds of errors (e.g. timeout, etc)
@@ -71,7 +71,7 @@ def _verify_auth(host: str, username: str = "root", password: str = "") -> bool:
 
 
 def _get_bmc_accounts(host: str, username: str, password: str) -> list[dict]:
-    """A vendor agnostic approach to crawling the API for BMC accounts"""
+    """A vendor agnostic approach to crawling the API for BMC accounts."""
     try:
         # get account service
         r = _redfish_request(host, "/redfish/v1", username, password)
@@ -95,7 +95,7 @@ def _get_bmc_accounts(host: str, username: str, password: str) -> list[dict]:
 
 
 def _set_bmc_creds(host: str, username: str, password: str, required_username: str, required_password: str):
-    """Find the account associated with the username in question"""
+    """Find the account associated with the username in question."""
     accounts = _get_bmc_accounts(host, username, password)
 
     matched_account = None

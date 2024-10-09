@@ -1,4 +1,3 @@
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -12,7 +11,6 @@ def mock_redfish(mocker):
     return mock
 
 def test_set_bmc_password(mock_redfish):
-    logger = MagicMock()
     set_bmc_password("1.2.3.4", "qwertyuiop")
     mock_redfish.assert_any_call("1.2.3.4", "/redfish/v1", "root", "qwertyuiop")
     mock_redfish.assert_any_call("1.2.3.4", "/testme", "root", "qwertyuiop")

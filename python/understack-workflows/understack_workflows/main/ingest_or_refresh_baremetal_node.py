@@ -14,7 +14,7 @@ from understack_workflows.helpers import setup_logger
 logger = setup_logger(__name__)
 
 def main():
-    """On-board new or Refresh existing baremetal node
+    """On-board new or Refresh existing baremetal node.
 
     We have been invoked because a baremetal node is available.
 
@@ -98,7 +98,7 @@ def main():
     device_info = chassis_info(bmc)
 
     logger.info(f"Discovered {device_info}")
-    device_id = nautobot_device.find_or_create(device_info, nautobot)
+    nautobot_device.find_or_create(device_info, nautobot)
 
     #_ironic_provision_state = ironic_node.create_or_update(device_uuid, bmc, logger)
     #sync_interfaces.from_nautobot_to_ironic(device_id)
