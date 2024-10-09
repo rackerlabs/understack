@@ -4,7 +4,6 @@ import urllib3
 from ipaddress import IPv4Interface
 from typing import List, Dict
 from dataclasses import dataclass
-from understack_workflows.bmc_sushy import bmc_sushy_session
 from understack_workflows.bmc import Bmc
 from understack_workflows.interface_normalization import normalize_interface_name
 

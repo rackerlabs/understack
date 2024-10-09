@@ -1,7 +1,6 @@
 import requests
 from dataclasses import dataclass
 from understack_workflows.helpers import credential
-from understack_workflows.bmc_password_standard import standard_password
 from sushy import Sushy
 
 @dataclass
@@ -51,7 +50,7 @@ def bmc_for_ip_address(
         password: str|None = None) -> Bmc:
 
     if password is None:
-        bmc_master_key = credential("bmc_master", "key")
-        password = standard_password(ip_address, bmc_master_key)
+        username = credential("oob-secrets", "username")
+        password = credential("oob-secrets", "password")
 
     return Bmc(bmc_type=bmc_type, ip_address=ip_address, password=password, username=username)
