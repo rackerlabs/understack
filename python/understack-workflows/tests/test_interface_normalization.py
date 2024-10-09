@@ -1,5 +1,5 @@
-import pytest
 from understack_workflows.interface_normalization import normalize_interface_name
+
 
 def test_normalize_interface_name():
     assert normalize_interface_name("Eth1/1") == "Ethernet1/1"

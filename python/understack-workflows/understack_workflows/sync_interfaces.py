@@ -1,9 +1,10 @@
+import os
 from uuid import UUID
+
 import pynautobot
 from ironicclient.v1.port import Port
 
 from understack_workflows.helpers import credential
-from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.port_configuration import PortConfiguration
@@ -11,8 +12,7 @@ from understack_workflows.port_configuration import PortConfiguration
 logger = setup_logger(__name__)
 
 def from_nautobot_to_ironic(device_id: str, dry_run=False, ironic_client=None):
-    """Update Ironic ports to match information found in Nautobot Interfaces"""
-
+    """Update Ironic ports to match information found in Nautobot Interfaces."""
     logger.info(f"Syncing Interfaces / Ports for Device {device_id} ...")
 
     nautobot_api = os.environ.get("NAUTOBOT_API")
@@ -80,7 +80,7 @@ def from_nautobot_to_ironic(device_id: str, dry_run=False, ironic_client=None):
             logger.debug(f"Deleted: {response}")
 
 def get_nautobot_interfaces(nautobot, device_id: UUID) -> list[PortConfiguration]:
-    """Get Nautobot interfaces for a device
+    """Get Nautobot interfaces for a device.
 
     Returns a list of PortConfiguration
 

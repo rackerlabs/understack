@@ -1,7 +1,5 @@
-import requests
-import json
-from typing import List, Dict
 import urllib3
+
 from understack_workflows.bmc import Bmc
 from understack_workflows.helpers import setup_logger
 

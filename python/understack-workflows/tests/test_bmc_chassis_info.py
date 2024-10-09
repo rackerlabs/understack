@@ -1,16 +1,13 @@
-import os
-import sys
-import pytest
-import pathlib
 import json
+import os
+import pathlib
 from ipaddress import IPv4Interface
 
-from understack_workflows.main.sync_bmc_creds import get_args
 from understack_workflows import bmc_chassis_info
 
 FIXTURE_PATH = "json_samples/bmc_chassis_info"
 
-class FakeBmc():
+class FakeBmc:
     def __init__(self, fixtures):
         self.fixtures = fixtures
         self.ip_address = "1.2.3.4"

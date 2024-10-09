@@ -1,14 +1,11 @@
-import re
-from uuid import UUID
-from dataclasses import dataclass
 from ipaddress import IPv4Interface
+from uuid import UUID
+
 import pynautobot
 
-from understack_workflows.helpers import credential
-from understack_workflows.helpers import setup_logger
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import InterfaceInfo
-from understack_workflows.nautobot import Nautobot
+from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -18,7 +15,6 @@ INTERFACE_TYPE = "25gbase-x-sfp28"
 
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
     """Update exsiting or create new device using the Nautobot API"""
-
     # TODO: a graphql query here could fetch the device with all existing
     # interfaces, macs, cable and connected switches.  We would want to change
     # all the "create" operations below to a "find or create", update the
@@ -193,7 +189,6 @@ def nautobot_server(nautobot, serial: str) -> dict:
 
 def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
     """Update Nautobot Device Interfaces using the Nautobot API"""
-
     for interface in chassis_info.interfaces:
         if interface.remote_switch_mac_address:
             find_or_create_interface(nautobot, interface, device_id, switches)
