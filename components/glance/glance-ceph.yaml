@@ -5,7 +5,7 @@ metadata:
   name: glance-rgw-root
   namespace: rook-ceph
 spec:
-  name: glance.rgw.root
+  name: .rgw.root
   failureDomain: host
   replicated:
     size: 3
