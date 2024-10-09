@@ -53,14 +53,14 @@ def create_ironic_node(
 
         return client.create_node(
             {
-                device_id: node_uuid,
-                device_name: device_hostname,
-                driver: driver,
-                driver_info: {
-                    redfish_address: bmc.url(),
-                    redfish_verify_ca: False,
-                    redfish_username: bmc.username,
-                    redfish_password: bmc.password,
+                "device_id": node_uuid,
+                "device_name": device_hostname,
+                "driver": driver,
+                "driver_info": {
+                    "redfish_address": bmc.url(),
+                    "redfish_verify_ca": False,
+                    "redfish_username": bmc.username,
+                    "redfish_password": bmc.password,
                 },
             }
         )
