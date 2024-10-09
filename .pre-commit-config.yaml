@@ -25,7 +25,7 @@ repos:
         name: validate argo workflows / workflowtemplates
         args:
           - --schemafile
-          - https://raw.githubusercontent.com/argoproj/argo-workflows/master/api/jsonschema/schema.json
+          - schema/argo-workflows.json
         files: "workflows/argo-events/workflowtemplates/.*.(yml|yaml)$"
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.37.0

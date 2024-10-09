@@ -3,6 +3,7 @@ extend-exclude = [
     ".venv",
     "venv",
     "assets",
+    "schema/argo-workflows.json",
 ]
 
 [default]
