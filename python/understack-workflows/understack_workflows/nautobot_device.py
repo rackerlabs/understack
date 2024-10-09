@@ -171,7 +171,8 @@ def nautobot_server(nautobot, serial: str) -> dict:
                     parent {{ prefix }}
                 }}
             }}
-        }}"""
+        }}
+    }}"""
 
     result = nautobot.graphql.query(query)
     if not result.json or result.json.get("errors"):
