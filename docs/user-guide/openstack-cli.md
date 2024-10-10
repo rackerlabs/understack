@@ -12,6 +12,7 @@ to already have Python on your system.
 
     ``` bash
     apt install python3-openstackclient
+    # TODO: install keystoneauth-websso
     ```
 
 === "macOS"
@@ -26,7 +27,7 @@ to already have Python on your system.
     # create Python virtualenv at $HOME/.openstack
     python -m venv $HOME/.openstack
     # install the tools
-    $HOME/.openstack/bin/pip install python-openstackclient 'python-ironicclient[cli]'
+    $HOME/.openstack/bin/pip install python-openstackclient 'python-ironicclient[cli]' keystoneauth-websso
 
     # create a binary wrapper to the virtualenv
     mkdir -p $HOME/.bin
@@ -54,17 +55,13 @@ The easiest way to configure your client is via `clouds.yaml`.
 ```yaml title="$HOME/.config/openstack/clouds.yaml"
 clouds:
   understack:
+    auth_type: v3websso
+    identity_provider: sso
+    protocol: openid
     auth:
       auth_url: https://your.endpoint.url/v3
-      user_domain_name: mydomain
-      username: myuser
-      password: mypass
       project_domain_name: mydomain
       project_name: myproject
-    region_name:
-      - MyRegion
-    interface: public
-    identity_api_version: 3
 ```
 
 With the above configuration in `$HOME/.config/openstack/clouds.yaml` you
