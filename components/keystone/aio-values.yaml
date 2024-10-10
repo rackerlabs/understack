@@ -256,7 +256,7 @@ conf:
 
         # OIDC
         OIDCClaimPrefix "OIDC-"
-        OIDCRemoteUserClaim preferred_username ^(.*)@
+        OIDCRemoteUserClaim preferred_username
         OIDCSessionType server-cache
         OIDCXForwardedHeaders X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
         OIDCResponseType "code"
