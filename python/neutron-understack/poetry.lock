@@ -1074,13 +1074,13 @@ files = [
 
 [[package]]
 name = "neutron-lib"
-version = "3.15.0"
+version = "3.16.0"
 description = "Neutron shared routines and utilities"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "neutron-lib-3.15.0.tar.gz", hash = "sha256:d9d4c45c09d2a80a84fe0a229f72f4c1ba91d39c7b96aa772d950f642864366e"},
-    {file = "neutron_lib-3.15.0-py3-none-any.whl", hash = "sha256:fe65f7ee785d8db4fbe66175d57546e3628ab8e9150d4261dcf7989d7dd5c718"},
+    {file = "neutron-lib-3.16.0.tar.gz", hash = "sha256:76fa92a897d1ff3c31399440d4fe0048fa60fa15d3457d060377422300cffd92"},
+    {file = "neutron_lib-3.16.0-py3-none-any.whl", hash = "sha256:09c2efcb306d88a12c799abff2a2598993e5862cc0d153b17021c5240b69eed2"},
 ]
 
 [package.dependencies]
