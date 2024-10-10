@@ -71,3 +71,6 @@ convention = "google"
 
 [tool.poetry.plugins."neutron.ml2.mechanism_drivers"]
 understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
+
+[tool.poetry.plugins."neutron.ml2.type_drivers"]
+understack_vxlan = "neutron_understack.type_understack_vxlan:UnderstackVxlanTypeDriver"
