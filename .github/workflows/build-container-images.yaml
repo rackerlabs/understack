@@ -17,6 +17,8 @@ on:
       - "containers/bmc-utils/**"
       - "containers/python311_alpine/**"
       - "containers/python312_alpine/**"
+  merge_group:
+    types: [checks_requested]
 
 # bump container versions here, they will be populated to tags and labels
 env:

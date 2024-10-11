@@ -12,6 +12,8 @@ on:
       - "python/**"
       - ".github/workflows/code-test.yaml"
   workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
 
 # limit rapid succession from pushes
 concurrency:

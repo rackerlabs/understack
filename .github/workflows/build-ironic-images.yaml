@@ -11,6 +11,8 @@ on:
       - main
     paths:
       - 'ironic-images/**'
+  merge_group:
+    types: [checks_requested]
 
 jobs:
   build-ironic-images:
