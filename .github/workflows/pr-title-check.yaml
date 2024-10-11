@@ -3,6 +3,8 @@ name: "Lint PR"
 on:
   pull_request_target:
     types: [opened, edited, reopened, synchronize]
+  merge_group:
+    types: [checks_requested]
 
 # IMPORTANT: No checkout actions, scripts, or builds should be added to this workflow. Permissions should always be used
 # with extreme caution. https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request_target
