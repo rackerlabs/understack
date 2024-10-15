@@ -55,14 +55,14 @@ spec:
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      ref: secrets
+                      ref: deploy
                     - repoURL: https://kubernetes.github.io/ingress-nginx
                       chart: ingress-nginx
                       targetRevision: 4.9.1
                       helm:
                         releaseName: ingress-nginx
                         valueFiles:
-                          - $secrets/{{.name}}/helm-configs/ingress-nginx.yaml
+                          - $deploy/{{.name}}/helm-configs/ingress-nginx.yaml
                         ignoreMissingValueFiles: true
                     - repoURL: https://kubernetes.github.io/ingress-nginx
                       chart: ingress-nginx
@@ -79,7 +79,7 @@ spec:
                               default: false
                               controllerValue: "k8s.io/provisioning-ingress-nginx"  # default: k8s.io/ingress-nginx
                         valueFiles:
-                          - $secrets/{{.name}}/helm-configs/provisioning-ingress-nginx.yaml
+                          - $deploy/{{.name}}/helm-configs/provisioning-ingress-nginx.yaml
                         ignoreMissingValueFiles: true
                 - component: cilium
                   skipComponent: '{{has "cilium" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
