@@ -18,7 +18,7 @@ repo.
 
 ### Kustomize
 
-To make changes you will need to add or modify files in `$DEPLOY_NAME/secrets/$APPLICATION/`
+To make changes you will need to add or modify files in `$DEPLOY_NAME/manifests/$APPLICATION/`
 in your deployment repo.
 
 ## Removing an application for a specific deploy

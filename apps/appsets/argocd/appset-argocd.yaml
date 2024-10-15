@@ -48,7 +48,7 @@ spec:
                     value: {{.name}}-cluster-issuer
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-          path: '{{.name}}/secrets/argocd'
+          path: '{{.name}}/manifests/argocd'
       ignoreDifferences:
         - kind: Secret
           namespace: argocd

@@ -68,7 +68,7 @@ kubectl --namespace dex \
     --from-literal=client-id={client_id} \
     --from-literal=client-secret={client_secret} \
     --from-literal=redirect-uri=https://dex.${DNS_ZONE}/callback \
-    -o yaml > ${UC_DEPLOY}/${DEPLOY_NAME}/secrets/secret-oidc-sso-dex.yaml
+    -o yaml > ${UC_DEPLOY}/${DEPLOY_NAME}/manifests/secret-oidc-sso-dex.yaml
 ```
 
 You must remember to add this secret to your secret storage (e.g. for
