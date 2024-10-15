@@ -27,6 +27,7 @@ fi
 # set temp path so we can reset it after import
 UC_REPO_PATH="$(cd "${SCRIPTS_DIR}" && git rev-parse --show-toplevel)"
 
+# shellcheck disable=SC1090
 . "$1"
 
 # set the value again after import
