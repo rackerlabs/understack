@@ -47,10 +47,8 @@ if [ "x${DEPLOY_NAME}" = "x" ]; then
     usage
 fi
 
-UC_REPO_APPS="${UC_REPO}/apps"
 UC_REPO_COMPONENTS="${UC_REPO}/components"
-UC_DEPLOY_CLUSTER="${UC_DEPLOY}/clusters/${DEPLOY_NAME}"
-UC_DEPLOY_HELM_CFG="${UC_DEPLOY}/helm-configs/${DEPLOY_NAME}"
+UC_DEPLOY_HELM_CFG="${UC_DEPLOY}/${DEPLOY_NAME}/helm-configs"
 
 export DNS_ZONE
 export UC_DEPLOY_GIT_URL

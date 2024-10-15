@@ -42,7 +42,7 @@ for production deployments.
 # from your understack checkout
 ./scripts/gitops-secrets-gen.sh ${UC_DEPLOY}/my-region.env
 pushd "${UC_DEPLOY}"
-git add secrets/my-region
+git add my-region
 git commit -m "my-region: secrets generation"
 popd
 ```
@@ -51,7 +51,7 @@ popd
 
 Now you must generate a configuration for your cluster, which will need to
 live where you deploy ArgoCD Applications. Within this repos scripts that
-would be `$UC_DEPLOY/secrets/$MAIN_DEPLOY/argocd/` and then you must
+would be `$UC_DEPLOY/$MAIN_DEPLOY/secrets/argocd/` and then you must
 add the file to the `kustomization.yaml` resources.
 
 ```bash title="generating a cluster config"
@@ -91,7 +91,7 @@ Once you've completed your cluster config you can run it through `kubeseal`
 with:
 
 ```bash
-cat cluster-config.yaml | kubeseal -o yaml -w $UC_DEPLOY/secrets/$MAIN_DEPLOY/argocd/secret-my-region-cluster.yaml
+cat cluster-config.yaml | kubeseal -o yaml -w $UC_DEPLOY/$MAIN_DEPLOY/secrets/argocd/secret-my-region-cluster.yaml
 ```
 
 [gitops]: <https://about.gitlab.com/topics/gitops/>

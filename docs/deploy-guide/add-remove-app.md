@@ -13,12 +13,12 @@ first determine if it's being deployed with Helm or Kustomize.
 ### Helm
 
 Most of the applications can have their Helm values overridden by adding
-or modifying `helm-configs/$DEPLOY_NAME/$APPLICATION.yaml` in your deployment
+or modifying `$DEPLOY_NAME/helm-configs/$APPLICATION.yaml` in your deployment
 repo.
 
 ### Kustomize
 
-To make changes you will need to add or modify files in `secrets/$DEPLOY_NAME/$APPLICATION/`
+To make changes you will need to add or modify files in `$DEPLOY_NAME/secrets/$APPLICATION/`
 in your deployment repo.
 
 ## Removing an application for a specific deploy
