@@ -10,6 +10,8 @@ def valid_yaml():
     return """
 ---
 name: gp2.ultramedium
+manufacturer: Dell
+model: PowerEdge R7615
 memory_gb: 7777
 cpu_cores: 245
 cpu_models:
@@ -17,9 +19,6 @@ cpu_models:
 drives:
     - 960
     - 960
-devices:
-    - PowerEdge R7515
-    - PowerEdge R7615
 """
 
 
@@ -47,11 +46,12 @@ def yaml_directory(tmp_path, valid_yaml, invalid_yaml):
 def test_from_yaml(valid_yaml):
     spec = FlavorSpec.from_yaml(valid_yaml)
     assert spec.name == "gp2.ultramedium"
+    assert spec.manufacturer == "Dell"
+    assert spec.model == "PowerEdge R7615"
     assert spec.memory_gb == 7777
     assert spec.cpu_cores == 245
     assert spec.cpu_models == ["AMD EPYC 9254 245-Core Processor"]
     assert spec.drives == [960, 960]
-    assert spec.devices == ["PowerEdge R7515", "PowerEdge R7615"]
 
 
 def test_from_yaml_invalid(invalid_yaml):
@@ -115,27 +115,30 @@ def flavors():
     return [
         FlavorSpec(
             name="small",
+            manufacturer="Dell",
+            model="Fake Machine",
             memory_gb=100,
             cpu_cores=13,
-            cpu_models=["AMD EPYC 9254 245-Core Processor", "Pentium 60"],
+            cpu_models=["AMD EPYC 9254 245-Core Processor"],
             drives=[500, 500],
-            devices=[],
         ),
         FlavorSpec(
             name="medium",
+            manufacturer="Dell",
+            model="Fake Machine",
             memory_gb=200,
             cpu_cores=15,
-            cpu_models=["AMD EPYC 9254 245-Core Processor", "Intel 80386DX"],
+            cpu_models=["AMD EPYC 9254 245-Core Processor"],
             drives=[1500, 1500],
-            devices=[],
         ),
         FlavorSpec(
             name="large",
+            manufacturer="Dell",
+            model="Fake Machine",
             memory_gb=400,
             cpu_cores=27,
             cpu_models=["AMD EPYC 9254 245-Core Processor"],
             drives=[1800, 1800],
-            devices=[],
         ),
     ]
 
