@@ -53,9 +53,9 @@ spec:
       helm:
         # context omitted
         valuesFiles:
-            - $values/components/dexidp/values-generic.yaml
-            - $values/components/dexidp/values-azure.yaml
-            - $secrets/YOUR_CLUSTER/helm-configs/dexidp.yaml
+            - $understack/components/dexidp/values-generic.yaml
+            - $understack/components/dexidp/values-azure.yaml
+            - $deploy/YOUR_CLUSTER/helm-configs/dexidp.yaml
 # rest omitted
 ```
 
