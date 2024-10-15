@@ -9,27 +9,30 @@ def sample_flavors():
     return [
         FlavorSpec(
             name="small",
+            manufacturer="Dell",
+            model="Fake Machine",
             memory_gb=4,
             cpu_cores=2,
-            cpu_models=["x86", "ARM"],
+            cpu_models=["x86"],
             drives=[20],
-            devices=[],
         ),
         FlavorSpec(
             name="medium",
+            manufacturer="Dell",
+            model="Fake Machine",
             memory_gb=8,
             cpu_cores=4,
             cpu_models=["x86"],
             drives=[40],
-            devices=[],
         ),
         FlavorSpec(
             name="large",
+            manufacturer="Dell",
+            model="Fake Machine",
             memory_gb=16,
             cpu_cores=8,
             cpu_models=["x86"],
             drives=[80],
-            devices=[],
         ),
     ]
 

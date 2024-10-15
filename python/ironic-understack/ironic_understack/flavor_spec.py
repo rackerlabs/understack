@@ -9,22 +9,24 @@ from ironic_understack.machine import Machine
 @dataclass
 class FlavorSpec:
     name: str
+    manufacturer: str
+    model: str
     memory_gb: int
     cpu_cores: int
     cpu_models: list[str]
     drives: list[int]
-    devices: list[str]
 
     @staticmethod
     def from_yaml(yaml_str: str) -> "FlavorSpec":
         data = yaml.safe_load(yaml_str)
         return FlavorSpec(
             name=data["name"],
+            manufacturer=data["manufacturer"],
+            model=data["model"],
             memory_gb=data["memory_gb"],
             cpu_cores=data["cpu_cores"],
             cpu_models=data["cpu_models"],
             drives=data["drives"],
-            devices=data["devices"],
         )
 
     @staticmethod
