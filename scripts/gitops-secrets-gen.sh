@@ -60,7 +60,7 @@ fi
 
 export DNS_ZONE
 export DEPLOY_NAME
-DEST_DIR="${UC_DEPLOY}/${DEPLOY_NAME}/secrets"
+DEST_DIR="${UC_DEPLOY}/${DEPLOY_NAME}/manifests"
 mkdir -p "${DEST_DIR}"
 
 ###

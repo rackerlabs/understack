@@ -174,13 +174,13 @@ to your git server so that ArgoCD can access it.
 Configure your ArgoCD to be aware of your cluster:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/secrets/argocd/secret-*-cluster.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/manifests/argocd/secret-*-cluster.yaml"
 ```
 
 Now configure your ArgoCD to have the credential access to your deploy repo:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/secrets/argocd/secret-deploy-repo.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/manifests/argocd/secret-deploy-repo.yaml"
 ```
 
 Label the node(s) to allow OpenStack control plane installation:

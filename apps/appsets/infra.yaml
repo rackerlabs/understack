@@ -29,7 +29,7 @@ spec:
                             enabled: true
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: '{{.name}}/secrets/cert-manager'
+                      path: '{{.name}}/manifests/cert-manager'
                 - component: metallb-system
                   skipComponent: '{{has "metallb" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
@@ -38,7 +38,7 @@ spec:
                       path: 'bootstrap/metallb'
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: '{{.name}}/secrets/metallb'
+                      path: '{{.name}}/manifests/metallb'
                   ignoreDifferences:
                     - group: "apiextensions.k8s.io"
                       kind: CustomResourceDefinition
@@ -88,7 +88,7 @@ spec:
                     # and environment specific stuff here
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: '{{.name}}/secrets/cilium'
+                      path: '{{.name}}/manifests/cilium'
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"

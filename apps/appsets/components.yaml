@@ -42,7 +42,7 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
-                      path: '{{.name}}/secrets/dex'
+                      path: '{{.name}}/manifests/dex'
                     - repoURL: https://charts.dexidp.io
                       chart: dex
                       targetRevision: 0.16.0
@@ -65,7 +65,7 @@ spec:
                       path: 'components/openstack'
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: '{{.name}}/secrets/openstack'
+                      path: '{{.name}}/manifests/openstack'
                 - component: undersync
                   skipComponent: '{{has "undersync" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
@@ -74,7 +74,7 @@ spec:
                       path: 'components/undersync'
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: '{{.name}}/secrets/undersync'
+                      path: '{{.name}}/manifests/undersync'
                 - component: nautobot
                   skipComponent: '{{has "nautobot" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
@@ -85,7 +85,7 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
-                      path: '{{.name}}/secrets/nautobot'
+                      path: '{{.name}}/manifests/nautobot'
                     - repoURL: https://nautobot.github.io/helm-charts/
                       chart: nautobot
                       targetRevision: 2.1.3
@@ -169,7 +169,7 @@ spec:
                       path: 'components/argo-events'
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: '{{.name}}/secrets/argo-events'
+                      path: '{{.name}}/manifests/argo-events'
                 - component: understack-workflows
                   componentNamespace: argo-events
                   skipComponent: '{{has "understack-workflows" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
