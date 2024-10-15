@@ -10,5 +10,8 @@ RUN apt-get update && \
         patch \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+COPY containers/ironic/bios-apply-no-ipa.patch /tmp/
+RUN patch -d /var/lib/openstack/lib/python3.10/site-packages -p1 < /tmp/bios-apply-no-ipa.patch
+
 COPY python/ironic-understack /tmp/ironic-understack
 RUN /var/lib/openstack/bin/python -m pip install --no-cache --no-cache-dir /tmp/ironic-understack sushy-oem-idrac==5.0.0
