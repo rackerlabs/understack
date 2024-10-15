@@ -60,9 +60,10 @@ def main():
 
     - Find BMC interface
 
-    - TODO Find or create DRAC network prefix
+    - TODO Find or create DRAC network prefix?  Actually DHCP does this already
 
-    - TODO create BMC IP address assignment for BMC interface
+    - TODO create BMC IP address assignment for BMC interface - convert our type
+      "DHCP" IP Address to type "host" and associate it with the interface?
 
     - For each server interface
         - find or create server interface by name in nautobot
@@ -89,7 +90,7 @@ def main():
 
     bmc = bmc_for_ip_address(bmc_ip_address, password=args.bmc_password)
     if args.bmc_password is None:
-        logger.info("Setting BMC password to bmc.password")
+        logger.info("Setting BMC password")
         set_bmc_password(bmc.ip_address, bmc.password)
 
     # TODO: make this pseudo-idempotent by ignoring the error when a job is already scheduled:

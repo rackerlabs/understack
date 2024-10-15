@@ -8,6 +8,7 @@ from understack_workflows.node_configuration import IronicNodeConfiguration
 STATES_ALLOWING_UPDATES = ["enroll", "manageable"]
 
 def create_or_update(node_uuid: str, device_hostname: str, bmc: Bmc, logger):
+    """Note interfaces/ports are not synced here, that happens elsewhere"""
     client = IronicClient()
 
     logger.debug(f"Ensuring node with UUID {node_uuid} exists in Ironic")
@@ -49,12 +50,10 @@ def create_ironic_node(
         bmc: Bmc,
 ) -> IronicNodeConfiguration:
         driver = "idrac" if bmc.bmc_type == "iDRAC" else "redfish"
-        # TODO: are we supposed to set something to do with interface here?
-
         return client.create_node(
             {
-                "device_id": node_uuid,
-                "device_name": device_hostname,
+                "uuid": node_uuid,
+                "name": device_hostname,
                 "driver": driver,
                 "driver_info": {
                     "redfish_address": bmc.url(),
