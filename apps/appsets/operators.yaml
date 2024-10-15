@@ -34,7 +34,7 @@ spec:
                         releaseName: rook-ceph
                         valueFiles:
                           - $understack/operators/rook/values-operator.yaml
-                          - $deploy/helm-configs/{{.name}}/rook-operator.yaml
+                          - $deploy/{{.name}}/helm-configs/rook-operator.yaml
                         ignoreMissingValueFiles: true
                     - repoURL: https://charts.rook.io/release
                       chart: rook-ceph-cluster
@@ -43,7 +43,7 @@ spec:
                         releaseName: rook-ceph-cluster
                         valueFiles:
                           - $understack/operators/rook/values-cluster.yaml
-                          - $deploy/helm-configs/{{.name}}/rook-cluster.yaml
+                          - $deploy/{{.name}}/helm-configs/rook-cluster.yaml
                         ignoreMissingValueFiles: true
                 - component: cnpg-system
                   skipComponent: '{{has "cnpg-system" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
@@ -87,7 +87,7 @@ spec:
                         releaseName: kube-prometheus-stack
                         valueFiles:
                           - $understack/operators/monitoring/values.yaml
-                          - $deploy/helm-configs/{{.name}}/monitoring.yaml
+                          - $deploy/{{.name}}/helm-configs/monitoring.yaml
                         ignoreMissingValueFiles: true
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it

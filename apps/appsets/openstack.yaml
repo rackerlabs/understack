@@ -44,7 +44,7 @@ spec:
           ref: understack
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-          path: 'secrets/{{.name}}/{{.component}}'
+          path: '{{.name}}/secrets/{{.component}}'
           ref: secrets
         - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
           chart: '{{.component}}'
@@ -54,8 +54,8 @@ spec:
             valueFiles:
               - $understack/components/openstack-2024.1-jammy.yaml
               - $understack/components/{{.component}}/aio-values.yaml
-              - $secrets/secrets/{{.name}}/secret-openstack.yaml
-              - $secrets/helm-configs/{{.name}}/{{.component}}.yaml
+              - $secrets/{{.name}}/secrets/secret-openstack.yaml
+              - $secrets/{{.name}}/helm-configs/{{.component}}.yaml
             # don't require all the values files
             ignoreMissingValueFiles: true
       ignoreDifferences:

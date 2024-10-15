@@ -60,8 +60,8 @@ fi
 
 export DNS_ZONE
 export DEPLOY_NAME
-mkdir -p "${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
-DEST_DIR="${UC_DEPLOY}/secrets/${DEPLOY_NAME}"
+DEST_DIR="${UC_DEPLOY}/${DEPLOY_NAME}/secrets"
+mkdir -p "${DEST_DIR}"
 
 ###
 ### start of secrets for each component

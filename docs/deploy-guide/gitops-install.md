@@ -132,7 +132,7 @@ for production deployments.
 # from your understack checkout
 ./scripts/gitops-secrets-gen.sh ${UC_DEPLOY}/my-k3s.env
 pushd "${UC_DEPLOY}"
-git add secrets/my-k3s
+git add my-k3s
 git commit -m "my-k3s: secrets generation"
 popd
 ```
@@ -146,8 +146,7 @@ the deployment of all the components of UnderStack.
 # from your understack checkout
 ./scripts/gitops-deploy.sh ${UC_DEPLOY}/my-k3s.env
 pushd "${UC_DEPLOY}"
-git add clusters/my-k3s
-git add helm-configs/my-k3s
+git add my-k3s
 git commit -m "my-k3s: initial cluster config"
 popd
 ```
@@ -163,7 +162,7 @@ ensure that you `git push` your `$UC_DEPLOY` repo so that ArgoCD can access it.
 
 For authentication, please review the [authentication](auth.md) documentation.
 
-For OpenStack Helm components, an empty file in `$UC_DEPLOY/helm-configs/my-k3s`
+For OpenStack Helm components, an empty file in `$UC_DEPLOY/my-k3s/helm-configs`
 has been created for each component for you to use for customization.
 
 ## Doing the Deployment
@@ -175,13 +174,13 @@ to your git server so that ArgoCD can access it.
 Configure your ArgoCD to be aware of your cluster:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-*-cluster.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/secrets/argocd/secret-*-cluster.yaml"
 ```
 
 Now configure your ArgoCD to have the credential access to your deploy repo:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/secrets/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/secrets/argocd/secret-deploy-repo.yaml"
 ```
 
 Label the node(s) to allow OpenStack control plane installation:

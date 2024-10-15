@@ -29,7 +29,7 @@ spec:
                             enabled: true
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: 'secrets/{{.name}}/cert-manager'
+                      path: '{{.name}}/secrets/cert-manager'
                 - component: metallb-system
                   skipComponent: '{{has "metallb" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
@@ -38,7 +38,7 @@ spec:
                       path: 'bootstrap/metallb'
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: 'secrets/{{.name}}/metallb'
+                      path: '{{.name}}/secrets/metallb'
                   ignoreDifferences:
                     - group: "apiextensions.k8s.io"
                       kind: CustomResourceDefinition
@@ -62,7 +62,7 @@ spec:
                       helm:
                         releaseName: ingress-nginx
                         valueFiles:
-                          - $secrets/helm-configs/{{.name}}/ingress-nginx.yaml
+                          - $secrets/{{.name}}/helm-configs/ingress-nginx.yaml
                         ignoreMissingValueFiles: true
                     - repoURL: https://kubernetes.github.io/ingress-nginx
                       chart: ingress-nginx
@@ -79,7 +79,7 @@ spec:
                               default: false
                               controllerValue: "k8s.io/provisioning-ingress-nginx"  # default: k8s.io/ingress-nginx
                         valueFiles:
-                          - $secrets/helm-configs/{{.name}}/provisioning-ingress-nginx.yaml
+                          - $secrets/{{.name}}/helm-configs/provisioning-ingress-nginx.yaml
                         ignoreMissingValueFiles: true
                 - component: cilium
                   skipComponent: '{{has "cilium" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
@@ -88,7 +88,7 @@ spec:
                     # and environment specific stuff here
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: 'secrets/{{.name}}/cilium'
+                      path: '{{.name}}/secrets/cilium'
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
