@@ -1,0 +1,26 @@
+diff --git a/ironic/drivers/modules/redfish/bios.py b/ironic/drivers/modules/redfish/bios.py
+index 6e72f0bfd..09dc10c94 100644
+--- a/ironic/drivers/modules/redfish/bios.py
++++ b/ironic/drivers/modules/redfish/bios.py
+@@ -142,8 +142,8 @@ class RedfishBIOS(base.BIOSInterface):
+             objects.BIOSSettingList.delete(
+                 task.context, node_id, delete_names)
+
+-    @base.clean_step(priority=0)
++    @base.clean_step(priority=0, requires_ramdisk=False)
+     @base.deploy_step(priority=0)
+     @base.cache_bios_settings
+     def factory_reset(self, task):
+         """Reset the BIOS settings of the node to the factory default.
+@@ -186,9 +186,9 @@ class RedfishBIOS(base.BIOSInterface):
+                       {'node_uuid': node.uuid, 'attrs': current_attrs})
+             self._clear_reboot_requested(task)
+
+-    @base.service_step(priority=0, argsinfo=_APPLY_CONFIGURATION_ARGSINFO)
+-    @base.clean_step(priority=0, argsinfo=_APPLY_CONFIGURATION_ARGSINFO)
++    @base.service_step(priority=0, argsinfo=_APPLY_CONFIGURATION_ARGSINFO, requires_ramdisk=False)
++    @base.clean_step(priority=0, argsinfo=_APPLY_CONFIGURATION_ARGSINFO, requires_ramdisk=False)
+     @base.deploy_step(priority=0, argsinfo=_APPLY_CONFIGURATION_ARGSINFO)
+     @base.cache_bios_settings
+     def apply_configuration(self, task, settings):
+         """Apply the BIOS settings to the node.
