@@ -1,0 +1,101 @@
+{
+  "@odata.context": "/redfish/v1/$metadata#DellSwitchConnectionCollection.DellSwitchConnectionCollection",
+  "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections",
+  "@odata.type": "#DellSwitchConnectionCollection.DellSwitchConnectionCollection",
+  "Description": "A collection of DellSwitchConnection resource",
+  "Members": [
+    {
+      "@odata.context": "/redfish/v1/$metadata#DellSwitchConnection.DellSwitchConnection",
+      "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/iDRAC.Embedded.1",
+      "@odata.type": "#DellSwitchConnection.v1_1_0.DellSwitchConnection",
+      "Description": "An instance of DellSwitchConnection will have the switch connection view information of all the ports.",
+      "FQDD": "iDRAC.Embedded.1",
+      "Id": "iDRAC.Embedded.1",
+      "InstanceID": "iDRAC.Embedded.1",
+      "Name": "DellSwitchConnection",
+      "StaleData": "NotStale",
+      "SwitchConnectionID": "c4:4d:84:48:61:80",
+      "SwitchPortConnectionID": "Gi1/0/3"
+    },
+    {
+      "@odata.context": "/redfish/v1/$metadata#DellSwitchConnection.DellSwitchConnection",
+      "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/NIC.Embedded.1-1-1",
+      "@odata.type": "#DellSwitchConnection.v1_1_0.DellSwitchConnection",
+      "Description": "An instance of DellSwitchConnection will have the switch connection view information of all the ports.",
+      "FQDD": "NIC.Embedded.1-1-1",
+      "Id": "NIC.Embedded.1-1-1",
+      "InstanceID": "NIC.Embedded.1-1-1",
+      "Name": "DellSwitchConnection",
+      "StaleData": "NotStale",
+      "SwitchConnectionID": "No Link",
+      "SwitchPortConnectionID": "No Link"
+    },
+    {
+      "@odata.context": "/redfish/v1/$metadata#DellSwitchConnection.DellSwitchConnection",
+      "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/NIC.Embedded.2-1-1",
+      "@odata.type": "#DellSwitchConnection.v1_1_0.DellSwitchConnection",
+      "Description": "An instance of DellSwitchConnection will have the switch connection view information of all the ports.",
+      "FQDD": "NIC.Embedded.2-1-1",
+      "Id": "NIC.Embedded.2-1-1",
+      "InstanceID": "NIC.Embedded.2-1-1",
+      "Name": "DellSwitchConnection",
+      "StaleData": "NotStale",
+      "SwitchConnectionID": "No Link",
+      "SwitchPortConnectionID": "No Link"
+    },
+    {
+      "@odata.context": "/redfish/v1/$metadata#DellSwitchConnection.DellSwitchConnection",
+      "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/NIC.Integrated.1-1-1",
+      "@odata.type": "#DellSwitchConnection.v1_1_0.DellSwitchConnection",
+      "Description": "An instance of DellSwitchConnection will have the switch connection view information of all the ports.",
+      "FQDD": "NIC.Integrated.1-1-1",
+      "Id": "NIC.Integrated.1-1-1",
+      "InstanceID": "NIC.Integrated.1-1-1",
+      "Name": "DellSwitchConnection",
+      "StaleData": "NotStale",
+      "SwitchConnectionID": "c4:7e:e0:e4:10:7f",
+      "SwitchPortConnectionID": "Ethernet1/5"
+    },
+    {
+      "@odata.context": "/redfish/v1/$metadata#DellSwitchConnection.DellSwitchConnection",
+      "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/NIC.Integrated.1-2-1",
+      "@odata.type": "#DellSwitchConnection.v1_1_0.DellSwitchConnection",
+      "Description": "An instance of DellSwitchConnection will have the switch connection view information of all the ports.",
+      "FQDD": "NIC.Integrated.1-2-1",
+      "Id": "NIC.Integrated.1-2-1",
+      "InstanceID": "NIC.Integrated.1-2-1",
+      "Name": "DellSwitchConnection",
+      "StaleData": "NotStale",
+      "SwitchConnectionID": "c4:7e:e0:e4:32:df",
+      "SwitchPortConnectionID": "Ethernet1/5"
+    },
+    {
+      "@odata.context": "/redfish/v1/$metadata#DellSwitchConnection.DellSwitchConnection",
+      "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/NIC.Slot.1-1-1",
+      "@odata.type": "#DellSwitchConnection.v1_1_0.DellSwitchConnection",
+      "Description": "An instance of DellSwitchConnection will have the switch connection view information of all the ports.",
+      "FQDD": "NIC.Slot.1-1-1",
+      "Id": "NIC.Slot.1-1-1",
+      "InstanceID": "NIC.Slot.1-1-1",
+      "Name": "DellSwitchConnection",
+      "StaleData": "NotStale",
+      "SwitchConnectionID": "c4:7e:e0:e4:32:df",
+      "SwitchPortConnectionID": "Ethernet1/6"
+    },
+    {
+      "@odata.context": "/redfish/v1/$metadata#DellSwitchConnection.DellSwitchConnection",
+      "@odata.id": "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/NIC.Slot.1-2-1",
+      "@odata.type": "#DellSwitchConnection.v1_1_0.DellSwitchConnection",
+      "Description": "An instance of DellSwitchConnection will have the switch connection view information of all the ports.",
+      "FQDD": "NIC.Slot.1-2-1",
+      "Id": "NIC.Slot.1-2-1",
+      "InstanceID": "NIC.Slot.1-2-1",
+      "Name": "DellSwitchConnection",
+      "StaleData": "NotStale",
+      "SwitchConnectionID": "c4:7e:e0:e4:10:7f",
+      "SwitchPortConnectionID": "Ethernet1/6"
+    }
+  ],
+  "Members@odata.count": 7,
+  "Name": "DellSwitchConnectionCollection"
+}
