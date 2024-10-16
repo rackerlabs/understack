@@ -64,6 +64,13 @@ spec:
                         valueFiles:
                           - $deploy/{{.name}}/helm-configs/ingress-nginx.yaml
                         ignoreMissingValueFiles: true
+                - component: provisioning-ingress-nginx
+                  componentNamespace: ingress-nginx
+                  skipComponent: '{{has "provisioning-ingress-nginx" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: secrets
                     - repoURL: https://kubernetes.github.io/ingress-nginx
                       chart: ingress-nginx
                       targetRevision: 4.9.1

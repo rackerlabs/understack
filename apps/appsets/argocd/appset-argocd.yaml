@@ -45,7 +45,7 @@ spec:
                     value: argocd.{{index .metadata.annotations "dns_zone"}}
                   - op: replace
                     path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
-                    value: {{.name}}-cluster-issuer
+                    value: understack-cluster-issuer
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
           path: '{{.name}}/manifests/argocd'
