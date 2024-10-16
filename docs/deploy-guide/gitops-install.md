@@ -129,12 +129,9 @@ has been chosen; other tools like Vault, SOPS, etc should be considered
 for production deployments.
 
 ```bash
-# from your understack checkout
-./scripts/gitops-secrets-gen.sh ${UC_DEPLOY}/my-k3s.env
-pushd "${UC_DEPLOY}"
-git add my-k3s
-git commit -m "my-k3s: secrets generation"
-popd
+./scripts/gitops-secrets-gen.sh ./my-k3s.env
+git -C "${UC_DEPLOY}" add secrets/my-k3s
+git -C "${UC_DEPLOY}" commit -m "my-k3s: secrets generation"
 ```
 
 ### Defining the app deployment
@@ -143,12 +140,9 @@ In this section we will use the [App of Apps][app-of-apps] pattern to define
 the deployment of all the components of UnderStack.
 
 ```bash
-# from your understack checkout
 ./scripts/gitops-deploy.sh ${UC_DEPLOY}/my-k3s.env
-pushd "${UC_DEPLOY}"
-git add my-k3s
-git commit -m "my-k3s: initial cluster config"
-popd
+git -C "${UC_DEPLOY}" add helm-configs/my-k3s
+git -C "${UC_DEPLOY}" commit -m "my-k3s: initial cluster config"
 ```
 
 ## Final modifications of your deployment
@@ -192,8 +186,7 @@ kubectl label node $(kubectl get nodes -o 'jsonpath={.items[*].metadata.name}') 
 Finally run the following to have ArgoCD deploy the system:
 
 ```bash
-# from your understack checkout
-kubectl apply -f apps/aio-app-of-apps.yaml
+kubectl -n argocd apply -f apps/aio-app-of-apps.yaml
 ```
 
 At this point ArgoCD will work to deploy Understack.
