@@ -30,6 +30,7 @@ def mock_args(monkeypatch):
 def fake_client(mocker):
     return mocker.patch("understack_workflows.ironic.client.IronicClient")
 
+
 @pytest.fixture
 def mock_creds(mocker):
     mock = mocker.patch("understack_workflows.node_configuration.credential")

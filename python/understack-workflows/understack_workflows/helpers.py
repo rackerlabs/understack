@@ -58,4 +58,3 @@ def credential(subpath, item):
     ref = pathlib.Path("/etc").joinpath(subpath).joinpath(item)
     with ref.open() as f:
         return f.read().strip()
-

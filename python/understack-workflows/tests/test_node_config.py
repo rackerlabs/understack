@@ -25,11 +25,13 @@ def bmc_ip(interface_event: dict) -> str:
 def ironic_client() -> IronicClient:
     return MagicMock(spec_set=IronicClient)
 
+
 @pytest.fixture
 def mock_creds(mocker):
     mock = mocker.patch("understack_workflows.node_configuration.credential")
     mock.return_value = "ultra-secret credential value"
     return mock
+
 
 def test_node_config_from_event_none_event():
     with pytest.raises(ValueError):

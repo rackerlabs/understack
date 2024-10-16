@@ -15,6 +15,7 @@ logger = setup_logger(__name__)
 def is_off_board(interface):
     return "Embedded ALOM" in interface.location or "Embedded" not in interface.location
 
+
 def argument_parser(name):
     parser = argparse.ArgumentParser(
         prog=os.path.basename(name), description="Nautobot Interface sync"

@@ -198,7 +198,7 @@ class IronicNodeConfiguration:
         driver = "idrac" if data["name"] == "iDRAC" else "redfish"
 
         bmc_master_key = credential("bmc_master", "key")
-        bmc_ip_address = data['ip_addresses'][0]['host']
+        bmc_ip_address = data["ip_addresses"][0]["host"]
         bmc_username = "root"
         bmc_password = standard_password(bmc_ip_address, bmc_master_key)
 
@@ -207,7 +207,7 @@ class IronicNodeConfiguration:
             redfish_verify_ca=False,
             redfish_username=bmc_username,
             redfish_password=bmc_password,
-            )
+        )
 
         return IronicNodeConfiguration(
             data["device"]["id"],

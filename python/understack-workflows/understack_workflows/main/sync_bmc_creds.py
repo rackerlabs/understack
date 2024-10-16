@@ -48,7 +48,7 @@ def main():
         sys.exit(0)
 
     # Update BMC credentials
-    bmc_ip_address = interface_update_event['data']['ip_addresses'][0]['host']
+    bmc_ip_address = interface_update_event["data"]["ip_addresses"][0]["host"]
     master_secret = credential("bmc_master", "key")
     expected_username = "root"
     expected_password = standard_password(bmc_ip_address, master_secret)
