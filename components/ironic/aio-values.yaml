@@ -61,6 +61,12 @@ conf:
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
       hooks: "$default_hooks,parse-lldp,local-link-connection,physical-network"
+    # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
+    sensor_data:
+      send_sensor_data: true
+      enable_for_undeployed_nodes: true
+    metrics:
+      backend: collector
 
 endpoints:
   oslo_messaging:
