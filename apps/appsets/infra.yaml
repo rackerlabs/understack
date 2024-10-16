@@ -70,7 +70,7 @@ spec:
                   sources:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      ref: secrets
+                      ref: deploy
                     - repoURL: https://kubernetes.github.io/ingress-nginx
                       chart: ingress-nginx
                       targetRevision: 4.9.1
