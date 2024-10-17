@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from ipaddress import IPv4Interface
+from ipaddress import IPv4Interface, IPv4Address
 
 import urllib3
 
@@ -16,6 +16,8 @@ class InterfaceInfo:
     description: str
     mac_address: str
     ipv4_address: IPv4Interface | None = None
+    ipv4_gateway: IPv4Address | None = None
+    dhcp: bool = False
     remote_switch_mac_address: str | None = None
     remote_switch_port_name: str | None = None
 
@@ -28,6 +30,10 @@ class ChassisInfo:
     bmc_ip_address: str
     bios_version: str
     interfaces: list[InterfaceInfo]
+
+    @property
+    def bmc_interface():
+        return interfaces[0]
 
 
 def chassis_info(bmc: Bmc) -> ChassisInfo:
@@ -67,15 +73,18 @@ def bmc_interface(bmc) -> dict:
     """Retrieve DRAC BMC interface info via redfish API."""
     url = "/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces/NIC.1"
     data = bmc.redfish_request(url)
+    ipv4_address, ipv4_gateway, dhcp = parse_ipv4(data["IPv4Addresses"])
     return {
         "name": "iDRAC",
         "description": "Dedicated iDRAC interface",
         "mac_address": data["MACAddress"].upper(),
-        "ipv4_address": parse_ipv4(data["IPv4Addresses"]),
+        "ipv4_address": ipv4_address,
+        "ipv4_gateway": ipv4_gateway,
+        "dhcp": dhcp,
     }
 
 
-def parse_ipv4(data: list[dict]) -> IPv4Interface | None:
+def parse_ipv4(data: list[dict]) -> tuple[IPv4Interface | None, bool]:
     """Parse the iDRAC's representation of network interface configuration.
 
     "IPv4Addresses": [
@@ -89,9 +98,13 @@ def parse_ipv4(data: list[dict]) -> IPv4Interface | None:
     Only the first address is returned
     """
     if data:
+        dhcp = (data[0]["AddressOrigin"] == "DHCP")
         address = data[0]["Address"]
         netmask = data[0]["SubnetMask"]
-        return IPv4Interface(f"{address}/{netmask}")
+        gateway = data[0]["Gateway"]
+        ipv4_address = IPv4Interface(f"{address}/{netmask}")
+        ipv4_gateway = IPv4Address(gateway)
+        return ipv4_address, ipv4_gateway, dhcp
 
 
 def in_band_interfaces(bmc: Bmc) -> list[dict]:
