@@ -15,11 +15,13 @@ INTERFACE_TYPE = "25gbase-x-sfp28"
 
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
     """Update exsiting or create new device using the Nautobot API."""
-    # TODO: a single graphql query here could fetch the device from nautobot
-    # with all existing interfaces, macs, cable and connected switches.
+    # TODO: performance: our single graphql query here fetches the device from
+    # nautobot with all existing interfaces, macs, cable and connected switches.
+    # We then query some of those items again, which adds unneccecary
+    # round-trips to the DRAC.
     #
-    # TODO: delete any extra items (however we don't want to delete cables that
-    # temporarily went down).
+    # TODO: delete any extra items from nautobot (however we don't want to
+    # delete cables that temporarily went down).
     #
     # TODO: look out for devices that have moved cabinet, or devices that are
     # taking over a switchport that is already occupied by some other device -

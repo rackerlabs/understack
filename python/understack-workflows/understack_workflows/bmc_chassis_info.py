@@ -32,8 +32,8 @@ class ChassisInfo:
     interfaces: list[InterfaceInfo]
 
     @property
-    def bmc_interface():
-        return interfaces[0]
+    def bmc_interface(self):
+        return self.interfaces[0]
 
 
 def chassis_info(bmc: Bmc) -> ChassisInfo:

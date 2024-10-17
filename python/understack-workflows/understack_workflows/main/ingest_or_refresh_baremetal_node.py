@@ -6,6 +6,7 @@ import pynautobot
 from understack_workflows import nautobot_device
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_chassis_info import chassis_info
+from understack_workflows.bmc_network_config import bmc_set_permanent_ip_addr
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
@@ -23,18 +24,21 @@ def main():
     All connected switches must have a device with the base MAC address stored
     in the asset tag field.
 
-    The Rack and Location of the switches must be correct as they will be copied
-    to the newly created server Device.
+    The Rack and Location of the switches must be correct (they will be copied
+    verbatim to the newly created server Device).
 
     The server Device type must exist, with a name that matches the "model" as
     reported by the BMC.
 
     The DRAC IP Prefix must exist.
 
+    This script has the following order of operations:
 
     - connect to the BMC, trying standard password then factory default
 
     - ensure standard BMC password is set
+
+    - TODO: if DHCP, set permanent IP address, netmask, default gw
 
     - TODO: create and install SSL certificate
 
@@ -62,15 +66,15 @@ def main():
 
     - TODO Find or create DRAC network prefix?  Actually DHCP does this already
 
-    - TODO create BMC IP address assignment for BMC interface - convert our type
-      "DHCP" IP Address to type "host" and associate it with the interface?
-
     - For each server interface
         - find or create server interface by name in nautobot
         - set interface mac addresses
         - look up switch by mac addr (is stored in Nautobot's asset tag field)
         - look up switch interface by name
         - find or create cable
+
+    - create BMC IP address assignment for BMC interface - convert our type
+      "dhcp" IP Address to type "host" and associate it with the interface
 
     -  TODO Find or create this baremetal node in Ironic
        - create ports with MACs
@@ -93,13 +97,17 @@ def main():
         logger.info("Setting BMC password")
         set_bmc_password(bmc.ip_address, bmc.password)
 
+    device_info = chassis_info(bmc)
+
     # TODO: make this pseudo-idempotent by ignoring the error when a job is already scheduled:
     # update_dell_bios_settings(bmc)
 
-    device_info = chassis_info(bmc)
-
     logger.info(f"Discovered {device_info}")
     nautobot_device.find_or_create(device_info, nautobot)
+
+
+    # Do this after Nautobot IPAddress has been changed from DHCP!
+    bmc_set_permanent_ip_addr(bmc, device_info.bmc_interface)
 
     #_ironic_provision_state = ironic_node.create_or_update(device_uuid, bmc, logger)
     #sync_interfaces.from_nautobot_to_ironic(device_id)
