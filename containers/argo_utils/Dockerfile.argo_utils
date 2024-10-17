@@ -1,9 +1,9 @@
 ARG BASE=ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest
 
-FROM ${BASE} as builder
+FROM ${BASE} AS builder
 RUN --mount=type=cache,target=/root/.cache/.pip pip install --no-cache-dir kubernetes==29.0.0
 
-FROM ${BASE} as prod
+FROM ${BASE} AS prod
 ARG APP_PATH=/app
 ARG APP_USER=appuser
 ARG APP_GROUP=appgroup
