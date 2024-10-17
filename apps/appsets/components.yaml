@@ -20,6 +20,20 @@ spec:
                 - component: dex
                   skipComponent: '{{has "dex" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
+                    - repoURL: https://charts.dexidp.io
+                      chart: dex
+                      targetRevision: 0.16.0
+                      helm:
+                        releaseName: dex
+                        valuesObject:
+                          config:
+                            issuer: 'https://dex.{{index .metadata.annotations "dns_zone" }}'
+                          env:
+                            DNS_ZONE: '{{index .metadata.annotations "dns_zone" }}'
+                        valueFiles:
+                          - $understack/components/dex/values.yaml
+                          - $deploy/{{.name}}/helm-configs/dex.yaml
+                        ignoreMissingValueFiles: true
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'components/dex'
@@ -43,20 +57,6 @@ spec:
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
                       path: '{{.name}}/manifests/dex'
-                    - repoURL: https://charts.dexidp.io
-                      chart: dex
-                      targetRevision: 0.16.0
-                      helm:
-                        releaseName: dex
-                        valuesObject:
-                          config:
-                            issuer: 'https://dex.{{index .metadata.annotations "dns_zone" }}'
-                          env:
-                            DNS_ZONE: '{{index .metadata.annotations "dns_zone" }}'
-                        valueFiles:
-                          - $understack/components/dex/values.yaml
-                          - $deploy/{{.name}}/helm-configs/dex.yaml
-                        ignoreMissingValueFiles: true
                 - component: openstack
                   skipComponent: '{{has "openstack" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
@@ -78,14 +78,6 @@ spec:
                 - component: nautobot
                   skipComponent: '{{has "nautobot" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                      path: 'components/nautobot'
-                      ref: understack
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      ref: deploy
-                      path: '{{.name}}/manifests/nautobot'
                     - repoURL: https://nautobot.github.io/helm-charts/
                       chart: nautobot
                       targetRevision: 2.1.3
@@ -106,6 +98,14 @@ spec:
                             # until ArgoCD 2.13.0 is released we cannot use a reference
                             # path: $understack/components/nautobot/nautobot_config.py
                             path: 'https://raw.githubusercontent.com/rackerlabs/understack/{{index .metadata.annotations "uc_repo_ref" }}/components/nautobot/nautobot_config.py'
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/nautobot'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
+                      path: '{{.name}}/manifests/nautobot'
                 - component: argo
                   skipComponent: '{{has "argo" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   source:
@@ -191,12 +191,6 @@ spec:
                   componentNamespace: monitoring
                   skipComponent: '{{has "openstack-exporter" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                      ref: understack
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      ref: deploy
                     - repoURL: registry.scs.community/openstack-exporter
                       chart: prometheus-openstack-exporter
                       targetRevision: 0.4.5
@@ -205,6 +199,12 @@ spec:
                         valueFiles:
                           - $deploy/{{.name}}/helm-configs/openstack-exporter.yaml
                         ignoreMissingValueFiles: true
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
