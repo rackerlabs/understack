@@ -1,4 +1,5 @@
 ARG BASE=ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest
+FROM ${BASE} AS builder
 
 ARG APP_PATH=/app
 ARG APP_USER=appuser
@@ -6,7 +7,6 @@ ARG APP_GROUP=appgroup
 ARG APP_USER_UID=1000
 ARG APP_GROUP_GID=1000
 
-FROM ${BASE} AS builder
 RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
 RUN --mount=type=cache,target=/root/.cache/.pip pip install 'wheel==0.43.0'
 RUN --mount=type=cache,target=/root/.cache/.pip \
@@ -22,6 +22,12 @@ RUN --mount=type=cache,target=/root/.cache/.pip pip wheel --wheel-dir /app/dist 
 RUN cd /app && /opt/poetry/bin/poetry build -f wheel && /opt/poetry/bin/poetry export --without-hashes -f requirements.txt -o dist/requirements.txt
 
 FROM ${BASE} AS prod
+ARG APP_PATH=/app
+ARG APP_USER=appuser
+ARG APP_GROUP=appgroup
+ARG APP_USER_UID=1000
+ARG APP_GROUP_GID=1000
+
 
 LABEL org.opencontainers.image.description="UnderStack Workflows"
 
