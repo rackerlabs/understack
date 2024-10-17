@@ -187,11 +187,15 @@ def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, sw
         if interface.remote_switch_mac_address:
             setup_nautobot_interface(nautobot, interface, device_id, switches)
 
-def setup_nautobot_interface(nautobot, interface, device_id, switches):
+def setup_nautobot_interface(nautobot, interface: InterfaceInfo, device_id, switches):
     nautobot_int = find_or_create_interface(nautobot, interface, device_id, switches)
 
     if interface.ipv4_address:
-        ip = assign_ip_address(nautobot, nautobot_int, interface.ipv4_address)
+        ip = assign_ip_address(
+            nautobot,
+            nautobot_int,
+            interface.ipv4_address,
+            interface.mac_address)
         ip = associate_ip_address(nautobot, nautobot_int, ip.id)
 
     connect_interface_to_switch(nautobot, interface, nautobot_int, switches)
@@ -257,11 +261,14 @@ def connect_interface_to_switch(nautobot, interface, server_nautobot_interface, 
     else:
         logger.info(f"Cable {cable.id} already exists in Nautobot")
 
-def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface):
+def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface, mac):
     try:
         ip = nautobot.ipam.ip_addresses.get(address=str(ipv4_address.ip))
-        if ip:
-            logger.info(f"Nautobot IP {ip.id} already exists for {ipv4_address}")
+        if ip and ip.type == "dhcp" and ip.custom_fields.get("pydhcp_mac") == mac:
+            # Make our DHCP assignment permenant:
+            ip.update(type="host", cf_pydhcp_expire=None)
+        elif ip:
+            logger.info(f"Nautobot IP already exists! {dict(ip)}")
         else:
             ip = nautobot.ipam.ip_addresses.create(
                 address=str(ipv4_address.ip),
