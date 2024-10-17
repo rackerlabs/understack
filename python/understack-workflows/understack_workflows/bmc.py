@@ -5,6 +5,9 @@ from sushy import Sushy
 
 from understack_workflows.helpers import credential
 
+import logging
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 HEADERS = {
     "Accept": "application/json",
     "Content-Type": "application/json; charset=utf-8",
