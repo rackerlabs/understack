@@ -5,6 +5,10 @@ from sushy import Sushy
 
 from understack_workflows.helpers import credential
 
+HEADERS = {
+    "Accept": "application/json",
+    "Content-Type": "application/json; charset=utf-8",
+}
 
 @dataclass
 class Bmc:
@@ -33,7 +37,8 @@ class Bmc:
             auth=(self.username, self.password),
             verify=verify,
             timeout=timeout,
-            json=payload
+            json=payload,
+            headers=HEADERS,
         )
         if r.status_code >= 400:
             raise Exception(
