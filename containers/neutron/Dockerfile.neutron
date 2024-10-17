@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG OPENSTACK_VERSION
+ARG OPENSTACK_VERSION="required_argument"
 FROM docker.io/openstackhelm/neutron:${OPENSTACK_VERSION}-ubuntu_jammy
 
 COPY python/neutron-understack /tmp/neutron-understack

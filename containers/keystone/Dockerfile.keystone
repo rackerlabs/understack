@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG OPENSTACK_VERSION
+ARG OPENSTACK_VERSION="required_argument"
 FROM docker.io/openstackhelm/keystone:${OPENSTACK_VERSION}-ubuntu_jammy
 
 COPY <<EOF /etc/apt/sources.list.d/ubuntu-mantic.list

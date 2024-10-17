@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
-FROM debian:bookworm-20240408-slim as builder
+FROM debian:bookworm-20240408-slim AS builder
 
-ENV DEBFULLNAME "Marek Skrobacki"
-ENV DEBEMAIL "marek.skrobacki@rackspace.co.uk"
+ENV DEBFULLNAME="Marek Skrobacki"
+ENV DEBEMAIL="marek.skrobacki@rackspace.co.uk"
 ENV QUILT_PATCHES=debian/patches
 
 RUN echo "deb-src http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list
@@ -29,7 +29,7 @@ RUN dch -v 2.89-2 "patched for dhcp-allowed-srvids"
 RUN dpkg-buildpackage -rfakeroot
 
 
-FROM debian:bookworm-20240408-slim as prod
+FROM debian:bookworm-20240408-slim AS prod
 
 LABEL org.opencontainers.image.description="dnsmasq for Understack's Ironic"
 
