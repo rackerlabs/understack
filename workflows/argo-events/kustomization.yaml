@@ -5,6 +5,8 @@ kind: Kustomization
 namespace: argo-events
 
 resources:
+  - eventbus/eventbus-default.yaml
+  - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
   - secrets/openstack-svc-acct.yaml
   - secrets/bmc-creds.yaml
   - secrets/placeholder-bmc-creds.yaml
