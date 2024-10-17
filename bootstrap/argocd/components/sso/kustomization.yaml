@@ -17,3 +17,4 @@ patches:
           clientID: $argocd-sso:client-id
           clientSecret: $argocd-sso:client-secret
           requestedIDTokenClaims: {"groups": {"essential": true}}
+          cliClientID: argocdcli
