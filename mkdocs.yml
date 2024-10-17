@@ -108,7 +108,6 @@ nav:
       - networking.md
     - Components:
       - component-overview.md
-      - component-argo-events.md
       - component-argo-workflows.md
       - component-understack-workflows.md
   - 'Deployment Guide':
