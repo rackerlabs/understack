@@ -36,7 +36,47 @@ uc_skip_components: |
 ## Adding an application to UnderStack
 
 Adding an application to be part of UnderStack involves modifying the
-`apps/appsets/*.yaml` file that is appropriate for what you are
+`apps/appsets/*.yaml` file that is appropriate for what you are attempting to add.
+
+The general form should be:
+
+```yaml
+# list item per ArgoCD Application
+# the component value will appear as the ArgoCD Application name
+- component: dex
+  # the below line can be added to install this into a different namespace than the component
+  # componentNamespace: dex-system
+  # this allows this component to not be installed
+  skipComponent: '{{has "dex" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+  # defines all the sources used, the upstream chart or upstream source should come first
+  # uc_repo_ in this context is the understack repo
+  # uc_deploy_ in this context is the deploy specific repo
+  sources:
+    - repoURL: https://charts.dexidp.io
+      chart: dex
+      targetRevision: 0.16.0
+      helm:
+        releaseName: dex
+        valueFiles:
+        # this pulls defaults from the understack repo
+          - $understack/components/dex/values.yaml
+        # this pulls overrides from your deploy repo
+          - $deploy/{{.name}}/helm-configs/dex.yaml
+        # this makes it so the above don't have to exist
+        ignoreMissingValueFiles: true
+    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+      # path should only be here if you have manifests you want loaded
+      path: 'components/dex'
+      # ref is used above in the chart for the valueFiles
+      ref: understack
+    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+      # ref is used in the chart valueFiles
+      ref: deploy
+      # only needed if manifests should be here
+      path: '{{.name}}/manifests/dex'
+```
 
 ## Removing an application from UnderStack
 
