@@ -38,14 +38,6 @@ spec:
     spec:
       project: default
       sources:
-        - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-          path: components/{{.component}}/
-          targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-          ref: understack
-        - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-          targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-          path: '{{.name}}/manifests/{{.component}}'
-          ref: deploy
         - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
           chart: '{{.component}}'
           targetRevision: '{{.chartVersion}}'
@@ -58,6 +50,14 @@ spec:
               - $deploy/{{.name}}/helm-configs/{{.component}}.yaml
             # don't require all the values files
             ignoreMissingValueFiles: true
+        - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+          path: components/{{.component}}/
+          targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+          ref: understack
+        - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+          targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+          path: '{{.name}}/manifests/{{.component}}'
+          ref: deploy
       ignoreDifferences:
         - kind: Secret
           name: keystone-fernet-keys

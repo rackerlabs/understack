@@ -20,13 +20,6 @@ spec:
                   componentNamespace: rook-ceph
                   skipComponent: '{{has "rook" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                      path: 'operators/rook'
-                      ref: understack
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      ref: deploy
                     - repoURL: https://charts.rook.io/release
                       chart: rook-ceph
                       targetRevision: v1.15.0
@@ -45,6 +38,13 @@ spec:
                           - $understack/operators/rook/values-cluster.yaml
                           - $deploy/{{.name}}/helm-configs/rook-cluster.yaml
                         ignoreMissingValueFiles: true
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/rook'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
                 - component: cnpg-system
                   skipComponent: '{{has "cnpg-system" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
@@ -70,16 +70,8 @@ spec:
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'operators/rabbitmq-system'
                 - component: monitoring
-                  componentNamespace: monitoring
                   skipComponent: '{{has "monitoring" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                      path: 'operators/monitoring'
-                      ref: understack
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      ref: deploy
                     - repoURL: https://prometheus-community.github.io/helm-charts
                       chart: kube-prometheus-stack
                       targetRevision: 62.6.0
@@ -89,6 +81,13 @@ spec:
                           - $understack/operators/monitoring/values.yaml
                           - $deploy/{{.name}}/helm-configs/monitoring.yaml
                         ignoreMissingValueFiles: true
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'operators/monitoring'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
