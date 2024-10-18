@@ -15,28 +15,52 @@ on:
     types: [checks_requested]
 
 jobs:
-  build-ironic-images:
+  build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ironic-images/ipa-debian-bookworm
+    strategy:
+      matrix:
+        image:
+          - name: "ubuntu"
+            release: "noble"
+          - name: "debian"
+            release: "ipa-debian-bookworm"
     steps:
-      - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
-      - uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5
+      - name: Checkout repository
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
+
+      - name: Setup python environment
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5
         id: setup-python
         with:
           python-version: '3.11'
           cache: 'pip'
-      - run: sudo apt update && sudo apt install -y debootstrap qemu-utils
-      - run: pip install -r requirements.txt
+
+      - name: Install Dependencies
+        run: sudo apt update && sudo apt install -y debootstrap qemu-utils squashfs-tools kpartx
+
+      - name: Install python packages
+        run: pip install -r requirements.txt
         working-directory: ironic-images
-      - name: Build the IPA image
-        run: bash ipa-debian-bookworm.sh
+
+      - name: Build Images
+        run: |
+          bash "${{ matrix.image.name == 'ubuntu' && format('{0}.sh', matrix.image.name) || format('{0}.sh', matrix.image.release) }}"
+          if [ "${{ matrix.image.name }}" == "ubuntu" ]; then
+            echo "qcow2_file=ironic-images/${{ matrix.image.name }}/${{ matrix.image.name }}-${{ matrix.image.release }}.qcow2" >> $GITHUB_ENV
+          elif [ "${{ matrix.image.name }}" == "debian" ]; then
+            echo "initramfs_file=ironic-images/${{ matrix.image.release }}/${{ matrix.image.release }}.initramfs" >> $GITHUB_ENV
+            echo "kernel_file=ironic-images/${{ matrix.image.release }}/${{ matrix.image.release }}.kernel" >> $GITHUB_ENV
+          fi
+        working-directory: "${{ matrix.image.name == 'ubuntu' && format('ironic-images/{0}', matrix.image.name) || format('ironic-images/{0}', matrix.image.release) }}"
         env:
-          ELEMENTS_PATH: ${{ env.pythonLocation }}/share/ironic-python-agent-builder/dib:${{ github.workspace }}/ironic-images/custom_elements
-      - name: Dynamically set timestamp environment variable
-        run: echo "TIMESTAMP=$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
-      - name: Publish IPA Release
+          # OS_VERSION variable used in ironic-images/ubuntu/ubuntu.sh
+          OS_VERSION: ${{ matrix.image.release }}
+          ELEMENTS_PATH: "${{ matrix.image.name == 'ubuntu' && '' || format('{0}/share/ironic-python-agent-builder/dib:{1}/ironic-images/custom_elements', env.pythonLocation, github.workspace) }}"
+
+      - name: Set timestamp environment variable
+        run: echo "TIMESTAMP=$(git show --no-patch --no-notes --pretty='%cd' --date=format:'%Y%m%d%H%M%S' ${{ github.sha }})" >>  $GITHUB_ENV
+
+      - name: Publish Release
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2
         with:
           name: undercloud-ironic-ipa
@@ -44,6 +68,7 @@ jobs:
           make_latest: true
           fail_on_unmatched_files: true
           files: |
-            ironic-images/ipa-debian-bookworm/ipa-debian-bookworm.initramfs
-            ironic-images/ipa-debian-bookworm/ipa-debian-bookworm.kernel
+            ${{ env.qcow2_file }}
+            ${{ env.initramfs_file }}
+            ${{ env.kernel_file }}
         if: ${{ github.ref == 'refs/heads/main' }}
