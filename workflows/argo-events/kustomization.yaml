@@ -5,6 +5,8 @@ kind: Kustomization
 namespace: argo-events
 
 resources:
+  - eventbus/eventbus-default.yaml
+  - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
   - secrets/openstack-svc-acct.yaml
   - secrets/bmc-creds.yaml
   - secrets/placeholder-bmc-creds.yaml
@@ -15,8 +17,8 @@ resources:
   - sensors/debug-sensor.yaml
   - sensors/nb-oob-interface-update.yaml
   - eventsources/nautobot-webhook.yaml
-  - roles/sensor-submit-workflow-role.yaml
-  - rolebindings/openstack-sensor-submit-workflow.yaml
+  - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
+  - serviceaccounts/openstack-sensor-submit-workflow.yaml
   - workflowtemplates/nautobot-api.yaml
   - workflowtemplates/get-device-nautobot.yaml
   - workflowtemplates/sync-interfaces-to-nautobot.yaml
