@@ -1,0 +1,11 @@
+- imagename: ubuntu-noble
+  elements:
+  - ubuntu
+  - grub2
+  - block-device-efi
+  - devuser
+  - dynamic-login
+  - simple-init
+  - baremetal
+  - bootloader
+  - package-installs
