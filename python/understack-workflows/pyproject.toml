@@ -30,6 +30,7 @@ python-ironicclient = "^5"
 sushy = "^5"
 # required by sushy but not depended on by it
 setuptools = "^70"
+kubernetes = "29.0.0"
 
 [tool.peotry.group.test]
 optional = true
@@ -41,6 +42,7 @@ pytest-cov = "^5.0.0"
 pytest-mock = "^3.14.0"
 pytest-lazy-fixtures = "^1.1.1"
 requests-mock = "^1.12.1"
+ruff = "^0.7.0"
 
 [tool.poetry.scripts]
 sync-keystone = "understack_workflows.main.sync_keystone:main"
