@@ -19,17 +19,27 @@ def create_or_update(node_uuid: str, device_hostname: str, bmc: Bmc, logger):
         ironic_node = create_ironic_node(
             client, node_uuid, device_hostname, bmc
         )
-        return
+        return ironic_node.provision_state
 
-    if ironic_node.provision_state not in STATES_ALLOWING_UPDATES:
+    if ironic_node.provision_state in STATES_ALLOWING_UPDATES:
+        update_ironic_node(client, node_uuid, device_hostname, bmc)
+    else:
         logger.info(
             f"Device {node_uuid} in Ironic is in a "
             f"{ironic_node.provision_state} provision_state, "
             f"so no updates are allowed."
         )
-        return
 
+    return ironic_node.provision_state
+
+
+def update_ironic_node(client, node_uuid, device_hostname, bmc):
+    driver = "idrac" if bmc.bmc_type == "iDRAC" else "redfish"
     updates = [
+        f"name={device_hostname}",
+        f"driver={driver}",
+        f"driver_info/redfish_address={bmc.url()}",
+        f"driver_info/redfish_verify_ca=false",
         f"driver_info/redfish_username={bmc.username}",
         f"driver_info/redfish_password={bmc.password}",
     ]
@@ -39,8 +49,6 @@ def create_or_update(node_uuid: str, device_hostname: str, bmc: Bmc, logger):
 
     response = client.update_node(node_uuid, patches)
     logger.info(f"Ironic node {node_uuid} Updated: {response=}")
-
-    return ironic_node.provision_state
 
 
 def create_ironic_node(
