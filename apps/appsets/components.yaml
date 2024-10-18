@@ -205,6 +205,24 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
+                - component: snmp-exporter
+                  componentNamespace: monitoring
+                  skipComponent: '{{has "snmp-exporter" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: https://prometheus-community.github.io/helm-charts
+                      chart: prometheus-snmp-exporter
+                      targetRevision: 5.6.0
+                      helm:
+                        releaseName: prometheus-snmp-exporter
+                        valueFiles:
+                          - $deploy/{{.name}}/helm-configs/prometheus-snmp-exporter.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
