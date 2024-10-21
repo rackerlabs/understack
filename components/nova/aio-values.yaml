@@ -45,6 +45,12 @@ conf:
       project_domain_name: infra
       project_name: baremetal
 
+bootstrap:
+  # disable using the bootstrap script for flavors since it is too limited for our needs
+  # we'll use crossplane at this time and eventually an operator
+  structured:
+    flavors:
+      enabled: false
 
 console:
   # we are working with baremetal nodes and not QEMU so we don't need novnc or spice
