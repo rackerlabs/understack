@@ -1,0 +1,11 @@
+apiVersion: openstack.crossplane.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: provider-openstack-config
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      key: config
+      name: keystone-admin-crossplane
+      namespace: openstack

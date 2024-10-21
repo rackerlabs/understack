@@ -6,3 +6,5 @@ resources:
   - keystone-mariadb-db.yaml
   - keystone-rabbitmq-queue.yaml
   - external-secret-keystone-sso.yaml
+  - secret-keystone-admin-crossplane.yaml
+  - provider-openstack-config.yaml
