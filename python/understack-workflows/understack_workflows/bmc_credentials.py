@@ -40,6 +40,7 @@ def set_bmc_password(ip_address, required_password, username="root"):
             f"Unable to log in to BMC {ip_address} with any known password!"
         )
 
+    logger.info("Changing BMC password to standard")
     _set_bmc_creds(
         ip_address, FACTORY_USER, FACTORY_PASSWORD, username, required_password
     )

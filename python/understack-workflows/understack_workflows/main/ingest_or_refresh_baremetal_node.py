@@ -94,9 +94,8 @@ def main():
 
 
     bmc = bmc_for_ip_address(bmc_ip_address, password=args.bmc_password)
-    if args.bmc_password is None:
-        logger.info("Setting BMC password")
-        set_bmc_password(bmc.ip_address, bmc.password)
+    logger.info("Checking BMC credentials")
+    set_bmc_password(bmc.ip_address, bmc.password)
 
     device_info = chassis_info(bmc)
 
