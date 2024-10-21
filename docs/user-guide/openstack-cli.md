@@ -60,9 +60,16 @@ clouds:
     protocol: openid
     auth:
       auth_url: https://your.endpoint.url/v3
-      project_domain_name: mydomain
+      project_domain_name: Default
       project_name: myproject
 ```
+
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD046 -->
+!!! Note
+
+    The Ironic nodes will be in the `infra` domain and the `baremetal` project.
+<!-- markdownlint-restore -->
 
 With the above configuration in `$HOME/.config/openstack/clouds.yaml` you
 will be able to run the OpenStack CLI as follows:
