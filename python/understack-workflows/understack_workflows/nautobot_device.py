@@ -12,8 +12,9 @@ logger = setup_logger(__name__)
 DEVICE_INITIAL_STATUS = "Active"
 DEVICE_ROLE = "server"
 INTERFACE_TYPE = "25gbase-x-sfp28"
+DRAC_INTERFACE_TYPE="1000base-t"
 
-def find_or_create(chassis_info: ChassisInfo, nautobot) -> UUID:
+def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
     """Update exsiting or create new device using the Nautobot API."""
     # TODO: performance: our single graphql query here fetches the device from
     # nautobot with all existing interfaces, macs, cable and connected switches.
@@ -71,7 +72,7 @@ def location_from(switches):
 def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
     switch_macs = {interface.remote_switch_mac_address
                     for interface in chassis_info.interfaces}
-    return {mac: nautobot_switch(nautobot, mac) for mac in switch_macs}
+    return {mac: nautobot_switch(nautobot, mac) for mac in switch_macs if mac}
 
 
 def server_device_payload(location_id, rack_id, chassis_info):
@@ -186,11 +187,11 @@ def nautobot_server(nautobot, serial: str) -> dict:
 def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
     """Update Nautobot Device Interfaces using the Nautobot API."""
     for interface in chassis_info.interfaces:
-        if interface.remote_switch_mac_address:
+        if interface.mac_address:
             setup_nautobot_interface(nautobot, interface, device_id, switches)
 
 def setup_nautobot_interface(nautobot, interface: InterfaceInfo, device_id, switches):
-    nautobot_int = find_or_create_interface(nautobot, interface, device_id, switches)
+    nautobot_int = find_or_create_interface(nautobot, interface, device_id)
 
     if interface.ipv4_address:
         ip = assign_ip_address(
@@ -200,15 +201,16 @@ def setup_nautobot_interface(nautobot, interface: InterfaceInfo, device_id, swit
             interface.mac_address)
         ip = associate_ip_address(nautobot, nautobot_int, ip.id)
 
-    connect_interface_to_switch(nautobot, interface, nautobot_int, switches)
+    if interface.remote_switch_mac_address:
+        connect_interface_to_switch(nautobot, interface, nautobot_int, switches)
 
-def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str, switches):
+def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str):
     id = {
         "device": device_id,
         "name": interface.name,
     }
     attrs = {
-        "type": INTERFACE_TYPE,
+        "type": interface_type(interface),
         "status": "Active",
         "description": interface.description,
         "mac_address": interface.mac_address,
@@ -227,6 +229,12 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str,
             f"{server_nautobot_interface.id} in Nautobot"
         )
     return server_nautobot_interface
+
+def interface_type(interface: InterfaceInfo) -> str:
+    if interface.name == "iDRAC":
+        return DRAC_INTERFACE_TYPE
+    else:
+        return INTERFACE_TYPE
 
 def connect_interface_to_switch(nautobot, interface, server_nautobot_interface, switches):
     connected_switch = switches[interface.remote_switch_mac_address]
