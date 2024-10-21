@@ -10,7 +10,23 @@ def mock_redfish(mocker):
     mock.return_value = {"AccountService": {"@odata.id": "/testme"}}
     return mock
 
-def test_set_bmc_password(mock_redfish):
+@pytest.fixture
+def mock_success_auth(mocker):
+    mock = mocker.patch("understack_workflows.bmc_credentials._verify_auth")
+    mock.return_value = "tOkEn"
+    return mock
+
+@pytest.fixture
+def mock_fail_auth(mocker):
+    mock = mocker.patch("understack_workflows.bmc_credentials._verify_auth")
+    mock.return_value = None
+    return mock
+
+
+def test_set_bmc_password_noop(mock_success_auth, mock_redfish):
     set_bmc_password("1.2.3.4", "qwertyuiop")
-    mock_redfish.assert_any_call("1.2.3.4", "/redfish/v1", "root", "qwertyuiop")
-    mock_redfish.assert_any_call("1.2.3.4", "/testme", "root", "qwertyuiop")
+    assert not mock_redfish.called
+
+def test_set_bmc_password_failed(mock_fail_auth, mock_redfish):
+    with pytest.raises(Exception):
+        set_bmc_password("1.2.3.4", "qwertyuiop")
