@@ -54,21 +54,24 @@ def _verify_auth(host: str, username: str = "root", password: str = "") -> str:
     Raises an Exception for other kinds of errors (e.g. timeout, etc)
     """
 
-    response = requests.request(
-        method="POST",
-        url=f"https://{host}/redfish/v1/SessionService/Sessions",
-        verify=False,
-        timeout=30,
-        json={"UserName": username, "Password": password},
-    )
-    if response.status_code == 401:
-        return None
-    if response.status_code >= 400:
-        raise Exception(f"BMC {host} password login failed: "
-              f" {response.status_code} {response.json()}")
-        return None
+    try:
+        response = requests.request(
+            method="POST",
+            url=f"https://{host}/redfish/v1/SessionService/Sessions",
+            verify=False,
+            timeout=30,
+            json={"UserName": username, "Password": password},
+        )
+        if response.status_code == 401:
+            return None
+        if response.status_code >= 400:
+            raise Exception(f"BMC {host} password login failed: "
+                f" {response.status_code} {response.json()}")
+            return None
 
-    return response.headers["X-Auth-Token"]
+        return response.headers["X-Auth-Token"]
+    except Exception as e:
+        raise e from None
 
 
 def _get_bmc_accounts(host: str, token: str, username: str) -> list[dict]:
@@ -136,5 +139,5 @@ def _redfish_request(
 
         else:
             return response.json()
-    except Exception:
-        raise
+    except Exception as e:
+        raise e from None
