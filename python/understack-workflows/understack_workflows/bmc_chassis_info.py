@@ -84,8 +84,10 @@ def bmc_interface(bmc) -> dict:
     }
 
 
-def parse_ipv4(data: list[dict]) -> tuple[IPv4Interface | None, bool]:
+def parse_ipv4(data: list[dict]) -> tuple[IPv4Interface, IPv4Address, bool]:
     """Parse the iDRAC's representation of network interface configuration.
+
+    Example input:
 
     "IPv4Addresses": [
         {
@@ -95,17 +97,19 @@ def parse_ipv4(data: list[dict]) -> tuple[IPv4Interface | None, bool]:
         "SubnetMask": "255.255.255.192"
         }
     ]
-    Only the first address is returned
-    """
-    if data:
-        dhcp = (data[0]["AddressOrigin"] == "DHCP")
-        address = data[0]["Address"]
-        netmask = data[0]["SubnetMask"]
-        gateway = data[0]["Gateway"]
-        ipv4_address = IPv4Interface(f"{address}/{netmask}")
-        ipv4_gateway = IPv4Address(gateway)
-        return ipv4_address, ipv4_gateway, dhcp
 
+    Only the first address in the input is considered.
+    """
+    if not data:
+        return None, None, None
+
+    dhcp = (data[0]["AddressOrigin"] == "DHCP")
+    address = data[0]["Address"]
+    netmask = data[0]["SubnetMask"]
+    gateway = data[0]["Gateway"]
+    ipv4_address = IPv4Interface(f"{address}/{netmask}")
+    ipv4_gateway = IPv4Address(gateway)
+    return ipv4_address, ipv4_gateway, dhcp
 
 def in_band_interfaces(bmc: Bmc) -> list[dict]:
     """A Collection of Ethernet Interfaces for this System."""
