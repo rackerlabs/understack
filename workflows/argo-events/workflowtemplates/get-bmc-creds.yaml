@@ -34,6 +34,7 @@ spec:
                 - name: device_id
                   value: "{{inputs.parameters.device_id}}"
           - name: get-bmc-creds
+            dependencies: [get-bmc-ip]
             template: get-standard-bmc-creds
             arguments:
               parameters:
