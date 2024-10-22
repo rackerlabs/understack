@@ -193,11 +193,9 @@ def nautobot_server(nautobot, serial: str) -> dict:
                     id name
                     device {{
                         id name
-                        location {{id name }}
+                        mac: asset_tag
+                        location {{ id name }}
                         rack {{ id name }}
-                        rel_vlan_group_to_devices {{
-                            rel_vlan_group_to_devices {{ id name }}
-                        }}
                     }}
                 }}
                 ip_addresses {{
