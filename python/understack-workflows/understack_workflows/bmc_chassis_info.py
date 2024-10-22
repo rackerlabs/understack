@@ -154,8 +154,17 @@ def lldp_data_by_name(bmc) -> dict:
     }
 
     The MAC address is from the remote switch - it matches the base MAC that is
-    found in `show version` output on a 2960, on N9k it is the mac you see in
-    `show mac address-table static | in Lo0`
+    found in `show version` output on a 2960, on N9k it is one of two things:
+
+    1) on a switch configured with `lldp chassis-id switch` this will be the the
+    mac you see in `show mac address-table static | in Lo0` or `sho vdc detail`
+    commands.  Note that this lldp configuration option is only available
+    starting in Nexus version 10.2(3)F
+
+    2) On other nexus, this mac address will be the base mac address plus the
+    port number, for example if the base mac address of the switch is
+    11:11:11:11:11:00 then the LLDP mac address seen on port e1/2 would be
+    11:11:11:11:11:02
     """
     url = "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/"
     ports = bmc.redfish_request(url)["Members"]

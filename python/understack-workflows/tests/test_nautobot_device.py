@@ -27,11 +27,7 @@ class FakeNautobot:
     class Graphql:
         def query(self, graphql):
             if "61:80" in graphql:
-                return FakeNautobot.SwitchResponse("f20-3-1.iad3")
-            if "32:DF" in graphql:
-                return FakeNautobot.SwitchResponse("f20-3-2.iad3")
-            if "10:7F" in graphql:
-                return FakeNautobot.SwitchResponse("f20-3-1d.iad3")
+                return FakeNautobot.SwitchResponse()
             if "33GSW04" in graphql:
                 return FakeNautobot.GraphqlResponse("json_samples/bmc_chassis_info/R7615/nautobot_graphql_response_server_device_33GSW04.json")
             raise Exception(f"implement graphql faker {graphql}")
@@ -60,13 +56,46 @@ class FakeNautobot:
             self.json = read_json_samples(name)
 
     class SwitchResponse:
-        def __init__(self, name):
+        def __init__(self):
             self.json = {
                 "data": {
                     "devices": [
                         {
                             "id": "leafsw-1234-3456-1234",
-                            "name": f"{name}.iad3.rackspace.net",
+                            "name": f"f20-3-1.iad3.iad3.rackspace.net",
+                            "mac": 'C4:7E:E0:E4:32:DF',
+                            "role": {
+                                "name": "Tenant leaf"
+                            },
+                            "location": {
+                                "id": "da47f07f-b66a-4f0c-b780-4be8498e6129",
+                                "name": "IAD3",
+                            },
+                            "rack": {
+                                "id": "3dd3c0f6-c6cd-42ff-8e34-763d0795ea16",
+                                "name": "F20-3",
+                            }
+                        },
+                        {
+                            "id": "leafsw-1234-3456-1234",
+                            "name": f"f20-3-2.iad3.iad3.rackspace.net",
+                            "mac": 'C4:7E:E0:E4:10:7F',
+                            "role": {
+                                "name": "Tenant leaf"
+                            },
+                            "location": {
+                                "id": "da47f07f-b66a-4f0c-b780-4be8498e6129",
+                                "name": "IAD3",
+                            },
+                            "rack": {
+                                "id": "3dd3c0f6-c6cd-42ff-8e34-763d0795ea16",
+                                "name": "F20-3",
+                            }
+                        },
+                        {
+                            "id": "leafsw-1234-3456-1234",
+                            "name": f"f20-3-1d.iad3.iad3.rackspace.net",
+                            "mac": 'C4:4D:84:48:61:80',
                             "role": {
                                 "name": "Tenant leaf"
                             },
@@ -96,7 +125,7 @@ def test_find_or_create():
                 name= 'iDRAC',
                 description= 'Dedicated iDRAC interface',
                 mac_address= 'A8:3C:A5:35:43:86',
-                remote_switch_mac_address= 'C4:4D:84:48:61:80',
+                remote_switch_mac_address= 'C4:4D:84:48:61:83',
                 remote_switch_port_name= 'GigabitEthernet1/0/3',
             ),
             InterfaceInfo(

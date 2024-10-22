@@ -1,6 +1,7 @@
 from ipaddress import IPv4Interface
 from uuid import UUID
-
+import json
+import re
 import pynautobot
 
 from understack_workflows.bmc_chassis_info import ChassisInfo
@@ -38,22 +39,20 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
     # - in-band interfaces are connected to leaf switches
     # - we already verify that all connections are inside the same cabinet
 
+    switches = switches_for(nautobot, chassis_info)
     device = nautobot_server(nautobot, serial=chassis_info.serial_number)
     if not device:
         logger.info(
             f"Device {chassis_info.serial_number} not in Nautobot, creating"
         )
 
-        switches = switches_for(nautobot, chassis_info)
-        location_id, rack_id = location_from(switches.values())
+        location_id, rack_id = location_from(list(switches.values()))
         payload = server_device_payload(location_id, rack_id, chassis_info)
         logger.info(f"Server device: {payload}")
         nautobot.dcim.devices.create(**payload)
         # Re-run the graphql query to fetch any auto-created defaults from
         # nautobot (e.g. it automatically creates a BMC interface):
         device = nautobot_server(nautobot, serial=chassis_info.serial_number)
-    else:
-        switches = switches_for(nautobot, chassis_info)
 
     find_or_create_interfaces(nautobot, chassis_info, device['id'], switches)
 
@@ -70,9 +69,89 @@ def location_from(switches):
 
 
 def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
-    switch_macs = {interface.remote_switch_mac_address
-                    for interface in chassis_info.interfaces}
-    return {mac: nautobot_switch(nautobot, mac) for mac in switch_macs if mac}
+    """Get all possible switches from the discovered LLDP neighbor information.
+
+    We search for two possible mac addresses for each neighbor because some
+    cisco switches report the chassis mac address while others report the
+    interface mac address.
+    """
+    switch_macs = {
+        interface.remote_switch_mac_address
+            for interface in chassis_info.interfaces
+                if interface.remote_switch_mac_address
+    }
+    base_switch_macs = {
+        base_mac(interface.remote_switch_mac_address,
+                 interface.remote_switch_port_name)
+            for interface in chassis_info.interfaces
+                if interface.remote_switch_mac_address
+    }
+    switches = nautobot_switches(nautobot, switch_macs.union(base_switch_macs))
+    if not switches:
+        raise Exception("No switches found in nautobot for {switch_macs}")
+    return switches
+
+
+def nautobot_switches(nautobot, mac_addresses: list[str]) -> dict[str, dict]:
+    """Get switches by MAC address.
+
+    Assumes that MAC addresses in Nautobot are normalized to upcase
+    AA:BB:CC:DD:EE:FF form.
+
+    We store the MAC address in the nautobot device "asset tag" field because
+    there was nowhere else to put it.
+
+    returns a dict[mac_address] -> dict switch information indexed by mac
+    """
+
+    formatted_list = json.dumps(list(mac_addresses))
+
+    query = """{
+        devices(asset_tag: %s){
+            id name
+            mac: asset_tag
+            location { id name }
+            rack { id name }
+        }
+    }""" % formatted_list
+
+    result = nautobot.graphql.query(query)
+    if not result.json or result.json.get("errors"):
+        raise Exception(f"Nautobot switch graphql query failed: {result}")
+    switches = result.json["data"]["devices"]
+
+    return {switch["mac"]: switch for switch in switches}
+
+def nautobot_switch(all_switches, interface):
+    mac_address = interface.remote_switch_mac_address
+    base_mac_address = base_mac(mac_address, interface.remote_switch_port_name)
+    switch = all_switches.get(
+        mac_address, all_switches.get(base_mac_address)
+    )
+    if not switch:
+        raise Exception(
+            f"Looking for a switch in nautobot that matches the LLDP "
+            f"info reported by server BMC - "
+            f"No device found in nautobot with asset_tag {mac_address} "
+            f"nor the calculated base mac address {base_mac_address}"
+            f"{all_switches}"
+        )
+    return switch
+
+def base_mac(mac: str, port_name: str) -> str:
+    """Given a mac addr, return the mac addr which is <port_num> less.
+
+    >>> base_mac("11:22:33:44:55:66", "Eth1/6")
+    "11:22:33:44:55:60"
+    """
+    port_number = re.split(r"\D+", port_name)[-1]
+    if not port_number:
+        raise ValueError(f"Need numeric interface, not {port_name}")
+    port_number = int(port_number)
+    mac_number = int(re.sub(r"[^0-9a-fA-f]+", "", mac), 16)
+    base = mac_number - port_number
+    hexadecimal = f"{base:012X}"
+    return ':'.join(hexadecimal[i:i+2] for i in range(0,12,2))
 
 
 def server_device_payload(location_id, rack_id, chassis_info):
@@ -98,46 +177,6 @@ def _parse_manufacturer(name: str) -> str:
         return "Dell"
     raise ValueError(f"Server manufacturer {name} not supported")
 
-
-def nautobot_switch(nautobot, mac_address: str) -> dict:
-    """Get switch by its MAC address.
-
-    MAC addresses in SOT are normalized to upcase AA:BB:CC:DD:EE form.
-
-    We store the MAC address in the "asset tag" field because there was nowhere
-    else to put it.  Retrieving switches this way is really slow, could do with
-    a better solution for storing switches' base mac addresses in Nautobot.
-
-    TODO: can we pass an array of MAC addresses to this query and get all
-    the switches in one go?
-    """
-    query = f"""{{
-        devices(asset_tag: "{mac_address}"){{
-            id name
-            location {{ id name }}
-            rack {{ id name }}
-        }}
-    }}"""
-
-    result = nautobot.graphql.query(query)
-    if not result.json or result.json.get("errors"):
-        raise Exception(f"Nautobot switch graphql query failed: {result}")
-    devices = result.json["data"]["devices"]
-
-    if not devices:
-        raise Exception(
-            f"Looking for a switch in nautobot that matches the LLDP "
-            f"info reported by server BMC - "
-            f"No device found in nautobot with asset_tag {mac_address}"
-        )
-    if len(devices) > 1:
-        raise Exception(
-            f"Looking for a switch in nautobot that matches the LLDP "
-            f"info reported by server BMC - "
-            f"Multiple devices found with asset_tag {mac_address}"
-        )
-
-    return devices[0]
 
 
 def nautobot_server(nautobot, serial: str) -> dict:
@@ -237,7 +276,7 @@ def interface_type(interface: InterfaceInfo) -> str:
         return INTERFACE_TYPE
 
 def connect_interface_to_switch(nautobot, interface, server_nautobot_interface, switches):
-    connected_switch = switches[interface.remote_switch_mac_address]
+    connected_switch = nautobot_switch(switches, interface)
     switch_port_name = interface.remote_switch_port_name
 
     switch_interface = nautobot.dcim.interfaces.get(

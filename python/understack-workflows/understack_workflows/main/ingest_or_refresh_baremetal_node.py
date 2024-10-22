@@ -109,10 +109,13 @@ def main():
     # Do this after Nautobot IPAddress has been changed from DHCP!
     bmc_set_permanent_ip_addr(bmc, device_info.bmc_interface)
 
-    _ironic_provision_state = ironic_node.create_or_update(device["id"], device["name"], bmc, logger)
-    #sync_interfaces.from_nautobot_to_ironic(device_id)
+    #_ironic_provision_state = ironic_node.create_or_update(device["id"], device["name"], bmc, logger)
+    #
+    # if there are a proper number of interfaces connected:
+    #    sync_interfaces.from_nautobot_to_ironic(device_id)
+    #    run cleaning and get this node into "managed" state.
 
-    logger.info(f"{__file__} complete successfully for {bmc.ip_address}")
+    logger.info(f"{__file__} complete for {bmc.ip_address}")
 
 
 def argument_parser():
