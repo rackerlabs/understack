@@ -6,8 +6,9 @@ import urllib3
 
 from understack_workflows.bmc import Bmc
 from understack_workflows.interface_normalization import normalize_interface_name
+from understack_workflows.helpers import setup_logger
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+logger = setup_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,11 @@ def interface_data(bmc: Bmc) -> list[InterfaceInfo]:
 
 def combine_lldp(lldp, interface) -> InterfaceInfo:
     name = interface["name"]
-    lldp_entry = lldp[name]
+    lldp_entry = lldp.get(name, {})
+    if not lldp_entry:
+        logger.info(
+            f"LLDP info from BMC is missing for {name}, we only have {list(lldp.keys())}"
+        )
     return InterfaceInfo(**interface, **lldp_entry)
 
 
