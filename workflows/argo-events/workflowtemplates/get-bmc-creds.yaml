@@ -49,7 +49,7 @@ spec:
             valueFrom:
               path: "/tmp/output.txt"
       container:
-        image: ghcr.io/rss-engineering/undercloud-deploy/argo-undercloud-rackspace3.11.8:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command: [python]
         args: ["/app/get_standard_bmc_creds.py", "{{inputs.parameters.ip_address}}"]
         env:
