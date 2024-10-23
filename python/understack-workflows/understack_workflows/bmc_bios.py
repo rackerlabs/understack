@@ -13,6 +13,10 @@ REQUIRED_BIOS_SETTINGS = {
     "PxeDev1Interface": "NIC.Slot.1-1",
     "HttpDev1Interface": "NIC.Slot.1-1",
     "TimeZone": "UTC",
+    "SNMP.1.AgentEnable": "1",
+    "SNMP.1.SNMPProtocol": "0",
+    "SNMP.1.AgentCommunity": "public",
+    "SNMP.1.AlertPort": "161",
 }
 
 
