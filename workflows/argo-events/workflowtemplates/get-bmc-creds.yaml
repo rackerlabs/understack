@@ -51,8 +51,10 @@ spec:
               path: "/tmp/output.txt"
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
-        command: [python]
-        args: ["/app/get_standard_bmc_creds.py", "{{inputs.parameters.ip_address}}"]
+        command:
+          - get-standard-bmc-creds
+        args:
+          - "{{inputs.parameters.ip_address}}"
         env:
         - name: BMC_MASTER
           valueFrom:

@@ -55,6 +55,7 @@ sync-nautobot-system-info = "understack_workflows.main.sync_nautobot_system_info
 undersync-switch = "understack_workflows.main.undersync_switch:main"
 undersync-device = "understack_workflows.main.undersync_device:main"
 nautobot-update-cf = "understack_workflows.main.nautobot_update_cf:main"
+get-standard-bmc-creds = "understack_workflows.main.get_standard_bmc_creds:main"
 
 [tool.setuptools.packages.find]
 # avoid packaging up our tests
