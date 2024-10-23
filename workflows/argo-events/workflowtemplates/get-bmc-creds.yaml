@@ -7,7 +7,6 @@ metadata:
     workflows.argoproj.io/title: Create a k8s secret containing BMC creds for given device_id
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/get-bmc-creds.yaml`.
-      An example template to return the name of a Kubernetes Secret which containing device's BMC credentials.
 spec:
   serviceAccountName: workflow
   entrypoint: main
@@ -23,39 +22,48 @@ spec:
         parameters:
           - name: secret
             valueFrom:
+              expression: "tasks['get-bmc-creds'].outputs.parameters.secret"
+      dag:
+        tasks:
+          - name: get-bmc-ip
+            templateRef:
+              name: get-bmc-ip
+              template: main
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{inputs.parameters.device_id}}"
+          - name: get-bmc-creds
+            dependencies: [get-bmc-ip]
+            template: get-standard-bmc-creds
+            arguments:
+              parameters:
+                - name: ip_address
+                  value: "{{tasks.get-bmc-ip.outputs.parameters.ip}}"
+    - name: get-standard-bmc-creds
+      inputs:
+        parameters:
+          - name: ip_address
+      outputs:
+        parameters:
+          - name: secret
+            valueFrom:
               path: "/tmp/output.txt"
-      script:
-        image: ghcr.io/rackerlabs/understack/argo-utils-python3.11.8:latest
-        command: [python]
-        source: |
-          from argo_python import ArgoWorkflow
-          import base64
-          import os
-
-          WF_NS = os.getenv("WF_NS")
-          WF_NAME = os.getenv("WF_NAME")
-          WF_UID = os.getenv("WF_UID")
-          SECRET_NAME="example-secret"
-          USERNAME="foo"
-          PASSWORD="bar"
-
-          data = {
-              'username': base64.b64encode(USERNAME.encode("utf-8")).decode(),
-              'password': base64.b64encode(PASSWORD.encode("utf-8")).decode(),
-          }
-
-          workflow = ArgoWorkflow(WF_NS, WF_NAME, WF_UID)
-          secret_name = workflow.create_secret(SECRET_NAME, data)
-          with open("/tmp/output.txt", "w") as f:
-              f.write(secret_name)
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - get-standard-bmc-creds
+        args:
+          - "{{inputs.parameters.ip_address}}"
         env:
-        - name: WF_UID
-          value: "{{workflow.uid}}"
-        - name: WF_NAME
-          value: "{{workflow.name}}"
+        - name: BMC_MASTER
+          valueFrom:
+            secretKeyRef:
+              name: bmc-master
+              key: key
         - name: WF_NS
           value: "{{workflow.namespace}}"
-        # only needed in this example Template as it's written using a ScriptTemplate which apparently doesn't seem
-        # to honor the workingDir directive, and mounts the above script at /argo/staging/script.
-        - name: PYTHONPATH
-          value: /app
+        - name: WF_NAME
+          value: "{{workflow.name}}"
+        - name: WF_UID
+          value: "{{workflow.uid}}"
