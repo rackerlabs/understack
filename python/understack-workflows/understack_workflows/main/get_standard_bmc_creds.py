@@ -33,7 +33,7 @@ def _create_secret(data):
     )
 
 
-def main(program_name, ip_address=None):
+def perform_action(program_name, ip_address=None):
     """This is intended for use by an Argo Workflow.
 
     It will generate BMC credentials for the given BMC IP address.
@@ -62,4 +62,5 @@ def main(program_name, ip_address=None):
         f.write(secret_name)
 
 
-main(*sys.argv)
+def main():
+    perform_action(*sys.argv)
