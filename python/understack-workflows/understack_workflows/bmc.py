@@ -1,11 +1,12 @@
 from dataclasses import dataclass
-
+import os
+import logging
 import requests
-from sushy import Sushy
 
+from sushy import Sushy
+from understack_workflows.bmc_password_standard import standard_password
 from understack_workflows.helpers import credential
 
-import logging
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 HEADERS = {
@@ -61,7 +62,12 @@ def bmc_for_ip_address(
         password: str|None = None) -> Bmc:
 
     if password is None:
-        username = credential("oob-secrets", "username")
-        password = credential("oob-secrets", "password")
+        bmc_master = os.getenv("BMC_MASTER") or credential("bmc_master", "key")
+        password = standard_password(ip_address, bmc_master)
 
-    return Bmc(bmc_type=bmc_type, ip_address=ip_address, password=password, username=username)
+    return Bmc(
+        bmc_type=bmc_type,
+        ip_address=ip_address,
+        password=password,
+        username=username,
+    )

@@ -1,4 +1,5 @@
 import pytest
+import os
 
 from understack_workflows.bmc import bmc_for_ip_address
 
@@ -10,8 +11,9 @@ def mock_creds(mocker):
     return mock
 
 def test_bmc_for_ip_address(mock_creds):
-    bmc = bmc_for_ip_address("1.2.3.4", "iDRAC")
+    assert os.getenv("BMC_MASTER") == None
+    bmc = bmc_for_ip_address("1.2.3.4")
     assert bmc.ip_address == "1.2.3.4"
     assert bmc.url() == "https://1.2.3.4"
-    assert bmc.username == "ultra-secret credential value"
-    assert bmc.password == "ultra-secret credential value"
+    assert bmc.username == "root"
+    assert bmc.password == "1MlzcjJ7bnICKp98wrdx"
