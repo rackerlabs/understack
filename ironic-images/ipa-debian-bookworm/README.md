@@ -1,4 +1,0 @@
-- Need to install package: debootstrap
-- Create virtualenv
-- pip install diskimage-builder ironic-python-agent-builder
-- ./ipa-debian-bookworm.sh
