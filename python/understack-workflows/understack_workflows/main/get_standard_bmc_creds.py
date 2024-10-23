@@ -19,7 +19,7 @@ def base64(string):
 def require_environment_variables(*names):
     missing_environment_variables = [name for name in names if os.getenv(name) is None]
     if missing_environment_variables:
-        print(f"Please set envionment: {missing_environment_variables=}")
+        print(f"Please set environment: {missing_environment_variables=}")
         exit(1)
 
 
