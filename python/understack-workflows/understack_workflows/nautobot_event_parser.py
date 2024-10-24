@@ -1,4 +1,3 @@
-
 def parse_event(payload) -> (str, str, str):
     """Parse Nautobot webhook event data.
 
@@ -15,6 +14,6 @@ def parse_event(payload) -> (str, str, str):
 
     device_uuid = data["device"]["id"]
     device_hostname = data["device"]["name"]
-    bmc_ip_address = data['ip_addresses'][0]['host']
+    bmc_ip_address = data["ip_addresses"][0]["host"]
 
     return device_uuid, device_hostname, bmc_ip_address

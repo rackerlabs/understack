@@ -1,7 +1,7 @@
-from ipaddress import IPv4Interface
-from uuid import UUID
 import json
 import re
+from ipaddress import IPv4Interface
+
 import pynautobot
 
 from understack_workflows.bmc_chassis_info import ChassisInfo
@@ -13,7 +13,8 @@ logger = setup_logger(__name__)
 DEVICE_INITIAL_STATUS = "Active"
 DEVICE_ROLE = "server"
 INTERFACE_TYPE = "25gbase-x-sfp28"
-DRAC_INTERFACE_TYPE="1000base-t"
+DRAC_INTERFACE_TYPE = "1000base-t"
+
 
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
     """Update existing or create new device using the Nautobot API."""
@@ -42,9 +43,7 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
     switches = switches_for(nautobot, chassis_info)
     device = nautobot_server(nautobot, serial=chassis_info.serial_number)
     if not device:
-        logger.info(
-            f"Device {chassis_info.serial_number} not in Nautobot, creating"
-        )
+        logger.info(f"Device {chassis_info.serial_number} not in Nautobot, creating")
 
         location_id, rack_id = location_from(list(switches.values()))
         payload = server_device_payload(location_id, rack_id, chassis_info)
@@ -54,13 +53,15 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
         # nautobot (e.g. it automatically creates a BMC interface):
         device = nautobot_server(nautobot, serial=chassis_info.serial_number)
 
-    find_or_create_interfaces(nautobot, chassis_info, device['id'], switches)
+    find_or_create_interfaces(nautobot, chassis_info, device["id"], switches)
 
     return device
 
 
 def location_from(switches):
-    locations = {(switch["location"]["id"], switch["rack"]["id"]) for switch in switches}
+    locations = {
+        (switch["location"]["id"], switch["rack"]["id"]) for switch in switches
+    }
     if not locations:
         raise Exception(f"Can't find locations for {switches}")
     if len(locations) > 1:
@@ -77,14 +78,13 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
     """
     switch_macs = {
         interface.remote_switch_mac_address
-            for interface in chassis_info.interfaces
-                if interface.remote_switch_mac_address
+        for interface in chassis_info.interfaces
+        if interface.remote_switch_mac_address
     }
     base_switch_macs = {
-        base_mac(interface.remote_switch_mac_address,
-                 interface.remote_switch_port_name)
-            for interface in chassis_info.interfaces
-                if interface.remote_switch_mac_address
+        base_mac(interface.remote_switch_mac_address, interface.remote_switch_port_name)
+        for interface in chassis_info.interfaces
+        if interface.remote_switch_mac_address
     }
     switches = nautobot_switches(nautobot, switch_macs.union(base_switch_macs))
     if not switches:
@@ -103,17 +103,19 @@ def nautobot_switches(nautobot, mac_addresses: list[str]) -> dict[str, dict]:
 
     returns a dict[mac_address] -> dict switch information indexed by mac
     """
-
     formatted_list = json.dumps(list(mac_addresses))
 
-    query = """{
+    query = (
+        """{
         devices(asset_tag: %s){
             id name
             mac: asset_tag
             location { id name }
             rack { id name }
         }
-    }""" % formatted_list
+    }"""
+        % formatted_list
+    )
 
     result = nautobot.graphql.query(query)
     if not result.json or result.json.get("errors"):
@@ -122,12 +124,11 @@ def nautobot_switches(nautobot, mac_addresses: list[str]) -> dict[str, dict]:
 
     return {switch["mac"]: switch for switch in switches}
 
+
 def nautobot_switch(all_switches, interface):
     mac_address = interface.remote_switch_mac_address
     base_mac_address = base_mac(mac_address, interface.remote_switch_port_name)
-    switch = all_switches.get(
-        mac_address, all_switches.get(base_mac_address)
-    )
+    switch = all_switches.get(mac_address, all_switches.get(base_mac_address))
     if not switch:
         raise Exception(
             f"Looking for a switch in nautobot that matches the LLDP "
@@ -137,6 +138,7 @@ def nautobot_switch(all_switches, interface):
             f"{all_switches}"
         )
     return switch
+
 
 def base_mac(mac: str, port_name: str) -> str:
     """Given a mac addr, return the mac addr which is <port_num> less.
@@ -151,7 +153,7 @@ def base_mac(mac: str, port_name: str) -> str:
     mac_number = int(re.sub(r"[^0-9a-fA-f]+", "", mac), 16)
     base = mac_number - port_number
     hexadecimal = f"{base:012X}"
-    return ':'.join(hexadecimal[i:i+2] for i in range(0,12,2))
+    return ":".join(hexadecimal[i : i + 2] for i in range(0, 12, 2))
 
 
 def server_device_payload(location_id, rack_id, chassis_info):
@@ -159,10 +161,10 @@ def server_device_payload(location_id, rack_id, chassis_info):
     name = f"{manufacturer}-{chassis_info.serial_number}"
 
     return {
-        "status": { "name": DEVICE_INITIAL_STATUS },
-        "role": { "name": DEVICE_ROLE },
+        "status": {"name": DEVICE_INITIAL_STATUS},
+        "role": {"name": DEVICE_ROLE},
         "device_type": {
-            "manufacturer" : { "name": manufacturer },
+            "manufacturer": {"name": manufacturer},
             "model": chassis_info.model_number,
         },
         "name": name,
@@ -176,7 +178,6 @@ def _parse_manufacturer(name: str) -> str:
     if "DELL" in name.upper():
         return "Dell"
     raise ValueError(f"Server manufacturer {name} not supported")
-
 
 
 def nautobot_server(nautobot, serial: str) -> dict:
@@ -227,19 +228,19 @@ def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, sw
         if interface.mac_address:
             setup_nautobot_interface(nautobot, interface, device_id, switches)
 
+
 def setup_nautobot_interface(nautobot, interface: InterfaceInfo, device_id, switches):
     nautobot_int = find_or_create_interface(nautobot, interface, device_id)
 
     if interface.ipv4_address:
         ip = assign_ip_address(
-            nautobot,
-            nautobot_int,
-            interface.ipv4_address,
-            interface.mac_address)
+            nautobot, nautobot_int, interface.ipv4_address, interface.mac_address
+        )
         ip = associate_ip_address(nautobot, nautobot_int, ip.id)
 
     if interface.remote_switch_mac_address:
         connect_interface_to_switch(nautobot, interface, nautobot_int, switches)
+
 
 def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str):
     id = {
@@ -267,13 +268,17 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str)
         )
     return server_nautobot_interface
 
+
 def interface_type(interface: InterfaceInfo) -> str:
     if interface.name == "iDRAC":
         return DRAC_INTERFACE_TYPE
     else:
         return INTERFACE_TYPE
 
-def connect_interface_to_switch(nautobot, interface, server_nautobot_interface, switches):
+
+def connect_interface_to_switch(
+    nautobot, interface, server_nautobot_interface, switches
+):
     connected_switch = nautobot_switch(switches, interface)
     switch_port_name = interface.remote_switch_port_name
 
@@ -308,6 +313,7 @@ def connect_interface_to_switch(nautobot, interface, server_nautobot_interface, 
     else:
         logger.info(f"Cable {cable.id} already exists in Nautobot")
 
+
 def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface, mac):
     try:
         ip = nautobot.ipam.ip_addresses.get(address=str(ipv4_address.ip))
@@ -327,9 +333,7 @@ def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface,
             )
             logger.info(f"Created Nautobot IP {ip.id} for {ipv4_address}")
     except pynautobot.core.query.RequestError as e:
-        raise Exception(
-            f"Failed to assign {ipv4_address=} in Nautobot: {e}"
-        ) from None
+        raise Exception(f"Failed to assign {ipv4_address=} in Nautobot: {e}") from None
     return ip
 
 

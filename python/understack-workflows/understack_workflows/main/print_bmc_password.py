@@ -15,9 +15,8 @@ def main(program_name, bmc_ip_address=None):
         exit(1)
 
     if os.getenv("BMC_MASTER") is None:
-        print(f"Please set the BMC_MASTER environment variable")
+        print("Please set the BMC_MASTER environment variable")
         exit(1)
-
 
     password = standard_password(bmc_ip_address, os.getenv("BMC_MASTER"))
     print(password)

@@ -1,4 +1,3 @@
-
 import requests
 import urllib3
 
@@ -10,6 +9,7 @@ FACTORY_PASSWORD = "calvin"
 FACTORY_USER = "root"
 
 logger = setup_logger(__name__)
+
 
 def set_bmc_password(ip_address, required_password, username="root"):
     """Access BMC via redfish and change password from factory default if needed.
@@ -53,7 +53,6 @@ def _verify_auth(host: str, username: str = "root", password: str = "") -> str:
     Returns None on authorisation failure
     Raises an Exception for other kinds of errors (e.g. timeout, etc)
     """
-
     try:
         response = requests.request(
             method="POST",
@@ -65,8 +64,10 @@ def _verify_auth(host: str, username: str = "root", password: str = "") -> str:
         if response.status_code == 401:
             return None
         if response.status_code >= 400:
-            raise Exception(f"BMC {host} password login failed: "
-                f" {response.status_code} {response.json()}")
+            raise Exception(
+                f"BMC {host} password login failed: "
+                f" {response.status_code} {response.json()}"
+            )
             return None
 
         return response.headers["X-Auth-Token"]
@@ -120,22 +121,20 @@ def _set_bmc_creds(host: str, token: str, username: str, new_password: str):
     payload = {"Password": new_password}
     _redfish_request(host, account_uri, token, "PATCH", payload)
 
+
 def _redfish_request(
-    host: str,
-    uri: str,
-    token: str,
-    method: str = "GET",
-    payload: dict | None = None
+    host: str, uri: str, token: str, method: str = "GET", payload: dict | None = None
 ) -> dict:
     url = f"https://{host}{uri}"
-    headers = { "X-Auth-Token": token }
+    headers = {"X-Auth-Token": token}
     try:
         response = requests.request(
             method, url, verify=False, timeout=15, json=payload, headers=headers
         )
         if response.status_code >= 400:
-            raise Exception(f"Redfish HTTP {response.status_code} "
-                            f"from {uri}: {response.text}")
+            raise Exception(
+                f"Redfish HTTP {response.status_code} " f"from {uri}: {response.text}"
+            )
 
         else:
             return response.json()

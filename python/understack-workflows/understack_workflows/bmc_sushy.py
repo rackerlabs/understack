@@ -4,7 +4,7 @@ from understack_workflows.bmc_password_standard import standard_password
 from understack_workflows.helpers import credential
 
 
-def bmc_sushy_session(ip_addr, username = "root", password = None):
+def bmc_sushy_session(ip_addr, username="root", password=None):
     """Get a Sushy session for given IP address using standard password."""
     url = f"https://{ip_addr}"
 

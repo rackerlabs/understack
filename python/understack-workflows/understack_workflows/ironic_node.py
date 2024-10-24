@@ -2,20 +2,18 @@ import ironicclient.common.apiclient.exceptions
 from ironicclient.common.utils import args_array_to_patch
 
 from understack_workflows.bmc import Bmc
+from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.node_configuration import IronicNodeConfiguration
-from understack_workflows.helpers import setup_logger
 
 STATES_ALLOWING_UPDATES = ["enroll", "manageable"]
 
 logger = setup_logger(__name__)
 
+
 def create_or_update(
-        node_uuid: str,
-        device_hostname: str,
-        device_manufacturer: str,
-        bmc: Bmc,
-        logger):
+    node_uuid: str, device_hostname: str, device_manufacturer: str, bmc: Bmc, logger
+):
     """Note interfaces/ports are not synced here, that happens elsewhere"""
     client = IronicClient()
     if device_manufacturer.startswith("Dell"):
@@ -50,7 +48,7 @@ def update_ironic_node(client, node_uuid, device_hostname, driver, bmc):
         f"name={device_hostname}",
         f"driver={driver}",
         f"driver_info/redfish_address={bmc.url()}",
-        f"driver_info/redfish_verify_ca=false",
+        "driver_info/redfish_verify_ca=false",
         f"driver_info/redfish_username={bmc.username}",
         f"driver_info/redfish_password={bmc.password}",
     ]
@@ -63,22 +61,22 @@ def update_ironic_node(client, node_uuid, device_hostname, driver, bmc):
 
 
 def create_ironic_node(
-        client: IronicClient,
-        node_uuid: str,
-        device_hostname: str,
-        driver: str,
-        bmc: Bmc,
+    client: IronicClient,
+    node_uuid: str,
+    device_hostname: str,
+    driver: str,
+    bmc: Bmc,
 ) -> IronicNodeConfiguration:
-        return client.create_node(
-            {
-                "uuid": node_uuid,
-                "name": device_hostname,
-                "driver": driver,
-                "driver_info": {
-                    "redfish_address": bmc.url(),
-                    "redfish_verify_ca": False,
-                    "redfish_username": bmc.username,
-                    "redfish_password": bmc.password,
-                },
-            }
-        )
+    return client.create_node(
+        {
+            "uuid": node_uuid,
+            "name": device_hostname,
+            "driver": driver,
+            "driver_info": {
+                "redfish_address": bmc.url(),
+                "redfish_verify_ca": False,
+                "redfish_username": bmc.username,
+                "redfish_password": bmc.password,
+            },
+        }
+    )

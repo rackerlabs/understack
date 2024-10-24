@@ -37,7 +37,9 @@ class NIC:
     @classmethod
     def nic_location(cls, nic: NetworkAdapter) -> str:
         try:
-            return nic.json["Controllers"][0]["Location"]["PartLocation"]["ServiceLabel"]
+            return nic.json["Controllers"][0]["Location"]["PartLocation"][
+                "ServiceLabel"
+            ]
         except KeyError:
             return nic.identity
 

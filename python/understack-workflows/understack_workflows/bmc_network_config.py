@@ -1,6 +1,3 @@
-import requests
-import urllib3
-
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc_chassis_info import InterfaceInfo
 from understack_workflows.helpers import setup_logger
@@ -12,7 +9,6 @@ logger = setup_logger(__name__)
 
 def bmc_set_permanent_ip_addr(bmc: Bmc, interface_info: InterfaceInfo):
     """If this device has DHCP IP configuration, configure it permanently."""
-
     if not interface_info.dhcp:
         logger.info("BMC interface was not set to DHCP")
         return

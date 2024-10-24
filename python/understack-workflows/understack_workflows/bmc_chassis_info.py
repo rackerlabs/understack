@@ -1,12 +1,11 @@
 import re
 from dataclasses import dataclass
-from ipaddress import IPv4Interface, IPv4Address
-
-import urllib3
+from ipaddress import IPv4Address
+from ipaddress import IPv4Interface
 
 from understack_workflows.bmc import Bmc
-from understack_workflows.interface_normalization import normalize_interface_name
 from understack_workflows.helpers import setup_logger
+from understack_workflows.interface_normalization import normalize_interface_name
 
 logger = setup_logger(__name__)
 
@@ -108,13 +107,14 @@ def parse_ipv4(data: list[dict]) -> tuple[IPv4Interface, IPv4Address, bool]:
     if not data:
         return None, None, None
 
-    dhcp = (data[0]["AddressOrigin"] == "DHCP")
+    dhcp = data[0]["AddressOrigin"] == "DHCP"
     address = data[0]["Address"]
     netmask = data[0]["SubnetMask"]
     gateway = data[0]["Gateway"]
     ipv4_address = IPv4Interface(f"{address}/{netmask}")
     ipv4_gateway = IPv4Address(gateway)
     return ipv4_address, ipv4_gateway, dhcp
+
 
 def in_band_interfaces(bmc: Bmc) -> list[dict]:
     """A Collection of Ethernet Interfaces for this System."""

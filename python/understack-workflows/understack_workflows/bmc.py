@@ -1,9 +1,10 @@
-from dataclasses import dataclass
-import os
 import logging
-import requests
+import os
+from dataclasses import dataclass
 
+import requests
 from sushy import Sushy
+
 from understack_workflows.bmc_password_standard import standard_password
 from understack_workflows.helpers import credential
 
@@ -13,6 +14,7 @@ HEADERS = {
     "Accept": "application/json",
     "Content-Type": "application/json; charset=utf-8",
 }
+
 
 @dataclass
 class Bmc:
@@ -26,7 +28,8 @@ class Bmc:
     def url(self):
         return f"https://{self.ip_address}"
 
-    def redfish_request(self,
+    def redfish_request(
+        self,
         path: str,
         method: str = "GET",
         payload: dict | None = None,
@@ -52,13 +55,14 @@ class Bmc:
             return r.json()
 
     def sushy(self):
-        return Sushy(self.url(), username=self.username, password=self.password, verify=False)
+        return Sushy(
+            self.url(), username=self.username, password=self.password, verify=False
+        )
+
 
 def bmc_for_ip_address(
-        ip_address: str,
-        username: str = "root",
-        password: str|None = None) -> Bmc:
-
+    ip_address: str, username: str = "root", password: str | None = None
+) -> Bmc:
     if password is None:
         bmc_master = os.getenv("BMC_MASTER") or credential("bmc_master", "key")
         password = standard_password(ip_address, bmc_master)

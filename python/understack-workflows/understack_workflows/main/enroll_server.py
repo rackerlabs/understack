@@ -15,6 +15,7 @@ from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
 
+
 def main():
     """On-board new or Refresh existing baremetal node.
 
@@ -90,7 +91,6 @@ def main():
     token = args.nautobot_token or credential("nb-token", "token")
     nautobot = pynautobot.api(url, token=token)
 
-
     bmc = bmc_for_ip_address(bmc_ip_address, password=args.bmc_password)
     logger.info("Checking BMC credentials")
     set_bmc_password(bmc.ip_address, bmc.password)
@@ -103,16 +103,12 @@ def main():
     logger.info(f"Discovered {device_info}")
     device = nautobot_device.find_or_create(device_info, nautobot)
 
-
     # Do this after Nautobot IPAddress has been changed from DHCP!
     bmc_set_permanent_ip_addr(bmc, device_info.bmc_interface)
 
     _ironic_provision_state = ironic_node.create_or_update(
-        device["id"],
-        device["name"],
-        device_info.manufacturer,
-        bmc,
-        logger)
+        device["id"], device["name"], device_info.manufacturer, bmc, logger
+    )
     logger.info(f"{device['id']} {_ironic_provision_state=}")
 
     #
@@ -127,17 +123,14 @@ def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__), description="Ingest Baremetal"
     )
-    parser.add_argument(
-        "--bmc-ip-address", type=str, required=True, help="BMC IP"
-    )
-    parser.add_argument(
-        "--bmc-password", type=str, required=False, help="BMC Pass"
-    )
+    parser.add_argument("--bmc-ip-address", type=str, required=True, help="BMC IP")
+    parser.add_argument("--bmc-password", type=str, required=False, help="BMC Pass")
     parser.add_argument(
         "--bmc-mac-address", type=str, required=False, help="BMC MAC Addr"
     )
     parser = parser_nautobot_args(parser)
     return parser
+
 
 if __name__ == "__main__":
     main()

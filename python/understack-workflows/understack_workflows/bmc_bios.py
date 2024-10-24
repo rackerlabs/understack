@@ -29,8 +29,9 @@ def update_dell_bios_settings(bmc: Bmc) -> dict:
     """
     current_settings = bmc.redfish_request(REDFISH_BIOS_PATH)["Attributes"]
 
-    required_changes = {k: v for k,v in REQUIRED_BIOS_SETTINGS.items()
-                            if current_settings[k] != v}
+    required_changes = {
+        k: v for k, v in REQUIRED_BIOS_SETTINGS.items() if current_settings[k] != v
+    }
 
     if required_changes:
         logger.info(f"{bmc} Updating BIOS settings: {required_changes}")
@@ -45,7 +46,7 @@ def update_dell_bios_settings(bmc: Bmc) -> dict:
 def patch_bios_settings(bmc: Bmc, new_settings: dict):
     path = f"{REDFISH_BIOS_PATH}/Settings"
     payload = {
-        "@Redfish.SettingsApplyTime": {"ApplyTime":"OnReset"},
+        "@Redfish.SettingsApplyTime": {"ApplyTime": "OnReset"},
         "Attributes": new_settings,
     }
-    bmc.redfish_request(path, payload = payload, method = "PATCH")
+    bmc.redfish_request(path, payload=payload, method="PATCH")

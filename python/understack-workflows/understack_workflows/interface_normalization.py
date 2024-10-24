@@ -13,6 +13,7 @@ ABBREVIATIONS = {
     "tw": "TwentyFiveGigE",
 }
 
+
 def normalize_interface_name(name: str) -> str:
     lower_case_name = name.lower()
 

@@ -11,6 +11,7 @@ from understack_workflows.port_configuration import PortConfiguration
 
 logger = setup_logger(__name__)
 
+
 def from_nautobot_to_ironic(device_id: str, dry_run=False, ironic_client=None):
     """Update Ironic ports to match information found in Nautobot Interfaces."""
     logger.info(f"Syncing Interfaces / Ports for Device {device_id} ...")
@@ -79,6 +80,7 @@ def from_nautobot_to_ironic(device_id: str, dry_run=False, ironic_client=None):
             response = ironic_client.delete_port(i.uuid)
             logger.debug(f"Deleted: {response}")
 
+
 def get_nautobot_interfaces(nautobot, device_id: UUID) -> list[PortConfiguration]:
     """Get Nautobot interfaces for a device.
 
@@ -110,5 +112,3 @@ def get_patch(nautobot_port: PortConfiguration, port: Port) -> list:
         if new_value != old_value:
             patch.append({"op": "replace", "path": f"/{a}", "value": new_value})
     return patch
-
-
