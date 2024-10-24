@@ -16,10 +16,10 @@ INTERFACE_TYPE = "25gbase-x-sfp28"
 DRAC_INTERFACE_TYPE="1000base-t"
 
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
-    """Update exsiting or create new device using the Nautobot API."""
+    """Update existing or create new device using the Nautobot API."""
     # TODO: performance: our single graphql query here fetches the device from
     # nautobot with all existing interfaces, macs, cable and connected switches.
-    # We then query some of those items again, which adds unneccecary
+    # We then query some of those items again, which adds unnecessary
     # round-trips to the DRAC.
     #
     # TODO: delete any extra items from nautobot (however we don't want to
@@ -312,7 +312,7 @@ def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface,
     try:
         ip = nautobot.ipam.ip_addresses.get(address=str(ipv4_address.ip))
         if ip and ip.type == "dhcp" and ip.custom_fields.get("pydhcp_mac") == mac:
-            # Make our DHCP assignment permenant:
+            # Make our DHCP assignment permanent:
             ip.update(type="host", cf_pydhcp_expire=None)
         elif ip:
             logger.info(f"Nautobot IP already exists! {dict(ip)}")
