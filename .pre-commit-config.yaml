@@ -34,16 +34,16 @@ repos:
           - schema/argo-workflows.json
         files: "workflows/argo-events/workflowtemplates/.*.(yml|yaml)$"
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.37.0
+    rev: v0.42.0
     hooks:
       - id: markdownlint
         files: '^docs/'
   - repo: https://github.com/crate-ci/typos
-    rev: v1.22.8
+    rev: v1.26.8
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.4
+    rev: v0.7.1
     hooks:
       - id: ruff
         args: [--fix]
