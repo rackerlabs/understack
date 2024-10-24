@@ -23,6 +23,7 @@ class Bmc:
     password: str
 
     def __str__(self):
+        """Stringify without password being printed."""
         return f"BMC {self.url()}"
 
     def url(self):

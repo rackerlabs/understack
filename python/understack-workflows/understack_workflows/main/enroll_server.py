@@ -97,7 +97,8 @@ def main():
 
     device_info = chassis_info(bmc)
 
-    # TODO: make this pseudo-idempotent by ignoring the error when a job is already scheduled:
+    # TODO: make this pseudo-idempotent by ignoring the error when a job is
+    # already scheduled:
     # update_dell_bios_settings(bmc)
 
     logger.info(f"Discovered {device_info}")

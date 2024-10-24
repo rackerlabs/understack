@@ -68,7 +68,8 @@ def combine_lldp(lldp, interface) -> InterfaceInfo:
     lldp_entry = lldp.get(name, {})
     if not lldp_entry:
         logger.info(
-            f"LLDP info from BMC is missing for {name}, we only have {list(lldp.keys())}"
+            f"LLDP info from BMC is missing for {name}, we only "
+            f"have LLDP info for {list(lldp.keys())}"
         )
     return InterfaceInfo(**interface, **lldp_entry)
 
@@ -175,7 +176,10 @@ def lldp_data_by_name(bmc) -> dict:
     11:11:11:11:11:00 then the LLDP mac address seen on port e1/2 would be
     11:11:11:11:11:02
     """
-    url = "/redfish/v1/Systems/System.Embedded.1/NetworkPorts/Oem/Dell/DellSwitchConnections/"
+    url = (
+        "/redfish/v1/Systems/System.Embedded.1"
+        "/NetworkPorts/Oem/Dell/DellSwitchConnections/"
+    )
     ports = bmc.redfish_request(url)["Members"]
 
     return {server_interface_name(port["Id"]): parse_lldp_port(port) for port in ports}

@@ -14,7 +14,7 @@ logger = setup_logger(__name__)
 def create_or_update(
     node_uuid: str, device_hostname: str, device_manufacturer: str, bmc: Bmc, logger
 ):
-    """Note interfaces/ports are not synced here, that happens elsewhere"""
+    """Note interfaces/ports are not synced here, that happens elsewhere."""
     client = IronicClient()
     if device_manufacturer.startswith("Dell"):
         driver = "idrac"
