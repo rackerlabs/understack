@@ -1538,17 +1538,17 @@ pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
 name = "sushy"
-version = "5.2.0"
+version = "5.3.0"
 description = "Sushy is a small Python library to communicate with Redfish based systems"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "sushy-5.2.0-py3-none-any.whl", hash = "sha256:503896341615761d81cd95dd5281ee4c8c02932c5048332d0000d2460209b8a0"},
-    {file = "sushy-5.2.0.tar.gz", hash = "sha256:d90a696fef42c522892179138f4ceae347d11676efdbe18fdeda0cf81154c1e4"},
+    {file = "sushy-5.3.0-py3-none-any.whl", hash = "sha256:4b02d98cef30c9842e024ca42ca0894af07e5fab5ec95b1f734b3e302aca8339"},
+    {file = "sushy-5.3.0.tar.gz", hash = "sha256:8785c4febf227b002750f316e856f31e894448fdbda816658aba201983f37e82"},
 ]
 
 [package.dependencies]
-pbr = ">=2.0.0,<2.1.0 || >2.1.0"
+pbr = ">=6.0.0"
 python-dateutil = ">=2.7.0"
 requests = ">=2.14.2"
 stevedore = ">=1.29.0"
