@@ -8,11 +8,17 @@ repos:
         exclude: '^docs/overrides'
       - id: fix-byte-order-marker
       - id: mixed-line-ending
+      - id: check-merge-conflict
+      - id: check-yaml
+        args:
+          - --allow-multiple-documents
+        exclude: mkdocs.yml
       - id: check-yaml
         name: check-yaml-mkdocs
         # --unsafe is a workaround for the use of !! in mkdocs.yml
         args: [--unsafe]
         files: mkdocs.yml
+      - id: check-symlinks
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.33.0
     hooks:
