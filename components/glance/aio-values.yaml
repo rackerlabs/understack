@@ -17,12 +17,25 @@ endpoints:
         public: 443
     scheme:
       public: https
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: glance-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer
 
 network:
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
   use_external_ingress_controller: true
+  api:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
 
 # Glance storage backend
 # we'll switch to radosgw in the future

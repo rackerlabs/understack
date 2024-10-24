@@ -144,7 +144,7 @@ if [ ! -f "${DEST_DIR}/cert-manager/cluster-issuer.yaml" ]; then
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: ${DEPLOY_NAME}-cluster-issuer
+  name: understack-cluster-issuer
   annotations:
     argocd.argoproj.io/sync-wave: "5"
 spec:

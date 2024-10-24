@@ -50,9 +50,6 @@ spec:
                               - op: replace
                                 path: /spec/tls/0/hosts/0
                                 value: dex.{{index .metadata.annotations "dns_zone" }}
-                              - op: replace
-                                path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
-                                value: 'understack-cluster-issuer'
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
@@ -85,9 +82,6 @@ spec:
                         releaseName: nautobot
                         valuesObject:
                           ingress:
-                            annotations:
-                              cert-manager.io/cluster-issuer: 'understack-cluster-issuer'
-                              nginx.ingress.kubernetes.io/backend-protocol: HTTPS
                             hostname: 'nautobot.{{index .metadata.annotations "dns_zone" }}'
                         valueFiles:
                           - $understack/components/nautobot/nautobot-values.yaml
@@ -158,9 +152,6 @@ spec:
                             - op: replace
                               path: /spec/tls/0/hosts/0
                               value: workflows.{{index .metadata.annotations "dns_zone" }}
-                            - op: replace
-                              path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
-                              value: 'understack-cluster-issuer'
                 - component: argo-events
                   skipComponent: '{{has "argo-events" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:

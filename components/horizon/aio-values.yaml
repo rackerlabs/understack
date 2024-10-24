@@ -14,11 +14,27 @@ conf:
         allowed_hosts:
           - '*'
 
+endpoints:
+  dashboard:
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: keystone-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer
+
 network:
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
   use_external_ingress_controller: true
+  dashboard:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
 
 # (nicholas.kuechler) updating the jobs list to remove the 'horizon-db-init' job.
 dependencies:

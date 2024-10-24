@@ -3,7 +3,7 @@ kind: Ingress
 metadata:
   name: dex
   annotations:
-    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    cert-manager.io/cluster-issuer: understack-cluster-issuer
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
 spec:
   ingressClassName: nginx
