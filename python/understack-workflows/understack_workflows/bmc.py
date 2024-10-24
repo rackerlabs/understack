@@ -17,7 +17,6 @@ HEADERS = {
 @dataclass
 class Bmc:
     ip_address: str
-    bmc_type: str
     username: str
     password: str
 
@@ -57,7 +56,6 @@ class Bmc:
 
 def bmc_for_ip_address(
         ip_address: str,
-        bmc_type: str = None,
         username: str = "root",
         password: str|None = None) -> Bmc:
 
@@ -66,7 +64,6 @@ def bmc_for_ip_address(
         password = standard_password(ip_address, bmc_master)
 
     return Bmc(
-        bmc_type=bmc_type,
         ip_address=ip_address,
         password=password,
         username=username,

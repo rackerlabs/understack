@@ -4,12 +4,24 @@ from ironicclient.common.utils import args_array_to_patch
 from understack_workflows.bmc import Bmc
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.node_configuration import IronicNodeConfiguration
+from understack_workflows.helpers import setup_logger
 
 STATES_ALLOWING_UPDATES = ["enroll", "manageable"]
 
-def create_or_update(node_uuid: str, device_hostname: str, bmc: Bmc, logger):
+logger = setup_logger(__name__)
+
+def create_or_update(
+        node_uuid: str,
+        device_hostname: str,
+        device_manufacturer: str,
+        bmc: Bmc,
+        logger):
     """Note interfaces/ports are not synced here, that happens elsewhere"""
     client = IronicClient()
+    if device_manufacturer.startswith("Dell"):
+        driver = "idrac"
+    else:
+        driver = "redfish"
 
     logger.debug(f"Ensuring node with UUID {node_uuid} exists in Ironic")
     try:
@@ -17,12 +29,12 @@ def create_or_update(node_uuid: str, device_hostname: str, bmc: Bmc, logger):
     except ironicclient.common.apiclient.exceptions.NotFound:
         logger.debug(f"Node: {node_uuid} not found in Ironic, creating.")
         ironic_node = create_ironic_node(
-            client, node_uuid, device_hostname, bmc
+            client, node_uuid, device_hostname, driver, bmc
         )
         return ironic_node.provision_state
 
     if ironic_node.provision_state in STATES_ALLOWING_UPDATES:
-        update_ironic_node(client, node_uuid, device_hostname, bmc)
+        update_ironic_node(client, node_uuid, device_hostname, driver, bmc)
     else:
         logger.info(
             f"Device {node_uuid} in Ironic is in a "
@@ -33,8 +45,7 @@ def create_or_update(node_uuid: str, device_hostname: str, bmc: Bmc, logger):
     return ironic_node.provision_state
 
 
-def update_ironic_node(client, node_uuid, device_hostname, bmc):
-    driver = "idrac" if bmc.bmc_type == "iDRAC" else "redfish"
+def update_ironic_node(client, node_uuid, device_hostname, driver, bmc):
     updates = [
         f"name={device_hostname}",
         f"driver={driver}",
@@ -55,9 +66,9 @@ def create_ironic_node(
         client: IronicClient,
         node_uuid: str,
         device_hostname: str,
+        driver: str,
         bmc: Bmc,
 ) -> IronicNodeConfiguration:
-        driver = "idrac" if bmc.bmc_type == "iDRAC" else "redfish"
         return client.create_node(
             {
                 "uuid": node_uuid,

@@ -493,5 +493,4 @@ def test_parse_event():
         "0ccdd4ae-3e49-42cd-9b70-f742ece59312",
         "1327198-GP2S.3.understack.iad3",
         "10.46.96.156",
-        "iDRAC"
     )
