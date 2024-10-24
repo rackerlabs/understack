@@ -4,6 +4,7 @@ extend-exclude = [
     "venv",
     "assets",
     "schema/argo-workflows.json",
+    "python/understack-workflows/tests/json_samples/",
 ]
 
 [default]
@@ -14,3 +15,5 @@ extend-ignore-identifiers-re = [
 [default.extend-words]
 # Don't correct "HPE"
 HPE = "HPE"
+fo = "fo"
+sme = "sme"
