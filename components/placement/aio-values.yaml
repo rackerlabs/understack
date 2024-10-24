@@ -55,3 +55,11 @@ annotations:
     placement_ks_endpoints:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+
+endpoints:
+  placement:
+    scheme:
+      public: 'https'
+    port:
+      api:
+        public: 443

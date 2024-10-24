@@ -76,6 +76,12 @@ endpoints:
       name: rabbitmq-server
     hosts:
       default: rabbitmq-nodes
+  baremetal:
+    port:
+      api:
+        public: 443
+    scheme:
+      public: https
 
 network:
   api:
