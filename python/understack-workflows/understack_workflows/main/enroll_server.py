@@ -39,7 +39,7 @@ def main():
 
     - ensure standard BMC password is set
 
-    - TODO: if DHCP, set permanent IP address, netmask, default gw
+    - if DHCP, set permanent IP address, netmask, default gw
 
     - TODO: create and install SSL certificate
 
@@ -65,8 +65,6 @@ def main():
 
     - Find BMC interface
 
-    - TODO Find or create DRAC network prefix?  Actually DHCP does this already
-
     - For each server interface
         - find or create server interface by name in nautobot
         - set interface mac addresses
@@ -77,10 +75,10 @@ def main():
     - create BMC IP address assignment for BMC interface - convert our type
       "dhcp" IP Address to type "host" and associate it with the interface
 
-    -  TODO Find or create this baremetal node in Ironic
-       - create ports with MACs
-       - advance to available state
-       - set flavor?  what else?
+    -  Find or create this baremetal node in Ironic
+       - TODO create ports with MACs (omit BMC port) and set one to PXE
+       - TODO advance to available state
+       - TODO set flavor?  what else?
 
     """
     args = argument_parser().parse_args()
@@ -109,7 +107,14 @@ def main():
     # Do this after Nautobot IPAddress has been changed from DHCP!
     bmc_set_permanent_ip_addr(bmc, device_info.bmc_interface)
 
-    #_ironic_provision_state = ironic_node.create_or_update(device["id"], device["name"], bmc, logger)
+    _ironic_provision_state = ironic_node.create_or_update(
+        device["id"],
+        device["name"],
+        device_info.manufacturer,
+        bmc,
+        logger)
+    logger.info(f"{device['id']} {_ironic_provision_state=}")
+
     #
     # if there are a proper number of interfaces connected:
     #    sync_interfaces.from_nautobot_to_ironic(device_id)
