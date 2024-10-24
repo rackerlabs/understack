@@ -312,6 +312,11 @@ endpoints:
     # which is wired back to keystone-api via the service_ingress_api manifest. just
     # go direct to the service
     default: keystone-api
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
 
 manifests:
   job_credential_cleanup: false

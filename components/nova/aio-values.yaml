@@ -18,6 +18,12 @@ endpoints:
       name: rabbitmq-server
     hosts:
       default: rabbitmq-nodes
+  compute:
+    port:
+      api:
+        public: 443
+    scheme:
+      public: https
 
 network:
   # we're using ironic and actual switches

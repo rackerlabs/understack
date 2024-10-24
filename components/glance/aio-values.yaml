@@ -11,6 +11,12 @@ endpoints:
       name: rabbitmq-server
     hosts:
       default: rabbitmq-nodes
+  image:
+    port:
+      api:
+        public: 443
+    scheme:
+      public: https
 
 network:
   # configure OpenStack Helm to use Undercloud's ingress
