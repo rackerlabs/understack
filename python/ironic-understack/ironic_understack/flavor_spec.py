@@ -34,7 +34,7 @@ class FlavorSpec:
             model=data["model"],
             memory_gb=data["memory_gb"],
             cpu_cores=data["cpu_cores"],
-            cpu_model=data.get("cpu_model", data.get("cpu_models", [""]).pop()),
+            cpu_model=data["cpu_model"],
             drives=data["drives"],
             pci=data.get("pci", []),
         )
