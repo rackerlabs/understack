@@ -8,11 +8,17 @@ repos:
         exclude: '^docs/overrides'
       - id: fix-byte-order-marker
       - id: mixed-line-ending
+      - id: check-merge-conflict
+      - id: check-yaml
+        args:
+          - --allow-multiple-documents
+        exclude: mkdocs.yml
       - id: check-yaml
         name: check-yaml-mkdocs
         # --unsafe is a workaround for the use of !! in mkdocs.yml
         args: [--unsafe]
         files: mkdocs.yml
+      - id: check-symlinks
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.33.0
     hooks:
@@ -28,16 +34,16 @@ repos:
           - schema/argo-workflows.json
         files: "workflows/argo-events/workflowtemplates/.*.(yml|yaml)$"
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.37.0
+    rev: v0.42.0
     hooks:
       - id: markdownlint
         files: '^docs/'
   - repo: https://github.com/crate-ci/typos
-    rev: v1.22.8
+    rev: v1.26.8
     hooks:
       - id: typos
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.5.4
+    rev: v0.7.1
     hooks:
       - id: ruff
         args: [--fix]
