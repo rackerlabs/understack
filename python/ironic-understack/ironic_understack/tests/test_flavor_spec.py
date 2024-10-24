@@ -14,8 +14,7 @@ manufacturer: Dell
 model: PowerEdge R7615
 memory_gb: 7777
 cpu_cores: 245
-cpu_models:
-    - AMD EPYC 9254 245-Core Processor
+cpu_model: AMD EPYC 9254 245-Core Processor
 drives:
     - 960
     - 960
@@ -50,7 +49,7 @@ def test_from_yaml(valid_yaml):
     assert spec.model == "PowerEdge R7615"
     assert spec.memory_gb == 7777
     assert spec.cpu_cores == 245
-    assert spec.cpu_models == ["AMD EPYC 9254 245-Core Processor"]
+    assert spec.cpu_model == "AMD EPYC 9254 245-Core Processor"
     assert spec.drives == [960, 960]
 
 
@@ -119,8 +118,9 @@ def flavors():
             model="Fake Machine",
             memory_gb=100,
             cpu_cores=13,
-            cpu_models=["AMD EPYC 9254 245-Core Processor"],
+            cpu_model="AMD EPYC 9254 245-Core Processor",
             drives=[500, 500],
+            pci=[],
         ),
         FlavorSpec(
             name="medium",
@@ -128,8 +128,9 @@ def flavors():
             model="Fake Machine",
             memory_gb=200,
             cpu_cores=15,
-            cpu_models=["AMD EPYC 9254 245-Core Processor"],
+            cpu_model="AMD EPYC 9254 245-Core Processor",
             drives=[1500, 1500],
+            pci=[],
         ),
         FlavorSpec(
             name="large",
@@ -137,8 +138,9 @@ def flavors():
             model="Fake Machine",
             memory_gb=400,
             cpu_cores=27,
-            cpu_models=["AMD EPYC 9254 245-Core Processor"],
+            cpu_model="AMD EPYC 9254 245-Core Processor",
             drives=[1800, 1800],
+            pci=[],
         ),
     ]
 
