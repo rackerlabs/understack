@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    cert-manager.io/cluster-issuer: selfsigned-cluster-issuer
+    cert-manager.io/cluster-issuer: understack-cluster-issuer
     nginx.ingress.kubernetes.io/backend-protocol: HTTPS
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
   name: argo-workflows
