@@ -15,35 +15,74 @@ on:
     types: [checks_requested]
 
 jobs:
-  build-ironic-images:
+  discover:
     runs-on: ubuntu-latest
+    outputs:
+      yaml-files: ${{ steps.set-matrix.outputs.yaml-files }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4
+
+      - name: Find YAML files
+        id: set-matrix
+        run: |
+          yaml_files="[$(find . -maxdepth 1 -type f \( -name '*.yaml' -o -name '*.yml' \) -printf '"%f", ' | sed 's/, $//')]"
+          echo "yaml-files=${yaml_files}" >> $GITHUB_OUTPUT
+        working-directory: ironic-images
+
+  build:
+    runs-on: ubuntu-latest
+    needs: discover
     defaults:
       run:
-        working-directory: ironic-images/ipa-debian-bookworm
+        working-directory: ironic-images
+    strategy:
+      matrix:
+        yaml-file: ${{ fromJson(needs.discover.outputs.yaml-files) }}
+
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Set up variables
+        run: |
+          echo "Processing YAML file: ${{ matrix.yaml-file }}"
+          imagename=$(grep -m 1 '^- imagename:' "${{ matrix.yaml-file }}" | awk '{print $3}')
+          echo "distro=${imagename%-*}" >> $GITHUB_ENV
+          echo "release=${imagename##*-}" >> $GITHUB_ENV
+
+      - name: Setup python environment
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5
         id: setup-python
         with:
           python-version: '3.11'
           cache: 'pip'
-      - run: sudo apt update && sudo apt install -y debootstrap qemu-utils
-      - run: pip install -r requirements.txt
-        working-directory: ironic-images
-      - name: Build the IPA image
-        run: bash ipa-debian-bookworm.sh
+
+      - name: Install Dependencies
+        run: sudo apt update && sudo apt install -y debootstrap qemu-utils squashfs-tools kpartx
+
+      - name: Install python packages
+        run: pip install -r requirements.txt
+
+      - name: Build Images
+        run: |
+          diskimage-builder ${{ matrix.yaml-file }}
+          mkdir -p upload
+          find . -maxdepth 1 -type f \( -name '*.qcow2' -o -name '*.kernel' -o -name '*.initramfs' \) -exec cp {} upload/ \;
         env:
-          ELEMENTS_PATH: ${{ env.pythonLocation }}/share/ironic-python-agent-builder/dib:${{ github.workspace }}/ironic-images/custom_elements
-      - name: Dynamically set timestamp environment variable
-        run: echo "TIMESTAMP=$(date +"%Y%m%d%H%M%S")" >> $GITHUB_ENV
-      - name: Publish IPA Release
+          DIB_RELEASE: ${{ env.release }}
+          ELEMENTS_PATH: "${{ env.distro == 'ipa-debian' && format('{0}/share/ironic-python-agent-builder/dib:{1}/ironic-images/custom_elements', env.pythonLocation, github.workspace) || ''}}"
+
+      - name: Set timestamp environment variable
+        run: echo "TIMESTAMP=$(git show --no-patch --no-notes --pretty='%cd' --date=format:'%Y%m%d%H%M%S' ${{ github.sha }})" >>  $GITHUB_ENV
+
+      - name: Publish Release
+        id: create_release
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2
         with:
-          name: undercloud-ironic-ipa
-          tag_name: undercloud-ironic-ipa-${{ env.TIMESTAMP }}
+          name: understack-images
+          tag_name: understack-images-${{ env.TIMESTAMP }}
           make_latest: true
           fail_on_unmatched_files: true
-          files: |
-            ironic-images/ipa-debian-bookworm/ipa-debian-bookworm.initramfs
-            ironic-images/ipa-debian-bookworm/ipa-debian-bookworm.kernel
+          files: ironic-images/upload/*
         if: ${{ github.ref == 'refs/heads/main' }}
