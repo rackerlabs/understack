@@ -13,8 +13,9 @@ def sample_flavors():
             model="Fake Machine",
             memory_gb=4,
             cpu_cores=2,
-            cpu_models=["x86"],
+            cpu_model="x86",
             drives=[20],
+            pci=[],
         ),
         FlavorSpec(
             name="medium",
@@ -22,8 +23,9 @@ def sample_flavors():
             model="Fake Machine",
             memory_gb=8,
             cpu_cores=4,
-            cpu_models=["x86"],
+            cpu_model="x86",
             drives=[40],
+            pci=[],
         ),
         FlavorSpec(
             name="large",
@@ -31,8 +33,9 @@ def sample_flavors():
             model="Fake Machine",
             memory_gb=16,
             cpu_cores=8,
-            cpu_models=["x86"],
+            cpu_model="x86",
             drives=[80],
+            pci=[],
         ),
     ]
 

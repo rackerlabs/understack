@@ -98,6 +98,12 @@ network:
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
   use_external_ingress_controller: true
+  api:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
 
 dependencies:
   static:
@@ -312,6 +318,18 @@ endpoints:
     # which is wired back to keystone-api via the service_ingress_api manifest. just
     # go direct to the service
     default: keystone-api
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: keystone-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer
 
 manifests:
   job_credential_cleanup: false

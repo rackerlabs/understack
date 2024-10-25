@@ -76,6 +76,19 @@ endpoints:
       name: rabbitmq-server
     hosts:
       default: rabbitmq-nodes
+  baremetal:
+    port:
+      api:
+        public: 443
+    scheme:
+      public: https
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: ironic-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer
 
 network:
   api:
@@ -86,6 +99,8 @@ network:
         cluster: "nginx-openstack"
       annotations:
         nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
     external_policy_local: false
     node_port:
       enabled: false

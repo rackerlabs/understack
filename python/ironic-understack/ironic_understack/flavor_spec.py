@@ -7,14 +7,23 @@ from ironic_understack.machine import Machine
 
 
 @dataclass
+class PciSpec:
+    vendor_id: str
+    device_id: str
+    sub_vendor_id: str
+    sub_device_id: str
+
+
+@dataclass
 class FlavorSpec:
     name: str
     manufacturer: str
     model: str
     memory_gb: int
     cpu_cores: int
-    cpu_models: list[str]
+    cpu_model: str
     drives: list[int]
+    pci: list[PciSpec]
 
     @staticmethod
     def from_yaml(yaml_str: str) -> "FlavorSpec":
@@ -25,8 +34,9 @@ class FlavorSpec:
             model=data["model"],
             memory_gb=data["memory_gb"],
             cpu_cores=data["cpu_cores"],
-            cpu_models=data["cpu_models"],
+            cpu_model=data["cpu_model"],
             drives=data["drives"],
+            pci=data.get("pci", []),
         )
 
     @staticmethod
@@ -67,7 +77,7 @@ class FlavorSpec:
         if (
             machine.memory_gb == self.memory_gb
             and machine.disk_gb in self.drives
-            and machine.cpu in self.cpu_models
+            and machine.cpu == self.cpu_model
         ):
             return 100
 
@@ -80,7 +90,7 @@ class FlavorSpec:
             return 0
 
         # Rule 4: Machine must match the flavor on one of the CPU models exactly
-        if machine.cpu not in self.cpu_models:
+        if machine.cpu != self.cpu_model:
             return 0
 
         # Rule 5 and 6: Rank based on exact matches or excess capacity
