@@ -1,0 +1,202 @@
+{
+  "data": {
+    "devices": [
+      {
+        "id": "a3a2983f-d906-4663-943c-c41ab73c9b62",
+        "name": "Dell-33GSW04",
+        "location": {
+          "id": "da47f07f-b66a-4f0c-b780-4be8498e6129",
+          "name": "IAD3"
+        },
+        "rack": {
+          "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6",
+          "name": "F20-2"
+        },
+        "interfaces": [
+          {
+            "id": "ac2f1eae-188e-4fc6-9245-f9a6cf8b4ea8",
+            "name": "NIC.Integrated.1-1",
+            "type": "A_25GBASE_X_SFP28",
+            "status": {
+              "id": "d4bcbafa-3033-433b-b21b-a20acf9d1324"
+            },
+            "description": "Integrated NIC 1 Port 1",
+            "mac_address": "D4:04:E6:4F:8D:B4",
+            "connected_interface": {
+              "id": "f9a5cc87-d10a-4827-99e8-48961fd1d773",
+              "name": "Ethernet1/5",
+              "device": {
+                "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
+                "name": "f20-2-1.iad3.rackspace.net",
+                "location": {
+                  "id": "da47f07f-b66a-4f0c-b780-4be8498e6129"
+                },
+                "rack": {
+                  "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
+                },
+                "rel_vlan_group_to_devices": {
+                  "rel_vlan_group_to_devices": [
+                    {
+                      "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
+                      "name": "f20-2-1.iad3.rackspace.net"
+                    },
+                    {
+                      "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
+                      "name": "f20-2-2.iad3.rackspace.net"
+                    }
+                  ]
+                }
+              }
+            },
+            "ip_addresses": []
+          },
+          {
+            "id": "39d98f09-3199-40e0-87dc-e5ed6dce78e5",
+            "name": "NIC.Integrated.1-2",
+            "type": "A_25GBASE_X_SFP28",
+            "status": {
+              "id": "d4bcbafa-3033-433b-b21b-a20acf9d1324"
+            },
+            "description": "Integrated NIC 1 Port 2",
+            "mac_address": "D4:04:E6:4F:8D:B5",
+            "connected_interface": {
+              "id": "2148cf50-f70e-42c9-9f68-8ce98d61498c",
+              "name": "Ethernet1/5",
+              "device": {
+                "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
+                "name": "f20-2-2.iad3.rackspace.net",
+                "location": {
+                  "id": "da47f07f-b66a-4f0c-b780-4be8498e6129"
+                },
+                "rack": {
+                  "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
+                },
+                "rel_vlan_group_to_devices": {
+                  "rel_vlan_group_to_devices": [
+                    {
+                      "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
+                      "name": "f20-2-1.iad3.rackspace.net"
+                    },
+                    {
+                      "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
+                      "name": "f20-2-2.iad3.rackspace.net"
+                    }
+                  ]
+                }
+              }
+            },
+            "ip_addresses": []
+          },
+          {
+            "id": "7ac587c4-015b-4a0e-b579-91284cbd0406",
+            "name": "NIC.Slot.1-1",
+            "type": "A_25GBASE_X_SFP28",
+            "status": {
+              "id": "d4bcbafa-3033-433b-b21b-a20acf9d1324"
+            },
+            "description": "NIC in Slot 1 Port 1",
+            "mac_address": "14:23:F3:F5:25:F0",
+            "connected_interface": {
+              "id": "f72bb830-3f3c-4aba-b7d5-9680ea4d358e",
+              "name": "Ethernet1/6",
+              "device": {
+                "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
+                "name": "f20-2-2.iad3.rackspace.net",
+                "location": {
+                  "id": "da47f07f-b66a-4f0c-b780-4be8498e6129"
+                },
+                "rack": {
+                  "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
+                },
+                "rel_vlan_group_to_devices": {
+                  "rel_vlan_group_to_devices": [
+                    {
+                      "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
+                      "name": "f20-2-1.iad3.rackspace.net"
+                    },
+                    {
+                      "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
+                      "name": "f20-2-2.iad3.rackspace.net"
+                    }
+                  ]
+                }
+              }
+            },
+            "ip_addresses": []
+          },
+          {
+            "id": "8c28941c-02cd-4aad-9e3f-93c39e08b58a",
+            "name": "NIC.Slot.1-2",
+            "type": "A_25GBASE_X_SFP28",
+            "status": {
+              "id": "d4bcbafa-3033-433b-b21b-a20acf9d1324"
+            },
+            "description": "NIC in Slot 1 Port 2",
+            "mac_address": "14:23:F3:F5:25:F1",
+            "connected_interface": {
+              "id": "c210be75-1038-4ba3-9923-60050e1c5362",
+              "name": "Ethernet1/6",
+              "device": {
+                "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
+                "name": "f20-2-1.iad3.rackspace.net",
+                "location": {
+                  "id": "da47f07f-b66a-4f0c-b780-4be8498e6129"
+                },
+                "rack": {
+                  "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
+                },
+                "rel_vlan_group_to_devices": {
+                  "rel_vlan_group_to_devices": [
+                    {
+                      "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
+                      "name": "f20-2-1.iad3.rackspace.net"
+                    },
+                    {
+                      "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
+                      "name": "f20-2-2.iad3.rackspace.net"
+                    }
+                  ]
+                }
+              }
+            },
+            "ip_addresses": []
+          },
+          {
+            "id": "60d880c7-8618-414e-b4b4-fb6ac448c992",
+            "name": "iDRAC",
+            "type": "A_25GBASE_X_SFP28",
+            "status": {
+              "id": "d4bcbafa-3033-433b-b21b-a20acf9d1324"
+            },
+            "description": "Dedicated iDRAC interface",
+            "mac_address": "A8:3C:A5:35:43:86",
+            "connected_interface": {
+              "id": "4d010e0f-3135-4769-8bb0-71ba905edf01",
+              "name": "GigabitEthernet1/0/3",
+              "device": {
+                "id": "912d38b1-1194-444c-8e19-5f455e16082e",
+                "name": "f20-2-1d.iad3.rackspace.net",
+                "location": {
+                  "id": "da47f07f-b66a-4f0c-b780-4be8498e6129"
+                },
+                "rack": {
+                  "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
+                },
+                "rel_vlan_group_to_devices": null
+              }
+            },
+            "ip_addresses": [
+              {
+                "id": "312d73f7-5b19-4cb4-b098-05d913ccef2d",
+                "host": "10.46.96.156",
+                "parent": {
+                  "prefix": "10.46.96.128/26"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

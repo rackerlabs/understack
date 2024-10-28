@@ -36,3 +36,4 @@ resources:
   - workflowtemplates/bmc-sync-creds.yaml
   - workflowtemplates/sync-srv-redfish-intfs-to-nb.yaml
   - workflowtemplates/sync-bmc-creds.yaml
+  - workflowtemplates/enroll-server.yaml
