@@ -23,7 +23,6 @@ spec:
         args:
           - --bmc-ip-address
           - "{{workflow.parameters.ip_address}}"
-          - "{{inputs.parameters.ip_address}}"
         volumeMounts:
           - mountPath: /etc/openstack
             name: openstack-svc-acct
