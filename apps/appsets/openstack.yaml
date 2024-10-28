@@ -17,24 +17,31 @@ spec:
           - list:
               elements:
                 - component: keystone
+                  openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=keystone
                   chartVersion: 0.3.17
                 - component: ironic
+                  openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=ironic
                   chartVersion: 0.2.18
                 - component: placement
+                  openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=placement
                   chartVersion: 0.3.17
                 - component: neutron
+                  openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=neutron
                   chartVersion: 0.3.47
                 - component: glance
+                  openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=glance
                   chartVersion: 0.5.1
                 - component: nova
+                  openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=nova
                   chartVersion: 0.3.46
                 - component: horizon
+                  openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=horizon
                   chartVersion: 0.3.29
   template:
@@ -51,7 +58,7 @@ spec:
           helm:
             releaseName: '{{.component}}'
             valueFiles:
-              - $understack/components/openstack-2024.1-jammy.yaml
+              - $understack/components/openstack-{{.openstackRelease}}-jammy.yaml
               - $understack/components/{{.component}}/aio-values.yaml
               - $deploy/{{.name}}/manifests/secret-openstack.yaml
               - $deploy/{{.name}}/helm-configs/{{.component}}.yaml
