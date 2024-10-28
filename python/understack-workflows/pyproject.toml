@@ -96,6 +96,8 @@ ignore = [
     "D102",  # don't require docs for every class method
     "D103",  # don't require docs for every function
     "D104",  # don't require docs for every package
+    "D106",  # don't require docs for every nested class
+    "D107",  # don't require docs for __init__
     "D417"   # don't require docs for every function parameter
 ]
 
