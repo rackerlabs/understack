@@ -18,25 +18,25 @@ spec:
               elements:
                 - component: keystone
                   # renovate: datasource=custom.openstackhelm depName=keystone
-                  chartVersion: 0.3.15
+                  chartVersion: 0.3.17
                 - component: ironic
                   # renovate: datasource=custom.openstackhelm depName=ironic
                   chartVersion: 0.2.18
                 - component: placement
                   # renovate: datasource=custom.openstackhelm depName=placement
-                  chartVersion: 0.3.16
+                  chartVersion: 0.3.17
                 - component: neutron
                   # renovate: datasource=custom.openstackhelm depName=neutron
                   chartVersion: 0.3.47
                 - component: glance
                   # renovate: datasource=custom.openstackhelm depName=glance
-                  chartVersion: 0.5.0
+                  chartVersion: 0.5.1
                 - component: nova
                   # renovate: datasource=custom.openstackhelm depName=nova
-                  chartVersion: 0.3.44
+                  chartVersion: 0.3.46
                 - component: horizon
                   # renovate: datasource=custom.openstackhelm depName=horizon
-                  chartVersion: 0.3.28
+                  chartVersion: 0.3.29
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
