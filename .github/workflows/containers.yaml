@@ -24,7 +24,7 @@ jobs:
 
     strategy:
       matrix:
-        project: [ironic, neutron, keystone]
+        project: [ironic, neutron, keystone, openstack-client]
         openstack: [2024.1, 2024.2]
 
     steps:
