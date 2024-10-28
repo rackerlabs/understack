@@ -35,5 +35,4 @@ resources:
   - workflowtemplates/idrac-enable-network-boot.yaml
   - workflowtemplates/bmc-sync-creds.yaml
   - workflowtemplates/sync-srv-redfish-intfs-to-nb.yaml
-  - workflowtemplates/bmc-firmware-update.yaml
   - workflowtemplates/sync-bmc-creds.yaml

@@ -12,7 +12,6 @@ set of WorkflowTemplates below.
 | get-bmc-creds         | Get the credentials for the target Device                 | device_id               | secret     | * |
 | get-bmc-ip            | Get BMC IP address for target Device                      | device_id               | ip         |   |
 | nautobot-api          | HTTP Template Workflow to query the Nautobot API          | method,nautobot_url,uri | result     |   |
-| bmc-firmware-update   | Update BMC firmware on target Device                      | device_id               |            |   |
 | bmc-sync-creds        | Sync's a devices BMC password with what we have on record | device_id               |            |   |
 
 \* WorkflowTemplate which requires a manual / custom implementation.

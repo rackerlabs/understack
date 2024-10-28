@@ -26,14 +26,14 @@ $(ACTIVATE): requirements-docs.txt
 	@$(PIP) install -U -r requirements-docs.txt
 	@touch $(ACTIVATE)
 
-docs/workflows: $(ACTIVATE)
+docs/workflows/argo-events.md: $(ACTIVATE)
 	@mkdir -p docs/workflows
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py workflows docs/workflows
 
 .PHONY: docs
-docs: $(ACTIVATE) docs/workflows ## Builds the documentation
+docs: $(ACTIVATE) docs/workflows/argo-events.md ## Builds the documentation
 	$(MKDOCS) build --strict
 
 .PHONY: docs-local
-docs-local: $(ACTIVATE) docs/workflows ## Build and locally host the documentation
+docs-local: $(ACTIVATE) docs/workflows/argo-events.md ## Build and locally host the documentation
 	$(MKDOCS) serve --strict
