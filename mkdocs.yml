@@ -126,4 +126,6 @@ nav:
     - user-guide/mariadb-operator-cheat-sheet.md
     - user-guide/postgres-operator-cheat-sheet.md
     - user-guide/monitoring.md
+    - user-guide/openstack-ironic.md
+    - user-guide/openstack-placement.md
   - Workflows: workflows/
