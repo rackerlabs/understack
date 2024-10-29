@@ -10,93 +10,88 @@ from understack_workflows.port_configuration import PortConfiguration
 logger = setup_logger(__name__)
 
 
-def from_nautobot_to_ironic(nautobot_data: dict, pxe_interface: str, ironic_client=None):
+def from_nautobot_to_ironic(
+    nautobot_data: dict, pxe_interface: str, ironic_client=None
+):
     """Update Ironic ports to match information found in Nautobot Interfaces."""
     device_id = nautobot_data["id"]
     logger.info(f"Syncing Interfaces / Ports for Device {device_id} ...")
 
-    nautobot_ports = get_nautobot_interfaces(nautobot_data, pxe_interface)
+    nautobot_ports = dict_by_uuid(get_nautobot_interfaces(nautobot_data, pxe_interface))
     logger.info(f"{nautobot_ports}")
 
     if ironic_client is None:
         ironic_client = IronicClient()
 
     logger.info("Fetching Ironic Ports ...")
-    ironic_ports = ironic_client.list_ports(device_id)
+    ironic_ports = dict_by_uuid(ironic_client.list_ports(device_id))
 
-    # Update existing Ironic Ports
-    new_ports = []
-    for n in nautobot_ports:
-        # identify any matching Ironic Ports
-        matching_port = None
-        for i in ironic_ports:
-            if n.uuid == i.uuid:
-                matching_port = i
-
-        # if a port doesn't already exist, we'll create it later
-        if not matching_port:
-            new_ports.append(n)
-            continue
-
-        # If a matching port was found, we will remove it from the ironic_ports
-        # list. Once this loop completes, any remaining ports in ironic_ports will
-        # be considered stale, and will be removed from Ironic
-        ironic_ports.remove(matching_port)
-
-        # if any data has changed on this interface, patch the matching ironic Port
-        patch = get_patch(n, matching_port)
-        if patch:
-            logger.debug(f"[ | ] {n}")
-            logger.info(f"Updating Ironic Port {n} ...")
-            response = ironic_client.update_port(n.uuid, patch)
-            logger.debug(f"Updated: {response}")
-        else:
-            logger.debug(
-                f"Existing Ironic Port already matches Nautobot Interface {n.uuid}"
+    for port_id, i in ironic_ports.items():
+        if port_id not in nautobot_ports:
+            logger.info(
+                f"Nautobot Interface {i.uuid} no longer exists, deleting "
+                f"corresponding Ironic Port"
             )
+            response = ironic_client.delete_port(i.uuid)
+            logger.debug(f"Deleted: {response}")
 
-    # Create new Ironic Ports
-    for p in new_ports:
-        logger.debug(f"[ + ] {p}")
-        logger.info(f"Creating Ironic Port {p} ...")
-        response = ironic_client.create_port(p.dict())
-        logger.debug(f"Created: {response}")
-
-    # Delete stale Ironic Ports
-    for i in ironic_ports:
-        logger.debug(f"[ - ] {i}")
-        logger.info(
-            f"Nautobot Interface {i.uuid} no longer exists, deleting "
-            f"corresponding Ironic Port"
-        )
-        response = ironic_client.delete_port(i.uuid)
-        logger.debug(f"Deleted: {response}")
+    for port_id, nb_port in nautobot_ports.items():
+        if port_id in ironic_ports:
+            patch = get_patch(nb_port, ironic_ports[port_id])
+            if patch:
+                logger.info(f"Updating Ironic Port {nb_port} ...")
+                response = ironic_client.update_port(port_id, patch)
+                logger.debug(f"Updated: {response}")
+            else:
+                logger.debug(f"No changes required for Ironic Port {port_id}")
+        else:
+            logger.info(f"Creating Ironic Port {nb_port} ...")
+            response = ironic_client.create_port(nb_port.dict())
+            logger.debug(f"Created: {response}")
 
 
-def get_nautobot_interfaces(nautobot_data, pxe_interface: str) -> list[PortConfiguration]:
+def dict_by_uuid(items: list) -> dict:
+    return {item.uuid: item for item in items}
+
+
+def get_nautobot_interfaces(
+    nautobot_data, pxe_interface: str
+) -> list[PortConfiguration]:
     """Get Nautobot interfaces for a device.
 
     Returns a list of PortConfiguration
 
     Excludes interfaces with no MAC address
+
     """
     device_id = nautobot_data["id"]
 
     return [
-        PortConfiguration(
-            node_uuid=device_id,
-            address=interface["mac_address"],
-            uuid=interface["id"],
-            name=interface["name"],
-            pxe_enabled=(interface["name"] == pxe_interface),
-        )
+        port_configuration(interface, pxe_interface, device_id)
         for interface in nautobot_data["interfaces"]
-            if interface_is_relevant(interface)
+        if interface_is_relevant(interface)
     ]
+
+
+def port_configuration(interface: dict, pxe_interface, device_id) -> PortConfiguration:
+    # Interface names have their UUID prepended because Ironic wants them
+    # globally unique across all devices.
+    name = f"{interface['id']} {interface['name']}"
+    pxe_enabled = interface["name"] == pxe_interface
+
+    return PortConfiguration(
+        node_uuid=device_id,
+        address=interface["mac_address"],
+        uuid=interface["id"],
+        name=name,
+        pxe_enabled=pxe_enabled,
+    )
+
 
 def interface_is_relevant(interface: dict) -> bool:
     name = interface["name"]
     return interface["mac_address"] and name != "iDRAC" and name != "iLo"
+
 
 def get_patch(nautobot_port: PortConfiguration, port: Port) -> list:
     """Generate patch to change data.
