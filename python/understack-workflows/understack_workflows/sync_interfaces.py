@@ -1,8 +1,5 @@
-import os
-
 from ironicclient.v1.port import Port
 
-from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.port_configuration import PortConfiguration

@@ -2,7 +2,6 @@ from typing import Annotated
 
 from pydantic import BaseModel
 from pydantic import StringConstraints
-from pydantic import field_serializer
 
 
 class PortConfiguration(BaseModel):

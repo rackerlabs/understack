@@ -5,8 +5,8 @@ import pynautobot
 
 from understack_workflows import ironic_node
 from understack_workflows import nautobot_device
-from understack_workflows import topology
 from understack_workflows import sync_interfaces
+from understack_workflows import topology
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.bmc_chassis_info import chassis_info
@@ -16,7 +16,6 @@ from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
-from understack_workflows.sync_interfaces import from_nautobot_to_ironic
 
 logger = setup_logger(__name__)
 
