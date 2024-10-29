@@ -5,6 +5,8 @@ import pynautobot
 
 from understack_workflows import ironic_node
 from understack_workflows import nautobot_device
+from understack_workflows import topology
+from understack_workflows import sync_interfaces
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.bmc_chassis_info import chassis_info
@@ -14,7 +16,7 @@ from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
-
+from understack_workflows.sync_interfaces import from_nautobot_to_ironic
 logger = setup_logger(__name__)
 
 
@@ -94,29 +96,31 @@ def main():
     nautobot = pynautobot.api(url, token=token)
 
     bmc = bmc_for_ip_address(bmc_ip_address, password=args.bmc_password)
-    logger.info("Checking BMC credentials")
     set_bmc_password(bmc.ip_address, bmc.password)
 
     device_info = chassis_info(bmc)
     logger.info(f"Discovered {device_info}")
 
+
     update_dell_drac_settings(bmc)
-    update_dell_bios_settings(bmc)
 
-    device = nautobot_device.find_or_create(device_info, nautobot)
+    nb_device = nautobot_device.find_or_create(device_info, nautobot)
 
-    # Do this after Nautobot IPAddress has been changed from DHCP!
+    pxe_interface = topology.pxe_interface_name(nb_device)
+
+    # Be sure to ony do this after Nautobot IPAddress has been changed from
+    # DHCP!  Also note this may require a restart of the DRAC, which in turn may
+    # delete any pending BIOS jobs.
     bmc_set_permanent_ip_addr(bmc, device_info.bmc_interface)
 
-    _ironic_provision_state = ironic_node.create_or_update(
-        device["id"], device["name"], device_info.manufacturer, bmc, logger
-    )
-    logger.info(f"{device['id']} {_ironic_provision_state=}")
+    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
-    #
-    # if there are a proper number of interfaces connected:
-    #    sync_interfaces.from_nautobot_to_ironic(device_id)
-    #    run cleaning and get this node into "managed" state.
+    _ironic_provision_state = ironic_node.create_or_update(
+        nb_device["id"], nb_device["name"], device_info.manufacturer, bmc, logger
+    )
+    logger.info(f"{nb_device['id']} {_ironic_provision_state=}")
+
+    sync_interfaces.from_nautobot_to_ironic(nb_device, pxe_interface=pxe_interface)
 
     logger.info(f"{__file__} complete for {bmc.ip_address}")
 

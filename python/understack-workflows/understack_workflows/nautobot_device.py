@@ -148,7 +148,7 @@ def base_mac(mac: str, port_name: str) -> str:
     """
     port_number = re.split(r"\D+", port_name)[-1]
     if not port_number:
-        raise ValueError(f"Need numeric interface, not {port_name}")
+        raise ValueError(f"Need numeric interface, not {port_name!r}")
     port_number = int(port_number)
     mac_number = int(re.sub(r"[^0-9a-fA-f]+", "", mac), 16)
     base = mac_number - port_number

@@ -6,15 +6,17 @@ logger = setup_logger(__name__)
 
 REDFISH_BIOS_PATH = "/redfish/v1/Systems/System.Embedded.1/Bios"
 
-REQUIRED_BIOS_SETTINGS = {
-    "PxeDev1EnDis": "Enabled",
-    "PxeDev1Interface": "NIC.Slot.1-1",
-    "HttpDev1Interface": "NIC.Slot.1-1",
-    "TimeZone": "UTC",
-}
+
+def required_bios_settings(pxe_interface: str) -> dict:
+    return {
+        "PxeDev1EnDis": "Enabled",
+        "PxeDev1Interface": pxe_interface,
+        "HttpDev1Interface": pxe_interface,
+        "TimeZone": "UTC",
+    }
 
 
-def update_dell_bios_settings(bmc: Bmc) -> dict:
+def update_dell_bios_settings(bmc: Bmc, pxe_interface="NIC.Slot.1-1") -> dict:
     """Check and update BIOS settings to standard as required.
 
     Any changes take effect on next server reboot.
@@ -22,9 +24,10 @@ def update_dell_bios_settings(bmc: Bmc) -> dict:
     Returns the changes that were made
     """
     current_settings = bmc.redfish_request(REDFISH_BIOS_PATH)["Attributes"]
+    required_settings = required_bios_settings(pxe_interface)
 
     required_changes = {
-        k: v for k, v in REQUIRED_BIOS_SETTINGS.items() if current_settings[k] != v
+        k: v for k, v in required_settings.items() if current_settings[k] != v
     }
 
     if required_changes:
