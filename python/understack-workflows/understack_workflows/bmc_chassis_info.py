@@ -190,14 +190,17 @@ def parse_lldp_port(port_data: dict[str, str]) -> dict:
 
     Remote Switch interface names have abbreviations expanded to cisco standard
     """
-    mac = port_data["SwitchConnectionID"]
+    mac = str(port_data["SwitchConnectionID"]).upper()
     port_name = normalize_interface_name(port_data["SwitchPortConnectionID"])
 
-    if mac == "No Link":
-        return {"remote_switch_mac_address": None, "remote_switch_port_name": None}
+    if mac in ["NOT AVAILABLE", "NO LINK"]:
+        return {
+            "remote_switch_mac_address": None,
+            "remote_switch_port_name": None,
+        }
     else:
         return {
-            "remote_switch_mac_address": mac.upper(),
+            "remote_switch_mac_address": mac,
             "remote_switch_port_name": port_name,
         }
 
