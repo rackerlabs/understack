@@ -2,3 +2,11 @@
 
 ARG OPENSTACK_VERSION="required_argument"
 FROM docker.io/openstackhelm/openstack-client:${OPENSTACK_VERSION}
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        vim \
+        wget \
+        telnet \
+        jq \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
