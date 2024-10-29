@@ -9,3 +9,4 @@ resources:
   - dnsmasq-cm.yaml
   - dnsmasq-ss.yaml
   - understack-data-pvc.yaml
+  - ironic-ks-user-baremetal.yaml
