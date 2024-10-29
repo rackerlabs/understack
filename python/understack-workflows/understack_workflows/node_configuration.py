@@ -174,28 +174,3 @@ class IronicNodeConfiguration:
             if k in field_list and v is not None
         )
         return client.create_node(fields)
-
-    @staticmethod
-    def from_event(event: dict) -> IronicNodeConfiguration:
-        # check for events we support
-        model = event.get("model")
-        if model not in ["interface"]:
-            raise ValueError(f"'{model}' events not supported")
-
-        data = event["data"]
-
-        # if we got an iDRAC interface then we'll want to use
-        # the idrac driver otherwise redfish
-        driver = "idrac" if data["name"] == "iDRAC" else "redfish"
-
-        di = RedfishDriverInfo(
-            redfish_address=f"https://{data['ip_addresses'][0]['host']}",
-            redfish_verify_ca=False,
-        )
-
-        return IronicNodeConfiguration(
-            data["device"]["id"],
-            data["device"]["name"],
-            driver,
-            driver_info=di,
-        )

@@ -6,7 +6,6 @@ from understack_workflows.helpers import setup_logger
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 FACTORY_PASSWORD = "calvin"
-FACTORY_USER = "root"
 
 logger = setup_logger(__name__)
 
@@ -68,8 +67,6 @@ def _verify_auth(host: str, username: str = "root", password: str = "") -> str:
                 f"BMC {host} password login failed: "
                 f" {response.status_code} {response.json()}"
             )
-            return None
-
         return response.headers["X-Auth-Token"]
     except Exception as e:
         raise e from None
