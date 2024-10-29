@@ -55,7 +55,10 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
 
     find_or_create_interfaces(nautobot, chassis_info, device["id"], switches)
 
-    return device
+    # Run the graphql query yet again, to include all the data we just populated
+    # in nautobot.   Fairly innefficient for the case where we didn't change
+    # anything, but we need the accurate data.
+    return nautobot_server(nautobot, serial=chassis_info.serial_number)
 
 
 def location_from(switches):
