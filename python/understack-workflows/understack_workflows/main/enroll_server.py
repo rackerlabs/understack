@@ -17,6 +17,7 @@ from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.sync_interfaces import from_nautobot_to_ironic
+
 logger = setup_logger(__name__)
 
 
@@ -45,6 +46,8 @@ def main():
     - ensure standard BMC password is set
 
     - if DHCP, set permanent IP address, netmask, default gw
+
+    - TODO: if server is off, power it on and wait (otherwise LLDP doesn't work)
 
     - TODO: create and install SSL certificate
 
@@ -81,7 +84,7 @@ def main():
       "dhcp" IP Address to type "host" and associate it with the interface
 
     -  Find or create this baremetal node in Ironic
-       - TODO create ports with MACs (omit BMC port) and set one to PXE
+       - create ports with MACs (omit BMC port) and set one to PXE
        - TODO advance to available state
        - TODO set flavor?  what else?
 
@@ -101,18 +104,17 @@ def main():
     device_info = chassis_info(bmc)
     logger.info(f"Discovered {device_info}")
 
-
     update_dell_drac_settings(bmc)
 
     nb_device = nautobot_device.find_or_create(device_info, nautobot)
-
     pxe_interface = topology.pxe_interface_name(nb_device)
 
-    # Be sure to ony do this after Nautobot IPAddress has been changed from
-    # DHCP!  Also note this may require a restart of the DRAC, which in turn may
-    # delete any pending BIOS jobs.
+    # Be sure to only do this after Nautobot IPAddress has been changed from
+    # DHCP, otherwise our IP might be handed out to someone else.
     bmc_set_permanent_ip_addr(bmc, device_info.bmc_interface)
 
+    # Note the above may require a restart of the DRAC, which in turn may delete
+    # any pending BIOS jobs, so do BIOS settings after the DRAC settings.
     update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
     _ironic_provision_state = ironic_node.create_or_update(
