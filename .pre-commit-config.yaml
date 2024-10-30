@@ -65,3 +65,10 @@ repos:
     rev: 38.114.0
     hooks:
       - id: renovate-config-validator
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 'v1.13.0'
+    hooks:
+      - id: mypy
+        files: '^python/understack-workflows/'
+        args: ["--ignore-missing-imports"]
+        additional_dependencies: ['types-requests']
