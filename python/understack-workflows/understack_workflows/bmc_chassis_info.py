@@ -89,7 +89,9 @@ def bmc_interface(bmc) -> dict:
     }
 
 
-def parse_ipv4(data: list[dict]) -> tuple[IPv4Interface, IPv4Address, bool]:
+def parse_ipv4(
+    data: list[dict],
+) -> tuple[None, None, None] | tuple[IPv4Interface, IPv4Address, bool]:
     """Parse the iDRAC's representation of network interface configuration.
 
     Example input:
