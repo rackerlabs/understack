@@ -36,6 +36,16 @@ class ChassisInfo:
         return self.interfaces[0]
 
 
+REDFISH_SYSTEM_ENDPOINT = "/redfish/v1/Systems/System.Embedded.1/"
+REDFISH_ETHERNET_ENDPOINT = f"{REDFISH_SYSTEM_ENDPOINT}EthernetInterfaces/"
+REDFISH_CONNECTION_ENDPOINT = (
+    f"{REDFISH_SYSTEM_ENDPOINT}NetworkPorts/Oem/Dell/DellSwitchConnections/"
+)
+REDFISH_DRAC_NIC_ENDPOINT = (
+    "/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces/NIC.1"
+)
+
+
 def chassis_info(bmc: Bmc) -> ChassisInfo:
     """Query DRAC for basic system info via redfish.
 
@@ -44,8 +54,7 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
         MemorySummary.TotalSystemMemoryGiB
 
     """
-    url = "/redfish/v1/Systems/System.Embedded.1/"
-    chassis_data = bmc.redfish_request(url)
+    chassis_data = bmc.redfish_request(REDFISH_SYSTEM_ENDPOINT)
 
     return ChassisInfo(
         manufacturer=chassis_data["Manufacturer"],
@@ -76,8 +85,7 @@ def combine_lldp(lldp, interface) -> InterfaceInfo:
 
 def bmc_interface(bmc) -> dict:
     """Retrieve DRAC BMC interface info via redfish API."""
-    url = "/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces/NIC.1"
-    data = bmc.redfish_request(url)
+    data = bmc.redfish_request(REDFISH_DRAC_NIC_ENDPOINT)
     ipv4_address, ipv4_gateway, dhcp = parse_ipv4(data["IPv4Addresses"])
     return {
         "name": "iDRAC",
@@ -121,8 +129,7 @@ def parse_ipv4(
 
 def in_band_interfaces(bmc: Bmc) -> list[dict]:
     """A Collection of Ethernet Interfaces for this System."""
-    url = "/redfish/v1/Systems/System.Embedded.1/EthernetInterfaces/"
-    index_data = bmc.redfish_request(url)
+    index_data = bmc.redfish_request(REDFISH_ETHERNET_ENDPOINT)
     urls = [member["@odata.id"] for member in index_data["Members"]]
 
     return [interface_detail(bmc, url) for url in urls if interface_is_relevant(url)]
@@ -178,11 +185,7 @@ def lldp_data_by_name(bmc) -> dict:
     11:11:11:11:11:00 then the LLDP mac address seen on port e1/2 would be
     11:11:11:11:11:02
     """
-    url = (
-        "/redfish/v1/Systems/System.Embedded.1"
-        "/NetworkPorts/Oem/Dell/DellSwitchConnections/"
-    )
-    ports = bmc.redfish_request(url)["Members"]
+    ports = bmc.redfish_request(REDFISH_CONNECTION_ENDPOINT)["Members"]
 
     return {server_interface_name(port["Id"]): parse_lldp_port(port) for port in ports}
 
