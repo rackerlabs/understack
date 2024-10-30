@@ -6,7 +6,7 @@ logger = setup_logger(__name__)
 # When we read Enum-type keys we can expect a string like "Enabled".
 #
 # To change that key requires the numeric new_value string like "1".
-STANDARD = {
+STANDARD: dict[str, dict] = {
     "SNMP.1.AgentEnable": {"expect": "Enabled", "new_value": "1"},
     "SNMP.1.SNMPProtocol": {"expect": "All", "new_value": "0"},
     "SNMP.1.AgentCommunity": {"expect": "public", "new_value": "public"},

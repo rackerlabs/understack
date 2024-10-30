@@ -45,7 +45,7 @@ def set_bmc_password(ip_address, required_password, username="root"):
         logger.info("Production BMC credentials are working on this BMC.")
 
 
-def _verify_auth(host: str, username: str = "root", password: str = "") -> str:
+def _verify_auth(host: str, username: str = "root", password: str = "") -> str | None:
     """Test whether provided credentials work against a secured API endpoint.
 
     Returns Session authentication token on success

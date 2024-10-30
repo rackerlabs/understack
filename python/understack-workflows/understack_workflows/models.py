@@ -29,8 +29,8 @@ class NIC:
 
     @classmethod
     def from_hp_json(cls, data: dict) -> NIC:
-        nic = cls(data.get("name"), data.get("location"), [], data.get("name"))
-        ports = data.get("network_ports") or data.get("unknown_ports")
+        nic = cls(data["name"], data["location"], [], data["name"])
+        ports = data.get("network_ports") or data.get("unknown_ports", [])
         nic.interfaces = [Interface.from_hp_json(i, nic, ports) for i in ports]
         return nic
 
@@ -78,9 +78,9 @@ class Interface:
         interface_name = f"NIC.{nic.location.replace(' ', '.')}_{p_num}"
         return cls(
             interface_name,
-            data.get("mac_addr"),
+            data["mac_addr"],
             nic.location,
-            data.get("speed", 0),
+            data["speed", 0],
             nic.model,
         )
 
@@ -116,7 +116,7 @@ class Chassis:
     name: str
     nics: list[NIC]
     network_interfaces: list[Interface]
-    system_info: Systeminfo
+    system_info: Systeminfo | None
 
     @classmethod
     def check_manufacturer(cls, manufacturer: str) -> None:
@@ -145,20 +145,23 @@ class Chassis:
         if cls.bmc_is_ilo4(chassis_data):
             return cls.from_hp_json(oob_obj, chassis_data.name)
 
-        chassis = cls(chassis_data.name, [], [], [])
-        chassis.nics = [
+        nics = [
             NIC.from_redfish(i) for i in chassis_data.network_adapters.get_members()
         ]
-        chassis.network_interfaces = cls.interfaces_from_nics(chassis.nics)
-        chassis.system_info = Systeminfo.from_redfish(chassis_data)
-        return chassis
+
+        return cls(
+            name=chassis_data.name,
+            nics=nics,
+            network_interfaces=cls.interfaces_from_nics(nics),
+            system_info=Systeminfo.from_redfish(chassis_data),
+        )
 
     @classmethod
     def from_hp_json(cls, oob_obj: Sushy, chassis_name: str) -> Chassis:
         data = cls.chassis_hp_json_data(oob_obj)
         nics = [NIC.from_hp_json(i) for i in data]
         network_interfaces = cls.interfaces_from_nics(nics)
-        return cls(chassis_name, nics, network_interfaces)
+        return cls(chassis_name, nics, network_interfaces, None)
 
     @classmethod
     def interfaces_from_nics(cls, nics: list[NIC]) -> list[Interface]:

@@ -37,7 +37,7 @@ class Nautobot:
 
     def non_lag_interface_by_mac(
         self, device_id: UUID, mac_address: str
-    ) -> list[NautobotInterface]:
+    ) -> NautobotInterface:
         interfaces = self.session.dcim.interfaces.filter(
             device_id=device_id,
             mac_address=mac_address,

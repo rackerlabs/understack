@@ -6,7 +6,7 @@ from ipaddress import IPv4Interface
 
 from understack_workflows import bmc_chassis_info
 
-FIXTURE_PATH = "json_samples/bmc_chassis_info"
+FIXTURE_PATH = pathlib.Path("json_samples/bmc_chassis_info")
 
 
 class FakeBmc:

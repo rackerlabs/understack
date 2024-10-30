@@ -52,13 +52,18 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
         # Re-run the graphql query to fetch any auto-created defaults from
         # nautobot (e.g. it automatically creates a BMC interface):
         device = nautobot_server(nautobot, serial=chassis_info.serial_number)
+        if not device:
+            raise Exception("Failed to create device in Nautobot")
 
     find_or_create_interfaces(nautobot, chassis_info, device["id"], switches)
 
     # Run the graphql query yet again, to include all the data we just populated
     # in nautobot.   Fairly innefficient for the case where we didn't change
     # anything, but we need the accurate data.
-    return nautobot_server(nautobot, serial=chassis_info.serial_number)
+    device = nautobot_server(nautobot, serial=chassis_info.serial_number)
+    if not device:
+        raise Exception("Failed to create device in Nautobot")
+    return device
 
 
 def location_from(switches):
@@ -95,7 +100,7 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
     return switches
 
 
-def nautobot_switches(nautobot, mac_addresses: list[str]) -> dict[str, dict]:
+def nautobot_switches(nautobot, mac_addresses: set[str]) -> dict[str, dict]:
     """Get switches by MAC address.
 
     Assumes that MAC addresses in Nautobot are normalized to upcase
@@ -143,13 +148,13 @@ def nautobot_switch(all_switches, interface):
     return switch
 
 
-def base_mac(mac: str, port_name: str) -> str:
+def base_mac(mac: str, port_name: str | None) -> str:
     """Given a mac addr, return the mac addr which is <port_num> less.
 
     >>> base_mac("11:22:33:44:55:66", "Eth1/6")
     "11:22:33:44:55:60"
     """
-    port_number = re.split(r"\D+", port_name)[-1]
+    port_number = re.split(r"\D+", str(port_name))[-1]
     if not port_number:
         raise ValueError(f"Need numeric interface, not {port_name!r}")
     port_number = int(port_number)
@@ -183,7 +188,7 @@ def _parse_manufacturer(name: str) -> str:
     raise ValueError(f"Server manufacturer {name} not supported")
 
 
-def nautobot_server(nautobot, serial: str) -> dict:
+def nautobot_server(nautobot, serial: str) -> dict | None:
     query = f"""{{
         devices(serial: ["{serial}"]){{
             id name
