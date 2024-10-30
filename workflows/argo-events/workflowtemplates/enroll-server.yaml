@@ -27,6 +27,9 @@ spec:
           - mountPath: /etc/openstack
             name: openstack-svc-acct
             readOnly: true
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
         env:
         - name: BMC_MASTER
           valueFrom:
@@ -40,6 +43,9 @@ spec:
         - name: WF_UID
           value: "{{workflow.uid}}"
       volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
         - name: openstack-svc-acct
           secret:
             secretName: openstack-svc-acct
