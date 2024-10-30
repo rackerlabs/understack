@@ -11,7 +11,7 @@ resources:
   - secrets/operate-workflow-sa.token.yaml
   - secrets/nautobot-token.yaml
   - sensors/ironic-node-update.yaml
-  - sensors/debug-sensor.yamssync
+  - sensors/debug-sensor.yaml
   - sensors/nb-oob-interface-update.yaml
   - eventsources/nautobot-webhook.yaml
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
