@@ -13,7 +13,7 @@ logger = setup_logger(__name__)
 DEVICE_INITIAL_STATUS = "Active"
 DEVICE_ROLE = "server"
 INTERFACE_TYPE = "25gbase-x-sfp28"
-DRAC_INTERFACE_TYPE = "1000base-t"
+BMC_INTERFACE_TYPE = "1000base-t"
 
 
 def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
@@ -273,8 +273,8 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str)
 
 
 def interface_type(interface: InterfaceInfo) -> str:
-    if interface.name == "iDRAC":
-        return DRAC_INTERFACE_TYPE
+    if interface.name in ["iDRAC", "iLO"]:
+        return BMC_INTERFACE_TYPE
     else:
         return INTERFACE_TYPE
 
