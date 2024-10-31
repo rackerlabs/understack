@@ -12,3 +12,4 @@ class PortConfiguration(BaseModel):
     node_uuid: str  # using a str here due to ironicclient Port attribute
     name: str  # port name
     pxe_enabled: bool
+    local_link_connection: dict
