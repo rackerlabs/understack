@@ -23,7 +23,7 @@ spec:
                 - component: ironic
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=ironic
-                  chartVersion: 0.2.18
+                  chartVersion: 0.2.19
                 - component: placement
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=placement
