@@ -91,9 +91,9 @@ def _get_bmc_accounts(host: str, token: str, username: str) -> list[dict]:
         logger.debug(f"accounts: {accounts}")
 
         return accounts
-    except Exception:
+    except Exception as e:
         logger.exception("Can't fetch accounts from Redfish account service.")
-        raise
+        raise e from None
 
 
 def _set_bmc_creds(host: str, token: str, username: str, new_password: str):
