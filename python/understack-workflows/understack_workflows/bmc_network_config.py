@@ -9,6 +9,9 @@ logger = setup_logger(__name__)
 
 def bmc_set_permanent_ip_addr(bmc: Bmc, interface_info: InterfaceInfo):
     """If this device has DHCP IP configuration, configure it permanently."""
+    if not bmc or not interface_info:
+        raise ValueError("Invalid input parameters")
+
     if not interface_info.dhcp:
         logger.info("BMC interface was not set to DHCP")
         return
