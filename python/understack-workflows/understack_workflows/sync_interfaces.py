@@ -23,13 +23,13 @@ def from_nautobot_to_ironic(
     logger.info("Fetching Ironic Ports ...")
     ironic_ports = dict_by_uuid(ironic_client.list_ports(device_id))
 
-    for port_id, i in ironic_ports.items():
+    for port_id, interface in ironic_ports.items():
         if port_id not in nautobot_ports:
             logger.info(
-                f"Nautobot Interface {i.uuid} no longer exists, deleting "
-                f"corresponding Ironic Port"
+                f"Nautobot Interface {interface.uuid} no longer exists, "
+                f"deleting corresponding Ironic Port"
             )
-            response = ironic_client.delete_port(i.uuid)
+            response = ironic_client.delete_port(interface.uuid)
             logger.debug(f"Deleted: {response}")
 
     for port_id, nb_port in nautobot_ports.items():
