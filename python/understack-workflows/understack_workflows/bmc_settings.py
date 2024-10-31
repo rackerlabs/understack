@@ -23,6 +23,10 @@ def update_dell_drac_settings(bmc: Bmc) -> dict:
     """
     current_values = bmc.redfish_request(REDFISH_PATH)["Attributes"]
 
+    for key in STANDARD.keys():
+        if key not in current_values:
+            raise Exception(f"{bmc} has no BMC attribute {key}")
+
     required_changes = {
         k: x["new_value"]
         for k, x in STANDARD.items()
