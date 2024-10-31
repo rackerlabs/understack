@@ -96,16 +96,14 @@ def interface_is_relevant(interface: NautobotInterface) -> bool:
     )
 
 
-def get_patch(nautobot_port: PortConfiguration, port: Port) -> list:
-    """Generate patch to change data.
+def get_patch(nautobot_port: PortConfiguration, ironic_port: Port) -> list[dict]:
+    """Generate patch to change data in format expected by Ironic API.
 
     Compare attributes between Port objects and return a patch object
     containing any changes.
     """
-    patch = []
-    for a in nautobot_port.__fields__:
-        new_value = getattr(nautobot_port, a)
-        old_value = getattr(port, a)
-        if new_value != old_value:
-            patch.append({"op": "replace", "path": f"/{a}", "value": new_value})
-    return patch
+    return [
+        {"op": "replace", "path": f"/{key}", "value": required_value}
+        for key, required_value in dict(nautobot_port).items()
+        if getattr(ironic_port, key) != required_value
+    ]
