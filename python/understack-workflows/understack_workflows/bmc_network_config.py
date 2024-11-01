@@ -16,6 +16,9 @@ def bmc_set_permanent_ip_addr(bmc: Bmc, interface_info: InterfaceInfo):
         logger.info("BMC interface was not set to DHCP")
         return
 
+    if not (interface_info.ipv4_address and interface_info.ipv4_gateway):
+        raise ValueError("BMC InterfaceInfo has missing IP information")
+
     payload = {
         "Attributes": {
             "IPv4.1.DHCPEnable": "Disabled",
