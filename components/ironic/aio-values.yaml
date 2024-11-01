@@ -43,7 +43,7 @@ conf:
       enabled_raid_interfaces: redfish,idrac-redfish,ilo5,agent
       enabled_vendor_interfaces: redfish,ipmitool,idrac-redfish,ilo
     conductor:
-      automated_clean: false
+      automated_clean: true
       # (nicholas.kuechler) tuning for idrac hardware type
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#nodes-go-into-maintenance-mode
       sync_power_state_interval: 70
