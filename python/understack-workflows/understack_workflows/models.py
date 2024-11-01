@@ -146,13 +146,16 @@ class Chassis:
         if cls.bmc_is_ilo4(chassis_data):
             return cls.from_hp_json(oob_obj, chassis_data.name)
 
-        chassis = cls(chassis_data.name, [], [], [])
-        chassis.nics = [
+        nics = [
             NIC.from_redfish(i) for i in chassis_data.network_adapters.get_members()
         ]
-        chassis.network_interfaces = cls.interfaces_from_nics(chassis.nics)
-        chassis.system_info = Systeminfo.from_redfish(chassis_data)
-        return chassis
+
+        return cls(
+            name=chassis_data.name,  # type: ignore
+            nics=nics,
+            network_interfaces=cls.interfaces_from_nics(nics),
+            system_info=Systeminfo.from_redfish(chassis_data),
+        )
 
     @classmethod
     def from_hp_json(cls, oob_obj: Sushy, chassis_name: str) -> Chassis:
