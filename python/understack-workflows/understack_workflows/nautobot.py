@@ -4,8 +4,7 @@ from uuid import UUID
 
 import pynautobot
 from pynautobot.core.api import Api as NautobotApi
-from pynautobot.models.dcim import Devices as NautobotDevice
-from pynautobot.models.dcim import Interfaces as NautobotInterface
+import pynautobot.models.dcim
 
 
 class Nautobot:
@@ -51,6 +50,10 @@ class Nautobot:
 
     def update_cf(self, device_id: UUID, field_name: str, field_value: str):
         device = self.device_by_id(device_id)
+        if not device:
+            raise Exception(f"No such device {device_id}")
+        if not device.custom_fields:
+            raise Exception(f"Device {device_id} has no custom fields")
         device.custom_fields[field_name] = field_value
         response = device.save()
         self.logger.info(f"save result: {response}")
