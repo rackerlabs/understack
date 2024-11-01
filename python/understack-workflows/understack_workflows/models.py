@@ -117,7 +117,7 @@ class Chassis:
     name: str
     nics: list[NIC]
     network_interfaces: list[Interface]
-    system_info: Systeminfo
+    system_info: Systeminfo | None
 
     @classmethod
     def check_manufacturer(cls, manufacturer: str) -> None:
