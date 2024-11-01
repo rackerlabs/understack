@@ -29,19 +29,20 @@ class NIC:
 
     @classmethod
     def from_hp_json(cls, data: dict) -> NIC:
-        nic = cls(data.get("name"), data.get("location"), [], data.get("name"))
-        ports = data.get("network_ports") or data.get("unknown_ports")
+        nic = cls(data["name"], data["location"], [], data["name"])
+        ports = data.get("network_ports") or data.get("unknown_ports", [])
         nic.interfaces = [Interface.from_hp_json(i, nic, ports) for i in ports]
         return nic
 
     @classmethod
     def nic_location(cls, nic: NetworkAdapter) -> str:
-        try:
-            return nic.json["Controllers"][0]["Location"]["PartLocation"][
-                "ServiceLabel"
-            ]
-        except KeyError:
-            return nic.identity
+        json = nic.json or {}
+        controller = json.get("Controllers", [])[0] or {}
+        return (
+            controller.get("Location", {})
+            .get("PartLocation", {})
+            .get("ServiceLabel", nic.identity)
+        )
 
     @classmethod
     def nic_ports(cls, nic: NetworkAdapter) -> list[NetworkPort]:
@@ -58,7 +59,7 @@ class Interface:
 
     @classmethod
     def from_redfish(cls, data: NetworkPort, nic: NIC) -> Interface:
-        if data.root.json["Vendor"] == "HPE":
+        if data.root and data.root.json["Vendor"] == "HPE":
             name = f"{nic.name}_{data.physical_port_number}"
             macaddr = data.associated_network_addresses[0]
         else:
