@@ -58,6 +58,8 @@ class Bmc:
             )
         if r.text:
             return r.json()
+        else:
+            return {}
 
     def sushy(self):
         return Sushy(
