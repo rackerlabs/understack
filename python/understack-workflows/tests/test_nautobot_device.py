@@ -1,8 +1,6 @@
 import json
 import pathlib
 
-from fixture_nautobot_device import FIXTURE_DELL_NAUTOBOT_DEVICE
-
 from understack_workflows import nautobot_device
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import InterfaceInfo
@@ -112,7 +110,7 @@ class FakeNautobot:
             }
 
 
-def test_find_or_create():
+def test_find_or_create(dell_nautobot_device):
     nautobot = FakeNautobot()
     chassis_info = ChassisInfo(
         manufacturer="Dell Inc.",
@@ -147,4 +145,4 @@ def test_find_or_create():
 
     device = nautobot_device.find_or_create(chassis_info, nautobot)
 
-    assert device == FIXTURE_DELL_NAUTOBOT_DEVICE
+    assert device == dell_nautobot_device
