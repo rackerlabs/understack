@@ -11,7 +11,7 @@ from openstack import config as _os_config
 from openstack.connection import Connection
 
 try:
-    _pkg_ver = _meta.version(__package__.split(".")[0])
+    _pkg_ver = _meta.version(str(__package__).split(".")[0])
 except Exception:
     _pkg_ver = "dev"
 
