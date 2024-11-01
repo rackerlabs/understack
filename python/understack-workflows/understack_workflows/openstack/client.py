@@ -40,7 +40,7 @@ def get_openstack_client(cloud=None, region_name="") -> Connection:
     return Connection(config=cloud_region)
 
 
-def get_ironic_client(cloud=None, region_name="") -> IronicClient:
+def get_ironic_client(cloud=None, region_name="") -> IronicClient:  # type: ignore
     """Returns our Ironic Client wrapper configured from our clouds.yaml."""
     cloud_region = _get_os_cloud_region(cloud, region_name)
     client = _get_ironic_client(

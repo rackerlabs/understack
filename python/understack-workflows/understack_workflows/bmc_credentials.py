@@ -3,7 +3,7 @@ import urllib3
 
 from understack_workflows.helpers import setup_logger
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore
 
 FACTORY_PASSWORD = "calvin"
 

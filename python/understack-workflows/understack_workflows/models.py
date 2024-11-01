@@ -23,7 +23,7 @@ class NIC:
     @classmethod
     def from_redfish(cls, data: NetworkAdapter) -> NIC:
         location = cls.nic_location(data)
-        nic = cls(data.identity, location, [], data.model)
+        nic = cls(data.identity, location, [], data.model)  # type: ignore
         nic.interfaces = [Interface.from_redfish(i, nic) for i in cls.nic_ports(data)]
         return nic
 
@@ -61,15 +61,15 @@ class Interface:
     def from_redfish(cls, data: NetworkPort, nic: NIC) -> Interface:
         if data.root and data.root.json["Vendor"] == "HPE":
             name = f"{nic.name}_{data.physical_port_number}"
-            macaddr = data.associated_network_addresses[0]
+            macaddr = data.associated_network_addresses[0]  # type: ignore
         else:
             name = data.identity
             macaddr = cls.fetch_macaddr_from_sys_resource(data)
         return cls(
-            name,
+            name,  # type: ignore
             macaddr,
             nic.location,
-            data.current_link_speed_mbps,
+            data.current_link_speed_mbps,  # type: ignore
             nic.model,
         )
 
@@ -88,9 +88,9 @@ class Interface:
     @classmethod
     def fetch_macaddr_from_sys_resource(cls, data: NetworkPort) -> str:
         try:
-            path = f"{data.root.get_system().ethernet_interfaces.path}/{data.identity}"
+            path = f"{data.root.get_system().ethernet_interfaces.path}/{data.identity}"  # type: ignore
             macaddr = (
-                data.root.get_system().ethernet_interfaces.get_member(path).mac_address
+                data.root.get_system().ethernet_interfaces.get_member(path).mac_address  # type: ignore
             )
         except ResourceNotFoundError:
             macaddr = ""
@@ -138,13 +138,13 @@ class Chassis:
     @classmethod
     def from_redfish(cls, oob_obj: Sushy) -> Chassis:
         chassis_data = oob_obj.get_chassis(
-            oob_obj.get_chassis_collection().members_identities[0]
+            oob_obj.get_chassis_collection().members_identities[0]  # type: ignore
         )
 
-        cls.check_manufacturer(chassis_data.manufacturer)
+        cls.check_manufacturer(chassis_data.manufacturer)  # type: ignore
 
         if cls.bmc_is_ilo4(chassis_data):
-            return cls.from_hp_json(oob_obj, chassis_data.name)
+            return cls.from_hp_json(oob_obj, chassis_data.name)  # type: ignore
 
         nics = [
             NIC.from_redfish(i) for i in chassis_data.network_adapters.get_members()
@@ -171,7 +171,8 @@ class Chassis:
     @classmethod
     def chassis_hp_json_data(cls, oob_obj: Sushy) -> dict:
         oob_obj._conn.set_http_basic_auth(
-            username=oob_obj._auth._username, password=oob_obj._auth._password
+            username=oob_obj._auth._username,  # type: ignore
+            password=oob_obj._auth._password,  # type: ignore
         )
         resp = oob_obj._conn.get(path="/json/comm_controller_info")
         resp.raise_for_status()

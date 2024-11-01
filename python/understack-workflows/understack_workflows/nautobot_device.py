@@ -380,7 +380,7 @@ def connect_interface_to_switch(
     if cable is None:
         try:
             cable = nautobot.dcim.cables.create(**identity, **attrs)
-        except pynautobot.core.query.RequestError as e:
+        except pynautobot.core.query.RequestError as e: # type: ignore
             raise Exception(
                 f"Failed to create nautobot cable {identity}: {e}"
             ) from None
@@ -407,7 +407,7 @@ def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface,
                 },
             )
             logger.info(f"Created Nautobot IP {ip.id} for {ipv4_address}")
-    except pynautobot.core.query.RequestError as e:
+    except pynautobot.core.query.RequestError as e:  # type: ignore
         raise Exception(f"Failed to assign {ipv4_address=} in Nautobot: {e}") from None
     return ip
 
@@ -423,7 +423,7 @@ def associate_ip_address(nautobot, nautobot_interface, ip_id):
         else:
             nautobot.ipam.ip_address_to_interface.create(**identity, is_primary=True)
             logger.info(f"Associated IP address {ip_id} with {nautobot_interface.name}")
-    except pynautobot.core.query.RequestError as e:
+    except pynautobot.core.query.RequestError as e:  # type: ignore
         raise Exception(
             f"Failed to associate IPAddress {ip_id} in Nautobot: {e}"
         ) from None

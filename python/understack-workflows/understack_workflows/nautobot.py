@@ -26,13 +26,13 @@ class Nautobot:
         device = self.session.dcim.devices.get(device_id)
         if not device:
             self.exit_with_error(f"Device {device_id!s} not found in Nautobot")
-        return device
+        return device  # type: ignore
 
     def interface_by_id(self, interface_id: UUID) -> dcim.Interfaces:
         interface = self.session.dcim.interfaces.get(interface_id)
         if not interface:
             self.exit_with_error(f"Interface {interface_id!s} not found in Nautobot")
-        return interface
+        return interface  # type: ignore
 
     def non_lag_interface_by_mac(
         self, device_id: UUID, mac_address: str
@@ -85,13 +85,13 @@ class Nautobot:
                 f"Interface {server_interface_mac=} {server_interface.type} "
                 "is not connected in Nautobot"
             )
-        switch_interface_id = connected_endpoint.id
+        switch_interface_id = connected_endpoint.id  # type: ignore
         self.logger.debug(
             f"Interface {server_interface_mac=} connects to {switch_interface_id=}"
         )
 
         switch_interface = self.interface_by_id(switch_interface_id)
-        switch_interface.status = new_status
+        switch_interface.status = new_status  # type: ignore
         result = switch_interface.save()
 
         self.logger.debug(
@@ -101,7 +101,7 @@ class Nautobot:
 
     def update_device_status(self, device_id: UUID, device_status: str):
         device = self.device_by_id(device_id)
-        device.status = device_status
+        device.status = device_status  # type: ignore
         result = device.save()
         self.logger.info(
             f"device {device_id} updated to Status {device_status} {result=}"

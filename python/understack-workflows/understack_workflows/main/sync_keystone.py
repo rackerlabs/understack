@@ -53,7 +53,7 @@ def is_valid_domain(
 ) -> bool:
     if only_domain is None:
         return True
-    project = conn.identity.get_project(project_id.hex)
+    project = conn.identity.get_project(project_id.hex)  # type: ignore
     ret = project.domain_id == only_domain.hex
     if not ret:
         logger.info(
@@ -65,22 +65,22 @@ def is_valid_domain(
 
 def handle_project_create(conn: Connection, nautobot: Nautobot, project_id: uuid.UUID):
     logger.info(f"got request to create tenant {project_id!s}")
-    project = conn.identity.get_project(project_id.hex)
+    project = conn.identity.get_project(project_id.hex)  # type: ignore
     ten_api = nautobot.session.tenancy.tenants
     ten_api.url = f"{ten_api.base_url}/plugins/uuid-api-endpoints/tenant"
     ten = ten_api.create(
         id=str(project_id), name=project.name, description=project.description
     )
-    logger.info(f"tenant '{project_id!s}' created {ten.created}")
+    logger.info(f"tenant '{project_id!s}' created {ten.created}")  # type: ignore
 
 
 def handle_project_update(conn: Connection, nautobot: Nautobot, project_id: uuid.UUID):
     logger.info(f"got request to update tenant {project_id!s}")
-    project = conn.identity.get_project(project_id.hex)
+    project = conn.identity.get_project(project_id.hex)  # type: ignore
     ten = nautobot.session.tenancy.tenants.get(project_id)
-    ten.description = project.description
-    ten.save()
-    logger.info(f"tenant '{project_id!s}' last updated {ten.last_updated}")
+    ten.description = project.description  # type: ignore
+    ten.save()  # type: ignore
+    logger.info(f"tenant '{project_id!s}' last updated {ten.last_updated}")  # type: ignore
 
 
 def handle_project_delete(conn: Connection, nautobot: Nautobot, project_id: uuid.UUID):
@@ -89,7 +89,7 @@ def handle_project_delete(conn: Connection, nautobot: Nautobot, project_id: uuid
     if not ten:
         logger.warn(f"tenant '{project_id!s}' does not exist already")
         return
-    ten.delete()
+    ten.delete()  # type: ignore
     logger.info(f"deleted tenant {project_id!s}")
 
 
