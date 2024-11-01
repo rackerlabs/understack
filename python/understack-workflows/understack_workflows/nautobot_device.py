@@ -280,7 +280,7 @@ def parse_device(data: dict) -> NautobotDevice:
 
 def parse_interface(data: dict) -> NautobotInterface:
     connected = data["connected_interface"]
-    ip_address = data["ip_addresses"] and data["ip_addresses"][0]
+    ip_address = data["ip_addresses"][0] if data["ip_addresses"] else None
     return NautobotInterface(
         id=data["id"],
         name=data["name"],
