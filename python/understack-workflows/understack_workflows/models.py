@@ -159,7 +159,7 @@ class Chassis:
         data = cls.chassis_hp_json_data(oob_obj)
         nics = [NIC.from_hp_json(i) for i in data]
         network_interfaces = cls.interfaces_from_nics(nics)
-        return cls(chassis_name, nics, network_interfaces)
+        return cls(chassis_name, nics, network_interfaces, None)
 
     @classmethod
     def interfaces_from_nics(cls, nics: list[NIC]) -> list[Interface]:
