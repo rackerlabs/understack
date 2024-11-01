@@ -99,6 +99,7 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
         raise Exception("Failed to create device in Nautobot")
     return device
 
+
 def location_from(switches):
     locations = {
         (switch["location"]["id"], switch["rack"]["id"]) for switch in switches
@@ -123,7 +124,9 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
         if interface.remote_switch_mac_address
     }
     base_switch_macs = {
-        base_mac(interface.remote_switch_mac_address, str(interface.remote_switch_port_name))
+        base_mac(
+            interface.remote_switch_mac_address, str(interface.remote_switch_port_name)
+        )
         for interface in chassis_info.interfaces
         if interface.remote_switch_mac_address
     }
@@ -384,7 +387,7 @@ def connect_interface_to_switch(
     if cable is None:
         try:
             cable = nautobot.dcim.cables.create(**identity, **attrs)
-        except pynautobot.core.query.RequestError as e: # type: ignore
+        except pynautobot.core.query.RequestError as e:  # type: ignore
             raise Exception(
                 f"Failed to create nautobot cable {identity}: {e}"
             ) from None
