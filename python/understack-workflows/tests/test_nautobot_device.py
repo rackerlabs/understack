@@ -1,11 +1,11 @@
 import json
 import pathlib
 
+from fixture_nautobot_device import FIXTURE_DELL_NAUTOBOT_DEVICE
+
 from understack_workflows import nautobot_device
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import InterfaceInfo
-from understack_workflows.nautobot_device import NautobotDevice
-from understack_workflows.nautobot_device import NautobotInterface
 
 
 def read_json_samples(file_path):
@@ -147,93 +147,4 @@ def test_find_or_create():
 
     device = nautobot_device.find_or_create(chassis_info, nautobot)
 
-    assert device == NautobotDevice(
-        id="a3a2983f-d906-4663-943c-c41ab73c9b62",
-        name="Dell-33GSW04",
-        location_id="da47f07f-b66a-4f0c-b780-4be8498e6129",
-        location_name="IAD3",
-        rack_id="1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6",
-        rack_name="F20-2",
-        interfaces=[
-            NautobotInterface(
-                id="ac2f1eae-188e-4fc6-9245-f9a6cf8b4ea8",
-                name="NIC.Integrated.1-1",
-                type="A_25GBASE_X_SFP28",
-                description="Integrated NIC 1 Port 1",
-                mac_address="D4:04:E6:4F:8D:B4",
-                status="Active",
-                ip_address=[],
-                neighbor_device_id="275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
-                neighbor_device_name="f20-2-1.iad3.rackspace.net",
-                neighbor_interface_id="f9a5cc87-d10a-4827-99e8-48961fd1d773",
-                neighbor_interface_name="Ethernet1/5",
-                neighbor_chassis_mac="9C:54:16:F5:AB:27",
-                neighbor_location_name="IAD3",
-                neighbor_rack_name="F20-2",
-            ),
-            NautobotInterface(
-                id="39d98f09-3199-40e0-87dc-e5ed6dce78e5",
-                name="NIC.Integrated.1-2",
-                type="A_25GBASE_X_SFP28",
-                description="Integrated NIC 1 Port 2",
-                mac_address="D4:04:E6:4F:8D:B5",
-                status="Active",
-                ip_address=[],
-                neighbor_device_id="05f6715a-4dbe-4fd6-af20-1e73adb285c2",
-                neighbor_device_name="f20-2-2.iad3.rackspace.net",
-                neighbor_interface_id="2148cf50-f70e-42c9-9f68-8ce98d61498c",
-                neighbor_interface_name="Ethernet1/5",
-                neighbor_chassis_mac="9C:54:16:F5:AC:27",
-                neighbor_location_name="IAD3",
-                neighbor_rack_name="F20-2",
-            ),
-            NautobotInterface(
-                id="7ac587c4-015b-4a0e-b579-91284cbd0406",
-                name="NIC.Slot.1-1",
-                type="A_25GBASE_X_SFP28",
-                description="NIC in Slot 1 Port 1",
-                mac_address="14:23:F3:F5:25:F0",
-                status="Active",
-                ip_address=[],
-                neighbor_device_id="05f6715a-4dbe-4fd6-af20-1e73adb285c2",
-                neighbor_device_name="f20-2-2.iad3.rackspace.net",
-                neighbor_interface_id="f72bb830-3f3c-4aba-b7d5-9680ea4d358e",
-                neighbor_interface_name="Ethernet1/6",
-                neighbor_chassis_mac="9C:54:16:F5:AD:27",
-                neighbor_location_name="IAD3",
-                neighbor_rack_name="F20-2",
-            ),
-            NautobotInterface(
-                id="8c28941c-02cd-4aad-9e3f-93c39e08b58a",
-                name="NIC.Slot.1-2",
-                type="A_25GBASE_X_SFP28",
-                description="NIC in Slot 1 Port 2",
-                mac_address="14:23:F3:F5:25:F1",
-                status="Active",
-                ip_address=[],
-                neighbor_device_id="275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
-                neighbor_device_name="f20-2-1.iad3.rackspace.net",
-                neighbor_interface_id="c210be75-1038-4ba3-9923-60050e1c5362",
-                neighbor_interface_name="Ethernet1/6",
-                neighbor_chassis_mac="9C:54:16:F5:AD:27",
-                neighbor_location_name="IAD3",
-                neighbor_rack_name="F20-2",
-            ),
-            NautobotInterface(
-                id="60d880c7-8618-414e-b4b4-fb6ac448c992",
-                name="iDRAC",
-                type="A_25GBASE_X_SFP28",
-                description="Dedicated iDRAC interface",
-                mac_address="A8:3C:A5:35:43:86",
-                status="Active",
-                ip_address="10.46.96.156",
-                neighbor_device_id="912d38b1-1194-444c-8e19-5f455e16082e",
-                neighbor_device_name="f20-2-1d.iad3.rackspace.net",
-                neighbor_interface_id="4d010e0f-3135-4769-8bb0-71ba905edf01",
-                neighbor_interface_name="GigabitEthernet1/0/3",
-                neighbor_chassis_mac="9C:54:16:F5:AE:27",
-                neighbor_location_name="IAD3",
-                neighbor_rack_name="F20-2",
-            ),
-        ],
-    )
+    assert device == FIXTURE_DELL_NAUTOBOT_DEVICE
