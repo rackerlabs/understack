@@ -86,14 +86,18 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
         # Re-run the graphql query to fetch any auto-created defaults from
         # nautobot (e.g. it automatically creates a BMC interface):
         device = nautobot_server(nautobot, serial=chassis_info.serial_number)
+        if not device:
+            raise Exception("Failed to create device in Nautobot")
 
     find_or_create_interfaces(nautobot, chassis_info, device.id, switches)
 
     # Run the graphql query yet again, to include all the data we just populated
     # in nautobot.   Fairly innefficient for the case where we didn't change
     # anything, but we need the accurate data.
-    return nautobot_server(nautobot, serial=chassis_info.serial_number)
-
+    device = nautobot_server(nautobot, serial=chassis_info.serial_number)
+    if not device:
+        raise Exception("Failed to create device in Nautobot")
+    return device
 
 def location_from(switches):
     locations = {
@@ -119,7 +123,7 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
         if interface.remote_switch_mac_address
     }
     base_switch_macs = {
-        base_mac(interface.remote_switch_mac_address, interface.remote_switch_port_name)
+        base_mac(interface.remote_switch_mac_address, str(interface.remote_switch_port_name))
         for interface in chassis_info.interfaces
         if interface.remote_switch_mac_address
     }
@@ -129,7 +133,7 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
     return switches
 
 
-def nautobot_switches(nautobot, mac_addresses: list[str]) -> dict[str, dict]:
+def nautobot_switches(nautobot, mac_addresses: set[str]) -> dict[str, dict]:
     """Get switches by MAC address.
 
     Assumes that MAC addresses in Nautobot are normalized to upcase
