@@ -44,16 +44,10 @@ ruff = "^0.7.0"
 
 [tool.poetry.scripts]
 sync-keystone = "understack_workflows.main.sync_keystone:main"
-sync-interfaces = "understack_workflows.main.sync_interfaces:main"
-sync-bmc-creds = "understack_workflows.main.sync_bmc_creds:main"
-sync-server = "understack_workflows.main.sync_server:main"
 sync-provision-state = "understack_workflows.main.sync_provision_state:main"
-sync-nautobot-interfaces = "understack_workflows.main.sync_nautobot_interfaces:main"
-sync-nautobot-system-info = "understack_workflows.main.sync_nautobot_system_info:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
 undersync-device = "understack_workflows.main.undersync_device:main"
-nautobot-update-cf = "understack_workflows.main.nautobot_update_cf:main"
-get-standard-bmc-creds = "understack_workflows.main.get_standard_bmc_creds:main"
+enroll-server = "understack_workflows.main.enroll_server:main"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -101,3 +95,8 @@ force-single-line = true
 [tool.ruff.lint.pydocstyle]
 # enable the google doc style rules by default
 convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"understack_workflows/nautobot_device.py" = ["UP031"]
+"tests/test_nautobot_event_parser.py" = ["E501"]
+"tests/test_bmc_credentials.py" = ["B017"]
