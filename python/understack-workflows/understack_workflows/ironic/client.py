@@ -58,7 +58,7 @@ class IronicClient:
             port_id,
         )
 
-    def list_ports(self, node_id: dict):
+    def list_ports(self, node_id: str):
         self._ensure_logged_in()
 
         return self.client.port.list(node=node_id, detail=True)
