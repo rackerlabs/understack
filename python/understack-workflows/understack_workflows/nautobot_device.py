@@ -27,14 +27,14 @@ class NautobotInterface:
     description: str
     mac_address: str
     status: str
-    ip_address: str
-    neighbor_device_id: str
-    neighbor_device_name: str
-    neighbor_interface_id: str
-    neighbor_interface_name: str
-    neighbor_chassis_mac: str
-    neighbor_location_name: str
-    neighbor_rack_name: str
+    ip_address: str | None
+    neighbor_device_id: str | None
+    neighbor_device_name: str | None
+    neighbor_interface_id: str | None
+    neighbor_interface_name: str | None
+    neighbor_chassis_mac: str | None
+    neighbor_location_name: str | None
+    neighbor_rack_name: str | None
 
 
 @dataclass
