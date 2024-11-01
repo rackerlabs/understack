@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pynautobot
 from pynautobot.core.api import Api as NautobotApi
-import pynautobot.models.dcim
+from pynautobot.models import dcim
 
 
 class Nautobot:
@@ -22,13 +22,13 @@ class Nautobot:
     def api_session(self, url: str, token: str) -> NautobotApi:
         return pynautobot.api(url, token=token)
 
-    def device_by_id(self, device_id: UUID) -> NautobotDevice:
+    def device_by_id(self, device_id: UUID) -> dcim.Devices:
         device = self.session.dcim.devices.get(device_id)
         if not device:
             self.exit_with_error(f"Device {device_id!s} not found in Nautobot")
         return device
 
-    def interface_by_id(self, interface_id: UUID) -> NautobotInterface:
+    def interface_by_id(self, interface_id: UUID) -> dcim.Interfaces:
         interface = self.session.dcim.interfaces.get(interface_id)
         if not interface:
             self.exit_with_error(f"Interface {interface_id!s} not found in Nautobot")
@@ -36,17 +36,17 @@ class Nautobot:
 
     def non_lag_interface_by_mac(
         self, device_id: UUID, mac_address: str
-    ) -> list[NautobotInterface]:
-        interfaces = self.session.dcim.interfaces.filter(
+    ) -> dcim.Interfaces:
+        interface = self.session.dcim.interfaces.get(
             device_id=device_id,
             mac_address=mac_address,
             type__n="lag",
         )
-        if not interfaces:
+        if not interface:
             self.exit_with_error(
                 f"Interface with {device_id=} and {mac_address=} not found in Nautobot"
             )
-        return interfaces[0]
+        return interface  # type: ignore
 
     def update_cf(self, device_id: UUID, field_name: str, field_value: str):
         device = self.device_by_id(device_id)
@@ -61,7 +61,7 @@ class Nautobot:
 
     def update_switch_interface_status(
         self, device_id: UUID, server_interface_mac: str, new_status: str
-    ) -> NautobotInterface:
+    ) -> dcim.Interfaces:
         """Change the Interface Status in Nautobot for interfaces.
 
         The device_id and interface MAC address parameters identify one or more
