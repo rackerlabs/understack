@@ -79,7 +79,7 @@ class Interface:
         interface_name = f"NIC.{nic.location.replace(' ', '.')}_{p_num}"
         return cls(
             interface_name,
-            data.get("mac_addr"),
+            data["mac_addr"],
             nic.location,
             data.get("speed", 0),
             nic.model,
