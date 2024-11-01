@@ -117,9 +117,9 @@ def main():
     update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
     _ironic_provision_state = ironic_node.create_or_update(
-        nb_device["id"], nb_device["name"], device_info.manufacturer, bmc, logger
+        nb_device.id, nb_device.name, device_info.manufacturer, bmc, logger
     )
-    logger.info(f"{nb_device['id']} {_ironic_provision_state=}")
+    logger.info(f"{nb_device.id} {_ironic_provision_state=}")
 
     sync_interfaces.from_nautobot_to_ironic(nb_device, pxe_interface=pxe_interface)
 

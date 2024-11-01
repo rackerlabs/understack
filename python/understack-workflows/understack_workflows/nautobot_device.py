@@ -1,5 +1,6 @@
 import json
 import re
+from dataclasses import dataclass
 from ipaddress import IPv4Interface
 
 import pynautobot
@@ -16,7 +17,40 @@ INTERFACE_TYPE = "25gbase-x-sfp28"
 BMC_INTERFACE_TYPE = "1000base-t"
 
 
-def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
+@dataclass
+class NautobotInterface:
+    """Represent a Nautobot Server Network Interface."""
+
+    id: str
+    name: str
+    type: str
+    description: str
+    mac_address: str
+    status: str
+    ip_address: str
+    neighbor_device_id: str
+    neighbor_device_name: str
+    neighbor_interface_id: str
+    neighbor_interface_name: str
+    neighbor_chassis_mac: str
+    neighbor_location_name: str
+    neighbor_rack_name: str
+
+
+@dataclass
+class NautobotDevice:
+    """Represent a Nautobot Server."""
+
+    id: str
+    name: str
+    location_id: str
+    location_name: str
+    rack_id: str
+    rack_name: str
+    interfaces: list[NautobotInterface]
+
+
+def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
     """Update existing or create new device using the Nautobot API."""
     # TODO: performance: our single graphql query here fetches the device from
     # nautobot with all existing interfaces, macs, cable and connected switches.
@@ -53,7 +87,7 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> dict:
         # nautobot (e.g. it automatically creates a BMC interface):
         device = nautobot_server(nautobot, serial=chassis_info.serial_number)
 
-    find_or_create_interfaces(nautobot, chassis_info, device["id"], switches)
+    find_or_create_interfaces(nautobot, chassis_info, device.id, switches)
 
     # Run the graphql query yet again, to include all the data we just populated
     # in nautobot.   Fairly innefficient for the case where we didn't change
@@ -183,7 +217,7 @@ def _parse_manufacturer(name: str) -> str:
     raise ValueError(f"Server manufacturer {name} not supported")
 
 
-def nautobot_server(nautobot, serial: str) -> dict:
+def nautobot_server(nautobot, serial: str) -> NautobotDevice | None:
     query = f"""{{
         devices(serial: ["{serial}"]){{
             id name
@@ -222,7 +256,40 @@ def nautobot_server(nautobot, serial: str) -> dict:
     if len(devices) > 1:
         raise Exception(f"Multiple nautobot devices found with serial {serial}")
 
-    return devices[0]
+    return parse_device(devices[0])
+
+
+def parse_device(data: dict) -> NautobotDevice:
+    return NautobotDevice(
+        id=data["id"],
+        name=data["name"],
+        location_id=data["location"]["id"],
+        location_name=data["location"]["name"],
+        rack_id=data["rack"]["id"],
+        rack_name=data["rack"]["name"],
+        interfaces=[parse_interface(i) for i in data["interfaces"]],
+    )
+
+
+def parse_interface(data: dict) -> NautobotInterface:
+    connected = data["connected_interface"]
+    ip_address = data["ip_addresses"] and data["ip_addresses"][0]
+    return NautobotInterface(
+        id=data["id"],
+        name=data["name"],
+        mac_address=data["mac_address"],
+        status=data["status"]["name"],
+        type=data["type"],
+        description=data["description"],
+        ip_address=ip_address and ip_address["host"],
+        neighbor_interface_id=connected and connected["id"],
+        neighbor_interface_name=connected and connected["name"],
+        neighbor_device_id=connected and connected["device"]["id"],
+        neighbor_device_name=connected and connected["device"]["name"],
+        neighbor_chassis_mac=connected and connected["device"]["mac"],
+        neighbor_location_name=connected and connected["device"]["location"]["name"],
+        neighbor_rack_name=connected and connected["device"]["rack"]["name"],
+    )
 
 
 def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
