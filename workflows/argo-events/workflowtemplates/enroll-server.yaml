@@ -8,10 +8,45 @@ metadata:
       Defined in `workflows/argo-events/workflowtemplates/enroll-server.yaml`
 kind: WorkflowTemplate
 spec:
+  entrypoint: main
   arguments:
     parameters:
       - name: ip_address
   templates:
+    - name: main
+      steps:
+        - - name: enroll-server
+            template: enroll-server
+        - - name: server-enroll-state
+            template: openstack-state-cmd
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
+        - - name: manage-server
+            template: openstack-wait-cmd
+            arguments:
+              parameters:
+                - name: operation
+                  value: "manage"
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
+            when: "{{steps.server-enroll-state.outputs.result}} == enroll"
+        - - name: server-manage-state
+            template: openstack-state-cmd
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
+        - - name: avail-server
+            template: openstack-wait-cmd
+            arguments:
+              parameters:
+                - name: operation
+                  value: "provide"
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
+            when: "{{steps.server-manage-state.outputs.result}} == manageable"
     - name: enroll-server
       inputs:
         parameters:
@@ -47,6 +82,61 @@ spec:
         - name: nb-token
           secret:
             secretName: nautobot-token
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct
+    - name: openstack-wait-cmd
+      inputs:
+        parameters:
+          - name: operation
+          - name: device_id
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        command:
+          - openstack
+        args:
+          - baremetal
+          - node
+          - "{{inputs.parameters.operation}}"
+          - --wait
+          - "0"
+          - "{{inputs.parameters.device_id}}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      volumes:
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct
+    - name: openstack-state-cmd
+      inputs:
+        parameters:
+          - name: device_id
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        command:
+          - openstack
+        args:
+          - baremetal
+          - node
+          - show
+          - "-f"
+          - value
+          - "-c"
+          - provision_state
+          - "{{inputs.parameters.device_id}}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      volumes:
         - name: openstack-svc-acct
           secret:
             secretName: openstack-svc-acct

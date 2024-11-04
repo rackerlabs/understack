@@ -125,6 +125,10 @@ def main():
 
     logger.info(f"{__file__} complete for {bmc.ip_address}")
 
+    # argo workflows captures stdout as the results which we can use
+    # return the device UUID
+    print(str(nb_device.id))
+
 
 def argument_parser():
     parser = argparse.ArgumentParser(
