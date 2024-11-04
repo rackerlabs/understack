@@ -81,12 +81,22 @@ def port_configuration(
     name = f"{interface.id} {interface.name}"
     pxe_enabled = interface.name == pxe_interface
 
+    if interface.neighbor_chassis_mac:
+        local_link_connection = {
+            "switch_id": interface.neighbor_chassis_mac.lower(),
+            "port_id": interface.neighbor_interface_name,
+            "switch_info": interface.neighbor_device_name,
+        }
+    else:
+        local_link_connection = {}
+
     return PortConfiguration(
         node_uuid=device_id,
         address=interface.mac_address.lower(),
         uuid=interface.id,
         name=name,
         pxe_enabled=pxe_enabled,
+        local_link_connection=local_link_connection,
     )
 
 
