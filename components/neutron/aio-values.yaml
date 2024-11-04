@@ -79,7 +79,16 @@ pod:
           - name: nb-token
             secret:
               secretName: nautobot-token
-
+    neutron_rpc_server:
+      neutron_rpc_server:
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+        volumes:
+          - name: nb-token
+            secret:
+              secretName: nautobot-token
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:
   dynamic:
