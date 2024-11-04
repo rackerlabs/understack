@@ -49,7 +49,7 @@ conf:
         # set the default ml2 backend to our plugin, neutron_understack
         mechanism_drivers: understack
         tenant_network_types: "vxlan,local"
-        type_drivers: "flat,vlan,local,understack_vxlan"
+        type_drivers: "vlan,local,understack_vxlan"
   neutron:
     DEFAULT:
       # we aren't using neutron routers
