@@ -20,6 +20,7 @@ on:
 
 jobs:
   openstack:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
 
     strategy:
@@ -67,6 +68,7 @@ jobs:
           annotations: ${{ steps.meta.outputs.annotations }}
 
   dnsmasq:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
 
     steps:
