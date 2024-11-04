@@ -5,6 +5,7 @@ from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
+from neutron_lib import exceptions as exc
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import (
     MechanismDriver,
@@ -23,6 +24,7 @@ LOG = logging.getLogger(__name__)
 
 config.register_ml2_type_understack_opts(cfg.CONF)
 config.register_ml2_understack_opts(cfg.CONF)
+
 
 def dump_context(
     context: NetworkContext | SubnetContext | PortContext,

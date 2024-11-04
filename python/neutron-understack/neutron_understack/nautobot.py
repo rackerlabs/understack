@@ -1,5 +1,5 @@
-from urllib.parse import urljoin
 import pathlib
+from urllib.parse import urljoin
 
 import requests
 from oslo_log import log
@@ -21,8 +21,11 @@ class Nautobot:
             return f.read().strip()
 
     def ucvni_create(
-        self, network_id: str,  ucvni_group: str, network_name: str,
-        segment_id: int | None = None
+        self,
+        network_id: str,
+        ucvni_group: str,
+        network_name: str,
+        segment_id: int | None = None,
     ):
         payload = {
             "id": network_id,
