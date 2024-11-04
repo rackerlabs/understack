@@ -14,50 +14,15 @@ from neutron_lib.plugins.ml2.api import (
 )
 from oslo_config import cfg
 
+from neutron_understack import config
 from neutron_understack.argo.workflows import ArgoClient
+from neutron_understack.nautobot import Nautobot
 
 LOG = logging.getLogger(__name__)
 
 
-def setup_conf():
-    grp = cfg.OptGroup("ml2_type_understack")
-    opts = [
-        cfg.StrOpt(
-            "provisioning_network",
-            help="provisioning_network ID as configured in ironic.conf",
-        ),
-        cfg.StrOpt(
-            "argo_workflow_sa",
-            default="workflow",
-            help="ServiceAccount to submit Workflow as",
-        ),
-        cfg.StrOpt(
-            "argo_api_url",
-            default="https://argo-server.argo.svc.cluster.local:2746",
-            help="URL of the Argo Server API",
-        ),
-        cfg.StrOpt(
-            "argo_namespace",
-            default="argo-events",
-            help="Namespace to submit the Workflows to",
-        ),
-        cfg.IntOpt(
-            "argo_max_attempts",
-            default=15,
-            help="Number of tries to retrieve the Workflow run result. "
-            "Sleeps 5 seconds between attempts.",
-        ),
-        cfg.BoolOpt(
-            "argo_dry_run", default=True, help="Call Undersync with dry-run mode"
-        ),
-        cfg.BoolOpt("argo_force", default=False, help="Call Undersync with force mode"),
-    ]
-    cfg.CONF.register_group(grp)
-    cfg.CONF.register_opts(opts, group=grp)
-
-
-setup_conf()
-
+config.register_ml2_type_understack_opts(cfg.CONF)
+config.register_ml2_understack_opts(cfg.CONF)
 
 def dump_context(
     context: NetworkContext | SubnetContext | PortContext,
@@ -143,13 +108,40 @@ class UnderstackDriver(MechanismDriver):
     resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
 
     def initialize(self):
-        pass
+        conf = cfg.CONF.ml2_understack
+        self.nb = Nautobot(conf.nb_url, conf.nb_token)
 
     def create_network_precommit(self, context):
         log_call("create_network_precommit", context)
 
     def create_network_postcommit(self, context):
         log_call("create_network_postcommit", context)
+
+        network = context.current
+        network_id = network["id"]
+        network_name = network["name"]
+        provider_type = network.get("provider:network_type")
+        segmentation_id = network.get("provider:segmentation_id")
+        physnet = network.get("provider:physical_network")
+
+        if provider_type == p_const.TYPE_VXLAN:
+            conf = cfg.CONF.ml2_understack
+            ucvni_group = conf.ucvni_group
+            try:
+                self.nb.ucvni_create(
+                    network_id, ucvni_group, network_name, segmentation_id
+                )
+            except Exception as e:
+                LOG.exception(
+                    "unable to create network %(net_id)s", {"net_id": network_id}
+                )
+                raise exc.NetworkNotFound(net_id=network_id) from e
+
+            LOG.info(
+                "network %(net_id)s has been added on ucvni_group %(ucvni_group), "
+                "physnet %(physnet)",
+                {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
+            )
 
     def update_network_precommit(self, context):
         log_call("update_network_precommit", context)
