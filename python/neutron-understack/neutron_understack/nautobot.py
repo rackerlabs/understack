@@ -31,7 +31,7 @@ class Nautobot:
             "id": network_id,
             "name": network_name,
             "ucvni_group": ucvni_group,
-            "status": "Active",
+            "status": {"name": "Active"},
         }
 
         if segment_id:
