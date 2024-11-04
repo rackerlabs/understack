@@ -10,8 +10,8 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-ironic = "^24.1"
-python = "^3.8"
+ironic = ">=24.1"
+python = "^3.10"
 pyyaml = "^6.0"
 
 [tool.poetry.group.test.dependencies]
