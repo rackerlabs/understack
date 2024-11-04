@@ -48,7 +48,8 @@ conf:
       ml2:
         # set the default ml2 backend to our plugin, neutron_understack
         mechanism_drivers: understack
-        tenant_network_types: local
+        tenant_network_types: "vxlan,local"
+        type_drivers: "flat,vlan,local,understack_vxlan"
   neutron:
     DEFAULT:
       # we aren't using neutron routers
@@ -67,6 +68,17 @@ pod:
     disruption_budget:
       server:
         min_available: 1
+  mounts:
+    neutron_server:
+      neutron_server:
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+        volumes:
+          - name: nb-token
+            secret:
+              secretName: nautobot-token
 
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:
