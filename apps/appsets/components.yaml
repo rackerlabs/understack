@@ -74,6 +74,7 @@ spec:
                       path: '{{.name}}/manifests/undersync'
                 - component: nautobot
                   skipComponent: '{{has "nautobot" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  imageUpdaterImageList: nautobot=ghcr.io/rss-engineering/nautobot-rackspace:staging
                   sources:
                     - repoURL: https://nautobot.github.io/helm-charts/
                       chart: nautobot
@@ -161,6 +162,24 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       path: '{{.name}}/manifests/argo-events'
+                - component: argocd-image-updater
+                  componentNamespace: argocd
+                  skipComponent: '{{has "argocd-image-updater" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: https://argoproj.github.io/argo-helm
+                      chart: argocd-image-updater
+                      targetRevision: 0.11.1
+                      helm:
+                        releaseName: argocd-image-updater
+                        valueFiles:
+                          - $deploy/{{.name}}/helm-configs/argocd-image-updater.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
                 - component: understack-workflows
                   componentNamespace: argo-events
                   skipComponent: '{{has "understack-workflows" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
@@ -238,6 +257,15 @@ spec:
           - ServerSideApply=true
           - RespectIgnoreDifferences=true
   templatePatch: |
+    {{- if hasKey . "imageUpdaterImageList" }}
+    metadata:
+      annotations:
+        argocd-image-updater.argoproj.io/image-list: {{ .imageUpdaterImageList }}
+        argocd-image-updater.argoproj.io/nautobot.update-strategy: digest
+        argocd-image-updater.argoproj.io/nautobot.helm.image-name: nautobot.image.repository
+        argocd-image-updater.argoproj.io/nautobot.helm.image-tag: nautobot.image.tag
+        argocd-image-updater.argoproj.io/nautobot.platforms: unknown/unknown,linux/amd64
+    {{- end }}
     spec:
       {{- if hasKey . "source" }}
       # indentation matters here. need to collapse to a single line to preserve it
