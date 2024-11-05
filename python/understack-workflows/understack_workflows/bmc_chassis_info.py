@@ -74,11 +74,12 @@ def interface_data(bmc: Bmc) -> list[InterfaceInfo]:
 
 def combine_lldp(lldp, interface) -> InterfaceInfo:
     name = interface["name"]
-    lldp_entry = lldp.get(name, {})
+    alternate_name = f"{name}-1"
+    lldp_entry = lldp.get(name, lldp.get(alternate_name))
     if not lldp_entry:
         logger.info(
-            f"LLDP info from BMC is missing for {name}, we only "
-            f"have LLDP info for {list(lldp.keys())}"
+            f"LLDP info from BMC is missing for {name} or {alternate_name}, "
+            f"we only have LLDP info for {list(lldp.keys())}"
         )
     return InterfaceInfo(**interface, **lldp_entry)
 
@@ -128,11 +129,22 @@ def parse_ipv4(
 
 
 def in_band_interfaces(bmc: Bmc) -> list[dict]:
-    """A Collection of Ethernet Interfaces for this System."""
+    """A Collection of Ethernet Interfaces for this System.
+
+    If the redfish list of Ethernet Interfaces includes "foo" as well as "foo-1"
+    then we disregard the latter.   The -1 suffix is used for "partitions" of a
+    physical interface.  It seems to vary by device whether these are included
+    in redfish output at all, and if they are, whether the mac address
+    information is present in the base interface, the partition, or both.
+    """
     index_data = bmc.redfish_request(REDFISH_ETHERNET_ENDPOINT)
     urls = [member["@odata.id"] for member in index_data["Members"]]
 
-    return [interface_detail(bmc, url) for url in urls if interface_is_relevant(url)]
+    return [
+        interface_detail(bmc, url)
+        for url in urls
+        if re.sub(r"-\d$", "", url) not in urls
+    ]
 
 
 def interface_detail(bmc, path) -> dict:
@@ -198,7 +210,7 @@ def parse_lldp_port(port_data: dict[str, str]) -> dict:
     mac = str(port_data["SwitchConnectionID"]).upper()
     port_name = normalize_interface_name(port_data["SwitchPortConnectionID"])
 
-    if mac in ["NOT AVAILABLE", "NO LINK"]:
+    if mac in ["NOT AVAILABLE", "NO LINK", "NOT SUPPORTED"]:
         return {
             "remote_switch_mac_address": None,
             "remote_switch_port_name": None,
@@ -210,18 +222,5 @@ def parse_lldp_port(port_data: dict[str, str]) -> dict:
         }
 
 
-def interface_is_relevant(url: str) -> bool:
-    return bool(re.match(r".*(iDRAC.Embedded.*|NIC.(Integrated|Slot).\d-\d)$", url))
-
-
 def server_interface_name(name: str) -> str:
-    if name.startswith("iDRAC.Embedded"):
-        return "iDRAC"
-
-    # remove the "-1" partition number from dell NIC ports
-    slot_regexp = re.compile(r"(.*\.\d-\d)-\d")
-    match = slot_regexp.match(name)
-    if match:
-        return match.group(1)
-
-    return name
+    return "iDRAC" if name.startswith("iDRAC.Embedded") else name
