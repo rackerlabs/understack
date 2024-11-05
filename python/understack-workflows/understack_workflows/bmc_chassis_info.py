@@ -211,7 +211,9 @@ def parse_lldp_port(port_data: dict[str, str]) -> dict:
 
 
 def interface_is_relevant(url: str) -> bool:
-    return bool(re.match(r".*(iDRAC.Embedded.*|NIC.(Integrated|Slot).\d-\d)$", url))
+    return bool(
+        re.match(r".*(iDRAC.Embedded.*|NIC.(Integrated|Slot).\d-\d(:?-\d)?)$", url)
+    )
 
 
 def server_interface_name(name: str) -> str:
