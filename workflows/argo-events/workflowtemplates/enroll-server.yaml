@@ -48,9 +48,6 @@ spec:
                   value: "{{steps.enroll-server.outputs.result}}"
             when: "{{steps.server-manage-state.outputs.result}} == manageable"
     - name: enroll-server
-      inputs:
-        parameters:
-          - name: ip_address
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
