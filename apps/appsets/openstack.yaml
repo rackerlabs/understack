@@ -23,7 +23,7 @@ spec:
                 - component: ironic
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=ironic
-                  chartVersion: 0.2.19
+                  chartVersion: 0.2.20
                 - component: placement
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=placement
@@ -35,7 +35,7 @@ spec:
                 - component: glance
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=glance
-                  chartVersion: 0.5.1
+                  chartVersion: 0.5.2
                 - component: nova
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=nova
