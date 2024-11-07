@@ -378,7 +378,12 @@ def connect_interface_to_switch(
 
     cable = nautobot.dcim.cables.get(**identity)
     if cable is None:
-        cable = nautobot.dcim.cables.create(**identity, **attrs)
+        try:
+            cable = nautobot.dcim.cables.create(**identity, **attrs)
+        except pynautobot.core.query.RequestError as e:
+            raise Exception(
+                f"Failed to create nautobot cable {identity}: {e}"
+            ) from None
         logger.info(f"Created cable {cable.id} in Nautobot")
     else:
         logger.info(f"Cable {cable.id} already exists in Nautobot")
