@@ -1,5 +1,6 @@
 import argparse
 import os
+from pprint import pformat
 
 import pynautobot
 
@@ -101,7 +102,7 @@ def main():
     set_bmc_password(bmc.ip_address, bmc.password)
 
     device_info = chassis_info(bmc)
-    logger.info(f"Discovered {device_info}")
+    logger.info(f"Discovered {pformat(device_info)}")
 
     update_dell_drac_settings(bmc)
 
