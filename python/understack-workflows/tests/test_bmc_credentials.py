@@ -13,7 +13,7 @@ def mock_redfish(mocker):
 @pytest.fixture
 def mock_success_auth(mocker):
     mock = mocker.patch("understack_workflows.bmc_credentials._verify_auth")
-    mock.return_value = "tOkEn"
+    mock.return_value = "tOkEn", "/path/to/session/1234"
     return mock
 
 
@@ -26,7 +26,10 @@ def mock_fail_auth(mocker):
 
 def test_set_bmc_password_noop(mock_success_auth, mock_redfish):
     set_bmc_password("1.2.3.4", "qwertyuiop")
-    assert not mock_redfish.called
+    assert mock_redfish.call_count == 1
+    mock_redfish.assert_called_with(
+        "1.2.3.4", "/path/to/session/1234", "tOkEn", "DELETE"
+    )
 
 
 def test_set_bmc_password_failed(mock_fail_auth, mock_redfish):

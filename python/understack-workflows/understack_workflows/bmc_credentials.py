@@ -23,15 +23,17 @@ def set_bmc_password(ip_address, required_password, username="root"):
 
     Raises an Exception if the password is not confirmed working.
     """
-    if _verify_auth(ip_address, username, required_password):
+    token, session = _verify_auth(ip_address, username, required_password)
+    if token:
         logger.info("Production BMC credentials are working on this BMC.")
+        close_session(ip_address, token, session)
         return
 
     logger.info(
         "Production BMC credentials don't work on this BMC. "
         "Trying factory default credentials."
     )
-    token = _verify_auth(ip_address, username, FACTORY_PASSWORD)
+    token, session = _verify_auth(ip_address, username, FACTORY_PASSWORD)
     if not token:
         raise Exception(
             f"Unable to log in to BMC {ip_address} with any known password!"
@@ -40,16 +42,21 @@ def set_bmc_password(ip_address, required_password, username="root"):
     logger.info("Changing BMC password to standard")
     _set_bmc_creds(ip_address, token, username, required_password)
     logger.info("BMC password has been set.")
+    close_session(ip_address, token, session)
 
-    if _verify_auth(ip_address, username, required_password):
+    token = _verify_auth(ip_address, username, required_password)
+    if token:
         logger.info("Production BMC credentials are working on this BMC.")
+        close_session(ip_address, token, session)
 
 
-def _verify_auth(host: str, username: str = "root", password: str = "") -> str:
+def _verify_auth(
+    host: str, username: str = "root", password: str = ""
+) -> tuple[str | None, str | None]:
     """Test whether provided credentials work against a secured API endpoint.
 
-    Returns Session authentication token on success
-    Returns None on authorisation failure
+    Returns authentication token and session path on success
+    Returns None, None on authorisation failure
     Raises an Exception for other kinds of errors (e.g. timeout, etc)
     """
     try:
@@ -61,15 +68,19 @@ def _verify_auth(host: str, username: str = "root", password: str = "") -> str:
             json={"UserName": username, "Password": password},
         )
         if response.status_code == 401:
-            return None
+            return None, None
         if response.status_code >= 400:
             raise Exception(
                 f"BMC {host} password login failed: "
                 f" {response.status_code} {response.json()}"
             )
-        return response.headers["X-Auth-Token"]
+        return response.headers["X-Auth-Token"], response.json()["@odata.id"]
     except Exception as e:
         raise e from None
+
+
+def close_session(host, token, session):
+    _redfish_request(host, session, token, "DELETE")
 
 
 def _get_bmc_accounts(host: str, token: str, username: str) -> list[dict]:
