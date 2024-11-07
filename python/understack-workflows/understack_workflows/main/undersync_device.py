@@ -1,7 +1,7 @@
 import argparse
 import os
 import sys
-from pprint import pprint
+from pprint import pformat
 from uuid import UUID
 
 import requests
@@ -159,7 +159,7 @@ def main():
 
     vlan_group_id = update_nautobot(args)
     response = call_undersync(args, vlan_group_id)
-    logger.info(f"Undersync returned: {pprint(response.json())}")
+    logger.info(f"Undersync returned: {pformat(response.json())}")
 
 
 if __name__ == "__main__":
