@@ -2,16 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "configMigration": true,
   "extends": [
-    "config:recommended",
-    "customManagers:dockerfileVersions",
-    "customManagers:githubActionsVersions",
-    "helpers:pinGitHubActionDigests",
-    ":approveMajorUpdates",
-    "github>rackerlabs/understack//.github/renovate/automergeGitHubActions",
-    "github>rackerlabs/understack//.github/renovate/precommit",
-    "github>rackerlabs/understack//.github/renovate/nautobot",
-    ":maintainLockFilesMonthly",
-    ":automergeDigest"
+    "github>rackerlabs/understack//.github/renovate/default",
+    "github>rackerlabs/understack//.github/renovate/nautobot"
   ],
   "customDatasources": {
     "openstackhelm": {
