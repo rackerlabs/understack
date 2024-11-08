@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "packageRules": [
+    {
+      "groupName": "nautobot",
+      "matchPackageNames": ["nautobot"],
+      "matchPackagePatterns": [".*/nautobot$"],
+      "datasources": ["pypi", "docker"]
+    }
+  ]
+}
