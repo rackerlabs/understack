@@ -9,6 +9,7 @@
     ":approveMajorUpdates",
     ":prNotPending",
     ":rebaseStalePrs",
+    "github>rackerlabs/understack//.github/renovate/automergeGitHubActions",
     ":automergeDigest"
   ],
   "customDatasources": {
