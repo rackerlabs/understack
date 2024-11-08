@@ -155,6 +155,28 @@ class UnderstackDriver(MechanismDriver):
         log_call("delete_network_precommit", context)
 
     def delete_network_postcommit(self, context):
+        network = context.current
+        network_id = network["id"]
+        provider_type = network.get("provider:network_type")
+        physnet = network.get("provider:physical_network")
+
+        if provider_type == p_const.TYPE_VXLAN:
+            conf = cfg.CONF.ml2_understack
+            ucvni_group = conf.ucvni_group
+            try:
+                self.nb.ucvni_delete(network_id)
+            except Exception as e:
+                LOG.exception(
+                    "unable to delete network %(net_id)s", {"net_id": network_id}
+                )
+                raise exc.NetworkNotFound(net_id=network_id) from e
+
+            LOG.info(
+                "network %(net_id)s has been deleted from ucvni_group %(ucvni_group), "
+                "physnet %(physnet)",
+                {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
+            )
+
         log_call("delete_network_postcommit", context)
 
     def create_subnet_precommit(self, context):
