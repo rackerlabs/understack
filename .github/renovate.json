@@ -7,8 +7,6 @@
     "customManagers:githubActionsVersions",
     "helpers:pinGitHubActionDigests",
     ":approveMajorUpdates",
-    ":prNotPending",
-    ":rebaseStalePrs",
     "github>rackerlabs/understack//.github/renovate/automergeGitHubActions",
     ":maintainLockFilesMonthly",
     ":automergeDigest"
