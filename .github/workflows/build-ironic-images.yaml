@@ -14,6 +14,10 @@ on:
   merge_group:
     types: [checks_requested]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   discover:
     runs-on: ubuntu-latest
@@ -30,9 +34,47 @@ jobs:
           echo "yaml-files=${yaml_files}" >> $GITHUB_OUTPUT
         working-directory: ironic-images
 
-  build:
+  build-esp-image:
     runs-on: ubuntu-latest
-    needs: discover
+    defaults:
+      run:
+        working-directory: ironic-images
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Install Dependencies
+        run: sudo apt update && sudo apt install -y grub-efi-amd64-signed shim-signed mtools ipxe
+
+      - name: Create esp image
+        run: |
+          cp /usr/lib/shim/shimx64.efi.signed /tmp/bootx64.efi
+          cp /usr/lib/grub/x86_64-efi-signed/grubnetx64.efi.signed /tmp/grubx64.efi
+          dd if=/dev/zero of=/tmp/esp.img bs=4096 count=1024
+          mkfs.msdos -F 12 -n ESP_IMAGE /tmp/esp.img
+          mmd -i /tmp/esp.img EFI EFI/BOOT
+          mcopy -i /tmp/esp.img -v /tmp/bootx64.efi ::EFI/BOOT/BOOTX64.efi
+          mcopy -i /tmp/esp.img -v /tmp/grubx64.efi ::EFI/BOOT/GRUBX64.efi
+          mdir -i /tmp/esp.img ::EFI/BOOT
+          mkdir artifacts
+          cp /tmp/esp.img artifacts
+
+      - name: Copy ipxe images
+        run: cp /usr/lib/ipxe/{undionly.kpxe,ipxe.efi,snponly.efi} artifacts
+
+      - name: Show artifacts
+        run: ls -la artifacts
+
+      - name: Save artifacts for next job
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-artifacts
+          path: ironic-images/artifacts/
+
+  build-tenant-images:
+    runs-on: ubuntu-latest
+    needs: [discover, build-esp-image]
     defaults:
       run:
         working-directory: ironic-images
@@ -76,6 +118,15 @@ jobs:
       - name: Set timestamp environment variable
         run: echo "TIMESTAMP=$(git show --no-patch --no-notes --pretty='%cd' --date=format:'%Y%m%d%H%M%S' ${{ github.sha }})" >>  $GITHUB_ENV
 
+      - name: Download artifacts from previous job
+        uses: actions/download-artifact@v4
+        with:
+          name: image-artifacts
+          path: ironic-images/artifacts
+
+      - name: Copy image artifacts from previous job in to uploads directory
+        run: ls -la artifacts && cp -R artifacts/* upload/
+
       - name: Publish Release
         id: create_release
         uses: softprops/action-gh-release@e7a8f85e1c67a31e6ed99a94b41bd0b71bbee6b8 # v2
@@ -86,3 +137,13 @@ jobs:
           fail_on_unmatched_files: true
           files: ironic-images/upload/*
         if: ${{ github.ref == 'refs/heads/main' }}
+
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: build-tenant-images
+
+    steps:
+      - name: Clean up artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: image-artifacts
