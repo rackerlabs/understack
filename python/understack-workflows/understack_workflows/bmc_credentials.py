@@ -10,20 +10,23 @@ FACTORY_PASSWORD = "calvin"
 logger = setup_logger(__name__)
 
 
-def set_bmc_password(ip_address, required_password, username="root"):
-    """Access BMC via redfish and change password from factory default if needed.
+def set_bmc_password(ip_address, new_password, username="root", old_password=None):
+    """Access BMC via redfish and change password from old password if needed.
+
+    Old password, if not specified, is the maufacturer's factory default.
 
     Check that we can log in using the standard password.
 
-    If that doesn't work, try the factory default password, if that succeeds
-    then we change the BMC password to our standard one.
+    If that doesn't work, try the old password, if that succeeds then we change
+    the BMC password to our standard one.
 
-    Once the password has been changed then we check that it works by logging in
-    again.
-
-    Raises an Exception if the password is not confirmed working.
+    Once the password has been changed, we check that it works by logging in
+    again, otherwise raise an Exception.
     """
-    token, session = _verify_auth(ip_address, username, required_password)
+    if not old_password:
+        old_password = FACTORY_PASSWORD
+
+    token, session = _verify_auth(ip_address, username, new_password)
     if token:
         logger.info("Production BMC credentials are working on this BMC.")
         close_session(ip_address, token, session)
@@ -31,20 +34,20 @@ def set_bmc_password(ip_address, required_password, username="root"):
 
     logger.info(
         "Production BMC credentials don't work on this BMC. "
-        "Trying factory default credentials."
+        "Trying old / factory default credentials."
     )
-    token, session = _verify_auth(ip_address, username, FACTORY_PASSWORD)
+    token, session = _verify_auth(ip_address, username, old_password)
     if not token:
         raise Exception(
             f"Unable to log in to BMC {ip_address} with any known password!"
         )
 
     logger.info("Changing BMC password to standard")
-    _set_bmc_creds(ip_address, token, username, required_password)
+    _set_bmc_creds(ip_address, token, username, new_password)
     logger.info("BMC password has been set.")
     close_session(ip_address, token, session)
 
-    token = _verify_auth(ip_address, username, required_password)
+    token = _verify_auth(ip_address, username, new_password)
     if token:
         logger.info("Production BMC credentials are working on this BMC.")
         close_session(ip_address, token, session)
