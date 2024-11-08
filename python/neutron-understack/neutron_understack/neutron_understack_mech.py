@@ -140,8 +140,8 @@ class UnderstackDriver(MechanismDriver):
                 raise exc.NetworkNotFound(net_id=network_id) from e
 
             LOG.info(
-                "network %(net_id)s has been added on ucvni_group %(ucvni_group), "
-                "physnet %(physnet)",
+                "network %(net_id)s has been added on ucvni_group %(ucvni_group)s, "
+                "physnet %(physnet)s",
                 {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
             )
 
@@ -155,6 +155,8 @@ class UnderstackDriver(MechanismDriver):
         log_call("delete_network_precommit", context)
 
     def delete_network_postcommit(self, context):
+        log_call("delete_network_postcommit", context)
+
         network = context.current
         network_id = network["id"]
         provider_type = network.get("provider:network_type")
@@ -172,12 +174,10 @@ class UnderstackDriver(MechanismDriver):
                 raise exc.NetworkNotFound(net_id=network_id) from e
 
             LOG.info(
-                "network %(net_id)s has been deleted from ucvni_group %(ucvni_group), "
-                "physnet %(physnet)",
+                "network %(net_id)s has been deleted from ucvni_group %(ucvni_group)s, "
+                "physnet %(physnet)s",
                 {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
             )
-
-        log_call("delete_network_postcommit", context)
 
     def create_subnet_precommit(self, context):
         log_call("create_subnet_precommit", context)
