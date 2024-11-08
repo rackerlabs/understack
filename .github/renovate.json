@@ -8,6 +8,7 @@
     "helpers:pinGitHubActionDigests",
     ":approveMajorUpdates",
     "github>rackerlabs/understack//.github/renovate/automergeGitHubActions",
+    "github>rackerlabs/understack//.github/renovate/precommit",
     ":maintainLockFilesMonthly",
     ":automergeDigest"
   ],
