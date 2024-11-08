@@ -41,7 +41,8 @@ def main():
 
     This script has the following order of operations:
 
-    - connect to the BMC, trying standard password then factory default
+    - connect to the BMC using standard password, if that fails then use
+      password supplied in --old-bmc-password option, or factory default
 
     - ensure standard BMC password is set
 
@@ -98,8 +99,12 @@ def main():
     token = args.nautobot_token or credential("nb-token", "token")
     nautobot = pynautobot.api(url, token=token)
 
-    bmc = bmc_for_ip_address(bmc_ip_address, password=args.bmc_password)
-    set_bmc_password(bmc.ip_address, bmc.password)
+    bmc = bmc_for_ip_address(bmc_ip_address)
+    set_bmc_password(
+        ip_address=bmc.ip_address,
+        new_password=bmc.password,
+        old_password=args.old_bmc_password,
+    )
 
     device_info = chassis_info(bmc)
     logger.info(f"Discovered {pformat(device_info)}")
@@ -133,12 +138,11 @@ def main():
 
 def argument_parser():
     parser = argparse.ArgumentParser(
-        prog=os.path.basename(__file__), description="Ingest Baremetal"
+        prog=os.path.basename(__file__), description="Ingest Baremetal Node"
     )
     parser.add_argument("--bmc-ip-address", type=str, required=True, help="BMC IP")
-    parser.add_argument("--bmc-password", type=str, required=False, help="BMC Pass")
     parser.add_argument(
-        "--bmc-mac-address", type=str, required=False, help="BMC MAC Addr"
+        "--old-bmc-password", type=str, required=False, help="Old Password"
     )
     parser = parser_nautobot_args(parser)
     return parser
