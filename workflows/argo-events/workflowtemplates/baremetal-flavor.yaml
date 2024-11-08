@@ -1,0 +1,68 @@
+---
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: baremetal-flavor
+  annotations:
+    workflows.argoproj.io/title: Set or Create flavors for use with the Bare Metal service
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/baremetal-flavor.yaml`
+      Set or create a flavor with specified properties if it does not already exist.
+kind: WorkflowTemplate
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: flavors
+        value:
+          '[{"name": "gp2.small", "properties": "--property resources:CUSTOM_BAREMETAL_GP2SMALL=1 --property resources:VCPU=0 --property resources:MEMORY_MB=0 --property resources:DISK_GB=0"},
+          {"name": "gp3.medium", "properties": "--property resources:CUSTOM_BAREMETAL_GP3MEDIUM=1 --property resources:VCPU=2 --property resources:MEMORY_MB=4096 --property resources:DISK_GB=40"}]'
+
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: flavors
+      steps:
+        - - name: create-flavor
+            template: create-flavor
+            arguments:
+              parameters:
+                - name: flavor_name
+                  value: "{{item.name}}"
+                - name: flavor_properties
+                  value: "{{item.properties}}"
+            withParam: "{{inputs.parameters.flavors}}"
+
+    - name: create-flavor
+      inputs:
+        parameters:
+          - name: flavor_name
+          - name: flavor_properties
+      script:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        command: [sh]
+        source: |
+          echo "Checking if flavor '{{inputs.parameters.flavor_name}}' exists..."
+          flavor_name=$(openstack --os-cloud understack flavor show '{{inputs.parameters.flavor_name}}' -f value -c name 2>/dev/null)
+          echo "$flavor_name"
+          if [ "$flavor_name" = "{{inputs.parameters.flavor_name}}" ]; then
+            echo "Setting flavor '{{inputs.parameters.flavor_name}}' with properties {{inputs.parameters.flavor_properties}}"
+            result=$(openstack flavor set '{{inputs.parameters.flavor_name}}' {{inputs.parameters.flavor_properties}})
+          else
+            echo "Creating flavor '{{inputs.parameters.flavor_name}}' with properties {{inputs.parameters.flavor_properties}}"
+            result=$(openstack flavor create '{{inputs.parameters.flavor_name}}' {{inputs.parameters.flavor_properties}})
+          fi
+          echo "$result"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+
+  volumes:
+    - name: openstack-svc-acct
+      secret:
+        secretName: openstack-svc-acct
