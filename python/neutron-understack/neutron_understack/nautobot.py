@@ -43,3 +43,13 @@ class Nautobot:
         resp = self.s.post(url, json=payload, timeout=10)
         LOG.debug("ucvni_create resp: %(resp)s", {"resp": resp.json()})
         resp.raise_for_status()
+
+    def ucvni_delete(self, network_id):
+        payload = {"id": network_id}
+
+        ucvni_url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
+        url = urljoin(self.base_url, ucvni_url)
+        LOG.debug("ucvni_delete payload: %(payload)s", {"payload": payload})
+        resp = self.s.delete(url, json=payload, timeout=10)
+        LOG.debug("ucvni_delete resp: %(resp)s", {"resp": resp.status_code})
+        resp.raise_for_status()
