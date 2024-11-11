@@ -44,7 +44,7 @@ jobs:
       - run: poetry install --sync --with test
       - run: poetry build
       - run: "poetry run pytest --cov --cov-report xml:coverage.xml"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         with:
           name: coverage-${{ matrix.project }}
           path: python/${{ matrix.project }}/coverage.xml
@@ -54,13 +54,13 @@ jobs:
     needs: python
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4
         with:
           pattern: coverage-*
           merge-multiple: true
       - run: |
           npx cobertura-merge-globby -o output.xml --files=python/**/coverage.xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         with:
           name: coverage.xml
           path: coverage.xml
