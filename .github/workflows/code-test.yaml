@@ -21,10 +21,6 @@ concurrency:
 
 jobs:
   python:
-    permissions:
-      contents: read
-      pull-requests: write
-
     runs-on: ubuntu-latest
 
     strategy:
@@ -48,7 +44,24 @@ jobs:
       - run: poetry install --sync --with test
       - run: poetry build
       - run: "poetry run pytest --cov --cov-report xml:coverage.xml"
-      - uses: orgoro/coverage@3f13a558c5af7376496aa4848bf0224aead366ac # v3.2
+      - uses: actions/upload-artifact@v4
         with:
-          coverageFile: python/${{ matrix.project }}/coverage.xml
-          token: ${{ secrets.GITHUB_TOKEN }}
+          name: coverage-${{ matrix.project }}
+          path: python/${{ matrix.project }}/coverage.xml
+          retention-days: 1
+
+  coverage-upload:
+    needs: python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+      - run: |
+          npx cobertura-merge-globby -o output.xml --files=python/**/coverage.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage.xml
+          path: coverage.xml
+          retention-days: 1
