@@ -46,7 +46,6 @@ def test_chassis_info_R7615():
         manufacturer="Dell Inc.",
         model_number="PowerEdge R7615",
         serial_number="33GSW04",
-        bmc_hostname="idrac-33GSW04",
         bios_version="1.6.10",
         bmc_ip_address="1.2.3.4",
         interfaces=[

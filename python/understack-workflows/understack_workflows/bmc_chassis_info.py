@@ -28,14 +28,17 @@ class ChassisInfo:
     manufacturer: str
     model_number: str
     serial_number: str
-    bmc_hostname: str
     bmc_ip_address: str
     bios_version: str
     interfaces: list[InterfaceInfo]
 
     @property
-    def bmc_interface(self):
+    def bmc_interface(self) -> InterfaceInfo:
         return self.interfaces[0]
+
+    @property
+    def bmc_hostname(self) -> str:
+        return str(self.bmc_interface.hostname)
 
 
 REDFISH_SYSTEM_ENDPOINT = "/redfish/v1/Systems/System.Embedded.1/"
@@ -65,7 +68,6 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
         serial_number=chassis_data["SKU"],
         bios_version=chassis_data["BiosVersion"],
         bmc_ip_address=bmc.ip_address,
-        bmc_hostname=str(interfaces[0] and interfaces[0].hostname),
         interfaces=interfaces,
     )
 

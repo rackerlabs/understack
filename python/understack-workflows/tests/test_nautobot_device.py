@@ -118,12 +118,12 @@ def test_find_or_create(dell_nautobot_device):
         serial_number="33GSW04",
         bios_version="1.6.10",
         bmc_ip_address="1.2.3.4",
-        bmc_hostname="Dell-33GSW04",
         interfaces=[
             InterfaceInfo(
                 name="iDRAC",
                 description="Dedicated iDRAC interface",
                 mac_address="A8:3C:A5:35:43:86",
+                hostname="Dell-33GSW04",
                 remote_switch_mac_address="C4:4D:84:48:61:83",
                 remote_switch_port_name="GigabitEthernet1/0/3",
             ),
