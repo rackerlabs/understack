@@ -47,6 +47,8 @@ sync-provision-state = "understack_workflows.main.sync_provision_state:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
 undersync-device = "understack_workflows.main.undersync_device:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
+bmc-password = "understack_workflows.main.print_bmc_password:main"
+bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
