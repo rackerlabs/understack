@@ -69,7 +69,8 @@ pod:
     disruption_budget:
       api:
         min_available: 1
-
+  resources:
+    enabled: true
   probes:
     api:
       glance-api:
