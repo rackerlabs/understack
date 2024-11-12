@@ -16,7 +16,7 @@
     "init_hook": [
       "echo 'Welcome to Understack understack_workflows devbox!' > /dev/null",
       ". $VENV_DIR/bin/activate",
-      "poetry install --with=test"
+      "poetry install --with=test -q"
     ],
     "scripts": {
       "test": [
