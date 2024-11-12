@@ -11,7 +11,7 @@ from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
 
-DEVICE_INITIAL_STATUS = "Active"
+DEVICE_INITIAL_STATUS = "enroll"
 DEVICE_ROLE = "server"
 INTERFACE_TYPE = "25gbase-x-sfp28"
 BMC_INTERFACE_TYPE = "1000base-t"
