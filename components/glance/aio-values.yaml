@@ -69,6 +69,33 @@ pod:
     disruption_budget:
       api:
         min_available: 1
+  resources:
+    enabled: true
+  probes:
+    api:
+      glance-api:
+        readiness:
+          enabled: true
+          params:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+        liveness:
+          enabled: true
+          params:
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 8
+            failureThreshold: 6
+
+conf:
+  glance_api_uwsgi:
+    uwsgi:
+      # This should be set to anything larger than 1.
+      # Otherwise uWSGI is not able to serve multiple requests at the same time
+      # under heavy load, which results in liveness probe failures in
+      # Kubernetes environment.
+      processes: 2
 
 manifests:
   job_db_init: false
