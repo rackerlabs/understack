@@ -15,6 +15,7 @@ class InterfaceInfo:
     name: str
     description: str
     mac_address: str
+    hostname: str | None = None
     ipv4_address: IPv4Interface | None = None
     ipv4_gateway: IPv4Address | None = None
     dhcp: bool = False
@@ -32,8 +33,12 @@ class ChassisInfo:
     interfaces: list[InterfaceInfo]
 
     @property
-    def bmc_interface(self):
+    def bmc_interface(self) -> InterfaceInfo:
         return self.interfaces[0]
+
+    @property
+    def bmc_hostname(self) -> str:
+        return str(self.bmc_interface.hostname)
 
 
 REDFISH_SYSTEM_ENDPOINT = "/redfish/v1/Systems/System.Embedded.1/"
@@ -55,6 +60,7 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
 
     """
     chassis_data = bmc.redfish_request(REDFISH_SYSTEM_ENDPOINT)
+    interfaces = interface_data(bmc)
 
     return ChassisInfo(
         manufacturer=chassis_data["Manufacturer"],
@@ -62,7 +68,7 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
         serial_number=chassis_data["SKU"],
         bios_version=chassis_data["BiosVersion"],
         bmc_ip_address=bmc.ip_address,
-        interfaces=interface_data(bmc),
+        interfaces=interfaces,
     )
 
 
@@ -92,6 +98,7 @@ def bmc_interface(bmc) -> dict:
         "name": "iDRAC",
         "description": "Dedicated iDRAC interface",
         "mac_address": data["MACAddress"].upper(),
+        "hostname": data["HostName"],
         "ipv4_address": ipv4_address,
         "ipv4_gateway": ipv4_gateway,
         "dhcp": dhcp,
@@ -163,6 +170,7 @@ def interface_detail(bmc, path) -> dict:
         "name": server_interface_name(data["Id"]),
         "description": data["Description"],
         "mac_address": data["MACAddress"].upper(),
+        "hostname": data["HostName"],
     }
 
 

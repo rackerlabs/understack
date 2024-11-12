@@ -12,6 +12,7 @@ from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.bmc_chassis_info import chassis_info
 from understack_workflows.bmc_credentials import set_bmc_password
+from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_network_config import bmc_set_permanent_ip_addr
 from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.helpers import credential
@@ -113,6 +114,8 @@ def main():
 
     nb_device = nautobot_device.find_or_create(device_info, nautobot)
     pxe_interface = topology.pxe_interface_name(nb_device)
+
+    bmc_set_hostname(bmc, device_info.bmc_hostname, nb_device.name)
 
     # Be sure to only do this after Nautobot IPAddress has been changed from
     # DHCP, otherwise our IP might be handed out to someone else.

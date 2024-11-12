@@ -123,6 +123,7 @@ def test_find_or_create(dell_nautobot_device):
                 name="iDRAC",
                 description="Dedicated iDRAC interface",
                 mac_address="A8:3C:A5:35:43:86",
+                hostname="Dell-33GSW04",
                 remote_switch_mac_address="C4:4D:84:48:61:83",
                 remote_switch_port_name="GigabitEthernet1/0/3",
             ),

@@ -53,6 +53,7 @@ def test_chassis_info_R7615():
                 name="iDRAC",
                 description="Dedicated iDRAC interface",
                 mac_address="A8:3C:A5:35:43:86",
+                hostname="idrac-33GSW04",
                 ipv4_address=IPv4Interface("10.46.96.156/26"),
                 ipv4_gateway=IPv4Address("10.46.96.129"),
                 remote_switch_mac_address="C4:4D:84:48:61:80",
