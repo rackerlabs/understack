@@ -112,6 +112,11 @@ class UnderstackDriver(MechanismDriver):
     def initialize(self):
         conf = cfg.CONF.ml2_understack
         self.nb = Nautobot(conf.nb_url, conf.nb_token)
+        self.argo_client = ArgoClient(
+            logger=LOG,
+            api_url=cfg.CONF.ml2_type_understack.argo_api_url,
+            namespace=cfg.CONF.ml2_type_understack.argo_namespace,
+        )
 
     def create_network_precommit(self, context):
         log_call("create_network_precommit", context)
@@ -209,18 +214,12 @@ class UnderstackDriver(MechanismDriver):
     def update_port_postcommit(self, context):
         log_call("update_port_postcommit", context)
 
-        argo_client = ArgoClient(
-            logger=LOG,
-            api_url=cfg.CONF.ml2_type_understack.argo_api_url,
-            namespace=cfg.CONF.ml2_type_understack.argo_namespace,
-        )
-
         self._move_to_network(
             vif_type=context.current["binding:vif_type"],
             mac_address=context.current["mac_address"],
             device_uuid=context.current["binding:host_id"],
             network_id=context.current["network_id"],
-            argo_client=argo_client,
+            argo_client=self.argo_client,
         )
 
     def delete_port_precommit(self, context):
@@ -228,6 +227,35 @@ class UnderstackDriver(MechanismDriver):
 
     def delete_port_postcommit(self, context):
         log_call("delete_port_postcommit", context)
+
+        vif_type = context.current["binding:vif_type"]
+        mac_address = context.current["mac_address"]
+        network_id = context.current["network_id"]
+
+        if vif_type != portbindings.VIF_TYPE_OTHER:
+            return
+
+        LOG.debug(
+            f"Detaching network with ID: {network_id} from port "
+            f"with MAC address {mac_address}"
+        )
+
+        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+            return self.nb.reset_port_status(mac_address)
+
+        nb_vlan_group_id = self.nb.detach_port(network_id, mac_address)
+
+        result = self.argo_client.submit(
+            template_name="undersync-switch",
+            entrypoint="undersync-switch",
+            parameters={
+                "switch_uuids": [str(nb_vlan_group_id)],
+                "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
+                "force": cfg.CONF.ml2_type_understack.argo_force,
+            },
+            service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
+        )
+        LOG.info(f"Undersync workflow submitted: {result}")
 
     def bind_port(self, context):
         log_call("bind_port", context)
