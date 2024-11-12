@@ -1174,13 +1174,13 @@ six = ">=1.5"
 
 [[package]]
 name = "python-ironicclient"
-version = "5.8.0"
+version = "5.9.0"
 description = "OpenStack Bare Metal Provisioning API Client Library"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "python-ironicclient-5.8.0.tar.gz", hash = "sha256:86fedc2358486628ca8682717ebc69ee102971f117da3526b9d3e29552ec942e"},
-    {file = "python_ironicclient-5.8.0-py3-none-any.whl", hash = "sha256:cfb4c1be25c859f5fe13d1203803cad279a1cb8720d69778c215424f9eb0da0b"},
+    {file = "python-ironicclient-5.9.0.tar.gz", hash = "sha256:c255de1ed402adacc24a90dd62310d6d5735d166f3995eabe9ea90db7c67bdb6"},
+    {file = "python_ironicclient-5.9.0-py3-none-any.whl", hash = "sha256:b226c7495b76785d8b709466f1f780d66bf9d910c4cacc4e9d2406ae064058dd"},
 ]
 
 [package.dependencies]
@@ -1191,7 +1191,7 @@ keystoneauth1 = ">=3.11.0"
 openstacksdk = ">=0.18.0"
 osc-lib = ">=2.0.0"
 "oslo.utils" = ">=3.33.0"
-pbr = ">=2.0.0"
+pbr = ">=6.0.0"
 platformdirs = ">=3"
 PyYAML = ">=3.13"
 requests = ">=2.14.2"
