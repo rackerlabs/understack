@@ -70,6 +70,22 @@ pod:
       api:
         min_available: 1
 
+  probes:
+    api:
+      glance-api:
+        readiness:
+          enabled: true
+          params:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+        liveness:
+          enabled: true
+          params:
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 8
+            failureThreshold: 6
 manifests:
   job_db_init: false
   job_rabbit_init: false
