@@ -87,7 +87,8 @@ def combine_lldp(lldp, interface) -> InterfaceInfo:
             f"LLDP info from BMC is missing for {name} or {alternate_name}, "
             f"we only have LLDP info for {list(lldp.keys())}"
         )
-    return InterfaceInfo(**interface, **lldp_entry)
+        interface.update(lldp_entry)
+    return InterfaceInfo(**interface)
 
 
 def bmc_interface(bmc) -> dict:
