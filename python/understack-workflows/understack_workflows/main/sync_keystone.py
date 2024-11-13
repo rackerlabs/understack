@@ -77,10 +77,20 @@ def handle_project_create(conn: Connection, nautobot: Nautobot, project_id: uuid
 def handle_project_update(conn: Connection, nautobot: Nautobot, project_id: uuid.UUID):
     logger.info(f"got request to update tenant {project_id!s}")
     project = conn.identity.get_project(project_id.hex)  # type: ignore
-    ten = nautobot.session.tenancy.tenants.get(project_id)
-    ten.description = project.description  # type: ignore
-    ten.save()  # type: ignore
-    logger.info(f"tenant '{project_id!s}' last updated {ten.last_updated}")  # type: ignore
+    tenant_api = nautobot.session.tenancy.tenants
+
+    existing_tenant = tenant_api.get(project_id)
+    if existing_tenant is None:
+        new_tenant = tenant_api.create(
+            id=str(project_id), name=project.name, description=project.description
+        )
+        logger.info(f"tenant '{project_id!s}' created {new_tenant.created}")  # type: ignore
+    else:
+        existing_tenant.description = project.description  # type: ignore
+        existing_tenant.save()  # type: ignore
+        logger.info(
+            f"tenant '{project_id!s}' last updated {existing_tenant.last_updated}"  # type: ignore
+        )
 
 
 def handle_project_delete(conn: Connection, nautobot: Nautobot, project_id: uuid.UUID):
