@@ -8,18 +8,22 @@ from understack_workflows import ironic_node
 from understack_workflows import nautobot_device
 from understack_workflows import sync_interfaces
 from understack_workflows import topology
+from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_bios import update_dell_bios_settings
-from understack_workflows.bmc_chassis_info import chassis_info
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_network_config import bmc_set_permanent_ip_addr
 from understack_workflows.bmc_settings import update_dell_drac_settings
+from understack_workflows.discover import discover_chassis_info
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
+from understack_workflows.nautobot_device import NautobotDevice
 
 logger = setup_logger(__name__)
+
+MIN_REQURED_NEIGHBOR_COUNT = 4
 
 
 def main():
@@ -49,7 +53,7 @@ def main():
 
     - if DHCP, set permanent IP address, netmask, default gw
 
-    - TODO: if server is off, power it on and wait (otherwise LLDP doesn't work)
+    - if server is off, power it on and wait (otherwise LLDP doesn't work)
 
     - TODO: create and install SSL certificate
 
@@ -99,13 +103,22 @@ def main():
     nautobot = pynautobot.api(url, token=token)
 
     bmc = bmc_for_ip_address(bmc_ip_address)
+
+    nb_device = enroll_server(bmc, nautobot, args.old_bmc_password)
+
+    # argo workflows captures stdout as the results which we can use
+    # to return the device UUID
+    print(str(nb_device.id))
+
+
+def enroll_server(bmc: Bmc, nautobot, old_password: str | None) -> NautobotDevice:
     set_bmc_password(
         ip_address=bmc.ip_address,
         new_password=bmc.password,
-        old_password=args.old_bmc_password,
+        old_password=old_password,
     )
 
-    device_info = chassis_info(bmc)
+    device_info = discover_chassis_info(bmc)
     logger.info(f"Discovered {pformat(device_info)}")
 
     update_dell_drac_settings(bmc)
@@ -132,9 +145,7 @@ def main():
 
     logger.info(f"{__file__} complete for {bmc.ip_address}")
 
-    # argo workflows captures stdout as the results which we can use
-    # return the device UUID
-    print(str(nb_device.id))
+    return nb_device
 
 
 def argument_parser():
