@@ -30,6 +30,7 @@ class ChassisInfo:
     serial_number: str
     bmc_ip_address: str
     bios_version: str
+    power_on: bool
     interfaces: list[InterfaceInfo]
 
     @property
@@ -67,6 +68,7 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
         model_number=chassis_data["Model"],
         serial_number=chassis_data["SKU"],
         bios_version=chassis_data["BiosVersion"],
+        power_on=(chassis_data["PowerState"] == "On"),
         bmc_ip_address=bmc.ip_address,
         interfaces=interfaces,
     )

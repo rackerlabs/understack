@@ -48,6 +48,7 @@ def test_chassis_info_R7615():
         serial_number="33GSW04",
         bios_version="1.6.10",
         bmc_ip_address="1.2.3.4",
+        power_on=True,
         interfaces=[
             bmc_chassis_info.InterfaceInfo(
                 name="iDRAC",
