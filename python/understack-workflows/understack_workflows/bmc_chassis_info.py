@@ -81,7 +81,7 @@ def interface_data(bmc: Bmc) -> list[InterfaceInfo]:
 def combine_lldp(lldp, interface) -> InterfaceInfo:
     name = interface["name"]
     alternate_name = f"{name}-1"
-    lldp_entry = lldp.get(name, lldp.get(alternate_name))
+    lldp_entry = lldp.get(name, lldp.get(alternate_name, {}))
     if not lldp_entry:
         logger.info(
             f"LLDP info from BMC is missing for {name} or {alternate_name}, "
