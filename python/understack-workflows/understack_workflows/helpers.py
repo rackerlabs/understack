@@ -17,6 +17,7 @@ def setup_logger(name: str | None = None, level: int = logging.DEBUG):
     """
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S %z",
         level=level,
     )
     return logging.getLogger(name)
