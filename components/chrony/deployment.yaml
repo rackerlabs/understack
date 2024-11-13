@@ -18,6 +18,6 @@ spec:
         image: dockurr/chrony@sha256:7dc19aa12f5e5da7aaa3640c6700012087d0eedd5bd4ece2a25cf42088637d62
         env:
         - name: NTP_SERVERS
-          value: time.rackspace.net
+          value: time.iad.rackspace.net,0.pool.ntp.org,1.pool.ntp.org
       restartPolicy: Always
       dnsPolicy: ClusterFirst
