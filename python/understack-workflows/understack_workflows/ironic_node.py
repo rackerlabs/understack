@@ -29,6 +29,7 @@ def create_or_update(
         ironic_node = create_ironic_node(
             client, node_uuid, device_hostname, driver, bmc
         )
+        return ironic_node.provision_state  # type: ignore
 
     if ironic_node.provision_state in STATES_ALLOWING_UPDATES:
         update_ironic_node(client, node_uuid, device_hostname, driver, bmc)

@@ -4,8 +4,7 @@ from uuid import UUID
 
 import pynautobot
 from pynautobot.core.api import Api as NautobotApi
-from pynautobot.models.dcim import Devices as NautobotDevice
-from pynautobot.models.dcim import Interfaces as NautobotInterface
+from pynautobot.models import dcim
 
 
 class Nautobot:
@@ -23,34 +22,38 @@ class Nautobot:
     def api_session(self, url: str, token: str) -> NautobotApi:
         return pynautobot.api(url, token=token)
 
-    def device_by_id(self, device_id: UUID) -> NautobotDevice:
+    def device_by_id(self, device_id: UUID) -> dcim.Devices:
         device = self.session.dcim.devices.get(device_id)
         if not device:
             self.exit_with_error(f"Device {device_id!s} not found in Nautobot")
-        return device
+        return device  # type: ignore
 
-    def interface_by_id(self, interface_id: UUID) -> NautobotInterface:
+    def interface_by_id(self, interface_id: UUID) -> dcim.Interfaces:
         interface = self.session.dcim.interfaces.get(interface_id)
         if not interface:
             self.exit_with_error(f"Interface {interface_id!s} not found in Nautobot")
-        return interface
+        return interface  # type: ignore
 
     def non_lag_interface_by_mac(
         self, device_id: UUID, mac_address: str
-    ) -> list[NautobotInterface]:
-        interfaces = self.session.dcim.interfaces.filter(
+    ) -> dcim.Interfaces:
+        interface = self.session.dcim.interfaces.get(
             device_id=device_id,
             mac_address=mac_address,
             type__n="lag",
         )
-        if not interfaces:
+        if not interface:
             self.exit_with_error(
                 f"Interface with {device_id=} and {mac_address=} not found in Nautobot"
             )
-        return interfaces[0]
+        return interface  # type: ignore
 
     def update_cf(self, device_id: UUID, field_name: str, field_value: str):
         device = self.device_by_id(device_id)
+        if not device:
+            raise Exception(f"No such device {device_id}")
+        if not device.custom_fields:
+            raise Exception(f"Device {device_id} has no custom fields")
         device.custom_fields[field_name] = field_value
         response = device.save()
         self.logger.info(f"save result: {response}")
@@ -58,7 +61,7 @@ class Nautobot:
 
     def update_switch_interface_status(
         self, device_id: UUID, server_interface_mac: str, new_status: str
-    ) -> NautobotInterface:
+    ) -> dcim.Interfaces:
         """Change the Interface Status in Nautobot for interfaces.
 
         The device_id and interface MAC address parameters identify one or more
@@ -82,13 +85,13 @@ class Nautobot:
                 f"Interface {server_interface_mac=} {server_interface.type} "
                 "is not connected in Nautobot"
             )
-        switch_interface_id = connected_endpoint.id
+        switch_interface_id = connected_endpoint.id  # type: ignore
         self.logger.debug(
             f"Interface {server_interface_mac=} connects to {switch_interface_id=}"
         )
 
         switch_interface = self.interface_by_id(switch_interface_id)
-        switch_interface.status = new_status
+        switch_interface.status = new_status  # type: ignore
         result = switch_interface.save()
 
         self.logger.debug(
@@ -98,7 +101,7 @@ class Nautobot:
 
     def update_device_status(self, device_id: UUID, device_status: str):
         device = self.device_by_id(device_id)
-        device.status = device_status
+        device.status = device_status  # type: ignore
         result = device.save()
         self.logger.info(
             f"device {device_id} updated to Status {device_status} {result=}"

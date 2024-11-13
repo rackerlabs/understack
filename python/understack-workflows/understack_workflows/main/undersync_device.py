@@ -50,6 +50,8 @@ def update_nautobot_for_provisioning(
     interface = nautobot.update_switch_interface_status(
         device_id, interface_mac, new_status
     )
+    if not interface.device:
+        raise Exception("Interface has no associated device")
     vlan_group_id = vlan_group_id_for(interface.device.id, nautobot)
     logger.debug(
         f"Switch interface {interface.device} {interface} found in {vlan_group_id=}"

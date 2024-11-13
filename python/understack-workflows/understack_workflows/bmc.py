@@ -9,7 +9,7 @@ from sushy import Sushy
 from understack_workflows.bmc_password_standard import standard_password
 from understack_workflows.helpers import credential
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 HEADERS = {
@@ -58,6 +58,8 @@ class Bmc:
             )
         if r.text:
             return r.json()
+        else:
+            return {}
 
     def sushy(self):
         return Sushy(

@@ -5,25 +5,17 @@ from ipaddress import IPv4Address
 from ipaddress import IPv4Interface
 
 from understack_workflows import bmc_chassis_info
+from understack_workflows.bmc import Bmc
 
-FIXTURE_PATH = "json_samples/bmc_chassis_info"
 
-
-class FakeBmc:
+class FakeBmc(Bmc):
     def __init__(self, fixtures):
         self.fixtures = fixtures
         self.ip_address = "1.2.3.4"
 
-    def redfish_request(self, path: str) -> dict:
+    def redfish_request(self, path: str, *_args, **_kw) -> dict:
         path = path.replace("/", "_") + ".json"
         return self.fixtures[path]
-
-
-def redfish_fixtures_by_platform() -> dict:
-    return {
-        platform: read_fixtures(FIXTURE_PATH.joinpath(platform))
-        for platform in sorted(os.listdir(FIXTURE_PATH))
-    }
 
 
 def read_fixtures(path) -> dict:

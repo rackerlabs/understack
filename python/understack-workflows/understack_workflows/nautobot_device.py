@@ -27,14 +27,14 @@ class NautobotInterface:
     description: str
     mac_address: str
     status: str
-    ip_address: str
-    neighbor_device_id: str
-    neighbor_device_name: str
-    neighbor_interface_id: str
-    neighbor_interface_name: str
-    neighbor_chassis_mac: str
-    neighbor_location_name: str
-    neighbor_rack_name: str
+    ip_address: str | None
+    neighbor_device_id: str | None
+    neighbor_device_name: str | None
+    neighbor_interface_id: str | None
+    neighbor_interface_name: str | None
+    neighbor_chassis_mac: str | None
+    neighbor_location_name: str | None
+    neighbor_rack_name: str | None
 
 
 @dataclass
@@ -86,13 +86,18 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
         # Re-run the graphql query to fetch any auto-created defaults from
         # nautobot (e.g. it automatically creates a BMC interface):
         device = nautobot_server(nautobot, serial=chassis_info.serial_number)
+        if not device:
+            raise Exception("Failed to create device in Nautobot")
 
     find_or_create_interfaces(nautobot, chassis_info, device.id, switches)
 
     # Run the graphql query yet again, to include all the data we just populated
     # in nautobot.   Fairly innefficient for the case where we didn't change
     # anything, but we need the accurate data.
-    return nautobot_server(nautobot, serial=chassis_info.serial_number)
+    device = nautobot_server(nautobot, serial=chassis_info.serial_number)
+    if not device:
+        raise Exception("Failed to create device in Nautobot")
+    return device
 
 
 def location_from(switches):
@@ -119,7 +124,9 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
         if interface.remote_switch_mac_address
     }
     base_switch_macs = {
-        base_mac(interface.remote_switch_mac_address, interface.remote_switch_port_name)
+        base_mac(
+            interface.remote_switch_mac_address, str(interface.remote_switch_port_name)
+        )
         for interface in chassis_info.interfaces
         if interface.remote_switch_mac_address
     }
@@ -129,7 +136,7 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
     return switches
 
 
-def nautobot_switches(nautobot, mac_addresses: list[str]) -> dict[str, dict]:
+def nautobot_switches(nautobot, mac_addresses: set[str]) -> dict[str, dict]:
     """Get switches by MAC address.
 
     Assumes that MAC addresses in Nautobot are normalized to upcase
@@ -273,7 +280,7 @@ def parse_device(data: dict) -> NautobotDevice:
 
 def parse_interface(data: dict) -> NautobotInterface:
     connected = data["connected_interface"]
-    ip_address = data["ip_addresses"] and data["ip_addresses"][0]
+    ip_address = data["ip_addresses"][0] if data["ip_addresses"] else None
     return NautobotInterface(
         id=data["id"],
         name=data["name"],
@@ -380,7 +387,7 @@ def connect_interface_to_switch(
     if cable is None:
         try:
             cable = nautobot.dcim.cables.create(**identity, **attrs)
-        except pynautobot.core.query.RequestError as e:
+        except pynautobot.core.query.RequestError as e:  # type: ignore
             raise Exception(
                 f"Failed to create nautobot cable {identity}: {e}"
             ) from None
@@ -407,7 +414,7 @@ def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface,
                 },
             )
             logger.info(f"Created Nautobot IP {ip.id} for {ipv4_address}")
-    except pynautobot.core.query.RequestError as e:
+    except pynautobot.core.query.RequestError as e:  # type: ignore
         raise Exception(f"Failed to assign {ipv4_address=} in Nautobot: {e}") from None
     return ip
 
@@ -423,7 +430,7 @@ def associate_ip_address(nautobot, nautobot_interface, ip_id):
         else:
             nautobot.ipam.ip_address_to_interface.create(**identity, is_primary=True)
             logger.info(f"Associated IP address {ip_id} with {nautobot_interface.name}")
-    except pynautobot.core.query.RequestError as e:
+    except pynautobot.core.query.RequestError as e:  # type: ignore
         raise Exception(
             f"Failed to associate IPAddress {ip_id} in Nautobot: {e}"
         ) from None
