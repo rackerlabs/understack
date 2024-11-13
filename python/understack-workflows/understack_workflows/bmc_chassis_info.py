@@ -41,6 +41,15 @@ class ChassisInfo:
     def bmc_hostname(self) -> str:
         return str(self.bmc_interface.hostname)
 
+    @property
+    def neighbors(self) -> set:
+        """A set of switch MAC addresses to which this chassis is connected."""
+        return {
+            interface.remote_switch_mac_address
+            for interface in self.interfaces
+            if interface.remote_switch_mac_address
+        }
+
 
 REDFISH_SYSTEM_ENDPOINT = "/redfish/v1/Systems/System.Embedded.1/"
 REDFISH_ETHERNET_ENDPOINT = f"{REDFISH_SYSTEM_ENDPOINT}EthernetInterfaces/"

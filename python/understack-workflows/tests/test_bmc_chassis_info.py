@@ -40,6 +40,16 @@ def read_fixture(path, filename):
         return json.loads(f.read())
 
 
+def test_chassis_neighbors():
+    bmc = FakeBmc(read_fixtures("json_samples/bmc_chassis_info/R7615"))
+    chassis_info = bmc_chassis_info.chassis_info(bmc)
+    assert chassis_info.neighbors == {
+        "C4:7E:E0:E4:10:7F",
+        "C4:4D:84:48:61:80",
+        "C4:7E:E0:E4:32:DF",
+    }
+
+
 def test_chassis_info_R7615():
     bmc = FakeBmc(read_fixtures("json_samples/bmc_chassis_info/R7615"))
     assert bmc_chassis_info.chassis_info(bmc) == bmc_chassis_info.ChassisInfo(
