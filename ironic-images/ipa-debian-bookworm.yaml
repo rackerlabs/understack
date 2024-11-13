@@ -6,3 +6,4 @@
   - journal-to-console
   - package-installs
   - undercloud-ipa
+  - install-static
