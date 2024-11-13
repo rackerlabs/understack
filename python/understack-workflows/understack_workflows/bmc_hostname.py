@@ -12,7 +12,7 @@ def bmc_set_hostname(bmc: Bmc, current_name: str, new_name: str):
         raise ValueError("Invalid input parameters")
 
     if current_name == new_name:
-        logger.info("BMC hostname is already set to {new_name}")
+        logger.info(f"BMC hostname is already set to {new_name}")
         return
 
     logger.info(f"Changing BMC hostname from {current_name} to {new_name}")
