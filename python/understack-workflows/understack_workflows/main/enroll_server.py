@@ -23,7 +23,7 @@ from understack_workflows.nautobot_device import NautobotDevice
 
 logger = setup_logger(__name__)
 
-MIN_REQURED_NEIGHBOR_COUNT = 4
+MIN_REQUIRED_NEIGHBOR_COUNT = 4
 
 
 def main():
