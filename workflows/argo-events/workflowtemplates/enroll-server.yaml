@@ -23,6 +23,12 @@ spec:
               parameters:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
+        - - name: openstack-set-baremetal-node-raid-config
+            template: openstack-set-baremetal-node-raid-config
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
         - - name: manage-server
             template: openstack-wait-cmd
             arguments:
@@ -98,6 +104,45 @@ spec:
           - --wait
           - "0"
           - "{{inputs.parameters.device_id}}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      volumes:
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct
+    - name: openstack-set-baremetal-node-raid-config
+      inputs:
+        parameters:
+          - name: device_id
+      # https://rackerlabs.github.io/understack/user-guide/openstack-ironic/#setting-baremetal-node-flavor
+      script:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        command: [sh]
+        source: |
+          echo "setting RAID1 config for node: {{inputs.parameters.device_id}}"
+          # create the raid1-config.json file. I find this easier to read
+          # than passing a big json string on command line
+          cat <<'EOF' >> raid1-config.json
+          { "logical_disks":
+            [ { "controller": "RAID.SL.1-1",
+                "is_root_volume": true,
+                "physical_disks": [
+                    "Disk.Bay.0:Enclosure.Internal.0-1:RAID.SL.1-1",
+                    "Disk.Bay.1:Enclosure.Internal.0-1:RAID.SL.1-1"
+                ],
+                "raid_level": "1",
+                "size_gb": "MAX"
+              }
+            ]
+          }
+          EOF
+          # apply the target raid config to the node
+          openstack baremetal node set {{inputs.parameters.device_id}} --target-raid-config raid1-config.json
         env:
           - name: OS_CLOUD
             value: understack
