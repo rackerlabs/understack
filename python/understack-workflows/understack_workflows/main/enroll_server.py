@@ -53,8 +53,6 @@ def main():
 
     - TODO: create and install SSL certificate
 
-    - TODO: update BMC firmware
-
     - TODO: set NTP Server IPs for DRAC
       (NTP server IP addresses are different per region)
 
