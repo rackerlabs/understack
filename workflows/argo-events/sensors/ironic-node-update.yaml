@@ -14,7 +14,7 @@ metadata:
 spec:
   dependencies:
   - eventName: openstack
-    eventSourceName: openstack-amqp
+    eventSourceName: openstack-ironic
     name: ironic-dep
     transform:
       jq: ".body[\"oslo.message\"] | fromjson"
