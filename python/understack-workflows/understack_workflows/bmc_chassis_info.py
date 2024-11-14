@@ -32,6 +32,8 @@ class ChassisInfo:
     bios_version: str
     power_on: bool
     interfaces: list[InterfaceInfo]
+    memory_gib: int
+    cpu: str
 
     @property
     def bmc_interface(self) -> InterfaceInfo:
@@ -79,7 +81,9 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
         bios_version=chassis_data["BiosVersion"],
         power_on=(chassis_data["PowerState"] == "On"),
         bmc_ip_address=bmc.ip_address,
+        memory_gib=chassis_data.get("MemorySummary", {}).get("TotalSystemMemoryGiB", 0),
         interfaces=interfaces,
+        cpu=chassis_data.get("ProcessorSummary", {}).get("Model", ""),
     )
 
 
