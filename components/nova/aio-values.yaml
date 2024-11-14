@@ -63,6 +63,10 @@ conf:
       # this is where we populate our hardware
       project_domain_name: infra
       project_name: baremetal
+  quota:
+    # adjust default quotas to make it possible to use baremetal
+    cores: 512
+    ram: 512000
 
 
 console:
