@@ -55,7 +55,8 @@ spec:
             when: "{{steps.server-manage-state.outputs.result}} == manageable"
     - name: enroll-server
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-481
+        imagePullPolicy: Always
         command:
           - enroll-server
         args:
