@@ -1,8 +1,8 @@
 from unittest.mock import mock_open, patch
 
 import pytest
-from ironic_understack.flavor_spec import FlavorSpec
-from ironic_understack.machine import Machine
+from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
 
 
 @pytest.fixture
@@ -164,7 +164,7 @@ def test_disk_too_small(flavors):
     machine = Machine(
         memory_mb=204800, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=100
     )
-    assert all(flavor.score_machine(machine) for flavor in flavors) == 0
+    assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
 
 
 def test_cpu_model_not_matching(flavors):
@@ -196,7 +196,7 @@ def test_memory_slightly_less(flavors):
         memory_mb=102300, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=500
     )
     # Should not match because memory is slightly less
-    assert all(flavor.score_machine(machine) for flavor in flavors) == 0
+    assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
 
 
 def test_disk_slightly_less(flavors):
@@ -205,7 +205,7 @@ def test_disk_slightly_less(flavors):
         memory_mb=102400, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=499
     )
     # Should not match because disk space is slightly less
-    assert all(flavor.score_machine(machine) for flavor in flavors) == 0
+    assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
 
 
 def test_memory_exact_disk_slightly_more(flavors):
@@ -234,11 +234,11 @@ def test_cpu_model_not_exact_but_memory_and_disk_match(flavors):
         memory_mb=102400, cpu="AMD EPYC 9254 245-Core Processor v2", disk_gb=500
     )
     # Should not match because CPU model is not exactly listed
-    assert all(flavor.score_machine(machine) for flavor in flavors) == 0
+    assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
 
 
 def test_large_flavor_memory_slightly_less_disk_exact(flavors):
     # Machine with slightly less memory than required for the medium flavor, exact disk space
     machine = Machine(memory_mb=204600, cpu="Intel 80386DX", disk_gb=1800)
     # Should not match because memory is slightly less than required
-    assert all(flavor.score_machine(machine) for flavor in flavors) == 0
+    assert all(flavor.score_machine(machine) == 0 for flavor in flavors)

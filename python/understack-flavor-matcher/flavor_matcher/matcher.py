@@ -1,5 +1,5 @@
-from ironic_understack.machine import Machine
-from ironic_understack.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
+from flavor_matcher.flavor_spec import FlavorSpec
 
 
 class Matcher:

@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import yaml
 
-from ironic_understack.machine import Machine
+from flavor_matcher.machine import Machine
 
 
 @dataclass

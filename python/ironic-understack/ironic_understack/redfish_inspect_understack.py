@@ -18,9 +18,9 @@ from ironic.drivers.modules.drac.inspect import DracRedfishInspect
 from ironic.drivers.modules.inspect_utils import get_inspection_data
 from ironic.drivers.modules.redfish.inspect import RedfishInspect
 from ironic.drivers.redfish import RedfishHardware
-from ironic_understack.flavor_spec import FlavorSpec
-from ironic_understack.machine import Machine
-from ironic_understack.matcher import Matcher
+from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
+from flavor_matcher.matcher import Matcher
 from ironic_understack.conf import CONF
 from oslo_log import log
 from oslo_utils import units
