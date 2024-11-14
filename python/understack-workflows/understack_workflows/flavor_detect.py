@@ -1,3 +1,5 @@
+import os
+
 from flavor_matcher.machine import Machine
 from flavor_matcher.matcher import FlavorSpec
 from flavor_matcher.matcher import Matcher
@@ -8,7 +10,7 @@ from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
-
+ENV_TYPE = os.getenv("FLAVOR_TYPES", "nonprod")
 FLAVORS = FlavorSpec.from_directory("/etc/understack_flavors/")
 logger.info(f"Loaded {len(FLAVORS)} flavor specifications.")
 
@@ -27,5 +29,6 @@ def guess_machine_flavor(device_info: ChassisInfo, bmc: Bmc) -> str:
         raise Exception(
             f"Machine: {machine} could not be classified into any flavor {FLAVORS=}"
         )
-    logger.info(f"Device has been classified as flavor: {flavor_name.name}")
-    return flavor_name.name
+    logger.info(f"Device has been classified as flavor: {flavor_name.stripped_name}")
+
+    return flavor_name.stripped_name

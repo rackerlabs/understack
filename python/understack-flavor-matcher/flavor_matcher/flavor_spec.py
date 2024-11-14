@@ -39,6 +39,14 @@ class FlavorSpec:
             pci=data.get("pci", []),
         )
 
+    @property
+    def stripped_name(self):
+        """Returns actual flavor name with the prod/nonprod prefix removed."""
+        _, name = self.name.split(".", 1)
+        if not name:
+            raise Exception(f"Unable to strip envtype from flavor: {self.name}")
+        return name
+
     @staticmethod
     def from_directory(directory: str = "/etc/flavors/") -> list["FlavorSpec"]:
         flavor_specs = []
