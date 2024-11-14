@@ -16,6 +16,7 @@ RUN --mount=type=cache,target=/root/.cache/.pip \
 
 # copy in the code
 COPY --chown=${APP_USER}:${APP_GROUP} python/understack-workflows /app
+COPY --chown=${APP_USER}:${APP_GROUP} python/understack-flavor-matcher /understack-flavor-matcher
 # need netifaces built as a wheel
 RUN --mount=type=cache,target=/root/.cache/.pip pip wheel --wheel-dir /app/dist netifaces
 # build wheels and requirements.txt, skip hashes due to building of netifaces above which won't match
@@ -35,6 +36,7 @@ WORKDIR /app
 
 RUN mkdir -p /opt/venv/wheels/
 COPY --from=builder /app/dist/*.whl /app/dist/requirements.txt /opt/venv/wheels/
+COPY --chown=${APP_USER}:${APP_GROUP} python/understack-flavor-matcher /understack-flavor-matcher
 
 RUN --mount=type=cache,target=/root/.cache/.pip /opt/venv/bin/pip install --find-links /opt/venv/wheels/ --only-binary netifaces -r /opt/venv/wheels/requirements.txt understack-workflows
 
