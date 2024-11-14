@@ -1,4 +1,5 @@
 import ironicclient.common.apiclient.exceptions
+from flavor_matcher.flavor_spec import dataclass
 from ironicclient.common.utils import args_array_to_patch
 
 from understack_workflows.bmc import Bmc

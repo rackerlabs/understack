@@ -118,6 +118,8 @@ def test_find_or_create(dell_nautobot_device):
         serial_number="33GSW04",
         bios_version="1.6.10",
         bmc_ip_address="1.2.3.4",
+        memory_gib=96,
+        cpu="AMD EPYC 666 444-Core Processor",
         interfaces=[
             InterfaceInfo(
                 name="iDRAC",

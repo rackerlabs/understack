@@ -120,4 +120,6 @@ def test_chassis_info_R7615():
                 remote_switch_port_name="Ethernet1/7",
             ),
         ],
+        memory_gib=96,
+        cpu="AMD EPYC 9124 16-Core Processor",
     )
