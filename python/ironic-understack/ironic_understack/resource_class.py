@@ -2,9 +2,9 @@
 from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
 from ironic_understack.conf import CONF
-from ironic_understack.flavor_spec import FlavorSpec
-from ironic_understack.machine import Machine
-from ironic_understack.matcher import Matcher
+from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
+from flavor_matcher.matcher import Matcher
 from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)

@@ -1,0 +1,30 @@
+[tool.poetry]
+name = "understack-flavor-matcher"
+version = "0.0.0"
+description = "Baremetal node flavor classifier"
+authors = ["Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "flavor_matcher" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pyyaml = "^6.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.2"
+pytest-github-actions-annotate-failures = "*"
+pytest-cov = "^5.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra --cov=flavor_matcher"
+testpaths = [
+    "tests",
+]

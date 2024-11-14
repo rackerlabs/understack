@@ -1,8 +1,8 @@
 from unittest.mock import mock_open, patch
 
 import pytest
-from ironic_understack.flavor_spec import FlavorSpec
-from ironic_understack.machine import Machine
+from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
 
 
 @pytest.fixture
