@@ -1,13 +1,15 @@
+import math
 from dataclasses import dataclass
+
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import RedfishError
 from understack_workflows.helpers import setup_logger
 
-
 logger = setup_logger(__name__)
 
 
-REDFISH_DISKS_PATH="/redfish/v1/Systems/System.Embedded.1/Storage/RAID.SL.1-1"
+REDFISH_DISKS_PATH = "/redfish/v1/Systems/System.Embedded.1/Storage/RAID.SL.1-1"
+
 
 @dataclass(frozen=True)
 class Disk:
@@ -23,7 +25,7 @@ class Disk:
 
     @property
     def capacity_gb(self) -> int:
-        return int(self.capacity_bytes // 10**9)
+        return math.ceil(self.capacity_bytes / 10**9)
 
     @staticmethod
     def from_path(bmc: Bmc, path: str):
@@ -34,8 +36,9 @@ class Disk:
             model=disk_data["Model"],
             name=disk_data["Name"],
             health=disk_data.get("Status", {}).get("Health", "Unknown"),
-            capacity_bytes=disk_data["CapacityBytes"]
+            capacity_bytes=disk_data["CapacityBytes"],
         )
+
 
 def physical_disks(bmc: Bmc) -> list[Disk]:
     """Retrieve list of physical physical_disks."""
@@ -49,3 +52,6 @@ def physical_disks(bmc: Bmc) -> list[Disk]:
         raise (err) from err
 
 
+def smallest_disk_size(bmc: Bmc) -> int:
+    """Returns size of a smallest disk in a given machine (in Gigabytes)."""
+    return min(physical_disks(bmc), key=lambda x: x.capacity_gb).capacity_gb

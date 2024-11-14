@@ -16,6 +16,7 @@ from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_network_config import bmc_set_permanent_ip_addr
 from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.discover import discover_chassis_info
+from understack_workflows.flavor_detect import guess_machine_flavor
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
@@ -136,8 +137,17 @@ def enroll_server(bmc: Bmc, nautobot, old_password: str | None) -> NautobotDevic
     # any pending BIOS jobs, so do BIOS settings after the DRAC settings.
     update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
+    flavor = guess_machine_flavor(device_info, bmc)
+    resource_class = f"baremetal.{flavor}"
+
     _ironic_provision_state = ironic_node.create_or_update(
-        nb_device.id, nb_device.name, device_info.manufacturer, bmc, logger
+        ironic_node.NodeMetadata(
+            uuid=nb_device.id,
+            hostname=nb_device.name,
+            manufacturer=device_info.manufacturer,
+            resource_class=resource_class,
+        ),
+        bmc,
     )
     logger.info(f"{nb_device.id} {_ironic_provision_state=}")
 
