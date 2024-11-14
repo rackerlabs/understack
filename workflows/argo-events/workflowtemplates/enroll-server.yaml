@@ -71,6 +71,10 @@ spec:
           - mountPath: /etc/bmc_master/
             name: bmc-master
             readOnly: true
+          - mountPath: /etc/understack_flavors/
+            name: understack-flavors
+            subPath: current/flavors/
+            readOnly: true
         env:
         - name: WF_NS
           value: "{{workflow.namespace}}"
@@ -88,6 +92,10 @@ spec:
         - name: openstack-svc-acct
           secret:
             secretName: openstack-svc-acct
+        - name: understack-flavors
+          persistentVolumeClaim:
+            claimName: understack-flavors
+            readOnly: true
     - name: openstack-wait-cmd
       inputs:
         parameters:
