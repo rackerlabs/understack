@@ -27,3 +27,6 @@ docs/workflows/
 # devbox's envrc
 .envrc
 .direnv
+
+# mkdocs site output
+site/

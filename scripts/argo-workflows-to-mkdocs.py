@@ -101,6 +101,7 @@ def main_orig():
 def main():
     if len(sys.argv) < 3:
         print("Usage: python script.py argo-workflows-input-dir mkdocs-output-dir")
+        print("The script will scan for 'workflowtemplates' dir in subdirs")
         sys.exit(1)
 
     input_dir = sys.argv[1]
@@ -128,35 +129,60 @@ def main():
             )
             continue
 
-        workflows = {}
         for workflow_file in workflow_files:
+            workflows = {}
+
             w_yaml = parse_yaml(workflow_file)
-            readme_file = workflow.path + "/docs/README.md"
-            workflow_readme = load_readme(readme_file)
+            workflow_name = w_yaml["metadata"]["name"]
+            workflow_title = (
+                w_yaml["metadata"]
+                .get("annotations", {})
+                .get("workflows.argoproj.io/title", "Title not set in workflow")
+            )
+            workflow_description = (
+                w_yaml["metadata"]
+                .get("annotations", {})
+                .get(
+                    "workflows.argoproj.io/description",
+                    "Description not set in workflow",
+                )
+                .strip("\n")
+            )
+
+            # replace spaces with dashes because we're using workflow_name
+            # as the filename in mkdocs
+            workflow_name.replace(" ", "-")
+
+            workflow_readme = f"## {workflow_title} \n\n {workflow_description}"
+
             if not w_yaml:
                 print(f"Failed to parse {workflow_file}")
                 continue
             w = make_workflow(w_yaml)
             workflows[w.name] = w
 
-        nodes = {}
-        for w in workflows.values():
-            for n in w.nodes:
-                nodes[n.id] = n
-        for w in workflows.values():
-            for n in w.nodes:
-                for t in n.tasks:
-                    if nodes.get(t.ref_node):
-                        nodes[t.ref_node].incoming_count += 1
-                for t in n.steps:
-                    if nodes.get(t.ref_node):
-                        nodes[t.ref_node].incoming_count += 1
+            nodes = {}
+            for w in workflows.values():
+                for n in w.nodes:
+                    nodes[n.id] = n
+            for w in workflows.values():
+                for n in w.nodes:
+                    for t in n.tasks:
+                        if nodes.get(t.ref_node):
+                            nodes[t.ref_node].incoming_count += 1
+                    for t in n.steps:
+                        if nodes.get(t.ref_node):
+                            nodes[t.ref_node].incoming_count += 1
 
-        output_file = output_dir + f"/{workflow.name}.md"
+            output_file = output_dir + f"/{workflow_name}.md"
 
-        generate_mermaid(
-            workflows.values(), nodes, workflow.name, output_file, workflow_readme
-        )
+            generate_mermaid(
+                workflows.values(),
+                nodes,
+                w_yaml["metadata"]["name"],
+                output_file,
+                workflow_readme,
+            )
 
 
 def make_workflow(w_yaml):
@@ -616,17 +642,18 @@ def generate_mermaid(workflows, nodes, output_name, output_file, workflow_readme
     with open(output_file, "w") as f:
         f.write(f"# {output_name}\n")
         f.write("\n")
-        f.write("# Workflow Diagram\n")
+
+        if workflow_readme:
+            f.write(workflow_readme)
+
+        f.write("\n")
+        f.write("## Workflow Diagram\n")
         f.write("\n")
         f.write("```mermaid\n")
         f.write(mermaid_output)
         f.write("\n")
         f.write("```\n")
         f.write("\n")
-        if workflow_readme:
-            f.write(workflow_readme)
-        else:
-            f.write("This workflow does not have a `docs/README.md` file! :(\n")
 
 
 def parse_depends(depends):
@@ -715,15 +742,6 @@ def parse_depends(depends):
     parser = Parser(tokenizer)
     parser.parse_or()
     return list(dict.fromkeys(parser.term_prefixes))
-
-
-def load_readme(file_path):
-    try:
-        with open(file_path, "r") as stream:
-            return stream.read()
-    except Exception:
-        log.exception("Problem loading README.md file")
-        return None
 
 
 def parse_yaml(file_path):

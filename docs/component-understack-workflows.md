@@ -80,7 +80,7 @@ execute a Workflow.
 Service Account access it needs to run Workflows.
 1. An [Argo Events][argo-events] Sensors and Triggers that
 execute workflows.
-1. [Workflow Templates](./workflows/argo-events.md)
+1. [Workflow Templates](./workflows/enroll-server.md)
 
 ## Containers and Source Code
 
