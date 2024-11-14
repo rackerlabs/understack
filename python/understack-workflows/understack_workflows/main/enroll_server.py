@@ -64,6 +64,7 @@ def main():
 
     -  from BMC, discover basic hardware info:
        - manufacturer, model number, serial number
+       - CPU model(s), RAM size and local storage
        - list ethernet interfaces with:
           - name like BMC or SLOT.NIC.1-1
           - MAC address
@@ -85,10 +86,11 @@ def main():
     - create BMC IP address assignment for BMC interface - convert our type
       "dhcp" IP Address to type "host" and associate it with the interface
 
-    -  Find or create this baremetal node in Ironic
+    - Determine flavor of the server based on the information collected from BMC
+    - Find or create this baremetal node in Ironic
        - create ports with MACs (omit BMC port) and set one to PXE
        - TODO advance to available state
-       - TODO set flavor?  what else?
+       - set flavor
 
     """
     args = argument_parser().parse_args()
