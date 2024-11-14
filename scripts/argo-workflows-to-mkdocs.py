@@ -319,7 +319,6 @@ def make_workflow(w_yaml):
                 input_artifacts=input_artifacts,
             )
             n.tasks.append(t)
-            n.tasks.sort(key=lambda t: t.name)
 
         steps_yaml = n_yaml.get("steps", [])
         log.debug(f"steps_yaml: {steps_yaml}")
@@ -403,15 +402,12 @@ def make_workflow(w_yaml):
                 input_artifacts=input_artifacts,
             )
             n.steps.append(t)
-            n.steps.sort(key=lambda t: t.name)
             counter += 1
             _previous_yaml = t_yaml
 
         if w_yaml.get("spec", {}).get("entrypoint") == n_yaml["name"]:
             n.is_entrypoint = True
 
-        n.tasks.sort(key=lambda t: t.name)
-        n.steps.sort(key=lambda t: t.name)
         w.nodes.append(n)
     return w
 
