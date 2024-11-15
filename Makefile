@@ -17,6 +17,8 @@ else
 	ACTIVATE := $(VENV_DIR)/bin/activate
 endif
 
+WFTMPLS := $(wildcard workflows/*/workflowtemplates/*.yaml)
+
 .PHONY: help
 help: ## Displays this help message
 	@echo "$$(grep -hE '^\S+:.*##' $(MAKEFILE_LIST) | sed -e 's/:.*##\s*/|/' -e 's/^\(.\+\):\(.*\)/\\x1b[36m\1\\x1b[m:\2/' | column -c2 -t -s'|' | sort)"
@@ -26,14 +28,15 @@ $(ACTIVATE): requirements-docs.txt
 	@$(PIP) install -U -r requirements-docs.txt
 	@touch $(ACTIVATE)
 
-docs/workflows/argo-events.md: $(ACTIVATE)
+.PHONY: wftmpls
+wftmpls: $(WFTMPLS) $(ACTIVATE)
 	@mkdir -p docs/workflows
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py workflows docs/workflows
 
 .PHONY: docs
-docs: $(ACTIVATE) docs/workflows/argo-events.md ## Builds the documentation
+docs: $(ACTIVATE) wftmpls ## Builds the documentation
 	$(MKDOCS) build --strict
 
 .PHONY: docs-local
-docs-local: $(ACTIVATE) docs/workflows/argo-events.md ## Build and locally host the documentation
+docs-local: $(ACTIVATE) wftmpls ## Build and locally host the documentation
 	$(MKDOCS) serve --strict
