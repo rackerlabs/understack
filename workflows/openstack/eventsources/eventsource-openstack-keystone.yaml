@@ -5,6 +5,7 @@ metadata:
   name: openstack-keystone
 spec:
   amqp:
+    # this is our eventName
     notifications:
       # amqp server url
       url: amqp://rabbitmq-server-0.rabbitmq-nodes.openstack.svc.cluster.local:5672/keystone

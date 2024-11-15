@@ -2,13 +2,31 @@ apiVersion: argoproj.io/v1alpha1
 metadata:
   name: keystone-event-project
   annotations:
+    workflows.argoproj.io/title: CRUD Nautobot Tenants with Keystone Projects
     workflows.argoproj.io/description: |
-      Defined in `workflows/argo-events/workflowtemplates/wf-keystone-event-project.yaml`
+      Updates Nautobot with data from a Keystone Project.
+
+      To test this workflow you can run it with the following:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/keystone-event-project \
+      -p event_type identity.project.created -p project_uuid=00000000-0000-0000-0000-000000000000
+      ```
+
+      Defined in `workflows/argo-events/workflowtemplates/keystone-event-project.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: sync-keystone
+  arguments:
+    parameters:
+      - name: event_type
+      - name: project_uuid
   templates:
     - name: sync-keystone
+      inputs:
+        parameters:
+          - name: event_type
+          - name: project_uuid
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
@@ -16,8 +34,8 @@ spec:
         args:
           - "--only-domain"
           - "default"
-          - "{{workflow.parameters.event_type}}"
-          - "{{workflow.parameters.project_uuid}}"
+          - "{{inputs.parameters.event_type}}"
+          - "{{inputs.parameters.project_uuid}}"
         volumeMounts:
           - mountPath: /etc/nb-token/
             name: nb-token
@@ -25,9 +43,6 @@ spec:
           - mountPath: /etc/openstack
             name: openstack-svc-acct
             readOnly: true
-      inputs:
-        parameters:
-          - name: project_uuid
       volumes:
         - name: nb-token
           secret:
