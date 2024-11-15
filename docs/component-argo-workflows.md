@@ -39,20 +39,6 @@ Authorization is handled by Kubernetes' RBAC services. Workflows are run with th
 Account. We've provided the `workflow` Service Account, which has been granted access to the necessary Kubernetes
 resources, to run the provided WorkflowTemplates.
 
-### argo-python
-
-To facilitate the ability to pass data securely between Workflows the [argo-python][argo-python] Class was written.
-This Python Class writes Kubernetes Secrets directly to the Kubernetes API from the Workflow's Pod, allowing these
-Secrets to be securely mounted into a subsequent Workflow's environment.
-
-By default these Secrets are created with an ownerReference set to the Workflow which created them, which allows
-them to be garbage collected when that Workflow is terminated. The ownerReference requires details about the
-Workflow to be passed in. This is available in the Workflow from the
-[workflow variable](https://argo-workflows.readthedocs.io/en/latest/variables/#global).
-
-An example WorkflowTemplate demonstrating argo-python usage can be found
-[here](https://github.com/rackerlabs/understack/blob/main/workflows/argo-events/workflowtemplates/get-bmc-creds.yaml).
-
 ### Argo CLI
 
 Argo Workflows has a CLI and the installation instructions can be found [here](https://github.com/argoproj/argo-workflows/releases/).
@@ -98,4 +84,3 @@ STEP                          TEMPLATE           PODNAME  DURATION  MESSAGE
 
 [argo-workflows]: <https://argo-workflows.readthedocs.io/en/latest/>
 [argo-events]: <https://argoproj.github.io/argo-events/>
-[argo-python]: <https://github.com/rackerlabs/understack/tree/main/argo-workflows/generic/code/argo_python>
