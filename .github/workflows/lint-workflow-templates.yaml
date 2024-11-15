@@ -1,0 +1,58 @@
+name: Lint Workflow Templates
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  lint-workflow-templates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout latest changes from the PR branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Set up Kind cluster with Helm
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: argo-lint-cluster
+
+      - name: Helm Install Argo
+        run: |
+          helm repo add argo https://argoproj.github.io/argo-helm
+          helm repo update
+          kubectl create namespace argo
+          helm install argo argo/argo-workflows --namespace argo
+
+      - name: Install Argo CLI
+        run: |
+          curl -sLO https://github.com/argoproj/argo-workflows/releases/latest/download/argo-linux-amd64.gz
+          gunzip argo-linux-amd64.gz
+          chmod +x argo-linux-amd64
+          sudo mv argo-linux-amd64 /usr/local/bin/argo
+          argo version
+
+      - name: Argo Lint Workflow Template
+        run: |
+          set +e
+          FAILED=""
+          for file in workflows/argo-events/workflowtemplates/*.yaml; do
+            echo "Linting workflow template: $file"
+            if ! argo lint "$file"; then
+              echo "::error file=$file, title=argo lint failed"
+              FAILED="$FAILED $file"
+            fi
+          done
+          echo "FAILED_WORKFLOWS=$FAILED" >> $GITHUB_ENV
+          exit 0
+
+      - name: Report Lint Results
+        run: |
+          if [ -n "${{ env.FAILED_WORKFLOWS }}" ]; then
+            echo "The following workflows failed linting:"
+            echo "${FAILED_WORKFLOWS}"
+            exit 1
+          fi
+          echo "All workflows passed linting!"
