@@ -10,7 +10,6 @@ resources:
   - secrets/openstack-svc-acct.yaml
   - secrets/operate-workflow-sa.token.yaml
   - secrets/nautobot-token.yaml
-  - sensors/ironic-node-update.yaml
   - sensors/debug-sensor.yaml
   - eventsources/nautobot-webhook.yaml
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
