@@ -17,7 +17,6 @@ resources:
   - serviceaccounts/openstack-sensor-submit-workflow.yaml
   - workflowtemplates/nautobot-api.yaml
   - workflowtemplates/sync-provision-state-to-nautobot.yaml
-  - workflowtemplates/node-events.yaml
   - workflowtemplates/undersync-device.yaml
   - workflowtemplates/undersync-switch.yaml
   - workflowtemplates/keystone-event-project.yaml
