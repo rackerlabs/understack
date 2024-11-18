@@ -1,7 +1,7 @@
 import pytest
-from ironic_understack.flavor_spec import FlavorSpec
-from ironic_understack.machine import Machine
-from ironic_understack.matcher import Matcher
+from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
+from flavor_matcher.matcher import Matcher
 
 
 @pytest.fixture
@@ -47,7 +47,7 @@ def matcher(sample_flavors):
 
 @pytest.fixture
 def machine():
-    return Machine(memory_mb=8192, cpu="x86", disk_gb=50)
+    return Machine(memory_mb=8192, cpu="x86", disk_gb=50, model="Fake Machine")
 
 
 def test_match(matcher, machine):
@@ -60,7 +60,7 @@ def test_match(matcher, machine):
 
 def test_match_no_flavor(matcher):
     # A machine that does not meet any flavor specs
-    machine = Machine(memory_mb=2048, cpu="x86", disk_gb=10)
+    machine = Machine(memory_mb=2048, cpu="x86", disk_gb=10, model="SomeModel")
     results = matcher.match(machine)
     assert len(results) == 0
 
@@ -74,6 +74,6 @@ def test_pick_best_flavor2(matcher, machine):
 
 def test_pick_best_flavor_no_match(matcher):
     # A machine that does not meet any flavor specs
-    machine = Machine(memory_mb=1024, cpu="ARM", disk_gb=10)
+    machine = Machine(memory_mb=1024, cpu="ARM", disk_gb=10, model="SomeModel")
     best_flavor = matcher.pick_best_flavor(machine)
     assert best_flavor is None

@@ -27,7 +27,6 @@ jobs:
       matrix:
         project:
           - understack-workflows
-          - ironic-understack
           - neutron-understack
 
     defaults:

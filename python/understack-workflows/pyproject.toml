@@ -29,6 +29,7 @@ pynautobot = "^2.2.1"
 python-ironicclient = "^5"
 sushy = "^5.3.0"
 kubernetes = "29.0.0"
+understack-flavor-matcher = {path = "../understack-flavor-matcher"}
 
 [tool.peotry.group.test]
 optional = true

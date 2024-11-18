@@ -2,10 +2,11 @@
 from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
 from ironic_understack.conf import CONF
-from ironic_understack.flavor_spec import FlavorSpec
-from ironic_understack.machine import Machine
-from ironic_understack.matcher import Matcher
+from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
+from flavor_matcher.matcher import Matcher
 from oslo_log import log as logging
+import re
 
 LOG = logging.getLogger(__name__)
 
@@ -28,8 +29,21 @@ class UndercloudResourceClassHook(base.InspectionHook):
             disk_size_gb = int(int(inventory["disks"][0]["size"]) / 10**9)
             cpu_model_name = inventory["cpu"]["model_name"]
 
+            model_name = re.search(
+                r"ModelName=(.*)\)", inventory["system_vendor"]["product_name"]
+            )
+
+            if not model_name:
+                LOG.warn("No model_name detected. skipping flavor setting.")
+                raise NoMatchError("mode_name not matched")
+            else:
+                model_name = model_name.group(1)
+
             machine = Machine(
-                memory_mb=memory_mb, cpu=cpu_model_name, disk_gb=disk_size_gb
+                memory_mb=memory_mb,
+                cpu=cpu_model_name,
+                disk_gb=disk_size_gb,
+                model=model_name,
             )
 
             resource_class_name = self.classify(machine)

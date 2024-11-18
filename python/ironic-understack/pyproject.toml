@@ -13,6 +13,7 @@ packages = [
 ironic = ">=24.1"
 python = "^3.10"
 pyyaml = "^6.0"
+understack-flavor-matcher = {path = "../understack-flavor-matcher"}
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.2"

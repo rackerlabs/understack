@@ -13,14 +13,16 @@
 Redfish Inspect Interface modified for Understack
 """
 
+import re
+
+from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
+from flavor_matcher.matcher import Matcher
 from ironic.drivers.drac import IDRACHardware
 from ironic.drivers.modules.drac.inspect import DracRedfishInspect
 from ironic.drivers.modules.inspect_utils import get_inspection_data
 from ironic.drivers.modules.redfish.inspect import RedfishInspect
 from ironic.drivers.redfish import RedfishHardware
-from ironic_understack.flavor_spec import FlavorSpec
-from ironic_understack.machine import Machine
-from ironic_understack.matcher import Matcher
 from ironic_understack.conf import CONF
 from oslo_log import log
 from oslo_utils import units
@@ -68,10 +70,27 @@ class FlavorInspectMixin:
             return upstream_state
 
         smallest_disk_gb = min([disk["size"] / units.Gi for disk in inventory["disks"]])
+        model_name_match = None
+        try:
+            model_name_match = re.search(
+                r"ModelName=(.*)\)",
+                inventory.get("system_vendor", {}).get("product_name", ""),
+            )
+        except TypeError as e:
+            LOG.warn("Error searching for model name: %s", e)
+            return upstream_state
+
+        if not model_name_match:
+            LOG.warn("No model_name detected. skipping flavor setting.")
+            return upstream_state
+        else:
+            model_name = model_name_match.group(1)
+
         machine = Machine(
             memory_mb=inventory["memory"]["physical_mb"],
             disk_gb=smallest_disk_gb,
             cpu=inventory["cpu"]["model_name"],
+            model=model_name,
         )
 
         matcher = Matcher(FLAVORS)
