@@ -1,7 +1,7 @@
 # Authentication and Authorization
 
 You must configure how users and operators will authenticate against the various services
-provided by Understack. At this time [Dex IdP](https://dexidp.io) is used for all the
+provided by UnderStack. At this time [Dex IdP](https://dexidp.io) is used for all the
 services and a connector must be configured to provide authentication.
 
 !!! warning Dex IdP Configuration Issue

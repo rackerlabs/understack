@@ -1,6 +1,6 @@
-# Understack Workflows
+# UnderStack Workflows
 
-Understack Workflows is a collection of code, scripts, container definitions
+UnderStack Workflows is a collection of code, scripts, container definitions
 centered around [Argo Workflows][argo-wf] and [Argo Events][argo-events] to
 drive automated operations based on events and other triggers in the system.
 
@@ -10,7 +10,7 @@ drive automated operations based on events and other triggers in the system.
 
 [Argo Events][argo-events] is a Kubernetes-native event-driven automation framework.
 We can use Argo Events to trigger automations processes from any of the internal
-Understack and external sources.
+UnderStack and external sources.
 
 ## Kubernetes Resources
 

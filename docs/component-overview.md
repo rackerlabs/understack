@@ -1,6 +1,6 @@
 # Overview
 
-Understack is deployed as a collection of multiple applications and/or tools which
+UnderStack is deployed as a collection of multiple applications and/or tools which
 are referred to in the code base in different category groupings. Each of these
 groupings can themselves be multiple applications combined.
 
