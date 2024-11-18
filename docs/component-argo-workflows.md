@@ -1,7 +1,7 @@
 # Argo Workflows
 
 [Argo Workflows][argo-workflows] was chosen as our workflow / orchestration service. It runs natively inside a
-Kubernetes environment and easily integrates with [Argo Events][argo-events]. Understack will be deployed with the
+Kubernetes environment and easily integrates with [Argo Events][argo-events]. UnderStack will be deployed with the
 set of WorkflowTemplates below.
 
 ## WorkflowTemplates
@@ -16,7 +16,7 @@ set of WorkflowTemplates below.
 
 \* WorkflowTemplate which requires a manual / custom implementation.
 
-As Understack develops, there may be underlying / dependant services which are not included, and require some of the
+As UnderStack develops, there may be underlying / dependant services which are not included, and require some of the
 included WorkflowTemplates to be manually implemented to work in your environment. For example, the get-bmc-creds
 WorkflowTemplate will need to be written to communicate with whatever service you're using to store your device
 credentials.

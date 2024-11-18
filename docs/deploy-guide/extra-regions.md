@@ -1,7 +1,7 @@
 # Extra Regions
 
 To create extra regions the operation will be very similar to
-creating the initial Understack deployment.
+creating the initial UnderStack deployment.
 
 ## Getting the source
 

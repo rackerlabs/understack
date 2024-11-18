@@ -189,7 +189,7 @@ Finally run the following to have ArgoCD deploy the system:
 kubectl -n argocd apply -f apps/aio-app-of-apps.yaml
 ```
 
-At this point ArgoCD will work to deploy Understack.
+At this point ArgoCD will work to deploy UnderStack.
 
 [gitops]: <https://about.gitlab.com/topics/gitops/>
 [app-of-apps]: <https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/>

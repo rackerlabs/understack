@@ -45,18 +45,18 @@ Now we are ready to remove ArgoCD from our existing cluster.
 kubectl delete ns argocd
 ```
 
-You are now ready to deploy Understack in your external ArgoCD.
+You are now ready to deploy UnderStack in your external ArgoCD.
 
-## Deploying Understack in an external ArgoCD
+## Deploying UnderStack in an external ArgoCD
 
-If you did not have Understack already deployed with an ArgoCD in cluster
+If you did not have UnderStack already deployed with an ArgoCD in cluster
 or you followed the removal steps above, you are ready for this section.
 
-Firstly you must create a cluster configuration for the Understack
+Firstly you must create a cluster configuration for the UnderStack
 [App of Apps][app-of-apps] which can be done by treating your
 setup like an [extra region](./extra-regions.md). Once you've created
 your cluster config and loaded it into your ArgoCD then you can load the
-Understack [app-of-apps] into your ArgoCD with:
+UnderStack [app-of-apps] into your ArgoCD with:
 
 ```bash
 kubectl -n argocd apply -f apps/app-of-apps.yaml
