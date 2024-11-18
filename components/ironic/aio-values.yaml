@@ -58,7 +58,10 @@ conf:
     dhcp:
       dhcp_provider: dnsmasq
     oslo_messaging_rabbit:
-      rabbit_ha_queues: true
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: true
+      use_queue_manager: true
+      rabbit_stream_fanout: true
     pxe:
       images_path: /var/lib/understack/master_iso_images
       instance_master_path: /var/lib/understack/master_iso_images
