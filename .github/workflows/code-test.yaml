@@ -27,6 +27,7 @@ jobs:
       matrix:
         project:
           - understack-workflows
+          - understack-flavor-matcher
           - neutron-understack
 
     defaults:
