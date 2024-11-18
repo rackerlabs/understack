@@ -5,7 +5,6 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "containers/argo_utils/**"
       - "containers/bmc-utils/**"
       - "containers/python311_alpine/**"
       - "containers/python312_alpine/**"
@@ -68,17 +67,6 @@ jobs:
           tags: ghcr.io/${{ github.repository }}/argo-python3.12.2-alpine3.19:latest,ghcr.io/${{ github.repository }}/argo-python3.12.2-alpine3.19:${{ env.VERSION_PYTHON312 }}
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_PYTHON312 }}
-
-      - name: Build and deploy Argo Utils image
-        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
-        with:
-          context: containers/argo_utils/
-          file: containers/argo_utils/Dockerfile.argo_utils
-          # push for all main branch commits
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository }}/argo-utils-python3.11.8:latest,ghcr.io/${{ github.repository }}/argo-utils-python3.11.8:${{ env.VERSION_ARGO_UTILS }}
-          labels: |
-              org.opencontainers.image.version=${{ env.VERSION_ARGO_UTILS }}
 
       - name: Build and deploy BMC Utils image
         uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
