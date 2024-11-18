@@ -36,3 +36,17 @@ addopts = "-ra --cov=ironic_understack"
 testpaths = [
     "tests",
 ]
+
+[tool.ruff]
+target-version = "py310"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "S",       # flake8-bandit
+]
+
+[tool.ruff.lint.per-file-ignores]
+"ironic_understack/tests/*.py" = [
+    "S101",     # allow 'assert' for pytest
+]

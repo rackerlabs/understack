@@ -6,7 +6,7 @@ import urllib3
 urllib3.disable_warnings()
 
 
-DEFAULT_TOKEN_FILENAME = "/run/secrets/kubernetes.io/serviceaccount/token"
+DEFAULT_TOKEN_FILENAME = "/run/secrets/kubernetes.io/serviceaccount/token"  # noqa: S105
 
 
 class ArgoClient:
@@ -42,7 +42,8 @@ class ArgoClient:
             f"{self.api_url}/api/v1/workflows/{self.namespace}/submit",
             headers=self.headers,
             json=json_body,
-            verify=False,
+            verify=False,  # noqa: S501 we should revisit this
+            timeout=30,
         )
         response.raise_for_status()
         if self.logger:
@@ -68,7 +69,8 @@ class ArgoClient:
             f"{self.api_url}/api/v1/workflows/{self.namespace}/{name}",
             headers=self.headers,
             json={"fields": "status.phase"},
-            verify=False,
+            verify=False,  # noqa: S501 we should revisit this
+            timeout=30,
         )
         response.raise_for_status()
         return response.json()["status"]["phase"]
