@@ -12,5 +12,6 @@ resources:
   - eventsources/rabbitmq-permission-argo-to-ironic-permission.yaml
   - eventsources/rabbitmq-permission-argo-to-keystone-permission.yaml
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
+  - sensors/sensor-ironic-node-update.yaml
   - sensors/sensor-keystone-event-project.yaml
   - secrets/nautobot-token.yaml

@@ -2,14 +2,28 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  finalizers:
-  - sensor-controller
-  labels:
-    argocd.argoproj.io/instance: argo-events
   name: keystone-event-project
   namespace: argo-events
   annotations:
-    workflows.argoproj.io/description: |
+    workflows.argoproj.io/title: CRUD Nautobot Tenants from Keystone Projects
+    workflows.argoproj.io/description: |+
+      Triggers on the following Keystone Events:
+
+      - identity.project.created
+      - identity.project.updated
+      - identity.project.deleted
+
+      Currently parses out the following fields:
+
+      - target.id which is the project_id
+
+      Resulting code should be very similar to:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/keystone-event-project \
+      -p event_type identity.project.created -p project_uuid=00000000-0000-0000-0000-000000000000
+      ```
+
       Defined in `workflows/openstack/sensor-keystone-event-project.yaml`
 spec:
   dependencies:
@@ -17,12 +31,15 @@ spec:
     eventSourceName: openstack-keystone
     name: keystone-msg
     transform:
+      # the event is a string-ified JSON so we need to decode it
       jq: ".body[\"oslo.message\"] | fromjson"
     filters:
+      # applies each of the items in data with 'and' but there's only one
       dataLogicalOperator: "and"
       data:
         - path: "event_type"
           type: "string"
+          # any of the values will trigger
           value:
             - "identity.project.created"
             - "identity.project.updated"
@@ -32,18 +49,24 @@ spec:
   triggers:
     - template:
         name: keystone-event-project
+        # uses 'argo' CLI instead of 'kubectl'
         argoWorkflow:
+          # sets the operation to 'argo submit'
           operation: submit
+          # edits the source section
           parameters:
+            # first parameter's value is replaced with the event type
             - dest: spec.arguments.parameters.0.value
               src:
                 dataKey: event_type
                 dependencyName: keystone-msg
+            # second parameter's value is replaced with the project id
             - dest: spec.arguments.parameters.1.value
               src:
                 dataKey: payload.target.id
                 dependencyName: keystone-msg
           source:
+            # create a workflow in argo-events prefixed with keystone-event-project-
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
@@ -51,12 +74,11 @@ spec:
                 generateName: keystone-event-project-
                 namespace: argo-events
               spec:
+                # defines the parameters being replaced above
                 arguments:
                   parameters:
                     - name: event_type
-                      value: "replaced by parameters section"
                     - name: project_uuid
-                      value: "replaced by parameters section"
-                serviceAccountName: workflow
+                # references the workflow
                 workflowTemplateRef:
                   name: keystone-event-project
