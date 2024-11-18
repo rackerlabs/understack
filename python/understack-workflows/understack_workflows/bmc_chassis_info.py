@@ -30,6 +30,7 @@ class ChassisInfo:
     serial_number: str
     bmc_ip_address: str
     bios_version: str
+    power_on: bool
     interfaces: list[InterfaceInfo]
 
     @property
@@ -39,6 +40,15 @@ class ChassisInfo:
     @property
     def bmc_hostname(self) -> str:
         return str(self.bmc_interface.hostname)
+
+    @property
+    def neighbors(self) -> set:
+        """A set of switch MAC addresses to which this chassis is connected."""
+        return {
+            interface.remote_switch_mac_address
+            for interface in self.interfaces
+            if interface.remote_switch_mac_address
+        }
 
 
 REDFISH_SYSTEM_ENDPOINT = "/redfish/v1/Systems/System.Embedded.1/"
@@ -67,6 +77,7 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
         model_number=chassis_data["Model"],
         serial_number=chassis_data["SKU"],
         bios_version=chassis_data["BiosVersion"],
+        power_on=(chassis_data["PowerState"] == "On"),
         bmc_ip_address=bmc.ip_address,
         interfaces=interfaces,
     )
