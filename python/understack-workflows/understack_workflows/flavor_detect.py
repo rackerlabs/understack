@@ -22,6 +22,7 @@ def guess_machine_flavor(device_info: ChassisInfo, bmc: Bmc) -> str:
         memory_mb=memory_mb,
         cpu=device_info.cpu,
         disk_gb=bmc_disk.smallest_disk_size(bmc),
+        model=device_info.model_number,
     )
 
     flavor_name = Matcher(FLAVORS).pick_best_flavor(machine)

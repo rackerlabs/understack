@@ -6,6 +6,7 @@ class Machine:
     memory_mb: int
     cpu: str
     disk_gb: int
+    model: str
 
     @property
     def memory_gb(self) -> int:

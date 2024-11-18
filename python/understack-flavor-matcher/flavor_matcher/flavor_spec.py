@@ -73,11 +73,12 @@ class FlavorSpec:
         #    it cannot be used - the score should be 0.
         # 3. If the machine has smaller disk size than specified in the flavor,
         #    it cannot be used - the score should be 0.
-        # 4. Machine must match the flavor on one of the CPU models exactly.
-        # 5. If the machine has exact amount memory as specified in flavor, but
+        # 4. If the machine's model does not match exactly, score should be 0
+        # 5. Machine must match the flavor on one of the CPU models exactly.
+        # 6. If the machine has exact amount memory as specified in flavor, but
         #    more disk space it is less desirable than the machine that matches
         #    exactly on both disk and memory.
-        # 6.  If the machine has exact amount of disk as specified in flavor,
+        # 7.  If the machine has exact amount of disk as specified in flavor,
         #     but more memory space it is less desirable than the machine that
         #     matches exactly on both disk and memory.
 
@@ -86,6 +87,7 @@ class FlavorSpec:
             machine.memory_gb == self.memory_gb
             and machine.disk_gb in self.drives
             and machine.cpu == self.cpu_model
+            and machine.model == self.model
         ):
             return 100
 
@@ -97,11 +99,15 @@ class FlavorSpec:
         if any(machine.disk_gb < drive for drive in self.drives):
             return 0
 
-        # Rule 4: Machine must match the flavor on one of the CPU models exactly
+        # Rule 4: Machine's model must match exactly
+        if machine.model != self.model:
+            return 0
+
+        # Rule 5: Machine must match the flavor on one of the CPU models exactly
         if machine.cpu != self.cpu_model:
             return 0
 
-        # Rule 5 and 6: Rank based on exact matches or excess capacity
+        # Rule 6 and 7: Rank based on exact matches or excess capacity
         score = 0
 
         # Exact memory match gives preference

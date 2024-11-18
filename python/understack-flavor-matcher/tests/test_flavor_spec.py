@@ -97,15 +97,40 @@ def test_empty_directory(tmp_path):
 def machines():
     return [
         # 1024 GB, exact CPU, medium
-        Machine(memory_mb=102400, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=1000),
+        Machine(
+            memory_mb=102400,
+            cpu="AMD EPYC 9254 245-Core Processor",
+            disk_gb=1000,
+            model="Dell XPS1319",
+        ),
         # 800 GB, non-matching CPU
-        Machine(memory_mb=800000, cpu="Intel Xeon E5-2676 v3", disk_gb=500),
+        Machine(
+            memory_mb=800000,
+            cpu="Intel Xeon E5-2676 v3",
+            disk_gb=500,
+            model="Dell XPS1319",
+        ),
         # 200 GB, exact CPU, medium
-        Machine(memory_mb=200000, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=1500),
+        Machine(
+            memory_mb=200000,
+            cpu="AMD EPYC 9254 245-Core Processor",
+            disk_gb=150,
+            model="Dell XPS1319",
+        ),
         # 300 GB, non-matching CPU
-        Machine(memory_mb=300000, cpu="Intel Xeon E5-2676 v3", disk_gb=500),
+        Machine(
+            memory_mb=300000,
+            cpu="Intel Xeon E5-2676 v3",
+            disk_gb=500,
+            model="Dell XPS1319",
+        ),
         # 409 GB, exact CPU, large
-        Machine(memory_mb=409600, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=2000),
+        Machine(
+            memory_mb=409600,
+            cpu="AMD EPYC 9254 245-Core Processor",
+            disk_gb=2000,
+            model="Dell XPS1319",
+        ),
     ]
 
 
@@ -115,7 +140,7 @@ def flavors():
         FlavorSpec(
             name="small",
             manufacturer="Dell",
-            model="Fake Machine",
+            model="Dell XPS1319",
             memory_gb=100,
             cpu_cores=13,
             cpu_model="AMD EPYC 9254 245-Core Processor",
@@ -135,7 +160,7 @@ def flavors():
         FlavorSpec(
             name="large",
             manufacturer="Dell",
-            model="Fake Machine",
+            model="Dell XPS1319",
             memory_gb=400,
             cpu_cores=27,
             cpu_model="AMD EPYC 9254 245-Core Processor",
@@ -147,41 +172,73 @@ def flavors():
 
 def test_exact_match(flavors):
     machine = Machine(
-        memory_mb=102400, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=500
+        memory_mb=102400,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=500,
+        model="Dell XPS1319",
     )
     assert flavors[0].score_machine(machine) == 100
     assert flavors[1].score_machine(machine) == 0
 
 
+def test_wrong_model_non_match(flavors):
+    machine = Machine(
+        memory_mb=102400,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=500,
+        model="Some other model",
+    )
+    for flavor in flavors:
+        assert flavor.score_machine(machine) == 0
+
+
 def test_memory_too_small(flavors):
     machine = Machine(
-        memory_mb=51200, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=500
+        memory_mb=51200,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=500,
+        model="Dell XPS1319",
     )
-    assert all(flavor.score_machine(machine) for flavor in flavors) == 0
+    for flavor in flavors:
+        assert flavor.score_machine(machine) == 0
 
 
 def test_disk_too_small(flavors):
     machine = Machine(
-        memory_mb=204800, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=100
+        memory_mb=204800,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=100,
+        model="Dell XPS1319",
     )
     assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
 
 
 def test_cpu_model_not_matching(flavors):
-    machine = Machine(memory_mb=102400, cpu="Non-Existent CPU Model", disk_gb=500)
-    assert all(flavor.score_machine(machine) for flavor in flavors) == 0
+    machine = Machine(
+        memory_mb=102400,
+        cpu="Non-Existent CPU Model",
+        disk_gb=500,
+        model="Dell XPS1319",
+    )
+    assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
 
 
 def test_memory_match_but_more_disk(flavors):
     machine = Machine(
-        memory_mb=102400, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=1000
+        memory_mb=102400,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=1000,
+        model="Dell XPS1319",
     )
     assert flavors[0].score_machine(machine) > 0
 
 
 def test_disk_match_but_more_memory(flavors):
     machine = Machine(
-        memory_mb=204800, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=500
+        memory_mb=204800,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=500,
+        model="Dell XPS1319",
     )
 
     assert flavors[0].score_machine(machine) > 0
@@ -193,7 +250,10 @@ def test_disk_match_but_more_memory(flavors):
 def test_memory_slightly_less(flavors):
     # Machine with slightly less memory than required by the smallest flavor
     machine = Machine(
-        memory_mb=102300, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=500
+        memory_mb=102300,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=500,
+        model="Dell XPS1319",
     )
     # Should not match because memory is slightly less
     assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
@@ -202,7 +262,10 @@ def test_memory_slightly_less(flavors):
 def test_disk_slightly_less(flavors):
     # Machine with slightly less disk space than required by the smallest flavor
     machine = Machine(
-        memory_mb=102400, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=499
+        memory_mb=102400,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=499,
+        model="Dell XPS1319",
     )
     # Should not match because disk space is slightly less
     assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
@@ -211,7 +274,10 @@ def test_disk_slightly_less(flavors):
 def test_memory_exact_disk_slightly_more(flavors):
     # Machine with exact memory but slightly more disk space than required
     machine = Machine(
-        memory_mb=102400, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=501
+        memory_mb=102400,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=501,
+        model="Dell XPS1319",
     )
     assert flavors[0].score_machine(machine) > 0
     assert flavors[1].score_machine(machine) == 0
@@ -221,7 +287,10 @@ def test_memory_exact_disk_slightly_more(flavors):
 def test_disk_exact_memory_slightly_more(flavors):
     # Machine with exact disk space but slightly more memory than required
     machine = Machine(
-        memory_mb=102500, cpu="AMD EPYC 9254 245-Core Processor", disk_gb=500
+        memory_mb=102500,
+        cpu="AMD EPYC 9254 245-Core Processor",
+        disk_gb=500,
+        model="Dell XPS1319",
     )
     assert flavors[0].score_machine(machine) > 0
     assert flavors[1].score_machine(machine) == 0
@@ -231,7 +300,10 @@ def test_disk_exact_memory_slightly_more(flavors):
 def test_cpu_model_not_exact_but_memory_and_disk_match(flavors):
     # Machine with exact memory and disk space but CPU model is close but not exact
     machine = Machine(
-        memory_mb=102400, cpu="AMD EPYC 9254 245-Core Processor v2", disk_gb=500
+        memory_mb=102400,
+        cpu="AMD EPYC 9254 245-Core Processor v2",
+        disk_gb=500,
+        model="Dell XPS1319",
     )
     # Should not match because CPU model is not exactly listed
     assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
@@ -239,6 +311,8 @@ def test_cpu_model_not_exact_but_memory_and_disk_match(flavors):
 
 def test_large_flavor_memory_slightly_less_disk_exact(flavors):
     # Machine with slightly less memory than required for the medium flavor, exact disk space
-    machine = Machine(memory_mb=204600, cpu="Intel 80386DX", disk_gb=1800)
+    machine = Machine(
+        memory_mb=204600, cpu="Intel 80386DX", disk_gb=1800, model="Dell XPS1319"
+    )
     # Should not match because memory is slightly less than required
     assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
