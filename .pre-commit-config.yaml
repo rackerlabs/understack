@@ -72,10 +72,14 @@ repos:
       files: '^python/understack-workflows/'
       args: ["--threads"]
       additional_dependencies:
+        # python-pyright stupidly does not allow local paths
+        # https://github.com/pre-commit/pre-commit/issues/1752#issuecomment-754252663
+        - "git+https://github.com/rackerlabs/understack.git@197e953#subdirectory=python/understack-flavor-matcher"
         - "kubernetes"
         - "pydantic"
         - "pynautobot"
         - "pytest"
+        - "pytest-mock"
         - "pytest_lazy_fixtures"
         - "python-ironicclient"
         - "requests"
