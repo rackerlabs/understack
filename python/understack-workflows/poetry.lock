@@ -1026,19 +1026,19 @@ typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
 name = "pynautobot"
-version = "2.2.1"
+version = "2.4.1"
 description = "Nautobot API client library"
 optional = false
 python-versions = "<4.0.0,>=3.8.1"
 files = [
-    {file = "pynautobot-2.2.1-py3-none-any.whl", hash = "sha256:52d3d0581f25fc1157dce666fb8b4e0fc0491dfab02d1b72fd78aca4a9258be7"},
-    {file = "pynautobot-2.2.1.tar.gz", hash = "sha256:0fa0fc2cbac8372d7cdf1d1e0abc396842760bf4934e31aba8517ab2171f2828"},
+    {file = "pynautobot-2.4.1-py3-none-any.whl", hash = "sha256:b40761e6429f02716720b811cda5c5bb184f3876a49bb2d4211b3c017ead9231"},
+    {file = "pynautobot-2.4.1.tar.gz", hash = "sha256:239c4fd6b1daa00013bef19a473467504d3e1e7495220d0fb6a89f728dbbceaf"},
 ]
 
 [package.dependencies]
 packaging = ">=23.2,<24.0"
 requests = ">=2.30.0,<3.0.0"
-urllib3 = ">=1.21.1,<1.27"
+urllib3 = ">=2.2.3,<3.0.0"
 
 [[package]]
 name = "pyparsing"
@@ -1535,19 +1535,20 @@ files = [
 
 [[package]]
 name = "urllib3"
-version = "1.26.19"
+version = "2.2.3"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
-python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
+python-versions = ">=3.8"
 files = [
-    {file = "urllib3-1.26.19-py2.py3-none-any.whl", hash = "sha256:37a0344459b199fce0e80b0d3569837ec6b6937435c5244e7fd73fa6006830f3"},
-    {file = "urllib3-1.26.19.tar.gz", hash = "sha256:3e3d753a8618b86d7de333b4223005f68720bcd6a7d2bcb9fbd2229ec7c1e429"},
+    {file = "urllib3-2.2.3-py3-none-any.whl", hash = "sha256:ca899ca043dcb1bafa3e262d73aa25c465bfb49e0bd9dd5d59f1d0acba2f8fac"},
+    {file = "urllib3-2.2.3.tar.gz", hash = "sha256:e7d814a81dad81e6caf2ec9fdedb284ecc9c73076b62654547cc64ccdcae26e9"},
 ]
 
 [package.extras]
-brotli = ["brotli (==1.0.9)", "brotli (>=1.0.9)", "brotlicffi (>=0.8.0)", "brotlipy (>=0.6.0)"]
-secure = ["certifi", "cryptography (>=1.3.4)", "idna (>=2.0.0)", "ipaddress", "pyOpenSSL (>=0.14)", "urllib3-secure-extra"]
-socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
+brotli = ["brotli (>=1.0.9)", "brotlicffi (>=0.8.0)"]
+h2 = ["h2 (>=4,<5)"]
+socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
+zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "wcwidth"
