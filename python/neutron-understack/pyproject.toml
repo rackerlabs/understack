@@ -52,6 +52,7 @@ select = [
   "F",       # pyflakes
   "B",       # flake8-bugbear
   "I",       # isort
+  "S",       # flake8-bandit
   "UP",      # pyupgrade
   "ASYNC",   # flake8-async
 ]
@@ -68,6 +69,11 @@ ignore = [
 [tool.ruff.lint.pydocstyle]
 # enable the google doc style rules by default
 convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"neutron_understack/tests/*.py" = [
+    "S311",     # allow non-cryptographic secure bits for test data
+]
 
 [tool.poetry.plugins."neutron.ml2.mechanism_drivers"]
 understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"

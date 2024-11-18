@@ -94,7 +94,7 @@ def update_nautobot_for_tenant(
 
     logger.debug(f"Running Nautobot prep_switch_interface job {uri=} {payload=}")
 
-    response = requests.request("POST", uri, headers=headers, json=payload)
+    response = requests.request("POST", uri, headers=headers, json=payload, timeout=30)
     response_data = response.json()
     logger.debug(f"Nautobot prep_switch_interface result: {response} {response_data=}")
     response.raise_for_status()

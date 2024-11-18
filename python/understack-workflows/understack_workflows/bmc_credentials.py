@@ -5,7 +5,7 @@ from understack_workflows.helpers import setup_logger
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore
 
-FACTORY_PASSWORD = "calvin"
+FACTORY_PASSWORD = "calvin"  # noqa: S105 we know this is hardcoded
 
 logger = setup_logger(__name__)
 

@@ -12,7 +12,7 @@ def main():
 
     ip_addr = sys.argv[1]
     master_key = (
-        subprocess.check_output(
+        subprocess.check_output(  # noqa: S603
             [
                 "kubectl",
                 "get",
