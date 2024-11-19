@@ -1,0 +1,42 @@
+[tool.poetry]
+name = "nova-flavors"
+version = "0.0.1"
+description = "Monitors FlavorSpec repository and reconciles it with Nova"
+authors = ["Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
+license = "Apache License 2.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+understack-flavor-matcher = {path = "../../python/understack-flavor-matcher"}
+python-novaclient = "^18.7.0"
+
+[tool.poetry.group.dev.dependencies]
+
+
+[tool.poetry.group.test.dependencies]
+pytest-mock = "^3.14.0"
+pytest = "^8.3.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra --cov=nova_flavors"
+testpaths = [
+    "tests",
+]
+
+[tool.ruff]
+target-version = "py310"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "S",       # flake8-bandit
+]
+
+[tool.isort]
+profile = "open_stack"
