@@ -73,6 +73,7 @@ conf:
       rabbit_transient_quorum_queue: true
       use_queue_manager: true
       rabbit_stream_fanout: true
+      rabbit_qos_prefetch_count: 1000
 
 console:
   # we are working with baremetal nodes and not QEMU so we don't need novnc or spice

@@ -102,6 +102,7 @@ conf:
       rabbit_transient_quorum_queue: true
       use_queue_manager: true
       rabbit_stream_fanout: true
+      rabbit_qos_prefetch_count: 1000
 
 manifests:
   job_db_init: false
