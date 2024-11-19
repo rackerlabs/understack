@@ -53,3 +53,37 @@ class Nautobot:
         resp = self.s.delete(url, json=payload, timeout=10)
         LOG.debug("ucvni_delete resp: %(resp)s", {"resp": resp.status_code})
         resp.raise_for_status()
+
+    def detach_port(self, network_id, mac_address):
+        payload = {
+            "ucvni_uuid": network_id,
+            "server_interface_mac": mac_address,
+        }
+
+        url = urljoin(self.base_url, "/api/plugins/undercloud-vni/detach_port")
+        LOG.debug("detach_port payload: %(payload)s", {"payload": payload})
+        resp = self.s.post(url, json=payload, timeout=10)
+        resp_data = resp.json()
+        LOG.debug("detach_port resp: %(resp)s", {"resp": resp_data})
+        resp.raise_for_status()
+        return resp_data["vlan_group_id"]
+
+    def reset_port_status(self, mac_address):
+        intf_url = urljoin(
+            self.base_url, f"/api/dcim/interfaces/?mac_address={mac_address}"
+        )
+        intf_resp = self.s.get(intf_url, timeout=10)
+        intf_resp_data = intf_resp.json()
+
+        LOG.debug("reset_port interface resp: %(resp)s", {"resp": intf_resp_data})
+        intf_resp.raise_for_status()
+
+        conn_intf_url = intf_resp_data["results"][0]["connected_endpoint"]["url"]
+
+        payload = {"status": {"name": "Active"}}
+        resp = self.s.patch(conn_intf_url, json=payload, timeout=10)
+
+        LOG.debug(
+            "reset_port connected interface resp: %(resp)s", {"resp": resp.json()}
+        )
+        resp.raise_for_status()
