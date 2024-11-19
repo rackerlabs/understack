@@ -3,7 +3,7 @@ from functools import cached_property
 from flavor_matcher.flavor_spec import FlavorSpec
 from novaclient import client as novaclient
 
-from logger import setup_logger
+from nova_flavors.logger import setup_logger
 
 logger = setup_logger(__name__)
 

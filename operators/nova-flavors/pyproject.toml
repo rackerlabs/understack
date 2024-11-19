@@ -5,6 +5,9 @@ description = "Monitors FlavorSpec repository and reconciles it with Nova"
 authors = ["Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
 license = "Apache License 2.0"
 readme = "README.md"
+packages = [
+    { include = "nova_flavors" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -41,3 +44,6 @@ select = [
 
 [tool.isort]
 profile = "open_stack"
+
+[tool.poetry.scripts]
+nova-flavors-sync = "nova_flavors.reconcile:main"

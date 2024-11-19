@@ -1,14 +1,15 @@
+import time
+from typing import Callable
 
 from watchdog.events import DirModifiedEvent
-from typing import Callable
 from watchdog.events import FileModifiedEvent
 from watchdog.events import FileSystemEventHandler
-from flavor_synchronizer import FlavorSynchronizer
-import time
 
-from logger import setup_logger
+from nova_flavors.flavor_synchronizer import FlavorSynchronizer
+from nova_flavors.logger import setup_logger
 
 logger = setup_logger(__name__)
+
 
 class SpecChangedHandler(FileSystemEventHandler):
     COOLDOWN_SECONDS = 30
