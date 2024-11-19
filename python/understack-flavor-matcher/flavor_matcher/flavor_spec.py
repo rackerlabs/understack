@@ -39,6 +39,10 @@ class FlavorSpec:
             pci=data.get("pci", []),
         )
 
+    @staticmethod
+    def configured_envtype():
+        return os.getenv("FLAVORS_ENV", "unconfigured")
+
     @property
     def stripped_name(self):
         """Returns actual flavor name with the prod/nonprod prefix removed."""
@@ -59,6 +63,10 @@ class FlavorSpec:
         return f"RESOURCES:CUSTOM_BAREMETAL_{converted_name}"
 
     @property
+    def env_type(self):
+        return self.name.split(".")[0]
+
+    @property
     def memory_mib(self):
         """Returns memory size in MiB"""
         return self.memory_gb * 1024
@@ -74,6 +82,8 @@ class FlavorSpec:
                         with open(filepath, "r") as file:
                             yaml_content = file.read()
                             flavor_spec = FlavorSpec.from_yaml(yaml_content)
+                            if flavor_spec.env_type != FlavorSpec.configured_envtype():
+                                continue
                             flavor_specs.append(flavor_spec)
                     except yaml.YAMLError as e:
                         print(f"Error parsing YAML file {filename}: {e}")

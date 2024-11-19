@@ -61,6 +61,7 @@ def test_from_yaml_invalid(invalid_yaml):
 
 @patch("os.walk")
 @patch("builtins.open", new_callable=mock_open)
+@patch.dict(os.environ, {"FLAVORS_ENV": "nonprod"})
 def test_from_directory(mocked_open, mock_walk, valid_yaml, invalid_yaml):
     mock_walk.return_value = [
         ("/etc/flavors", [], ["valid.yaml", "invalid.yaml"]),
@@ -69,9 +70,7 @@ def test_from_directory(mocked_open, mock_walk, valid_yaml, invalid_yaml):
         mock_open(read_data=valid_yaml).return_value,
         mock_open(read_data=invalid_yaml).return_value,
     ]
-
     mocked_open.side_effect = mock_file_handles
-
     specs = FlavorSpec.from_directory("/etc/flavors/")
 
     assert len(specs) == 1
@@ -80,6 +79,7 @@ def test_from_directory(mocked_open, mock_walk, valid_yaml, invalid_yaml):
     assert specs[0].cpu_cores == 245
 
 
+@patch.dict(os.environ, {"FLAVORS_ENV": "nonprod"})
 def test_from_directory_with_real_files(yaml_directory):
     specs = FlavorSpec.from_directory(str(yaml_directory))
 
@@ -326,4 +326,11 @@ def test_memory_gib(valid_yaml):
 
 def test_baremetal_nova_resource_class(valid_yaml):
     flv = FlavorSpec.from_yaml(valid_yaml)
-    assert flv.baremetal_nova_resource_class == "RESOURCES:CUSTOM_BAREMETAL_GP2ULTRAMEDIUM"
+    assert (
+        flv.baremetal_nova_resource_class == "RESOURCES:CUSTOM_BAREMETAL_GP2ULTRAMEDIUM"
+    )
+
+
+def test_envtype(valid_yaml):
+    flv = FlavorSpec.from_yaml(valid_yaml)
+    assert flv.env_type == "nonprod"
