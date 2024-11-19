@@ -63,6 +63,7 @@ conf:
       use_queue_manager: true
       rabbit_stream_fanout: true
       rabbit_qos_prefetch_count: 1000
+      rabbit_ha_queues: false
 
     pxe:
       images_path: /var/lib/understack/master_iso_images
