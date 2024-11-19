@@ -1,8 +1,8 @@
 import os
+import re
 from dataclasses import dataclass
 
 import yaml
-
 from flavor_matcher.machine import Machine
 
 
@@ -48,6 +48,20 @@ class FlavorSpec:
         # need to strip '.' from the ironic flavor name
         name = name.replace(".", "")
         return name
+
+    @property
+    def baremetal_nova_resource_class(self):
+        """Returns flavor name converted to be used with Nova flavor resources.
+
+        https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html
+        """
+        converted_name = re.sub(r"[^\w]", "", self.stripped_name).upper()
+        return f"RESOURCES:CUSTOM_BAREMETAL_{converted_name}"
+
+    @property
+    def memory_mib(self):
+        """Returns memory size in MiB"""
+        return self.memory_gb * 1024
 
     @staticmethod
     def from_directory(directory: str = "/etc/flavors/") -> list["FlavorSpec"]:
