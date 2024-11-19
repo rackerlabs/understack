@@ -26,9 +26,13 @@ def test_parse_device_id(device_id):
 
 def test_calls_update_cf(fakebot, device_id):
     do_action(fakebot, device_id, "active")
-
     fakebot.update_cf.assert_called_once_with(
-        device_id, "ironic_provision_state", "active"
+        device_id=device_id,
+        tenant_id=None,
+        fields={
+            "ironic_provision_state": "active",
+            "resource_class": None,
+        },
     )
 
 

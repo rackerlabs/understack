@@ -61,6 +61,16 @@ spec:
               src:
                 dataKey: payload.ironic_object\.data.provision_state
                 dependencyName: ironic-dep
+            # third parameter's value is replaced with the lessee
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: payload.ironic_object\.data.lessee
+                dependencyName: ironic-dep
+            # fourth parameter's value is replaced with the resource_class
+            - dest: spec.arguments.parameters.3.value
+              src:
+                dataKey: payload.ironic_object\.data.resource_class
+                dependencyName: ironic-dep
           source:
             # create a workflow in argo-events prefixed with ironic-node-update-
             resource:
@@ -75,6 +85,8 @@ spec:
                   parameters:
                     - name: device_uuid
                     - name: provision_state
+                    - name: lessee
+                    - name: resource_class
                 # references the workflow
                 workflowTemplateRef:
                   name: sync-provision-state-to-nautobot
