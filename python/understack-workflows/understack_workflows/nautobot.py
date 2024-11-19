@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pynautobot
 from pynautobot.core.api import Api as NautobotApi
+from pynautobot.core.response import Record
 from pynautobot.models import dcim
 
 
@@ -48,13 +49,30 @@ class Nautobot:
             )
         return interface  # type: ignore
 
-    def update_cf(self, device_id: UUID, field_name: str, field_value: str):
+    def tenancy_by_id(self, tenant_id: UUID) -> Record:
+        if tenant_id:
+            tenant = self.session.tenancy.tenants.get(id=tenant_id)
+            if not tenant:
+                self.logger.error(f"Tenant {tenant_id!s} not found in Nautobot")
+            return tenant  # type: ignore
+
+    def update_cf(
+        self,
+        device_id: UUID,
+        tenant_id: UUID | None = None,
+        fields: dict[str, str] | None = None,
+    ):
         device = self.device_by_id(device_id)
         if not device:
             raise Exception(f"No such device {device_id}")
         if not device.custom_fields:
             raise Exception(f"Device {device_id} has no custom fields")
-        device.custom_fields[field_name] = field_value
+
+        for field_name, field_value in (fields or {}).items():
+            device.custom_fields[field_name] = field_value
+
+        device.tenant = self.tenancy_by_id(tenant_id)  # type: ignore[attr-defined]
+
         response = device.save()
         self.logger.info(f"save result: {response}")
         return response

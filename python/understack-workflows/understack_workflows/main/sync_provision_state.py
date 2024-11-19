@@ -18,6 +18,8 @@ def argument_parser():
         "--device-id", required=True, type=UUID, help="Nautobot device UUID"
     )
     parser.add_argument("--provision-state", required=True)
+    parser.add_argument("--lessee")
+    parser.add_argument("--resource-class")
     parser = parser_nautobot_args(parser)
 
     return parser
@@ -26,9 +28,23 @@ def argument_parser():
 logger = setup_logger(__name__)
 
 
-def do_action(nautobot, device_uuid, provision_state):
+def do_action(
+    nautobot,
+    device_uuid,
+    provision_state,
+    tenant_id=None,
+    resource_class=None,
+):
     new_status = ProvisionStateMapper.translate_to_nautobot(provision_state)
-    nautobot.update_cf(device_uuid, "ironic_provision_state", provision_state)
+
+    custom_fields_to_update = {
+        "ironic_provision_state": provision_state,
+        "resource_class": resource_class,
+    }
+    nautobot.update_cf(
+        device_id=device_uuid, tenant_id=tenant_id, fields=custom_fields_to_update
+    )
+
     if new_status:
         nautobot.update_device_status(device_uuid, new_status)
 
@@ -37,10 +53,17 @@ def main():
     args = argument_parser().parse_args()
 
     device_uuid = args.device_id
+    tenant_id = (lambda lessee: UUID(lessee))(args.lessee) if args.lessee else None
     nb_token = args.nautobot_token or credential("nb-token", "token")
 
     nautobot = Nautobot(args.nautobot_url, nb_token, logger=logger)
-    do_action(nautobot, device_uuid, args.provision_state)
+    do_action(
+        nautobot,
+        device_uuid=device_uuid,
+        provision_state=args.provision_state,
+        tenant_id=tenant_id,
+        resource_class=args.resource_class,
+    )
 
 
 if __name__ == "__main__":

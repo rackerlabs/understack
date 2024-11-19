@@ -24,12 +24,16 @@ spec:
     parameters:
     - name: device_uuid
     - name: provision_state
+    - name: lessee
+    - name: resource_class
   templates:
     - name: sync-state
       inputs:
         parameters:
           - name: device_uuid
           - name: provision_state
+          - name: lessee
+          - name: resource_class
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
@@ -39,6 +43,10 @@ spec:
           - "{{inputs.parameters.device_uuid}}"
           - --provision-state
           - "{{inputs.parameters.provision_state}}"
+          - --lessee
+          - "{{inputs.parameters.lessee}}"
+          - --resource-class
+          - "{{inputs.parameters.resource_class}}"
         volumeMounts:
           - mountPath: /etc/nb-token/
             name: nb-token
