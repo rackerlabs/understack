@@ -8,7 +8,7 @@ class ProvisionStateMapper:
         "rescue": "Quarantine",
         "rescue failed": "Quarantine",
         "unrescueing": "Quarantine",
-        "manageable": "Quarantine",
+        "manageable": "Staged",
         "inspecting": "Provisioning",
         "deploying": "Provisioning",
         "cleaning": "Quarantine",
