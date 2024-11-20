@@ -1,4 +1,6 @@
-from unittest.mock import mock_open, patch
+import os
+from unittest.mock import mock_open
+from unittest.mock import patch
 
 import pytest
 from flavor_matcher.flavor_spec import FlavorSpec

@@ -2,6 +2,7 @@ from flavor_matcher.machine import Machine
 from flavor_matcher.matcher import FlavorSpec
 from flavor_matcher.matcher import Matcher
 
+from understack_workflows import bmc_disk
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.helpers import setup_logger
