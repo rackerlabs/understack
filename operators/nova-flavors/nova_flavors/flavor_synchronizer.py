@@ -38,6 +38,9 @@ class FlavorSynchronizer:
         )
 
     def reconcile(self, desired_flavors: list[FlavorSpec]):
+        if len(desired_flavors) < 1:
+            raise Exception(f"Empty desired_flavors list.")
+
         existing_flavors = self._nova.flavors.list()
         for flavor in desired_flavors:
             nova_flavor = next(

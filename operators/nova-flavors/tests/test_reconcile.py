@@ -4,11 +4,9 @@ import pytest
 from unittest.mock import patch
 
 from nova_flavors.reconcile import (
-    FlavorSpec,
     FlavorSynchronizer,
     SpecChangedHandler,
     main,
-    read_flavors,
 )
 from watchdog.observers import Observer
 
@@ -28,29 +26,6 @@ def test_flavors_dir_env_var_not_set(mocker, return_value):
     # Execute and Verify
     with pytest.raises(Exception):
         main()
-
-
-@patch.dict(
-    "os.environ",
-    {
-        "FLAVORS_ENV": "testenv",
-        "NOVA_FLAVOR_MONITOR_LOGLEVEL": "info",
-        "FLAVORS_DIR": "/",
-    },
-)
-def test_read_flavors(mocker):
-    # Set up
-    mock_flavor_spec = mocker.Mock(spec=FlavorSpec)
-    mocker.patch(
-        "nova_flavors.reconcile.FlavorSpec.from_directory",
-        return_value=mock_flavor_spec,
-    )
-
-    # Execute
-    result = read_flavors()
-
-    # Verify
-    assert result == mock_flavor_spec
 
 
 @patch.dict(

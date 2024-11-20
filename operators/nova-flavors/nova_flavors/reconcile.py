@@ -14,13 +14,6 @@ logging.getLogger().setLevel(loglevel)
 logger = setup_logger(__name__, level=loglevel)
 
 
-flavors_dir = ""
-
-
-def read_flavors():
-    return FlavorSpec.from_directory(flavors_dir)
-
-
 def main():
     # nonprod vs prod
     flavors_dir = os.getenv("FLAVORS_DIR", "")
@@ -35,7 +28,9 @@ def main():
         auth_url=os.getenv("OS_AUTH_URL"),
     )
 
-    handler = SpecChangedHandler(synchronizer, read_flavors)
+    handler = SpecChangedHandler(
+        synchronizer, lambda: FlavorSpec.from_directory(flavors_dir)
+    )
     observer = Observer()
     observer.schedule(handler, flavors_dir, recursive=True)
     logger.info(f"Watching for changes in {flavors_dir}")
