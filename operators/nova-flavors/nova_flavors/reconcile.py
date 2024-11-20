@@ -27,11 +27,12 @@ def main():
     if not os.path.isdir(flavors_dir):
         raise ValueError(f"flavors_dir '{flavors_dir}' is not a directory")
     synchronizer = FlavorSynchronizer(
-        username=os.environ.get("OS_USERNAME", ""),
-        password=os.environ.get("OS_PASSWORD", ""),
-        project_id=os.environ.get("OS_PROJECT_ID"),
-        user_domain_id=os.environ.get("OS_USER_DOMAIN_ID", ""),
-        auth_url=os.environ.get("OS_AUTH_URL"),
+        username=os.getenv("OS_USERNAME", ""),
+        password=os.getenv("OS_PASSWORD", ""),
+        project_name=os.getenv("OS_PROJECT_NAME", "admin"),
+        project_domain_name=os.getenv("OS_PROJECT_DOMAIN_NAME", "default"),
+        user_domain_name=os.getenv("OS_USER_DOMAIN_NAME", "service"),
+        auth_url=os.getenv("OS_AUTH_URL"),
     )
 
     handler = SpecChangedHandler(synchronizer, read_flavors)

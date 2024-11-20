@@ -11,8 +11,6 @@ def flavor_synchronizer():
     return FlavorSynchronizer(
         username="test_username",
         password="test_password",
-        project_id="test_project_id",
-        user_domain_id="test_user_domain_id",
         auth_url="test_auth_url",
     )
 
@@ -46,8 +44,7 @@ def flavor():
 def test_flavor_synchronizer_init(flavor_synchronizer):
     assert flavor_synchronizer.username == "test_username"
     assert flavor_synchronizer.password == "test_password"
-    assert flavor_synchronizer.project_id == "test_project_id"
-    assert flavor_synchronizer.user_domain_id == "test_user_domain_id"
+    assert flavor_synchronizer.user_domain_name == "service"
     assert flavor_synchronizer.auth_url == "test_auth_url"
 
 

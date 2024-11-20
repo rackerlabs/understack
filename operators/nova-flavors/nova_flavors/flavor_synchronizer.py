@@ -13,25 +13,28 @@ class FlavorSynchronizer:
         self,
         username: str | None = "",
         password: str = "",
-        project_id: str | None = None,
-        user_domain_id=None,
+        project_name: str | None = "admin",
+        project_domain_name: str = "default",
+        user_domain_name="service",
         auth_url: str | None = None,
     ) -> None:
         self.username = username
         self.password = password
-        self.project_id = str(project_id)
-        self.user_domain_id = user_domain_id
+        self.project_name = str(project_name)
+        self.project_domain_name = str(project_domain_name)
+        self.user_domain_name = user_domain_name
         self.auth_url = auth_url
 
     @cached_property
     def _nova(self):
         return novaclient.Client(
             "2",
-            self.username,
-            self.password,
-            self.project_id,
-            self.auth_url,
-            user_domain_id=self.user_domain_id,
+            username=self.username,
+            password=self.password,
+            project_name=self.project_name,
+            project_domain_name=self.project_domain_name,
+            user_domain_name=self.user_domain_name,
+            auth_url=self.auth_url,
         )
 
     def reconcile(self, desired_flavors: list[FlavorSpec]):
