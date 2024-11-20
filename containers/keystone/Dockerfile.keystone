@@ -3,27 +3,9 @@
 ARG OPENSTACK_VERSION="required_argument"
 FROM docker.io/openstackhelm/keystone:${OPENSTACK_VERSION}-ubuntu_jammy
 
-COPY <<EOF /etc/apt/sources.list.d/ubuntu-mantic.list
-deb http://archive.ubuntu.com/ubuntu/ mantic main universe
-EOF
-
-COPY <<EOF /etc/apt/apt.conf.d/default-release
-APT::Default-Release "jammy";
-EOF
-
-COPY <<"EOF" /etc/apt/preferences.d/pin-mod-auth-openidc
-
-Package: libapache2-mod-auth-openidc
-Pin: release n=jammy
-Pin-Priority: -10
-
-Package: libapache2-mod-auth-openidc
-Pin: release n=mantic
-Pin-Priority: 900
-
-EOF
+ADD --checksum=sha256:deb52ea8304a41ee0331e4ba87a9f82ff643464b6d34084e161f58ec11c25a69 https://github.com/OpenIDC/mod_auth_openidc/releases/download/v2.4.16.5/libapache2-mod-auth-openidc_2.4.16.5-1.jammy_amd64.deb /tmp
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libjansson4=2.14-2 libapache2-mod-auth-openidc=2.4.14.2-1 \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+        /tmp/libapache2-mod-auth-openidc_2.4.16.5-1.jammy_amd64.deb \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*.deb
