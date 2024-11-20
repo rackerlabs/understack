@@ -60,9 +60,15 @@ def update_nautobot_for_provisioning(
 
 
 def vlan_group_id_for(device_id, nautobot):
-    result = nautobot.session.graphql.query(
-        f'{{device(id: "{device_id}") {{ rel_vlan_group_to_devices {{id}}}}}}'
-    )
+    query = """
+        query($device_id: ID!){
+            device(id: $device_id) {
+                rel_vlan_group_to_devices {id}
+            }
+        }
+    """
+    variables = {"device_id": device_id}
+    result = nautobot.session.graphql.query(query=query, variables=variables)
     if not result.json or result.json.get("errors"):
         raise Exception(f"Nautobot vlan_group graphql query failed: {result}")
     return result.json["data"]["device"]["rel_vlan_group_to_devices"]["id"]

@@ -222,33 +222,35 @@ def _parse_manufacturer(name: str) -> str:
 
 
 def nautobot_server(nautobot, serial: str) -> NautobotDevice | None:
-    query = f"""{{
-        devices(serial: ["{serial}"]){{
-            id name
-            location {{ id name }}
-            rack {{ id name }}
-            interfaces {{
+    query = """
+        query($serial: String!){
+            devices(serial: [$serial]){
                 id name
-                type description mac_address
-                status {{ name }}
-                connected_interface {{
+                location { id name }
+                rack { id name }
+                interfaces {
                     id name
-                    device {{
+                    type description mac_address
+                    status { name }
+                    connected_interface {
                         id name
-                        mac: cf_chassis_mac_address
-                        location {{ id name }}
-                        rack {{ id name }}
-                    }}
-                }}
-                ip_addresses {{
-                    id host
-                    parent {{ prefix }}
-                }}
-            }}
-        }}
-    }}"""
+                        device {
+                            id name
+                            mac: cf_chassis_mac_address
+                            location { id name }
+                            rack { id name }
+                        }
+                    }
+                    ip_addresses {
+                        id host
+                        parent { prefix }
+                    }
+                }
+            }
+        }
+    """
 
-    result = nautobot.graphql.query(query)
+    result = nautobot.graphql.query(query, variables={"serial": serial})
     if not result.json or result.json.get("errors"):
         raise Exception(f"Nautobot server graphql query failed: {result}")
 

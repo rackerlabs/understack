@@ -26,10 +26,10 @@ class FakeNautobot:
             pass
 
     class Graphql:
-        def query(self, graphql, variables=None):
-            if "pattern" in graphql and variables:
+        def query(self, graphql, variables: dict):
+            if "pattern" in variables:
                 return FakeNautobot.SwitchResponse()
-            if "33GSW04" in graphql:
+            if "serial" in variables:
                 return FakeNautobot.GraphqlResponse(
                     "json_samples/bmc_chassis_info/R7615/nautobot_graphql_response_server_device_33GSW04.json"
                 )
