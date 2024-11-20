@@ -148,19 +148,18 @@ def nautobot_switches(nautobot, mac_addresses: set[str]) -> dict[str, dict]:
     """
     pattern = "|".join(mac_addresses)
 
-    query = (
-        """{
-        devices(cf_chassis_mac_address__re: "(%s)"){
-            id name
-            mac: cf_chassis_mac_address
-            location { id name }
-            rack { id name }
+    query = """
+        query($pattern: [String!]){
+            devices(cf_chassis_mac_address__re: $pattern){
+                id name
+                mac: cf_chassis_mac_address
+                location { id name }
+                rack { id name }
+            }
         }
-    }"""
-        % pattern
-    )
+    """
 
-    result = nautobot.graphql.query(query)
+    result = nautobot.graphql.query(query, variables={"pattern": pattern})
     if not result.json or result.json.get("errors"):
         raise Exception(f"Nautobot switch graphql query failed: {result}")
     switches = result.json["data"]["devices"]

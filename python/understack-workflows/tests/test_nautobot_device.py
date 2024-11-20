@@ -26,8 +26,8 @@ class FakeNautobot:
             pass
 
     class Graphql:
-        def query(self, graphql):
-            if "61:80" in graphql:
+        def query(self, graphql, variables=None):
+            if "pattern" in graphql and variables:
                 return FakeNautobot.SwitchResponse()
             if "33GSW04" in graphql:
                 return FakeNautobot.GraphqlResponse(
