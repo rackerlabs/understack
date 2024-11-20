@@ -30,17 +30,20 @@ flowchart TD
   B[Global] --> E[Region N];
 ```
 
-A fully functioning system only needs one Management environment, one Global
-environment and one or more Regions. In this configuration, the Management
-environment is responsible for utilizing the [GitOps][gitops] tool to deploy
-the expected state to all other environments. The Global environment is
+A fully functioning system only needs one _Management_ environment, one _Global_
+environment and one or more _Region_ environment(s). In this configuration,
+the _Management_ environment is responsible for utilizing our [GitOps][gitops]
+tool, [ArgoCD][argocd] to deploy the expected state to all other environments.
+While the _Global_ environment is
 responsible for hosting any services that are expected to exist only once
-for a whole system deployment such as the DCIM/IPAM tool. While the Region
+for a whole system deployment such as the DCIM/IPAM tool. While the _Region_
 environments will run the tools and services that need to live close to the
 actual hardware.
 
-In fact, one Management environment can control multiple systems; for example,
-a staging environment and a production environment.
+In fact, one _Management_ environment can control multiple _Global_ environments
+and their associated _Region_ environments. We call the grouping of the _Global_
+environment and it's associated _Region_ environments a _partition_. An example
+would be a staging partition and a production partition.
 
 ```mermaid
 flowchart TD
@@ -49,10 +52,11 @@ flowchart TD
   B[Global] --> C[Region A];
   B[Global] --> D[Region B...];
   B[Global] --> E[Region N];
-  A[Management] --> |prod| F[Global];
-  F[Global] --> G[Region A];
-  F[Global] --> H[Region B...];
-  F[Global] --> I[Region N];
+  A[Management] --> |production| F[Global];
+  F[Global] --> G[Region D];
+  F[Global] --> H[Region E...];
+  F[Global] --> I[Region Z];
 ```
 
+[argocd]: <https://argo-cd.readthedocs.io/en/stable/>
 [gitops]: <https://about.gitlab.com/topics/gitops/>
