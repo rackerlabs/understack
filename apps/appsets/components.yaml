@@ -168,9 +168,9 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'workflows'
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: 'workflows'
+                    # - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                    #   targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                    #   path: 'workflows'
                 - component: chrony
                   componentNamespace: openstack
                   skipComponent: '{{has "chrony" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
