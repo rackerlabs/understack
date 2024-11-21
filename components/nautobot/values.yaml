@@ -42,6 +42,8 @@ nautobot:
       mountPath: /opt/nautobot/sso/
       readOnly: true
 
+  extraEnvVarsCM:
+    - nautobot-sso
   extraEnvVarsSecret:
     - nautobot-custom-env
 

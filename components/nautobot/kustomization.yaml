@@ -13,3 +13,14 @@ configMapGenerator:
       - dexauth.py
     options:
       disableNameSuffixHash: true
+  - name: nautobot-sso
+    literals:
+      # enables SOCIAL_AUTH_PIPELINE to load the group_sync plugin
+      - NAUTOBOT_SSO_ENABLE_GROUP_SYNC="true"
+      # which claim should be read for the groups
+      - NAUTOBOT_SSO_CLAIMS_GROUP="groups"
+      # comma separated list to get these permissions
+      - NAUTOBOT_SSO_STAFF_GROUPS="ucadmin"
+      - NAUTOBOT_SSO_SUPERUSER_GROUPS="ucadmin"
+    options:
+      disableNameSuffixHash: true
