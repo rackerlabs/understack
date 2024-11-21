@@ -2,7 +2,7 @@ class ProvisionStateMapper:
     STATUS_MAP = {
         "active": "Active",
         "enroll": "Planned",
-        "available": "Inventory",
+        "available": "Available",
         "deploy failed": "Quarantine",
         "error": "Quarantine",
         "rescue": "Quarantine",
