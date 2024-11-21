@@ -60,7 +60,7 @@ class FlavorSpec:
         https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html
         """
         converted_name = re.sub(r"[^\w]", "", self.stripped_name).upper()
-        return f"RESOURCES:CUSTOM_BAREMETAL_{converted_name}"
+        return f"resources:CUSTOM_BAREMETAL_{converted_name}"
 
     @property
     def env_type(self):

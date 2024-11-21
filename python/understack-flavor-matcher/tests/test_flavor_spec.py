@@ -329,7 +329,7 @@ def test_memory_gib(valid_yaml):
 def test_baremetal_nova_resource_class(valid_yaml):
     flv = FlavorSpec.from_yaml(valid_yaml)
     assert (
-        flv.baremetal_nova_resource_class == "RESOURCES:CUSTOM_BAREMETAL_GP2ULTRAMEDIUM"
+        flv.baremetal_nova_resource_class == "resources:CUSTOM_BAREMETAL_GP2ULTRAMEDIUM"
     )
 
 
