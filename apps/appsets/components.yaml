@@ -84,7 +84,7 @@ spec:
                           ingress:
                             hostname: 'nautobot.{{index .metadata.annotations "dns_zone" }}'
                         valueFiles:
-                          - $understack/components/nautobot/nautobot-values.yaml
+                          - $understack/components/nautobot/values.yaml
                           - $deploy/{{.name}}/helm-configs/nautobot.yaml
                         ignoreMissingValueFiles: true
                         fileParameters:
