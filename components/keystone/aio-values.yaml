@@ -21,8 +21,8 @@ bootstrap:
 
     # create 'flavorsync' user to allow synchronization of the flavors to nova
     openstack user create --or-show --domain service --password abcd1234 flavorsync
-    openstack role create --or-show --domain service flavorsync
-    openstack role add --user-domain service --user flavorsync flavorsync
+    openstack role create --or-show flavorsync
+    openstack role add --user flavorsync --user-domain service --domain default --inherited  flavorsync
 
     # create 'monitoring' user for monitoring usage
     openstack user create --or-show --domain infra --password monitoring_demo monitoring
