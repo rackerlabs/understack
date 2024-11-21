@@ -16,9 +16,9 @@ def _env_list(field: str, default: str) -> list[str]:
 
 
 logger = logging.getLogger("auth.Dex")
-GROUPS_ATTR_NAME = "groups"
-SUPERUSER_GROUPS = _env_list("DEX_SUPERUSER_GROUPS", "ucadmin")
-STAFF_GROUPS = _env_list("DEX_STAFF_GROUPS", "ucadmin")
+GROUPS_ATTR_NAME = os.getenv("NAUTOBOT_SSO_CLAIMS_GROUP", "groups")
+SUPERUSER_GROUPS = _env_list("NAUTOBOT_SSO_SUPERUSER_GROUPS")
+STAFF_GROUPS = _env_list("NAUTOBOT_SSO_STAFF_GROUPS")
 
 
 def group_sync(uid, user=None, response=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg, unused-argument
