@@ -1,4 +1,3 @@
-import json
 import re
 from dataclasses import dataclass
 from ipaddress import IPv4Interface
@@ -139,29 +138,28 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
 def nautobot_switches(nautobot, mac_addresses: set[str]) -> dict[str, dict]:
     """Get switches by MAC address.
 
+    Assumes switch MAC addresses are present in Nautobot in a custom field on
+    Device called chassis_mac_address.
+
     Assumes that MAC addresses in Nautobot are normalized to upcase
     AA:BB:CC:DD:EE:FF form.
 
-    We store the MAC address in the nautobot device "asset tag" field because
-    there was nowhere else to put it.
-
     returns a dict[mac_address] -> dict switch information indexed by mac
     """
-    formatted_list = json.dumps(list(mac_addresses))
+    pattern = "|".join(mac_addresses)
 
-    query = (
-        """{
-        devices(asset_tag: %s){
-            id name
-            mac: asset_tag
-            location { id name }
-            rack { id name }
+    query = """
+        query($pattern: [String!]){
+            devices(cf_chassis_mac_address__re: $pattern){
+                id name
+                mac: cf_chassis_mac_address
+                location { id name }
+                rack { id name }
+            }
         }
-    }"""
-        % formatted_list
-    )
+    """
 
-    result = nautobot.graphql.query(query)
+    result = nautobot.graphql.query(query, variables={"pattern": pattern})
     if not result.json or result.json.get("errors"):
         raise Exception(f"Nautobot switch graphql query failed: {result}")
     switches = result.json["data"]["devices"]
@@ -177,9 +175,8 @@ def nautobot_switch(all_switches, interface):
         raise Exception(
             f"Looking for a switch in nautobot that matches the LLDP "
             f"info reported by server BMC - "
-            f"No device found in nautobot with asset_tag {mac_address} "
-            f"nor the calculated base mac address {base_mac_address}"
-            f"{all_switches}"
+            f"No device in nautobot with chassis_mac_address {mac_address}, "
+            f"nor the calculated base mac address {base_mac_address}."
         )
     return switch
 
@@ -225,33 +222,35 @@ def _parse_manufacturer(name: str) -> str:
 
 
 def nautobot_server(nautobot, serial: str) -> NautobotDevice | None:
-    query = f"""{{
-        devices(serial: ["{serial}"]){{
-            id name
-            location {{ id name }}
-            rack {{ id name }}
-            interfaces {{
+    query = """
+        query($serial: String!){
+            devices(serial: [$serial]){
                 id name
-                type description mac_address
-                status {{ name }}
-                connected_interface {{
+                location { id name }
+                rack { id name }
+                interfaces {
                     id name
-                    device {{
+                    type description mac_address
+                    status { name }
+                    connected_interface {
                         id name
-                        mac: asset_tag
-                        location {{ id name }}
-                        rack {{ id name }}
-                    }}
-                }}
-                ip_addresses {{
-                    id host
-                    parent {{ prefix }}
-                }}
-            }}
-        }}
-    }}"""
+                        device {
+                            id name
+                            mac: cf_chassis_mac_address
+                            location { id name }
+                            rack { id name }
+                        }
+                    }
+                    ip_addresses {
+                        id host
+                        parent { prefix }
+                    }
+                }
+            }
+        }
+    """
 
-    result = nautobot.graphql.query(query)
+    result = nautobot.graphql.query(query, variables={"serial": serial})
     if not result.json or result.json.get("errors"):
         raise Exception(f"Nautobot server graphql query failed: {result}")
 
