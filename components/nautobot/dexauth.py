@@ -6,8 +6,8 @@ import os
 from django.contrib.auth.models import Group
 
 
-def _env_list(field: str, default: str) -> list[str]:
-    data = os.getenv(field, default)
+def _env_list(field: str) -> list[str]:
+    data = os.getenv(field)
     if not data:
         return []
     if not isinstance(data, str):
