@@ -59,7 +59,7 @@ class FlavorSpec:
 
         https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html
         """
-        converted_name = re.sub(r"[^\w]", "", self.stripped_name).upper()
+        converted_name = re.sub(r"[^\w]", "_", self.stripped_name).upper()
         return f"resources:CUSTOM_BAREMETAL_{converted_name}"
 
     @property
