@@ -49,8 +49,6 @@ class FlavorSpec:
         _, name = self.name.split(".", 1)
         if not name:
             raise Exception(f"Unable to strip envtype from flavor: {self.name}")
-        # need to strip '.' from the ironic flavor name
-        name = name.replace(".", "")
         return name
 
     @property
