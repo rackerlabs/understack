@@ -74,20 +74,32 @@ pod:
           - mountPath: /etc/nb-token/
             name: nb-token
             readOnly: true
+          - mountPath: /etc/undersync/
+            name: undersync-token
+            readOnly: true
         volumes:
           - name: nb-token
             secret:
               secretName: nautobot-token
+          - name: undersync-token
+            secret:
+              secretName: undersync-token
     neutron_rpc_server:
       neutron_rpc_server:
         volumeMounts:
           - mountPath: /etc/nb-token/
             name: nb-token
             readOnly: true
+          - mountPath: /etc/undersync/
+            name: undersync-token
+            readOnly: true
         volumes:
           - name: nb-token
             secret:
               secretName: nautobot-token
+          - name: undersync-token
+            secret:
+              secretName: undersync-token
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:
   dynamic:
