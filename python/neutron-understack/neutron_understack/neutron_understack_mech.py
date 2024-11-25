@@ -16,8 +16,8 @@ from neutron_lib.plugins.ml2.api import (
 from oslo_config import cfg
 
 from neutron_understack import config
-from neutron_understack.argo.workflows import ArgoClient
 from neutron_understack.nautobot import Nautobot
+from neutron_understack.undersync import Undersync
 
 LOG = logging.getLogger(__name__)
 
@@ -112,11 +112,7 @@ class UnderstackDriver(MechanismDriver):
     def initialize(self):
         conf = cfg.CONF.ml2_understack
         self.nb = Nautobot(conf.nb_url, conf.nb_token)
-        self.argo_client = ArgoClient(
-            logger=LOG,
-            api_url=cfg.CONF.ml2_type_understack.argo_api_url,
-            namespace=cfg.CONF.ml2_type_understack.argo_namespace,
-        )
+        self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
 
     def create_network_precommit(self, context):
         log_call("create_network_precommit", context)
@@ -214,12 +210,18 @@ class UnderstackDriver(MechanismDriver):
     def update_port_postcommit(self, context):
         log_call("update_port_postcommit", context)
 
-        self._move_to_network(
-            vif_type=context.current["binding:vif_type"],
-            mac_address=context.current["mac_address"],
-            device_uuid=context.current["binding:host_id"],
-            network_id=context.current["network_id"],
-            argo_client=self.argo_client,
+        vif_type = context.current["binding:vif_type"]
+
+        if vif_type != portbindings.VIF_TYPE_OTHER:
+            return
+
+        network_id = context.current["network_id"]
+        connected_interface_uuid = self.fetch_connected_interface_uuid(context)
+        nb_vlan_group_id = self.update_nautobot(network_id, connected_interface_uuid)
+
+        self.undersync.sync_devices(
+            vlan_group_uuids=str(nb_vlan_group_id),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
     def delete_port_precommit(self, context):
@@ -227,35 +229,6 @@ class UnderstackDriver(MechanismDriver):
 
     def delete_port_postcommit(self, context):
         log_call("delete_port_postcommit", context)
-
-        vif_type = context.current["binding:vif_type"]
-        mac_address = context.current["mac_address"]
-        network_id = context.current["network_id"]
-
-        if vif_type != portbindings.VIF_TYPE_OTHER:
-            return
-
-        LOG.debug(
-            f"Detaching network with ID: {network_id} from port "
-            f"with MAC address {mac_address}"
-        )
-
-        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
-            return self.nb.reset_port_status(mac_address)
-
-        nb_vlan_group_id = self.nb.detach_port(network_id, mac_address)
-
-        result = self.argo_client.submit(
-            template_name="undersync-switch",
-            entrypoint="undersync-switch",
-            parameters={
-                "switch_uuids": [str(nb_vlan_group_id)],
-                "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
-                "force": cfg.CONF.ml2_type_understack.argo_force,
-            },
-            service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
-        )
-        LOG.info(f"Undersync workflow submitted: {result}")
 
     def bind_port(self, context):
         log_call("bind_port", context)
@@ -300,45 +273,49 @@ class UnderstackDriver(MechanismDriver):
     def check_vlan_transparency(self, context):
         log_call("check_vlan_transparency", context)
 
-    def _move_to_network(
-        self,
-        vif_type: str,
-        mac_address: str,
-        device_uuid: UUID,
-        network_id: str,
-        argo_client: ArgoClient,
-    ):
-        """Triggers Argo "trigger-undersync" workflow.
+    def fetch_connected_interface_uuid(self, context: PortContext) -> str:
+        """Fetches the connected interface UUID from the port context.
 
-        This has the effect of connecting our server to the given networks: either
-        "provisioning" (for PXE booting) or "tenant" (normal access to customer's
-        networks).  The choice of network is based on the network ID.
-
-        This only happens when vif_type is VIF_TYPE_OTHER.
-
-        argo_client is injected by the caller to make testing easier
+        :param context: The context of the port.
+        :return: The connected interface UUID.
         """
-        if vif_type != portbindings.VIF_TYPE_OTHER:
-            return
-
-        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
-            network_name = "provisioning"
-        else:
-            network_name = "tenant"
-
-        LOG.debug(f"Selected {network_name=} for {device_uuid=} {mac_address=}")
-
-        result = argo_client.submit(
-            template_name="undersync-device",
-            entrypoint="trigger-undersync",
-            parameters={
-                "interface_mac": mac_address,
-                "device_uuid": device_uuid,
-                "network_name": network_name,
-                "network_id": network_id,
-                "dry_run": cfg.CONF.ml2_type_understack.argo_dry_run,
-                "force": cfg.CONF.ml2_type_understack.argo_force,
-            },
-            service_account=cfg.CONF.ml2_type_understack.argo_workflow_sa,
+        connected_interface_uuid = (
+            context.current["binding:profile"]
+            .get("local_link_information")[0]
+            .get("port_id")
         )
-        LOG.info(f"Binding workflow submitted: {result}")
+        try:
+            UUID(str(connected_interface_uuid))
+        except ValueError:
+            LOG.debug(
+                "Local link information port_id is not a valid UUID type"
+                " port_id: %(connected_interface_uuid)s",
+                {"connected_interface_uuid": connected_interface_uuid},
+            )
+            raise
+        return connected_interface_uuid
+
+    def update_nautobot(self, network_id: str, connected_interface_uuid: str) -> UUID:
+        """Updates Nautobot with the new network ID and connected interface UUID.
+
+        If the network ID is a provisioning network, sets the interface status to
+        "Provisioning-Interface" and configures Nautobot for provisioning mode.
+        If the network ID is a tenant network, sets the interface status to a tenant
+        status and triggers a Nautobot Job to update the switch interface for tenant
+        mode. In either case, retrieves and returns the VLAN Group UUID for the
+        specified network and interface.
+        :param network_id: The ID of the network.
+        :param connected_interface_uuid: The UUID of the connected interface.
+        :return: The VLAN group UUID.
+        """
+        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+            port_status = "Provisioning-Interface"
+            configure_port_status_data = self.nb.configure_port_status(
+                connected_interface_uuid, port_status
+            )
+            switch_uuid = configure_port_status_data.get("device", {}).get("id")
+            return UUID(self.nb.fetch_vlan_group_uuid(switch_uuid))
+        else:
+            return UUID(
+                self.nb.prep_switch_interface(connected_interface_uuid, network_id)
+            )

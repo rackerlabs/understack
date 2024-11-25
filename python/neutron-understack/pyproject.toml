@@ -73,6 +73,7 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "neutron_understack/tests/*.py" = [
     "S311",     # allow non-cryptographic secure bits for test data
+    "S101",
 ]
 
 [tool.poetry.plugins."neutron.ml2.mechanism_drivers"]
