@@ -1,24 +1,64 @@
+import inspect
 import pathlib
 from urllib.parse import urljoin
 
 import requests
 from oslo_log import log
+from requests.models import HTTPError
 
 LOG = log.getLogger(__name__)
 
 
+class NautobotError(Exception):
+    pass
+
+
 class Nautobot:
+    CALLER_FRAME = 1
+
     def __init__(self, nb_url: str | None = None, nb_token: str | None = None):
         """Basic Nautobot wrapper because pynautobot doesn't expose plugin APIs."""
         self.base_url = nb_url or "http://nautobot-default.nautobot.svc.cluster.local"
-        self.token = nb_token or self.fetch_nb_token()
+        self.token = nb_token or self._fetch_nb_token()
         self.s = requests.Session()
         self.s.headers.update({"Authorization": f"Token {self.token}"})
 
-    def fetch_nb_token(self):
+    def _fetch_nb_token(self):
         file = pathlib.Path("/etc/nb-token/token")
         with file.open() as f:
             return f.read().strip()
+
+    def _log_and_raise_for_status(self, response):
+        try:
+            response.raise_for_status()
+        except HTTPError as error:
+            LOG.error("Nautobot error: %(error)s", {"error": error})
+            raise NautobotError() from error
+
+    def make_api_request(
+        self, url: str, method: str, payload: dict | None = None
+    ) -> dict:
+        endpoint_url = urljoin(self.base_url, url)
+        caller_function = inspect.stack()[self.CALLER_FRAME].function
+        http_method = method.upper()
+
+        LOG.debug(
+            "%(caller_function)s payload: %(payload)s",
+            {"payload": payload, "caller_function": caller_function},
+        )
+        resp = self.s.request(http_method, endpoint_url, timeout=10, json=payload)
+
+        if resp.content:
+            resp_data = resp.json()
+        else:
+            resp_data = {"status_code": resp.status_code}
+
+        LOG.debug(
+            "%(caller_function)s resp: %(resp)s",
+            {"resp": resp_data, "caller_function": caller_function},
+        )
+        self._log_and_raise_for_status(resp)
+        return resp_data
 
     def ucvni_create(
         self,
@@ -38,52 +78,52 @@ class Nautobot:
             payload["ucvni_id"] = segment_id
             payload["ucvni_type"] = "INFRA"
 
-        url = urljoin(self.base_url, "/api/plugins/undercloud-vni/ucvnis/")
-        LOG.debug("ucvni_create payload: %(payload)s", {"payload": payload})
-        resp = self.s.post(url, json=payload, timeout=10)
-        LOG.debug("ucvni_create resp: %(resp)s", {"resp": resp.json()})
-        resp.raise_for_status()
+        url = "/api/plugins/undercloud-vni/ucvnis/"
+        resp_data = self.make_api_request(url, "post", payload)
+        return resp_data
 
     def ucvni_delete(self, network_id):
-        payload = {"id": network_id}
+        url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
+        return self.make_api_request(url, "delete")
 
-        ucvni_url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
-        url = urljoin(self.base_url, ucvni_url)
-        LOG.debug("ucvni_delete payload: %(payload)s", {"payload": payload})
-        resp = self.s.delete(url, json=payload, timeout=10)
-        LOG.debug("ucvni_delete resp: %(resp)s", {"resp": resp.status_code})
-        resp.raise_for_status()
+    def prep_switch_interface(
+        self, connected_interface_id: str, ucvni_uuid: str
+    ) -> str:
+        """Runs a Nautobot Job to update a switch interface for tenant mode.
 
-    def detach_port(self, network_id, mac_address):
+        The nautobot job will assign vlans as required and set the interface
+        into the correct mode for "normal" tenant operation.
+
+        The vlan group ID is returned.
+        """
+        url = "/api/plugins/undercloud-vni/prep_switch_interface"
         payload = {
-            "ucvni_uuid": network_id,
-            "server_interface_mac": mac_address,
+            "ucvni_id": str(ucvni_uuid),
+            "connected_interface_id": str(connected_interface_id),
         }
+        resp_data = self.make_api_request(url, "post", payload)
 
-        url = urljoin(self.base_url, "/api/plugins/undercloud-vni/detach_port")
-        LOG.debug("detach_port payload: %(payload)s", {"payload": payload})
-        resp = self.s.post(url, json=payload, timeout=10)
-        resp_data = resp.json()
-        LOG.debug("detach_port resp: %(resp)s", {"resp": resp_data})
-        resp.raise_for_status()
         return resp_data["vlan_group_id"]
 
-    def reset_port_status(self, mac_address):
-        intf_url = urljoin(
-            self.base_url, f"/api/dcim/interfaces/?mac_address={mac_address}"
-        )
-        intf_resp = self.s.get(intf_url, timeout=10)
-        intf_resp_data = intf_resp.json()
+    def configure_port_status(self, interface_uuid: str, status: str) -> dict:
+        url = f"/api/dcim/interfaces/{interface_uuid}/"
+        payload = {"status": {"name": status}}
+        resp_data = self.make_api_request(url, "patch", payload)
+        return resp_data
 
-        LOG.debug("reset_port interface resp: %(resp)s", {"resp": intf_resp_data})
-        intf_resp.raise_for_status()
+    def fetch_vlan_group_uuid(self, device_uuid: str) -> str:
+        url = f"/api/dcim/devices/{device_uuid}/?include=relationships"
 
-        conn_intf_url = intf_resp_data["results"][0]["connected_endpoint"]["url"]
-
-        payload = {"status": {"name": "Active"}}
-        resp = self.s.patch(conn_intf_url, json=payload, timeout=10)
+        resp_data = self.make_api_request(url, "get")
+        try:
+            vlan_group_uuid = resp_data["relationships"]["vlan_group_to_devices"][
+                "source"
+            ]["objects"][0]["id"]
+        except (KeyError, IndexError, TypeError) as error:
+            LOG.error("vlan_group_uuid_error: %(error)s", {"error": error})
+            raise NautobotError() from error
 
         LOG.debug(
-            "reset_port connected interface resp: %(resp)s", {"resp": resp.json()}
+            "vlan_group_uuid: %(vlan_group_uuid)s", {"vlan_group_uuid": vlan_group_uuid}
         )
-        resp.raise_for_status()
+        return vlan_group_uuid
