@@ -1,35 +1,47 @@
 {
   "admin_state_up": true,
   "allowed_address_pairs": [],
-  "binding:host_id": "",
-  "binding:profile": {},
-  "binding:vif_details": {},
-  "binding:vif_type": "unbound",
-  "binding:vnic_type": "normal",
-  "created_at": "2024-07-24T13:42:24Z",
+  "binding:host_id": "4c2e4c6e-bdbe-4d93-857f-a6003884e8cc",
+  "binding:profile": {
+    "local_link_information": [
+      {
+        "port_id": "03921f8d-b4de-412e-a733-f8eade4c6268",
+        "switch_id": "11:22:33:44:55:66"
+      }
+    ]
+  },
+  "binding:vif_details": {
+    "bound_drivers": {
+      "0": "understack"
+    }
+  },
+  "binding:vif_type": "other",
+  "binding:vnic_type": "baremetal",
+  "created_at": "2024-11-13T10:40:50Z",
   "description": "",
-  "device_id": "41d18c6a-5548-4ee9-926f-4e3ebf43153f",
+  "device_id": "e5e28c6a-abea-4974-9f25-748ee149ab38",
   "device_owner": "compute:nova",
   "extra_dhcp_opts": [],
   "fixed_ips": [
     {
-      "ip_address": "192.168.17.17",
-      "subnet_id": "7f2f436c-fd65-44b0-9265-6b642cecbec5"
+      "ip_address": "172.16.0.197",
+      "subnet_id": "304bd384-338a-4365-9394-0c356ec698ed"
     }
   ],
-  "id": "e5d5cd73-ca9a-4b74-9d52-43188d0cdcaa",
-  "mac_address": "fa:16:3e:35:1c:3d",
+  "id": "9238973b-57d7-43f3-b425-8114e225913c",
+  "ip_allocation": "immediate",
+  "mac_address": "d4:04:e6:4f:87:84",
   "name": "",
-  "network_id": "c2702769-5592-4555-8ae6-e670db82c31e",
+  "network_id": "0c9f8f79-66d3-41c8-99c2-83bc0354e02b",
   "port_security_enabled": true,
-  "project_id": "ebc5b22e420d4dfc9e385a63b4583623",
-  "revision_number": 2,
+  "project_id": "d3c2c85bdbf24ff5843f323524b63768",
+  "revision_number": 6,
   "security_groups": [
-    "684dcc25-f419-44a5-b4e7-fdcad4335ecd"
+    "73d7e451-fa23-4a98-8897-c9ef1b1d531b"
   ],
-  "standard_attr_id": 56,
-  "status": "DOWN",
+  "standard_attr_id": 508,
+  "status": "ACTIVE",
   "tags": [],
-  "tenant_id": "ebc5b22e420d4dfc9e385a63b4583623",
-  "updated_at": "2024-07-24T13:42:25Z"
+  "tenant_id": "d3c2c85bdbf24ff5843f323524b63768",
+  "updated_at": "2024-11-13T10:40:58Z"
 }
