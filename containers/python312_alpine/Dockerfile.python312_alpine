@@ -1,7 +1,7 @@
 FROM python:3.12.2-alpine3.19 AS builder
 
 LABEL org.opencontainers.image.title="Python 3.12 image base image"
-LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19"
+LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/python3.12.2-alpine3.19"
 LABEL org.opencontainers.image.source=https://github.com/rackerlabs/understack
 
 ENV PYTHONUNBUFFERED=1
@@ -23,12 +23,12 @@ CMD ["python", "-"]
 #    Note: After installing dependencies, switch back to `USER appuser` if root access was required at build time.
 #
 # Example usage in final image
-# FROM ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19
+# FROM ghcr.io/rackerlabs/understack/python3.12.2-alpine3.19
 #
 # RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
 # RUN --mount=type=cache,target=/root/.cache/.pip pip install --no-cache-dir python-ironicclient==5.4.0
 #
-# FROM ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19 as prod
+# FROM ghcr.io/rackerlabs/understack/python3.12.2-alpine3.19 as prod
 # ENV PATH="/opt/venv/bin:$PATH"
 # COPY --from=builder /opt/venv /opt/venv
 # USER appuser

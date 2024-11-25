@@ -1,4 +1,4 @@
-ARG BASE=ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest
+ARG BASE=ghcr.io/rackerlabs/understack/python3.11.8-alpine3.19:latest
 FROM ${BASE} AS builder
 
 RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
