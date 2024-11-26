@@ -21,6 +21,7 @@ class InterfaceInfo:
     dhcp: bool = False
     remote_switch_mac_address: str | None = None
     remote_switch_port_name: str | None = None
+    remote_switch_data_stale: bool = False
 
 
 @dataclass(frozen=True)
@@ -232,16 +233,19 @@ def parse_lldp_port(port_data: dict[str, str]) -> dict:
     """
     mac = str(port_data["SwitchConnectionID"]).upper()
     port_name = normalize_interface_name(port_data["SwitchPortConnectionID"])
+    stale = str(port_data["StaleData"]) != "NotStale"
 
     if mac in ["NOT AVAILABLE", "NO LINK", "NOT SUPPORTED"]:
         return {
             "remote_switch_mac_address": None,
             "remote_switch_port_name": None,
+            "remote_switch_data_stale": stale,
         }
     else:
         return {
             "remote_switch_mac_address": mac,
             "remote_switch_port_name": port_name,
+            "remote_switch_data_stale": stale,
         }
 
 

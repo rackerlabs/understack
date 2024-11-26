@@ -169,6 +169,9 @@ def nautobot_switches(nautobot, mac_addresses: set[str]) -> dict[str, dict]:
 
 
 def nautobot_switch(all_switches: dict[str, Any], interface: InterfaceInfo):
+    if interface.remote_switch_data_stale:
+        logger.info(f"Warning: BMC marked LLDP data stale for {interface.name}")
+
     if not interface.remote_switch_mac_address or not interface.remote_switch_port_name:
         raise ValueError(f"missing LDLDP info in {interface}")
 
