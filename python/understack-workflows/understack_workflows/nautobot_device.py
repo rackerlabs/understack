@@ -54,7 +54,7 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
     # TODO: performance: our single graphql query here fetches the device from
     # nautobot with all existing interfaces, macs, cable and connected switches.
     # We then query some of those items again, which adds unnecessary
-    # round-trips to the DRAC.
+    # round-trips to Nautobot and/or DRAC.
     #
     # TODO: delete any extra items from nautobot (however we don't want to
     # delete cables that temporarily went down).
@@ -396,13 +396,17 @@ def connect_interface_to_switch(
 
 
 def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface, mac):
+    """Find or create IP Address in Nautobot IPAM.
+
+    If the existing IP address is a "dhcp" type then upgrade it to a "host" type.
+    """
     try:
         ip = nautobot.ipam.ip_addresses.get(address=str(ipv4_address.ip))
         if ip and ip.type == "dhcp" and ip.custom_fields.get("pydhcp_mac") == mac:
-            # Make our DHCP assignment permanent:
+            logger.info(f"Making DHCP lease permanent in Nautobot {dict(ip)}")
             ip.update(type="host", cf_pydhcp_expire=None)
         elif ip:
-            logger.info(f"Nautobot IP already exists! {dict(ip)}")
+            logger.info(f"{ipv4_address} exists as {ip.id} in Nautobot IPAM")
         else:
             ip = nautobot.ipam.ip_addresses.create(
                 address=str(ipv4_address.ip),
@@ -419,17 +423,35 @@ def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface,
 
 
 def associate_ip_address(nautobot, nautobot_interface, ip_id):
-    identity = {
-        "ip_address": ip_id,
-        "interface": nautobot_interface.id,
-    }
-    try:
-        if nautobot.ipam.ip_address_to_interface.get(**identity):
-            logger.info(f"IP address {ip_id} is already on {nautobot_interface.name}")
-        else:
-            nautobot.ipam.ip_address_to_interface.create(**identity, is_primary=True)
-            logger.info(f"Associated IP address {ip_id} with {nautobot_interface.name}")
-    except pynautobot.core.query.RequestError as e:  # type: ignore
+    """Associate a given IP Address with a given Interface in Nautobot IPAM.
+
+    If the IP Address is already associated with some other Interface then an
+    Exception is raised.
+
+    If the Interface is already associated to some other IP addres then an
+    Exception is raised.
+    """
+    existing_association = nautobot.ipam.ip_address_to_interface.get(ip_address=ip_id)
+
+    if existing_association is None:
+        try:
+            nautobot.ipam.ip_address_to_interface.create(
+                ip_address=ip_id,
+                interface=nautobot_interface.id,
+                is_primary=True
+            )
+        except pynautobot.core.query.RequestError as e:  # type: ignore
+            raise Exception(
+                f"Failed to associate IPAddress {ip_id} in Nautobot: {e}"
+            ) from None
+        logger.info(f"Associated IP address {ip_id} with {nautobot_interface.name}")
+    elif existing_association.interface == nautobot_interface.id:
+        logger.info(
+            f"IP address {ip_id} already correct on {nautobot_interface.name}"
+        )
+    else:
         raise Exception(
-            f"Failed to associate IPAddress {ip_id} in Nautobot: {e}"
+            f"Failed to document discovered server in Nautobot - IP Address "
+            f"{ip_id} is already associated with some other interface: "
+            f"{existing_association.interface.id=} {existing_association.display}"
         ) from None
