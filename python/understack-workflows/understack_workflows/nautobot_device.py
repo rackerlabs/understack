@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 from ipaddress import IPv4Interface
+from typing import Any
 
 import pynautobot
 
@@ -110,7 +111,7 @@ def location_from(switches):
     return next(iter(locations))
 
 
-def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
+def switches_for(nautobot, chassis_info: ChassisInfo) -> dict[str, dict]:
     """Get all possible switches from the discovered LLDP neighbor information.
 
     We search for two possible mac addresses for each neighbor because some
@@ -167,16 +168,19 @@ def nautobot_switches(nautobot, mac_addresses: set[str]) -> dict[str, dict]:
     return {switch["mac"]: switch for switch in switches}
 
 
-def nautobot_switch(all_switches, interface):
+def nautobot_switch(all_switches: dict[str, Any], interface: InterfaceInfo):
+    if not interface.remote_switch_mac_address or not interface.remote_switch_port_name:
+        raise ValueError(f"missing LDLDP info in {interface}")
+
     mac_address = interface.remote_switch_mac_address
     base_mac_address = base_mac(mac_address, interface.remote_switch_port_name)
     switch = all_switches.get(mac_address, all_switches.get(base_mac_address))
     if not switch:
         raise Exception(
-            f"Looking for a switch in nautobot that matches the LLDP "
-            f"info reported by server BMC - "
-            f"No device in nautobot with chassis_mac_address {mac_address}, "
-            f"nor the calculated base mac address {base_mac_address}."
+            f"There is no switch Device in nautobot that matches the LLDP info "
+            f"reported by server BMC for {interface} - I was looking for "
+            f"chassis_mac_address= {mac_address}, or the calculated base mac "
+            f"chassis_mac_address= {base_mac_address}."
         )
     return switch
 
@@ -197,7 +201,9 @@ def base_mac(mac: str, port_name: str) -> str:
     return ":".join(hexadecimal[i : i + 2] for i in range(0, 12, 2))
 
 
-def server_device_payload(location_id, rack_id, chassis_info):
+def server_device_payload(
+    location_id: str, rack_id: str, chassis_info: ChassisInfo
+) -> dict:
     manufacturer = _parse_manufacturer(chassis_info.manufacturer)
     name = f"{manufacturer}-{chassis_info.serial_number}"
 
@@ -298,14 +304,18 @@ def parse_interface(data: dict) -> NautobotInterface:
     )
 
 
-def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
+def find_or_create_interfaces(
+    nautobot, chassis_info: ChassisInfo, device_id, switches: dict[str, dict]
+):
     """Update Nautobot Device Interfaces using the Nautobot API."""
     for interface in chassis_info.interfaces:
         if interface.mac_address:
             setup_nautobot_interface(nautobot, interface, device_id, switches)
 
 
-def setup_nautobot_interface(nautobot, interface: InterfaceInfo, device_id, switches):
+def setup_nautobot_interface(
+    nautobot, interface: InterfaceInfo, device_id, switches: dict[str, dict]
+):
     nautobot_int = find_or_create_interface(nautobot, interface, device_id)
 
     if interface.ipv4_address:
