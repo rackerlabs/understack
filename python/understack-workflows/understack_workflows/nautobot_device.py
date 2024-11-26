@@ -345,7 +345,7 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str)
     server_nautobot_interface = nautobot.dcim.interfaces.get(**id)
     if server_nautobot_interface:
         logger.info(
-            f"Updating existing interface {interface.name} "
+            f"Found existing interface {interface.name} "
             f"{server_nautobot_interface.id} in Nautobot"
         )
         server_nautobot_interface.update(attrs)
@@ -401,11 +401,16 @@ def connect_interface_to_switch(
             cable = nautobot.dcim.cables.create(**identity, **attrs)
         except pynautobot.core.query.RequestError as e:  # type: ignore
             raise Exception(
-                f"Failed to create nautobot cable {identity}: {e}"
+                f"Failed to document discovered server in Nautobot - Server "
+                f"Interface {server_nautobot_interface.id} {interface.name} "
+                f"is detected as connected to Switch Interface "
+                f"{switch_interface.id} {connected_switch['name']} "
+                f"{switch_port_name}, but in Nautobot, when we try to create "
+                f"that cable {identity}, Nautobot gave error {e}"
             ) from None
         logger.info(f"Created cable {cable.id} in Nautobot")
     else:
-        logger.info(f"Cable {cable.id} already exists in Nautobot")
+        logger.info(f"Cable {cable.id} already correctly exists in Nautobot")
 
 
 def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface, mac):
@@ -419,7 +424,7 @@ def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface,
             logger.info(f"Making DHCP lease permanent in Nautobot {dict(ip)}")
             ip.update(type="host", cf_pydhcp_expire=None)
         elif ip:
-            logger.info(f"{ipv4_address} exists as {ip.id} in Nautobot IPAM")
+            logger.info(f"IP Address {ipv4_address} found, {ip.id} in Nautobot")
         else:
             ip = nautobot.ipam.ip_addresses.create(
                 address=str(ipv4_address.ip),
@@ -441,30 +446,43 @@ def associate_ip_address(nautobot, nautobot_interface, ip_id):
     If the IP Address is already associated with some other Interface then an
     Exception is raised.
 
-    If the Interface is already associated to some other IP addres then an
+    If the Interface is already associated to some other IP address then an
     Exception is raised.
     """
-    existing_association = nautobot.ipam.ip_address_to_interface.get(ip_address=ip_id)
+    existing_record = nautobot.ipam.ip_address_to_interface.get(ip_address=ip_id)
 
-    if existing_association is None:
-        try:
-            nautobot.ipam.ip_address_to_interface.create(
-                ip_address=ip_id,
-                interface=nautobot_interface.id,
-                is_primary=True
-            )
-        except pynautobot.core.query.RequestError as e:  # type: ignore
-            raise Exception(
-                f"Failed to associate IPAddress {ip_id} in Nautobot: {e}"
-            ) from None
-        logger.info(f"Associated IP address {ip_id} with {nautobot_interface.name}")
-    elif existing_association.interface == nautobot_interface.id:
-        logger.info(
-            f"IP address {ip_id} already correct on {nautobot_interface.name}"
-        )
-    else:
+    if existing_record and existing_record.interface.id == nautobot_interface.id:
+        logger.info(f"IP Address {ip_id} already on {nautobot_interface.name}")
+        return
+    elif existing_record:
         raise Exception(
-            f"Failed to document discovered server in Nautobot - IP Address "
-            f"{ip_id} is already associated with some other interface: "
-            f"{existing_association.interface.id=} {existing_association.display}"
+            f"Failed to document discovered server IP Address in Nautobot - "
+            f"We need to associate IP address {ip_id} with the server "
+            f"interface {nautobot_interface.id}, but the IP address is already "
+            f"associated with another interface {existing_record.interface.id} "
+            f"({existing_record.display})  Please resolve IP address clash and "
+            f"then re-try enrollment."
+        )
+
+    existing_record = nautobot.ipam.ip_address_to_interface.get(
+        interface=nautobot_interface.id
+    )
+    if existing_record:
+        raise Exception(
+            f"Failed to document discovered server IP Address in Nautobot - "
+            f"We need to associate IP address {ip_id} with the server "
+            f"interface {nautobot_interface.id}, but that interface is already "
+            f"associated with a different IP address {existing_record.id} "
+            f"({existing_record.display})  Please resolve IP address clash and "
+            f"then re-try enrollment."
+        )
+
+    try:
+        nautobot.ipam.ip_address_to_interface.create(
+            ip_address=ip_id, interface=nautobot_interface.id, is_primary=True
+        )
+    except pynautobot.core.query.RequestError as e:  # type: ignore
+        raise Exception(
+            f"Failed to associate IPAddress {ip_id} in Nautobot: {e}"
         ) from None
+    logger.info(f"Associated IP address {ip_id} with {nautobot_interface.name}")
