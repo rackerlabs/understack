@@ -34,7 +34,7 @@ driver = UnderstackDriver()
 
 
 def test_fetch_connected_interface_uuid(context):
-    result = driver.fetch_connected_interface_uuid(context)
+    result = driver.fetch_connected_interface_uuid(context.current)
     assert result == "03921f8d-b4de-412e-a733-f8eade4c6268"
 
 
