@@ -105,6 +105,23 @@ class Nautobot:
 
         return resp_data["vlan_group_id"]
 
+    def detach_port(self, connected_interface_id: str, ucvni_uuid: str) -> str:
+        """Runs a Nautobot Job to cleanup a switch interface.
+
+        The nautobot job will find a VLAN that is bound to the UCVNI, remove it
+        from the Interface and if the VLAN is unused it will delete it.
+
+        The vlan group ID is returned.
+        """
+        url = "/api/plugins/undercloud-vni/detach_port"
+        payload = {
+            "ucvni_uuid": str(ucvni_uuid),
+            "connected_interface_id": str(connected_interface_id),
+        }
+        resp_data = self.make_api_request(url, "post", payload)
+
+        return resp_data["vlan_group_id"]
+
     def configure_port_status(self, interface_uuid: str, status: str) -> dict:
         url = f"/api/dcim/interfaces/{interface_uuid}/"
         payload = {"status": {"name": status}}
