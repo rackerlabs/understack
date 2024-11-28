@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 from ipaddress import IPv4Interface
+from typing import Any
 
 import pynautobot
 
@@ -54,7 +55,7 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
     # TODO: performance: our single graphql query here fetches the device from
     # nautobot with all existing interfaces, macs, cable and connected switches.
     # We then query some of those items again, which adds unnecessary
-    # round-trips to the DRAC.
+    # round-trips to Nautobot and/or DRAC.
     #
     # TODO: delete any extra items from nautobot (however we don't want to
     # delete cables that temporarily went down).
@@ -110,7 +111,7 @@ def location_from(switches):
     return next(iter(locations))
 
 
-def switches_for(nautobot, chassis_info: ChassisInfo) -> dict:
+def switches_for(nautobot, chassis_info: ChassisInfo) -> dict[str, dict]:
     """Get all possible switches from the discovered LLDP neighbor information.
 
     We search for two possible mac addresses for each neighbor because some
@@ -167,16 +168,22 @@ def nautobot_switches(nautobot, mac_addresses: set[str]) -> dict[str, dict]:
     return {switch["mac"]: switch for switch in switches}
 
 
-def nautobot_switch(all_switches, interface):
+def nautobot_switch(all_switches: dict[str, Any], interface: InterfaceInfo):
+    if interface.remote_switch_data_stale:
+        logger.info(f"Warning: BMC marked LLDP data stale for {interface.name}")
+
+    if not interface.remote_switch_mac_address or not interface.remote_switch_port_name:
+        raise ValueError(f"missing LDLDP info in {interface}")
+
     mac_address = interface.remote_switch_mac_address
     base_mac_address = base_mac(mac_address, interface.remote_switch_port_name)
     switch = all_switches.get(mac_address, all_switches.get(base_mac_address))
     if not switch:
         raise Exception(
-            f"Looking for a switch in nautobot that matches the LLDP "
-            f"info reported by server BMC - "
-            f"No device in nautobot with chassis_mac_address {mac_address}, "
-            f"nor the calculated base mac address {base_mac_address}."
+            f"There is no switch Device in nautobot that matches the LLDP info "
+            f"reported by server BMC for {interface} - I was looking for "
+            f"chassis_mac_address= {mac_address}, or the calculated base mac "
+            f"chassis_mac_address= {base_mac_address}."
         )
     return switch
 
@@ -197,7 +204,9 @@ def base_mac(mac: str, port_name: str) -> str:
     return ":".join(hexadecimal[i : i + 2] for i in range(0, 12, 2))
 
 
-def server_device_payload(location_id, rack_id, chassis_info):
+def server_device_payload(
+    location_id: str, rack_id: str, chassis_info: ChassisInfo
+) -> dict:
     manufacturer = _parse_manufacturer(chassis_info.manufacturer)
     name = f"{manufacturer}-{chassis_info.serial_number}"
 
@@ -298,14 +307,18 @@ def parse_interface(data: dict) -> NautobotInterface:
     )
 
 
-def find_or_create_interfaces(nautobot, chassis_info: ChassisInfo, device_id, switches):
+def find_or_create_interfaces(
+    nautobot, chassis_info: ChassisInfo, device_id, switches: dict[str, dict]
+):
     """Update Nautobot Device Interfaces using the Nautobot API."""
     for interface in chassis_info.interfaces:
         if interface.mac_address:
             setup_nautobot_interface(nautobot, interface, device_id, switches)
 
 
-def setup_nautobot_interface(nautobot, interface: InterfaceInfo, device_id, switches):
+def setup_nautobot_interface(
+    nautobot, interface: InterfaceInfo, device_id, switches: dict[str, dict]
+):
     nautobot_int = find_or_create_interface(nautobot, interface, device_id)
 
     if interface.ipv4_address:
@@ -332,7 +345,7 @@ def find_or_create_interface(nautobot, interface: InterfaceInfo, device_id: str)
     server_nautobot_interface = nautobot.dcim.interfaces.get(**id)
     if server_nautobot_interface:
         logger.info(
-            f"Updating existing interface {interface.name} "
+            f"Found existing interface {interface.name} "
             f"{server_nautobot_interface.id} in Nautobot"
         )
         server_nautobot_interface.update(attrs)
@@ -388,21 +401,30 @@ def connect_interface_to_switch(
             cable = nautobot.dcim.cables.create(**identity, **attrs)
         except pynautobot.core.query.RequestError as e:  # type: ignore
             raise Exception(
-                f"Failed to create nautobot cable {identity}: {e}"
+                f"Failed to document discovered server in Nautobot - Server "
+                f"Interface {server_nautobot_interface.id} {interface.name} "
+                f"is detected as connected to Switch Interface "
+                f"{switch_interface.id} {connected_switch['name']} "
+                f"{switch_port_name}, but in Nautobot, when we try to create "
+                f"that cable {identity}, Nautobot gave error {e}"
             ) from None
         logger.info(f"Created cable {cable.id} in Nautobot")
     else:
-        logger.info(f"Cable {cable.id} already exists in Nautobot")
+        logger.info(f"Cable {cable.id} already correctly exists in Nautobot")
 
 
 def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface, mac):
+    """Find or create IP Address in Nautobot IPAM.
+
+    If the existing IP address is a "dhcp" type then upgrade it to a "host" type.
+    """
     try:
         ip = nautobot.ipam.ip_addresses.get(address=str(ipv4_address.ip))
         if ip and ip.type == "dhcp" and ip.custom_fields.get("pydhcp_mac") == mac:
-            # Make our DHCP assignment permanent:
+            logger.info(f"Making DHCP lease permanent in Nautobot {dict(ip)}")
             ip.update(type="host", cf_pydhcp_expire=None)
         elif ip:
-            logger.info(f"Nautobot IP already exists! {dict(ip)}")
+            logger.info(f"IP Address {ipv4_address} found, {ip.id} in Nautobot")
         else:
             ip = nautobot.ipam.ip_addresses.create(
                 address=str(ipv4_address.ip),
@@ -419,17 +441,48 @@ def assign_ip_address(nautobot, nautobot_interface, ipv4_address: IPv4Interface,
 
 
 def associate_ip_address(nautobot, nautobot_interface, ip_id):
-    identity = {
-        "ip_address": ip_id,
-        "interface": nautobot_interface.id,
-    }
+    """Associate a given IP Address with a given Interface in Nautobot IPAM.
+
+    If the IP Address is already associated with some other Interface then an
+    Exception is raised.
+
+    If the Interface is already associated to some other IP address then an
+    Exception is raised.
+    """
+    existing_record = nautobot.ipam.ip_address_to_interface.get(ip_address=ip_id)
+
+    if existing_record and existing_record.interface.id == nautobot_interface.id:
+        logger.info(f"IP Address {ip_id} already on {nautobot_interface.name}")
+        return
+    elif existing_record:
+        raise Exception(
+            f"Failed to document discovered server IP Address in Nautobot - "
+            f"We need to associate IP address {ip_id} with the server "
+            f"interface {nautobot_interface.id}, but the IP address is already "
+            f"associated with another interface {existing_record.interface.id} "
+            f"({existing_record.display})  Please resolve IP address clash and "
+            f"then re-try enrollment."
+        )
+
+    existing_record = nautobot.ipam.ip_address_to_interface.get(
+        interface=nautobot_interface.id
+    )
+    if existing_record:
+        raise Exception(
+            f"Failed to document discovered server IP Address in Nautobot - "
+            f"We need to associate IP address {ip_id} with the server "
+            f"interface {nautobot_interface.id}, but that interface is already "
+            f"associated with a different IP address {existing_record.id} "
+            f"({existing_record.display})  Please resolve IP address clash and "
+            f"then re-try enrollment."
+        )
+
     try:
-        if nautobot.ipam.ip_address_to_interface.get(**identity):
-            logger.info(f"IP address {ip_id} is already on {nautobot_interface.name}")
-        else:
-            nautobot.ipam.ip_address_to_interface.create(**identity, is_primary=True)
-            logger.info(f"Associated IP address {ip_id} with {nautobot_interface.name}")
+        nautobot.ipam.ip_address_to_interface.create(
+            ip_address=ip_id, interface=nautobot_interface.id, is_primary=True
+        )
     except pynautobot.core.query.RequestError as e:  # type: ignore
         raise Exception(
             f"Failed to associate IPAddress {ip_id} in Nautobot: {e}"
         ) from None
+    logger.info(f"Associated IP address {ip_id} with {nautobot_interface.name}")
