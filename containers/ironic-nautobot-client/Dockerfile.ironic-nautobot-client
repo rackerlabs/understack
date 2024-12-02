@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.cache/.pip \
 COPY --chown=${APP_USER}:${APP_GROUP} python/understack-workflows /app
 COPY --chown=${APP_USER}:${APP_GROUP} python/understack-flavor-matcher /understack-flavor-matcher
 # need netifaces built as a wheel
-RUN --mount=type=cache,target=/root/.cache/.pip pip wheel --wheel-dir /app/dist netifaces
+RUN --mount=type=cache,target=/root/.cache/.pip pip wheel --wheel-dir /app/dist netifaces psutil
 # build wheels and requirements.txt, skip hashes due to building of netifaces above which won't match
 RUN cd /app && /opt/poetry/bin/poetry build -f wheel && /opt/poetry/bin/poetry export --without-hashes -f requirements.txt -o dist/requirements.txt
 
@@ -38,6 +38,6 @@ RUN mkdir -p /opt/venv/wheels/
 COPY --from=builder /app/dist/*.whl /app/dist/requirements.txt /opt/venv/wheels/
 COPY --chown=${APP_USER}:${APP_GROUP} python/understack-flavor-matcher /understack-flavor-matcher
 
-RUN --mount=type=cache,target=/root/.cache/.pip /opt/venv/bin/pip install --find-links /opt/venv/wheels/ --only-binary netifaces -r /opt/venv/wheels/requirements.txt understack-workflows
+RUN --mount=type=cache,target=/root/.cache/.pip /opt/venv/bin/pip install --find-links /opt/venv/wheels/ --only-binary netifaces psutil -r /opt/venv/wheels/requirements.txt understack-workflows
 
 USER $APP_USER
