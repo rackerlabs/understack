@@ -134,7 +134,9 @@ pod:
   lifecycle:
     disruption_budget:
       osapi:
-        min_available: 1
+        # this should be set to no more than (pod.replicas.osapi - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
 
 manifests:
   job_db_init: false
