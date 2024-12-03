@@ -10,6 +10,15 @@ storage:
   size: 10Gi
   resizeInUseVolumes: true
   waitForVolumeResize: true
+  # storageClassName: default
+  # volumeClaimTemplate:
+  #   metadata:
+  #     name: datadir
+  #   spec:
+  #     accessModes: [ "ReadWriteOnce" ]
+  #     resources:
+  #       requests:
+  #         storage: 500M
 
 # renovate: image:mariadb
 image: mariadb:11.0.3
