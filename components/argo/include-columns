@@ -1,0 +1,3 @@
+- name: Workflow Completed
+  type: label
+  key: workflows.argoproj.io/completed
