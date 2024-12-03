@@ -1,0 +1,41 @@
+---
+apiVersion: v1
+data:
+  password: {{ .Values.testPassword | b64enc }}
+  root-password: {{ .Values.testPassword | b64enc }}
+kind: Secret
+metadata:
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+  name: test-mariadb
+type: Opaque
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-mariadb-select
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+spec:
+  template:
+    metadata:
+      name: test-mariadb-select
+    spec:
+      containers:
+      - name: mariadb-client
+        image: mariadb:11.0.3
+        command:
+          - /bin/sh
+          - -c
+          - |
+            echo "Waiting for MariaDB to be ready..."
+            for i in $(seq 1 30); do
+              mariadb -h {{ .Values.instanceName  }}.{{ .Release.Namespace }}.svc.cluster.local -u root -p{{ .Values.testPassword}} -e "SELECT 1;" && exit 0
+              echo "MariaDB not ready, retrying in 1 second..."
+              sleep 1
+            done
+            echo "MariaDB test failed: Timeout reached"
+            exit 1
+      restartPolicy: Never
