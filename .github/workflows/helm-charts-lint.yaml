@@ -1,0 +1,19 @@
+name: Lint Charts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'helm-charts/**'
+
+jobs:
+  lint-chart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Run chart-testing (lint)
+        uses: helm/chart-testing-action@v2.6.1
+        with:
+          command: lint
+          config: .github/chart-testing.yaml
