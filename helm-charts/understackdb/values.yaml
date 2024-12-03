@@ -1,0 +1,36 @@
+# Default values for understackdb.
+instanceName: mariadb
+rootPasswordSecretKeyRef:
+  name: mariadb
+  key: root-password
+  generate: false
+
+storage:
+  size: 10Gi
+  resizeInUseVolumes: true
+  waitForVolumeResize: true
+
+# renovate: image:mariadb
+image: mariadb:11.0.3
+imagePullPolicy: IfNotPresent
+
+# contents of my.cnf
+myCnf: |
+  [mariadb]
+  bind-address=*
+  default_storage_engine=InnoDB
+  binlog_format=row
+  innodb_autoinc_lock_mode=2
+  max_allowed_packet=256M
+
+metrics:
+  enabled: true
+  exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    port: 9104
+  passwordSecretKeyRef:
+    key: password
+    name: mariadb-metrics-password
+    generate: true
+  serviceMonitor: {}
+  username: mariadb-metrics
