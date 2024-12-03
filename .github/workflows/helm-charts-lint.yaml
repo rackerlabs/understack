@@ -1,0 +1,36 @@
+name: Lint Charts
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'helm-charts/**'
+      - .github/workflows/hehelm-helm-charts-lint.yaml
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  lint-chart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Run chart-testing (lint)
+        uses: helm/chart-testing-action@v2.6.1
+        with:
+          command: lint
+          config: .github/chart-testing.yaml
+      - name: Install helm-docs
+        uses: gabe565/setup-helm-docs-action@v1.0.4
+      - name: Generate documentation
+        uses: losisin/helm-docs-github-action@v1.3.4
+        id: generate
+        with:
+          chart-search-root: "helm-charts/"
+          # ensures that no value changes are committed without updating the
+          # documentation.
+          fail-on-diff: true
+      - name: Show diff
+        if: ${{ failure() && steps.generate.conclusion == 'failure' }}
+        run:
+          git diff
