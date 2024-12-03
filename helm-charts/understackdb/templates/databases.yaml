@@ -1,0 +1,18 @@
+{{- range .Values.databases }}
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Database
+metadata:
+  name: {{ .name }}
+  namespace: {{ .namespace | default "openstack" }}
+spec:
+  mariaDbRef:
+    name: {{ $.Values.instanceName }}
+    waitForIt: true
+  characterSet: {{ .characterSet | default "utf8" }}
+  collate: {{ .collate | default "utf8_general_ci" }}
+  retryInterval: {{ .retryInterval | default "5s" }}
+  {{- with .extraConfig }}
+  {{ . | toYaml | nindent 4 }}
+  {{- end }}
+{{- end }}
