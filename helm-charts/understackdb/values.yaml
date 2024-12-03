@@ -34,3 +34,61 @@ metrics:
     generate: true
   serviceMonitor: {}
   username: mariadb-metrics
+
+# each users entry has following format and defaults:
+# users:
+#   - name: user_name   (required)
+#     namespace: openstack
+#     maxUserConnections: 0
+#     retryInterval: 5s
+#     extraConfig: {}            # use to specify any additional params
+users:
+  - name: glance
+  - name: horizon
+  - name: ironic
+  - name: keystone
+  - name: neutron
+  - name: nova
+  - name: placement
+
+# each databases entry has following format and defaults:
+# databases:
+#   - name: dbname (required)
+#     namespace: openstack
+#     instanceName: mariadb    # or whatever instanceName value is
+#     characterSet: utf8
+#     collate: utf8_general_ci
+#     retryInterval: 5s
+#     extraConfig: {}            # use to specify any additional params
+
+databases:
+  - name: glance
+  - name: horizon
+  - name: ironic
+  - name: keystone
+  - name: neutron
+  - name: nova
+  - name: nova-api
+  - name: nova-cell0
+  - name: placement
+
+grants:
+  # each grants entry has following format and defaults:
+  # grants:
+  #   - name: grant_name   (required) the -grant suffix will be appended
+  #     namespace: openstack
+  #     table: "*"
+  #     privileges: [ALL]
+  #     grantOption: true
+  #     retryInterval: 5s
+  - name: glance
+  - name: horizon
+  - name: ironic
+  - name: keystone
+  - name: neutron
+  - name: nova
+  - name: nova-api
+    username: nova
+  - name: nova-cell0
+    username: nova
+  - name: placement
