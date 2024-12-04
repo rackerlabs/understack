@@ -54,6 +54,26 @@ spec:
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
                       path: '{{.name}}/manifests/dex'
+                - component: understackdb
+                  skipComponent: '{{has "understackdb" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: ghcr.io
+                      chart: rackerlabs/understack/understackdb
+                      targetRevision: 0.1.0
+                      helm:
+                        releaseName: understackdb
+                        valueFiles:
+                          - $understack/components/understackdb/values.yaml
+                          - $deploy/{{.name}}/helm-configs/understackdb.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/understackdb'
+                      ref: understack
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
+                      path: '{{.name}}/manifests/understackdb'
                 - component: openstack
                   skipComponent: '{{has "openstack" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
