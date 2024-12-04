@@ -31,6 +31,7 @@ fix = true
 python = "^3.10"
 requests = "^2"
 neutron-lib = "^3"
+neutron = "^25"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.2"
@@ -81,3 +82,6 @@ understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
 
 [tool.poetry.plugins."neutron.ml2.type_drivers"]
 understack_vxlan = "neutron_understack.type_understack_vxlan:UnderstackVxlanTypeDriver"
+
+[tool.poetry.plugins."neutron.service_plugins"]
+l3_understack = "neutron_understack.l3_service_plugin:UnderStackL3ServicePlugin"
