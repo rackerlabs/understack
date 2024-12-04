@@ -1,11 +1,5 @@
-ARG BASE=ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19:latest
+ARG BASE=ghcr.io/rackerlabs/understack/python3.11.8-alpine3.19:latest
 FROM ${BASE} AS builder
-
-ARG APP_PATH=/app
-ARG APP_USER=appuser
-ARG APP_GROUP=appgroup
-ARG APP_USER_UID=1000
-ARG APP_GROUP_GID=1000
 
 RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
 RUN --mount=type=cache,target=/root/.cache/.pip pip install 'wheel==0.43.0'
@@ -15,29 +9,21 @@ RUN --mount=type=cache,target=/root/.cache/.pip \
     /opt/poetry/bin/poetry self add 'poetry-dynamic-versioning[plugin]==1.3.0'
 
 # copy in the code
-COPY --chown=${APP_USER}:${APP_GROUP} python/understack-workflows /app
-COPY --chown=${APP_USER}:${APP_GROUP} python/understack-flavor-matcher /understack-flavor-matcher
+COPY --chown=appuser:appgroup python/understack-workflows /app
+COPY --chown=appuser:appgroup python/understack-flavor-matcher /understack-flavor-matcher
 # need netifaces built as a wheel
 RUN --mount=type=cache,target=/root/.cache/.pip pip wheel --wheel-dir /app/dist netifaces psutil
 # build wheels and requirements.txt, skip hashes due to building of netifaces above which won't match
 RUN cd /app && /opt/poetry/bin/poetry build -f wheel && /opt/poetry/bin/poetry export --without-hashes -f requirements.txt -o dist/requirements.txt
 
 FROM ${BASE} AS prod
-ARG APP_PATH=/app
-ARG APP_USER=appuser
-ARG APP_GROUP=appgroup
-ARG APP_USER_UID=1000
-ARG APP_GROUP_GID=1000
-
-
 LABEL org.opencontainers.image.description="UnderStack Workflows"
-
 WORKDIR /app
 
 RUN mkdir -p /opt/venv/wheels/
 COPY --from=builder /app/dist/*.whl /app/dist/requirements.txt /opt/venv/wheels/
-COPY --chown=${APP_USER}:${APP_GROUP} python/understack-flavor-matcher /understack-flavor-matcher
+COPY --chown=appuser:appgroup python/understack-flavor-matcher /understack-flavor-matcher
 
 RUN --mount=type=cache,target=/root/.cache/.pip /opt/venv/bin/pip install --find-links /opt/venv/wheels/ --only-binary netifaces psutil -r /opt/venv/wheels/requirements.txt understack-workflows
 
-USER $APP_USER
+USER appuser

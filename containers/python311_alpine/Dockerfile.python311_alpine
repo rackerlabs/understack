@@ -1,7 +1,7 @@
 FROM python:3.11.8-alpine3.19 AS builder
 
 LABEL org.opencontainers.image.title="Python 3.11 image base image"
-LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19"
+LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/python3.11.8-alpine3.19"
 LABEL org.opencontainers.image.source=https://github.com/rackerlabs/understack
 
 ENV PYTHONUNBUFFERED=1
@@ -9,36 +9,30 @@ ENV PYTHONUNBUFFERED=1
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-ARG APP_PATH=/app
-ARG APP_USER=appuser
-ARG APP_GROUP=appgroup
-ARG APP_USER_UID=1000
-ARG APP_GROUP_GID=1000
-
-RUN addgroup -g $APP_GROUP_GID -S $APP_GROUP && \
-  adduser -S -s /sbin/nologin -u $APP_USER_UID -G $APP_GROUP $APP_USER && \
-  mkdir $APP_PATH && \
-  chown $APP_USER:$APP_GROUP $APP_PATH
+RUN addgroup -g 1000 -S appgroup && \
+  adduser -S -s /sbin/nologin -u 1000 -G appgroup appuser && \
+  mkdir /app && \
+  chown appuser:appgroup /app
 WORKDIR /app
 CMD ["python", "-"]
 
+# Instructions for using this template as a base image:
+# 1. Place your Python code in /app.
+# 2. A pre-created Python virtual environment is available in /opt/venv.
+# 3. Run your application as user 'appuser' with UID=1000. This account has been pre-created.
+#    Note: After installing dependencies, switch back to `USER appuser` if root access was required at build time.
+#
 # Example usage in final image
-# FROM ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19
-#
-#  # This section needs to be repeated in child images
-#  ARG APP_PATH=/app
-#  ARG APP_USER=appuser
-#  ARG APP_GROUP=appgroup
-#  ARG APP_USER_UID=1000
-#  ARG APP_GROUP_GID=1000
-#
+# FROM ghcr.io/rackerlabs/understack/python3.11.8-alpine3.19
 #
 # RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
 # RUN --mount=type=cache,target=/root/.cache/.pip pip install --no-cache-dir python-ironicclient==5.4.0
 #
-# FROM ghcr.io/rackerlabs/understack/argo-python3.11.8-alpine3.19 as prod
+# FROM ghcr.io/rackerlabs/understack/python3.11.8-alpine3.19 as prod
 # ENV PATH="/opt/venv/bin:$PATH"
 # COPY --from=builder /opt/venv /opt/venv
+# USER appuser
 #
+# COPY --chown=appuser:appgroup src/ /app/code
 # WORKDIR /app
 # CMD ["python", "-"]
