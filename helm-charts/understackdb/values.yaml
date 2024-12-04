@@ -1,16 +1,30 @@
 # Default values for understackdb.
+# -- name of the database instance
 instanceName: mariadb
+# -- the namespace where the MariaDB will be created
 instanceNamespace: openstack
+# -- reference to a Secret containing the root password
 rootPasswordSecretKeyRef:
+  # -- the name of the Secret
   name: mariadb
+  # -- the key in the Secret containing the root password
   key: root-password
+  # -- generate determines whether a password should be generated if it's missing
   generate: false
 
 storage:
+  # -- the size of the Persistent Volume Claim
   size: 10Gi
+  # -- resizeInUseVolumes indicates whether the PVCs can be resized.
   resizeInUseVolumes: true
   waitForVolumeResize: true
+  # -- StorageClassName to be used to provision the PVCS. It supersedes the
+  # 'StorageClassName' specified in 'VolumeClaimTemplate'.
+  storageClassName:
+  # @default -- If not provided, the default 'StorageClass' configured in the
+  #             cluster is used.
   # storageClassName: default
+
   # volumeClaimTemplate:
   #   metadata:
   #     name: datadir
@@ -20,11 +34,14 @@ storage:
   #       requests:
   #         storage: 500M
 
+
 # renovate: image:mariadb
 image: mariadb:11.0.3
 imagePullPolicy: IfNotPresent
 
-# contents of my.cnf
+#
+# -- stringified contents of my.cnf
+# @ignored
 myCnf: |
   [mariadb]
   bind-address=*
@@ -33,10 +50,15 @@ myCnf: |
   innodb_autoinc_lock_mode=2
   max_allowed_packet=256M
 
+# -- the configuration for the prometheus exporter
+# @ignored
 metrics:
+  # -- enabled determines whether the metrics exporter is enabled
   enabled: true
   exporter:
+    # -- container image for the metrics exporter
     image: prom/mysqld-exporter:v0.15.1
+    # -- port for the metrics exporter
     port: 9104
   passwordSecretKeyRef:
     key: password
@@ -45,15 +67,20 @@ metrics:
   serviceMonitor: {}
   username: mariadb-metrics
 
-# each users entry has following format and defaults:
-# users:
-#   - name: user_name   (required)
-#     namespace: openstack
-#     maxUserConnections: 0
-#     retryInterval: 5s
-#     extraConfig: {}            # use to specify any additional params
+# -- list of database users
+# @default -- users for all Understack components (horizon, ironic, nova, neutron, keystone)
 users:
+  # users[0].name -- (required) MariaDB username
   - name: glance
+    # -- namespace where the `User` record will be created
+    # @default --  openstack
+    namespace:
+    # -- maximum user connections. `0` means unlimited.
+    maxUserConnections: 0
+    # -- retryInterval
+    retryInterval: 5s
+    # -- use to specify any additional params
+    extraConfig: {}
   - name: horizon
   - name: ironic
   - name: keystone
@@ -61,18 +88,23 @@ users:
   - name: nova
   - name: placement
 
-# each databases entry has following format and defaults:
-# databases:
-#   - name: dbname (required)
-#     namespace: openstack
-#     instanceName: mariadb    # or whatever instanceName value is
-#     characterSet: utf8
-#     collate: utf8_general_ci
-#     retryInterval: 5s
-#     extraConfig: {}            # use to specify any additional params
-
+# -- list of databases to create
+# @default -- databases for all Understack components (horizon, ironic, nova, neutron, keystone)
 databases:
+  # databases[0].name -- (required) database name
   - name: glance
+    # -- namespace that `Database` record will be created in
+    # @default -- openstack
+    namespace: openstack
+    # -- name of the `MariaDB` cluster identifier (`.spec.metadata.name` on MariaDB resource)
+    instanceName: mariadb
+    # -- database's character set
+    characterSet: utf8
+    # -- database's collation
+    collate: utf8_general_ci
+    # -- the interval used to perform retries.
+    retryInterval: 5s
+    extraConfig: {}            # use to specify any additional params
   - name: horizon
   - name: ironic
   - name: keystone
@@ -82,6 +114,8 @@ databases:
   - name: nova-cell0
   - name: placement
 
+# -- list of databases to create
+# @default -- grants for all Understack components (horizon, ironic, nova, neutron, keystone)
 grants:
   # each grants entry has following format and defaults:
   # grants:
@@ -91,7 +125,18 @@ grants:
   #     privileges: [ALL]
   #     grantOption: true
   #     retryInterval: 5s
+  # grants[0].name -- (required) partial grant name, the `-grant` suffix will be added.
   - name: glance
+    # -- namespace that `Grant` record will be created in
+    namespace: openstack
+    # -- list of tables that grant is for
+    table: "*"
+    # -- list of privileges that grant allows
+    privileges: [ALL]
+    # -- use grant option for this grant
+    grantOption: true
+    # -- interval used to perform retries.
+    retryInterval: 5s
   - name: horizon
   - name: ironic
   - name: keystone

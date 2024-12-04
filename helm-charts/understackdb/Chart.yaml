@@ -2,7 +2,12 @@ apiVersion: v2
 name: understackdb
 description: Helm chart to deploy MariaDB Database instances for Understack
 type: application
-
+home: https://rackerlabs.github.io/understack/
+maintainers:
+  - name: Understack team
+    url: https://github.com/orgs/rackerlabs/teams/understack-dev
+sources:
+- https://github.com/rackerlabs/understack/tree/main/helm-charts/understackdb
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
