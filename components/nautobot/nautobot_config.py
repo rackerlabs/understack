@@ -478,20 +478,6 @@ SOCIAL_AUTH_OIDC_SECRET = _read_cred("/opt/nautobot/sso/client-secret")
 # below *adds* scope.
 SOCIAL_AUTH_OIDC_SCOPE = ["groups"]
 
-# include custom auth pipeline to sync groups
-SOCIAL_AUTH_PIPELINE = (
-    "social_core.pipeline.social_auth.social_details",
-    "social_core.pipeline.social_auth.social_uid",
-    "social_core.pipeline.social_auth.auth_allowed",
-    "social_core.pipeline.social_auth.social_user",
-    "social_core.pipeline.user.get_username",
-    "social_core.pipeline.user.create_user",
-    "social_core.pipeline.social_auth.associate_user",
-    "social_core.pipeline.social_auth.load_extra_data",
-    "social_core.pipeline.user.user_details",
-    "dexauth.group_sync",
-)
-
 if SOCIAL_AUTH_OIDC_OIDC_ENDPOINT and SOCIAL_AUTH_OIDC_SECRET:
     AUTHENTICATION_BACKENDS = [
         "social_core.backends.open_id_connect.OpenIdConnectAuth",

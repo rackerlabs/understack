@@ -8,11 +8,6 @@ resources:
   - external-secret-nautobot-sso.yaml
 
 configMapGenerator:
-  - name: dexauth
-    files:
-      - dexauth.py
-    options:
-      disableNameSuffixHash: true
   - name: nautobot-sso
     literals:
       # enables SOCIAL_AUTH_PIPELINE to load the group_sync plugin
