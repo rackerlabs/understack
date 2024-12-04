@@ -185,7 +185,9 @@ pod:
   lifecycle:
     disruption_budget:
       api:
-        min_available: 1
+        # this should be set to no more than (pod.replicas.api - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
 
 # we don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as
