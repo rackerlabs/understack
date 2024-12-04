@@ -52,7 +52,7 @@ conf:
         type_drivers: "vlan,local,understack_vxlan"
   neutron:
     DEFAULT:
-      service_plugins: "router,segments,port_forwarding"
+      service_plugins: "l3_understack,segments,port_forwarding"
       # we don't want HA L3 routers. It's a Python value so we need to quote it in YAML.
       l3_ha: "False"
       # we aren't using availability zones so having calls attempt to add things to
