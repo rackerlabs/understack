@@ -227,13 +227,14 @@ spec:
       destination:
         server: '{{.server}}'
         namespace: '{{coalesce (get . "componentNamespace") .component}}'
-      syncPolicy:
-        automated:
-          selfHeal: true
-        syncOptions:
-          - CreateNamespace=true
-          - ServerSideApply=true
-          - RespectIgnoreDifferences=true
+      syncPolicy: {}
+        # automated:
+        #   selfHeal: false
+        #   prune: false
+        # syncOptions:
+        #   - CreateNamespace=true
+        #   - ServerSideApply=true
+        #   - RespectIgnoreDifferences=true
   templatePatch: |
     spec:
       {{- if hasKey . "source" }}
