@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - mariadb-configurable-storage
     paths:
       - 'helm-charts/**'
       - .github/workflows/helm-charts-release.yaml
@@ -14,17 +13,28 @@ on:
 
 jobs:
   release:
+    strategy:
+      matrix:
+        charts: [understackdb]
+
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v1
-      - name: Configure Git
+
+      - name: Read Helm chart
         run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.6.0
+          VERSION=$(yq .version helm-charts/${{ matrix.charts }}/Chart.yaml)
+          echo "helm_chart_version=${VERSION}" >> "$GITHUB_OUTPUT"
+        id: read_helm_chart
+
+      - name: Push Helm chart
+        uses: appany/helm-oci-chart-releaser@v0.4.2
         with:
-          charts_dir: helm-charts
-        env:
-          CR_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+          name: ${{ matrix.charts }}
+          repository: rackerlabs/understack
+          tag: ${{ steps.read_helm_chart.outputs['helm_chart_version'] }}
+          path: helm-charts/${{ matrix.charts }}/
+          registry: ghcr.io
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
