@@ -96,6 +96,9 @@ databases:
     # -- namespace that `Database` record will be created in
     # @default -- openstack
     namespace: openstack
+    # -- database name override (if different from metadata.name)
+    # @default -- value of `.name` is used if unspecified.
+    dbname:
     # -- name of the `MariaDB` cluster identifier (`.spec.metadata.name` on MariaDB resource)
     instanceName: mariadb
     # -- database's character set
@@ -111,7 +114,9 @@ databases:
   - name: neutron
   - name: nova
   - name: nova-api
+    dbname: nova_api
   - name: nova-cell0
+    dbname: nova_cell0
   - name: placement
 
 # -- list of databases to create

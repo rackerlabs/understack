@@ -23,6 +23,7 @@ Helm chart to deploy MariaDB Database instances for Understack
 | databases | list | databases for all Understack components (horizon, ironic, nova, neutron, keystone) | list of databases to create |
 | databases[0].characterSet | string | `"utf8"` | database's character set |
 | databases[0].collate | string | `"utf8_general_ci"` | database's collation |
+| databases[0].dbname | string | value of `.name` is used if unspecified. | database name override (if different from metadata.name) |
 | databases[0].instanceName | string | `"mariadb"` | name of the `MariaDB` cluster identifier (`.spec.metadata.name` on MariaDB resource) |
 | databases[0].name | required | `"glance"` | database name |
 | databases[0].namespace | string | openstack | namespace that `Database` record will be created in |

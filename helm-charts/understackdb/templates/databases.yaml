@@ -10,6 +10,7 @@ spec:
     name: {{ $.Values.instanceName }}
     waitForIt: true
   characterSet: {{ .characterSet | default "utf8" }}
+  name: {{ .dbname | default .name }}
   collate: {{ .collate | default "utf8_general_ci" }}
   retryInterval: {{ .retryInterval | default "5s" }}
   {{- with .extraConfig }}
