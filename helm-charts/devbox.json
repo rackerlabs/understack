@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.0/.schema/devbox.schema.json",
+  "packages": [
+    "python312Packages.watchdog@latest",
+    "nodePackages.livedown@latest",
+    "helm-docs@latest"
+  ],
+  "shell": {
+    "init_hook": [
+      "echo 'Welcome to understack helm-chart devbox!' > /dev/null"
+    ],
+    "scripts": {
+      "generate-docs": [
+        "echo Regenerating helm charts documentation",
+        "helm-docs"
+      ],
+      "livedocs-understackdb": [
+        "echo Watching for changes in 'understack/*.yaml'",
+        "watchmedo shell-command -w -D -W -v --patterns '*.yaml' -R  --command 'helm-docs && sleep 5' understackdb/ &",
+        "trap \"kill 0\" EXIT",
+        "echo Live markdown preview will be available at http://localhost:4242/",
+        "livedown start understackdb/README.md --port 4242 --open"
+      ]
+    }
+  }
+}
