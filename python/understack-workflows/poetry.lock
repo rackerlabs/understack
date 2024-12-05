@@ -1037,13 +1037,13 @@ typing-extensions = ">=4.6.0,<4.7.0 || >4.7.0"
 
 [[package]]
 name = "pynautobot"
-version = "2.4.1"
+version = "2.4.2"
 description = "Nautobot API client library"
 optional = false
 python-versions = "<4.0.0,>=3.8.1"
 files = [
-    {file = "pynautobot-2.4.1-py3-none-any.whl", hash = "sha256:b40761e6429f02716720b811cda5c5bb184f3876a49bb2d4211b3c017ead9231"},
-    {file = "pynautobot-2.4.1.tar.gz", hash = "sha256:239c4fd6b1daa00013bef19a473467504d3e1e7495220d0fb6a89f728dbbceaf"},
+    {file = "pynautobot-2.4.2-py3-none-any.whl", hash = "sha256:65b30e9438c498c3fbbe591dd293c1a33158ba9f6d0e6ff3ebeff3c49405b559"},
+    {file = "pynautobot-2.4.2.tar.gz", hash = "sha256:24de5a1a0587df18bb07b0d5f3dcbf78e883f37fa8b3825c9b7b4c5b9a1c62ec"},
 ]
 
 [package.dependencies]
