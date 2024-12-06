@@ -1,4 +1,6 @@
-from unittest.mock import mock_open, patch
+import os
+from unittest.mock import mock_open
+from unittest.mock import patch
 
 import pytest
 from flavor_matcher.flavor_spec import FlavorSpec
@@ -9,7 +11,7 @@ from flavor_matcher.machine import Machine
 def valid_yaml():
     return """
 ---
-name: gp2.ultramedium
+name: nonprod.gp2.ultramedium
 manufacturer: Dell
 model: PowerEdge R7615
 memory_gb: 7777
@@ -44,7 +46,8 @@ def yaml_directory(tmp_path, valid_yaml, invalid_yaml):
 
 def test_from_yaml(valid_yaml):
     spec = FlavorSpec.from_yaml(valid_yaml)
-    assert spec.name == "gp2.ultramedium"
+    assert spec.name == "nonprod.gp2.ultramedium"
+    assert spec.stripped_name == "gp2.ultramedium"
     assert spec.manufacturer == "Dell"
     assert spec.model == "PowerEdge R7615"
     assert spec.memory_gb == 7777
@@ -60,6 +63,7 @@ def test_from_yaml_invalid(invalid_yaml):
 
 @patch("os.walk")
 @patch("builtins.open", new_callable=mock_open)
+@patch.dict(os.environ, {"FLAVORS_ENV": "nonprod"})
 def test_from_directory(mocked_open, mock_walk, valid_yaml, invalid_yaml):
     mock_walk.return_value = [
         ("/etc/flavors", [], ["valid.yaml", "invalid.yaml"]),
@@ -68,22 +72,21 @@ def test_from_directory(mocked_open, mock_walk, valid_yaml, invalid_yaml):
         mock_open(read_data=valid_yaml).return_value,
         mock_open(read_data=invalid_yaml).return_value,
     ]
-
     mocked_open.side_effect = mock_file_handles
-
     specs = FlavorSpec.from_directory("/etc/flavors/")
 
     assert len(specs) == 1
-    assert specs[0].name == "gp2.ultramedium"
+    assert specs[0].name == "nonprod.gp2.ultramedium"
     assert specs[0].memory_gb == 7777
     assert specs[0].cpu_cores == 245
 
 
+@patch.dict(os.environ, {"FLAVORS_ENV": "nonprod"})
 def test_from_directory_with_real_files(yaml_directory):
     specs = FlavorSpec.from_directory(str(yaml_directory))
 
     assert len(specs) == 1
-    assert specs[0].name == "gp2.ultramedium"
+    assert specs[0].name == "nonprod.gp2.ultramedium"
     assert specs[0].memory_gb == 7777
     assert specs[0].cpu_cores == 245
 
@@ -316,3 +319,21 @@ def test_large_flavor_memory_slightly_less_disk_exact(flavors):
     )
     # Should not match because memory is slightly less than required
     assert all(flavor.score_machine(machine) == 0 for flavor in flavors)
+
+
+def test_memory_gib(valid_yaml):
+    flv = FlavorSpec.from_yaml(valid_yaml)
+    assert flv.memory_mib == 7963648
+
+
+def test_baremetal_nova_resource_class(valid_yaml):
+    flv = FlavorSpec.from_yaml(valid_yaml)
+    assert (
+        flv.baremetal_nova_resource_class
+        == "resources:CUSTOM_BAREMETAL_GP2_ULTRAMEDIUM"
+    )
+
+
+def test_envtype(valid_yaml):
+    flv = FlavorSpec.from_yaml(valid_yaml)
+    assert flv.env_type == "nonprod"

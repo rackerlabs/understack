@@ -116,6 +116,7 @@ jobs:
       matrix:
         container:
           - name: ironic-nautobot-client
+          - name: nova-flavors
 
     steps:
       - name: setup docker buildx
