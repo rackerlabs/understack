@@ -30,6 +30,6 @@ def guess_machine_flavor(device_info: ChassisInfo, bmc: Bmc) -> str:
         raise Exception(
             f"Machine: {machine} could not be classified into any flavor {FLAVORS=}"
         )
-    logger.info(f"Device has been classified as flavor: {flavor_name.stripped_name}")
+    logger.info(f"Device has been classified as flavor: {flavor_name.name}")
 
-    return flavor_name.stripped_name
+    return flavor_name.name
