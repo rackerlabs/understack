@@ -243,6 +243,7 @@ conf:
         values:
           - http://localhost:9990/auth/websso/
           # - https://yourinstance.of.horizon.example.com/auth/websso/
+      default_authorization_ttl: 720
     DEFAULT:
       max_token_size: 512
   wsgi_keystone: |
