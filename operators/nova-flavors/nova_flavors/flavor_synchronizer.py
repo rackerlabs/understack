@@ -44,15 +44,13 @@ class FlavorSynchronizer:
         existing_flavors = self._nova.flavors.list()
         for flavor in desired_flavors:
             nova_flavor = next(
-                (flv for flv in existing_flavors if flv.name == flavor.stripped_name),
+                (flv for flv in existing_flavors if flv.name == flavor.name),
                 None,
             )
 
             update_needed = False
             if nova_flavor:
-                logger.info(
-                    f"Flavor: {flavor.stripped_name} already exists. Syncing values"
-                )
+                logger.info(f"Flavor: {flavor.name} already exists. Syncing values")
                 if nova_flavor.ram != flavor.memory_mib:
                     logger.info(
                         f"{flavor.name} RAM mismatch - {nova_flavor.ram=} {flavor.memory_mib=}"
@@ -86,7 +84,7 @@ class FlavorSynchronizer:
 
     def _create(self, flavor: FlavorSpec):
         nova_flavor = self._nova.flavors.create(
-            flavor.stripped_name,
+            flavor.name,
             flavor.memory_mib,
             flavor.cpu_cores,
             min(flavor.drives),
