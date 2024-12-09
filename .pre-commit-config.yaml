@@ -12,7 +12,7 @@ repos:
       - id: check-yaml
         args:
           - --allow-multiple-documents
-        exclude: mkdocs.yml
+        exclude: "^(helm-charts\/.*/templates/.*|mkdocs.yml)"
       - id: check-yaml
         name: check-yaml-mkdocs
         # --unsafe is a workaround for the use of !! in mkdocs.yml
@@ -24,6 +24,7 @@ repos:
     hooks:
       - id: yamllint
         args: [-c, .yamllint.yaml]
+        exclude: "^helm-charts\/.*/templates/.*"
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.28.4
     hooks:
@@ -85,3 +86,8 @@ repos:
         - "requests"
         - "sushy"
         - "types-requests"
+  - repo: https://github.com/gruntwork-io/pre-commit
+    rev: v0.1.24
+    hooks:
+      - id: helmlint
+        files: "^helm-charts\/"

@@ -164,6 +164,10 @@ echo "Checking metallb"
 # create placeholder directory for metallb configs
 mkdir -p "${DEST_DIR}/metallb"
 
+echo "Checking understackdb"
+# create placeholder directory for understackdb configs
+mkdir -p "${DEST_DIR}/understackdb"
+
 echo "Checking nautobot"
 # Nautobot secrets
 mkdir -p "${DEST_DIR}/nautobot/"

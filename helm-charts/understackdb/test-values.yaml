@@ -1,0 +1,38 @@
+# Default values for understackdb.
+instanceName: test-mariadb
+testPassword: just-a-test
+rootPasswordSecretKeyRef:
+  name: test-mariadb
+  key: root-password
+  generate: false
+
+storage:
+  size: 512Mi
+  resizeInUseVolumes: true
+  waitForVolumeResize: true
+
+# renovate: image:mariadb
+image: mariadb:11.0.3
+imagePullPolicy: IfNotPresent
+
+# contents of my.cnf
+myCnf: |
+  [mariadb]
+  bind-address=*
+  binlog_format=row
+
+metrics:
+  enabled: false
+  #
+users:
+  - name: testuser
+    namespace: default
+
+databases:
+  - name: testdb
+    namespace: default
+
+grants:
+  - name: testdb
+    namespace: default
+    username: testuser
