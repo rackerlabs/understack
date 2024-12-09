@@ -82,6 +82,8 @@ spec:
           value: "{{workflow.name}}"
         - name: WF_UID
           value: "{{workflow.uid}}"
+        - name: FLAVORS_ENV
+          value: nonprod
       volumes:
         - name: bmc-master
           secret:
