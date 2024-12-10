@@ -51,6 +51,14 @@ manifests:
   secret_db: false
   service_ingress: false
 
+pod:
+  lifecycle:
+    disruption_budget:
+      horizon:
+        # this should be set to no more than (pod.replicas.horizon - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
+
 # We don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as
 # post-install,post-upgrade which in ArgoCD

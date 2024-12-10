@@ -19,6 +19,11 @@ bootstrap:
     # give 'argoworkflow' 'admin' over the 'baremetal' project
     openstack role add --user-domain infra --project-domain infra --user argoworkflow --project baremetal admin
 
+    # create 'flavorsync' user to allow synchronization of the flavors to nova
+    openstack user create --or-show --domain service --password abcd1234 flavorsync
+    openstack role create --or-show flavorsync
+    openstack role add --user flavorsync --user-domain service --domain default --inherited  flavorsync
+
     # create 'monitoring' user for monitoring usage
     openstack user create --or-show --domain infra --password monitoring_demo monitoring
     # give 'monitoring' the 'admin' over the 'baremetal' project
@@ -229,7 +234,9 @@ pod:
   lifecycle:
     disruption_budget:
       api:
-        min_available: 1
+        # this should be set to no more than (pod.replicas.api - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
 
 conf:
   keystone:

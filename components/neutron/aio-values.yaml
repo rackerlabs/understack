@@ -52,7 +52,7 @@ conf:
         type_drivers: "vlan,local,understack_vxlan"
   neutron:
     DEFAULT:
-      service_plugins: "router,segments,port_forwarding"
+      service_plugins: "l3_understack,segments,port_forwarding"
       # we don't want HA L3 routers. It's a Python value so we need to quote it in YAML.
       l3_ha: "False"
       # we aren't using availability zones so having calls attempt to add things to
@@ -66,7 +66,9 @@ pod:
   lifecycle:
     disruption_budget:
       server:
-        min_available: 1
+        # this should be set to no more than (pod.replicas.server - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
   mounts:
     neutron_server:
       neutron_server:

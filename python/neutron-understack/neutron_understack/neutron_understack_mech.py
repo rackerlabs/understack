@@ -5,7 +5,6 @@ from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
-from neutron_lib import exceptions as exc
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import (
     MechanismDriver,
@@ -130,20 +129,16 @@ class UnderstackDriver(MechanismDriver):
         if provider_type == p_const.TYPE_VXLAN:
             conf = cfg.CONF.ml2_understack
             ucvni_group = conf.ucvni_group
-            try:
-                self.nb.ucvni_create(
-                    network_id, ucvni_group, network_name, segmentation_id
-                )
-            except Exception as e:
-                LOG.exception(
-                    "unable to create network %(net_id)s", {"net_id": network_id}
-                )
-                raise exc.NetworkNotFound(net_id=network_id) from e
-
+            self.nb.ucvni_create(network_id, ucvni_group, network_name, segmentation_id)
             LOG.info(
                 "network %(net_id)s has been added on ucvni_group %(ucvni_group)s, "
                 "physnet %(physnet)s",
                 {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
+            )
+            self.nb.namespace_create(name=network_id)
+            LOG.info(
+                "namespace with name %(network_id)s has been created in Nautobot",
+                {"network_id": network_id},
             )
 
     def update_network_precommit(self, context):
@@ -166,19 +161,13 @@ class UnderstackDriver(MechanismDriver):
         if provider_type == p_const.TYPE_VXLAN:
             conf = cfg.CONF.ml2_understack
             ucvni_group = conf.ucvni_group
-            try:
-                self.nb.ucvni_delete(network_id)
-            except Exception as e:
-                LOG.exception(
-                    "unable to delete network %(net_id)s", {"net_id": network_id}
-                )
-                raise exc.NetworkNotFound(net_id=network_id) from e
-
+            self.nb.ucvni_delete(network_id)
             LOG.info(
                 "network %(net_id)s has been deleted from ucvni_group %(ucvni_group)s, "
                 "physnet %(physnet)s",
                 {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
             )
+            self._fetch_and_delete_nautobot_namespace(network_id)
 
     def create_subnet_precommit(self, context):
         log_call("create_subnet_precommit", context)
@@ -364,3 +353,16 @@ class UnderstackDriver(MechanismDriver):
                 vlan_group_uuids=str(nb_vlan_group_id),
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
             )
+
+    def _fetch_and_delete_nautobot_namespace(self, name: str) -> None:
+        namespace_uuid = self.nb.fetch_namespace_by_name(name)
+        LOG.info(
+            "namespace %(name)s nautobot uuid: %(ns_uuid)s",
+            {"name": name, "ns_uuid": namespace_uuid},
+        )
+        self.nb.namespace_delete(namespace_uuid)
+        LOG.info(
+            "namespace with name: %(name)s and uuid: %(ns_uuid)s has been deleted "
+            "from nautobot",
+            {"name": name, "ns_uuid": namespace_uuid},
+        )

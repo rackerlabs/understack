@@ -3,14 +3,19 @@ import pathlib
 from urllib.parse import urljoin
 
 import requests
+from neutron_lib import exceptions as exc
 from oslo_log import log
 from requests.models import HTTPError
 
 LOG = log.getLogger(__name__)
 
 
-class NautobotError(Exception):
-    pass
+class NautobotError(exc.NeutronException):
+    message = "Nautobot error"
+
+
+class NautobotNotFoundError(NautobotError):
+    message = "%(obj)s not found in Nautobot. ref=%(ref)s"
 
 
 class Nautobot:
@@ -84,6 +89,24 @@ class Nautobot:
 
     def ucvni_delete(self, network_id):
         url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
+        return self.make_api_request(url, "delete")
+
+    def fetch_namespace_by_name(self, name: str) -> str:
+        url = f"/api/ipam/namespaces/?name={name}&depth=1"
+        resp_data = self.make_api_request(url, "get")
+        try:
+            return resp_data["results"][0]["id"]
+        except (IndexError, KeyError) as error:
+            LOG.error("Nautobot error: %(error)s", {"error": error})
+            raise NautobotNotFoundError(obj="namespace", ref=name) from error
+
+    def namespace_create(self, name: str) -> dict:
+        url = "/api/ipam/namespaces/"
+        payload = {"name": name}
+        return self.make_api_request(url, "post", payload)
+
+    def namespace_delete(self, namespace_uuid: str) -> dict:
+        url = f"/api/ipam/namespaces/{namespace_uuid}/"
         return self.make_api_request(url, "delete")
 
     def prep_switch_interface(

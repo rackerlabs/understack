@@ -1,8 +1,8 @@
 import os
+import re
 from dataclasses import dataclass
 
 import yaml
-
 from flavor_matcher.machine import Machine
 
 
@@ -39,15 +39,35 @@ class FlavorSpec:
             pci=data.get("pci", []),
         )
 
+    @staticmethod
+    def configured_envtype():
+        return os.getenv("FLAVORS_ENV", "unconfigured")
+
     @property
     def stripped_name(self):
         """Returns actual flavor name with the prod/nonprod prefix removed."""
         _, name = self.name.split(".", 1)
         if not name:
             raise Exception(f"Unable to strip envtype from flavor: {self.name}")
-        # need to strip '.' from the ironic flavor name
-        name = name.replace(".", "")
         return name
+
+    @property
+    def baremetal_nova_resource_class(self):
+        """Returns flavor name converted to be used with Nova flavor resources.
+
+        https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html
+        """
+        converted_name = re.sub(r"[^\w]", "_", self.stripped_name).upper()
+        return f"resources:CUSTOM_BAREMETAL_{converted_name}"
+
+    @property
+    def env_type(self):
+        return self.name.split(".")[0]
+
+    @property
+    def memory_mib(self):
+        """Returns memory size in MiB"""
+        return self.memory_gb * 1024
 
     @staticmethod
     def from_directory(directory: str = "/etc/flavors/") -> list["FlavorSpec"]:
@@ -60,6 +80,8 @@ class FlavorSpec:
                         with open(filepath, "r") as file:
                             yaml_content = file.read()
                             flavor_spec = FlavorSpec.from_yaml(yaml_content)
+                            if flavor_spec.env_type != FlavorSpec.configured_envtype():
+                                continue
                             flavor_specs.append(flavor_spec)
                     except yaml.YAMLError as e:
                         print(f"Error parsing YAML file {filename}: {e}")

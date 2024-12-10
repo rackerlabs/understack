@@ -17,6 +17,7 @@ metadata:
 kind: WorkflowTemplate
 spec:
   entrypoint: sync-keystone
+  serviceAccountName: workflow
   arguments:
     parameters:
       - name: event_type

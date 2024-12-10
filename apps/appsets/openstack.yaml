@@ -39,7 +39,7 @@ spec:
                 - component: nova
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=nova
-                  chartVersion: 0.3.46
+                  chartVersion: 0.3.47
                 - component: horizon
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=horizon

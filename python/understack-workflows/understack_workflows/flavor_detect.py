@@ -10,8 +10,8 @@ from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
-ENV_TYPE = os.getenv("FLAVOR_TYPES", "nonprod")
-FLAVORS = FlavorSpec.from_directory("/etc/understack_flavors/")
+FLAVORS_DIR = os.getenv("FLAVORS_DIR", "/etc/understack_flavors/")
+FLAVORS = FlavorSpec.from_directory(FLAVORS_DIR)
 logger.info(f"Loaded {len(FLAVORS)} flavor specifications.")
 
 
