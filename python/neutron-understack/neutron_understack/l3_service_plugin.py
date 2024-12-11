@@ -27,10 +27,14 @@ def print_post_commit_data(method: str, data: dict) -> None:
 
 @resource_extend.has_resource_extenders
 class UnderStackL3ServicePlugin(L3RouterPlugin):
-    """Understack L3 plugin.
+    def __init__(self, *args, **kwargs) -> None:
+        """Understack L3 plugin.
 
-    L3 plugin to deal with Understack infrastructure.
-    """
+        L3 plugin to deal with Understack infrastructure.
+        """
+        pprint(args)
+        pprint(kwargs)
+        super().__init__()
 
     @classmethod
     def get_plugin_type(self):
