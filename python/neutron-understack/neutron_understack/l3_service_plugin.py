@@ -25,14 +25,13 @@ def print_post_commit_data(method: str, data: dict) -> None:
 
 
 class UnderStackL3ServicePlugin(L3RouterPlugin):
-    def __init__(self):
-        """Understack L3 plugin.
+    """Understack L3 plugin.
 
-        L3 plugin to deal with Understack infrastructure.
-        """
-        super().__init__()
+    L3 plugin to deal with Understack infrastructure.
+    """
 
-    def get_plugin_type(self):
+    @classmethod
+    def get_plugin_type(cls):
         return "L3_ROUTER_NAT"
 
     def get_plugin_description(self):
