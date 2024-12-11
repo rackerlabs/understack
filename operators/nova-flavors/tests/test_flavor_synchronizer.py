@@ -54,7 +54,7 @@ def test_flavor_synchronizer_reconcile_new_flavor(
     mock_nova_client.return_value.flavors.list.return_value = []
     flavor_synchronizer.reconcile([flavor])
     mock_nova_client.return_value.flavors.create.assert_called_once_with(
-        flavor.stripped_name, flavor.memory_mib, flavor.cpu_cores, min(flavor.drives)
+        flavor.name, flavor.memory_mib, flavor.cpu_cores, min(flavor.drives)
     )
 
 
@@ -62,7 +62,7 @@ def test_flavor_synchronizer_reconcile_existing_flavor(
     flavor_synchronizer, mock_nova_client, flavor
 ):
     existing_flavor = MagicMock()
-    existing_flavor.name = flavor.stripped_name
+    existing_flavor.name = flavor.name
     existing_flavor.ram = flavor.memory_mib
     existing_flavor.disk = max(flavor.drives)
     existing_flavor.vcpus = flavor.cpu_cores
@@ -75,7 +75,7 @@ def test_flavor_synchronizer_reconcile_existing_flavor_update_needed(
     flavor_synchronizer, mock_nova_client, flavor
 ):
     existing_flavor = MagicMock()
-    existing_flavor.name = flavor.stripped_name
+    existing_flavor.name = flavor.name
     existing_flavor.ram = flavor.memory_mib + 1
     existing_flavor.disk = max(flavor.drives)
     existing_flavor.vcpus = flavor.cpu_cores
@@ -84,7 +84,7 @@ def test_flavor_synchronizer_reconcile_existing_flavor_update_needed(
     flavor_synchronizer.reconcile([flavor])
     existing_flavor.delete.assert_called_once()
     mock_nova_client.return_value.flavors.create.assert_called_once_with(
-        flavor.stripped_name, flavor.memory_mib, flavor.cpu_cores, min(flavor.drives)
+        flavor.name, flavor.memory_mib, flavor.cpu_cores, min(flavor.drives)
     )
 
 
@@ -94,7 +94,7 @@ def test_flavor_synchronizer_create_flavor(
     mock_create_flavor = mock_nova_client.return_value.flavors.create.return_value
     flavor_synchronizer._create(flavor)
     mock_nova_client.return_value.flavors.create.assert_called_once_with(
-        flavor.stripped_name, flavor.memory_mib, flavor.cpu_cores, min(flavor.drives)
+        flavor.name, flavor.memory_mib, flavor.cpu_cores, min(flavor.drives)
     )
     mock_create_flavor.set_keys.assert_called_once_with(
         {
