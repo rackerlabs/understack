@@ -3,6 +3,7 @@ from pprint import pprint
 
 from neutron.services.l3_router.l3_router_plugin import L3RouterPlugin
 from neutron_lib.context import Context
+from neutron_lib.db import resource_extend
 
 LOG = logging.getLogger(__name__)
 
@@ -24,14 +25,14 @@ def print_post_commit_data(method: str, data: dict) -> None:
     pprint(data)
 
 
+@resource_extend.has_resource_extenders
 class UnderStackL3ServicePlugin(L3RouterPlugin):
-    def __init__(self):
-        """Understack L3 plugin.
+    """Understack L3 plugin.
 
-        L3 plugin to deal with Understack infrastructure.
-        """
-        super().__init__()
+    L3 plugin to deal with Understack infrastructure.
+    """
 
+    @classmethod
     def get_plugin_type(self):
         return "L3_ROUTER_NAT"
 
