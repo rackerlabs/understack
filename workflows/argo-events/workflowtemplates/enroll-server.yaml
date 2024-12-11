@@ -73,7 +73,6 @@ spec:
             readOnly: true
           - mountPath: /etc/understack_flavors/
             name: understack-flavors
-            subPath: current/flavors/
             readOnly: true
         env:
         - name: WF_NS
@@ -82,6 +81,12 @@ spec:
           value: "{{workflow.name}}"
         - name: WF_UID
           value: "{{workflow.uid}}"
+        - name: FLAVORS_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: understack-flavors
+              key: FLAVORS_DIR
+              optional: true
       volumes:
         - name: bmc-master
           secret:
