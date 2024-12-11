@@ -127,4 +127,5 @@ nav:
     - user-guide/monitoring.md
     - user-guide/openstack-ironic.md
     - user-guide/openstack-placement.md
+    - user-guide/rook-ceph.md
   - Workflows: workflows/
