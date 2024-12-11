@@ -23,10 +23,6 @@ nautobot:
     existingSecretApiTokenKey: apitoken
 
   extraVolumes:
-    - name: nautobot-dexauth
-      configMap:
-        name: dexauth
-        defaultMode: 420
     - name: nautobot-sso
       secret:
         secretName: nautobot-sso
@@ -34,10 +30,6 @@ nautobot:
         optional: false
 
   extraVolumeMounts:
-    - name: nautobot-dexauth
-      mountPath: /opt/nautobot/dexauth.py
-      readOnly: true
-      subPath: dexauth.py
     - name: nautobot-sso
       mountPath: /opt/nautobot/sso/
       readOnly: true
