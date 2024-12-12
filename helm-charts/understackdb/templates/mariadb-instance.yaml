@@ -1,0 +1,46 @@
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: {{ .Values.instanceName }}
+  namespace: {{ .Values.instanceNamespace }}
+spec:
+  rootPasswordSecretKeyRef:
+    name: {{ .Values.rootPasswordSecretKeyRef.name }}
+    key: {{ .Values.rootPasswordSecretKeyRef.key }}
+    generate: {{ .Values.rootPasswordSecretKeyRef.generate | default false }}
+  image: {{ .Values.image | default "mariadb:latest" }}
+  imagePullPolicy: {{ .Values.imagePullPolicy | default "IfNotPresent" }}
+  port: {{ .Values.port | default 3306 }}
+  storage:
+    size: {{ .Values.storage.size | default "128Mi" }}
+    resizeInUseVolumes: {{ .Values.storage.resizeInUseVolumes | default true }}
+    waitForVolumeResize: {{ .Values.storage.waitForVolumeResize | default true }}
+    {{- if .Values.storage.storageClassName }}
+    storageClassName: {{ .Values.storage.storageClassName }}
+    {{- end }}
+    {{- if .Values.storage.ephemeral }}
+    ephemeral: {{ .Values.storage.ephemeral }}
+    {{- end }}
+    {{- with .Values.storage.volumeClaimTemplate }}
+    volumeClaimTemplate:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
+  service:
+    type: ClusterIP
+
+  {{- with .Values.myCnf }}
+  myCnf:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  # ArgoCD diff for server side apply
+  myCnfConfigMapKeyRef:
+    key: my.cnf
+    name: mariadb-config
+
+  {{- with .Values.metrics }}
+  metrics:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

@@ -1,0 +1,40 @@
+name: Release Charts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'helm-charts/**'
+      - .github/workflows/helm-charts-release.yaml
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        charts: [understackdb]
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Read Helm chart
+        run: |
+          VERSION=$(yq .version helm-charts/${{ matrix.charts }}/Chart.yaml)
+          echo "helm_chart_version=${VERSION}" >> "$GITHUB_OUTPUT"
+        id: read_helm_chart
+
+      - name: Push Helm chart
+        uses: appany/helm-oci-chart-releaser@v0.4.2
+        with:
+          name: ${{ matrix.charts }}
+          repository: rackerlabs/understack
+          tag: ${{ steps.read_helm_chart.outputs['helm_chart_version'] }}
+          path: helm-charts/${{ matrix.charts }}/
+          registry: ghcr.io
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
