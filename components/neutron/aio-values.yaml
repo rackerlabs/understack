@@ -58,6 +58,8 @@ conf:
       # we aren't using availability zones so having calls attempt to add things to
       # availability zones won't work.
       default_availability_zones: ""
+    service_providers:
+      service_provider: "L3_ROUTER_NAT:cisco-asa:neutron_understack.l3_service_cisco_asa.CiscoAsa"
 
 # disable the neutron-ironic-agent from loading a non-existent config
 pod:
