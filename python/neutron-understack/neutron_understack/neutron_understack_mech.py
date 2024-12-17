@@ -175,6 +175,21 @@ class UnderstackDriver(MechanismDriver):
     def create_subnet_postcommit(self, context):
         log_call("create_subnet_postcommit", context)
 
+        subnet = context.current
+        subnet_uuid = subnet["id"]
+        network_uuid = subnet["network_id"]
+        prefix = subnet["cidr"]
+        external = subnet["router:external"]
+        shared_namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
+        nautobot_namespace_name = network_uuid if not external else shared_namespace
+
+        self.nb.subnet_create(subnet_uuid, prefix, nautobot_namespace_name)
+        LOG.info(
+            "subnet with ID: %(uuid)s and prefix %(prefix)s has been "
+            "created in Nautobot",
+            {"prefix": prefix, "uuid": subnet_uuid},
+        )
+
     def update_subnet_precommit(self, context):
         log_call("update_subnet_precommit", context)
 
@@ -186,6 +201,17 @@ class UnderstackDriver(MechanismDriver):
 
     def delete_subnet_postcommit(self, context):
         log_call("delete_subnet_postcommit", context)
+
+        subnet = context.current
+        subnet_uuid = subnet["id"]
+        prefix = subnet["cidr"]
+
+        self.nb.subnet_delete(subnet_uuid)
+        LOG.info(
+            "subnet with ID: %(uuid)s and prefix %(prefix)s has been "
+            "deleted in Nautobot",
+            {"prefix": prefix, "uuid": subnet_uuid},
+        )
 
     def create_port_precommit(self, context):
         log_call("create_port_precommit", context)
