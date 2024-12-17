@@ -109,6 +109,20 @@ class Nautobot:
         url = f"/api/ipam/namespaces/{namespace_uuid}/"
         return self.make_api_request(url, "delete")
 
+    def subnet_create(self, subnet_uuid: str, prefix: str, namespace_name: str) -> dict:
+        url = "/api/ipam/prefixes/"
+        payload = {
+            "id": subnet_uuid,
+            "prefix": prefix,
+            "status": "Active",
+            "namespace": {"name": namespace_name},
+        }
+        return self.make_api_request(url, "post", payload)
+
+    def subnet_delete(self, subnet_uuid: str) -> dict:
+        url = f"/api/ipam/prefixes/{subnet_uuid}/"
+        return self.make_api_request(url, "delete")
+
     def prep_switch_interface(
         self, connected_interface_id: str, ucvni_uuid: str
     ) -> str:
