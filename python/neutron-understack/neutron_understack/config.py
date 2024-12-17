@@ -35,6 +35,14 @@ mech_understack_opts = [
     cfg.BoolOpt(
         "undersync_dry_run", default=True, help="Call Undersync with dry-run mode"
     ),
+    cfg.StrOpt(
+        "shared_nautobot_namespace_name",
+        default="Global",
+        help=(
+            "Nautobot namespace name that will house all external prefixes, i.e "
+            "prefixes that need to be routable outside of a tenant environment."
+        ),
+    ),
 ]
 
 
