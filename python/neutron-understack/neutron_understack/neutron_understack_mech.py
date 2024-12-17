@@ -122,6 +122,7 @@ class UnderstackDriver(MechanismDriver):
         network = context.current
         network_id = network["id"]
         network_name = network["name"]
+        external = network["router:external"]
         provider_type = network.get("provider:network_type")
         segmentation_id = network.get("provider:segmentation_id")
         physnet = network.get("provider:physical_network")
@@ -135,11 +136,7 @@ class UnderstackDriver(MechanismDriver):
                 "physnet %(physnet)s",
                 {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
             )
-            self.nb.namespace_create(name=network_id)
-            LOG.info(
-                "namespace with name %(network_id)s has been created in Nautobot",
-                {"network_id": network_id},
-            )
+            self._create_nautobot_namespace(network_id, external)
 
     def update_network_precommit(self, context):
         log_call("update_network_precommit", context)
@@ -155,6 +152,7 @@ class UnderstackDriver(MechanismDriver):
 
         network = context.current
         network_id = network["id"]
+        external = network["router:external"]
         provider_type = network.get("provider:network_type")
         physnet = network.get("provider:physical_network")
 
@@ -167,7 +165,8 @@ class UnderstackDriver(MechanismDriver):
                 "physnet %(physnet)s",
                 {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
             )
-            self._fetch_and_delete_nautobot_namespace(network_id)
+            if not external:
+                self._fetch_and_delete_nautobot_namespace(network_id)
 
     def create_subnet_precommit(self, context):
         log_call("create_subnet_precommit", context)
@@ -392,3 +391,24 @@ class UnderstackDriver(MechanismDriver):
             "from nautobot",
             {"name": name, "ns_uuid": namespace_uuid},
         )
+
+    def _create_nautobot_namespace(
+        self, network_id: str, network_is_external: bool
+    ) -> None:
+        if not network_is_external:
+            self.nb.namespace_create(name=network_id)
+            LOG.info(
+                "namespace with name %(network_id)s has been created in Nautobot",
+                {"network_id": network_id},
+            )
+        else:
+            shared_namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
+            LOG.info(
+                "Network %(network_id)s is external, nautobot namespace "
+                "%(shared_nautobot_namespace)s will be used to house all "
+                "prefixes in this network",
+                {
+                    "network_id": network_id,
+                    "shared_nautobot_namespace": shared_namespace,
+                },
+            )
