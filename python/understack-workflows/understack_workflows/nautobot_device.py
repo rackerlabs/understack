@@ -132,7 +132,11 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict[str, dict]:
     }
     switches = nautobot_switches(nautobot, switch_macs.union(base_switch_macs))
     if not switches:
-        raise Exception("No switches found in nautobot for {switch_macs}")
+        raise Exception(
+            f"There are no switch Devices in nautobot that match the LLDP info "
+            f"reported by server BMC - I found no Devices where "
+            f"chassis_mac_address is one of {switch_macs}"
+        )
     return switches
 
 
