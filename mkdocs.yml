@@ -128,4 +128,5 @@ nav:
     - user-guide/openstack-ironic.md
     - user-guide/openstack-placement.md
     - user-guide/rook-ceph.md
+    - user-guide/nautobot.md
   - Workflows: workflows/
