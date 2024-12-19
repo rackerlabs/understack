@@ -6,12 +6,10 @@ from uuid import UUID
 import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
 from neutron_lib.plugins.ml2 import api
-from neutron_lib.plugins.ml2.api import (
-    MechanismDriver,
-    NetworkContext,
-    PortContext,
-    SubnetContext,
-)
+from neutron_lib.plugins.ml2.api import MechanismDriver
+from neutron_lib.plugins.ml2.api import NetworkContext
+from neutron_lib.plugins.ml2.api import PortContext
+from neutron_lib.plugins.ml2.api import SubnetContext
 from oslo_config import cfg
 
 from neutron_understack import config
