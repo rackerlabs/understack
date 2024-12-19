@@ -9,9 +9,7 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-"""
-Redfish Inspect Interface modified for Understack
-"""
+"""Redfish Inspect Interface modified for Understack."""
 
 import re
 
@@ -23,9 +21,10 @@ from ironic.drivers.modules.drac.inspect import DracRedfishInspect
 from ironic.drivers.modules.inspect_utils import get_inspection_data
 from ironic.drivers.modules.redfish.inspect import RedfishInspect
 from ironic.drivers.redfish import RedfishHardware
-from ironic_understack.conf import CONF
 from oslo_log import log
 from oslo_utils import units
+
+from ironic_understack.conf import CONF
 
 LOG = log.getLogger(__name__)
 FLAVORS = FlavorSpec.from_directory(CONF.ironic_understack.flavors_dir)
@@ -111,10 +110,8 @@ class UnderstackRedfishInspect(FlavorInspectMixin, RedfishInspect):
         super().__init__(*args, **kwargs)
         patched_ifaces = RedfishHardware().supported_inspect_interfaces
         patched_ifaces.append(UnderstackDracRedfishInspect)
-        setattr(
-            RedfishHardware,
-            "supported_inspect_interfaces",
-            property(lambda _: patched_ifaces),
+        RedfishHardware.supported_inspect_interfaces = property(
+            lambda _: patched_ifaces
         )
 
 
@@ -123,8 +120,4 @@ class UnderstackDracRedfishInspect(FlavorInspectMixin, DracRedfishInspect):
         super().__init__(*args, **kwargs)
         patched_ifaces = IDRACHardware().supported_inspect_interfaces
         patched_ifaces.append(UnderstackDracRedfishInspect)
-        setattr(
-            IDRACHardware,
-            "supported_inspect_interfaces",
-            property(lambda _: patched_ifaces),
-        )
+        IDRACHardware.supported_inspect_interfaces = property(lambda _: patched_ifaces)
