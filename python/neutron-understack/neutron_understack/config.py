@@ -64,6 +64,16 @@ l3_svc_cisco_asa_opts = [
         help="ASA interface for outside connections",
         default="OUTSIDE",
     ),
+    cfg.StrOpt(
+        "outside_physical",
+        help="Physical Interface for outside connections",
+        default="GigabitEthernet1/1",
+    ),
+    cfg.StrOpt(
+        "inside_physical",
+        help="Physical Interface for inside connections",
+        default="GigabitEthernet1/2",
+    ),
 ]
 
 
