@@ -3,6 +3,7 @@ from unittest.mock import mock_open
 from unittest.mock import patch
 
 import pytest
+
 from flavor_matcher.flavor_spec import FlavorSpec
 from flavor_matcher.machine import Machine
 
@@ -56,7 +57,7 @@ def test_from_yaml(valid_yaml):
 
 
 def test_from_yaml_invalid(invalid_yaml):
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa:B017
         FlavorSpec.from_yaml(invalid_yaml)
 
 
@@ -312,7 +313,8 @@ def test_cpu_model_not_exact_but_memory_and_disk_match(flavors):
 
 
 def test_large_flavor_memory_slightly_less_disk_exact(flavors):
-    # Machine with slightly less memory than required for the medium flavor, exact disk space
+    # Machine with slightly less memory than required for the medium
+    # flavor, exact disk space
     machine = Machine(
         memory_mb=204600, cpu="Intel 80386DX", disk_gb=1800, model="Dell XPS1319"
     )

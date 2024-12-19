@@ -1,5 +1,5 @@
-from flavor_matcher.machine import Machine
 from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.machine import Machine
 
 
 class Matcher:
@@ -7,9 +7,7 @@ class Matcher:
         self.flavors = flavors
 
     def match(self, machine: Machine) -> list[FlavorSpec]:
-        """
-        Find list of all flavors that the machine is eligible for.
-        """
+        """Find list of all flavors that the machine is eligible for."""
         results = []
         for flavor in self.flavors:
             score = flavor.score_machine(machine)
@@ -18,11 +16,11 @@ class Matcher:
         return results
 
     def pick_best_flavor(self, machine: Machine) -> FlavorSpec | None:
-        """
-        Obtains list of all flavors that particular machine can be classified
-        as, then tries to select "the best" one.
-        """
+        """Selects the best patching flavor.
 
+        Obtains list of all flavors that particular machine can be classified as,
+        then tries to select "the best" one.
+        """
         possible = self.match(machine)
 
         if len(possible) == 0:
