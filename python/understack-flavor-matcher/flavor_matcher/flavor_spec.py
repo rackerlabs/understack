@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass
 
 import yaml
+
 from flavor_matcher.machine import Machine
 
 
@@ -50,7 +51,7 @@ class FlavorSpec:
 
     @property
     def memory_mib(self):
-        """Returns memory size in MiB"""
+        """Returns memory size in MiB."""
         return self.memory_gb * 1024
 
     @staticmethod
@@ -61,7 +62,7 @@ class FlavorSpec:
                 if filename.endswith(".yaml") or filename.endswith(".yml"):
                     filepath = os.path.join(root, filename)
                     try:
-                        with open(filepath, "r") as file:
+                        with open(filepath) as file:
                             yaml_content = file.read()
                             flavor_spec = FlavorSpec.from_yaml(yaml_content)
                             flavor_specs.append(flavor_spec)
@@ -97,11 +98,13 @@ class FlavorSpec:
         ):
             return 100
 
-        # Rule 2: If machine has less memory than specified in the flavor, it cannot be used
+        # Rule 2: If machine has less memory than specified in the
+        # flavor, it cannot be used
         if machine.memory_gb < self.memory_gb:
             return 0
 
-        # Rule 3: If machine has smaller disk than specified in the flavor, it cannot be used
+        # Rule 3: If machine has smaller disk than specified in the
+        # flavor, it cannot be used
         if any(machine.disk_gb < drive for drive in self.drives):
             return 0
 

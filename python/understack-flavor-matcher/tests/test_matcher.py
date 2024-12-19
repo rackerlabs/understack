@@ -1,4 +1,5 @@
 import pytest
+
 from flavor_matcher.flavor_spec import FlavorSpec
 from flavor_matcher.machine import Machine
 from flavor_matcher.matcher import Matcher
