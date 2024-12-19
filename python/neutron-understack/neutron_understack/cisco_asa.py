@@ -106,3 +106,56 @@ class CiscoAsaAsdm:
         ]
 
         return self._make_request("delete_nat", cmds)
+
+    def create_inside_interface(
+        self,
+        asa_phys_inf: str,
+        asa_inside_inf: str,
+        vlan: int,
+        gateway_ip: str,
+        standby_ip: str,
+        netmask: str,
+    ) -> bool:
+        cmds = [
+            f"interface {asa_phys_inf}.{vlan}",
+            f"vlan {vlan}",
+            f"nameif {asa_inside_inf}",
+            f"ip address {gateway_ip} {netmask} standby {standby_ip}",
+        ]
+        return self._make_request("create_inside_interface", cmds)
+
+    def delete_inside_interface(self, asa_phys_inf: str, vlan: int) -> bool:
+        cmds = [
+            f"no interface {asa_phys_inf}.{vlan}",
+        ]
+        return self._make_request("delete_inside_interface", cmds)
+
+    def create_interface_access_list(self, asa_inside_inf: str) -> bool:
+        cmds = [
+            f"access-list {asa_inside_inf} permit ip any any",
+            f"access-group {asa_inside_inf} in interface {asa_inside_inf}",
+        ]
+        return self._make_request("create_interface_access_list", cmds)
+
+    def delete_interface_access_list(self, asa_inside_inf: str) -> bool:
+        cmds = [
+            f"no access-list {asa_inside_inf} permit ip any any",
+        ]
+        return self._make_request("delete_interface_access_list", cmds)
+
+    def create_default_pat(
+        self, outside_ip_addr: str, asa_outside_inf: str, asa_inside_inf: str
+    ) -> bool:
+        cmds = [
+            f"object network OBJ-{outside_ip_addr}",
+            # next entry spans two lines NO COMMA so its one command
+            f"nat ({asa_inside_inf},{asa_outside_inf}) after-auto source "
+            f"dynamic any OBJ-{outside_ip_addr}",
+        ]
+        return self._make_request("create_default_pat", cmds)
+
+    def delete_default_pat(self, outside_ip_addr: str) -> bool:
+        cmds = [
+            f"no object network OBJ-{outside_ip_addr}",
+        ]
+        return self._make_request("delete_default_pat", cmds)
