@@ -285,6 +285,9 @@ conf:
         OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
         OIDCCryptoPassphrase "exec:/bin/bash -c \"head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32\""
         OIDCClaimDelimiter ;
+        # cache sessions between pods in memcache
+        OIDCCacheType "memcache"
+        OIDCMemCacheServers "{{- tuple "oslo_cache" "internal" "memcache" $ | include "helm-toolkit.endpoints.host_and_port_endpoint_uri_lookup" -}}"
 
         # avoid redirect issues per the following
         # https://review.opendev.org/c/openstack/keystone/+/925553
