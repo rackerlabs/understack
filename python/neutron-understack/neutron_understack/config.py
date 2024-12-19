@@ -45,6 +45,21 @@ mech_understack_opts = [
     ),
 ]
 
+l3_svc_cisco_asa_opts = [
+    cfg.StrOpt(
+        "user_agent",
+        help="User-Agent for requests to Cisco ASA",
+    ),
+    cfg.StrOpt(
+        "username",
+        help="username for requests to the Cisco ASA",
+    ),
+    cfg.StrOpt(
+        "password",
+        help="password for requests to the Cisco ASA",
+    ),
+]
+
 
 def register_ml2_type_understack_opts(config):
     config.register_opts(type_understack_opts, "ml2_type_understack")
@@ -52,3 +67,7 @@ def register_ml2_type_understack_opts(config):
 
 def register_ml2_understack_opts(config):
     config.register_opts(mech_understack_opts, "ml2_understack")
+
+
+def register_l3_svc_cisco_asa_opts(config):
+    config.register_opts(l3_svc_cisco_asa_opts, "l3_service_cisco_asa")
