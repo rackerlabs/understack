@@ -113,6 +113,9 @@ nav:
   - 'Deployment Guide':
     - deploy-guide/index.md
     - Quick Start: deploy-guide/gitops-install.md
+    - Full Deploy:
+      - deploy-guide/getting-started.md
+      - deploy-guide/deploy-repo.md
     - deploy-guide/auth.md
     - deploy-guide/extra-regions.md
     - deploy-guide/external-argocd.md
