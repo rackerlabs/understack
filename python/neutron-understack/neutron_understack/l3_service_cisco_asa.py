@@ -29,19 +29,18 @@ class CiscoAsa(base.L3ServiceProvider):
         [events.AFTER_CREATE, events.AFTER_UPDATE, events.AFTER_DELETE],
     )
     def _process_router_interface_create(self, resource, event, trigger, payload):
-        LOG.debug("router_interface_early %s %s", event, payload)
-        router = payload.states[0]
+        LOG.debug("router_interface_early %s %s", event, payload.metadata)
+        router = payload.states[0] if len(payload.states) >= 1 else None
         context = payload.context
-        port = payload.metadata["port"]
-        subnets = payload.metadata["subnets"]
+        port = payload.metadata.get("port")
+        subnets = payload.metadata.get("subnets")
         LOG.debug(
             "router_interface_create1 %s / %s / %s / %s", router, context, port, subnets
         )
         LOG.debug(
-            "router_interface_create2 %s / %s / %s",
+            "router_interface_create2 %s / %s",
             event,
             payload.metadata,
-            payload.states[0],
         )
 
     @registry.receives(
@@ -49,7 +48,7 @@ class CiscoAsa(base.L3ServiceProvider):
         [events.AFTER_CREATE, events.AFTER_UPDATE, events.AFTER_DELETE],
     )
     def _process_router_gateway(self, resource, event, trigger, payload):
-        LOG.debug("router_gateway_early %s %s", event, payload)
+        LOG.debug("router_gateway_early %s %s", event, payload.metadata)
 
         LOG.debug(
             "router_gateway %s / %s / %s / %s",
