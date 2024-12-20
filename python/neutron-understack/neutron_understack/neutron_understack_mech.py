@@ -14,6 +14,7 @@ from oslo_config import cfg
 
 from neutron_understack import config
 from neutron_understack.nautobot import Nautobot
+from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
 
 LOG = logging.getLogger(__name__)
@@ -110,6 +111,7 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
         self.nb = Nautobot(conf.nb_url, conf.nb_token)
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
+        self.trunk_driver = UnderStackTrunkDriver.create(self)
 
     def create_network_precommit(self, context):
         log_call("create_network_precommit", context)

@@ -24,27 +24,38 @@ class CiscoAsa(base.L3ServiceProvider):
         super().__init__(l3plugin)
         self.core_plugin = directory.get_plugin()
 
-    @registry.receives(resources.ROUTER_INTERFACE, [events.AFTER_CREATE])
+    @registry.receives(
+        resources.ROUTER_INTERFACE,
+        [events.AFTER_CREATE, events.AFTER_UPDATE, events.AFTER_DELETE],
+    )
     def _process_router_interface_create(self, resource, event, trigger, payload):
-        router = payload.states[0]
+        LOG.debug("router_interface_early %s %s", event, payload.metadata)
+        router = payload.states[0] if len(payload.states) >= 1 else None
         context = payload.context
-        port = payload.metadata["port"]
-        subnets = payload.metadata["subnets"]
+        port = payload.metadata.get("port")
+        subnets = payload.metadata.get("subnets")
         LOG.debug(
             "router_interface_create1 %s / %s / %s / %s", router, context, port, subnets
         )
         LOG.debug(
-            "router_interface_create2 %s / %s / %s / %s",
-            resource,
+            "router_interface_create2 %s / %s",
             event,
-            trigger,
-            payload,
+            payload.metadata,
         )
 
-    @registry.receives(resources.FLOATING_IP, [events.AFTER_CREATE])
-    def _process_floatingip_create(self, resource, event, trigger, payload):
+    @registry.receives(
+        resources.ROUTER_GATEWAY,
+        [events.AFTER_CREATE, events.AFTER_UPDATE, events.AFTER_DELETE],
+    )
+    def _process_router_gateway(self, resource, event, trigger, payload):
+        LOG.debug("router_gateway_early %s %s", event, payload.metadata)
+
         LOG.debug(
-            "floatingip_create %s / %s / %s / %s", resource, event, trigger, payload
+            "router_gateway %s / %s / %s / %s",
+            event,
+            payload.metadata,
+            payload.states[0],
+            payload.states[1],
         )
 
     @registry.receives(resources.FLOATING_IP, [events.AFTER_UPDATE])
