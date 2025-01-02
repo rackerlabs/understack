@@ -15,6 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Typos Spell Checker
-        uses: crate-ci/typos@c8fd3764afbf5eaf6e53d2e6571c835db2c8fa5f # v1.29.0
+        uses: crate-ci/typos@3265cef783c98e382e561f6089c2179a7d91bf0d # v1.29.1
         with:
           config: ./.typos.toml
