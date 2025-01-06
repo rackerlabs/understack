@@ -645,10 +645,12 @@ def generate_mermaid(workflows, nodes, output_name, output_file, workflow_readme
         f.write("\n")
         f.write("## Workflow Diagram\n")
         f.write("\n")
+        f.write("{% raw %}\n\n")
         f.write("```mermaid\n")
         f.write(mermaid_output)
         f.write("\n")
         f.write("```\n")
+        f.write("\n{% endraw %}\n")
         f.write("\n")
 
 

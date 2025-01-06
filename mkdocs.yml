@@ -89,6 +89,7 @@ plugins:
   - include_dir_to_nav:
       sort_file: true
       sort_directory: true
+  - macros
 
 validation:
   omitted_files: warn

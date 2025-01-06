@@ -40,6 +40,8 @@ Adding an application to be part of UnderStack involves modifying the
 
 The general form should be:
 
+{% raw %}
+
 ```yaml
 # list item per ArgoCD Application
 # the component value will appear as the ArgoCD Application name
@@ -77,6 +79,8 @@ The general form should be:
       # only needed if manifests should be here
       path: '{{.name}}/manifests/dex'
 ```
+
+{% endraw %}
 
 ## Removing an application from UnderStack
 
