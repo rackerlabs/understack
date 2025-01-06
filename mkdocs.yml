@@ -97,6 +97,9 @@ validation:
   unrecognized_links: warn
   anchors: warn
 
+extra:
+  auth_url: !ENV [OS_AUTH_URL, "https://your.endpoint.url/v3"]
+
 nav:
   - Home: index.md
   - Overview:
