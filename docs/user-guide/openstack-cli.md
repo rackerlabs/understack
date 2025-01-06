@@ -59,7 +59,7 @@ clouds:
     identity_provider: sso
     protocol: openid
     auth:
-      auth_url: https://your.endpoint.url/v3
+      auth_url: {{ config.extra.auth_url }}
       project_domain_name: Default
       project_name: myproject
 ```

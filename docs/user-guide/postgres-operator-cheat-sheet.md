@@ -30,6 +30,8 @@ kubectl -n nautobot describe cluster nautobot-cluster
 
 ## Connect to the Nautobot database with psql command line
 
+{% raw %}
+
 ```bash
 # This is the name of the secret with the nautobot postgres credentials
 PG_CLUSTER_SECRET=nautobot-cluster-app
@@ -37,6 +39,8 @@ PG_CLUSTER_SECRET=nautobot-cluster-app
 # psql command line which loads the credentials from the secret
 PGPASSWORD=$(kubectl get secret -n nautobot "${PG_CLUSTER_SECRET}" -o go-template='{{.data.password | base64decode}}') PGUSER=$(kubectl get secret -n nautobot "${PG_CLUSTER_SECRET}" -o go-template='{{.data.user | base64decode}}') PGDATABASE=$(kubectl get secret -n nautobot "${PG_CLUSTER_SECRET}" -o go-template='{{.data.dbname | base64decode}}') psql -h localhost
 ```
+
+{% endraw %}
 
 ## Create a local pg_dump backup of the Nautobot database
 
@@ -53,7 +57,11 @@ kubectl -n nautobot port-forward "${PG_CLUSTER_PRIMARY_POD}" 5432:5432
 
 Once the port forward has been created, we can perform a `pg_dump` of the postgres database:
 
+{% raw %}
+
 ```bash
 PG_CLUSTER_SECRET=nautobot-cluster-app
 PGPASSWORD=$(kubectl get secret -n nautobot "${PG_CLUSTER_SECRET}" -o go-template='{{.data.password | base64decode}}') PGUSER=$(kubectl get secret -n nautobot "${PG_CLUSTER_SECRET}" -o go-template='{{.data.user | base64decode}}') PGDATABASE=$(kubectl get secret -n nautobot "${PG_CLUSTER_SECRET}" -o go-template='{{.data.dbname | base64decode}}') pg_dump -h localhost -f nautobot.postgres.sql
 ```
+
+{% endraw %}
