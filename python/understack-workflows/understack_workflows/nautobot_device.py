@@ -92,7 +92,7 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
     find_or_create_interfaces(nautobot, chassis_info, device.id, switches)
 
     # Run the graphql query yet again, to include all the data we just populated
-    # in nautobot.   Fairly innefficient for the case where we didn't change
+    # in nautobot. Fairly inefficient for the case where we didn't change
     # anything, but we need the accurate data.
     device = nautobot_server(nautobot, serial=chassis_info.serial_number)
     if not device:
