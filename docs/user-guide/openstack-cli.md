@@ -85,3 +85,41 @@ command as follows:
 export OS_CLOUD=understack
 openstack <sub-command-here>
 ```
+
+### Application Credentials
+
+Users can create application credentials to allow their applications to authenticate to keystone.
+This is useful when using tooling such as `terraform` and `ansible` to programmatically build infrastructure.
+
+To create an application credential:
+
+```sh
+# creates an application credential called "application-credential"
+openstack application credential create application-credential
+# terraform and ansible will read these environment variables
+export OS_APPLICATION_CREDENTIAL_ID=${FROM_ABOVE}
+export OS_APPLICATION_CREDENTIAL_SECRET=${FROM_ABOVE}
+```
+
+You can also add a section to your `$HOME/.config/openstack/clouds.yaml` OpenStack configuration file.
+Note the auth_type and auth options are slightly different than in the above SSO example.
+
+```yaml title="$HOME/.config/openstack/clouds.yaml"
+clouds:
+  understack-application:
+    auth_type: v3applicationcredential
+    auth:
+      auth_url: {{ config.extra.auth_url }}
+      application_credential_id: ${FROM_ABOVE}
+      application_credential_secret: ${FROM_ABOVE}
+```
+
+The `openstack` cli, `terraform` and `ansible` can all use application credentials and
+the `OS_CLOUD` environment variable:
+
+```bash
+export OS_CLOUD=understack-application
+```
+
+There are a number of additional features and options available in the OpenStack documentation:
+<https://docs.openstack.org/keystone/latest/user/application_credentials.html>
