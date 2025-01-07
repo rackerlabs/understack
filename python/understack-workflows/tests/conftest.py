@@ -110,7 +110,5 @@ def nautobot(requests_mock, nautobot_url: str, tenant_data: dict) -> Nautobot:
     )
     requests_mock.get(tenant_data["url"], json=tenant_data)
     requests_mock.delete(tenant_data["url"])
-    requests_mock.post(
-        f"{nautobot_url}/api/plugins/uuid-api-endpoints/tenant/", json=tenant_data
-    )
+    requests_mock.post(f"{nautobot_url}/api/tenancy/tenants/", json=tenant_data)
     return Nautobot(nautobot_url, "blah")
