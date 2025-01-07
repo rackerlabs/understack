@@ -18,7 +18,7 @@ WORKDIR /app
 RUN cd /app && /opt/poetry/bin/poetry build -f wheel && /opt/poetry/bin/poetry export --without-hashes -f requirements.txt -o dist/requirements.txt
 
 ######################## PROD  ########################
-FROM builder AS prod
+FROM ghcr.io/rackerlabs/understack/argo-python3.12.2-alpine3.19 AS prod
 
 ENV FLAVORS_DIR="/flavors"
 ENV NOVA_FLAVOR_MONITOR_LOGLEVEL="info"
