@@ -11,7 +11,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY --chown=appuser:appgroup operators/nova-flavors /app
 COPY --chown=appuser:appgroup python/understack-flavor-matcher /understack-flavor-matcher
 # need watchdog and psutil built AS a wheel
-RUN --mount=type=cache,target=/root/.cache/pip pip wheel --wheel-dir /app/dist watchdog psutil==6.1.0
+RUN --mount=type=cache,target=/root/.cache/pip pip wheel --wheel-dir /app/dist watchdog psutil==6.1.1
 CMD ["nova-flavors-sync"]
 
 WORKDIR /app
