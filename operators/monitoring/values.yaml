@@ -6,3 +6,6 @@ defaultRules:
     kubeProxy: false
 kubeProxy:
   enabled: false
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
