@@ -5,3 +5,4 @@ spec:
   ttlStrategy:
     secondsAfterSuccess: 129600  # 36 hours
     secondsAfterFailure: 259200  # 3 days
+    secondsAfterCompletion: 604800  # 7 days
