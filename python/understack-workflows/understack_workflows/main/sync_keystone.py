@@ -67,7 +67,6 @@ def handle_project_create(conn: Connection, nautobot: Nautobot, project_id: uuid
     logger.info(f"got request to create tenant {project_id!s}")
     project = conn.identity.get_project(project_id.hex)  # type: ignore
     ten_api = nautobot.session.tenancy.tenants
-    ten_api.url = f"{ten_api.base_url}/plugins/uuid-api-endpoints/tenant"
     ten = ten_api.create(
         id=str(project_id), name=project.name, description=project.description
     )
