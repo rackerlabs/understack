@@ -1,2 +1,5 @@
 # Defaults
 # https://github.com/rook/rook/blob/release-1.15/deploy/charts/rook-ceph/values.yaml
+
+monitoring:
+  enabled: true
