@@ -154,8 +154,23 @@ spec:
             ]
           }
           EOF
+          # create the initial clean steps which will create a raid config
+          cat <<'EOF' >> raid-clean-steps.json
+          [
+              {
+                  "interface": "raid",
+                  "step": "delete_configuration"
+              },
+              {
+                  "interface": "raid",
+                  "step": "create_configuration"
+              }
+          ]
+          EOF
           # apply the target raid config to the node
           openstack baremetal node set {{inputs.parameters.device_id}} --target-raid-config raid1-config.json
+          # create the raid config
+          openstack baremetal node clean --wait 0 --clean-steps raid-clean-steps.json --disable-ramdisk {{inputs.parameters.device_id}}
         env:
           - name: OS_CLOUD
             value: understack
