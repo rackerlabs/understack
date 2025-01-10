@@ -170,7 +170,7 @@ spec:
           # apply the target raid config to the node
           openstack baremetal node set {{inputs.parameters.device_id}} --target-raid-config raid1-config.json
           # create the raid config
-          openstack baremetal node clean --clean-steps raid-clean-steps.json --disable-ramdisk {{inputs.parameters.device_id}}
+          openstack baremetal node clean --wait 0 --clean-steps raid-clean-steps.json --disable-ramdisk {{inputs.parameters.device_id}}
         env:
           - name: OS_CLOUD
             value: understack
