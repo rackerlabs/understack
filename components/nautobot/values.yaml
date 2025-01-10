@@ -64,5 +64,9 @@ ingress:
     cert-manager.io/cluster-issuer: understack-cluster-issuer
     nginx.ingress.kubernetes.io/backend-protocol: HTTPS
 
+# (nicholas.kuechler) seeing something unexpected:
+# https://networktocode.slack.com/archives/C01NWPK6WHL/p1736445485521569
 metrics:
   enabled: true
+  prometheusRule:
+    enabled: true
