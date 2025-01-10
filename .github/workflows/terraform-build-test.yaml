@@ -23,7 +23,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
     - name: Setup OpenStack config
       env:
@@ -32,7 +32,7 @@ jobs:
         mkdir -p ~/.config/openstack/
         echo $OPENSTACK_CONFIG | base64 --decode > ~/.config/openstack/clouds.yml
 
-    - uses: hashicorp/setup-terraform@v3
+    - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
 
     - run: terraform init
 
