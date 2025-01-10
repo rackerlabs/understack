@@ -12,3 +12,25 @@ prometheus:
     ruleSelectorNilUsesHelmValues: false
     serviceMonitorSelectorNilUsesHelmValues: false
     probeSelectorNilUsesHelmValues: false
+
+grafana:
+  dashboards:
+    default:
+      # mariadb-operator dashboards
+      # https://github.com/mariadb-operator/mariadb-operator/blob/main/hack/config/kube-prometheus-stack.yaml
+      mysql-overview:
+        gnetId: 7362
+        revision: 5
+        datasource: Prometheus
+      mysql-replication:
+        gnetId: 7371
+        revision: 1
+        datasource: Prometheus
+      mariadb-galera:
+        gnetId: 13106
+        revision: 3
+        datasource: Prometheus
+      mysql-quickstart:
+        gnetId: 14057
+        revision: 1
+        datasource: Prometheus
