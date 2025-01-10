@@ -2,6 +2,7 @@
 name: terraform-build-test
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 7,16 * * *'
 
