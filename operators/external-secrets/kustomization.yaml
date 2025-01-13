@@ -9,3 +9,4 @@ helmCharts:
   releaseName: external-secrets
   version: 0.11.0
   repo: https://charts.external-secrets.io
+  valuesFile: values.yaml
