@@ -61,4 +61,10 @@ resource "openstack_compute_instance_v2" "tenant_server" {
   network {
     uuid = openstack_networking_network_v2.tenant_net.id
   }
+
+  depends_on = [
+    openstack_networking_subnet_v2.tenant_subnet,
+    openstack_networking_network_v2.tenant_net,
+    openstack_compute_keypair_v2.ssh_keypair
+  ]
 }
