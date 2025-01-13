@@ -97,6 +97,7 @@ def port_configuration(
         name=name,
         pxe_enabled=pxe_enabled,
         local_link_connection=local_link_connection,
+        physical_network=interface.ucvni_group_name,
     )
 
 

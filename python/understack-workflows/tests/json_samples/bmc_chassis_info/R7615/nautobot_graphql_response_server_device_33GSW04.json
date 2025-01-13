@@ -37,17 +37,10 @@
                   "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6",
                   "name": "F20-2"
                 },
-                "rel_vlan_group_to_devices": {
-                  "rel_vlan_group_to_devices": [
-                    {
-                      "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
-                      "name": "f20-2-1.iad3.rackspace.net"
-                    },
-                    {
-                      "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
-                      "name": "f20-2-2.iad3.rackspace.net"
-                    }
-                  ]
+                "vlan_group": {
+                  "ucvni_group": {
+                    "name": "spine402-1.iad3"
+                  }
                 }
               }
             },
@@ -77,17 +70,10 @@
                   "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6",
                   "name": "F20-2"
                 },
-                "rel_vlan_group_to_devices": {
-                  "rel_vlan_group_to_devices": [
-                    {
-                      "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
-                      "name": "f20-2-1.iad3.rackspace.net"
-                    },
-                    {
-                      "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
-                      "name": "f20-2-2.iad3.rackspace.net"
-                    }
-                  ]
+                "vlan_group": {
+                  "ucvni_group": {
+                    "name": "spine402-1.iad3"
+                  }
                 }
               }
             },
@@ -117,17 +103,10 @@
                   "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6",
                   "name": "F20-2"
                 },
-                "rel_vlan_group_to_devices": {
-                  "rel_vlan_group_to_devices": [
-                    {
-                      "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
-                      "name": "f20-2-1.iad3.rackspace.net"
-                    },
-                    {
-                      "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
-                      "name": "f20-2-2.iad3.rackspace.net"
-                    }
-                  ]
+                "vlan_group": {
+                  "ucvni_group": {
+                    "name": "spine402-1.iad3"
+                  }
                 }
               }
             },
@@ -157,17 +136,10 @@
                   "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6",
                   "name": "F20-2"
                 },
-                "rel_vlan_group_to_devices": {
-                  "rel_vlan_group_to_devices": [
-                    {
-                      "id": "275ef491-2b27-4d1b-bd45-330bd6b7e0cf",
-                      "name": "f20-2-1.iad3.rackspace.net"
-                    },
-                    {
-                      "id": "05f6715a-4dbe-4fd6-af20-1e73adb285c2",
-                      "name": "f20-2-2.iad3.rackspace.net"
-                    }
-                  ]
+                "vlan_group": {
+                  "ucvni_group": {
+                    "name": "spine402-1.iad3"
+                  }
                 }
               }
             },
@@ -197,7 +169,7 @@
                   "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6",
                   "name": "F20-2"
                 },
-                "rel_vlan_group_to_devices": null
+                "vlan_group": null
               }
             },
             "ip_addresses": [
