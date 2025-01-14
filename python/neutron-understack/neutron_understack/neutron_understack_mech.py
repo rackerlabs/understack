@@ -130,6 +130,8 @@ class UnderstackDriver(MechanismDriver):
 
         if provider_type in allowed_provider_types:
             ucvni_group = conf.ucvni_group
+            if provider_type == p_const.TYPE_VLAN:
+                segmentation_id = None
             self.nb.ucvni_create(network_id, ucvni_group, network_name, segmentation_id)
             LOG.info(
                 "network %(net_id)s has been added on ucvni_group %(ucvni_group)s, "
