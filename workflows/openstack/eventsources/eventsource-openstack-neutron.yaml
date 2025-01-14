@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: openstack-neutron
+  namespace: openstack
+spec:
+  template:
+    serviceAccountName: openstack-events
+  resource:
+    neutron-deployment:
+      namespace: openstack
+      resource: deployments
+      group: apps
+      version: v1
+      eventTypes:
+        - ADD
+      filter:
+        labels:
+          - key: application
+            value: neutron
+          - key: component
+            value: server

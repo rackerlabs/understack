@@ -1,0 +1,153 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: neutron-deployment
+  namespace: openstack
+spec:
+  template:
+    serviceAccountName: openstack-events
+  dependencies:
+    - eventName: neutron-deployment
+      eventSourceName: openstack-neutron
+      name: openstack-neutron-server-deployment
+  triggers:
+    - template:
+        name: create-provisioning-network
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                generateName: create-provision-network
+              spec:
+                template:
+                  spec:
+                    containers:
+                      - name: create-network
+                        image: docker.io/openstackhelm/heat:2024.1-ubuntu_jammy
+                        command:
+                          - /bin/bash
+                          - '-c'
+                          - >-
+                            openstack network create --description "${PROVISIONING_NETWORK_DESCRIPTION}" \
+                            --no-share --provider-network-type "${PROVISIONING_NETWORK_TYPE}" \
+                            --provider-physical-network "${PROVISIONING_PHYSICAL_NETWORK}" \
+                            --tag "${PROVISIONING_NETWORK_TAGS}" \
+                            "${PROVISIONING_NETWORK_NAME}"
+                        env:
+                          - name: OS_IDENTITY_API_VERSION
+                            value: '3'
+                          - name: OS_AUTH_URL
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_AUTH_URL
+                          - name: OS_REGION_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_REGION_NAME
+                          - name: OS_INTERFACE
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_INTERFACE
+                          - name: OS_ENDPOINT_TYPE
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_INTERFACE
+                          - name: OS_PROJECT_DOMAIN_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_PROJECT_DOMAIN_NAME
+                          - name: OS_PROJECT_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_PROJECT_NAME
+                          - name: OS_USER_DOMAIN_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_USER_DOMAIN_NAME
+                          - name: OS_USERNAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_USERNAME
+                          - name: OS_PASSWORD
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_PASSWORD
+                          - name: OS_DEFAULT_DOMAIN
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-admin
+                                key: OS_DEFAULT_DOMAIN
+                          - name: SERVICE_OS_SERVICE_NAME
+                            value: neutron
+                          - name: SERVICE_OS_REGION_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-user
+                                key: OS_REGION_NAME
+                          - name: SERVICE_OS_PROJECT_DOMAIN_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-user
+                                key: OS_PROJECT_DOMAIN_NAME
+                          - name: SERVICE_OS_PROJECT_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-user
+                                key: OS_PROJECT_NAME
+                          - name: SERVICE_OS_USER_DOMAIN_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-user
+                                key: OS_USER_DOMAIN_NAME
+                          - name: SERVICE_OS_USERNAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-user
+                                key: OS_USERNAME
+                          - name: SERVICE_OS_PASSWORD
+                            valueFrom:
+                              secretKeyRef:
+                                name: neutron-keystone-user
+                                key: OS_PASSWORD
+                          - name: SERVICE_OS_ROLES
+                            value: admin,service
+                          - name: PROVISIONING_NETWORK_NAME
+                            valueFrom:
+                              configMapKeyRef:
+                                name: provisioning-network-config
+                                key: network_name
+                          - name: PROVISIONING_NETWORK_TYPE
+                            valueFrom:
+                              configMapKeyRef:
+                                name: provisioning-network-config
+                                key: network_type
+                          - name: PROVISIONING_PHYSICAL_NETWORK
+                            valueFrom:
+                              configMapKeyRef:
+                                name: provisioning-network-config
+                                key: physical_network
+                          - name: PROVISIONING_NETWORK_TAGS
+                            valueFrom:
+                              configMapKeyRef:
+                                name: provisioning-network-config
+                                key: tags
+                          - name: PROVISIONING_NETWORK_DESCRIPTION
+                            valueFrom:
+                              configMapKeyRef:
+                                name: provisioning-network-config
+                                key: description
+                        imagePullPolicy: IfNotPresent
+                    restartPolicy: OnFailure
