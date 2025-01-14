@@ -155,16 +155,12 @@ class UnderstackDriver(MechanismDriver):
             )
 
     def _adjust_network_segmentation_id(self, context, vlan_tag):
-        network_id = context.current["id"]
-        if (
-            len(context.network_segments) != 1
-            or len(context.network_segments[network_id]) != 1
-        ):
+        if len(context.network_segments) != 1:
             msg = "Only single network segment is supported."
             raise NotImplementedError(msg)
 
         session = context.plugin_context.session
-        network_segment_id = context.network_segments[network_id][0]["id"]
+        network_segment_id = context.network_segments[0]["id"]
 
         LOG.debug(
             "Updating network segment ID: %(network_seg_id)s with vlan tag: "
