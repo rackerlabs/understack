@@ -4,6 +4,7 @@ from pprint import pprint
 from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
+from neutron.db.models.segment import NetworkSegment
 from neutron_lib import constants as p_const
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
@@ -124,9 +125,10 @@ class UnderstackDriver(MechanismDriver):
         provider_type = network.get("provider:network_type")
         segmentation_id = network.get("provider:segmentation_id")
         physnet = network.get("provider:physical_network")
+        conf = cfg.CONF.ml2_understack
+        allowed_provider_types = [p_const.TYPE_VLAN, p_const.TYPE_VXLAN]
 
-        if provider_type == p_const.TYPE_VXLAN:
-            conf = cfg.CONF.ml2_understack
+        if provider_type in allowed_provider_types:
             ucvni_group = conf.ucvni_group
             self.nb.ucvni_create(network_id, ucvni_group, network_name, segmentation_id)
             LOG.info(
@@ -135,6 +137,42 @@ class UnderstackDriver(MechanismDriver):
                 {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
             )
             self._create_nautobot_namespace(network_id, external)
+
+        if provider_type == p_const.TYPE_VLAN:
+            vlan_group_id_and_vlan_tag = self.nb.prep_switch_interface(
+                connected_interface_id=conf.network_node_switchport_uuid,
+                ucvni_uuid=network_id,
+                modify_native_vlan=False,
+            )
+            self._adjust_network_segmentation_id(
+                context, vlan_group_id_and_vlan_tag["vlan_tag"]
+            )
+            self.undersync.sync_devices(
+                vlan_group_uuids=str(vlan_group_id_and_vlan_tag["vlan_group_id"]),
+                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+            )
+
+    def _adjust_network_segmentation_id(self, context, vlan_tag):
+        network_id = context.current["id"]
+        if (
+            len(context.network_segments) != 1
+            or len(context.network_segments[network_id]) != 1
+        ):
+            msg = "Only single network segment is supported."
+            raise NotImplementedError(msg)
+
+        session = context.plugin_context.session
+        network_segment_id = context.network_segments[network_id][0]["id"]
+
+        LOG.debug(
+            "Updating network segment ID: %(network_seg_id)s with vlan tag: "
+            "%(vlan_tag)s",
+            {"network_seg_id": network_segment_id, "vlan_tag": vlan_tag},
+        )
+        segment = session.get(NetworkSegment, network_segment_id)
+        segment.segmentation_id = int(vlan_tag)
+        segment.save(session)
+        session.flush()
 
     def update_network_precommit(self, context):
         log_call("update_network_precommit", context)
@@ -345,9 +383,10 @@ class UnderstackDriver(MechanismDriver):
             switch_uuid = configure_port_status_data.get("device", {}).get("id")
             return UUID(self.nb.fetch_vlan_group_uuid(switch_uuid))
         else:
-            return UUID(
-                self.nb.prep_switch_interface(connected_interface_uuid, network_id)
-            )
+            vlan_group_id = self.nb.prep_switch_interface(
+                connected_interface_uuid, network_id
+            )["vlan_group_id"]
+            return UUID(vlan_group_id)
 
     def _delete_tenant_port_on_unbound(self, context):
         """Tenant network port cleanup in the UnderCloud infrastructure.
