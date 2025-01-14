@@ -1,0 +1,11 @@
+query {
+  devices(role: "server", rack: "${QUERY_VARIABLE}") {
+    id
+    name
+    interfaces(name: ["iDRAC", "iLO"]) {
+      ip_addresses {
+        host
+      }
+    }
+  }
+}
