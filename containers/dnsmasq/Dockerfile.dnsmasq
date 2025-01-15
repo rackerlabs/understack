@@ -42,7 +42,7 @@ COPY --from=builder /src/dnsmasq-base_*_amd64.deb /tmp
 COPY --from=builder /src/dnsmasq_*_all.deb /tmp
 
 RUN apt-get update && \
-    apt-get -y install --no-install-recommends python3-jinja2=3.1.2-1 && \
+    apt-get -y install --no-install-recommends python3-jinja2 && \
     apt-get -y --fix-broken install --no-install-recommends /tmp/dnsmasq-base_*_amd64.deb /tmp/dnsmasq_*_all.deb && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/*.deb
