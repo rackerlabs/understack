@@ -6,15 +6,19 @@ metadata:
 spec:
   template:
     serviceAccountName: openstack-events
+  # Kubernetes resource event sources
   resource:
     neutron-deployment:
+      # monitor deployment resources under openstack namespace
       namespace: openstack
       resource: deployments
       group: apps
       version: v1
+      # Event types to listen for (e.g., ADD, UPDATE, DELETE). Here we want only when deployment is created.
       eventTypes:
         - ADD
       filter:
+        # filter based these labels to match neutron-server deployment
         labels:
           - key: application
             value: neutron
