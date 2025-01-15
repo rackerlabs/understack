@@ -124,6 +124,8 @@ nav:
     - deploy-guide/extra-regions.md
     - deploy-guide/external-argocd.md
     - deploy-guide/add-remove-app.md
+    - Debugging:
+      - deploy-guide/debug-neutron.md
   - 'User Guide':
     - user-guide/index.md
     - user-guide/openstack-cli.md
