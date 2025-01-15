@@ -27,9 +27,11 @@ endpoints:
 
 
 network:
-  # we're using ironic and actual switches
+  # we're using ironic and actual switches so baremetal
+  # we're using OVN for our router solution
   backend:
     - baremetal
+    - ovn
 
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
@@ -47,7 +49,8 @@ conf:
     ml2_conf:
       ml2:
         # set the default ml2 backend to our plugin, neutron_understack
-        mechanism_drivers: understack
+        # we'll need to use the ovn ML2 plugin to hook the routers to our network
+        mechanism_drivers: "understack,ovn"
         tenant_network_types: "vxlan,local"
         type_drivers: "vlan,local,understack_vxlan"
   neutron:
@@ -57,7 +60,8 @@ conf:
       # the 'network_segment_range' plugin allows us to set the allowed VNIs or VLANs
       # for a given network and let's OpenStack select one from the available pool. We
       # are also able to see which ones are used from the OpenStack API.
-      service_plugins: "l3_understack,trunk,network_segment_range"
+      # the 'ovn-router' plugin enables OVN to be our L3 router
+      service_plugins: "ovn-router,trunk,network_segment_range"
       # we don't want HA L3 routers. It's a Python value so we need to quote it in YAML.
       l3_ha: "False"
       # we aren't using availability zones so having calls attempt to add things to
@@ -65,6 +69,13 @@ conf:
       default_availability_zones: ""
     service_providers:
       service_provider: "L3_ROUTER_NAT:cisco-asa:neutron_understack.l3_service_cisco_asa.CiscoAsa"
+    ovn:
+      # the ovn-metadata-agent utilizes 'localport' on each hypervisor in OVS to work, since
+      # we don't have an OVS that the baremetal nodes are plugged into we can't have this
+      # working at this time so we need to disable it
+      ovn_metadata_enabled: false
+      # by default let's have OVN's DB be updated with what is in neutron on startup
+      neutron_sync_mode: repair
 
 # disable the neutron-ironic-agent from loading a non-existent config
 pod:
@@ -148,11 +159,20 @@ manifests:
   pod_rally_test: false
   secret_db: false
   secret_keystone: true
+  # OVN has its own pieces and does not need the following:
+  # - neutron-dhcp-agent (OVN's does not work with baremetal/ironic currently)
+  # - neutron-l3-agent
+  # - neutron-metadata-agent
+  # - neutron-ovs-agent
+  # - neutron-sriov-agent
+  # - neutron-rpc-agent (this sends requests to the various agents)
+  # https://docs.openstack.org/ironic/latest/admin/ovn-networking.html
   daemonset_dhcp_agent: false
   daemonset_l3_agent: false
   daemonset_lb_agent: false
   daemonset_metadata_agent: false
   daemonset_ovs_agent: false
+  deployment_rpc_server: false
   daemonset_sriov_agent: false
   daemonset_l2gw_agent: false
   daemonset_bagpipe_bgp: false
