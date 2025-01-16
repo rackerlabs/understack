@@ -126,6 +126,7 @@ nav:
     - deploy-guide/add-remove-app.md
   - 'Operator Guide':
     - operator-guide/index.md
+    - operator-guide/debug-ovs-ovn.md
     - operator-guide/debug-neutron.md
   - 'User Guide':
     - user-guide/index.md
