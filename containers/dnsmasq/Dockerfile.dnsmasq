@@ -20,25 +20,30 @@ RUN apt-get update && apt-get -y install \
 WORKDIR /src
 RUN apt-get -y build-dep dnsmasq
 RUN apt-get -y source dnsmasq
-WORKDIR /src/dnsmasq-2.89
-RUN mkdir -p debian/patches
-COPY dnsmasq/dhcp-allowed-srvids.patch /src/dnsmasq-2.89/debian/patches/
-RUN echo dhcp-allowed-srvids.patch > debian/patches/series
-RUN quilt push -a
-RUN dch -v 2.89-2 "patched for dhcp-allowed-srvids"
-RUN dpkg-buildpackage -rfakeroot
+# copy in our patch
+COPY dnsmasq/dhcp-allowed-srvids.patch /src/
+# setup the patch to be built into the quilt file
+# set our version number to a local override suffixed by '.uc1'
+RUN cd /src/dnsmasq-* && \
+    mkdir -p debian/patches && \
+    mv /src/dhcp-allowed-srvids.patch debian/patches && \
+    dch -l .uc "patched for dhcp-allowed-srvids" && \
+    echo dhcp-allowed-srvids.patch >> debian/patches/series && \
+    quilt push -a
+# build it
+RUN cd /src/dnsmasq-* && dpkg-buildpackage -rfakeroot
 
 
 FROM debian:bookworm-20240408-slim AS prod
 
 LABEL org.opencontainers.image.description="dnsmasq for Understack's Ironic"
 
-COPY --from=builder /src/dnsmasq-base_2.89-2_amd64.deb /tmp
-COPY --from=builder /src/dnsmasq_2.89-2_all.deb /tmp
+COPY --from=builder /src/dnsmasq-base_*_amd64.deb /tmp
+COPY --from=builder /src/dnsmasq_*_all.deb /tmp
 
 RUN apt-get update && \
-    apt-get -y install --no-install-recommends python3-jinja2=3.1.2-1 && \
-    apt-get -y --fix-broken install --no-install-recommends /tmp/dnsmasq-base_2.89-2_amd64.deb /tmp/dnsmasq_2.89-2_all.deb && \
+    apt-get -y install --no-install-recommends python3-jinja2 && \
+    apt-get -y --fix-broken install --no-install-recommends /tmp/dnsmasq-base_*_amd64.deb /tmp/dnsmasq_*_all.deb && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/*.deb
 
