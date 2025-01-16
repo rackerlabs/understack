@@ -126,17 +126,29 @@ class UnderstackDriver(MechanismDriver):
         provider_type = network.get("provider:network_type")
         segmentation_id = network.get("provider:segmentation_id")
         physnet = network.get("provider:physical_network")
+        conf = cfg.CONF.ml2_understack
 
-        if provider_type == p_const.TYPE_VXLAN:
-            conf = cfg.CONF.ml2_understack
-            ucvni_group = conf.ucvni_group
-            self.nb.ucvni_create(network_id, ucvni_group, network_name, segmentation_id)
-            LOG.info(
-                "network %(net_id)s has been added on ucvni_group %(ucvni_group)s, "
-                "physnet %(physnet)s",
-                {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
-            )
-            self._create_nautobot_namespace(network_id, external)
+        if provider_type != p_const.TYPE_VLAN:
+            return
+        ucvni_group = conf.ucvni_group
+        self.nb.ucvni_create(network_id, ucvni_group, network_name)
+        LOG.info(
+            "network %(net_id)s has been added on ucvni_group %(ucvni_group)s, "
+            "physnet %(physnet)s",
+            {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
+        )
+        self._create_nautobot_namespace(network_id, external)
+
+        vlan_group_id_and_vlan_tag = self.nb.prep_switch_interface(
+            connected_interface_id=conf.network_node_switchport_uuid,
+            ucvni_uuid=network_id,
+            modify_native_vlan=False,
+            vlan_tag=int(segmentation_id),
+        )
+        self.undersync.sync_devices(
+            vlan_group_uuids=str(vlan_group_id_and_vlan_tag["vlan_group_id"]),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
 
     def update_network_precommit(self, context):
         log_call("update_network_precommit", context)
@@ -232,8 +244,12 @@ class UnderstackDriver(MechanismDriver):
             return
 
         network_id = context.current["network_id"]
+
+        vlan_tag = int(context.network.current.get("provider:segmentation_id"))
         connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
-        nb_vlan_group_id = self.update_nautobot(network_id, connected_interface_uuid)
+        nb_vlan_group_id = self.update_nautobot(
+            network_id, connected_interface_uuid, vlan_tag
+        )
 
         self.undersync.sync_devices(
             vlan_group_uuids=str(nb_vlan_group_id),
@@ -326,7 +342,12 @@ class UnderstackDriver(MechanismDriver):
             raise
         return connected_interface_uuid
 
-    def update_nautobot(self, network_id: str, connected_interface_uuid: str) -> UUID:
+    def update_nautobot(
+        self,
+        network_id: str,
+        connected_interface_uuid: str,
+        vlan_tag: int,
+    ) -> UUID:
         """Updates Nautobot with the new network ID and connected interface UUID.
 
         If the network ID is a provisioning network, sets the interface status to
@@ -347,9 +368,12 @@ class UnderstackDriver(MechanismDriver):
             switch_uuid = configure_port_status_data.get("device", {}).get("id")
             return UUID(self.nb.fetch_vlan_group_uuid(switch_uuid))
         else:
-            return UUID(
-                self.nb.prep_switch_interface(connected_interface_uuid, network_id)
-            )
+            vlan_group_id = self.nb.prep_switch_interface(
+                connected_interface_id=connected_interface_uuid,
+                ucvni_uuid=network_id,
+                vlan_tag=vlan_tag,
+            )["vlan_group_id"]
+            return UUID(vlan_group_id)
 
     def _delete_tenant_port_on_unbound(self, context):
         """Tenant network port cleanup in the UnderCloud infrastructure.
