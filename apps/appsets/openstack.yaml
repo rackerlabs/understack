@@ -64,6 +64,8 @@ spec:
       name: '{{.name}}-{{.component}}'
       finalizers:
         - resources-finalizer.argocd.argoproj.io
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
     spec:
       project: default
       sources:
