@@ -51,7 +51,7 @@ conf:
         # set the default ml2 backend to our plugin, neutron_understack
         # we'll need to use the ovn ML2 plugin to hook the routers to our network
         mechanism_drivers: "understack,ovn"
-        tenant_network_types: "vxlan,local"
+        tenant_network_types: "vlan"
         type_drivers: "vlan,local,understack_vxlan"
   neutron:
     DEFAULT:
