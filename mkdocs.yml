@@ -141,6 +141,7 @@ nav:
       - operator-guide/rabbitmq.md
       - operator-guide/rook-ceph.md
       - operator-guide/nautobot.md
+      - operator-guide/troubleshooting-osh.md
     - 'Scripts and Tools':
       - operator-guide/scripts.md
   - 'User Guide':
