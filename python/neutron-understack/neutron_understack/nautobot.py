@@ -127,6 +127,7 @@ class Nautobot:
         self,
         connected_interface_id: str,
         ucvni_uuid: str,
+        vlan_tag: int,
         modify_native_vlan: bool | None = True,
     ) -> dict:
         """Runs a Nautobot Job to update a switch interface for tenant mode.
@@ -141,6 +142,7 @@ class Nautobot:
             "ucvni_id": str(ucvni_uuid),
             "connected_interface_id": str(connected_interface_id),
             "modify_native_vlan": modify_native_vlan,
+            "vlan_tag": vlan_tag,
         }
         resp_data = self.make_api_request(url, "post", payload)
 

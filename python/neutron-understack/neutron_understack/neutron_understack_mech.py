@@ -4,7 +4,6 @@ from pprint import pprint
 from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
-from neutron.db.models.segment import NetworkSegment
 from neutron_lib import constants as p_const
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
@@ -145,32 +144,12 @@ class UnderstackDriver(MechanismDriver):
                 connected_interface_id=conf.network_node_switchport_uuid,
                 ucvni_uuid=network_id,
                 modify_native_vlan=False,
-            )
-            self._adjust_network_segmentation_id(
-                context, vlan_group_id_and_vlan_tag["vlan_tag"]
+                vlan_tag=int(segmentation_id),
             )
             self.undersync.sync_devices(
                 vlan_group_uuids=str(vlan_group_id_and_vlan_tag["vlan_group_id"]),
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
             )
-
-    def _adjust_network_segmentation_id(self, context, vlan_tag):
-        if len(context.network_segments) != 1:
-            msg = "Only single network segment is supported."
-            raise NotImplementedError(msg)
-
-        session = context.plugin_context.session
-        network_segment_id = context.network_segments[0]["id"]
-
-        LOG.debug(
-            "Updating network segment ID: %(network_seg_id)s with vlan tag: "
-            "%(vlan_tag)s",
-            {"network_seg_id": network_segment_id, "vlan_tag": vlan_tag},
-        )
-        segment = session.get(NetworkSegment, network_segment_id)
-        segment.segmentation_id = int(vlan_tag)
-        segment.save(session)
-        session.flush()
 
     def update_network_precommit(self, context):
         log_call("update_network_precommit", context)
@@ -266,8 +245,12 @@ class UnderstackDriver(MechanismDriver):
             return
 
         network_id = context.current["network_id"]
+
+        vlan_tag = int(context.network.current.get("provider:segmentation_id"))
         connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
-        nb_vlan_group_id = self.update_nautobot(network_id, connected_interface_uuid)
+        nb_vlan_group_id = self.update_nautobot(
+            network_id, connected_interface_uuid, vlan_tag
+        )
 
         self.undersync.sync_devices(
             vlan_group_uuids=str(nb_vlan_group_id),
@@ -360,7 +343,12 @@ class UnderstackDriver(MechanismDriver):
             raise
         return connected_interface_uuid
 
-    def update_nautobot(self, network_id: str, connected_interface_uuid: str) -> UUID:
+    def update_nautobot(
+        self,
+        network_id: str,
+        connected_interface_uuid: str,
+        vlan_tag: int,
+    ) -> UUID:
         """Updates Nautobot with the new network ID and connected interface UUID.
 
         If the network ID is a provisioning network, sets the interface status to
@@ -382,7 +370,9 @@ class UnderstackDriver(MechanismDriver):
             return UUID(self.nb.fetch_vlan_group_uuid(switch_uuid))
         else:
             vlan_group_id = self.nb.prep_switch_interface(
-                connected_interface_uuid, network_id
+                connected_interface_id=connected_interface_uuid,
+                ucvni_uuid=network_id,
+                vlan_tag=vlan_tag,
             )["vlan_group_id"]
             return UUID(vlan_group_id)
 
