@@ -21,7 +21,7 @@ spec:
           source:
             resource:
               apiVersion: batch/v1
-              kind: Job # Resource type to be created
+              kind: Job
               metadata:
                 generateName: create-provision-network
               spec:
