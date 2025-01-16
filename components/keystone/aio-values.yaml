@@ -251,6 +251,8 @@ conf:
           - http://localhost:9990/auth/websso/
           # - https://yourinstance.of.horizon.example.com/auth/websso/
       default_authorization_ttl: 720
+    cache:
+      backend_argument: memcached_expire_time:3600
     DEFAULT:
       max_token_size: 512
   wsgi_keystone: |
