@@ -1,0 +1,9 @@
+---
+
+conf:
+  ovs_hw_offload:
+    # enable hardware offload by default
+    enabled: true
+  # required for OVN support
+  openvswitch_db_server:
+    ptcp_port: 6640

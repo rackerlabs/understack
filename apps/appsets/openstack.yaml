@@ -21,6 +21,14 @@ spec:
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=keystone
                   chartVersion: 0.3.17
+                - component: openvswitch
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
+                  openstackRelease: 2024.2
+                  chartVersion: 2024.2.0
+                - component: ovn
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
+                  openstackRelease: 2024.2
+                  chartVersion: 2024.2.0
                 - component: ironic
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2

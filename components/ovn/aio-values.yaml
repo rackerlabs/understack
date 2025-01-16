@@ -1,0 +1,18 @@
+---
+
+conf:
+  # availability zones are currently not set in neutron by default
+  # but if they are or you override the default this must be updated
+  # to include 'availability-zones=blah'
+  ovn_cms_options: ""
+  ovn_cms_options_gw_enabled: "enable-chassis-as-gw"
+  # we are working with baremetal so we'll need VTEP support
+  ovn_encap_type: vxlan
+
+volume:
+  ovn_ovsdb_nb:
+    # let it use the default storage class
+    class_name: ""
+  ovn_ovsdb_sb:
+    # let it use the default storage class
+    class_name: ""
