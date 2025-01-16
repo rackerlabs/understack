@@ -596,13 +596,13 @@ dev = ["pre-commit", "pytest-asyncio", "tox"]
 
 [[package]]
 name = "python-novaclient"
-version = "18.7.0"
+version = "18.8.0"
 description = "Client library for OpenStack Compute API"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "python-novaclient-18.7.0.tar.gz", hash = "sha256:94cad0f0f4c161ced52a5ecd85d134fd673b997da7194a031c0ca69344340b0d"},
-    {file = "python_novaclient-18.7.0-py3-none-any.whl", hash = "sha256:4e9f1ff681a635168c7635b1facce369d9117b60400ea03a5b58487880670553"},
+    {file = "python-novaclient-18.8.0.tar.gz", hash = "sha256:66d0d81dee69bdc6937cca3b878261f1834959c607891527a78927a01cea8800"},
+    {file = "python_novaclient-18.8.0-py3-none-any.whl", hash = "sha256:c23ea52f2009711cf3eb6105110eb4ffbf263d5d68366b2d43c3e5d17335de6f"},
 ]
 
 [package.dependencies]
