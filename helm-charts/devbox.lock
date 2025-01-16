@@ -1,0 +1,165 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "helm-docs@latest": {
+      "last_modified": "2024-11-28T07:51:56Z",
+      "resolved": "github:NixOS/nixpkgs/226216574ada4c3ecefcbbec41f39ce4655f78ef#helm-docs",
+      "source": "devbox-search",
+      "version": "1.14.2",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/m2msynf3dxyda9nncagy0nv9j25wxbrq-helm-docs-1.14.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/m2msynf3dxyda9nncagy0nv9j25wxbrq-helm-docs-1.14.2"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/3kp9bbzkfcw95gli8c6jxzijabyg84vx-helm-docs-1.14.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/3kp9bbzkfcw95gli8c6jxzijabyg84vx-helm-docs-1.14.2"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/4ycsq3qfk27srka2whvfbv4vpkm5rifh-helm-docs-1.14.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/4ycsq3qfk27srka2whvfbv4vpkm5rifh-helm-docs-1.14.2"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/wym1j85k9s49szmwigblhc419qf63r6j-helm-docs-1.14.2",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/wym1j85k9s49szmwigblhc419qf63r6j-helm-docs-1.14.2"
+        }
+      }
+    },
+    "nodePackages.livedown@latest": {
+      "last_modified": "2024-11-16T04:25:12Z",
+      "resolved": "github:NixOS/nixpkgs/34a626458d686f1b58139620a8b2793e9e123bba#nodePackages.livedown",
+      "source": "devbox-search",
+      "version": "2.1.1",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/adil58kb5flpf6ffsb6xf1qwilh4m4px-livedown-2.1.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/adil58kb5flpf6ffsb6xf1qwilh4m4px-livedown-2.1.1"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/wmgqq0d4r1wqchdmryzq4hb9c3nz94b6-livedown-2.1.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/wmgqq0d4r1wqchdmryzq4hb9c3nz94b6-livedown-2.1.1"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/xc2xqz891gi0zpy7qfmnciavf6pjb3mk-livedown-2.1.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/xc2xqz891gi0zpy7qfmnciavf6pjb3mk-livedown-2.1.1"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/3yxkaapmhzihyiach0glc94lslbix7jq-livedown-2.1.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/3yxkaapmhzihyiach0glc94lslbix7jq-livedown-2.1.1"
+        }
+      }
+    },
+    "python312Packages.watchdog@latest": {
+      "last_modified": "2024-11-28T07:51:56Z",
+      "resolved": "github:NixOS/nixpkgs/226216574ada4c3ecefcbbec41f39ce4655f78ef#python312Packages.watchdog",
+      "source": "devbox-search",
+      "version": "4.0.2",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/2g78p2ky1plp3cpw5d07kfmy8kp4jx12-python3.12-watchdog-4.0.2",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/jxda7vd3hyxbnrg33pnmk45rn2y8pn4p-python3.12-watchdog-4.0.2-dist"
+            }
+          ],
+          "store_path": "/nix/store/2g78p2ky1plp3cpw5d07kfmy8kp4jx12-python3.12-watchdog-4.0.2"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/qz2a137ix98zz66xzcnqw7l4f36va0nr-python3.12-watchdog-4.0.2",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/l4916ss3nnfjlqm92c5c7sqas8swdmjn-python3.12-watchdog-4.0.2-dist"
+            }
+          ],
+          "store_path": "/nix/store/qz2a137ix98zz66xzcnqw7l4f36va0nr-python3.12-watchdog-4.0.2"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/hhdwwn3lzpaw50jkfh2q8nl91876acdx-python3.12-watchdog-4.0.2",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/q9yb4mk4rq75mam2mh942c2jj1rly2wv-python3.12-watchdog-4.0.2-dist"
+            }
+          ],
+          "store_path": "/nix/store/hhdwwn3lzpaw50jkfh2q8nl91876acdx-python3.12-watchdog-4.0.2"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/s1cvc10q0vy9pm23702sln4ilfwiq9h3-python3.12-watchdog-4.0.2",
+              "default": true
+            },
+            {
+              "name": "dist",
+              "path": "/nix/store/mhsnd63lwchd18ak3phda213ahbq4hgi-python3.12-watchdog-4.0.2-dist"
+            }
+          ],
+          "store_path": "/nix/store/s1cvc10q0vy9pm23702sln4ilfwiq9h3-python3.12-watchdog-4.0.2"
+        }
+      }
+    }
+  }
+}

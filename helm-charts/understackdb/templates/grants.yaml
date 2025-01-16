@@ -1,0 +1,25 @@
+{{- range .Values.grants }}
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Grant
+metadata:
+  name: {{ .name }}-grant
+  namespace: {{ .namespace | default "openstack" }}
+spec:
+  mariaDbRef:
+    name: {{ $.Values.instanceName }}
+    waitForIt: true
+{{- if .privileges }}
+  privileges:
+    {{- .privileges | toYaml | nindent 4 }}
+  {{- else }}
+  privileges:
+    - ALL
+  {{- end }}
+  database: {{ .database | default .name | quote }}
+  table: {{ .table | default "*" | quote }}
+  username: {{ .username | default .name | quote }}
+  grantOption: {{ .grantOption | default true }}
+  host: {{ .host | default "%" | quote }}
+  retryInterval: {{ .retryInterval | default "5s" }}
+{{- end }}
