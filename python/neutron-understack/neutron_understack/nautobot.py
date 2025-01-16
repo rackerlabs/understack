@@ -124,23 +124,29 @@ class Nautobot:
         return self.make_api_request(url, "delete")
 
     def prep_switch_interface(
-        self, connected_interface_id: str, ucvni_uuid: str
-    ) -> str:
+        self,
+        connected_interface_id: str,
+        ucvni_uuid: str,
+        vlan_tag: int,
+        modify_native_vlan: bool | None = True,
+    ) -> dict:
         """Runs a Nautobot Job to update a switch interface for tenant mode.
 
         The nautobot job will assign vlans as required and set the interface
         into the correct mode for "normal" tenant operation.
 
-        The vlan group ID is returned.
+        The dictionary with vlan group ID and vlan tag is returned.
         """
         url = "/api/plugins/undercloud-vni/prep_switch_interface"
         payload = {
             "ucvni_id": str(ucvni_uuid),
             "connected_interface_id": str(connected_interface_id),
+            "modify_native_vlan": modify_native_vlan,
+            "vlan_tag": vlan_tag,
         }
         resp_data = self.make_api_request(url, "post", payload)
 
-        return resp_data["vlan_group_id"]
+        return resp_data
 
     def detach_port(self, connected_interface_id: str, ucvni_uuid: str) -> str:
         """Runs a Nautobot Job to cleanup a switch interface.

@@ -48,12 +48,16 @@ def test_fail_fetch_connected_interface_uuid(context):
 def test_update_nautobot_for_tenant_network(nautobot_client):
     driver.nb = nautobot_client
     attrs = {
-        "prep_switch_interface.return_value": "304bd384-338a-4365-9394-0c356ec698ed"
+        "prep_switch_interface.return_value": {
+            "vlan_group_id": "304bd384-338a-4365-9394-0c356ec698ed"
+        }
     }
     nautobot_client.configure_mock(**attrs)
-    driver.update_nautobot("111", "222")
+    driver.update_nautobot("111", "222", 333)
 
-    nautobot_client.prep_switch_interface.assert_called_once_with("222", "111")
+    nautobot_client.prep_switch_interface.assert_called_once_with(
+        connected_interface_id="222", ucvni_uuid="111", vlan_tag=333
+    )
 
 
 def test_update_nautobot_for_provisioning_network(nautobot_client):
@@ -63,7 +67,7 @@ def test_update_nautobot_for_provisioning_network(nautobot_client):
     }
     nautobot_client.configure_mock(**attrs)
     driver.nb = nautobot_client
-    driver.update_nautobot("change_me", "333")
+    driver.update_nautobot("change_me", "333", 123)
 
     nautobot_client.configure_port_status.assert_called_once_with(
         "333", "Provisioning-Interface"

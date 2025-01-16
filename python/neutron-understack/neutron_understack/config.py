@@ -43,6 +43,13 @@ mech_understack_opts = [
             "prefixes that need to be routable outside of a tenant environment."
         ),
     ),
+    cfg.StrOpt(
+        "network_node_switchport_uuid",
+        help=(
+            "Nautobot UUID of the network node's switchport interface, that "
+            "is used to trunk all vlans used by a neutron router."
+        ),
+    ),
 ]
 
 l3_svc_cisco_asa_opts = [
