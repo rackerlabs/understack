@@ -199,7 +199,7 @@ def lldp_data_by_name(bmc) -> dict:
 
     {
         "iDRAC": {
-            "remote_switch_mac_address" : "C4:4D:84:48:61:80",
+            "remote_switch_mac_address" : "C4:4D:04:48:61:80",
             "remote_switch_port_name" : "GigabitEthernet1/0/3",
         },
         'NIC.Slot.1-1': {
@@ -243,10 +243,14 @@ def parse_lldp_port(port_data: dict[str, str]) -> dict:
         }
     else:
         return {
-            "remote_switch_mac_address": mac,
+            "remote_switch_mac_address": normalise_mac(mac),
             "remote_switch_port_name": port_name,
             "remote_switch_data_stale": stale,
         }
+
+
+def normalise_mac(mac: str) -> str:
+    return ":".join(f"{int(n, 16):02X}" for n in mac.split(":"))
 
 
 def server_interface_name(name: str) -> str:
