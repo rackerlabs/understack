@@ -16,7 +16,7 @@ spec:
         command:
           - undersync-switch
         args:
-          - --switch_uuids
+          - --vlan_group_uuid
           - "{{workflow.parameters.vlan_group_uuid}}"
           - --dry-run
           - "{{workflow.parameters.dry_run}}"
