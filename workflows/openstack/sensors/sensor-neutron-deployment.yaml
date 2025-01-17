@@ -65,5 +65,26 @@ spec:
                               configMapKeyRef:
                                 name: provisioning-network-config
                                 key: description
+                          - name: OS_AUTH_URL
+                            value: "http://keystone-api.openstack.svc.cluster.local:5000/v3"
+                          - name: OS_PROJECT_DOMAIN_NAME
+                            value: "infra"
+                          - name: OS_PROJECT_NAME
+                            value: "baremetal"
+                          - name: OS_USER_DOMAIN_NAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: svc-acct-argoworkflow
+                                key: user_domain
+                          - name: OS_USERNAME
+                            valueFrom:
+                              secretKeyRef:
+                                name: svc-acct-argoworkflow
+                                key: username
+                          - name: OS_PASSWORD
+                            valueFrom:
+                              secretKeyRef:
+                                name: svc-acct-argoworkflow
+                                key: password
                         imagePullPolicy: IfNotPresent
                     restartPolicy: OnFailure
