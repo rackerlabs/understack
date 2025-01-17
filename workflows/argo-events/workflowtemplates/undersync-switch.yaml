@@ -17,7 +17,7 @@ spec:
           - undersync-switch
         args:
           - --switch_uuids
-          - "{{workflow.parameters.switch_uuids}}"
+          - "{{workflow.parameters.vlan_group_uuid}}"
           - --dry-run
           - "{{workflow.parameters.dry_run}}"
           - --force
@@ -31,7 +31,7 @@ spec:
             readOnly: true
       inputs:
         parameters:
-          - name: switch_uuids
+          - name: vlan_group_uuid
           - name: force
           - name: dry_run
       volumes:
