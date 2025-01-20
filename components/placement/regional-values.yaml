@@ -1,0 +1,86 @@
+---
+release_group: null
+
+network:
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+  api:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
+
+# (nicholas.kuechler) updating the jobs list to remove the 'placement-db-init' job.
+dependencies:
+  dynamic:
+    common:
+      local_image_registry:
+        jobs: null
+  static:
+    db_sync:
+      jobs: []
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
+pod:
+  lifecycle:
+    disruption_budget:
+      api:
+        # this should be set to no more than (pod.replicas.api - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
+
+manifests:
+  job_db_init: false
+  secret_db: false
+  service_ingress: false
+
+# We don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete to become
+# healthy. Which they cannot because they are in
+# the post step and not in the main step.
+# Turning this on results in the keys jobs
+# editing the annotation which deletes the item
+# and wipes our keys.
+helm3_hook: false
+
+annotations:
+  job:
+    placement_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    placement_ks_service:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    placement_ks_user:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    placement_ks_endpoints:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+
+endpoints:
+  placement:
+    scheme:
+      public: 'https'
+    port:
+      api:
+        public: 443
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: placement-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer

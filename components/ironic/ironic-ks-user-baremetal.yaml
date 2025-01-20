@@ -142,7 +142,6 @@ spec:
         - name: PATH
           value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/
         - name: DEPENDENCY_SERVICE
-          value: openstack:keystone-api
         - name: DEPENDENCY_DAEMONSET
         - name: DEPENDENCY_JOB
           value: ironic-ks-user
