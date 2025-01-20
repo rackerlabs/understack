@@ -17,30 +17,45 @@ spec:
           - list:
               elements:
                 - component: keystone
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=keystone
                   chartVersion: 0.3.17
+                - component: openvswitch
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
+                  openstackRelease: 2024.2
+                  chartVersion: 2024.2.0
+                - component: ovn
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
+                  openstackRelease: 2024.2
+                  chartVersion: 2024.2.0
                 - component: ironic
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=ironic
                   chartVersion: 0.2.21
                 - component: placement
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=placement
                   chartVersion: 0.3.17
                 - component: neutron
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=neutron
                   chartVersion: 0.3.47
                 - component: glance
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=glance
                   chartVersion: 0.5.2
                 - component: nova
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=nova
                   chartVersion: 0.3.47
                 - component: horizon
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=horizon
                   chartVersion: 0.3.29
@@ -49,10 +64,12 @@ spec:
       name: '{{.name}}-{{.component}}'
       finalizers:
         - resources-finalizer.argocd.argoproj.io
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
     spec:
       project: default
       sources:
-        - repoURL: https://tarballs.opendev.org/openstack/openstack-helm/
+        - repoURL: '{{.repoURL}}'
           chart: '{{.component}}'
           targetRevision: '{{.chartVersion}}'
           helm:
