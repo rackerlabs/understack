@@ -22,10 +22,15 @@ able to authenticate to your project.
 
 ```sh
 # creates an application credential called "terraform-cred"
-openstack application credential create terraform-cred
+# formatting it as a shell variable and only outputting the 'id' and 'secret'
+# prefix it such that its valid for sourcing the file in
+# lastly fix up the lowercase to make the variable name correct
+# this results in a file we can just source in
+openstack application credential create terraform-cred \
+    -f shell -c id -c secret --prefix 'export OS_APPLICATION_CREDENTIAL_' \
+    | sed -e 's/_id/_ID/' -e 's/_secret/_SECRET/' > tf-creds.env
 # terraform will read these environment variables
-export OS_APPLICATION_CREDENTIAL_ID=${FROM_ABOVE}
-export OS_APPLICATION_CREDENTIAL_SECRET=${FROM_ABOVE}
+source tf-creds.env
 ```
 
 ## Executing the example
