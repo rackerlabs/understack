@@ -101,6 +101,15 @@ export OS_APPLICATION_CREDENTIAL_ID=${FROM_ABOVE}
 export OS_APPLICATION_CREDENTIAL_SECRET=${FROM_ABOVE}
 ```
 
+As a scriptable command:
+
+```sh
+openstack application credential create terraform-cred \
+    -f shell -c id -c secret --prefix 'export OS_APPLICATION_CREDENTIAL_' \
+    | sed -e 's/_id/_ID/' -e 's/_secret/_SECRET/' > tf-creds.env
+source tf-creds.env
+```
+
 You can also add a section to your `$HOME/.config/openstack/clouds.yaml` OpenStack configuration file.
 Note the auth_type and auth options are slightly different than in the above SSO example.
 
