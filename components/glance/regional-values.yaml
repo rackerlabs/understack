@@ -1,0 +1,159 @@
+---
+release_group: null
+
+# typically overridden by environmental
+# values, but should include all endpoints
+# required by this chart
+endpoints:
+  oslo_messaging:
+    statefulset:
+      replicas: 3
+      name: rabbitmq-server
+    hosts:
+      default: rabbitmq-nodes
+  image:
+    port:
+      api:
+        public: 443
+    scheme:
+      public: https
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: glance-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer
+
+network:
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+  api:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
+
+# Glance storage backend
+# we'll switch to radosgw in the future
+storage: pvc
+
+# leave it empty to use the default
+volume:
+  class_name: ''
+
+# disable the default image additions
+bootstrap:
+  structured:
+    images: {}
+
+dependencies:
+  dynamic:
+    common:
+      local_image_registry:
+        jobs: null
+  static:
+    db_sync:
+      jobs:
+    api:
+      jobs:
+        - glance-db-sync
+        - glance-ks-user
+        - glance-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+    bootstrap:
+      services:
+        - endpoint: internal
+          service: image
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+    tests:
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: image
+
+pod:
+  lifecycle:
+    disruption_budget:
+      api:
+        # this should be set to no more than (pod.replicas.api - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
+  resources:
+    enabled: true
+  probes:
+    api:
+      glance-api:
+        readiness:
+          enabled: true
+          params:
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+        liveness:
+          enabled: true
+          params:
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 8
+            failureThreshold: 6
+
+conf:
+  glance_api_uwsgi:
+    uwsgi:
+      # This should be set to anything larger than 1.
+      # Otherwise uWSGI is not able to serve multiple requests at the same time
+      # under heavy load, which results in liveness probe failures in
+      # Kubernetes environment.
+      processes: 2
+
+manifests:
+  job_db_init: false
+  job_rabbit_init: false
+  # disabled for now but we might want this
+  job_image_repo_sync: false
+  pod_rally_test: false
+  secret_db: false
+  secret_keystone: true
+  service_ingress_api: false
+
+# We don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete to become
+# healthy. Which they cannot because they are in
+# the post step and not in the main step.
+# Turning this on results in the keys jobs
+# editing the annotation which deletes the item
+# and wipes our keys.
+helm3_hook: false
+
+annotations:
+  job:
+    glance_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    glance_ks_service:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    glance_ks_user:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    glance_ks_endpoints:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation

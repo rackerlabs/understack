@@ -25,7 +25,6 @@ patches:
         - --namespaced
         - --managed-namespace
         - argo-events
-
 - target:  # configure the workflow controller to monitor the argo-events namespace
     group: apps
     version: v1

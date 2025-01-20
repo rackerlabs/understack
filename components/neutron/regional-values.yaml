@@ -1,0 +1,219 @@
+---
+release_group: null
+
+# typically overridden by environmental
+# values, but should include all endpoints
+# required by this chart
+endpoints:
+  oslo_messaging:
+    statefulset:
+      replicas: 3
+      name: rabbitmq-server
+    hosts:
+      default: rabbitmq-nodes
+  network:
+    port:
+      api:
+        public: 443
+    scheme:
+      public: https
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: neutron-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer
+
+
+network:
+  # we're using ironic and actual switches
+  backend:
+    - baremetal
+
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+  server:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
+
+conf:
+  plugins:
+    ml2_conf:
+      ml2:
+        # set the default ml2 backend to our plugin, neutron_understack
+        mechanism_drivers: understack
+        tenant_network_types: "vxlan,local"
+        type_drivers: "vlan,local,understack_vxlan"
+  neutron:
+    DEFAULT:
+      # the 'trunk' plugin allows for us to create and configure trunk ports to allow
+      # multiple networks to be trunked into the node and let the node apply the VLAN
+      # the 'network_segment_range' plugin allows us to set the allowed VNIs or VLANs
+      # for a given network and let's OpenStack select one from the available pool. We
+      # are also able to see which ones are used from the OpenStack API.
+      service_plugins: "l3_understack,trunk,network_segment_range"
+      # we don't want HA L3 routers. It's a Python value so we need to quote it in YAML.
+      l3_ha: "False"
+      # we aren't using availability zones so having calls attempt to add things to
+      # availability zones won't work.
+      default_availability_zones: ""
+    service_providers:
+      service_provider: "L3_ROUTER_NAT:cisco-asa:neutron_understack.l3_service_cisco_asa.CiscoAsa"
+
+# disable the neutron-ironic-agent from loading a non-existent config
+pod:
+  use_fqdn:
+    neutron_agent: false
+  lifecycle:
+    disruption_budget:
+      server:
+        # this should be set to no more than (pod.replicas.server - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
+  mounts:
+    neutron_server:
+      neutron_server:
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/undersync/
+            name: undersync-token
+            readOnly: true
+        volumes:
+          - name: nb-token
+            secret:
+              secretName: nautobot-token
+          - name: undersync-token
+            secret:
+              secretName: undersync-token
+    neutron_rpc_server:
+      neutron_rpc_server:
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/undersync/
+            name: undersync-token
+            readOnly: true
+        volumes:
+          - name: nb-token
+            secret:
+              secretName: nautobot-token
+          - name: undersync-token
+            secret:
+              secretName: undersync-token
+# (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
+dependencies:
+  dynamic:
+    common:
+      local_image_registry:
+        jobs: null
+  static:
+    db_sync:
+      jobs:
+    dhcp:
+      jobs:
+    l3:
+      jobs:
+    lb_agent:
+      jobs:
+    metadata:
+      jobs:
+    ovs_agent:
+      jobs:
+    server:
+      jobs:
+        - neutron-db-sync
+        - neutron-ks-user
+        - neutron-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+    rpc_server:
+      jobs:
+        - neutron-db-sync
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+    ironic_agent:
+      jobs:
+        - neutron-db-sync
+        - neutron-ks-user
+        - neutron-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+    ks_endpoints:
+      jobs:
+        - nova-ks-service
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
+manifests:
+  job_db_init: false
+  job_rabbit_init: false
+  pod_rally_test: false
+  secret_db: false
+  secret_keystone: true
+  daemonset_dhcp_agent: false
+  daemonset_l3_agent: false
+  daemonset_lb_agent: false
+  daemonset_metadata_agent: false
+  daemonset_ovs_agent: false
+  daemonset_sriov_agent: false
+  daemonset_l2gw_agent: false
+  daemonset_bagpipe_bgp: false
+  daemonset_bgp_dragent: false
+  daemonset_netns_cleanup_cron: false
+  deployment_ironic_agent: true
+  service_ingress_server: false
+
+# We don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete to become
+# healthy. Which they cannot because they are in
+# the post step and not in the main step.
+# Turning this on results in the keys jobs
+# editing the annotation which deletes the item
+# and wipes our keys.
+helm3_hook: false
+
+annotations:
+  job:
+    neutron_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    neutron_ks_service:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    neutron_ks_user:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    neutron_ks_endpoints:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation

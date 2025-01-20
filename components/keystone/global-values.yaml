@@ -1,0 +1,376 @@
+---
+release_group: null
+
+bootstrap:
+  enabled: true
+  ks_user: admin
+  script: |
+    # admin needs the admin role for the default domain
+    openstack role add \
+          --user="${OS_USERNAME}" \
+          --domain="${OS_DEFAULT_DOMAIN}" \
+          "admin"
+    # create 'infra' domain
+    openstack domain create --or-show infra
+    # create 'baremetal' project for our ironic nodes to live in
+    openstack project create --or-show --domain infra baremetal
+    # create 'argoworkflow' user for automation
+    openstack user create --or-show --domain infra --password demo argoworkflow
+    # give 'argoworkflow' 'admin' over the 'baremetal' project
+    openstack role add --user-domain infra --project-domain infra --user argoworkflow --project baremetal admin
+
+    # create 'flavorsync' user to allow synchronization of the flavors to nova
+    openstack user create --or-show --domain service --password abcd1234 flavorsync
+    openstack role create --or-show flavorsync
+    openstack role add --user flavorsync --user-domain service --domain default --inherited  flavorsync
+
+    # create 'monitoring' user for monitoring usage
+    openstack user create --or-show --domain infra --password monitoring_demo monitoring
+    # give 'monitoring' the 'admin' over the 'baremetal' project
+    openstack role add --user-domain infra --project-domain infra --user monitoring --project baremetal admin
+
+    # this is too early because ironic won't exist
+    openstack role add --project service --user ironic --user-domain service service
+
+    # OIDC integration
+    RULES_FILE=$(mktemp)
+    cat <<EOF > ${RULES_FILE}
+    [
+        {
+            "local": [
+                {
+                    "user": {
+                        "id": "{0}",
+                        "name": "{1}",
+                        "email": "{2}"
+                    },
+                    "groups": "{3}",
+                     "domain": {
+                        "name": "sso"
+                    }
+                }
+            ],
+            "remote": [
+                {
+                    "type": "HTTP_OIDC_SUB"
+                },
+                {
+                    "type": "REMOTE_USER"
+                },
+                {
+                    "type": "HTTP_OIDC_EMAIL"
+                },
+                {
+                    "type": "HTTP_OIDC_GROUPS"
+                }
+            ]
+        }
+    ]
+    EOF
+    # look up or create our domain for SSO integration, called 'sso'
+    sso_domain_id=$(openstack domain create --or-show --description "Domain for 'sso' identity provider" -f value -c id sso)
+
+    # define our identity provider 'sso' for the domain 'sso'
+    openstack identity provider show sso 2>/dev/null || openstack identity provider create --domain "${sso_domain_id}" --description "Identity Provider to our dex" --remote-id https://dex.dev.undercloud.rackspace.net sso
+
+    # create or update the mapping that we'll use for the 'sso' identity
+    if openstack mapping show sso_mapping 2>/dev/null; then
+      openstack mapping set --rules ${RULES_FILE} sso_mapping;
+    else
+      openstack mapping create --rules ${RULES_FILE} sso_mapping;
+    fi
+
+    # clean up
+    rm -f "${RULES_FILE}"
+
+    # create the federation protocol 'openid' to use the identity provider 'sso' with the 'sso_mapping'
+    openstack federation protocol show openid --identity-provider sso || openstack federation protocol create openid --mapping sso_mapping --identity-provider sso
+
+    for group in ucadmin ucuser ucneteng ucdctech; do
+      # create groups which map to our groups claim from dex which can be mapped to permissions
+      openstack group create --domain "${sso_domain_id}" ${group} --or-show
+      # give each of the groups the member role on the domain and have them inherit it to each project
+      # in the domain
+      openstack role add --group-domain "${sso_domain_id}" --group ${group} --inherited --domain default member
+    done
+    # ucadmin can manage the standard project domain
+    openstack role add --group-domain "${sso_domain_id}" --group ucadmin --inherited --domain default manager
+    # ucadmin can manage the infra domain
+    openstack role add --group-domain "${sso_domain_id}" --group ucadmin --inherited --domain infra manager
+
+network:
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+  api:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
+
+dependencies:
+  static:
+    db_sync:
+      jobs:
+        - keystone-credential-setup
+        - keystone-fernet-setup
+
+pod:
+  resources:
+    enabled: false
+    api:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "4096Mi"
+    jobs:
+      bootstrap:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      domain_manage:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      db_init:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      db_sync:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      db_drop:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      rabbit_init:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      tests:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      fernet_setup:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      fernet_rotate:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      credential_setup:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      credential_rotate:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      credential_cleanup:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+      image_repo_sync:
+        requests:
+          memory: "64Mi"
+          cpu: "100m"
+        limits:
+          memory: "4096Mi"
+  probes:
+    api:
+      api:
+        readiness:
+          enabled: true
+          params:
+            initialDelaySeconds: 15
+            periodSeconds: 60
+            timeoutSeconds: 15
+        liveness:
+          enabled: true
+          params:
+            initialDelaySeconds: 50
+            periodSeconds: 60
+            timeoutSeconds: 15
+  mounts:
+    keystone_api:
+      keystone_api:
+        volumeMounts:
+          - name: keystone-sso
+            mountPath: /etc/keystone-sso
+            readOnly: true
+        volumes:
+          - name: keystone-sso
+            secret:
+              secretName: keystone-sso
+  lifecycle:
+    disruption_budget:
+      api:
+        # this should be set to no more than (pod.replicas.api - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
+
+conf:
+  keystone:
+    auth:
+      methods: password,token,openid,mapped,application_credential
+    openid:
+      remote_id_attribute: HTTP_OIDC_ISS
+    federation:
+      trusted_dashboard:
+        type: multistring
+        values:
+          - http://localhost:9990/auth/websso/
+          # - https://yourinstance.of.horizon.example.com/auth/websso/
+      default_authorization_ttl: 720
+    cache:
+      backend_argument: memcached_expire_time:3600
+    DEFAULT:
+      max_token_size: 512
+  wsgi_keystone: |
+    {{- $portInt := tuple "identity" "service" "api" $ | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+
+    Listen 0.0.0.0:{{ $portInt }}
+
+    LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" combined
+    LogFormat "%{X-Forwarded-For}i %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"" proxy
+
+    SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
+    CustomLog /dev/stdout combined env=!forwarded
+    CustomLog /dev/stdout proxy env=forwarded
+    ErrorLog /dev/stderr
+
+    <VirtualHost *:{{ $portInt }}>
+        WSGIDaemonProcess keystone-public processes=1 threads=1 user=keystone group=keystone display-name=%{GROUP}
+        WSGIProcessGroup keystone-public
+        WSGIScriptAlias / /var/www/cgi-bin/keystone/keystone-wsgi-public
+        WSGIApplicationGroup %{GLOBAL}
+        WSGIPassAuthorization On
+
+        # OIDC
+        OIDCClaimPrefix "OIDC-"
+        OIDCRemoteUserClaim preferred_username
+        OIDCSessionType server-cache
+        OIDCXForwardedHeaders X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
+        OIDCResponseType "code"
+        OIDCScope "openid email profile groups"
+        OIDCProviderMetadataURL http://dex.dex.svc:5556/.well-known/openid-configuration
+        OIDCClientID keystone
+        OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
+        OIDCCryptoPassphrase "exec:/bin/bash -c \"head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32\""
+        OIDCClaimDelimiter ;
+
+        # avoid redirect issues per the following
+        # https://review.opendev.org/c/openstack/keystone/+/925553
+        OIDCRedirectURI https://{{- tuple "identity" "public" $ | include "helm-toolkit.endpoints.hostname_fqdn_endpoint_lookup" -}}/redirect_uri
+        <Location ~ "/redirect_uri">
+          Require valid-user
+          AuthType openid-connect
+        </Location>
+
+        # add using the identity provider 'sso' with the protocol 'openid'
+        <Location /v3/OS-FEDERATION/identity_providers/sso/protocols/openid/auth>
+          Require valid-user
+          AuthType openid-connect
+        </Location>
+        # websso support
+        <Location /v3/auth/OS-FEDERATION/websso/openid>
+          Require valid-user
+          AuthType openid-connect
+        </Location>
+        <Location /v3/auth/OS-FEDERATION/identity_providers/sso/protocols/openid/websso>
+          Require valid-user
+          AuthType openid-connect
+        </Location>
+    </VirtualHost>
+
+
+# typically overridden by environmental
+# values, but should include all endpoints
+# required by this chart
+endpoints:
+  oslo_messaging:
+    statefulset:
+      replicas: 3
+      name: rabbitmq-server
+    hosts:
+      default: rabbitmq-nodes
+  identity:
+    # upstream uses 'keystone' here which causes traffic to go via an internal ingress
+    # which is wired back to keystone-api via the service_ingress_api manifest. just
+    # go direct to the service
+    default: keystone-api
+    scheme:
+      public: https
+    port:
+      api:
+        public: 443
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: keystone-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer
+
+manifests:
+  job_credential_cleanup: false
+  job_db_init: false
+  job_rabbit_init: false
+  pod_rally_test: false
+  secret_db: false
+  secret_keystone: true
+  service_ingress_api: false
+
+# we don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete to become
+# healthy. Which they cannot because they are in
+# the post step and not in the main step.
+# Turning this on results in the keys jobs
+# editing the annotation which deletes the item
+# and wipes our keys.
+helm3_hook: false
+
+annotations:
+  job:
+    keystone_fernet_setup:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    keystone_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    keystone_credential_setup:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
