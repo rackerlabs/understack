@@ -126,18 +126,22 @@ nav:
     - deploy-guide/add-remove-app.md
   - 'Operator Guide':
     - operator-guide/index.md
-    - operator-guide/debug-ovs-ovn.md
-    - operator-guide/debug-neutron.md
+    - 'OpenStack':
+      - operator-guide/openstack-ironic.md
+      - operator-guide/openstack-neutron.md
+      - operator-guide/openstack-placement.md
+    - 'Networking':
+      - operator-guide/openstack-neutron.md
+      - operator-guide/ovs-ovn.md
+    - 'Infrastructure':
+      - operator-guide/monitoring.md
+      - operator-guide/mariadb-operator.md
+      - operator-guide/postgres-operator.md
+      - operator-guide/rabbitmq.md
+      - operator-guide/rook-ceph.md
+      - operator-guide/nautobot.md
   - 'User Guide':
     - user-guide/index.md
     - user-guide/openstack-cli.md
     - user-guide/openstack-image.md
-    - user-guide/rabbitmq-cheat-sheet.md
-    - user-guide/mariadb-operator-cheat-sheet.md
-    - user-guide/postgres-operator-cheat-sheet.md
-    - user-guide/monitoring.md
-    - user-guide/openstack-ironic.md
-    - user-guide/openstack-placement.md
-    - user-guide/rook-ceph.md
-    - user-guide/nautobot.md
   - Workflows: workflows/

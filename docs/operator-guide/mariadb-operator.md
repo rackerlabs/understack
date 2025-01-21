@@ -1,8 +1,6 @@
-# MariaDB Operator Cheat Sheet
+# MariaDB Operator
 
 Useful commands for working with the MariaDB operator.
-
-## MariaDB Operator
 
 Docs: <https://mariadb-operator.github.io/mariadb-operator/latest/>
 

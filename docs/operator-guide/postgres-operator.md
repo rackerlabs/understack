@@ -1,4 +1,4 @@
-# Postgres Operator Cheat Sheet
+# Postgres Operator
 
 Useful commands for working with the PostgreSQL operator.
 

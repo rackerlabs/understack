@@ -1,4 +1,6 @@
-# Debugging OVN / Open vSwitch
+# OVN / Open vSwitch
+
+## Debugging OVN / Open vSwitch
 
 To troubleshoot OVN specific issues you'll want to refer to
 the [OVN manual pages](https://docs.ovn.org/en/latest/ref/index.html).

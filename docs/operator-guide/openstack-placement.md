@@ -1,4 +1,4 @@
-# OpenStack Placement
+# Placement
 
 ## Query Placement usages
 

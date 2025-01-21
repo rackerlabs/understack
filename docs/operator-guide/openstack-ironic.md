@@ -1,4 +1,4 @@
-# OpenStack Baremetal (Ironic)
+# Ironic
 
 ## Setting baremetal node flavor
 

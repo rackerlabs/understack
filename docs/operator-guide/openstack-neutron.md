@@ -1,6 +1,8 @@
-# Debugging Neutron
+# Neutron
 
-## Debugging ML2
+## Debugging Neutron
+
+### Debugging ML2
 
 To debug ML2 and see the messages that are flowing into the ML2
 mechanism you can add the following snippet into your `neutron.yaml`
