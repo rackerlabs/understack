@@ -15,6 +15,11 @@ from understack_workflows.openstack.client import get_openstack_client
 logger = setup_logger(__name__, level=logging.INFO)
 
 
+_EXIT_SUCCESS = 0
+_EXIT_API_ERROR = 1
+_EXIT_EVENT_UNKNOWN = 2
+
+
 class Event(StrEnum):
     ProjectCreate = "identity.project.created"
     ProjectUpdate = "identity.project.updated"
@@ -63,44 +68,66 @@ def is_valid_domain(
     return ret
 
 
-def handle_project_create(conn: Connection, nautobot: Nautobot, project_id: uuid.UUID):
+def handle_project_create(
+    conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
+) -> int:
     logger.info(f"got request to create tenant {project_id!s}")
     project = conn.identity.get_project(project_id.hex)  # type: ignore
     ten_api = nautobot.session.tenancy.tenants
-    ten = ten_api.create(
-        id=str(project_id), name=project.name, description=project.description
-    )
+    try:
+        ten = ten_api.create(
+            id=str(project_id), name=project.name, description=project.description
+        )
+    except Exception:
+        logger.exception(
+            "Unable to create project %s / %s", str(project_id), project.name
+        )
+        return _EXIT_API_ERROR
+
     logger.info(f"tenant '{project_id!s}' created {ten.created}")  # type: ignore
+    return _EXIT_SUCCESS
 
 
-def handle_project_update(conn: Connection, nautobot: Nautobot, project_id: uuid.UUID):
+def handle_project_update(
+    conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
+) -> int:
     logger.info(f"got request to update tenant {project_id!s}")
     project = conn.identity.get_project(project_id.hex)  # type: ignore
     tenant_api = nautobot.session.tenancy.tenants
 
     existing_tenant = tenant_api.get(project_id)
     logger.info(f"existing_tenant: {existing_tenant}")
-    if existing_tenant is None:
-        new_tenant = tenant_api.create(
-            id=str(project_id), name=project.name, description=project.description
+    try:
+        if existing_tenant is None:
+            new_tenant = tenant_api.create(
+                id=str(project_id), name=project.name, description=project.description
+            )
+            logger.info(f"tenant '{project_id!s}' created {new_tenant.created}")  # type: ignore
+        else:
+            existing_tenant.description = project.description  # type: ignore
+            existing_tenant.save()  # type: ignore
+            logger.info(
+                f"tenant '{project_id!s}' last updated {existing_tenant.last_updated}"  # type: ignore
+            )
+    except Exception:
+        logger.exception(
+            "Unable to update project %s / %s", str(project_id), project.name
         )
-        logger.info(f"tenant '{project_id!s}' created {new_tenant.created}")  # type: ignore
-    else:
-        existing_tenant.description = project.description  # type: ignore
-        existing_tenant.save()  # type: ignore
-        logger.info(
-            f"tenant '{project_id!s}' last updated {existing_tenant.last_updated}"  # type: ignore
-        )
+        return _EXIT_API_ERROR
+    return _EXIT_SUCCESS
 
 
-def handle_project_delete(conn: Connection, nautobot: Nautobot, project_id: uuid.UUID):
+def handle_project_delete(
+    conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
+) -> int:
     logger.info(f"got request to delete tenant {project_id!s}")
     ten = nautobot.session.tenancy.tenants.get(project_id)
     if not ten:
-        logger.warn(f"tenant '{project_id!s}' does not exist already")
-        return
+        logger.warn(f"tenant '{project_id!s}' does not exist, nothing to delete")
+        return _EXIT_SUCCESS
     ten.delete()  # type: ignore
     logger.info(f"deleted tenant {project_id!s}")
+    return _EXIT_SUCCESS
 
 
 def do_action(
@@ -109,31 +136,33 @@ def do_action(
     event: Event,
     project_id: uuid.UUID,
     only_domain: uuid.UUID | DefaultDomain | None,
-):
+) -> int:
     if event in [Event.ProjectCreate, Event.ProjectUpdate] and not is_valid_domain(
         conn, project_id, only_domain
     ):
         logger.info(
             f"keystone project {project_id!s} not part of {only_domain!s}, skipping"
         )
-        return
+        return _EXIT_SUCCESS
 
     match event:
         case Event.ProjectCreate:
-            handle_project_create(conn, nautobot, project_id)
+            return handle_project_create(conn, nautobot, project_id)
         case Event.ProjectUpdate:
-            handle_project_update(conn, nautobot, project_id)
+            return handle_project_update(conn, nautobot, project_id)
         case Event.ProjectDelete:
-            handle_project_delete(conn, nautobot, project_id)
+            return handle_project_delete(conn, nautobot, project_id)
         case _:
-            raise Exception(f"Cannot handle event: {event}")
+            logger.error("Cannot handle event: %s", event)
+            return _EXIT_EVENT_UNKNOWN
+    return _EXIT_EVENT_UNKNOWN
 
 
-def main():
+def main() -> int:
     args = argument_parser().parse_args()
 
     conn = get_openstack_client(cloud=args.os_cloud)
     nb_token = args.nautobot_token or credential("nb-token", "token")
     nautobot = Nautobot(args.nautobot_url, nb_token, logger=logger)
 
-    do_action(conn, nautobot, args.event, args.object, args.only_domain)
+    return do_action(conn, nautobot, args.event, args.object, args.only_domain)
