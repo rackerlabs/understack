@@ -13,16 +13,13 @@ class Undersync:
         self.token = auth_token
         self.api_url = api_url
 
-    def sync_devices(self, switch_uuids: str | list[str], force=False, dry_run=False):
-        if isinstance(switch_uuids, list):
-            switch_uuids = ",".join(switch_uuids)
-
+    def sync_devices(self, vlan_group_uuid: str, force=False, dry_run=False):
         if dry_run:
-            return self.dry_run(switch_uuids)
+            return self.dry_run(vlan_group_uuid)
         elif force:
-            return self.force(switch_uuids)
+            return self.force(vlan_group_uuid)
         else:
-            return self.sync(switch_uuids)
+            return self.sync(vlan_group_uuid)
 
     @cached_property
     def client(self):
