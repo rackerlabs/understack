@@ -96,6 +96,7 @@ def handle_project_update(
     tenant_api = nautobot.session.tenancy.tenants
 
     existing_tenant = tenant_api.get(project_id)
+    logger.info(f"existing_tenant: {existing_tenant}")
     try:
         if existing_tenant is None:
             new_tenant = tenant_api.create(
