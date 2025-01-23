@@ -42,8 +42,14 @@ conf:
       enabled_power_interfaces: redfish,ipmitool,idrac-redfish,ilo
       enabled_raid_interfaces: redfish,idrac-redfish,ilo5,agent
       enabled_vendor_interfaces: redfish,ipmitool,idrac-redfish,ilo
+    deploy:
+      delete_configuration_priority: 95
+      create_configuration_priority: 94
+      # erase_devices_priority: 0
+      # erase_devices_metadata_priority: 0
     conductor:
       automated_clean: true
+      # clean_step_priority_override: deploy.erase_devices_express:95
       # (nicholas.kuechler) tuning for idrac hardware type
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#nodes-go-into-maintenance-mode
       sync_power_state_interval: 70
