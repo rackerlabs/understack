@@ -1,3 +1,4 @@
+# Defaults: https://opendev.org/openstack/openstack-helm/src/branch/master/keystone/values.yaml
 ---
 release_group: null
 
