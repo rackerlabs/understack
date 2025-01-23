@@ -51,7 +51,7 @@ conf:
         type: multistring
         values:
           - raid.delete_configuration:200
-          - raid.delete_configuration:199
+          - raid.create_configuration:199
       # (nicholas.kuechler) tuning for idrac hardware type
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#nodes-go-into-maintenance-mode
       sync_power_state_interval: 70
