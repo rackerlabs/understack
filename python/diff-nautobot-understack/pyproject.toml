@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "diff-nautobot-understack"
+version = "0.1.0"
+description = ""
+authors = ["haseeb <184114777+haseebsyed12@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+openstacksdk = "^4.2.0"
+keystoneauth-websso = "^0.2.0"
+diffsync = "^2.0.1"
+oslo-log = "^7.0.0"
+
+[tool.poetry.scripts]
+diff-network = "diff_nautobot_understack.network.main:openstack_network_diff_from_ucvni_network"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
