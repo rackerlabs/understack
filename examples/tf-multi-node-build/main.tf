@@ -5,7 +5,7 @@ resource "tls_private_key" "ssh_key" {
 
 # save the private key to a local file
 resource "local_file" "private_key" {
-  content         = tls_private_key.ssh_key.private_key_pem
+  content         = tls_private_key.ssh_key.private_key_openssh
   filename        = "${path.module}/id_ed25519"
   file_permission = "0600"
 }
@@ -38,6 +38,8 @@ resource "openstack_networking_subnet_v2" "tenant_subnet" {
   network_id = openstack_networking_network_v2.tenant_net.id
   cidr       = var.network_subnet
   ip_version = 4
+  # set default DNS servers
+  dns_nameservers = ["8.8.8.8"]
   # not currently enabled for understack
   enable_dhcp = false
 }
