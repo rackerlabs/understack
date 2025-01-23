@@ -70,3 +70,44 @@ resource "openstack_compute_instance_v2" "tenant_server" {
     openstack_compute_keypair_v2.ssh_keypair
   ]
 }
+
+data "openstack_networking_network_v2" "ext_network" {
+  name = var.external_network
+}
+
+resource "openstack_networking_router_v2" "tenant_router" {
+  name                = random_pet.name.id
+  admin_state_up      = true
+  external_network_id = data.openstack_networking_network_v2.ext_network.id
+}
+
+resource "openstack_networking_router_interface_v2" "router_inf" {
+  router_id = openstack_networking_router_v2.tenant_router.id
+  subnet_id = openstack_networking_subnet_v2.tenant_subnet.id
+}
+
+resource "openstack_networking_floatingip_v2" "bastion_ip" {
+  pool = var.external_network
+}
+
+data "openstack_networking_port_v2" "bastion_port" {
+  network_id  = openstack_compute_instance_v2.tenant_server[0].network[0].uuid
+  mac_address = openstack_compute_instance_v2.tenant_server[0].network[0].mac
+}
+
+resource "openstack_networking_floatingip_associate_v2" "bastion_ip_association" {
+  floating_ip = openstack_networking_floatingip_v2.bastion_ip.address
+  port_id     = data.openstack_networking_port_v2.bastion_port.id
+
+  depends_on = [
+    openstack_networking_subnet_v2.tenant_subnet,
+    openstack_networking_network_v2.tenant_net,
+    openstack_networking_router_interface_v2.router_inf,
+    data.openstack_networking_port_v2.bastion_port
+  ]
+}
+
+output "bastion_ip" {
+  value       = openstack_networking_floatingip_v2.bastion_ip.address
+  description = "The floating IP address associated with the server"
+}
