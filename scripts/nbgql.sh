@@ -11,6 +11,7 @@ function usage() {
     echo "NAUTOBOT_TOKEN= Nautobot authentication token for API use" >&2
     echo "" >&2
     echo "Query files available include:" >&2
+    # shellcheck disable=SC2006
     ls "`dirname "$0"`"/nautobot_graphql_queries/*.gql >&2
     exit 1
 }
