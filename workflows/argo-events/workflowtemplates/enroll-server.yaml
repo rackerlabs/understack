@@ -23,12 +23,6 @@ spec:
               parameters:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
-        - - name: openstack-set-baremetal-node-raid-config
-            template: openstack-set-baremetal-node-raid-config
-            arguments:
-              parameters:
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
         - - name: manage-server
             template: openstack-wait-cmd
             arguments:
@@ -38,6 +32,12 @@ spec:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
             when: "{{steps.server-enroll-state.outputs.result}} == enroll"
+        - - name: openstack-set-baremetal-node-raid-config
+            template: openstack-set-baremetal-node-raid-config
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
         - - name: server-manage-state
             template: openstack-state-cmd
             arguments:
