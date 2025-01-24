@@ -40,6 +40,9 @@ IFS=$'\n'
 # envsubst for the variable substitution
 # shellcheck disable=SC2034
 QUERY_VARIABLE="$2"
+# export QUERY_VARIABLE so that envsubst can use it inside
+# of the template files
+export QUERY_VARIABLE
 
 # shellcheck disable=SC2086
 QUERY=$(jq -n \
