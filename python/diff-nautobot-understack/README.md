@@ -6,4 +6,5 @@ poetry lock
 poetry install
 
 export NB_TOKEN=<get_token_from_nautobot_dev>
-poetry run diff-network
+poetry run diff-networks
+poetry run diff-projects
