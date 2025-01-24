@@ -13,8 +13,8 @@ diffsync = "^2.0.1"
 oslo-log = "^7.0.0"
 
 [tool.poetry.scripts]
-diff-network = "diff_nautobot_understack.network.main:openstack_network_diff_from_ucvni_network"
-
+diff-networks = "diff_nautobot_understack.network.main:openstack_network_diff_from_ucvni_network"
+diff-projects = "diff_nautobot_understack.project.main:openstack_project_diff_from_nautobot_tenant"
 
 [build-system]
 requires = ["poetry-core"]
