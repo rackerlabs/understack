@@ -70,6 +70,8 @@ openstack baremetal node clean --clean-steps raid-clean-steps.json --disable-ram
 
 ### Node History
 
+Upstream docs: <https://docs.openstack.org/ironic/latest/admin/node-history.html>
+
 You can quickly see a bare metal node's history using the ironic CLI and the `openstack baremetal node history list <node>` command:
 
 ``` console
