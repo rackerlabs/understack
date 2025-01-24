@@ -24,6 +24,10 @@ labels:
     node_selector_value: conductor
 
 conf:
+  # Update policies for better integration with OpenStack services
+  # https://docs.openstack.org/ironic/latest/configuration/sample-policy.html
+  policy:
+    "baremetal:node:get:last_error": "role:service or role:admin or (project_id:%(node.owner)s or project_id:%(node.lessee)s)"
   ironic:
     DEFAULT:
       # We only want to default to direct, otherwise defaults interfere with hardware
