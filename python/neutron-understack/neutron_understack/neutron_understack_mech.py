@@ -117,7 +117,8 @@ class UnderstackDriver(MechanismDriver):
 
     def create_network_precommit(self, context: NetworkContext):
         log_call("create_network_precommit", context)
-        self.vlan_manager.create_vlan_for_network(context)
+        if cfg.CONF.ml2_understack.enforce_unique_vlans_in_fabric:
+            self.vlan_manager.create_vlan_for_network(context)
 
     def create_network_postcommit(self, context):
         log_call("create_network_postcommit", context)

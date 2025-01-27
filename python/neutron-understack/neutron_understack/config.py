@@ -50,6 +50,16 @@ mech_understack_opts = [
             "is used to trunk all vlans used by a neutron router."
         ),
     ),
+    cfg.BoolOpt(
+        "enforce_unique_vlans_in_fabric",
+        default=True,
+        help=(
+            "When enabled, Neutron performs an extra check during the creation of a"
+            "new VLAN network. This check ensures that the VLAN ID being assigned is"
+            "not already in use within a fabric. The verification is handled by "
+            "Nautobot."
+        ),
+    ),
 ]
 
 l3_svc_cisco_asa_opts = [
