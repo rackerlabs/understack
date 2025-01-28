@@ -1,21 +1,59 @@
 [tool.poetry]
 name = "diff-nautobot-understack"
-version = "0.1.0"
-description = ""
-authors = ["haseeb <184114777+haseebsyed12@users.noreply.github.com>"]
+version = "0.0.0"
+authors = ["Understack Developers"]
+description = "tool to compare data between Openstack and Nautobot"
 readme = "README.md"
+packages = [{include = "diff_nautobot_understack"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
 openstacksdk = "^4.2.0"
 keystoneauth-websso = "^0.2.0"
 diffsync = "^2.0.1"
-oslo-log = "^7.0.0"
+typer = "^0.15.1"
+pydantic-settings = "^2.7.1"
+
+[tool.ruff]
+target-version = "py311"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "D",       # pydocstyle
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
+  "S",       # flake8-bandit
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
+]
+
+ignore = [
+    "D100",  # don't require docs for every module
+    "D101",  # don't require docs for every class
+    "D102",  # don't require docs for every class method
+    "D103",  # don't require docs for every function
+    "D104",  # don't require docs for every package
+    "D106",  # don't require docs for every nested class
+    "D107",  # don't require docs for __init__
+    "D417"   # don't require docs for every function parameter
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[tool.ruff.lint.pydocstyle]
+# enable the google doc style rules by default
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"diff_nautobot_understack/cli.py" = ["D415"]
 
 [tool.poetry.scripts]
-diff-networks = "diff_nautobot_understack.network.main:openstack_network_diff_from_ucvni_network"
-diff-projects = "diff_nautobot_understack.project.main:openstack_project_diff_from_nautobot_tenant"
+uc-diff = "diff_nautobot_understack.cli:app"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
 build-backend = "poetry.core.masonry.api"

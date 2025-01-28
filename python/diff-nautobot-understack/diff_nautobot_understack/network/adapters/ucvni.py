@@ -1,7 +1,7 @@
 from diffsync import Adapter
 from pydantic import BaseModel
-from diff_nautobot_understack.clients.nautobot import API
 
+from diff_nautobot_understack.clients.nautobot import API
 from diff_nautobot_understack.network import models
 
 

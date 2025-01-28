@@ -1,21 +1,25 @@
-from pprint import pprint
+from diffsync.diff import Diff
 from diffsync.enum import DiffSyncFlags
+from rich import print
+
 from diff_nautobot_understack.network.adapters.openstack_network import (
     Network as OpenstackNetwork,
 )
 from diff_nautobot_understack.network.adapters.ucvni import Network as UcvniNetwork
 
 
-def openstack_network_diff_from_ucvni_network():
+def openstack_network_diff_from_ucvni_network() -> Diff:
     openstack_network = OpenstackNetwork()
-    openstack_network.load()
-
+    try:
+        openstack_network.load()
+    except Exception:
+        print("Error retrieving networks from Openstack")
     ucvni_network = UcvniNetwork()
-    ucvni_network.load()
-    openstack_network_destination_ucvni_source = openstack_network.diff_from(
-        ucvni_network, flags=DiffSyncFlags.CONTINUE_ON_FAILURE
+    try:
+        ucvni_network.load()
+    except Exception:
+        print("Error retrieving ucvnis from Nautobot")
+    ucvni_network_destination_openstack_source = ucvni_network.diff_from(
+        openstack_network, flags=DiffSyncFlags.CONTINUE_ON_FAILURE
     )
-    pprint(" Nautobot ucvnis ⟹ Openstack networks ")
-    summary = openstack_network_destination_ucvni_source.summary()
-    pprint(summary, width=120)
-    pprint(openstack_network_destination_ucvni_source.dict(), width=120)
+    return ucvni_network_destination_openstack_source

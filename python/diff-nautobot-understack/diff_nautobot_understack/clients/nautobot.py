@@ -1,22 +1,20 @@
-import os
-
-import requests
-import logging
 import inspect
+import logging
 from urllib.parse import urljoin
 
-NB_URL = os.environ.get("NB_URL", "https://nautobot.dev.undercloud.rackspace.net")
-NB_TOKEN = os.environ.get("NB_TOKEN")
+import requests
+
+from diff_nautobot_understack.settings import app_settings as settings
 
 
 class API:
     CALLER_FRAME = 1
 
     def __init__(self):
-        self.base_url = NB_URL
+        self.base_url = settings.nautobot_url
         self.s = requests.Session()
-        self.token = NB_TOKEN
-        self.s.headers.update({"Authorization": f"Token {NB_TOKEN}"})
+        self.token = settings.nautobot_token
+        self.s.headers.update({"Authorization": f"Token {self.token}"})
 
     def make_api_request(
         self, url: str, payload: dict | None = None, paginated: bool = False

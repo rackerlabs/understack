@@ -14,5 +14,5 @@ class NetworkModel(DiffSyncModel):
     id: str
     name: str
     status: str
-    provider_physical_network: str
-    vni_id: int
+    provider_physical_network: str | None = None
+    vni_id: int | None = None
