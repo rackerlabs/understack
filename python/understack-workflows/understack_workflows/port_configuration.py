@@ -13,3 +13,4 @@ class PortConfiguration(BaseModel):
     name: str  # port name
     pxe_enabled: bool
     local_link_connection: dict
+    physical_network: str | None
