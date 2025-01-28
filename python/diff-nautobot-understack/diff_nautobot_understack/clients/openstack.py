@@ -1,13 +1,12 @@
-import os
-
 import openstack
 
-OS_CLOUD = os.environ.get("OS_CLOUD", "uc-dev-infra")
-
-
-openstack.enable_logging(debug=True)
+from diff_nautobot_understack.settings import app_settings as settings
 
 
 class API:
     def __init__(self):
-        self.cloud_connection = openstack.connect(cloud=OS_CLOUD)
+        cloud_name = settings.os_cloud
+        debug = settings.debug
+
+        openstack.enable_logging(debug=debug)
+        self.cloud_connection = openstack.connect(cloud=cloud_name)
