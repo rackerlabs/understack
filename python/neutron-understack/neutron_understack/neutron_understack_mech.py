@@ -207,19 +207,22 @@ class UnderstackDriver(MechanismDriver):
     def create_subnet_postcommit(self, context):
         log_call("create_subnet_postcommit", context)
 
-        subnet = context.current
-        subnet_uuid = subnet["id"]
-        network_uuid = subnet["network_id"]
-        prefix = subnet["cidr"]
-        external = subnet["router:external"]
-        shared_namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
-        nautobot_namespace_name = network_uuid if not external else shared_namespace
+        subnet_uuid = context.current["id"]
+        network_uuid = context.current["network_id"]
+        prefix = context.current["cidr"]
+        external = context.current["router:external"]
 
-        self.nb.subnet_create(subnet_uuid, prefix, nautobot_namespace_name)
+        if external:
+            namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
+        else:
+            namespace = network_uuid
+
+        self.nb.subnet_create(subnet_uuid, prefix, namespace)
+
         LOG.info(
-            "subnet with ID: %(uuid)s and prefix %(prefix)s has been "
-            "created in Nautobot",
-            {"prefix": prefix, "uuid": subnet_uuid},
+            f"subnet with ID: {subnet_uuid} and prefix {prefix} has been "
+            f"created in Nautobot namespace {namespace}"
+        )
         )
 
     def update_subnet_precommit(self, context):
