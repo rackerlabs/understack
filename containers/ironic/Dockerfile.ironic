@@ -12,3 +12,8 @@ RUN apt-get update && \
 COPY python/ironic-understack /tmp/ironic-understack
 COPY python/understack-flavor-matcher /tmp/understack-flavor-matcher
 RUN /var/lib/openstack/bin/python -m pip install --no-cache --no-cache-dir /tmp/ironic-understack /tmp/understack-flavor-matcher sushy-oem-idrac==6.0.0
+
+COPY containers/ironic/testing/async_steps.py /var/lib/openstack/lib/python3.10/site-packages/ironic/common/async_steps.py
+COPY containers/ironic/testing/cleaning.py /var/lib/openstack/lib/python3.10/site-packages/ironic/conductor/cleaning.py
+COPY containers/ironic/testing/deployments.py /var/lib/openstack/lib/python3.10/site-packages/ironic/conductor/deployments.py
+COPY containers/ironic/testing/servicing.py /var/lib/openstack/lib/python3.10/site-packages/ironic/conductor/servicing.py
