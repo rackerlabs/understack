@@ -53,6 +53,7 @@ conf:
           - raid.delete_configuration:124
           - raid.create_configuration:123
           - deploy.erase_devices_express:95
+          - power.power_off:1
       # (nicholas.kuechler) tuning for idrac hardware type
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#nodes-go-into-maintenance-mode
       sync_power_state_interval: 70
