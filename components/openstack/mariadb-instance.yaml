@@ -44,5 +44,9 @@ spec:
       key: password
       name: mariadb-metrics-password
       generate: true
-    serviceMonitor: {}
+    serviceMonitor:
+      prometheusRelease: kube-prometheus-stack
+      jobLabel: mariadb-monitoring
+      interval: 10s
+      scrapeTimeout: 10s
     username: mariadb-metrics

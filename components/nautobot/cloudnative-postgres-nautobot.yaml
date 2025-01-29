@@ -8,6 +8,8 @@ spec:
   instances: 3
   storage:
     size: 20Gi
+  monitoring:
+    enablePodMonitor: true
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: ScheduledBackup

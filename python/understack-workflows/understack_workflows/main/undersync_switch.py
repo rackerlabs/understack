@@ -3,22 +3,29 @@ import os
 import sys
 
 from understack_workflows.helpers import boolean_args
-from understack_workflows.helpers import comma_list_args
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
 from understack_workflows.undersync.client import Undersync
 
 
-def call_undersync(args, switches):
+def call_undersync(args):
     undersync_token = credential("undersync", "token")
     if not undersync_token:
         logger.error("Please provide auth token for Undersync.")
         sys.exit(1)
+
     undersync = Undersync(undersync_token)
 
     try:
-        logger.debug(f"Syncing switches: {switches} {args.dry_run=} {args.force=}")
-        return undersync.sync_devices(switches, dry_run=args.dry_run, force=args.force)
+        logger.debug(
+            f"Syncing switches in vlan group {args.vlan_group_uuid} "
+            f"{args.dry_run=} {args.force=}"
+        )
+        return undersync.sync_devices(
+            args.vlan_group_uuid,
+            dry_run=args.dry_run,
+            force=args.force,
+        )
     except Exception as error:
         logger.error(error)
         sys.exit(2)
@@ -30,10 +37,10 @@ def argument_parser():
         description="Trigger undersync run for a set of switches.",
     )
     parser.add_argument(
-        "--switch_uuids",
-        type=comma_list_args,
+        "--vlan_group_uuid",
+        type=str,
         required=True,
-        help="Comma separated list of UUIDs of the switches to Undersync",
+        help="UUID of Nautobot VlanGroup containing the switches to Undersync",
     )
     parser.add_argument(
         "--force",
@@ -55,7 +62,7 @@ def main():
     """Requests an Undersync run on a pair of switches."""
     args = argument_parser().parse_args()
 
-    response = call_undersync(args, args.switch_uuids)
+    response = call_undersync(args)
     logger.info(f"Undersync returned: {response.json()}")
 
 

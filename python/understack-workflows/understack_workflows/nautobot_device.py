@@ -35,6 +35,7 @@ class NautobotInterface:
     neighbor_chassis_mac: str | None
     neighbor_location_name: str | None
     neighbor_rack_name: str | None
+    ucvni_group_name: str | None = None
 
 
 @dataclass
@@ -92,7 +93,7 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
     find_or_create_interfaces(nautobot, chassis_info, device.id, switches)
 
     # Run the graphql query yet again, to include all the data we just populated
-    # in nautobot.   Fairly innefficient for the case where we didn't change
+    # in nautobot. Fairly inefficient for the case where we didn't change
     # anything, but we need the accurate data.
     device = nautobot_server(nautobot, serial=chassis_info.serial_number)
     if not device:
@@ -132,7 +133,11 @@ def switches_for(nautobot, chassis_info: ChassisInfo) -> dict[str, dict]:
     }
     switches = nautobot_switches(nautobot, switch_macs.union(base_switch_macs))
     if not switches:
-        raise Exception("No switches found in nautobot for {switch_macs}")
+        raise Exception(
+            f"There are no switch Devices in nautobot that match the LLDP info "
+            f"reported by server BMC - I found no Devices where "
+            f"chassis_mac_address is one of {switch_macs}"
+        )
     return switches
 
 
@@ -248,6 +253,9 @@ def nautobot_server(nautobot, serial: str) -> NautobotDevice | None:
                             mac: cf_chassis_mac_address
                             location { id name }
                             rack { id name }
+                            vlan_group: rel_vlan_group_to_devices {
+                              ucvni_group: rel_ucvnigroup_vlangroup { name }
+                            }
                         }
                     }
                     ip_addresses {
@@ -287,8 +295,12 @@ def parse_device(data: dict) -> NautobotDevice:
 
 
 def parse_interface(data: dict) -> NautobotInterface:
-    connected = data["connected_interface"]
     ip_address = data["ip_addresses"][0] if data["ip_addresses"] else None
+    connected = data["connected_interface"]
+    connected_device = connected and connected.get("device")
+    vlan_group = connected_device and connected_device.get("vlan_group")
+    ucvni_group = vlan_group and vlan_group.get("ucvni_group")
+
     return NautobotInterface(
         id=data["id"],
         name=data["name"],
@@ -304,6 +316,7 @@ def parse_interface(data: dict) -> NautobotInterface:
         neighbor_chassis_mac=connected and connected["device"]["mac"],
         neighbor_location_name=connected and connected["device"]["location"]["name"],
         neighbor_rack_name=connected and connected["device"]["rack"]["name"],
+        ucvni_group_name=ucvni_group and ucvni_group["name"],
     )
 
 

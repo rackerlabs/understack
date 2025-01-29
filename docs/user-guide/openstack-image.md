@@ -68,6 +68,7 @@ openstack image create 'My-Ubuntu-24.04' \
   --disk-format qcow2 \
   --property os_distro=ubuntu \
   --property os_version=24.04 \
+  --progress \
   --file=/path/to/image.qcow2
 ```
 

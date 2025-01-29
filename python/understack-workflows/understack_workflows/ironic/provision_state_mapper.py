@@ -12,7 +12,7 @@ class ProvisionStateMapper:
         "inspecting": "Provisioning",
         "deploying": "Provisioning",
         "cleaning": "Quarantine",
-        "deleting": "Decom",
+        "deleting": "Decommissioning",
     }
     ALL_IRONIC_STATES = [
         "enroll",

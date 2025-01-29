@@ -14,7 +14,7 @@
       "InstanceID": "iDRAC.Embedded.1",
       "Name": "DellSwitchConnection",
       "StaleData": "NotStale",
-      "SwitchConnectionID": "c4:4d:84:48:61:80",
+      "SwitchConnectionID": "c4:4d:4:48:61:80",
       "SwitchPortConnectionID": "Gi1/0/3"
     },
     {

@@ -89,12 +89,16 @@ plugins:
   - include_dir_to_nav:
       sort_file: true
       sort_directory: true
+  - macros
 
 validation:
   omitted_files: warn
   absolute_links: warn
   unrecognized_links: warn
   anchors: warn
+
+extra:
+  auth_url: !ENV [OS_AUTH_URL, "https://your.endpoint.url/v3"]
 
 nav:
   - Home: index.md
@@ -113,18 +117,31 @@ nav:
   - 'Deployment Guide':
     - deploy-guide/index.md
     - Quick Start: deploy-guide/gitops-install.md
+    - Full Deploy:
+      - deploy-guide/getting-started.md
+      - deploy-guide/deploy-repo.md
     - deploy-guide/auth.md
     - deploy-guide/extra-regions.md
     - deploy-guide/external-argocd.md
     - deploy-guide/add-remove-app.md
+  - 'Operator Guide':
+    - operator-guide/index.md
+    - 'OpenStack':
+      - operator-guide/openstack-ironic.md
+      - operator-guide/openstack-neutron.md
+      - operator-guide/openstack-placement.md
+    - 'Networking':
+      - operator-guide/openstack-neutron.md
+      - operator-guide/ovs-ovn.md
+    - 'Infrastructure':
+      - operator-guide/monitoring.md
+      - operator-guide/mariadb-operator.md
+      - operator-guide/postgres-operator.md
+      - operator-guide/rabbitmq.md
+      - operator-guide/rook-ceph.md
+      - operator-guide/nautobot.md
   - 'User Guide':
     - user-guide/index.md
     - user-guide/openstack-cli.md
     - user-guide/openstack-image.md
-    - user-guide/rabbitmq-cheat-sheet.md
-    - user-guide/mariadb-operator-cheat-sheet.md
-    - user-guide/postgres-operator-cheat-sheet.md
-    - user-guide/monitoring.md
-    - user-guide/openstack-ironic.md
-    - user-guide/openstack-placement.md
   - Workflows: workflows/

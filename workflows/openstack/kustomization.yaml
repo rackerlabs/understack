@@ -11,7 +11,10 @@ resources:
   - eventsources/rabbitmq-user-argo.yaml
   - eventsources/rabbitmq-permission-argo-to-ironic-permission.yaml
   - eventsources/rabbitmq-permission-argo-to-keystone-permission.yaml
+  - eventsources/eventsource-openstack-neutron.yaml
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
+  - serviceaccounts/serviceaccount-openstack-events.yaml
   - sensors/sensor-ironic-node-update.yaml
   - sensors/sensor-keystone-event-project.yaml
+  - sensors/sensor-neutron-deployment.yaml
   - secrets/nautobot-token.yaml

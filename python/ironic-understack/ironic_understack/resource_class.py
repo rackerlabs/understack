@@ -1,12 +1,14 @@
 # from ironic.drivers.modules.inspector.hooks import base
-from ironic.common import exception
-from ironic.drivers.modules.inspector.hooks import base
-from ironic_understack.conf import CONF
+import re
+
 from flavor_matcher.flavor_spec import FlavorSpec
 from flavor_matcher.machine import Machine
 from flavor_matcher.matcher import Matcher
+from ironic.common import exception
+from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
-import re
+
+from ironic_understack.conf import CONF
 
 LOG = logging.getLogger(__name__)
 
@@ -23,7 +25,6 @@ class UndercloudResourceClassHook(base.InspectionHook):
 
     def __call__(self, task, inventory, plugin_data):
         """Update node resource_class with deducted flavor."""
-
         try:
             memory_mb = inventory["memory"]["physical_mb"]
             disk_size_gb = int(int(inventory["disks"][0]["size"]) / 10**9)
@@ -60,7 +61,9 @@ class UndercloudResourceClassHook(base.InspectionHook):
                 f"Inventory has missing hardware information for node {task.node.uuid}."
             )
             LOG.error(msg)
-            raise exception.InvalidNodeInventory(node=task.node.uuid, reason=msg)
+            raise exception.InvalidNodeInventory(
+                node=task.node.uuid, reason=msg
+            ) from None
         except NoMatchError:
             msg = f"No matching flavor found for {task.node.uuid}"
             LOG.error(msg)

@@ -3,6 +3,7 @@ from unittest.mock import mock_open
 from unittest.mock import patch
 
 import pytest
+
 from flavor_matcher.flavor_spec import FlavorSpec
 from flavor_matcher.machine import Machine
 
@@ -11,7 +12,7 @@ from flavor_matcher.machine import Machine
 def valid_yaml():
     return """
 ---
-name: nonprod.gp2.ultramedium
+name: gp2.ultramedium
 manufacturer: Dell
 model: PowerEdge R7615
 memory_gb: 7777
@@ -46,8 +47,7 @@ def yaml_directory(tmp_path, valid_yaml, invalid_yaml):
 
 def test_from_yaml(valid_yaml):
     spec = FlavorSpec.from_yaml(valid_yaml)
-    assert spec.name == "nonprod.gp2.ultramedium"
-    assert spec.stripped_name == "gp2.ultramedium"
+    assert spec.name == "gp2.ultramedium"
     assert spec.manufacturer == "Dell"
     assert spec.model == "PowerEdge R7615"
     assert spec.memory_gb == 7777
@@ -57,7 +57,7 @@ def test_from_yaml(valid_yaml):
 
 
 def test_from_yaml_invalid(invalid_yaml):
-    with pytest.raises(Exception):
+    with pytest.raises(Exception):  # noqa:B017
         FlavorSpec.from_yaml(invalid_yaml)
 
 
@@ -76,7 +76,7 @@ def test_from_directory(mocked_open, mock_walk, valid_yaml, invalid_yaml):
     specs = FlavorSpec.from_directory("/etc/flavors/")
 
     assert len(specs) == 1
-    assert specs[0].name == "nonprod.gp2.ultramedium"
+    assert specs[0].name == "gp2.ultramedium"
     assert specs[0].memory_gb == 7777
     assert specs[0].cpu_cores == 245
 
@@ -86,7 +86,7 @@ def test_from_directory_with_real_files(yaml_directory):
     specs = FlavorSpec.from_directory(str(yaml_directory))
 
     assert len(specs) == 1
-    assert specs[0].name == "nonprod.gp2.ultramedium"
+    assert specs[0].name == "gp2.ultramedium"
     assert specs[0].memory_gb == 7777
     assert specs[0].cpu_cores == 245
 
@@ -313,7 +313,8 @@ def test_cpu_model_not_exact_but_memory_and_disk_match(flavors):
 
 
 def test_large_flavor_memory_slightly_less_disk_exact(flavors):
-    # Machine with slightly less memory than required for the medium flavor, exact disk space
+    # Machine with slightly less memory than required for the medium
+    # flavor, exact disk space
     machine = Machine(
         memory_mb=204600, cpu="Intel 80386DX", disk_gb=1800, model="Dell XPS1319"
     )
@@ -332,8 +333,3 @@ def test_baremetal_nova_resource_class(valid_yaml):
         flv.baremetal_nova_resource_class
         == "resources:CUSTOM_BAREMETAL_GP2_ULTRAMEDIUM"
     )
-
-
-def test_envtype(valid_yaml):
-    flv = FlavorSpec.from_yaml(valid_yaml)
-    assert flv.env_type == "nonprod"

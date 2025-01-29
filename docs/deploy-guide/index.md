@@ -14,7 +14,7 @@ with a production best practices installation. Improvements are always welcome.
 
 ## System Division
 
-A fully deployed UnderStack is divided into three distinct parts, or environments,
+A fully deployed UnderStack is divided into three distinct parts, or tiers,
 that are referred to in the documentation as:
 
 - Management
@@ -30,19 +30,19 @@ flowchart TD
   B[Global] --> E[Region N];
 ```
 
-A fully functioning system only needs one _Management_ environment, one _Global_
-environment and one or more _Region_ environment(s). In this configuration,
-the _Management_ environment is responsible for utilizing our [GitOps][gitops]
-tool, [ArgoCD][argocd] to deploy the expected state to all other environments.
-While the _Global_ environment is
+A fully functioning system only needs one _Management_ tier, one _Global_
+tier and one or more _Region_ tier(s). In this configuration,
+the _Management_ tier is responsible for utilizing our [GitOps][gitops]
+tool, [ArgoCD][argocd] to deploy the expected state to all other tier.
+While the _Global_ tier is
 responsible for hosting any services that are expected to exist only once
 for a whole system deployment such as the DCIM/IPAM tool. While the _Region_
-environments will run the tools and services that need to live close to the
+tiers will run the tools and services that need to live close to the
 actual hardware.
 
-In fact, one _Management_ environment can control multiple _Global_ environments
-and their associated _Region_ environments. We call the grouping of the _Global_
-environment and it's associated _Region_ environments a _partition_. An example
+In fact, one _Management_ tier can control multiple _Global_ tiers
+and their associated _Region_ tiers. We call the grouping of the _Global_
+tier and it's associated _Region_ tiers a _partition_. An example
 would be a staging partition and a production partition.
 
 ```mermaid

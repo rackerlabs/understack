@@ -23,11 +23,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 
-[tool.ruff]
-target-version = "py310"
-fix = true
-
 [tool.poetry.dependencies]
+# keep this python field in sync with the tool.ruff.target-version
 python = "^3.10"
 requests = "^2"
 neutron-lib = "^3"
@@ -42,9 +39,9 @@ minversion = "6.0"
 addopts = "-ra"
 filterwarnings = "ignore::DeprecationWarning"
 
-
-[tool.isort]
-profile = "open_stack"
+[tool.ruff]
+target-version = "py310"
+fix = true
 
 [tool.ruff.lint]
 select = [
@@ -64,8 +61,13 @@ ignore = [
     "D102",  # don't require docs for every class method
     "D103",  # don't require docs for every function
     "D104",  # don't require docs for every package
+    "D106",  # don't require docs for every nested class
+    "D107",  # don't require docs for __init__
     "D417"   # don't require docs for every function parameter
 ]
+
+[tool.ruff.lint.isort]
+force-single-line = true
 
 [tool.ruff.lint.pydocstyle]
 # enable the google doc style rules by default
@@ -85,3 +87,4 @@ understack_vxlan = "neutron_understack.type_understack_vxlan:UnderstackVxlanType
 
 [tool.poetry.plugins."neutron.service_plugins"]
 l3_understack = "neutron_understack.l3_service_plugin:UnderStackL3ServicePlugin"
+l3_service_cisco_asa = "neutron_understack.l3_service_cisco_asa:CiscoAsa"

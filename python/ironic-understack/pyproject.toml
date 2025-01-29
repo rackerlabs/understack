@@ -1,3 +1,7 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry]
 name = "ironic-understack"
 version = "0.0.0"
@@ -10,8 +14,9 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-ironic = ">=24.1"
+# keep this python field in sync with the tool.ruff.target-version
 python = "^3.10"
+ironic = ">=24.1"
 pyyaml = "^6.0"
 understack-flavor-matcher = {path = "../understack-flavor-matcher"}
 
@@ -19,10 +24,6 @@ understack-flavor-matcher = {path = "../understack-flavor-matcher"}
 pytest = "^8.3.2"
 pytest-github-actions-annotate-failures = "*"
 pytest-cov = "^5.0.0"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.plugins."ironic.inspection.hooks"]
 "resource-class" = "ironic_understack.resource_class:UndercloudResourceClassHook"
@@ -44,8 +45,34 @@ fix = true
 
 [tool.ruff.lint]
 select = [
+  "D",       # pydocstyle
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
   "S",       # flake8-bandit
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
 ]
+
+ignore = [
+    "D100",  # don't require docs for every module
+    "D101",  # don't require docs for every class
+    "D102",  # don't require docs for every class method
+    "D103",  # don't require docs for every function
+    "D104",  # don't require docs for every package
+    "D106",  # don't require docs for every nested class
+    "D107",  # don't require docs for __init__
+    "D417"   # don't require docs for every function parameter
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+
+[tool.ruff.lint.pydocstyle]
+# enable the google doc style rules by default
+convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "ironic_understack/tests/*.py" = [

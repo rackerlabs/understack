@@ -23,12 +23,6 @@ spec:
               parameters:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
-        - - name: openstack-set-baremetal-node-raid-config
-            template: openstack-set-baremetal-node-raid-config
-            arguments:
-              parameters:
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
         - - name: manage-server
             template: openstack-wait-cmd
             arguments:
@@ -38,6 +32,12 @@ spec:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
             when: "{{steps.server-enroll-state.outputs.result}} == enroll"
+        - - name: openstack-set-baremetal-node-raid-config
+            template: openstack-set-baremetal-node-raid-config
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
         - - name: server-manage-state
             template: openstack-state-cmd
             arguments:
@@ -73,7 +73,6 @@ spec:
             readOnly: true
           - mountPath: /etc/understack_flavors/
             name: understack-flavors
-            subPath: current/flavors/
             readOnly: true
         env:
         - name: WF_NS
@@ -82,8 +81,12 @@ spec:
           value: "{{workflow.name}}"
         - name: WF_UID
           value: "{{workflow.uid}}"
-        - name: FLAVORS_ENV
-          value: nonprod
+        - name: FLAVORS_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: understack-flavors
+              key: FLAVORS_DIR
+              optional: true
       volumes:
         - name: bmc-master
           secret:
@@ -151,8 +154,23 @@ spec:
             ]
           }
           EOF
+          # create the initial clean steps which will create a raid config
+          cat <<'EOF' >> raid-clean-steps.json
+          [
+              {
+                  "interface": "raid",
+                  "step": "delete_configuration"
+              },
+              {
+                  "interface": "raid",
+                  "step": "create_configuration"
+              }
+          ]
+          EOF
           # apply the target raid config to the node
           openstack baremetal node set {{inputs.parameters.device_id}} --target-raid-config raid1-config.json
+          # create the raid config
+          openstack baremetal node clean --wait 0 --clean-steps raid-clean-steps.json --disable-ramdisk {{inputs.parameters.device_id}}
         env:
           - name: OS_CLOUD
             value: understack

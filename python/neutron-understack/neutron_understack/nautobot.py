@@ -1,6 +1,7 @@
 import inspect
 import pathlib
 from urllib.parse import urljoin
+from uuid import UUID
 
 import requests
 from neutron_lib import exceptions as exc
@@ -41,7 +42,7 @@ class Nautobot:
             raise NautobotError() from error
 
     def make_api_request(
-        self, url: str, method: str, payload: dict | None = None
+        self, url: str, method: str, payload: dict | None = None, params=None
     ) -> dict:
         endpoint_url = urljoin(self.base_url, url)
         caller_function = inspect.stack()[self.CALLER_FRAME].function
@@ -51,7 +52,9 @@ class Nautobot:
             "%(caller_function)s payload: %(payload)s",
             {"payload": payload, "caller_function": caller_function},
         )
-        resp = self.s.request(http_method, endpoint_url, timeout=10, json=payload)
+        resp = self.s.request(
+            http_method, endpoint_url, timeout=10, json=payload, params=params
+        )
 
         if resp.content:
             resp_data = resp.json()
@@ -109,24 +112,44 @@ class Nautobot:
         url = f"/api/ipam/namespaces/{namespace_uuid}/"
         return self.make_api_request(url, "delete")
 
+    def subnet_create(self, subnet_uuid: str, prefix: str, namespace_name: str) -> dict:
+        url = "/api/ipam/prefixes/"
+        payload = {
+            "id": subnet_uuid,
+            "prefix": prefix,
+            "status": "Active",
+            "namespace": {"name": namespace_name},
+        }
+        return self.make_api_request(url, "post", payload)
+
+    def subnet_delete(self, subnet_uuid: str) -> dict:
+        url = f"/api/ipam/prefixes/{subnet_uuid}/"
+        return self.make_api_request(url, "delete")
+
     def prep_switch_interface(
-        self, connected_interface_id: str, ucvni_uuid: str
-    ) -> str:
+        self,
+        connected_interface_id: str,
+        ucvni_uuid: str,
+        vlan_tag: int,
+        modify_native_vlan: bool | None = True,
+    ) -> dict:
         """Runs a Nautobot Job to update a switch interface for tenant mode.
 
         The nautobot job will assign vlans as required and set the interface
         into the correct mode for "normal" tenant operation.
 
-        The vlan group ID is returned.
+        The dictionary with vlan group ID and vlan tag is returned.
         """
         url = "/api/plugins/undercloud-vni/prep_switch_interface"
         payload = {
             "ucvni_id": str(ucvni_uuid),
             "connected_interface_id": str(connected_interface_id),
+            "modify_native_vlan": modify_native_vlan,
+            "vlan_tag": vlan_tag,
         }
         resp_data = self.make_api_request(url, "post", payload)
 
-        return resp_data["vlan_group_id"]
+        return resp_data
 
     def detach_port(self, connected_interface_id: str, ucvni_uuid: str) -> str:
         """Runs a Nautobot Job to cleanup a switch interface.
@@ -167,3 +190,20 @@ class Nautobot:
             "vlan_group_uuid: %(vlan_group_uuid)s", {"vlan_group_uuid": vlan_group_uuid}
         )
         return vlan_group_uuid
+
+    def check_vlan_availability(self, interface_id: str | UUID, vlan_tag: int) -> bool:
+        """Checks if particular vlan_tag is available in a fabric.
+
+        This method checks if a VLAN number, specified as `vlan_tag`, is used
+        in any of the VLAN groups associated with the fabric to which the
+        interface, identified by `interface_id`, is connected.
+        """
+        url = "/api/plugins/undercloud-vni/vlan_availability_check"
+        params = {
+            "interface_id": str(interface_id),
+            "vlan_tag": int(vlan_tag),
+        }
+        response = self.make_api_request(url, "get", params=params)
+        if not response:
+            return False
+        return response.get("available", False)

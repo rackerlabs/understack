@@ -117,7 +117,7 @@ def call_undersync(args, vlan_group_id: UUID):
 
     try:
         return undersync.sync_devices(
-            [str(vlan_group_id)], dry_run=args.dry_run, force=args.force
+            str(vlan_group_id), dry_run=args.dry_run, force=args.force
         )
     except Exception as error:
         logger.error(error)

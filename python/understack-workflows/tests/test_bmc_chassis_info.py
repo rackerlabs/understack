@@ -37,7 +37,7 @@ def test_chassis_neighbors():
     chassis_info = bmc_chassis_info.chassis_info(bmc)
     assert chassis_info.neighbors == {
         "C4:7E:E0:E4:10:7F",
-        "C4:4D:84:48:61:80",
+        "C4:4D:04:48:61:80",
         "C4:7E:E0:E4:32:DF",
     }
 
@@ -59,7 +59,7 @@ def test_chassis_info_R7615():
                 hostname="idrac-33GSW04",
                 ipv4_address=IPv4Interface("10.46.96.156/26"),
                 ipv4_gateway=IPv4Address("10.46.96.129"),
-                remote_switch_mac_address="C4:4D:84:48:61:80",
+                remote_switch_mac_address="C4:4D:04:48:61:80",
                 remote_switch_port_name="GigabitEthernet1/0/3",
             ),
             bmc_chassis_info.InterfaceInfo(

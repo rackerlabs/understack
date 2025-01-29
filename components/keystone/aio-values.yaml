@@ -1,3 +1,4 @@
+# Defaults: https://opendev.org/openstack/openstack-helm/src/branch/master/keystone/values.yaml
 ---
 release_group: null
 
@@ -251,8 +252,16 @@ conf:
           - http://localhost:9990/auth/websso/
           # - https://yourinstance.of.horizon.example.com/auth/websso/
       default_authorization_ttl: 720
+    cache:
+      backend_argument: memcached_expire_time:3600
     DEFAULT:
       max_token_size: 512
+    # (TODO) Need to follow up on this. There is a pending upstream change to
+    # add this to the openstack-helm values:
+    # https://review.opendev.org/c/openstack/openstack-helm/+/934703
+    fernet_tokens:
+      max_active_keys: 7
+
   wsgi_keystone: |
     {{- $portInt := tuple "identity" "service" "api" $ | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
 

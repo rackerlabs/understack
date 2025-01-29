@@ -72,8 +72,9 @@ def test_create_project(
     project_id: uuid.UUID,
     only_domain: uuid.UUID | DefaultDomain | None,
 ):
-    do_action(os_conn, nautobot, Event.ProjectCreate, project_id, only_domain)
+    ret = do_action(os_conn, nautobot, Event.ProjectCreate, project_id, only_domain)
     os_conn.identity.get_project.assert_called_with(project_id.hex)
+    assert ret == 0
 
 
 @pytest.mark.parametrize(
@@ -90,8 +91,9 @@ def test_update_project(
     project_id: uuid.UUID,
     only_domain: uuid.UUID | DefaultDomain | None,
 ):
-    do_action(os_conn, nautobot, Event.ProjectUpdate, project_id, only_domain)
+    ret = do_action(os_conn, nautobot, Event.ProjectUpdate, project_id, only_domain)
     os_conn.identity.get_project.assert_called_with(project_id.hex)
+    assert ret == 0
 
 
 @pytest.mark.parametrize(
@@ -108,4 +110,5 @@ def test_delete_project(
     project_id: uuid.UUID,
     only_domain: uuid.UUID | DefaultDomain | None,
 ):
-    do_action(os_conn, nautobot, Event.ProjectDelete, project_id, only_domain)
+    ret = do_action(os_conn, nautobot, Event.ProjectDelete, project_id, only_domain)
+    assert ret == 0

@@ -1,14 +1,20 @@
-Description: add support for dhcp-allowed-srvids
+From a3bfd99772edea6a7b78e30b7f3d4a80997323bd Mon Sep 17 00:00:00 2001
+From: Marek Skrobacki <marek.skrobacki@rackspace.co.uk>
+Date: Wed, 15 Jan 2025 17:10:57 -0600
+Subject: [PATCH] dd support for dhcp-allowed-srvids
 
-Author: Marek Skrobacki
-Origin: other
-Last-Update: 2024-05-21 
 ---
-This patch add support for allowing custom Server IDs in the containerised environments.
-Built for Debian 12 / dnsmasq 2.89
+ man/dnsmasq.8 | 19 +++++++++++++++++++
+ src/dnsmasq.h |  2 ++
+ src/option.c  | 15 +++++++++++++++
+ src/rfc2131.c | 46 ++++++++++++++++++++++++++++++++++++++--------
+ 4 files changed, 74 insertions(+), 8 deletions(-)
+
+diff --git a/man/dnsmasq.8 b/man/dnsmasq.8
+index 32bdeff..8a6cb3e 100644
 --- a/man/dnsmasq.8
 +++ b/man/dnsmasq.8
-@@ -1985,6 +1985,25 @@
+@@ -2026,6 +2026,25 @@ form is used, there must be a route to all of the addresses configured on the in
  The two-address form of shared-network is also usable with a DHCP relay: the first address
  is the address of the relay and the second, as before, specifies an extra subnet which
  addresses may be allocated from.
@@ -34,9 +40,11 @@ Built for Debian 12 / dnsmasq 2.89
  
  .TP
  .B \-s, --domain=<domain>[[,<address range>[,local]]|<interface>]
+diff --git a/src/dnsmasq.h b/src/dnsmasq.h
+index e455c3f..6f52e3e 100644
 --- a/src/dnsmasq.h
 +++ b/src/dnsmasq.h
-@@ -1175,11 +1175,13 @@
+@@ -1206,11 +1206,13 @@ extern struct daemon {
    struct pxe_service *pxe_services;
    struct tag_if *tag_if; 
    struct addr_list *override_relays;
@@ -50,33 +58,35 @@ Built for Debian 12 / dnsmasq 2.89
    struct dhcp_netid_list *dhcp_ignore, *dhcp_ignore_names, *dhcp_gen_names; 
    struct dhcp_netid_list *force_broadcast, *bootp_dynamic;
    struct hostsfile *dhcp_hosts_file, *dhcp_opts_file;
+diff --git a/src/option.c b/src/option.c
+index f4ff7c0..eafcf54 100644
 --- a/src/option.c
 +++ b/src/option.c
-@@ -186,6 +186,7 @@
- #define LOPT_STALE_CACHE   377
- #define LOPT_NORR          378
- #define LOPT_NO_IDENT      379
+@@ -192,6 +192,7 @@ struct myoption {
+ #define LOPT_NO_DHCP4      383
+ #define LOPT_MAX_PROCS     384
+ #define LOPT_DNSSEC_LIMITS 385
 +#define LOPT_DHCP_AL_SVID  386
  
  #ifdef HAVE_GETOPT_LONG
  static const struct option opts[] =  
-@@ -376,6 +377,7 @@
-     { "fast-dns-retry", 2, 0, LOPT_FAST_RETRY },
+@@ -388,6 +389,7 @@ static const struct myoption opts[] =
      { "use-stale-cache", 2, 0 , LOPT_STALE_CACHE },
      { "no-ident", 0, 0, LOPT_NO_IDENT },
+     { "max-tcp-connections", 1, 0, LOPT_MAX_PROCS },
 +    { "dhcp-allowed-srvids", 1, 0, LOPT_DHCP_AL_SVID },
      { NULL, 0, 0, 0 }
    };
  
-@@ -573,6 +575,7 @@
-   { LOPT_QUIET_TFTP, OPT_QUIET_TFTP, NULL, gettext_noop("Do not log routine TFTP."), NULL },
-   { LOPT_NORR, OPT_NORR, NULL, gettext_noop("Suppress round-robin ordering of DNS records."), NULL },
+@@ -591,6 +593,7 @@ static struct {
    { LOPT_NO_IDENT, OPT_NO_IDENT, NULL, gettext_noop("Do not add CHAOS TXT records."), NULL },
+   { LOPT_CACHE_RR, ARG_DUP, "<RR-type>", gettext_noop("Cache this DNS resource record type."), NULL },
+   { LOPT_MAX_PROCS, ARG_ONE, "<integer>", gettext_noop("Maximum number of concurrent tcp connections."), NULL },
 +  { LOPT_DHCP_AL_SVID, ARG_DUP, "[=<ipaddr>]...", gettext_noop("Allow these ServerIDs"), NULL },
    { 0, 0, NULL, NULL, NULL }
  }; 
  
-@@ -4632,6 +4635,18 @@
+@@ -4720,6 +4723,18 @@ static int one_opt(int option, char *arg, char *errstr, char *gen_err, int comma
  	
  	break;
        }
@@ -95,9 +105,11 @@ Built for Debian 12 / dnsmasq 2.89
  
  #endif
        
+diff --git a/src/rfc2131.c b/src/rfc2131.c
+index 68834ea..fd24654 100644
 --- a/src/rfc2131.c
 +++ b/src/rfc2131.c
-@@ -1202,8 +1202,22 @@
+@@ -1202,8 +1202,22 @@ size_t dhcp_reply(struct dhcp_context *context, char *iface_name, int int_index,
  	      
  	      if (override.s_addr != 0)
  		{
@@ -122,7 +134,7 @@ Built for Debian 12 / dnsmasq 2.89
  		}
  	      else 
  		{
-@@ -1230,12 +1244,28 @@
+@@ -1230,12 +1244,28 @@ size_t dhcp_reply(struct dhcp_context *context, char *iface_name, int int_index,
  			override = intr->addr.in.sin_addr;
  		      else
  			{
@@ -157,3 +169,5 @@ Built for Debian 12 / dnsmasq 2.89
  			}
  		    }
  		}
+-- 
+2.39.5 (Apple Git-154)

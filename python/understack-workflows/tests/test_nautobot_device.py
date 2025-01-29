@@ -94,7 +94,7 @@ class FakeNautobot:
                         {
                             "id": "leafsw-1234-3456-1234",
                             "name": "f20-3-1d.iad3.iad3.rackspace.net",
-                            "mac": "C4:4D:84:48:61:80",
+                            "mac": "C4:4D:04:48:61:80",
                             "role": {"name": "Tenant leaf"},
                             "location": {
                                 "id": "da47f07f-b66a-4f0c-b780-4be8498e6129",
@@ -127,7 +127,7 @@ def test_find_or_create(dell_nautobot_device):
                 description="Dedicated iDRAC interface",
                 mac_address="A8:3C:A5:35:43:86",
                 hostname="Dell-33GSW04",
-                remote_switch_mac_address="C4:4D:84:48:61:83",
+                remote_switch_mac_address="C4:4D:04:48:61:83",
                 remote_switch_port_name="GigabitEthernet1/0/3",
             ),
             InterfaceInfo(

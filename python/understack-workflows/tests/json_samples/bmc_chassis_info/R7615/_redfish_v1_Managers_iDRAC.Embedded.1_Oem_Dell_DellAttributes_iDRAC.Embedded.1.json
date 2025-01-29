@@ -1141,7 +1141,7 @@
     "NIC.1.DNSDomainName": "",
     "NIC.1.DNSRacName": "idrac-33GSW04",
     "NIC.1.MACAddress": "a8:3c:a5:35:43:86",
-    "NIC.1.SwitchConnection": "c4:4d:84:48:61:80",
+    "NIC.1.SwitchConnection": "c4:4d:4:48:61:80",
     "NIC.1.SwitchPortConnection": "Gi1/0/3",
     "TelemetrySerialLog.1.ReportTriggers": "",
     "TelemetryCPUSensor.1.ReportTriggers": "CPUCriticalTrigger, CPUWarnTrigger, TMPCpuCriticalTrigger, TMPCpuWarnTrigger",

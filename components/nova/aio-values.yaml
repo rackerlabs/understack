@@ -69,6 +69,15 @@ conf:
       cores: 512
       ram: 512000
 
+    # (TODO) This is to help with an upstream Nova bug:
+    # https://review.opendev.org/c/openstack/nova/+/883411
+    #
+    # This can be removed from when the upstream issue has been resolved.
+    # Cleaning can take around 5-10 minutes, so we need the value of
+    # (api_max_retries * api_retry_interval) > time to clean
+    ironic:
+      api_max_retries: 90  # number of times to retry. default is 60.
+      api_retry_interval: 10  # number of sesconds between retries. default is 2.
 
 console:
   # we are working with baremetal nodes and not QEMU so we don't need novnc or spice
