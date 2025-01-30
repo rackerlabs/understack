@@ -10,8 +10,9 @@ class Settings(BaseSettings):
     nautobot_url: str = "https://nautobot.dev.undercloud.rackspace.net"
     debug: bool = False
     os_cloud: Optional[str] = None
-    os_project: Optional[str] = "default"
+    os_project: str = "default"
     os_client_config_file: Optional[str] = None
+    output_format: str = "table"
 
 
 Settings.model_rebuild()
