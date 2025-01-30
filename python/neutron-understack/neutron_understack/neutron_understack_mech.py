@@ -265,7 +265,11 @@ class UnderstackDriver(MechanismDriver):
 
         network_id = context.current["network_id"]
 
-        vlan_tag = int(context.network.current.get("provider:segmentation_id"))
+        network_type = context.network.current.get("provider:network_type")
+        if network_type == p_const.TYPE_VLAN:
+            vlan_tag = int(context.network.current.get("provider:segmentation_id"))
+        else:
+            vlan_tag = None
         connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
         nb_vlan_group_id = self.update_nautobot(
             network_id, connected_interface_uuid, vlan_tag
@@ -366,7 +370,7 @@ class UnderstackDriver(MechanismDriver):
         self,
         network_id: str,
         connected_interface_uuid: str,
-        vlan_tag: int,
+        vlan_tag: int | None,
     ) -> UUID:
         """Updates Nautobot with the new network ID and connected interface UUID.
 
