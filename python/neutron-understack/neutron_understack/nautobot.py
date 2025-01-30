@@ -38,7 +38,7 @@ class Nautobot:
         try:
             response.raise_for_status()
         except HTTPError as error:
-            LOG.error("Nautobot error: %(error)s", {"error": error})
+            LOG.error(f"Nautobot error: {error} {response.content}")
             raise NautobotError() from error
 
     def make_api_request(
