@@ -174,20 +174,24 @@ class UnderstackDriver(MechanismDriver):
         provider_type = network.get("provider:network_type")
         physnet = network.get("provider:physical_network")
 
-        if provider_type != p_const.TYPE_VLAN:
-            return
-
         conf = cfg.CONF.ml2_understack
         ucvni_group = conf.ucvni_group
-        vlan_group_id = self.nb.detach_port(
-            connected_interface_id=conf.network_node_switchport_uuid,
-            ucvni_uuid=network_id,
-        )
-        self.nb.ucvni_delete(network_id)
-        self.undersync.sync_devices(
-            vlan_group_uuids=str(vlan_group_id),
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
+
+        if provider_type == p_const.TYPE_VLAN:
+            vlan_group_id = self.nb.detach_port(
+                connected_interface_id=conf.network_node_switchport_uuid,
+                ucvni_uuid=network_id,
+            )
+            self.nb.ucvni_delete(network_id)
+            self.undersync.sync_devices(
+                vlan_group_uuids=str(vlan_group_id),
+                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+            )
+        elif provider_type == p_const.TYPE_VXLAN:
+            self.nb.ucvni_delete(network_id)
+        else:
+            return
+
         LOG.info(
             "network %(net_id)s has been deleted from ucvni_group %(ucvni_group)s, "
             "physnet %(physnet)s",
