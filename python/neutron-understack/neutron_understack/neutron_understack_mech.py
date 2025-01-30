@@ -132,7 +132,7 @@ class UnderstackDriver(MechanismDriver):
         physnet = network.get("provider:physical_network")
         conf = cfg.CONF.ml2_understack
 
-        if provider_type != p_const.TYPE_VLAN:
+        if provider_type not in [p_const.TYPE_VLAN, p_const.TYPE_VXLAN]:
             return
         ucvni_group = conf.ucvni_group
         self.nb.ucvni_create(network_id, ucvni_group, network_name)
@@ -143,16 +143,18 @@ class UnderstackDriver(MechanismDriver):
         )
         self._create_nautobot_namespace(network_id, external)
 
+        vlan_tag = int(segmentation_id) if provider_type == p_const.TYPE_VLAN else None
         vlan_group_id_and_vlan_tag = self.nb.prep_switch_interface(
             connected_interface_id=conf.network_node_switchport_uuid,
             ucvni_uuid=network_id,
             modify_native_vlan=False,
-            vlan_tag=int(segmentation_id),
+            vlan_tag=vlan_tag,
         )
-        self.undersync.sync_devices(
-            vlan_group_uuids=str(vlan_group_id_and_vlan_tag["vlan_group_id"]),
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
+        if provider_type == p_const.TYPE_VLAN:
+            self.undersync.sync_devices(
+                vlan_group_uuids=str(vlan_group_id_and_vlan_tag["vlan_group_id"]),
+                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+            )
 
     def update_network_precommit(self, context):
         log_call("update_network_precommit", context)

@@ -130,7 +130,7 @@ class Nautobot:
         self,
         connected_interface_id: str,
         ucvni_uuid: str,
-        vlan_tag: int,
+        vlan_tag: int | None,
         modify_native_vlan: bool | None = True,
     ) -> dict:
         """Runs a Nautobot Job to update a switch interface for tenant mode.
