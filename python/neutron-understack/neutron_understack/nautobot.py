@@ -42,7 +42,7 @@ class Nautobot:
             raise NautobotError() from error
 
     def make_api_request(
-        self, url: str, method: str, payload: dict | None = None, params=None
+        self, url: str, method: str = "get", payload: dict | None = None, params=None
     ) -> dict:
         endpoint_url = urljoin(self.base_url, url)
         caller_function = inspect.stack()[self.CALLER_FRAME].function
@@ -67,6 +67,31 @@ class Nautobot:
         )
         self._log_and_raise_for_status(resp)
         return resp_data
+
+    def post(self, url: str, **payload) -> str:
+        result = self.make_api_request(url, "post", payload)
+        return result["id"]
+
+    def make_graphql_request(self, query: str, **variables) -> dict:
+        url = urljoin(self.base_url, "/api/graphql/")
+        payload = {
+            "query": query,
+            "variables": variables,
+        }
+        resp = self.s.request("POST", url, timeout=30, json=payload)
+
+        self._log_and_raise_for_status(resp)
+
+        if not resp.content:
+            return {"status_code": resp.status_code}
+
+        data = resp.json()
+
+        if "data" not in data:
+            LOG.error(f"Nautobot graphql query failed: {data}")
+            raise NautobotError()
+
+        return data["data"]
 
     def ucvni_create(
         self,
@@ -125,6 +150,30 @@ class Nautobot:
     def subnet_delete(self, subnet_uuid: str) -> dict:
         url = f"/api/ipam/prefixes/{subnet_uuid}/"
         return self.make_api_request(url, "delete")
+
+    def ip_address_create(self, cidr: str, namespace: str) -> str:
+        return self.post(
+            "/api/ipam/ip-addresses/",
+            address=cidr,
+            status="Active",
+            namespace=namespace,
+        )
+
+    def interface_create(self, device: str, name: str, type: str = "virtual") -> str:
+        return self.post(
+            "/api/dcim/interfaces/",
+            device=device,
+            name=name,
+            status="Active",
+            type={"value": type},
+        )
+
+    def add_ip_to_interface(self, ip_address_uuid: str, interface_uuid: str):
+        return self.post(
+            "/api/ipam/ip-address-to-interface/",
+            ip_address=ip_address_uuid,
+            interface=interface_uuid,
+        )
 
     def prep_switch_interface(
         self,
@@ -207,3 +256,43 @@ class Nautobot:
         if not response:
             return False
         return response.get("available", False)
+
+    def get_switchport_vlan_details(
+        self, ucvni_uuid: str, interface_uuid: str
+    ) -> tuple[str, int, str]:
+        """Get switch device UUID and VLAN ID for a given VNI and Interface."""
+        query = """
+          query ($ucvni_uuid: String!, $interface_uuid: String!) {
+            interfaces(id: [$interface_uuid]) {
+              device {
+                id
+                vlan_group: rel_vlan_group_to_devices {
+                  id
+                  vlans(cr_ucvni_vlans__source: [$ucvni_uuid]) {
+                    vid
+                    rel_ucvni_vlans {
+                      id
+                    }
+                  }
+                }
+              }
+            }
+          }
+        """
+
+        data = self.make_graphql_request(
+            query, ucvni_uuid=ucvni_uuid, interface_uuid=interface_uuid
+        )
+        if not data.get("interfaces"):
+            raise ValueError(f"Nautobot missing interface {interface_uuid=}")
+
+        device_data = data["interfaces"][0]["device"]
+        switch_uuid = device_data["id"]
+        vlan_group_uuid = device_data["vlan_group"]["id"]
+        vlans = device_data["vlan_group"]["vlans"]
+        if not vlans:
+            raise ValueError(f"Nautobot missing vlan {ucvni_uuid=} {interface_uuid=}")
+
+        vlan_id = vlans[0]["vid"]
+
+        return switch_uuid, vlan_id, vlan_group_uuid
