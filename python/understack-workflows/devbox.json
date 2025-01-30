@@ -10,7 +10,8 @@
     "kubeseal@latest",
     "kustomize@latest",
     "telepresence2@latest",
-    "jq@latest"
+    "jq@latest",
+    "poetry@1.8.3"
   ],
   "shell": {
     "init_hook": [
