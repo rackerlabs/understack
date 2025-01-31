@@ -103,3 +103,60 @@ def test_wrong_vif_type_update_port_post_commit(
     driver.update_port_postcommit(context)
 
     mocked_fetch_connected_interface_uuid.assert_not_called()
+
+
+def test_create_subnet_postcommit_private(nautobot_client):
+    context = MagicMock(
+        current={
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "network_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "cidr": "1.0.0.0/24",
+            "router:external": False,
+        }
+    )
+
+    driver.nb = nautobot_client
+    driver.create_subnet_postcommit(context)
+
+    nautobot_client.subnet_create.assert_called_once_with(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        "1.0.0.0/24",
+        "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+    )
+
+
+def test_create_subnet_postcommit_public(nautobot_client, undersync_client):
+    context = MagicMock(
+        current={
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "network_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "cidr": "1.0.0.0/24",
+            "router:external": True,
+        }
+    )
+
+    nautobot_client.get_switchport_vlan_details.return_value = [
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+        666,
+        "cccccccc-cccc-cccc-cccc-cccccccccccc",
+    ]
+
+    driver.nb = nautobot_client
+    driver.undersync = undersync_client
+
+    driver.create_subnet_postcommit(context)
+
+    nautobot_client.subnet_create.assert_called_once_with(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "1.0.0.0/24", "Global"
+    )
+
+    nautobot_client.interface_create.assert_called_once_with(
+        device="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", name="Vlan666"
+    )
+    nautobot_client.ip_address_create.assert_called_once_with(
+        cidr="1.0.0.1", namespace="Global"
+    )
+    nautobot_client.add_ip_to_interface.assert_called_once()
+    undersync_client.sync_devices.assert_called_once_with(
+        vlan_group_uuids="cccccccc-cccc-cccc-cccc-cccccccccccc", dry_run=True
+    )

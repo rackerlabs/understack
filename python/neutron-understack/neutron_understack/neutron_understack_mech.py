@@ -1,5 +1,6 @@
 import json
 import logging
+from ipaddress import IPv4Network
 from pprint import pprint
 from uuid import UUID
 
@@ -223,6 +224,31 @@ class UnderstackDriver(MechanismDriver):
             f"subnet with ID: {subnet_uuid} and prefix {prefix} has been "
             f"created in Nautobot namespace {namespace}"
         )
+        if external:
+            self._create_public_svi(prefix, network_uuid)
+
+    def _create_public_svi(self, cidr: str, network_uuid: str):
+        first_ip_address = str(IPv4Network(cidr)[1])
+
+        switch_uuid, vlan_id, vlan_group_uuid = self.nb.get_switchport_vlan_details(
+            ucvni_uuid=network_uuid,
+            interface_uuid=cfg.CONF.ml2_understack.network_node_switchport_uuid,
+        )
+
+        interface_uuid = self.nb.interface_create(
+            device=switch_uuid, name=f"Vlan{vlan_id}"
+        )
+
+        ip_address_uuid = self.nb.ip_address_create(
+            cidr=first_ip_address,
+            namespace=cfg.CONF.ml2_understack.shared_nautobot_namespace_name,
+        )
+
+        self.nb.add_ip_to_interface(ip_address_uuid, interface_uuid)
+
+        self.undersync.sync_devices(
+            vlan_group_uuids=str(vlan_group_uuid),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
     def update_subnet_precommit(self, context):
