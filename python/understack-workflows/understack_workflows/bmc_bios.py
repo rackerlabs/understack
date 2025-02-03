@@ -52,5 +52,4 @@ def patch_bios_settings(bmc: Bmc, new_settings: dict):
         if "Pending configuration values" in repr(e):
             logger.info("%s BIOS settings job already queued, ignoring.", bmc)
             return
-        else:
-            raise (e) from None
+        raise
