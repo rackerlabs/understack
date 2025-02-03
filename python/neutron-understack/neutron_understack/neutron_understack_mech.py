@@ -132,7 +132,7 @@ class UnderstackDriver(MechanismDriver):
         physnet = network.get("provider:physical_network")
         conf = cfg.CONF.ml2_understack
 
-        if provider_type != p_const.TYPE_VLAN:
+        if provider_type not in [p_const.TYPE_VLAN, p_const.TYPE_VXLAN]:
             return
         ucvni_group = conf.ucvni_group
         self.nb.ucvni_create(network_id, ucvni_group, network_name)
@@ -142,6 +142,9 @@ class UnderstackDriver(MechanismDriver):
             {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
         )
         self._create_nautobot_namespace(network_id, external)
+
+        if provider_type != p_const.TYPE_VLAN:
+            return
 
         vlan_group_id_and_vlan_tag = self.nb.prep_switch_interface(
             connected_interface_id=conf.network_node_switchport_uuid,
@@ -172,20 +175,24 @@ class UnderstackDriver(MechanismDriver):
         provider_type = network.get("provider:network_type")
         physnet = network.get("provider:physical_network")
 
-        if provider_type != p_const.TYPE_VLAN:
-            return
-
         conf = cfg.CONF.ml2_understack
         ucvni_group = conf.ucvni_group
-        vlan_group_id = self.nb.detach_port(
-            connected_interface_id=conf.network_node_switchport_uuid,
-            ucvni_uuid=network_id,
-        )
-        self.nb.ucvni_delete(network_id)
-        self.undersync.sync_devices(
-            vlan_group_uuids=str(vlan_group_id),
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
+
+        if provider_type == p_const.TYPE_VLAN:
+            vlan_group_id = self.nb.detach_port(
+                connected_interface_id=conf.network_node_switchport_uuid,
+                ucvni_uuid=network_id,
+            )
+            self.nb.ucvni_delete(network_id)
+            self.undersync.sync_devices(
+                vlan_group_uuids=str(vlan_group_id),
+                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+            )
+        elif provider_type == p_const.TYPE_VXLAN:
+            self.nb.ucvni_delete(network_id)
+        else:
+            return
+
         LOG.info(
             "network %(net_id)s has been deleted from ucvni_group %(ucvni_group)s, "
             "physnet %(physnet)s",
@@ -259,7 +266,11 @@ class UnderstackDriver(MechanismDriver):
 
         network_id = context.current["network_id"]
 
-        vlan_tag = int(context.network.current.get("provider:segmentation_id"))
+        network_type = context.network.current.get("provider:network_type")
+        if network_type == p_const.TYPE_VLAN:
+            vlan_tag = int(context.network.current.get("provider:segmentation_id"))
+        else:
+            vlan_tag = None
         connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
         nb_vlan_group_id = self.update_nautobot(
             network_id, connected_interface_uuid, vlan_tag
@@ -360,7 +371,7 @@ class UnderstackDriver(MechanismDriver):
         self,
         network_id: str,
         connected_interface_uuid: str,
-        vlan_tag: int,
+        vlan_tag: int | None,
     ) -> UUID:
         """Updates Nautobot with the new network ID and connected interface UUID.
 

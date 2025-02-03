@@ -423,6 +423,13 @@ INSTALLATION_METRICS_ENABLED = is_truthy(
 #         'buzz': 'bazz'
 #     }
 # }
+PLUGINS_CONFIG = {
+    "vni_custom_model": {
+        "FORCE_UNIQUE_VLANS": is_truthy(
+            os.getenv("VNI_CUSTOM_MODEL_FORCE_UNIQUE_VLANS", "false")
+        )
+    }
+}
 
 # Prefer IPv6 addresses or IPv4 addresses in selecting a device's primary IP address?
 #
