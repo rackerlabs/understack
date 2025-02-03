@@ -18,8 +18,10 @@ def call_undersync(args):
 
     try:
         logger.debug(
-            f"Syncing switches in vlan group {args.vlan_group_uuid} "
-            f"{args.dry_run=} {args.force=}"
+            "Syncing switches in vlan group %s args.dry_run=%s args.force=%s",
+            args.vlan_group_uuid,
+            args.dry_run,
+            args.force,
         )
         return undersync.sync_devices(
             args.vlan_group_uuid,
@@ -63,7 +65,7 @@ def main():
     args = argument_parser().parse_args()
 
     response = call_undersync(args)
-    logger.info(f"Undersync returned: {response.json()}")
+    logger.info("Undersync returned: %s", response.json())
 
 
 logger = setup_logger(__name__)

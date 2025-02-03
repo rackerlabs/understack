@@ -34,15 +34,15 @@ def update_dell_drac_settings(bmc: Bmc) -> dict:
     }
 
     if required_changes:
-        logger.info(f"{bmc} Updating DRAC settings:")
+        logger.info("%s Updating DRAC settings:", bmc)
         for k in required_changes.keys():
-            logger.info(f"  {k}: {current_values[k]}->{STANDARD[k]['expect']}")
+            logger.info("  %s: %s->%s", k, current_values[k], STANDARD[k]["expect"])
 
         payload = {"Attributes": required_changes}
         bmc.redfish_request(REDFISH_PATH, payload=payload, method="PATCH")
 
-        logger.info(f"{bmc} DRAC settings have been updated")
+        logger.info("%s DRAC settings have been updated", bmc)
     else:
-        logger.info(f"{bmc} all required DRAC settings present and correct")
+        logger.info("%s all required DRAC settings present and correct", bmc)
 
     return required_changes

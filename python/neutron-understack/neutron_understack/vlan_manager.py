@@ -49,12 +49,13 @@ class VlanManager:
                 self.conf.network_node_switchport_uuid,
                 vlan_tag,
             ):
-                LOG.debug(f"Vlan {vlan_tag} is available for all VLANGroups.")
+                LOG.debug("Vlan %s is available for all VLANGroups.", vlan_tag)
                 return alloc
 
             LOG.info(
-                f"Vlan {vlan_tag} is reported to be used in fabric associated with "
-                "this VlanGroup. Trying next one..."
+                "Vlan %s is reported to be used in fabric associated with "
+                "this VlanGroup. Trying next one...",
+                vlan_tag,
             )
             alloc = self._find_next_available_vlan(context)
             vlan_tag = alloc.vlan_id

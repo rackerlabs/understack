@@ -92,17 +92,17 @@ def _get_bmc_accounts(host: str, token: str, username: str) -> list[dict]:
         # get account service
         r = _redfish_request(host, "/redfish/v1", token)
         account_service_uri = r["AccountService"]["@odata.id"]
-        logger.debug(f"account_service_url: {account_service_uri}")
+        logger.debug("account_service_url: %s", account_service_uri)
 
         # get account collection uri
         r = _redfish_request(host, account_service_uri, token)
         accounts_uri = r["Accounts"]["@odata.id"]
-        logger.debug(f"accounts_url: {accounts_uri}")
+        logger.debug("accounts_url: %s", accounts_uri)
 
         # get accounts
         r = _redfish_request(host, accounts_uri, token)
         accounts = r["Members"]
-        logger.debug(f"accounts: {accounts}")
+        logger.debug("accounts: %s", accounts)
 
         return accounts
     except Exception as e:
@@ -120,7 +120,7 @@ def _set_bmc_creds(host: str, token: str, username: str, new_password: str):
 
         a = _redfish_request(host, account_url, token)
         if username == a["UserName"]:
-            logger.debug(f"found account: {a}")
+            logger.debug("found account: %s", a)
             matched_account = a
             break
 

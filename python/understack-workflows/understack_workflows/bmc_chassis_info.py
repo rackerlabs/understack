@@ -100,8 +100,11 @@ def combine_lldp(lldp, interface) -> InterfaceInfo:
     lldp_entry = lldp.get(name, lldp.get(alternate_name, {}))
     if not lldp_entry:
         logger.info(
-            f"LLDP info from BMC is missing for {name} or {alternate_name}, "
-            f"we only have LLDP info for {list(lldp.keys())}"
+            "LLDP info from BMC is missing for %s or %s, "
+            "we only have LLDP info for %s",
+            name,
+            alternate_name,
+            list(lldp.keys()),
         )
     return InterfaceInfo(**interface, **lldp_entry)
 

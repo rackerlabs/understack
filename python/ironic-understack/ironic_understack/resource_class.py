@@ -13,7 +13,7 @@ from ironic_understack.conf import CONF
 LOG = logging.getLogger(__name__)
 
 FLAVORS = FlavorSpec.from_directory(CONF.ironic_understack.flavors_dir)
-LOG.info(f"Loaded {len(FLAVORS)} flavor specifications.")
+LOG.info("Loaded %d flavor specifications.", len(FLAVORS))
 
 
 class NoMatchError(Exception):
@@ -35,7 +35,7 @@ class UndercloudResourceClassHook(base.InspectionHook):
             )
 
             if not model_name:
-                LOG.warn("No model_name detected. skipping flavor setting.")
+                LOG.warning("No model_name detected. skipping flavor setting.")
                 raise NoMatchError("mode_name not matched")
             else:
                 model_name = model_name.group(1)
