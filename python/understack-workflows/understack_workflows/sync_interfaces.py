@@ -13,12 +13,12 @@ def from_nautobot_to_ironic(
     nautobot_device: NautobotDevice, pxe_interface: str, ironic_client=None
 ):
     """Update Ironic ports to match information found in Nautobot Interfaces."""
-    logger.info(f"Syncing Interfaces / Ports for Device {nautobot_device.id} ...")
+    logger.info("Syncing Interfaces / Ports for Device %s ...", nautobot_device.id)
 
     nautobot_ports = dict_by_uuid(
         get_nautobot_interfaces(nautobot_device, pxe_interface)
     )
-    logger.info(f"{nautobot_ports}")
+    logger.debug("%s", nautobot_ports)
 
     if ironic_client is None:
         ironic_client = IronicClient()
@@ -29,25 +29,26 @@ def from_nautobot_to_ironic(
     for port_id, interface in ironic_ports.items():
         if port_id not in nautobot_ports:
             logger.info(
-                f"Nautobot Interface {interface.uuid} no longer exists, "
-                f"deleting corresponding Ironic Port"
+                "Nautobot Interface %s no longer exists, "
+                "deleting corresponding Ironic Port",
+                interface.uuid,
             )
             response = ironic_client.delete_port(interface.uuid)
-            logger.debug(f"Deleted: {response}")
+            logger.debug("Deleted: %s", response)
 
     for port_id, nb_port in nautobot_ports.items():
         if port_id in ironic_ports:
             patch = get_patch(nb_port, ironic_ports[port_id])
             if patch:
-                logger.info(f"Updating Ironic Port {nb_port} ...")
+                logger.info("Updating Ironic Port %s ...", nb_port)
                 response = ironic_client.update_port(port_id, patch)
-                logger.debug(f"Updated: {response}")
+                logger.debug("Updated: %s", response)
             else:
-                logger.debug(f"No changes required for Ironic Port {port_id}")
+                logger.debug("No changes required for Ironic Port %s", port_id)
         else:
-            logger.info(f"Creating Ironic Port {nb_port} ...")
+            logger.info("Creating Ironic Port %s ...", nb_port)
             response = ironic_client.create_port(nb_port.dict())
-            logger.debug(f"Created: {response}")
+            logger.debug("Created: %s", response)
 
 
 def dict_by_uuid(items: list) -> dict:

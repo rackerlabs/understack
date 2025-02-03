@@ -27,5 +27,7 @@ def bmc_set_permanent_ip_addr(bmc: Bmc, interface_info: InterfaceInfo):
             "IPv4.1.Netmask": str(interface_info.ipv4_address.netmask),
         }
     }
-    logger.info(f"BMC was DHCP IP {interface_info.ipv4_address}, making this permanent")
+    logger.info(
+        "BMC was DHCP IP %s, making this permanent", interface_info.ipv4_address
+    )
     bmc.redfish_request(REDFISH_PATH, method="PATCH", payload=payload)

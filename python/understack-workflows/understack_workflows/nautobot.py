@@ -53,7 +53,7 @@ class Nautobot:
         if tenant_id:
             tenant = self.session.tenancy.tenants.get(id=tenant_id)
             if not tenant:
-                self.logger.error(f"Tenant {tenant_id!s} not found in Nautobot")
+                self.logger.error("Tenant %s not found in Nautobot", tenant_id)
             return tenant  # type: ignore
 
     def update_cf(
@@ -74,7 +74,7 @@ class Nautobot:
         device.tenant = self.tenancy_by_id(tenant_id)  # type: ignore[attr-defined]
 
         response = device.save()
-        self.logger.info(f"save result: {response}")
+        self.logger.debug("save result: %s", response)
         return response
 
     def update_switch_interface_status(
@@ -105,7 +105,9 @@ class Nautobot:
             )
         switch_interface_id = connected_endpoint.id  # type: ignore
         self.logger.debug(
-            f"Interface {server_interface_mac=} connects to {switch_interface_id=}"
+            "Interface server_interface_mac=%s connects to switch_interface_id=%s",
+            server_interface_mac,
+            switch_interface_id,
         )
 
         switch_interface = self.interface_by_id(switch_interface_id)
@@ -113,7 +115,10 @@ class Nautobot:
         result = switch_interface.save()
 
         self.logger.debug(
-            f"Interface {switch_interface_id=} updated to Status {new_status} {result=}"
+            "Interface switch_interface_id=%s updated to Status %s result=%s",
+            switch_interface_id,
+            new_status,
+            result,
         )
         return switch_interface
 
@@ -122,6 +127,6 @@ class Nautobot:
         device.status = device_status  # type: ignore
         result = device.save()
         self.logger.info(
-            f"device {device_id} updated to Status {device_status} {result=}"
+            "device %s updated to Status %s result=%s", device_id, device_status, result
         )
         return result

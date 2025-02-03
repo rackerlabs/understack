@@ -314,7 +314,7 @@ class UnderstackDriver(MechanismDriver):
                     {},
                     status=p_const.PORT_STATUS_ACTIVE,
                 )
-                LOG.debug(f"Bound segment: {segment}")
+                LOG.debug("Bound segment: %s", segment)
                 return
             else:
                 LOG.debug(

@@ -39,10 +39,12 @@ select = [
   "D",       # pydocstyle
   "E",       # pycodestyle (error)
   "F",       # pyflakes
+  "G",       # flake8-logging-format
   "B",       # flake8-bugbear
   "I",       # isort
   "S",       # flake8-bandit
   "UP",      # pyupgrade
+  "LOG",     # flake8-logging
   "ASYNC",   # flake8-async
 ]
 

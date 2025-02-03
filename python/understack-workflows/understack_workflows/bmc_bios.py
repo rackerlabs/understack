@@ -31,11 +31,11 @@ def update_dell_bios_settings(bmc: Bmc, pxe_interface="NIC.Slot.1-1") -> dict:
     }
 
     if required_changes:
-        logger.info(f"{bmc} Updating BIOS settings: {required_changes}")
+        logger.info("%s Updating BIOS settings: %s", bmc, required_changes)
         patch_bios_settings(bmc, required_changes)
-        logger.info(f"{bmc} BIOS settings will be updated on next server boot")
+        logger.info("%s BIOS settings will be updated on next server boot", bmc)
     else:
-        logger.info(f"{bmc} all required BIOS settings present and correct")
+        logger.info("%s all required BIOS settings present and correct", bmc)
 
     return required_changes
 
@@ -50,7 +50,7 @@ def patch_bios_settings(bmc: Bmc, new_settings: dict):
         bmc.redfish_request(path, payload=payload, method="PATCH")
     except RedfishError as e:
         if "Pending configuration values" in repr(e):
-            logger.info(f"{bmc} BIOS settings job already queued, ignoring.")
+            logger.info("%s BIOS settings job already queued, ignoring.", bmc)
             return
         else:
             raise (e) from None
