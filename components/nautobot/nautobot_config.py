@@ -425,8 +425,9 @@ INSTALLATION_METRICS_ENABLED = is_truthy(
 # }
 PLUGINS_CONFIG = {
     "vni_custom_model": {
-        "FORCE_UNIQUE_VLANS": os.getenv("VNI_CUSTOM_MODEL_FORCE_UNIQUE_VLANS", None)
-        == "true"
+        "FORCE_UNIQUE_VLANS": is_truthy(
+            os.getenv("VNI_CUSTOM_MODEL_FORCE_UNIQUE_VLANS", "false")
+        )
     }
 }
 
