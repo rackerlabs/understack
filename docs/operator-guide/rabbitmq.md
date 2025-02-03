@@ -4,9 +4,9 @@
 
 ```bash
 # Username
-kubectl -n openstack get secret rabbitmq-default-user -o jsonpath="{.data.username}" | base64 --decode
+kubectl -n openstack get secret rabbitmq-default-user -o jsonpath="{.data.username}" | base64 --decode && echo
 # Password
-kubectl -n openstack get secret rabbitmq-default-user -o jsonpath="{.data.password}" | base64 --decode
+kubectl -n openstack get secret rabbitmq-default-user -o jsonpath="{.data.password}" | base64 --decode && echo
 ```
 
 ## Opening the UI
