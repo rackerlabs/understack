@@ -134,6 +134,7 @@ nav:
       - operator-guide/openstack-neutron.md
       - operator-guide/ovs-ovn.md
     - 'Infrastructure':
+      - operator-guide/workflows.md
       - operator-guide/monitoring.md
       - operator-guide/mariadb-operator.md
       - operator-guide/postgres-operator.md
