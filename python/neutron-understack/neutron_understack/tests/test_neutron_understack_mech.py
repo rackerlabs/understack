@@ -160,3 +160,30 @@ def test_create_subnet_postcommit_public(nautobot_client, undersync_client):
     undersync_client.sync_devices.assert_called_once_with(
         vlan_group_uuids="cccccccc-cccc-cccc-cccc-cccccccccccc", dry_run=True
     )
+
+
+def test_delete_subnet_postcommit_public(nautobot_client, undersync_client):
+    context = MagicMock(
+        current={
+            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "network_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "cidr": "1.0.0.0/24",
+            "router:external": True,
+        }
+    )
+
+    nautobot_client.subnet_cascade_delete.return_value = [
+        "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    ]
+    driver.nb = nautobot_client
+    driver.undersync = undersync_client
+
+    driver.delete_subnet_postcommit(context)
+
+    nautobot_client.subnet_cascade_delete.assert_called_once_with(
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    )
+
+    undersync_client.sync_devices.assert_called_once_with(
+        vlan_group_uuids="cccccccc-cccc-cccc-cccc-cccccccccccc", dry_run=True
+    )

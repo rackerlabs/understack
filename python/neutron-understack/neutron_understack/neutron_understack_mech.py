@@ -267,12 +267,19 @@ class UnderstackDriver(MechanismDriver):
         subnet_uuid = subnet["id"]
         prefix = subnet["cidr"]
 
-        self.nb.subnet_delete(subnet_uuid)
+        affected_vlan_groups = self.nb.subnet_cascade_delete(subnet_uuid)
         LOG.info(
             "subnet with ID: %(uuid)s and prefix %(prefix)s has been "
-            "deleted in Nautobot",
+            "deleted in Nautobot, along with any SVI and its IP Address",
             {"prefix": prefix, "uuid": subnet_uuid},
         )
+
+        for vlan_group in affected_vlan_groups:
+            LOG.info(f"Calling Undersync for {vlan_group=}")
+            self.undersync.sync_devices(
+                vlan_group_uuids=str(vlan_group),
+                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+            )
 
     def create_port_precommit(self, context):
         log_call("create_port_precommit", context)

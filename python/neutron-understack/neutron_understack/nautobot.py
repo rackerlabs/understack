@@ -159,6 +159,12 @@ class Nautobot:
             namespace=namespace,
         )
 
+    def ip_address_delete(self, uuid: str):
+        return self.make_api_request(
+            f"/api/ipam/ip-addresses/{uuid}/",
+            method="delete",
+        )
+
     def interface_create(self, device: str, name: str, type: str = "virtual") -> str:
         return self.post(
             "/api/dcim/interfaces/",
@@ -166,6 +172,12 @@ class Nautobot:
             name=name,
             status="Active",
             type={"value": type},
+        )
+
+    def interface_delete(self, uuid: str):
+        return self.make_api_request(
+            f"/api/dcim/interfaces/{uuid}/",
+            method="delete",
         )
 
     def add_ip_to_interface(self, ip_address_uuid: str, interface_uuid: str):
@@ -296,3 +308,50 @@ class Nautobot:
         vlan_id = vlans[0]["vid"]
 
         return switch_uuid, vlan_id, vlan_group_uuid
+
+    def subnet_cascade_delete(self, uuid: str) -> set[str]:
+        """Delete a Prefix, its SVI interfaces and their IP Addresses.
+
+        Nautobot knows which IP Addresses belong to this prefix and will give us
+        a list.
+
+        For those IP Addresses associated with one or more SVI interfaces, we
+        delete the interfaces and the IP address.
+
+        The Prefix is also deleted.
+
+        Return value is a set of UUIDs for any VLAN Groups containing the
+        device(s) that had affected interfaces.
+        """
+        query = """
+          query ($id: String!) {
+            prefixes(id: [$id]) {
+              ip_addresses {
+                id
+                interfaces(type__ie: "virtual", name__isw: "vlan") {
+                  id
+                  device { vlan_group: rel_vlan_group_to_devices { id } }
+                }
+              }
+            }
+          }
+        """
+
+        vlan_group_uuids = set()
+
+        data = self.make_graphql_request(query, id=uuid)
+        prefixes = data.get("prefixes")
+        if not prefixes:
+            raise ValueError(f"Nautobot has no such prefix {uuid}")
+
+        for ip_address in prefixes[0]["ip_addresses"]:
+            interfaces = ip_address["interfaces"]
+            if interfaces:
+                self.ip_address_delete(ip_address["id"])
+            for interface in interfaces:
+                self.interface_delete(interface["id"])
+                vlan_group_uuids.add(interface["device"]["vlan_group"]["id"])
+
+        self.subnet_delete(uuid)
+
+        return vlan_group_uuids
