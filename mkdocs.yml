@@ -141,6 +141,8 @@ nav:
       - operator-guide/rabbitmq.md
       - operator-guide/rook-ceph.md
       - operator-guide/nautobot.md
+    - 'Scripts and Tools':
+      - operator-guide/scripts.md
   - 'User Guide':
     - user-guide/index.md
     - user-guide/openstack-cli.md
