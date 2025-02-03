@@ -20,7 +20,7 @@ spec:
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=keystone
-                  chartVersion: 0.3.17
+                  chartVersion: 2024.2.4+79d4b689-eb60e37c
                 - component: openvswitch
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
                   openstackRelease: 2024.2
