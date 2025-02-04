@@ -221,8 +221,11 @@ class UnderstackDriver(MechanismDriver):
         self.nb.subnet_create(subnet_uuid, prefix, namespace)
 
         LOG.info(
-            f"subnet with ID: {subnet_uuid} and prefix {prefix} has been "
-            f"created in Nautobot namespace {namespace}"
+            "subnet with ID: %s and prefix %s has been "
+            "created in Nautobot namespace %s",
+            subnet_uuid,
+            prefix,
+            namespace,
         )
         if external:
             self._create_public_svi(prefix, network_uuid)
@@ -275,7 +278,7 @@ class UnderstackDriver(MechanismDriver):
         )
 
         for vlan_group in affected_vlan_groups:
-            LOG.info(f"Calling Undersync for {vlan_group=}")
+            LOG.info("Calling Undersync for vlan group %s", vlan_group)
             self.undersync.sync_devices(
                 vlan_group_uuids=str(vlan_group),
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,

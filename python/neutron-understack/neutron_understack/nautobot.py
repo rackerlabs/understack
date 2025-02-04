@@ -38,7 +38,7 @@ class Nautobot:
         try:
             response.raise_for_status()
         except HTTPError as error:
-            LOG.error(f"Nautobot error: {error} {response.content}")
+            LOG.error("Nautobot error: %s %s", error, response.content)
             raise NautobotError() from error
 
     def make_api_request(
@@ -88,7 +88,7 @@ class Nautobot:
         data = resp.json()
 
         if "data" not in data:
-            LOG.error(f"Nautobot graphql query failed: {data}")
+            LOG.error("Nautobot graphql query failed: %s", data)
             raise NautobotError()
 
         return data["data"]
