@@ -1,17 +1,22 @@
-from typing import Optional
+import os
+import sys
 
 import typer
 from diffsync.diff import Diff
-from diff_nautobot_understack.project.main import (
-    openstack_project_diff_from_nautobot_tenant,
-)
+from rich import print
+from rich.console import Console
+from rich.table import Table
+
 from diff_nautobot_understack.network.main import (
     openstack_network_diff_from_ucvni_network,
 )
+from diff_nautobot_understack.project.main import (
+    openstack_project_diff_from_nautobot_tenant,
+)
 from diff_nautobot_understack.settings import app_settings as settings
-from rich.console import Console
-from rich.table import Table
-from rich import print
+
+required_env_vars = ["NAUTOBOT_TOKEN", "NAUTOBOT_URL", "OS_CLOUD"]
+
 
 app = typer.Typer(
     name="diff",
@@ -25,7 +30,7 @@ diff_outputs = {
 
 
 def display_output(
-    diff_result: Diff, diff_output: str, output_format: Optional[str] = None
+    diff_result: Diff, diff_output: str, output_format: str | None = None
 ):
     print(diff_result.summary())
     __output_format = (
@@ -84,5 +89,14 @@ def network(
     display_output(diff_result, "network", output_format)
 
 
-if __name__ == "__main__":
-    app()
+def check_env_vars(required_vars):
+    missing_vars = [var for var in required_vars if var not in os.environ]
+
+    if missing_vars:
+        print(f"Error: Missing environment variables: {', '.join(missing_vars)}")
+        sys.exit(1)
+    else:
+        print("All required environment variables are set.")
+
+
+check_env_vars(required_env_vars)

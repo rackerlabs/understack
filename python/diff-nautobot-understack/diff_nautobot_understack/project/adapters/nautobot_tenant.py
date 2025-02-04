@@ -1,8 +1,8 @@
 import uuid
 
 from diffsync import Adapter
-from diff_nautobot_understack.clients.nautobot import API
 
+from diff_nautobot_understack.clients.nautobot import API
 from diff_nautobot_understack.project import models
 
 

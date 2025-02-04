@@ -1,7 +1,8 @@
 from diffsync.diff import Diff
 from diffsync.enum import DiffSyncFlags
-from diff_nautobot_understack.project.adapters.openstack_project import Project
+
 from diff_nautobot_understack.project.adapters.nautobot_tenant import Tenant
+from diff_nautobot_understack.project.adapters.openstack_project import Project
 from diff_nautobot_understack.settings import app_settings as settings
 
 

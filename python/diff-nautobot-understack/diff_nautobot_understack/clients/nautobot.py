@@ -1,7 +1,8 @@
-import requests
-import logging
 import inspect
+import logging
 from urllib.parse import urljoin
+
+import requests
 
 from diff_nautobot_understack.settings import app_settings as settings
 
@@ -12,7 +13,7 @@ class API:
     def __init__(self):
         self.base_url = settings.nautobot_url
         self.s = requests.Session()
-        self.token = settings.nautobot_api_token
+        self.token = settings.nautobot_token
         self.s.headers.update({"Authorization": f"Token {self.token}"})
 
     def make_api_request(
