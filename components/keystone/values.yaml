@@ -228,10 +228,18 @@ pod:
           - name: keystone-sso
             mountPath: /etc/keystone-sso
             readOnly: true
+          - name: oidc-secret
+            mountPath: /etc/oidc-secret
+            readOnly: true
         volumes:
           - name: keystone-sso
             secret:
               secretName: keystone-sso
+          - name: oidc-secret
+            secret:
+              secretName: sso-passphrase
+  replicas:
+    api: 2
   lifecycle:
     disruption_budget:
       api:
@@ -287,7 +295,9 @@ conf:
         OIDCProviderMetadataURL http://dex.dex.svc:5556/.well-known/openid-configuration
         OIDCClientID keystone
         OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
-        OIDCCryptoPassphrase "exec:/bin/bash -c \"head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32\""
+        OIDCCryptoPassphrase "exec:/bin/cat /etc/oidc-secret/password"
+        OIDCCacheType memcache
+        OIDCMemCacheServers "memcached.openstack.svc.cluster.local:11211"
         OIDCClaimDelimiter ;
 
         # avoid redirect issues per the following
