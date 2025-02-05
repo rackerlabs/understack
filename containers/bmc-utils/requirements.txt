@@ -1,3 +1,0 @@
-requests==2.32.3
-pynautobot==2.5.0
-sushy==5.4.0
