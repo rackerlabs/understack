@@ -122,6 +122,22 @@ class Nautobot:
         }
         return self.make_api_request(url, "post", payload)
 
+    def associate_subnet_with_network(
+        self, network_uuid: str, subnet_uuid: str, role: str
+    ):
+        url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}"
+        payload = {
+            "role": {"name": role},
+            "relationships": {
+                "ucvni_prefix": {
+                    "destination": {
+                        "objects": [subnet_uuid],
+                    },
+                },
+            },
+        }
+        self.make_api_request(url, "put", payload)
+
     def subnet_delete(self, subnet_uuid: str) -> dict:
         url = f"/api/ipam/prefixes/{subnet_uuid}/"
         return self.make_api_request(url, "delete")

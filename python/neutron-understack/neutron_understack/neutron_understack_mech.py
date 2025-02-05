@@ -117,6 +117,26 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def create_subnet_postcommit(self, context):
+        """Create Prefix in Nautobot to represent this Subnet.
+
+        We divide the world into two kinds of Subnet:
+
+        1) external subnets
+
+           Have a public IP address, hence they all go into a single shared
+           namespace.
+
+           Will have an SVI configured on the leaf switch, which is achieved by
+           associating them with a VNI in nautobot.
+
+        2) non-external subnets
+
+           Have arbitrary IP space, so each Network has its own namespace which
+           means that two networks can both use the same IP block.
+
+           Don't have an SVI, which means we don't associate them with a VNI in
+           nautobot.
+        """
         subnet_uuid = context.current["id"]
         network_uuid = context.current["network_id"]
         prefix = context.current["cidr"]
@@ -127,7 +147,18 @@ class UnderstackDriver(MechanismDriver):
         else:
             namespace = network_uuid
 
-        self.nb.subnet_create(subnet_uuid, prefix, namespace)
+        self.nb.subnet_create(
+            subnet_uuid=subnet_uuid,
+            prefix=prefix,
+            namespace_name=namespace,
+        )
+
+        if external:
+            self.nb.associate_subnet_with_network(
+                role="svi_vxlan_anycast_gateway",
+                network_uuid=network_uuid,
+                subnet_uuid=subnet_uuid,
+            )
 
         LOG.info(
             "subnet with ID: %s and prefix %s has been "
