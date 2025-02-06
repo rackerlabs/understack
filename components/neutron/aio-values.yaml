@@ -53,6 +53,10 @@ conf:
         mechanism_drivers: "understack,ovn"
         tenant_network_types: "vlan"
         type_drivers: "vlan,local,understack_vxlan"
+      ml2_type_vxlan:
+        # OSH sets a default range here but we want to use network_segment_range plugin
+        # to configure this instead
+        vni_ranges: ""
   neutron:
     DEFAULT:
       # the 'trunk' plugin allows for us to create and configure trunk ports to allow
