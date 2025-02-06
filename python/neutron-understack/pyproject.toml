@@ -57,5 +57,4 @@ understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
 understack_vxlan = "neutron_understack.type_understack_vxlan:UnderstackVxlanTypeDriver"
 
 [tool.poetry.plugins."neutron.service_plugins"]
-l3_understack = "neutron_understack.l3_service_plugin:UnderStackL3ServicePlugin"
 l3_service_cisco_asa = "neutron_understack.l3_service_cisco_asa:CiscoAsa"
