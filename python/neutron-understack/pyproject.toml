@@ -40,40 +40,9 @@ addopts = "-ra"
 filterwarnings = "ignore::DeprecationWarning"
 
 [tool.ruff]
+# use our default and override anything we need specifically
+extend = "../pyproject.toml"
 target-version = "py310"
-fix = true
-
-[tool.ruff.lint]
-select = [
-  "D",       # pydocstyle
-  "E",       # pycodestyle (error)
-  "F",       # pyflakes
-  "G",       # flake8-logging-format
-  "B",       # flake8-bugbear
-  "I",       # isort
-  "S",       # flake8-bandit
-  "UP",      # pyupgrade
-  "LOG",     # flake8-logging
-  "ASYNC",   # flake8-async
-]
-
-ignore = [
-    "D100",  # don't require docs for every module
-    "D101",  # don't require docs for every class
-    "D102",  # don't require docs for every class method
-    "D103",  # don't require docs for every function
-    "D104",  # don't require docs for every package
-    "D106",  # don't require docs for every nested class
-    "D107",  # don't require docs for __init__
-    "D417"   # don't require docs for every function parameter
-]
-
-[tool.ruff.lint.isort]
-force-single-line = true
-
-[tool.ruff.lint.pydocstyle]
-# enable the google doc style rules by default
-convention = "google"
 
 [tool.ruff.lint.per-file-ignores]
 "neutron_understack/tests/*.py" = [
@@ -88,5 +57,4 @@ understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
 understack_vxlan = "neutron_understack.type_understack_vxlan:UnderstackVxlanTypeDriver"
 
 [tool.poetry.plugins."neutron.service_plugins"]
-l3_understack = "neutron_understack.l3_service_plugin:UnderStackL3ServicePlugin"
 l3_service_cisco_asa = "neutron_understack.l3_service_cisco_asa:CiscoAsa"
