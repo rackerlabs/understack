@@ -50,3 +50,27 @@ spec:
       interval: 10s
       scrapeTimeout: 10s
     username: mariadb-metrics
+---
+# mariadb-operator backups for openstack
+# https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/BACKUP.md
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Backup
+metadata:
+  name: backup
+spec:
+  mariaDbRef:
+    name: mariadb
+  maxRetention: 720h  # 30 days
+  schedule:
+    cron: "*/1 * * * *"
+    suspend: false
+  args:
+    - --verbose
+  storage:
+    persistentVolumeClaim:
+      resources:
+        requests:
+          storage: 10Gi
+      accessModes:
+        - ReadWriteOnce
+---
