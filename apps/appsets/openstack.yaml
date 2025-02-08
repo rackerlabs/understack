@@ -76,7 +76,7 @@ spec:
             releaseName: '{{.component}}'
             valueFiles:
               - $understack/components/openstack-{{.openstackRelease}}-jammy.yaml
-              - $understack/components/{{.component}}/aio-values.yaml
+              - $understack/components/{{.component}}/values.yaml
               - $deploy/{{.name}}/manifests/secret-openstack.yaml
               - $deploy/{{.name}}/helm-configs/{{.component}}.yaml
             # don't require all the values files
