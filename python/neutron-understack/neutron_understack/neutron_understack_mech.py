@@ -282,11 +282,8 @@ class UnderstackDriver(MechanismDriver):
         """
         network_type = segment[api.NETWORK_TYPE]
         return network_type in [
-            p_const.TYPE_LOCAL,
-            p_const.TYPE_GRE,
             p_const.TYPE_VXLAN,
             p_const.TYPE_VLAN,
-            p_const.TYPE_FLAT,
         ]
 
     def check_vlan_transparency(self, context):
