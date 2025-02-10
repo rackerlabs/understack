@@ -261,22 +261,12 @@ convert_to_var_name() {
 convert_to_secret_name() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | tr '_' '-'
 }
-# Default password generator using pwgen.sh
-# shellcheck disable=SC2317
-default_pwgen() {
-    "${SCRIPTS_DIR}/pwgen.sh" 2>/dev/null
-}
-
-# Custom password generator with only alphabets
-# shellcheck disable=SC2317
-alpha_only_pwgen() {
-    head /dev/urandom | tr -dc A-Za-z | head -c 32
-}
 
 load_or_gen_os_secret() {
     local data_var=$1
     local secret_var=$2
-    local gen_func=${3:-default_pwgen}
+    local charset=$3  # Optional third argument for custom charset
+    local charset_length=${4:-32}  # Optional fourth argument, Default to 32 if not provided
 
     if kubectl -n openstack get secret "${secret_var}" &>/dev/null; then
         data="$(kubectl -n openstack get secret "${secret_var}" -o jsonpath='{.data.password}' | base64 -d)"
@@ -286,7 +276,13 @@ load_or_gen_os_secret() {
         return 1
     else
         echo "Generating ${secret_var}"
-        data="$(${gen_func})"
+
+        if [[ -n "$charset" ]]; then
+            data="$("${SCRIPTS_DIR}/pwgen.sh" "$charset_length" "$charset" 2>/dev/null)"
+        else
+            data="$("${SCRIPTS_DIR}/pwgen.sh" "$charset_length" 2>/dev/null)"
+        fi
+
         # good ol' bash 3 compat for macOS
         eval "${data_var}=\"${data}\""
         # return 0 because we need to write this out
@@ -386,7 +382,7 @@ mkdir -p "${DEST_DIR}/keystone"
 VARNAME_PASSPHRASE="OS_SSO_PASSPHRASE"
 SECRET_PASSPHRASE="sso-passphrase"
 
-load_or_gen_os_secret "${VARNAME_PASSPHRASE}" "${SECRET_PASSPHRASE}" alpha_only_pwgen && \
+load_or_gen_os_secret "${VARNAME_PASSPHRASE}" "${SECRET_PASSPHRASE}" "A-Za-z" && \
     create_os_secret "PASSPHRASE" "keystone" "passphrase"
 
 # Export for Helm templating if needed
