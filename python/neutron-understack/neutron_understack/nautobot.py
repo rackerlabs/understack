@@ -136,7 +136,7 @@ class Nautobot:
                 },
             },
         }
-        self.make_api_request(url, "put", payload)
+        self.make_api_request(url, "patch", payload)
 
     def subnet_delete(self, subnet_uuid: str) -> dict:
         url = f"/api/ipam/prefixes/{subnet_uuid}/"
