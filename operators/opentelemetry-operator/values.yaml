@@ -1,0 +1,9 @@
+admissionWebhooks:
+  certManager:
+    issuerRef:
+      kind: ClusterIssuer
+      name: understack-cluster-issuer
+manager:
+  collectorImage:
+    # The contrib image contains additional modules (i.e. exporters) that increase the compatibility
+    repository: "otel/opentelemetry-collector-contrib"
