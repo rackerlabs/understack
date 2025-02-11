@@ -26,7 +26,7 @@ class VlanManager:
         if not context.current:
             raise RuntimeError("no current context provided.")
 
-        vlan_tag = context.current["provider:segmentation_id"]
+        vlan_tag = int(context.current["provider:segmentation_id"])
         allocated = self._allocate_vlan(context, vlan_tag)
 
         if allocated:
