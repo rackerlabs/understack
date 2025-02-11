@@ -1,4 +1,5 @@
 import inspect
+from pprint import pformat
 from urllib.parse import urljoin
 from uuid import UUID
 
@@ -7,7 +8,6 @@ from neutron_lib import exceptions as exc
 from oslo_log import log
 
 LOG = log.getLogger(__name__)
-
 
 
 class NautobotRequestError(exc.NeutronException):
@@ -57,17 +57,22 @@ class Nautobot:
                 code=response.status_code, url=full_url, body=response.content
             )
         if not response.content:
-            data = {"status_code": response.status_code}
+            response_data = {"status_code": response.status_code}
         try:
-            data = response.json()
+            response_data = response.json()
         except requests.exceptions.JSONDecodeError:
-            data = {"body": response.content}
+            response_data = {"body": response.content}
 
         caller_function = inspect.stack()[1].function
         LOG.debug(
-            "[%s] %s %s %s ==> %s", caller_function, full_url, method, payload, data
+            "[%s] %s %s %s ==> %s",
+            caller_function,
+            full_url,
+            method,
+            pformat(payload),
+            pformat(response_data),
         )
-        return data
+        return response_data
 
     def ucvni_create(
         self,
