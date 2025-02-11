@@ -201,8 +201,6 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def update_port_postcommit(self, context):
-        pass
-
         self._delete_tenant_port_on_unbound(context)
 
         vif_type = context.current["binding:vif_type"]
@@ -231,8 +229,6 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def delete_port_postcommit(self, context):
-        pass
-
         network_id = context.current["network_id"]
 
         if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
