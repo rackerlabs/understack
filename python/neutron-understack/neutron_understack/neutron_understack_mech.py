@@ -229,9 +229,13 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def delete_port_postcommit(self, context):
-        network_id = context.current["network_id"]
+        provisioning_network = (
+            cfg.CONF.ml2_understack.provisioning_network
+            or cfg.CONF.ml2_type_understack.provisioning_network
+        )
 
-        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+        network_id = context.current["network_id"]
+        if network_id == provisioning_network:
             connected_interface_uuid = self.fetch_connected_interface_uuid(
                 context.current
             )
@@ -323,7 +327,12 @@ class UnderstackDriver(MechanismDriver):
         :param connected_interface_uuid: The UUID of the connected interface.
         :return: The VLAN group UUID.
         """
-        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+        provisioning_network = (
+            cfg.CONF.ml2_understack.provisioning_network
+            or cfg.CONF.ml2_type_understack.provisioning_network
+        )
+
+        if network_id == provisioning_network:
             port_status = "Provisioning-Interface"
             configure_port_status_data = self.nb.configure_port_status(
                 connected_interface_uuid, port_status
