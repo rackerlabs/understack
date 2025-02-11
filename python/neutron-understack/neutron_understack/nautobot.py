@@ -53,7 +53,12 @@ class Nautobot:
             {"payload": payload, "caller_function": caller_function},
         )
         resp = self.s.request(
-            http_method, endpoint_url, timeout=10, json=payload, params=params
+            http_method,
+            endpoint_url,
+            timeout=10,
+            json=payload,
+            params=params,
+            allow_redirects=False,
         )
 
         if resp.content:
@@ -125,7 +130,7 @@ class Nautobot:
     def associate_subnet_with_network(
         self, network_uuid: str, subnet_uuid: str, role: str
     ):
-        url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}"
+        url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}/"
         payload = {
             "role": {"name": role},
             "relationships": {
