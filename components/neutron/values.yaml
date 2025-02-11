@@ -52,7 +52,7 @@ conf:
         # we'll need to use the ovn ML2 plugin to hook the routers to our network
         mechanism_drivers: "understack,ovn"
         tenant_network_types: "vlan"
-        type_drivers: "vlan,local,understack_vxlan"
+        type_drivers: "vlan,understack_vxlan"
       ml2_type_vxlan:
         # OSH sets a default range here but we want to use network_segment_range plugin
         # to configure this instead

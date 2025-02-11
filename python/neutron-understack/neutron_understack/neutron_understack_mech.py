@@ -201,8 +201,6 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def update_port_postcommit(self, context):
-        pass
-
         self._delete_tenant_port_on_unbound(context)
 
         vif_type = context.current["binding:vif_type"]
@@ -231,11 +229,13 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def delete_port_postcommit(self, context):
-        pass
+        provisioning_network = (
+            cfg.CONF.ml2_understack.provisioning_network
+            or cfg.CONF.ml2_type_understack.provisioning_network
+        )
 
         network_id = context.current["network_id"]
-
-        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+        if network_id == provisioning_network:
             connected_interface_uuid = self.fetch_connected_interface_uuid(
                 context.current
             )
@@ -282,11 +282,8 @@ class UnderstackDriver(MechanismDriver):
         """
         network_type = segment[api.NETWORK_TYPE]
         return network_type in [
-            p_const.TYPE_LOCAL,
-            p_const.TYPE_GRE,
             p_const.TYPE_VXLAN,
             p_const.TYPE_VLAN,
-            p_const.TYPE_FLAT,
         ]
 
     def check_vlan_transparency(self, context):
@@ -330,7 +327,12 @@ class UnderstackDriver(MechanismDriver):
         :param connected_interface_uuid: The UUID of the connected interface.
         :return: The VLAN group UUID.
         """
-        if network_id == cfg.CONF.ml2_type_understack.provisioning_network:
+        provisioning_network = (
+            cfg.CONF.ml2_understack.provisioning_network
+            or cfg.CONF.ml2_type_understack.provisioning_network
+        )
+
+        if network_id == provisioning_network:
             port_status = "Provisioning-Interface"
             configure_port_status_data = self.nb.configure_port_status(
                 connected_interface_uuid, port_status

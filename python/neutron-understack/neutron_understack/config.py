@@ -36,6 +36,11 @@ mech_understack_opts = [
         "undersync_dry_run", default=True, help="Call Undersync with dry-run mode"
     ),
     cfg.StrOpt(
+        "provisioning_network",
+        help="provisioning_network ID as configured in ironic.conf",
+        default="change_me",
+    ),
+    cfg.StrOpt(
         "shared_nautobot_namespace_name",
         default="Global",
         help=(
