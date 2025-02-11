@@ -38,7 +38,7 @@ class Nautobot:
         try:
             response.raise_for_status()
         except HTTPError as error:
-            LOG.error("Nautobot error: %(error)s", {"error": error})
+            LOG.error("Nautobot error: %s %s", error, response.content)
             raise NautobotError() from error
 
     def make_api_request(
@@ -53,7 +53,12 @@ class Nautobot:
             {"payload": payload, "caller_function": caller_function},
         )
         resp = self.s.request(
-            http_method, endpoint_url, timeout=10, json=payload, params=params
+            http_method,
+            endpoint_url,
+            timeout=10,
+            json=payload,
+            params=params,
+            allow_redirects=False,
         )
 
         if resp.content:
@@ -121,6 +126,22 @@ class Nautobot:
             "namespace": {"name": namespace_name},
         }
         return self.make_api_request(url, "post", payload)
+
+    def associate_subnet_with_network(
+        self, network_uuid: str, subnet_uuid: str, role: str
+    ):
+        url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}/"
+        payload = {
+            "role": {"name": role},
+            "relationships": {
+                "ucvni_prefixes": {
+                    "destination": {
+                        "objects": [subnet_uuid],
+                    },
+                },
+            },
+        }
+        self.make_api_request(url, "patch", payload)
 
     def subnet_delete(self, subnet_uuid: str) -> dict:
         url = f"/api/ipam/prefixes/{subnet_uuid}/"

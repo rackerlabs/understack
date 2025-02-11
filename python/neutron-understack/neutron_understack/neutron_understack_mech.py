@@ -117,19 +117,55 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def create_subnet_postcommit(self, context):
-        subnet = context.current
-        subnet_uuid = subnet["id"]
-        network_uuid = subnet["network_id"]
-        prefix = subnet["cidr"]
-        external = subnet["router:external"]
-        shared_namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
-        nautobot_namespace_name = network_uuid if not external else shared_namespace
+        """Create Prefix in Nautobot to represent this Subnet.
 
-        self.nb.subnet_create(subnet_uuid, prefix, nautobot_namespace_name)
+        We divide the world into two kinds of Subnet:
+
+        1) external subnets
+
+           Have a public IP address, hence they all go into a single shared
+           namespace.
+
+           Will have an SVI configured on the leaf switch, which is achieved by
+           associating them with a VNI in nautobot.
+
+        2) non-external subnets
+
+           Have arbitrary IP space, so each Network has its own namespace which
+           means that two networks can both use the same IP block.
+
+           Don't have an SVI, which means we don't associate them with a VNI in
+           nautobot.
+        """
+        subnet_uuid = context.current["id"]
+        network_uuid = context.current["network_id"]
+        prefix = context.current["cidr"]
+        external = context.current["router:external"]
+
+        if external:
+            namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
+        else:
+            namespace = network_uuid
+
+        self.nb.subnet_create(
+            subnet_uuid=subnet_uuid,
+            prefix=prefix,
+            namespace_name=namespace,
+        )
+
+        if external:
+            self.nb.associate_subnet_with_network(
+                role="svi_vxlan_anycast_gateway",
+                network_uuid=network_uuid,
+                subnet_uuid=subnet_uuid,
+            )
+
         LOG.info(
-            "subnet with ID: %(uuid)s and prefix %(prefix)s has been "
-            "created in Nautobot",
-            {"prefix": prefix, "uuid": subnet_uuid},
+            "subnet with ID: %s and prefix %s has been "
+            "created in Nautobot namespace %s",
+            subnet_uuid,
+            prefix,
+            namespace,
         )
 
     def update_subnet_precommit(self, context):
