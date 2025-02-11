@@ -134,7 +134,7 @@ class Nautobot:
         payload = {
             "role": {"name": role},
             "relationships": {
-                "ucvni_prefix": {
+                "ucvni_prefixes": {
                     "destination": {
                         "objects": [subnet_uuid],
                     },
