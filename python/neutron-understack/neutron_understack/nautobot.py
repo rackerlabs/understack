@@ -56,16 +56,18 @@ class Nautobot:
         except Exception as e:
             raise NautobotOSError(err=e) from e
 
+        if response.content:
+            try:
+                response_data = response.json()
+            except requests.exceptions.JSONDecodeError:
+                response_data = {"body": response.content}
+        else:
+            response_data = {"status_code": response.status_code}
+
         if response.status_code >= 300:
             raise NautobotRequestError(
-                code=response.status_code, url=full_url, body=response.content
+                code=response.status_code, url=full_url, body=response_data
             )
-        if not response.content:
-            response_data = {"status_code": response.status_code}
-        try:
-            response_data = response.json()
-        except requests.exceptions.JSONDecodeError:
-            response_data = {"body": response.content}
 
         caller_function = inspect.stack()[1].function
         LOG.debug(
