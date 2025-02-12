@@ -225,6 +225,10 @@ pod:
     keystone_api:
       keystone_api:
         volumeMounts:
+          - mountPath: /etc/keystone/keystone.conf.d/db_conn.conf
+            name: keystone-db-conn
+            subPath: db_conf.conf
+            readOnly: true
           - name: keystone-sso
             mountPath: /etc/keystone-sso
             readOnly: true
@@ -232,12 +236,92 @@ pod:
             mountPath: /etc/oidc-secret
             readOnly: true
         volumes:
+          - name: keystone-db-conn
+            secret:
+              secretName: keystone-db-conn
           - name: keystone-sso
             secret:
               secretName: keystone-sso
           - name: oidc-secret
             secret:
               secretName: sso-passphrase
+    keystone_db_sync:
+      keystone_db_sync:
+        volumeMounts:
+          - mountPath: /etc/keystone/keystone.conf.d/db_conn.conf
+            name: keystone-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: keystone-db-conn
+            secret:
+              secretName: keystone-db-conn
+    keystone_credential_setup:
+      keystone_credential_setup:
+        volumeMounts:
+          - mountPath: /etc/keystone/keystone.conf.d/db_conn.conf
+            name: keystone-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: keystone-db-conn
+            secret:
+              secretName: keystone-db-conn
+    keystone_fernet_setup:
+      keystone_fernet_setup:
+        volumeMounts:
+          - mountPath: /etc/keystone/keystone.conf.d/db_conn.conf
+            name: keystone-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: keystone-db-conn
+            secret:
+              secretName: keystone-db-conn
+    keystone_credential_rotate:
+      keystone_credential_rotate:
+        volumeMounts:
+          - mountPath: /etc/keystone/keystone.conf.d/db_conn.conf
+            name: keystone-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: keystone-db-conn
+            secret:
+              secretName: keystone-db-conn
+    keystone_fernet_rotate:
+      keystone_fernet_rotate:
+        volumeMounts:
+          - mountPath: /etc/keystone/keystone.conf.d/db_conn.conf
+            name: keystone-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: keystone-db-conn
+            secret:
+              secretName: keystone-db-conn
+    keystone_credential_cleanup:
+      keystone_credential_cleanup:
+        volumeMounts:
+          - mountPath: /etc/keystone/keystone.conf.d/db_conn.conf
+            name: keystone-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: keystone-db-conn
+            secret:
+              secretName: keystone-db-conn
+    keystone_domain_manage:
+      keystone_domain_manage:
+        volumeMounts:
+          - mountPath: /etc/keystone/keystone.conf.d/db_conn.conf
+            name: keystone-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: keystone-db-conn
+            secret:
+              secretName: keystone-db-conn
   replicas:
     api: 2
   lifecycle:
