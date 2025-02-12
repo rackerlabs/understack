@@ -65,6 +65,8 @@ class Nautobot:
             response_data = {"status_code": response.status_code, "body": ""}
 
         if response.status_code >= 300:
+            response_data = response_data.get("error", response_data)
+
             raise NautobotRequestError(
                 code=response.status_code, url=full_url, body=response_data
             )
