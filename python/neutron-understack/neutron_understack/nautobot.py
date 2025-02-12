@@ -26,6 +26,14 @@ class NautobotCustomFieldNotFoundError(exc.NeutronException):
     message = "Custom field with name %(cf_name)s not found for %(obj)s"
 
 
+def _truncated(message: str | bytes, maxlen=200) -> str:
+    input = str(message)
+    if len(input) <= maxlen:
+        return input
+
+    return f"{input[:maxlen]}...{len(input) - maxlen} more chars"
+
+
 class Nautobot:
     """Basic Nautobot wrapper because pynautobot doesn't expose plugin APIs."""
 
@@ -60,7 +68,8 @@ class Nautobot:
             try:
                 response_data = response.json()
             except requests.exceptions.JSONDecodeError:
-                response_data = {"body": response.content}
+                response_data = {"body": _truncated(response.content)}
+
         else:
             response_data = {"status_code": response.status_code, "body": ""}
 
