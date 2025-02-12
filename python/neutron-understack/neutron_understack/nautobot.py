@@ -11,7 +11,7 @@ LOG = log.getLogger(__name__)
 
 
 class NautobotRequestError(exc.NeutronException):
-    message = "Nautobot API returned error %(code)s for %(url)s: %(body)s"
+    message = "Nautobot API ERROR %(code)s for %(url)s %(method)s %(payload)s: %(body)s"
 
 
 class NautobotOSError(exc.NeutronException):
@@ -68,7 +68,11 @@ class Nautobot:
             response_data = response_data.get("error", response_data)
 
             raise NautobotRequestError(
-                code=response.status_code, url=full_url, body=response_data
+                code=response.status_code,
+                url=full_url,
+                method=method,
+                payload=payload,
+                body=response_data,
             )
 
         caller_function = inspect.stack()[1].function
