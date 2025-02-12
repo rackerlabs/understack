@@ -7,7 +7,7 @@ variable "server_count" {
 variable "server_image" {
   description = "The OS image to use for the servers"
   type        = string
-  default     = "Ubuntu-24.04"
+  default     = "Ubuntu 24.04"
 }
 
 variable "server_flavor" {
