@@ -15,6 +15,11 @@ change from what's been deployed. You will need the following:
 You can generate what ArgoCD would deploy for `ironic` by running:
 
 ```bash
+# first we need to build the dependencies
+helm dependency build openstack-helm/ironic
+```
+
+```bash
 helm template \
     ironic \  # what we are deploying
     openstack-helm/ironic \  # the path the chart's source is in
