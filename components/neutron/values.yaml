@@ -95,32 +95,27 @@ pod:
     neutron_server:
       neutron_server:
         volumeMounts:
-          - mountPath: /etc/nb-token/
-            name: nb-token
+          - mountPath: /etc/neutron/neutron-server.conf.d/ml2_understack.conf
+            name: neutron-nautobot
+            subPath: ml2_understack.conf
             readOnly: true
           - mountPath: /etc/undersync/
             name: undersync-token
             readOnly: true
         volumes:
-          - name: nb-token
+          - name: neutron-nautobot
             secret:
-              secretName: nautobot-token
+              secretName: neutron-nautobot
           - name: undersync-token
             secret:
               secretName: undersync-token
     neutron_rpc_server:
       neutron_rpc_server:
         volumeMounts:
-          - mountPath: /etc/nb-token/
-            name: nb-token
-            readOnly: true
           - mountPath: /etc/undersync/
             name: undersync-token
             readOnly: true
         volumes:
-          - name: nb-token
-            secret:
-              secretName: nautobot-token
           - name: undersync-token
             secret:
               secretName: undersync-token
