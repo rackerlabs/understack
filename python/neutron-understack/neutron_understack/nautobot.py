@@ -62,7 +62,7 @@ class Nautobot:
             except requests.exceptions.JSONDecodeError:
                 response_data = {"body": response.content}
         else:
-            response_data = {"status_code": response.status_code}
+            response_data = {"status_code": response.status_code, "body": ""}
 
         if response.status_code >= 300:
             raise NautobotRequestError(
