@@ -38,7 +38,7 @@ spec:
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=placement
-                  chartVersion: 0.3.17
+                  chartVersion: 2024.2.0
                 - component: neutron
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
@@ -58,7 +58,7 @@ spec:
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
                   # renovate: datasource=custom.openstackhelm depName=horizon
-                  chartVersion: 0.3.29
+                  chartVersion: 2024.2.0
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
