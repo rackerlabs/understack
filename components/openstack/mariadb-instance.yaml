@@ -60,9 +60,9 @@ metadata:
 spec:
   mariaDbRef:
     name: mariadb
-  maxRetention: 720h  # 30 days
+  maxRetention: 168h  # 7 days
   schedule:
-    cron: "*/1 * * * *"
+    cron: "0 */1 * * *"
     suspend: false
   args:
     - --verbose
@@ -70,7 +70,7 @@ spec:
     persistentVolumeClaim:
       resources:
         requests:
-          storage: 10Gi
+          storage: 20Gi
       accessModes:
         - ReadWriteOnce
 ---
