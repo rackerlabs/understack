@@ -95,7 +95,16 @@ pod:
     neutron_server:
       neutron_server:
         volumeMounts:
-          - mountPath: /etc/neutron/neutron-server.conf.d/ml2_understack.conf
+          # oslo.config autoloads certain paths in alphabetical order
+          # which gives us the opportunity to inject secrets and extra
+          # configs here. likely the best paths are:
+          # /etc/${project}/${prog}.conf.d/*.conf
+          # /etc/${project}/${project}.conf.d/*.conf
+          # the first would be best for per service separation but since each
+          # service is in its own pod they won't overlap. further more there
+          # is an issue with that see https://bugs.launchpad.net/oslo.config/+bug/2098514
+          # so we'll use the bottom one
+          - mountPath: /etc/neutron/neutron.conf.d/ml2_understack.conf
             name: neutron-nautobot
             subPath: ml2_understack.conf
             readOnly: true
