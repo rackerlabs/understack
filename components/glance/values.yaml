@@ -39,7 +39,7 @@ network:
 
 # Glance storage backend
 # we'll switch to radosgw in the future
-storage: pvc
+storage: radosgw
 
 # leave it empty to use the default
 volume:
@@ -98,6 +98,16 @@ conf:
       # under heavy load, which results in liveness probe failures in
       # Kubernetes environment.
       processes: 2
+  glance:
+    glance_store:
+      default_store: radosgw
+      stores: radosgw
+    radosgw:
+      rgw_store_access_key: "S2C73MXSS3O95YMGDC6X"
+      rgw_store_secret_key: "f6zuDbCmHYpOYUWcSsRP9PfbEGCEfDk72j1QtBo0"
+      rgw_store_endpoint: "http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc.cluster.local:80"
+      rgw_store_container: "glance-images"
+      rgw_store_region: "default"
 
 manifests:
   job_db_init: false
