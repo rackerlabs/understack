@@ -7,7 +7,9 @@
   ],
   "packageRules": [
     {
-      "matchManagers": ["devbox"],
+      "matchManagers": [
+        "devbox"
+      ],
       "automerge": true,
       "automergeType": "branch"
     }
@@ -15,9 +17,11 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["app/appsets/openstack.yaml$"],
+      "fileMatch": [
+        "app/appsets/openstack.yaml$"
+      ],
       "matchStrings": [
-        "\\s- component: (?<depName>.+)\\n\\s+repoURL: (?<lookupName>.+)\\n\\s+chartVersion: (?<currentValue>.+)\\s"
+        "\\s- component: (?<depName>.+)\\n\\s+repoURL: (?<packageName>.+)\\n\\s+chartVersion: (?<currentValue>.+)\\s"
       ],
       "datasourceTemplate": "helm"
     }
