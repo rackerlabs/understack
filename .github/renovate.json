@@ -5,23 +5,14 @@
     "github>rackerlabs/understack//.github/renovate/default",
     "github>rackerlabs/understack//.github/renovate/nautobot"
   ],
-  "customDatasources": {
-    "openstackhelm": {
-      "defaultRegistryUrlTemplate": "https://tarballs.opendev.org/openstack/openstack-helm/",
-      "format": "html",
-      "transformTemplates": [
-        "{\"releases\": $map($filter($.releases, function($v) {$match($v.version, /^{{packageName}}-/)}), function($v) { {\"version\": $match($v.version, /^{{packageName}}-([0-9.]+).tar.gz$/).groups[0]} } ) }"
-      ]
-    }
-  },
   "customManagers": [
     {
-      "customType": "regex",
-      "fileMatch": ["\\.yaml$"],
-      "datasourceTemplate": "custom.openstackhelm",
+      "fileMatch": ["app/appsets/openstack.yaml"],
       "matchStrings": [
-        "#\\s*renovate:\\s*(datasource=(?<datasource>.*?)\\s*)?depName=(?<depName>.*?)\\s*chartVersion:\\s*(?<currentValue>.+?)\\s"
-      ]
+        "- component: (?<depName>.+)\\n\\s+repoURL: (?<lookupName>.+)\\n\\s+chartVersion: (?<currentValue>.+)"
+      ],
+      "datasourceTemplate": "helm",
+      "versioningTemplate": "helm"
     }
   ]
 }
