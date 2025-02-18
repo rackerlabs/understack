@@ -7,12 +7,12 @@
   ],
   "customManagers": [
     {
-      "fileMatch": ["app/appsets/openstack.yaml"],
+      "customType": "regex",
+      "fileMatch": ["app/appsets/openstack.yaml$"],
       "matchStrings": [
-        "- component: (?<depName>.+)\\n\\s+repoURL: (?<lookupName>.+)\\n\\s+chartVersion: (?<currentValue>.+)"
+        "\\s- component: (?<depName>.+)\\n\\s+repoURL: (?<lookupName>.+)\\n\\s+chartVersion: (?<currentValue>.+)\\s"
       ],
-      "datasourceTemplate": "helm",
-      "versioningTemplate": "helm"
+      "datasourceTemplate": "helm"
     }
   ]
 }
