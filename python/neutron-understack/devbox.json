@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.12.0/.schema/devbox.schema.json",
   "packages": [
     "python@3.11",
-    "poetry@1.8.3",
+    "poetry@1.8.5",
     "argo@latest",
     "difftastic@latest",
     "yq-go@latest",

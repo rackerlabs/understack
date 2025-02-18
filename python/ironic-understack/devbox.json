@@ -4,7 +4,7 @@
     "jq@latest",
     "yq-go@latest",
     "python3@3.11",
-    "poetry@latest",
+    "poetry@1.8.5",
     "kubectl@latest",
     "kubeseal@latest",
     "kustomize@latest",
