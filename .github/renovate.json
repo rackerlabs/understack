@@ -5,6 +5,13 @@
     "github>rackerlabs/understack//.github/renovate/default",
     "github>rackerlabs/understack//.github/renovate/nautobot"
   ],
+  "packageRules": [
+    {
+      "matchManagers": ["devbox"],
+      "automerge": true,
+      "automergeType": "branch"
+    }
+  ],
   "customManagers": [
     {
       "customType": "regex",
