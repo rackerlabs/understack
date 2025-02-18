@@ -19,7 +19,6 @@ spec:
                 - component: keystone
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=keystone
                   chartVersion: 2024.2.4+79d4b689-eb60e37c
                 - component: openvswitch
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
@@ -32,32 +31,26 @@ spec:
                 - component: ironic
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=ironic
                   chartVersion: 0.2.21
                 - component: placement
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=placement
                   chartVersion: 0.3.17
                 - component: neutron
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=neutron
                   chartVersion: 0.3.47
                 - component: glance
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=glance
                   chartVersion: 0.5.2
                 - component: nova
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=nova
                   chartVersion: 0.3.47
                 - component: horizon
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=horizon
                   chartVersion: 0.3.29
   template:
     metadata:
