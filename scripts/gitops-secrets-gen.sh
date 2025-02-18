@@ -320,26 +320,23 @@ for component in keystone ironic placement neutron nova glance; do
 
     # environment variable names
     VARNAME_RABBITMQ_PASSWORD="$(convert_to_var_name "${component}" "RABBITMQ_PASSWORD")"
-    VARNAME_DB_PASSWORD="$(convert_to_var_name "${component}" "DB_PASSWORD")"
     VARNAME_KEYSTONE_PASSWORD="$(convert_to_var_name "${keystone_user}" "KEYSTONE_PASSWORD")"
 
     # k8s secret names
     SECRET_RABBITMQ_PASSWORD="$(convert_to_secret_name "${VARNAME_RABBITMQ_PASSWORD}")"
-    SECRET_DB_PASSWORD="$(convert_to_secret_name "${VARNAME_DB_PASSWORD}")"
     SECRET_KEYSTONE_PASSWORD="$(convert_to_secret_name "${VARNAME_KEYSTONE_PASSWORD}")"
 
     # attempt to load the existing secrets from the cluster and use those
     # otherwise generate the passwords and set the variable names
     load_or_gen_os_secret "${VARNAME_RABBITMQ_PASSWORD}" "${SECRET_RABBITMQ_PASSWORD}" && \
         create_os_secret "RABBITMQ_PASSWORD" "${component}" "${component}"
-    load_or_gen_os_secret "${VARNAME_DB_PASSWORD}" "${SECRET_DB_PASSWORD}" && \
+    [ ! -f "${DEST_DIR}/${component}/secret-db-password.yaml" ] && \
         create_os_secret "DB_PASSWORD" "${component}" "${component}"
     load_or_gen_os_secret "${VARNAME_KEYSTONE_PASSWORD}" "${SECRET_KEYSTONE_PASSWORD}" && \
         create_os_secret "KEYSTONE_PASSWORD" "${component}" "${keystone_user}"
 
     # export the variables for templating the openstack secret
     export "${VARNAME_RABBITMQ_PASSWORD?}"
-    export "${VARNAME_DB_PASSWORD?}"
     export "${VARNAME_KEYSTONE_PASSWORD?}"
 
 done
@@ -348,12 +345,8 @@ echo "Checking horizon"
 # horizon credentials
 mkdir -p "${DEST_DIR}/horizon"
 # horizon user password for database
-VARNAME_DB_PASSWORD="HORIZON_DB_PASSWORD"
-SECRET_DB_PASSWORD="horizon-db-password"
-load_or_gen_os_secret "${VARNAME_DB_PASSWORD}" "${SECRET_DB_PASSWORD}" && \
+[ ! -f "${DEST_DIR}/horizon/secret-db-password.yaml" ] && \
     create_os_secret "DB_PASSWORD" "horizon" "horizon"
-# export the variable for templating into the openstack secret / values.yaml
-export HORIZON_DB_PASSWORD
 
 # generate the secret-openstack.yaml file every time from our secrets data
 # this is a helm values.yaml but it contains secrets because of the lack
