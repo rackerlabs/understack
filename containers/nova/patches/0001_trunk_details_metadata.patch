@@ -1,0 +1,381 @@
+From 97871f1e313752f7ac860c63a827524799e289b1 Mon Sep 17 00:00:00 2001
+From: Vasyl Saienko <vsaienko@mirantis.com>
+Date: Tue, 11 Feb 2025 09:27:57 +0000
+Subject: [PATCH] Add trunk subports to network metadata
+
+Include information about trunk subports into network_data.json
+for cloudinit to be able to create vlan subinterfaces.
+The trunk feature is implemented in neutron long time ago [0]
+
+[0] https://specs.openstack.org/openstack/neutron-specs/specs/newton/vlan-aware-vms.html
+
+Closes-Bug: #2091185
+Implements: blueprint expose-vlan-trunking
+
+Change-Id: I03cb85200cc362b8ec876bdb955e8c0bb41f2c6e
+---
+ nova/network/model.py                         | 15 +++-
+ nova/network/neutron.py                       | 27 ++++++-
+ nova/tests/unit/network/test_network_info.py  | 32 ++++++++
+ nova/tests/unit/network/test_neutron.py       | 79 +++++++++++++++++++
+ nova/virt/netutils.py                         | 37 ++++++++-
+ ...n-aware-network-data-9b9b5e8c0fd191ba.yaml |  5 ++
+ 6 files changed, 190 insertions(+), 5 deletions(-)
+ create mode 100644 releasenotes/notes/vlan-aware-network-data-9b9b5e8c0fd191ba.yaml
+
+diff --git a/nova/network/model.py b/nova/network/model.py
+index c59161daaf..22869c2fda 100644
+--- a/nova/network/model.py
++++ b/nova/network/model.py
+@@ -45,6 +45,7 @@ VIF_TYPE_AGILIO_OVS = 'agilio_ovs'
+ VIF_TYPE_BINDING_FAILED = 'binding_failed'
+ VIF_TYPE_VIF = 'vif'
+ VIF_TYPE_UNBOUND = 'unbound'
++VIF_TYPE_TRUNK_SUBPORT = 'trunk-subport'
+ 
+ 
+ # Constants for dictionary keys in the 'vif_details' field in the VIF
+@@ -413,7 +414,7 @@ class VIF(Model):
+                  qbh_params=None, qbg_params=None, active=False,
+                  vnic_type=VNIC_TYPE_NORMAL, profile=None,
+                  preserve_on_delete=False, delegate_create=False,
+-                 **kwargs):
++                 trunk_vifs=None, **kwargs):
+         super(VIF, self).__init__()
+ 
+         self['id'] = id
+@@ -431,6 +432,7 @@ class VIF(Model):
+         self['profile'] = profile
+         self['preserve_on_delete'] = preserve_on_delete
+         self['delegate_create'] = delegate_create
++        self['trunk_vifs'] = trunk_vifs or []
+ 
+         self._set_meta(kwargs)
+ 
+@@ -438,7 +440,8 @@ class VIF(Model):
+         keys = ['id', 'address', 'network', 'vnic_type',
+                 'type', 'profile', 'details', 'devname',
+                 'ovs_interfaceid', 'qbh_params', 'qbg_params',
+-                'active', 'preserve_on_delete', 'delegate_create']
++                'active', 'preserve_on_delete', 'delegate_create',
++                'trunk_vifs']
+         return all(self[k] == other[k] for k in keys)
+ 
+     def __ne__(self, other):
+@@ -509,9 +512,17 @@ class VIF(Model):
+             phy_network = self['details'].get(VIF_DETAILS_PHYSICAL_NETWORK)
+         return phy_network
+ 
++    def add_trunk_vif(self, vif):
++        for _vif in self['trunk_vifs']:
++            if vif["id"] == _vif["id"]:
++                return
++        self['trunk_vifs'].append(vif)
++
+     @classmethod
+     def hydrate(cls, vif):
+         vif = cls(**vif)
++        vif['trunk_vifs'] = [VIF.hydrate(**trunk_vif) for trunk_vif
++                             in vif.get('trunk_vifs', [])]
+         vif['network'] = Network.hydrate(vif['network'])
+         return vif
+ 
+diff --git a/nova/network/neutron.py b/nova/network/neutron.py
+index f24177de15..da2ae27555 100644
+--- a/nova/network/neutron.py
++++ b/nova/network/neutron.py
+@@ -3420,13 +3420,17 @@ class API:
+         preserve_on_delete = (current_neutron_port['id'] in
+                               preexisting_port_ids)
+ 
++        vif_type = current_neutron_port.get('binding:vif_type')
++        if current_neutron_port.get('device_owner') == 'trunk:subport':
++            vif_type = network_model.VIF_TYPE_TRUNK_SUBPORT
++
+         return network_model.VIF(
+             id=current_neutron_port['id'],
+             address=current_neutron_port['mac_address'],
+             network=network,
+             vnic_type=current_neutron_port.get('binding:vnic_type',
+                                                network_model.VNIC_TYPE_NORMAL),
+-            type=current_neutron_port.get('binding:vif_type'),
++            type=vif_type,
+             profile=get_binding_profile(current_neutron_port),
+             details=current_neutron_port.get('binding:vif_details'),
+             ovs_interfaceid=ovs_interfaceid,
+@@ -3455,6 +3459,20 @@ class API:
+                 instance=instance
+             )
+ 
++    def _populate_trunk_info(self, vif, current_neutron_port, context, client):
++        trunk_details = current_neutron_port.get("trunk_details", {})
++        for subport in trunk_details.get("sub_ports", []):
++            port_id = subport["port_id"]
++            port = self._show_port(context, port_id,
++                                   neutron_client=client)
++            subport_network = client.show_network(
++                port['network_id'])['network']
++
++            subport_vif = self._build_vif_model(
++                    context, client, port, [subport_network],
++                    [port_id])
++            vif.add_trunk_vif(subport_vif)
++
+     def _build_network_info_model(self, context, instance, networks=None,
+                                   port_ids=None, admin_client=None,
+                                   preexisting_port_ids=None,
+@@ -3526,6 +3544,8 @@ class API:
+                     refreshed_vif = self._build_vif_model(
+                         context, client, current_neutron_port, networks,
+                         preexisting_port_ids)
++                    self._populate_trunk_info(
++                        refreshed_vif, current_neutron_port, context, client)
+                     for index, vif in enumerate(nw_info):
+                         if vif['id'] == refresh_vif_id:
+                             self._log_error_if_vnic_type_changed(
+@@ -3599,7 +3619,12 @@ class API:
+                             vif['vnic_type'],
+                             instance,
+                         )
++
++                self._populate_trunk_info(
++                    vif, current_neutron_port, context, client)
++
+                 nw_info.append(vif)
++
+             elif nw_info_refresh:
+                 LOG.info('Port %s from network info_cache is no '
+                          'longer associated with instance in Neutron. '
+diff --git a/nova/tests/unit/network/test_network_info.py b/nova/tests/unit/network/test_network_info.py
+index 1c604975b0..089d5f655c 100644
+--- a/nova/tests/unit/network/test_network_info.py
++++ b/nova/tests/unit/network/test_network_info.py
+@@ -1081,6 +1081,38 @@ class TestNetworkMetadata(test.NoDBTestCase):
+     def test_get_network_metadata_json_ipv6_addr_mode_stateless(self):
+         self._test_get_network_metadata_json_ipv6_addr_mode('dhcpv6-stateless')
+ 
++    def test_get_network_metadata_json_trunks(self):
++
++        parent_vif = fake_network_cache_model.new_vif(
++            {'type': 'ovs', 'devname': 'interface0',
++             'trunk_vifs': [],
++             'id': 'parent1'
++            })
++        trunk_vif = fake_network_cache_model.new_vif(
++            {'type': 'trunk-subport', 'devname': 'interface0',
++             'trunk_vifs': [parent_vif],
++             'id': 'subport1',
++             'profile': {"tag": 1049,
++                         "parent_name": "parent1"}
++        })
++
++        netinfo = model.NetworkInfo([parent_vif, trunk_vif])
++
++        net_metadata = netutils.get_network_metadata(netinfo)
++
++        # IPv4 Network
++        self.assertIn({
++            'id': 'interface0',
++            'vif_id': 'subport1',
++            'type': 'vlan',
++            'mtu': None,
++            'ethernet_mac_address': 'aa:aa:aa:aa:aa:aa',
++            'vlan_link': 'interface0',
++            'vlan_id': 1049,
++            'vlan_mac_address': 'aa:aa:aa:aa:aa:aa'},
++            net_metadata['links']
++        )
++
+     def test__get_nets(self):
+         expected_net = {
+             'id': 'network0',
+diff --git a/nova/tests/unit/network/test_neutron.py b/nova/tests/unit/network/test_neutron.py
+index fa794cb012..f974e84f47 100644
+--- a/nova/tests/unit/network/test_neutron.py
++++ b/nova/tests/unit/network/test_neutron.py
+@@ -3345,6 +3345,85 @@ class TestAPI(TestAPIBase):
+         mock_get_physnet.assert_has_calls([
+             mock.call(self.context, mocked_client, 'net-id')] * 6)
+ 
++    @mock.patch.object(neutronapi.API, '_get_physnet_tunneled_info',
++                       return_value=(None, False))
++    @mock.patch.object(neutronapi.API, '_get_preexisting_port_ids',
++                       return_value=['port5'])
++    @mock.patch.object(neutronapi.API, '_get_subnets_from_port',
++                       return_value=[model.Subnet(cidr='1.0.0.0/8')])
++    @mock.patch.object(neutronapi.API, '_get_floating_ips_by_fixed_and_port',
++                       return_value=[{'floating_ip_address': '10.0.0.1'}])
++    @mock.patch.object(neutronapi, 'get_client')
++    def test_build_network_info_model_trunk(
++        self, mock_get_client, mock_get_floating, mock_get_subnets,
++        mock_get_preexisting, mock_get_physnet):
++        mocked_client = mock.create_autospec(client.Client)
++        mock_get_client.return_value = mocked_client
++        fake_inst = objects.Instance()
++        fake_inst.project_id = uuids.fake
++        fake_inst.uuid = uuids.instance
++        fake_inst.info_cache = objects.InstanceInfoCache()
++        fake_inst.info_cache.network_info = model.NetworkInfo()
++        fake_ports = [
++            {'id': 'port1',
++             'network_id': 'net-id',
++             'admin_state_up': True,
++             'status': 'ACTIVE',
++             'tenant_id': uuids.fake,
++             'fixed_ips': [{'ip_address': '1.1.1.1'}],
++             'mac_address': 'de:ad:be:ef:00:05',
++             'binding:vif_type': model.VIF_TYPE_802_QBH,
++             'binding:vnic_type': model.VNIC_TYPE_MACVTAP,
++             constants.BINDING_PROFILE: {'pci_vendor_info': '1137:0047',
++                                         'pci_slot': '0000:0a:00.2',
++                                         'physical_network': 'physnet1'},
++             'binding:vif_details': {model.VIF_DETAILS_PROFILEID: 'pfid'},
++             'trunk_details': {"sub_ports": [{
++                 'segmentation_id': 1049,
++                 'segmentation_type': 'vlan',
++                 'port_id': 'subport1'}
++             ]},
++             },
++            ]
++        fake_subport = {
++            'id': 'subport2',
++            'network_id': 'net-id2',
++            'admin_state_up': True,
++            'status': 'ACTIVE',
++            'fixed_ips': [{'ip_address': '1.1.2.1'}],
++            'mac_address': 'aa:bb:cc:dd:ee:ff',
++            'binding:vif_type': model.VIF_TYPE_BRIDGE,
++            'binding:vnic_type': model.VNIC_TYPE_NORMAL,
++            'binding:vif_details': {},
++            'tenant_id': uuids.fake,
++        }
++        fake_nets = [
++            {'id': 'net-id',
++             'name': 'foo',
++             'tenant_id': uuids.fake,
++             }
++        ]
++        mocked_client.list_ports.return_value = {'ports': fake_ports}
++        mocked_client.show_port.return_value = {
++            'port': fake_subport}
++
++        fake_inst.info_cache = objects.InstanceInfoCache.new(
++            self.context, uuids.instance)
++        fake_inst.info_cache.network_info = model.NetworkInfo.hydrate([])
++
++        nw_infos = self.api._build_network_info_model(
++            self.context, fake_inst,
++            fake_nets,
++            [fake_ports[0]['id']],
++            preexisting_port_ids=[])
++
++        mocked_client.list_ports.assert_called_once_with(
++            tenant_id=uuids.fake, device_id=uuids.instance)
++        mocked_client.show_port.assert_called_once_with(
++            'subport1')
++        self.assertIn("trunk_vifs", nw_infos[0])
++        self.assertEqual(1, len(nw_infos[0]["trunk_vifs"]))
++
+     @mock.patch.object(neutronapi, 'get_client')
+     @mock.patch('nova.network.neutron.API._nw_info_get_subnets')
+     @mock.patch('nova.network.neutron.API._nw_info_get_ips')
+diff --git a/nova/virt/netutils.py b/nova/virt/netutils.py
+index 2bc78134a1..9bc3381027 100644
+--- a/nova/virt/netutils.py
++++ b/nova/virt/netutils.py
+@@ -165,6 +165,12 @@ def get_injected_network_template(network_info, template=None,
+                             'libvirt_virt_type': libvirt_virt_type})
+ 
+ 
++def get_vif_from_network_info(vif_id, network_info):
++    for vif in network_info:
++        if vif["id"] == vif_id:
++            return vif
++
++
+ def get_network_metadata(network_info):
+     """Gets a more complete representation of the instance network information.
+ 
+@@ -186,10 +192,26 @@ def get_network_metadata(network_info):
+     ifc_num = -1
+     net_num = -1
+ 
++    trunk_vifs = []
+     for vif in network_info:
++        for trunk_vif in vif['trunk_vifs']:
++            trunk_vifs.append(trunk_vif)
++
++    for vif in network_info + trunk_vifs:
+         if not vif.get('network') or not vif['network'].get('subnets'):
+             continue
+ 
++        parent_vif = None
++        if vif['type'] == 'trunk-subport':
++            vif_profile = vif.get("profile")
++            if not vif_profile:
++                continue
++            parent_vif_id = vif_profile.get("parent_name")
++            if not parent_vif_id:
++                continue
++            parent_vif = get_vif_from_network_info(parent_vif_id,
++                                                   network_info)
++
+         network = vif['network']
+         # NOTE(JoshNang) currently, only supports the first IPv4 and first
+         # IPv6 subnet on network, a limitation that also exists in the
+@@ -202,7 +224,7 @@ def get_network_metadata(network_info):
+ 
+         # Get the VIF or physical NIC data
+         if subnet_v4 or subnet_v6:
+-            link = _get_eth_link(vif, ifc_num)
++            link = _get_eth_link(vif, ifc_num, parent_vif)
+             links.append(link)
+ 
+         # Add IPv4 and IPv6 networks if they exist
+@@ -240,7 +262,7 @@ def get_ec2_ip_info(network_info):
+     return ip_info
+ 
+ 
+-def _get_eth_link(vif, ifc_num):
++def _get_eth_link(vif, ifc_num, parent_vif=None):
+     """Get a VIF or physical NIC representation.
+ 
+     :param vif: Neutron VIF
+@@ -256,6 +278,8 @@ def _get_eth_link(vif, ifc_num):
+     # Use 'phy' for physical links. Ethernet can be confusing
+     if vif.get('type') in model.LEGACY_EXPOSED_VIF_TYPES:
+         nic_type = vif.get('type')
++    elif vif.get('type') == model.VIF_TYPE_TRUNK_SUBPORT:
++        nic_type = 'vlan'
+     else:
+         nic_type = 'phy'
+ 
+@@ -266,6 +290,15 @@ def _get_eth_link(vif, ifc_num):
+         'mtu': _get_link_mtu(vif),
+         'ethernet_mac_address': vif.get('address'),
+     }
++
++    if nic_type == "vlan":
++        link.update({
++            "vif_id": vif["id"],
++            "vlan_link": parent_vif['devname'],
++            "vlan_id": vif["profile"]["tag"],
++            "vlan_mac_address": vif["address"],
++        })
++
+     return link
+ 
+ 
+diff --git a/releasenotes/notes/vlan-aware-network-data-9b9b5e8c0fd191ba.yaml b/releasenotes/notes/vlan-aware-network-data-9b9b5e8c0fd191ba.yaml
+new file mode 100644
+index 0000000000..dfa4e9394d
+--- /dev/null
++++ b/releasenotes/notes/vlan-aware-network-data-9b9b5e8c0fd191ba.yaml
+@@ -0,0 +1,5 @@
++---
++features:
++  - |
++    When deploing instance with trunks generate required
++    network_data for cloudinit.
+-- 
+2.39.5 (Apple Git-154)
