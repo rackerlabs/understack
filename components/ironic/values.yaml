@@ -169,9 +169,44 @@ manifests:
 
 pod:
   mounts:
+    # oslo.config autoloads certain paths in alphabetical order
+    # which gives us the opportunity to inject secrets and extra
+    # configs here. likely the best paths are:
+    # /etc/${project}/${prog}.conf.d/*.conf
+    # /etc/${project}/${project}.conf.d/*.conf
+    # the first would be best for per service separation but since each
+    # service is in its own pod they won't overlap. further more there
+    # is an issue with that see https://bugs.launchpad.net/oslo.config/+bug/2098514
+    # so we'll use the bottom one
+    ironic_api:
+      ironic_api:
+        volumeMounts:
+          - mountPath: /etc/ironic/ironic.conf.d/db_conn.conf
+            name: ironic-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: ironic-db-conn
+            secret:
+              secretName: ironic-db-conn
+    ironic_db_sync:
+      ironic_db_sync:
+        volumeMounts:
+          - mountPath: /etc/ironic/ironic.conf.d/db_conn.conf
+            name: ironic-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: ironic-db-conn
+            secret:
+              secretName: ironic-db-conn
     ironic_conductor:
       ironic_conductor:
         volumeMounts:
+          - mountPath: /etc/ironic/ironic.conf.d/db_conn.conf
+            name: ironic-db-conn
+            subPath: db_conf.conf
+            readOnly: true
           - name: dnsmasq-ironic
             mountPath: /etc/dnsmasq.d/
           - name: dnsmasq-dhcp
@@ -179,6 +214,9 @@ pod:
           - name: understack-data
             mountPath: /var/lib/understack
         volumes:
+          - name: ironic-db-conn
+            secret:
+              secretName: ironic-db-conn
           - name: dnsmasq-ironic
             persistentVolumeClaim:
               claimName: dnsmasq-ironic
