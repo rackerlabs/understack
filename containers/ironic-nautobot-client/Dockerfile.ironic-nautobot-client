@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/root/.cache/.pip \
 COPY --chown=appuser:appgroup python/understack-workflows /app
 COPY --chown=appuser:appgroup python/understack-flavor-matcher /understack-flavor-matcher
 # need netifaces built as a wheel
-RUN --mount=type=cache,target=/root/.cache/.pip pip wheel --wheel-dir /app/dist netifaces psutil
+RUN --mount=type=cache,target=/root/.cache/.pip pip wheel --wheel-dir /app/dist netifaces psutil==6.1.1
 # build wheels and requirements.txt, skip hashes due to building of netifaces above which won't match
 RUN cd /app && /opt/poetry/bin/poetry build -f wheel && /opt/poetry/bin/poetry export --without-hashes -f requirements.txt -o dist/requirements.txt
 
