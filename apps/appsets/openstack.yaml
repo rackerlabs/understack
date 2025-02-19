@@ -35,7 +35,7 @@ spec:
                 - component: placement
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  chartVersion: 0.3.17
+                  chartVersion: 2024.2.1+34d1672a-93ed069c
                 - component: neutron
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
@@ -51,7 +51,7 @@ spec:
                 - component: horizon
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  chartVersion: 0.3.29
+                  chartVersion: 2024.2.1+34d1672a-93ed069c
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
