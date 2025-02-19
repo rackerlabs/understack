@@ -22,6 +22,10 @@ class NautobotNotFoundError(exc.NeutronException):
     message = "%(obj)s not found in Nautobot. ref=%(ref)s"
 
 
+class NautobotCustomFieldNotFoundError(exc.NeutronException):
+    message = "Custom field with name %(cf_name)s not found for %(obj)s"
+
+
 class Nautobot:
     """Basic Nautobot wrapper because pynautobot doesn't expose plugin APIs."""
 
@@ -99,6 +103,19 @@ class Nautobot:
         url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
         return self.make_api_request("DELETE", url)
 
+    def fetch_ucvni(self, network_id: str) -> dict:
+        url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
+        return self.make_api_request("GET", url)
+
+    def fetch_ucvni_tenant_vlan_id(self, network_id: str) -> int | None:
+        ucvni_data = self.fetch_ucvni(network_id=network_id)
+        custom_fields = ucvni_data.get("custom_fields", {})
+        if "tenant_vlan_id" not in custom_fields:
+            raise NautobotCustomFieldNotFoundError(
+                cf_name="tenant_vlan_id", obj="UCVNI"
+            )
+        return custom_fields.get("tenant_vlan_id")
+
     def fetch_namespace_by_name(self, name: str) -> str:
         url = f"/api/ipam/namespaces/?name={name}&depth=1"
         resp_data = self.make_api_request("GET", url)
@@ -138,6 +155,11 @@ class Nautobot:
             },
         }
         self.make_api_request("PATCH", url, payload)
+
+    def add_tenant_vlan_tag_to_ucvni(self, network_uuid: str, vlan_tag: int) -> dict:
+        url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}/"
+        payload = {"custom_fields": {"tenant_vlan_id": vlan_tag}}
+        return self.make_api_request("PATCH", url, payload)
 
     def subnet_delete(self, uuid: str) -> dict:
         return self.make_api_request("DELETE", f"/api/ipam/prefixes/{uuid}/")
