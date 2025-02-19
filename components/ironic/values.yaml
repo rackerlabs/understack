@@ -42,6 +42,12 @@ conf:
       enabled_power_interfaces: redfish,ipmitool,idrac-redfish,ilo
       enabled_raid_interfaces: redfish,idrac-redfish,ilo5,agent
       enabled_vendor_interfaces: redfish,ipmitool,idrac-redfish,ilo
+      # the service account belongs to the service project but our nodes
+      # will live in the infra domain in the baremetal project so the
+      # service account needs to have permissions outside of just the
+      # service project
+      # see: https://review.opendev.org/c/openstack/ironic/+/907148
+      rbac_service_role_elevated_access: true
     deploy:
       erase_devices_priority: 0
       erase_devices_metadata_priority: 0
