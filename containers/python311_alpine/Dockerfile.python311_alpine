@@ -26,7 +26,7 @@ CMD ["python", "-"]
 # FROM ghcr.io/rackerlabs/understack/python3.11.8-alpine3.19
 #
 # RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
-# RUN --mount=type=cache,target=/root/.cache/.pip pip install --no-cache-dir python-ironicclient==5.4.0
+# RUN --mount=type=cache,target=/root/.cache/pip pip install --no-cache-dir python-ironicclient==5.4.0
 #
 # FROM ghcr.io/rackerlabs/understack/python3.11.8-alpine3.19 as prod
 # ENV PATH="/opt/venv/bin:$PATH"
