@@ -5,7 +5,7 @@
     "python3@3.11",
     "zsh@latest",
     "argo@latest",
-    "argocd@latest",
+    "argocd@1.8.6",
     "kubectl@latest",
     "kubeseal@latest",
     "kustomize@latest",
