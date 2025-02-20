@@ -1,0 +1,58 @@
+From 31ab29bd97adff476cc3e35b33f8a2c9bcc22243 Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Thu, 20 Feb 2025 14:46:47 -0600
+Subject: [PATCH] whatever
+
+Change-Id: I19562753c11686d44d5b7fc91e63fb7c56503efd
+---
+ ironic/common/glance_service/service_utils.py | 2 ++
+ ironic/drivers/modules/deploy_utils.py        | 8 +++++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/ironic/common/glance_service/service_utils.py b/ironic/common/glance_service/service_utils.py
+index 20cc21ffa..636d77b77 100644
+--- a/ironic/common/glance_service/service_utils.py
++++ b/ironic/common/glance_service/service_utils.py
+@@ -40,6 +40,8 @@ def _extract_attributes(image):
+     output['properties'] = {}
+     output['schema'] = image.schema
+ 
++    for image_property in set(image.properties) - set(_IMAGE_ATTRIBUTES):
++        output['properties'][image_property] = image.properties[image_property]
+     for image_property in set(image) - set(_IMAGE_ATTRIBUTES):
+         output['properties'][image_property] = image[image_property]
+ 
+diff --git a/ironic/drivers/modules/deploy_utils.py b/ironic/drivers/modules/deploy_utils.py
+index 4848e2fb7..35b90b4d7 100644
+--- a/ironic/drivers/modules/deploy_utils.py
++++ b/ironic/drivers/modules/deploy_utils.py
+@@ -538,7 +538,10 @@ def get_image_properties(ctx, image_href):
+     """
+     try:
+         img_service = image_service.get_image_service(image_href, context=ctx)
+-        return img_service.show(image_href)['properties']
++        LOG.debug("calling img_service.show() but why is properties wrong")
++        data = img_service.show(image_href)
++        LOG.debug("img_service.show: %s", data)
++        return data['properties']
+     except (exception.GlanceConnectionFailed,
+             exception.ImageNotAuthorized,
+             exception.Invalid):
+@@ -605,12 +608,15 @@ def validate_image_properties(task, deploy_info):
+         properties = ['kernel_id', 'ramdisk_id']
+         if boot_option == 'kickstart':
+             properties.append('stage2_id')
++        LOG.debug("about to request image properties %s", image_href)
+         image_props = get_image_properties(task.context, image_href)
+     else:
+         # We are likely netbooting in this case...
+         properties = ['kernel', 'ramdisk']
+         image_props = {}
+ 
++    LOG.debug("current image props: %s", image_props)
++    LOG.debug("current deploy_info: %s", deploy_info)
+     missing_props = []
+     for prop in properties:
+         if not (deploy_info.get(prop) or image_props.get(prop)):
+-- 
+2.39.5 (Apple Git-154)
