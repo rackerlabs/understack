@@ -37,7 +37,7 @@ conf:
       default_deploy_interface: direct
       enabled_bios_interfaces: no-bios,redfish,idrac-redfish,ilo
       enabled_boot_interfaces: http-ipxe,ipxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,ilo-virtual-media,ilo-uefi-https,ilo-ipxe
-      enabled_deploy_interfaces: direct,ramdisk
+      enabled_deploy_interfaces: direct,ramdisk,anaconda
       enabled_firmware_interfaces: redfish,no-firmware
       enabled_hardware_types: redfish,idrac,ilo5,ilo
       enabled_inspect_interfaces: redfish,agent,idrac-redfish,ilo
