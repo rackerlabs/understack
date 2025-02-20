@@ -10,3 +10,10 @@ resources:
   - dnsmasq-ss.yaml
   - understack-data-pvc.yaml
   - ironic-ks-user-baremetal.yaml
+
+configMapGenerator:
+  - name: ironic-ipxe-template
+    files:
+      - ipxe_config.template=esxi.ipxe_config.template
+    options:
+      disableNameSuffixHash: true

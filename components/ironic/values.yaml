@@ -72,6 +72,7 @@ conf:
     pxe:
       images_path: /var/lib/understack/master_iso_images
       instance_master_path: /var/lib/understack/master_iso_images
+      ipxe_config_template: /var/lib/extracfg/ipxe_config.template
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
       hooks: "$default_hooks,parse-lldp,local-link-connection,physical-network"
@@ -182,6 +183,9 @@ pod:
             mountPath: /var/lib/dnsmasq/
           - name: understack-data
             mountPath: /var/lib/understack
+          - name: extracfg
+            mountPath: /var/lib/extracfg
+            readOnly: true
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -192,6 +196,16 @@ pod:
           - name: understack-data
             persistentVolumeClaim:
               claimName: understack-data
+          - name: extracfg
+            projected:
+              sources:
+                - configMap:
+                    name: ironic-ipxe-template
+                    items:
+                      - key: ipxe_config.template
+                        path: ipxe_config.template
+
+
   lifecycle:
     disruption_budget:
       api:
