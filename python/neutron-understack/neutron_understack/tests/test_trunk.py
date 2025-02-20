@@ -4,10 +4,9 @@ from unittest.mock import patch
 import pytest
 
 from neutron_understack.nautobot import Nautobot
+from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.trunk import SubportSegmentationIDError
 from neutron_understack.trunk import UnderStackTrunkDriver
-
-trunk_driver = UnderStackTrunkDriver.create("plugin_driver")
 
 
 @pytest.fixture
@@ -33,6 +32,11 @@ def payload(payload_metadata, trunk) -> MagicMock:
 @pytest.fixture
 def nautobot_client() -> Nautobot:
     return MagicMock(spec_set=Nautobot)
+
+
+driver = UnderstackDriver()
+driver.nb = Nautobot("", "")
+trunk_driver = UnderStackTrunkDriver.create(driver)
 
 
 @patch("neutron_understack.utils.fetch_subport_network_id", return_value="112233")

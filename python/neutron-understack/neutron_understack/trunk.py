@@ -9,11 +9,7 @@ from neutron_lib.services.trunk import constants as trunk_consts
 from oslo_config import cfg
 from oslo_log import log
 
-from neutron_understack import config
 from neutron_understack import utils
-from neutron_understack.nautobot import Nautobot
-
-config.register_ml2_understack_opts(cfg.CONF)
 
 LOG = log.getLogger(__name__)
 
@@ -48,8 +44,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             agent_type=agent_type,
             can_trunk_bound_port=can_trunk_bound_port,
         )
-        conf = cfg.CONF.ml2_understack
-        self.nb = Nautobot(conf.nb_url, conf.nb_token)
+        self.nb = self.plugin_driver.nb
 
     @property
     def is_loaded(self):
@@ -83,41 +78,46 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             self.trunk_created, resources.TRUNK, events.AFTER_CREATE, cancellable=True
         )
 
-    def _configure_tenant_vlan_id(
-        self, tenant_vlan_id: int | None, ucvni_uuid: str, subport: SubPort
+    def _handle_segmentation_id_mismatch(
+        self, subport: SubPort, ucvni_uuid: str, tenant_vlan_id: int
     ) -> None:
+        subport.delete()
+        raise SubportSegmentationIDError(
+            seg_id=subport.segmentation_id,
+            net_id=ucvni_uuid,
+            nb_seg_id=tenant_vlan_id,
+            subport_id=subport.port_id,
+        )
+
+    def _configure_tenant_vlan_id(self, ucvni_uuid: str, subport: SubPort) -> None:
         subport_seg_id = subport.segmentation_id
-        if not tenant_vlan_id:
-            self.nb.add_tenant_vlan_tag_to_ucvni(
-                network_uuid=ucvni_uuid, vlan_tag=subport_seg_id
-            )
-            LOG.info(
-                "Segmentation ID: %(seg_id)s is now set on Nautobot's UCVNI "
-                "UUID: %(ucvni_uuid)s in the tenant_vlan_id custom field",
-                {"seg_id": subport_seg_id, "ucvni_uuid": ucvni_uuid},
-            )
-        elif tenant_vlan_id != subport_seg_id:
-            subport.delete()
-            raise SubportSegmentationIDError(
-                seg_id=subport_seg_id,
-                net_id=ucvni_uuid,
-                nb_seg_id=tenant_vlan_id,
-                subport_id=subport.port_id,
-            )
+        self.nb.add_tenant_vlan_tag_to_ucvni(
+            network_uuid=ucvni_uuid, vlan_tag=subport_seg_id
+        )
+        LOG.info(
+            "Segmentation ID: %(seg_id)s is now set on Nautobot's UCVNI "
+            "UUID: %(ucvni_uuid)s in the tenant_vlan_id custom field",
+            {"seg_id": subport_seg_id, "ucvni_uuid": ucvni_uuid},
+        )
 
     def _subports_added(self, subports: list[SubPort]) -> None:
         for subport in subports:
-            subport_id = subport.port_id
-            subport_network_id = utils.fetch_subport_network_id(subport_id=subport_id)
+            subport_network_id = utils.fetch_subport_network_id(
+                subport_id=subport.port_id
+            )
             ucvni_tenant_vlan_id = self.nb.fetch_ucvni_tenant_vlan_id(
                 network_id=subport_network_id
             )
-
-            self._configure_tenant_vlan_id(
-                tenant_vlan_id=ucvni_tenant_vlan_id,
-                ucvni_uuid=subport_network_id,
-                subport=subport,
-            )
+            if not ucvni_tenant_vlan_id:
+                self._configure_tenant_vlan_id(
+                    ucvni_uuid=subport_network_id, subport=subport
+                )
+            elif ucvni_tenant_vlan_id != subport.segmentation_id:
+                self._handle_segmentation_id_mismatch(
+                    subport=subport,
+                    ucvni_uuid=subport_network_id,
+                    tenant_vlan_id=ucvni_tenant_vlan_id,
+                )
 
     def subports_added(self, resource, event, trunk_plugin, payload):
         subports = payload.metadata["subports"]
