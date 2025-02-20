@@ -22,4 +22,4 @@ RUN apt-get update && \
 COPY containers/ironic/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.10/site-packages && \
     QUILT_PATCHES=/tmp/patches quilt push -a
-COPY containers/ironic/patches/ipxe_config.template /var/lib/openstack-helm/
+COPY containers/ironic/patches/ipxe_config.template /var/lib/ipxe-template/
