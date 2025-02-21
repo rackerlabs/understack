@@ -32,8 +32,8 @@ index c59161daaf..22869c2fda 100644
  VIF_TYPE_VIF = 'vif'
  VIF_TYPE_UNBOUND = 'unbound'
 +VIF_TYPE_TRUNK_SUBPORT = 'trunk-subport'
- 
- 
+
+
  # Constants for dictionary keys in the 'vif_details' field in the VIF
 @@ -413,7 +414,7 @@ class VIF(Model):
                   qbh_params=None, qbg_params=None, active=False,
@@ -42,16 +42,16 @@ index c59161daaf..22869c2fda 100644
 -                 **kwargs):
 +                 trunk_vifs=None, **kwargs):
          super(VIF, self).__init__()
- 
+
          self['id'] = id
 @@ -431,6 +432,7 @@ class VIF(Model):
          self['profile'] = profile
          self['preserve_on_delete'] = preserve_on_delete
          self['delegate_create'] = delegate_create
 +        self['trunk_vifs'] = trunk_vifs or []
- 
+
          self._set_meta(kwargs)
- 
+
 @@ -438,7 +440,8 @@ class VIF(Model):
          keys = ['id', 'address', 'network', 'vnic_type',
                  'type', 'profile', 'details', 'devname',
@@ -60,12 +60,12 @@ index c59161daaf..22869c2fda 100644
 +                'active', 'preserve_on_delete', 'delegate_create',
 +                'trunk_vifs']
          return all(self[k] == other[k] for k in keys)
- 
+
      def __ne__(self, other):
 @@ -509,9 +512,17 @@ class VIF(Model):
              phy_network = self['details'].get(VIF_DETAILS_PHYSICAL_NETWORK)
          return phy_network
- 
+
 +    def add_trunk_vif(self, vif):
 +        for _vif in self['trunk_vifs']:
 +            if vif["id"] == _vif["id"]:
@@ -75,11 +75,11 @@ index c59161daaf..22869c2fda 100644
      @classmethod
      def hydrate(cls, vif):
          vif = cls(**vif)
-+        vif['trunk_vifs'] = [VIF.hydrate(**trunk_vif) for trunk_vif
++        vif['trunk_vifs'] = [VIF.hydrate(trunk_vif) for trunk_vif
 +                             in vif.get('trunk_vifs', [])]
          vif['network'] = Network.hydrate(vif['network'])
          return vif
- 
+
 diff --git a/nova/network/neutron.py b/nova/network/neutron.py
 index f24177de15..da2ae27555 100644
 --- a/nova/network/neutron.py
@@ -87,7 +87,7 @@ index f24177de15..da2ae27555 100644
 @@ -3420,13 +3420,17 @@ class API:
          preserve_on_delete = (current_neutron_port['id'] in
                                preexisting_port_ids)
- 
+
 +        vif_type = current_neutron_port.get('binding:vif_type')
 +        if current_neutron_port.get('device_owner') == 'trunk:subport':
 +            vif_type = network_model.VIF_TYPE_TRUNK_SUBPORT
@@ -106,7 +106,7 @@ index f24177de15..da2ae27555 100644
 @@ -3455,6 +3459,20 @@ class API:
                  instance=instance
              )
- 
+
 +    def _populate_trunk_info(self, vif, current_neutron_port, context, client):
 +        trunk_details = current_neutron_port.get("trunk_details", {})
 +        for subport in trunk_details.get("sub_ports", []):
@@ -153,7 +153,7 @@ index 1c604975b0..089d5f655c 100644
 @@ -1081,6 +1081,38 @@ class TestNetworkMetadata(test.NoDBTestCase):
      def test_get_network_metadata_json_ipv6_addr_mode_stateless(self):
          self._test_get_network_metadata_json_ipv6_addr_mode('dhcpv6-stateless')
- 
+
 +    def test_get_network_metadata_json_trunks(self):
 +
 +        parent_vif = fake_network_cache_model.new_vif(
@@ -196,7 +196,7 @@ index fa794cb012..f974e84f47 100644
 @@ -3345,6 +3345,85 @@ class TestAPI(TestAPIBase):
          mock_get_physnet.assert_has_calls([
              mock.call(self.context, mocked_client, 'net-id')] * 6)
- 
+
 +    @mock.patch.object(neutronapi.API, '_get_physnet_tunneled_info',
 +                       return_value=(None, False))
 +    @mock.patch.object(neutronapi.API, '_get_preexisting_port_ids',
@@ -285,8 +285,8 @@ index 2bc78134a1..9bc3381027 100644
 +++ b/nova/virt/netutils.py
 @@ -165,6 +165,12 @@ def get_injected_network_template(network_info, template=None,
                              'libvirt_virt_type': libvirt_virt_type})
- 
- 
+
+
 +def get_vif_from_network_info(vif_id, network_info):
 +    for vif in network_info:
 +        if vif["id"] == vif_id:
@@ -295,11 +295,11 @@ index 2bc78134a1..9bc3381027 100644
 +
  def get_network_metadata(network_info):
      """Gets a more complete representation of the instance network information.
- 
+
 @@ -186,10 +192,26 @@ def get_network_metadata(network_info):
      ifc_num = -1
      net_num = -1
- 
+
 +    trunk_vifs = []
      for vif in network_info:
 +        for trunk_vif in vif['trunk_vifs']:
@@ -308,7 +308,7 @@ index 2bc78134a1..9bc3381027 100644
 +    for vif in network_info + trunk_vifs:
          if not vif.get('network') or not vif['network'].get('subnets'):
              continue
- 
+
 +        parent_vif = None
 +        if vif['type'] == 'trunk-subport':
 +            vif_profile = vif.get("profile")
@@ -324,22 +324,22 @@ index 2bc78134a1..9bc3381027 100644
          # NOTE(JoshNang) currently, only supports the first IPv4 and first
          # IPv6 subnet on network, a limitation that also exists in the
 @@ -202,7 +224,7 @@ def get_network_metadata(network_info):
- 
+
          # Get the VIF or physical NIC data
          if subnet_v4 or subnet_v6:
 -            link = _get_eth_link(vif, ifc_num)
 +            link = _get_eth_link(vif, ifc_num, parent_vif)
              links.append(link)
- 
+
          # Add IPv4 and IPv6 networks if they exist
 @@ -240,7 +262,7 @@ def get_ec2_ip_info(network_info):
      return ip_info
- 
- 
+
+
 -def _get_eth_link(vif, ifc_num):
 +def _get_eth_link(vif, ifc_num, parent_vif=None):
      """Get a VIF or physical NIC representation.
- 
+
      :param vif: Neutron VIF
 @@ -256,6 +278,8 @@ def _get_eth_link(vif, ifc_num):
      # Use 'phy' for physical links. Ethernet can be confusing
@@ -349,7 +349,7 @@ index 2bc78134a1..9bc3381027 100644
 +        nic_type = 'vlan'
      else:
          nic_type = 'phy'
- 
+
 @@ -266,6 +290,15 @@ def _get_eth_link(vif, ifc_num):
          'mtu': _get_link_mtu(vif),
          'ethernet_mac_address': vif.get('address'),
@@ -364,8 +364,8 @@ index 2bc78134a1..9bc3381027 100644
 +        })
 +
      return link
- 
- 
+
+
 diff --git a/releasenotes/notes/vlan-aware-network-data-9b9b5e8c0fd191ba.yaml b/releasenotes/notes/vlan-aware-network-data-9b9b5e8c0fd191ba.yaml
 new file mode 100644
 index 0000000000..dfa4e9394d
@@ -377,5 +377,5 @@ index 0000000000..dfa4e9394d
 +  - |
 +    When deploing instance with trunks generate required
 +    network_data for cloudinit.
--- 
+--
 2.39.5 (Apple Git-154)
