@@ -3,7 +3,7 @@
   "packages": [
     "jq@latest",
     "yq-go@latest",
-    "python3@3.11",
+    "python3@3.12.8",
     "poetry@latest",
     "kubectl@latest",
     "kubeseal@0.28.0",
