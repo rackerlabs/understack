@@ -7,7 +7,7 @@
     "poetry@latest",
     "kubectl@latest",
     "kubeseal@0.28.0",
-    "kustomize@latest",
+    "kustomize@3.10.0",
     "telepresence2@latest"
   ],
   "shell": {
