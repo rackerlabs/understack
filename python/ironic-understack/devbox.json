@@ -6,7 +6,7 @@
     "python3@3.11",
     "poetry@latest",
     "kubectl@latest",
-    "kubeseal@latest",
+    "kubeseal@0.28.0",
     "kustomize@latest",
     "telepresence2@latest"
   ],
