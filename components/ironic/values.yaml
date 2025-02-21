@@ -52,6 +52,8 @@ conf:
       # service project
       # see: https://review.opendev.org/c/openstack/ironic/+/907148
       rbac_service_role_elevated_access: true
+    anaconda:
+      use_provisioning_network: true
     deploy:
       erase_devices_priority: 0
       erase_devices_metadata_priority: 0
