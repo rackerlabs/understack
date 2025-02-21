@@ -1,0 +1,70 @@
+From 01982628cf83f2668961470f2cc249c421b3c108 Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Fri, 21 Feb 2025 16:01:08 -0600
+Subject: [PATCH 2/3] deploy: allow anaconda to use the provisioning network
+
+Allow the anaconda deploy interface to use the provisioning network to
+deploy itself.
+<longer commit message to come>
+
+Change-Id: I4dea2855889d7699f09b545b341054e0fe1470f8
+---
+ ironic/conf/anaconda.py       |  9 +++++++++
+ ironic/drivers/modules/pxe.py | 15 +++++++++++++--
+ 2 files changed, 22 insertions(+), 2 deletions(-)
+
+diff --git a/ironic/conf/anaconda.py b/ironic/conf/anaconda.py
+index f478e49fe..c4144ab19 100644
+--- a/ironic/conf/anaconda.py
++++ b/ironic/conf/anaconda.py
+@@ -39,6 +39,15 @@ opts = [
+                        'heartbeat operations, depending on the contents of '
+                        'the utilized kickstart template, may not enforce TLS '
+                        'certificate verification.')),
++    cfg.BoolOpt('use_provisioning_network',
++                default=False,
++                help=_('Controls if the deployment will happen when connected '
++                       'to the provisioning network or to the tenant network '
++                       '(default). To use the provisioning network you must '
++                       'callback using the heartbeat_url and agent_token with '
++                       'status during your build to let Ironic know when the '
++                       'installation is done to switch it back to the tenant '
++                       'network.')),
+ ]
+ 
+ 
+diff --git a/ironic/drivers/modules/pxe.py b/ironic/drivers/modules/pxe.py
+index c3ea7093e..8a64e5296 100644
+--- a/ironic/drivers/modules/pxe.py
++++ b/ironic/drivers/modules/pxe.py
+@@ -70,8 +70,12 @@ class PXEAnacondaDeploy(agent_base.AgentBaseMixin, agent_base.HeartbeatMixin,
+     @task_manager.require_exclusive_lock
+     def deploy(self, task):
+         manager_utils.node_power_action(task, states.POWER_OFF)
+-        with manager_utils.power_state_for_network_configuration(task):
+-            task.driver.network.configure_tenant_networks(task)
++
++        # if the user is not using the provisioning network
++        # then setup the tenant network
++        if not CONF.anaconda.use_provisioning_network:
++            with manager_utils.power_state_for_network_configuration(task):
++                task.driver.network.configure_tenant_networks(task)
+ 
+         # calling boot.prepare_instance will also set the node
+         # to PXE boot, and update PXE templates accordingly
+@@ -97,6 +101,13 @@ class PXEAnacondaDeploy(agent_base.AgentBaseMixin, agent_base.HeartbeatMixin,
+             # NOTE(TheJulia): If this was any other interface, we would
+             # unconfigure tenant networks, add provisioning networks, etc.
+             task.driver.storage.attach_volumes(task)
++
++            # if the user has requested to use the provisioning network,
++            # set it up
++            if CONF.anaconda.use_provisioning_network:
++                task.driver.network.unconfigure_tenant_networks(task)
++                task.driver.network.add_provisioning_network(task)
++
+             node.instance_info = deploy_utils.build_instance_info_for_deploy(
+                 task)
+             node.save()
+-- 
+2.39.5 (Apple Git-154)
