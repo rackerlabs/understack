@@ -9,6 +9,7 @@ from neutron_lib.plugins.ml2.api import NetworkContext
 from oslo_config import cfg
 
 from neutron_understack import config
+from neutron_understack import utils
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
@@ -200,6 +201,25 @@ class UnderstackDriver(MechanismDriver):
     def update_port_precommit(self, context):
         pass
 
+    def _fetch_subports_network_ids(self, trunk_details: dict) -> list:
+        network_uuids = [
+            utils.fetch_subport_network_id(subport.get("port_id"))
+            for subport in trunk_details.get("sub_ports", [])
+        ]
+        return network_uuids
+
+    def _configure_trunk(
+        self, trunk_details: dict, connected_interface_uuid: str
+    ) -> None:
+        network_uuids = self._fetch_subports_network_ids(trunk_details)
+        for network_uuid in network_uuids:
+            self.nb.prep_switch_interface(
+                connected_interface_id=connected_interface_uuid,
+                ucvni_uuid=network_uuid,
+                modify_native_vlan=False,
+                vlan_tag=None,
+            )
+
     def update_port_postcommit(self, context):
         self._delete_tenant_port_on_unbound(context)
 
@@ -208,14 +228,17 @@ class UnderstackDriver(MechanismDriver):
         if vif_type != portbindings.VIF_TYPE_OTHER:
             return
 
+        trunk_details = context.current.get("trunk_details", {})
         network_id = context.current["network_id"]
-
         network_type = context.network.current.get("provider:network_type")
+        connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
+
+        if trunk_details:
+            self._configure_trunk(trunk_details, connected_interface_uuid)
         if network_type == p_const.TYPE_VLAN:
             vlan_tag = int(context.network.current.get("provider:segmentation_id"))
         else:
             vlan_tag = None
-        connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
         nb_vlan_group_id = self.update_nautobot(
             network_id, connected_interface_uuid, vlan_tag
         )
@@ -347,6 +370,11 @@ class UnderstackDriver(MechanismDriver):
             )["vlan_group_id"]
             return UUID(vlan_group_id)
 
+    def _clean_trunks(self, trunk_details: dict, connected_interface_uuid: str) -> None:
+        network_uuids = self._fetch_subports_network_ids(trunk_details)
+        for network_uuid in network_uuids:
+            self.nb.detach_port(connected_interface_uuid, network_uuid)
+
     def _delete_tenant_port_on_unbound(self, context):
         """Tenant network port cleanup in the UnderCloud infrastructure.
 
@@ -366,6 +394,10 @@ class UnderstackDriver(MechanismDriver):
             connected_interface_uuid = self.fetch_connected_interface_uuid(
                 context.original
             )
+            trunk_details = context.current.get("trunk_details", {})
+            if trunk_details:
+                self._clean_trunks(trunk_details, connected_interface_uuid)
+
             network_id = context.current["network_id"]
             nb_vlan_group_id = UUID(
                 self.nb.detach_port(connected_interface_uuid, network_id)
