@@ -5,7 +5,7 @@
     "poetry@1.8.3",
     "argo@latest",
     "difftastic@latest",
-    "yq-go@latest",
+    "yq-go@3.4.1",
     "jq@latest",
     "pyright@latest"
   ],
