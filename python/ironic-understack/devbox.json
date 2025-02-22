@@ -8,7 +8,7 @@
     "kubectl@latest",
     "kubeseal@0.28.0",
     "kustomize@3.10.0",
-    "telepresence2@latest"
+    "telepresence2@2.21.3"
   ],
   "shell": {
     "init_hook": [
