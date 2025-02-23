@@ -1,0 +1,52 @@
+From 6ed47b5b71888e1b28ff088cfc4804158eaf3f90 Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Sat, 22 Feb 2025 18:34:59 -0600
+Subject: [PATCH] fix glance metadata layout
+
+The code here builds a dictionary from a glance v2 image object that
+roughly resembles the glance v2 image object. The current behavior
+nests the 'properties' set on the image under it's own 'properties' key
+resulting in the image properties never being seen by the Ironic code.
+Unfortunately nearly all the tests mock the outer function (after the
+_extract_attributes) with a dict of the contents of a glance v2 image
+object. So the tests end up succeeding but the actual code fails to find
+image properties. The broken path is any user of get_image_properties()
+(both copies from common/images and deploy_utils) checking for user
+supplied properties.
+
+Change-Id: I1842e2651fd2bd8455646db9a3a80c3b9ece5c97
+Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
+---
+ ironic/common/glance_service/service_utils.py | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/ironic/common/glance_service/service_utils.py b/ironic/common/glance_service/service_utils.py
+index 20cc21ffa..08ba132c7 100644
+--- a/ironic/common/glance_service/service_utils.py
++++ b/ironic/common/glance_service/service_utils.py
+@@ -34,13 +34,21 @@ _IMAGE_ATTRIBUTES = ['size', 'disk_format', 'owner',
+ 
+ def _extract_attributes(image):
+     output = {}
++    # copies attributes from the openstacksdk Image object
++    # to a dictionary
+     for attr in _IMAGE_ATTRIBUTES:
+         output[attr] = getattr(image, attr, None)
+ 
+-    output['properties'] = {}
++    # copy the properties over to start so that image properties
++    # are not nested in another properties key
++    output['properties'] = getattr(image, 'properties', {})
+     output['schema'] = image.schema
+ 
+-    for image_property in set(image) - set(_IMAGE_ATTRIBUTES):
++    # attributes already copied so we copy the rest into properties
++    copied = set(_IMAGE_ATTRIBUTES)
++    copied.add('properties')
++
++    for image_property in set(image) - copied:
+         output['properties'][image_property] = image[image_property]
+ 
+     return output
+-- 
+2.39.5 (Apple Git-154)
