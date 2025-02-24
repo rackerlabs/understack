@@ -28,7 +28,7 @@ from ironic_understack.conf import CONF
 
 LOG = log.getLogger(__name__)
 FLAVORS = FlavorSpec.from_directory(CONF.ironic_understack.flavors_dir)
-LOG.info(f"Loaded {len(FLAVORS)} flavor specifications.")
+LOG.info("Loaded %d flavor specifications.", len(FLAVORS))
 
 
 class FlavorInspectMixin:
@@ -51,21 +51,21 @@ class FlavorInspectMixin:
 
         inventory = inspection_data or {}
         if not inventory:
-            LOG.warn(f"No inventory found for node {task.node}")
+            LOG.warning("No inventory found for node %s", task.node)
 
         inventory = inventory["inventory"]
-        LOG.debug(f"Retrieved {inspection_data=}")
+        LOG.debug("Retrieved inspection_data=%s", inspection_data)
 
         if not (inventory.get("memory") and "physical_mb" in inventory["memory"]):
-            LOG.warn("No memory_mb property detected, skipping flavor setting.")
+            LOG.warning("No memory_mb property detected, skipping flavor setting.")
             return upstream_state
 
         if not (inventory.get("disks") and inventory["disks"][0].get("size")):
-            LOG.warn("No disks detected, skipping flavor setting.")
+            LOG.warning("No disks detected, skipping flavor setting.")
             return upstream_state
 
         if not (inventory.get("cpu") and inventory["cpu"]["model_name"]):
-            LOG.warn("No CPUS detected, skipping flavor setting.")
+            LOG.warning("No CPUS detected, skipping flavor setting.")
             return upstream_state
 
         smallest_disk_gb = min([disk["size"] / units.Gi for disk in inventory["disks"]])
@@ -76,11 +76,11 @@ class FlavorInspectMixin:
                 inventory.get("system_vendor", {}).get("product_name", ""),
             )
         except TypeError as e:
-            LOG.warn("Error searching for model name: %s", e)
+            LOG.warning("Error searching for model name: %s", e)
             return upstream_state
 
         if not model_name_match:
-            LOG.warn("No model_name detected. skipping flavor setting.")
+            LOG.warning("No model_name detected. skipping flavor setting.")
             return upstream_state
         else:
             model_name = model_name_match.group(1)
@@ -95,9 +95,9 @@ class FlavorInspectMixin:
         matcher = Matcher(FLAVORS)
         best_flavor = matcher.pick_best_flavor(machine)
         if not best_flavor:
-            LOG.warn(f"No flavor matched for {task.node.uuid}")
+            LOG.warning("No flavor matched for %s", task.node.uuid)
             return upstream_state
-        LOG.info(f"Matched {task.node.uuid} to flavor {best_flavor}")
+        LOG.info("Matched %s to flavor %s", task.node.uuid, best_flavor)
 
         task.node.resource_class = f"baremetal.{best_flavor.name}"
         task.node.save()

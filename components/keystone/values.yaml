@@ -228,10 +228,18 @@ pod:
           - name: keystone-sso
             mountPath: /etc/keystone-sso
             readOnly: true
+          - name: oidc-secret
+            mountPath: /etc/oidc-secret
+            readOnly: true
         volumes:
           - name: keystone-sso
             secret:
               secretName: keystone-sso
+          - name: oidc-secret
+            secret:
+              secretName: sso-passphrase
+  replicas:
+    api: 2
   lifecycle:
     disruption_budget:
       api:
@@ -256,11 +264,6 @@ conf:
       backend_argument: memcached_expire_time:3600
     DEFAULT:
       max_token_size: 512
-    # (TODO) Need to follow up on this. There is a pending upstream change to
-    # add this to the openstack-helm values:
-    # https://review.opendev.org/c/openstack/openstack-helm/+/934703
-    fernet_tokens:
-      max_active_keys: 7
 
   wsgi_keystone: |
     {{- $portInt := tuple "identity" "service" "api" $ | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
@@ -292,7 +295,9 @@ conf:
         OIDCProviderMetadataURL http://dex.dex.svc:5556/.well-known/openid-configuration
         OIDCClientID keystone
         OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
-        OIDCCryptoPassphrase "exec:/bin/bash -c \"head /dev/urandom | tr -dc A-Za-z0-9 | head -c 32\""
+        OIDCCryptoPassphrase "exec:/bin/cat /etc/oidc-secret/password"
+        OIDCCacheType memcache
+        OIDCMemCacheServers "memcached.openstack.svc.cluster.local:11211"
         OIDCClaimDelimiter ;
 
         # avoid redirect issues per the following

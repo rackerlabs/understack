@@ -7,7 +7,7 @@ conf:
   ovn_cms_options: ""
   ovn_cms_options_gw_enabled: "enable-chassis-as-gw"
   # we are working with baremetal so we'll need VTEP support
-  ovn_encap_type: vxlan
+  ovn_encap_type: geneve
 
 volume:
   ovn_ovsdb_nb:

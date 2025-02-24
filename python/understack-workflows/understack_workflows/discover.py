@@ -24,22 +24,23 @@ def discover_chassis_info(bmc: Bmc) -> ChassisInfo:
     device_info = chassis_info(bmc)
 
     if not device_info.power_on:
-        logger.info(f"Server is powered off, sending power-on command to {bmc}")
+        logger.info("Server is powered off, sending power-on command to %s", bmc)
         bmc_power_on(bmc)
 
     attempts_remaining = LLDP_DISCOVERY_ATTEMPTS
     while len(device_info.neighbors) < MIN_REQUIRED_NEIGHBOR_COUNT:
         logger.info(
-            f"{bmc} does not have enough LLDP neighbors "
-            f"(saw {device_info.neighbors}), need at "
-            f"least {MIN_REQUIRED_NEIGHBOR_COUNT}. "
+            "%s does not have enough LLDP neighbors (saw %d), need at least %d. ",
+            bmc,
+            len(device_info.neighbors),
+            MIN_REQUIRED_NEIGHBOR_COUNT,
         )
         if not attempts_remaining:
             raise Exception(
                 f"Only {len(device_info.neighbors)} LLDP neighbors appeared, "
                 f" but {MIN_REQUIRED_NEIGHBOR_COUNT} are required."
             )
-        logger.info(f"Retry in 30 seconds ({attempts_remaining=})")
+        logger.info("Retry in 30 seconds (attempts_remaining=%d)", attempts_remaining)
         attempts_remaining = attempts_remaining - 1
 
         time.sleep(30)

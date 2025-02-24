@@ -24,7 +24,12 @@ def update_nautobot(args) -> UUID:
     nb_url = args.nautobot_url
     nb_token = args.nautobot_token or credential("nb-token", "token")
 
-    logger.info(f"Updating Nautobot {device_id=!s} {interface_mac=!s} {network_name=}")
+    logger.info(
+        "Updating Nautobot device_id=%s interface_mac=%s network_name=%s",
+        device_id,
+        interface_mac,
+        network_name,
+    )
 
     if network_name == "tenant":
         vlan_group_id = update_nautobot_for_tenant(
@@ -37,7 +42,12 @@ def update_nautobot(args) -> UUID:
     else:
         raise ValueError(f"need provisioning or tenant, not {network_name=}")
 
-    logger.info(f"Updated Nautobot {device_id=!s} {interface_mac=!s} {network_name=}")
+    logger.info(
+        "Updated Nautobot device_id=%s interface_mac=%s network_name=%s",
+        device_id,
+        interface_mac,
+        network_name,
+    )
     return vlan_group_id
 
 
@@ -54,7 +64,10 @@ def update_nautobot_for_provisioning(
         raise Exception("Interface has no associated device")
     vlan_group_id = vlan_group_id_for(interface.device.id, nautobot)
     logger.debug(
-        f"Switch interface {interface.device} {interface} found in {vlan_group_id=}"
+        "Switch interface %s %s found in vlan_group_id=%s",
+        interface.device,
+        interface,
+        vlan_group_id,
     )
     return vlan_group_id
 
@@ -98,11 +111,17 @@ def update_nautobot_for_tenant(
         "Accept": "application/json",
     }
 
-    logger.debug(f"Running Nautobot prep_switch_interface job {uri=} {payload=}")
+    logger.debug(
+        "Running Nautobot prep_switch_interface job uri=%s payload=%s", uri, payload
+    )
 
     response = requests.request("POST", uri, headers=headers, json=payload, timeout=30)
     response_data = response.json()
-    logger.debug(f"Nautobot prep_switch_interface result: {response} {response_data=}")
+    logger.debug(
+        "Nautobot prep_switch_interface result: %s response_data=%s",
+        response,
+        response_data,
+    )
     response.raise_for_status()
 
     return response_data["vlan_group_id"]
@@ -167,7 +186,7 @@ def main():
 
     vlan_group_id = update_nautobot(args)
     response = call_undersync(args, vlan_group_id)
-    logger.info(f"Undersync returned: {pformat(response.json())}")
+    logger.info("Undersync returned: %s", pformat(response.json()))
 
 
 if __name__ == "__main__":

@@ -19,8 +19,7 @@ spec:
                 - component: keystone
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=keystone
-                  chartVersion: 0.3.17
+                  chartVersion: 2024.2.4+79d4b689-eb60e37c
                 - component: openvswitch
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
                   openstackRelease: 2024.2
@@ -32,33 +31,27 @@ spec:
                 - component: ironic
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=ironic
                   chartVersion: 0.2.21
                 - component: placement
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=placement
-                  chartVersion: 0.3.17
+                  chartVersion: 2024.2.1+34d1672a-93ed069c
                 - component: neutron
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=neutron
                   chartVersion: 0.3.47
                 - component: glance
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=glance
                   chartVersion: 0.5.2
                 - component: nova
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=nova
                   chartVersion: 0.3.47
                 - component: horizon
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   openstackRelease: 2024.2
-                  # renovate: datasource=custom.openstackhelm depName=horizon
-                  chartVersion: 0.3.29
+                  chartVersion: 2024.2.1+34d1672a-93ed069c
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
@@ -76,8 +69,9 @@ spec:
             releaseName: '{{.component}}'
             valueFiles:
               - $understack/components/openstack-{{.openstackRelease}}-jammy.yaml
-              - $understack/components/{{.component}}/aio-values.yaml
+              - $understack/components/{{.component}}/values.yaml
               - $deploy/{{.name}}/manifests/secret-openstack.yaml
+              - $deploy/{{.name}}/manifests/images-openstack.yaml
               - $deploy/{{.name}}/helm-configs/{{.component}}.yaml
             # don't require all the values files
             ignoreMissingValueFiles: true

@@ -25,5 +25,12 @@ configs:
     kustomize.buildOptions: --enable-helm
   rbac:
     policy.csv: |
-      g, ucadmin, role:admin
+      # role:ucadmin can sync applications
+      p, role:ucadmin, applications, sync, */*, allow
+      # role:ucadmin can update clusters so that they can set branch info
+      p, role:ucadmin, clusters, update, *, allow
+      # role:ucadmin inherits role:readonly
+      g, role:ucadmin, role:readonly
+      # members of the ucadmin group get role:ucadmin
+      g, ucadmin, role:ucadmin
     policy.default: role:readonly

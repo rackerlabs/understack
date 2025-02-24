@@ -52,7 +52,11 @@ conf:
         # we'll need to use the ovn ML2 plugin to hook the routers to our network
         mechanism_drivers: "understack,ovn"
         tenant_network_types: "vlan"
-        type_drivers: "vlan,local,understack_vxlan"
+        type_drivers: "vlan,vxlan"
+      ml2_type_vxlan:
+        # OSH sets a default range here but we want to use network_segment_range plugin
+        # to configure this instead
+        vni_ranges: ""
   neutron:
     DEFAULT:
       # the 'trunk' plugin allows for us to create and configure trunk ports to allow
@@ -91,32 +95,26 @@ pod:
     neutron_server:
       neutron_server:
         volumeMounts:
-          - mountPath: /etc/nb-token/
-            name: nb-token
+          # oslo.config autoloads certain paths in alphabetical order
+          # which gives us the opportunity to inject secrets and extra
+          # configs here. likely the best paths are:
+          # /etc/${project}/${prog}.conf.d/*.conf
+          # /etc/${project}/${project}.conf.d/*.conf
+          # the first would be best for per service separation but since each
+          # service is in its own pod they won't overlap. further more there
+          # is an issue with that see https://bugs.launchpad.net/oslo.config/+bug/2098514
+          # so we'll use the bottom one
+          - mountPath: /etc/neutron/neutron.conf.d/ml2_understack.conf
+            name: neutron-nautobot
+            subPath: ml2_understack.conf
             readOnly: true
           - mountPath: /etc/undersync/
             name: undersync-token
             readOnly: true
         volumes:
-          - name: nb-token
+          - name: neutron-nautobot
             secret:
-              secretName: nautobot-token
-          - name: undersync-token
-            secret:
-              secretName: undersync-token
-    neutron_rpc_server:
-      neutron_rpc_server:
-        volumeMounts:
-          - mountPath: /etc/nb-token/
-            name: nb-token
-            readOnly: true
-          - mountPath: /etc/undersync/
-            name: undersync-token
-            readOnly: true
-        volumes:
-          - name: nb-token
-            secret:
-              secretName: nautobot-token
+              secretName: neutron-nautobot
           - name: undersync-token
             secret:
               secretName: undersync-token

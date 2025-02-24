@@ -1407,16 +1407,17 @@ WebOb = ">=1.8.2"
 
 [[package]]
 name = "neutron-lib"
-version = "3.17.0"
+version = "3.18.1"
 description = "Neutron shared routines and utilities"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "neutron-lib-3.17.0.tar.gz", hash = "sha256:8528cae48c77b1a7e8d540acd4d6a267d19e2d0e929b2122fc0739f8d2edc2b4"},
-    {file = "neutron_lib-3.17.0-py3-none-any.whl", hash = "sha256:c5dffd79dac2a39ee045a471d7aa298e9d07334f952d2ce208b48715e6b293ad"},
+    {file = "neutron_lib-3.18.1-py3-none-any.whl", hash = "sha256:f448ebab1900fc12de6242382d94a4c12ccab2945a691f8770b6b317f1e3d920"},
+    {file = "neutron_lib-3.18.1.tar.gz", hash = "sha256:25f7c8c765fe9e8b410a6181160e3985b5d400ed08541528fab1df2a50edd27b"},
 ]
 
 [package.dependencies]
+debtcollector = ">=3.0.0"
 keystoneauth1 = ">=3.14.0"
 netaddr = ">=0.7.18"
 os-ken = ">=0.3.0"

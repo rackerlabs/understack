@@ -12,10 +12,12 @@ mech_understack_opts = [
     cfg.StrOpt(
         "nb_url",
         help="Nautobot URL",
+        required=True,
     ),
     cfg.StrOpt(
         "nb_token",
         help="Nautobot API token",
+        required=True,
     ),
     cfg.StrOpt(
         "ucvni_group",
@@ -34,6 +36,11 @@ mech_understack_opts = [
     ),
     cfg.BoolOpt(
         "undersync_dry_run", default=True, help="Call Undersync with dry-run mode"
+    ),
+    cfg.StrOpt(
+        "provisioning_network",
+        help="provisioning_network ID as configured in ironic.conf",
+        default="change_me",
     ),
     cfg.StrOpt(
         "shared_nautobot_namespace_name",

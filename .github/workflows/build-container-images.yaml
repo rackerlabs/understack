@@ -5,14 +5,12 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "containers/bmc-utils/**"
       - "containers/python311_alpine/**"
       - "containers/python312_alpine/**"
   push:
     branches:
       - main
     paths:
-      - "containers/bmc-utils/**"
       - "containers/python311_alpine/**"
       - "containers/python312_alpine/**"
   merge_group:
@@ -22,9 +20,6 @@ on:
 env:
   VERSION_PYTHON311: 0.0.1
   VERSION_PYTHON312: 0.0.1
-  VERSION_ARGO_UTILS: 0.0.1
-  VERSION_BMC_UTILS: 0.0.1
-  VERSION_PYTHON_NAUTOBOT: 0.0.1
 
 jobs:
   build-ghcr-registry:
@@ -35,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3
+        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3
 
       - name: Login to ghcr.io
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
@@ -45,7 +40,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and deploy Python 3.11 image
-        uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991 # v6
+        uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
         with:
           context: containers/python311_alpine/
           file: containers/python311_alpine/Dockerfile.python311_alpine
@@ -56,7 +51,7 @@ jobs:
               org.opencontainers.image.version=${{ env.VERSION_PYTHON311 }}
 
       - name: Build and deploy Python 3.12 image
-        uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991 # v6
+        uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
         with:
           context: containers/python312_alpine/
           file: containers/python312_alpine/Dockerfile.python312_alpine
@@ -65,14 +60,3 @@ jobs:
           tags: ghcr.io/${{ github.repository }}/argo-python3.12.2-alpine3.19:latest,ghcr.io/${{ github.repository }}/argo-python3.12.2-alpine3.19:${{ env.VERSION_PYTHON312 }}
           labels: |
               org.opencontainers.image.version=${{ env.VERSION_PYTHON312 }}
-
-      - name: Build and deploy BMC Utils image
-        uses: docker/build-push-action@ca877d9245402d1537745e0e356eab47c3520991 # v6
-        with:
-          context: containers/bmc-utils/
-          file: containers/bmc-utils/Dockerfile.bmc_utils
-          # push for all main branch commits
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository }}/argo-bmc-utils-python3.11.8:latest,ghcr.io/${{ github.repository }}/argo-bmc-utils-python3.11.8:${{ env.VERSION_BMC_UTILS }}
-          labels: |
-              org.opencontainers.image.version=${{ env.VERSION_BMC_UTILS }}

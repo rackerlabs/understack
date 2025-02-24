@@ -2,13 +2,13 @@
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.12.0/.schema/devbox.schema.json",
   "packages": [
     "jq@latest",
-    "yq-go@latest",
-    "python3@3.11",
+    "yq-go@3.4.1",
+    "python3@3.12.8",
     "poetry@latest",
     "kubectl@latest",
-    "kubeseal@latest",
-    "kustomize@latest",
-    "telepresence2@latest"
+    "kubeseal@0.28.0",
+    "kustomize@3.10.0",
+    "telepresence2@2.21.3"
   ],
   "shell": {
     "init_hook": [

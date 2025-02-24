@@ -12,6 +12,7 @@ class ProvisionStateMapper:
         "inspecting": "Provisioning",
         "deploying": "Provisioning",
         "cleaning": "Quarantine",
+        "clean failed": "Quarantine",
         "deleting": "Decommissioning",
     }
     ALL_IRONIC_STATES = [
@@ -23,6 +24,7 @@ class ProvisionStateMapper:
         "inspect failed",
         "cleaning",
         "clean wait",
+        "clean failed",
         "available",
         "deploying",
         "wait call-back",

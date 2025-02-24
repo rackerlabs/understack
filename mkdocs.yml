@@ -124,6 +124,7 @@ nav:
     - deploy-guide/extra-regions.md
     - deploy-guide/external-argocd.md
     - deploy-guide/add-remove-app.md
+    - deploy-guide/override-openstack-svc-config.md
   - 'Operator Guide':
     - operator-guide/index.md
     - 'OpenStack':
@@ -134,12 +135,16 @@ nav:
       - operator-guide/openstack-neutron.md
       - operator-guide/ovs-ovn.md
     - 'Infrastructure':
+      - operator-guide/workflows.md
       - operator-guide/monitoring.md
       - operator-guide/mariadb-operator.md
       - operator-guide/postgres-operator.md
       - operator-guide/rabbitmq.md
       - operator-guide/rook-ceph.md
       - operator-guide/nautobot.md
+      - operator-guide/troubleshooting-osh.md
+    - 'Scripts and Tools':
+      - operator-guide/scripts.md
   - 'User Guide':
     - user-guide/index.md
     - user-guide/openstack-cli.md

@@ -62,8 +62,10 @@ def is_valid_domain(
     ret = project.domain_id == only_domain.hex
     if not ret:
         logger.info(
-            f"keystone project {project_id!s} part of domain "
-            f"{project.domain_id} and not {only_domain!s}"
+            "keystone project %s part of domain %s and not %s",
+            project_id,
+            project.domain_id,
+            only_domain,
         )
     return ret
 
@@ -71,7 +73,7 @@ def is_valid_domain(
 def handle_project_create(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
-    logger.info(f"got request to create tenant {project_id!s}")
+    logger.info("got request to create tenant %s", project_id)
     project = conn.identity.get_project(project_id.hex)  # type: ignore
     ten_api = nautobot.session.tenancy.tenants
     try:
@@ -84,30 +86,32 @@ def handle_project_create(
         )
         return _EXIT_API_ERROR
 
-    logger.info(f"tenant '{project_id!s}' created {ten.created}")  # type: ignore
+    logger.info("tenant %s created %s", project_id, ten.created)  # type: ignore
     return _EXIT_SUCCESS
 
 
 def handle_project_update(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
-    logger.info(f"got request to update tenant {project_id!s}")
+    logger.info("got request to update tenant %s", project_id)
     project = conn.identity.get_project(project_id.hex)  # type: ignore
     tenant_api = nautobot.session.tenancy.tenants
 
     existing_tenant = tenant_api.get(project_id)
-    logger.info(f"existing_tenant: {existing_tenant}")
+    logger.info("existing_tenant: %s", existing_tenant)
     try:
         if existing_tenant is None:
             new_tenant = tenant_api.create(
                 id=str(project_id), name=project.name, description=project.description
             )
-            logger.info(f"tenant '{project_id!s}' created {new_tenant.created}")  # type: ignore
+            logger.info("tenant %s created %s", project_id, new_tenant.created)  # type: ignore
         else:
             existing_tenant.description = project.description  # type: ignore
             existing_tenant.save()  # type: ignore
             logger.info(
-                f"tenant '{project_id!s}' last updated {existing_tenant.last_updated}"  # type: ignore
+                "tenant %s last updated %s",
+                project_id,
+                existing_tenant.last_updated,  # type: ignore
             )
     except Exception:
         logger.exception(
@@ -120,13 +124,13 @@ def handle_project_update(
 def handle_project_delete(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
-    logger.info(f"got request to delete tenant {project_id!s}")
+    logger.info("got request to delete tenant %s", project_id)
     ten = nautobot.session.tenancy.tenants.get(project_id)
     if not ten:
-        logger.warn(f"tenant '{project_id!s}' does not exist, nothing to delete")
+        logger.warning("tenant %s does not exist, nothing to delete", project_id)
         return _EXIT_SUCCESS
     ten.delete()  # type: ignore
-    logger.info(f"deleted tenant {project_id!s}")
+    logger.info("deleted tenant %s", project_id)
     return _EXIT_SUCCESS
 
 
@@ -141,7 +145,7 @@ def do_action(
         conn, project_id, only_domain
     ):
         logger.info(
-            f"keystone project {project_id!s} not part of {only_domain!s}, skipping"
+            "keystone project %s not part of %s, skipping", project_id, only_domain
         )
         return _EXIT_SUCCESS
 

@@ -48,7 +48,7 @@ helm --namespace openstack \
     install \
     ironic osh/ironic \
     -f components/openstack-2024.1-jammy.yaml \
-    -f components/ironic/aio-values.yaml \
+    -f components/ironic/values.yaml \
     -f components/ironic/values.tpl.yaml \
     -f secret-openstack.yaml
 ```

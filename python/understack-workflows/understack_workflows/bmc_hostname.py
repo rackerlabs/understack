@@ -12,9 +12,9 @@ def bmc_set_hostname(bmc: Bmc, current_name: str, new_name: str):
         raise ValueError("Invalid input parameters")
 
     if current_name == new_name:
-        logger.info(f"BMC hostname is already set to {new_name}")
+        logger.info("BMC hostname is already set to %s", new_name)
         return
 
-    logger.info(f"Changing BMC hostname from {current_name} to {new_name}")
+    logger.info("Changing BMC hostname from %s to %s", current_name, new_name)
     payload = {"HostName": new_name}
     bmc.redfish_request(REDFISH_PATH, method="PATCH", payload=payload)

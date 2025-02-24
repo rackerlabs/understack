@@ -30,11 +30,11 @@ class NodeMetadata:
 def create_or_update(node_meta: NodeMetadata, bmc: Bmc):
     """Note interfaces/ports are not synced here, that happens elsewhere."""
     client = IronicClient()
-    logger.debug(f"Ensuring node with UUID {node_meta.uuid} exists in Ironic")
+    logger.debug("Ensuring node with UUID %s exists in Ironic", node_meta.uuid)
     try:
         ironic_node = client.get_node(node_meta.uuid)
     except ironicclient.common.apiclient.exceptions.NotFound:
-        logger.debug(f"Node: {node_meta.uuid} not found in Ironic, creating.")
+        logger.debug("Node: %s not found in Ironic, creating.", node_meta.uuid)
         ironic_node = create_ironic_node(client, node_meta, bmc)
         return ironic_node.provision_state  # type: ignore
 
@@ -42,9 +42,9 @@ def create_or_update(node_meta: NodeMetadata, bmc: Bmc):
         update_ironic_node(client, node_meta, bmc)
     else:
         logger.info(
-            f"Device {node_meta.uuid} in Ironic is in a "
-            f"{ironic_node.provision_state} provision_state, "
-            f"so no updates are allowed."
+            "Device %s in Ironic is in a %s provision_state, so no updates are allowed",
+            node_meta.uuid,
+            ironic_node.provision_state,
         )
 
     return ironic_node.provision_state
@@ -62,10 +62,10 @@ def update_ironic_node(client, node_meta, bmc):
     ]
 
     patches = args_array_to_patch("add", updates)
-    logger.info(f"Updating Ironic node {node_meta.uuid} {patches=}")
+    logger.info("Updating Ironic node %s patches=%s", node_meta.uuid, patches)
 
     response = client.update_node(node_meta.uuid, patches)
-    logger.info(f"Ironic node {node_meta.uuid} Updated: {response=}")
+    logger.info("Ironic node %s Updated: response=%s", node_meta.uuid, response)
 
 
 def create_ironic_node(

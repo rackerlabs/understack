@@ -5,6 +5,7 @@ extend-exclude = [
     "assets",
     "schema/argo-workflows.json",
     "python/understack-workflows/tests/json_samples/",
+    "containers/*/patches",
 ]
 
 [default]

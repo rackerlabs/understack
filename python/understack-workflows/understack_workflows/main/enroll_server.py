@@ -97,7 +97,7 @@ def main():
     args = argument_parser().parse_args()
 
     bmc_ip_address = args.bmc_ip_address
-    logger.info(f"{__file__} starting for {bmc_ip_address=}")
+    logger.info("%s starting for bmc_ip_address=%s", __file__, bmc_ip_address)
 
     url = args.nautobot_url
     token = args.nautobot_token or credential("nb-token", "token")
@@ -120,7 +120,7 @@ def enroll_server(bmc: Bmc, nautobot, old_password: str | None) -> NautobotDevic
     )
 
     device_info = discover_chassis_info(bmc)
-    logger.info(f"Discovered {pformat(device_info)}")
+    logger.info("Discovered %s", pformat(device_info))
 
     update_dell_drac_settings(bmc)
 
@@ -149,11 +149,11 @@ def enroll_server(bmc: Bmc, nautobot, old_password: str | None) -> NautobotDevic
         ),
         bmc,
     )
-    logger.info(f"{nb_device.id} {_ironic_provision_state=}")
+    logger.info("%s _ironic_provision_state=%s", nb_device.id, _ironic_provision_state)
 
     sync_interfaces.from_nautobot_to_ironic(nb_device, pxe_interface=pxe_interface)
 
-    logger.info(f"{__file__} complete for {bmc.ip_address}")
+    logger.info("%s complete for %s", __file__, bmc.ip_address)
 
     return nb_device
 

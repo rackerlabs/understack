@@ -24,6 +24,10 @@ labels:
     node_selector_value: conductor
 
 conf:
+  # Update policies for better integration with OpenStack services
+  # https://docs.openstack.org/ironic/latest/configuration/sample-policy.html
+  policy:
+    "baremetal:node:get:last_error": "role:service or role:admin or (project_id:%(node.owner)s or project_id:%(node.lessee)s)"
   ironic:
     DEFAULT:
       # We only want to default to direct, otherwise defaults interfere with hardware
@@ -42,6 +46,12 @@ conf:
       enabled_power_interfaces: redfish,ipmitool,idrac-redfish,ilo
       enabled_raid_interfaces: redfish,idrac-redfish,ilo5,agent
       enabled_vendor_interfaces: redfish,ipmitool,idrac-redfish,ilo
+      # the service account belongs to the service project but our nodes
+      # will live in the infra domain in the baremetal project so the
+      # service account needs to have permissions outside of just the
+      # service project
+      # see: https://review.opendev.org/c/openstack/ironic/+/907148
+      rbac_service_role_elevated_access: true
     deploy:
       erase_devices_priority: 0
       erase_devices_metadata_priority: 0

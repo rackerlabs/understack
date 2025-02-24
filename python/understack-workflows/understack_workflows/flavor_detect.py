@@ -12,7 +12,7 @@ from understack_workflows.helpers import setup_logger
 logger = setup_logger(__name__)
 FLAVORS_DIR = os.getenv("FLAVORS_DIR", "/etc/understack_flavors/")
 FLAVORS = FlavorSpec.from_directory(FLAVORS_DIR)
-logger.info(f"Loaded {len(FLAVORS)} flavor specifications.")
+logger.info("Loaded %d flavor specifications.", len(FLAVORS))
 
 
 def guess_machine_flavor(device_info: ChassisInfo, bmc: Bmc) -> str:
@@ -30,6 +30,6 @@ def guess_machine_flavor(device_info: ChassisInfo, bmc: Bmc) -> str:
         raise Exception(
             f"Machine: {machine} could not be classified into any flavor {FLAVORS=}"
         )
-    logger.info(f"Device has been classified as flavor: {flavor_name.name}")
+    logger.info("Device has been classified as flavor: %s", flavor_name.name)
 
     return flavor_name.name
