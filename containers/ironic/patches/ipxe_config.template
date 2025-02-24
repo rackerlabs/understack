@@ -27,7 +27,7 @@ poweroff
 
 :boot_anaconda
 imgfree
-kernel {% if pxe_options.ipxe_timeout > 0 %}--timeout {{ pxe_options.ipxe_timeout }} {% endif %}{{ pxe_options.aki_path }} -c {{ pxe_options.ari_path|default("deploy_ramdisk", true) }} ignoreHeadless=TRUE ks={{ pxe_options.ks_cfg_url }} ip=${net0/ip} netmask=${net0/netmask} gateway=${net0/gateway} nameserver=${net0/dns} BOOTIF=01-${mac:hexhyp}|| goto retry
+kernel {% if pxe_options.ipxe_timeout > 0 %}--timeout {{ pxe_options.ipxe_timeout }} {% endif %}{{ pxe_options.aki_path }} -c {{ pxe_options.ari_path|default("deploy_ramdisk", true) }} ignoreHeadless=TRUE ks={{ pxe_options.ks_cfg_url }} ip=${net0/ip} netmask=${net0/netmask} gateway=${net0/gateway} nameserver=${net0/dns} BOOTIF=01-${mac:hexhyp} || goto retry
 boot
 
 :boot_ramdisk
