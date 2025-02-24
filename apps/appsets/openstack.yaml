@@ -18,39 +18,30 @@ spec:
               elements:
                 - component: keystone
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  openstackRelease: 2024.2
                   chartVersion: 2024.2.4+79d4b689-eb60e37c
                 - component: openvswitch
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
-                  openstackRelease: 2024.2
                   chartVersion: 2024.2.0
                 - component: ovn
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
-                  openstackRelease: 2024.2
                   chartVersion: 2024.2.0
                 - component: ironic
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  openstackRelease: 2024.2
                   chartVersion: 0.2.21
                 - component: placement
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  openstackRelease: 2024.2
                   chartVersion: 2024.2.1+34d1672a-93ed069c
                 - component: neutron
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  openstackRelease: 2024.2
                   chartVersion: 0.3.47
                 - component: glance
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  openstackRelease: 2024.2
                   chartVersion: 0.5.2
                 - component: nova
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  openstackRelease: 2024.2
                   chartVersion: 0.3.47
                 - component: horizon
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  openstackRelease: 2024.2
                   chartVersion: 2024.2.1+34d1672a-93ed069c
   template:
     metadata:
@@ -68,10 +59,15 @@ spec:
           helm:
             releaseName: '{{.component}}'
             valueFiles:
-              - $understack/components/openstack-{{.openstackRelease}}-jammy.yaml
+              # default upstream images
+              - $understack/components/images-openstack.yaml
+              # default values for each component
               - $understack/components/{{.component}}/values.yaml
+              # current global secret data per deployment
               - $deploy/{{.name}}/manifests/secret-openstack.yaml
+              # optional file to allow users to override upstream images
               - $deploy/{{.name}}/manifests/images-openstack.yaml
+              # optional file to allow users to override component values
               - $deploy/{{.name}}/helm-configs/{{.component}}.yaml
             # don't require all the values files
             ignoreMissingValueFiles: true

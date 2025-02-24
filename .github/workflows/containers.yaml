@@ -18,6 +18,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+env:
+  OPENSTACK_VERSION: 2024.2
+
 jobs:
   openstack:
     if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
@@ -26,7 +29,6 @@ jobs:
     strategy:
       matrix:
         project: [ironic, neutron, keystone, nova, openstack-client]
-        openstack: [2024.2]
 
     steps:
       - name: setup docker buildx
@@ -44,8 +46,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}/${{ matrix.project }}
           tags: |
-            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable={{is_default_branch}}
-            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=${{ env.OPENSTACK_VERSION }}-ubuntu_jammy,enable={{is_default_branch}}
+            type=raw,value=${{ env.OPENSTACK_VERSION }}-ubuntu_jammy,enable=${{ github.event_name == 'workflow_dispatch' }}
             type=ref,event=tag
             type=ref,event=pr
         env:
@@ -60,7 +62,7 @@ jobs:
         uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
         with:
           file: containers/${{ matrix.project }}/Dockerfile.${{ matrix.project }}
-          build-args: OPENSTACK_VERSION=${{ matrix.openstack }}
+          build-args: OPENSTACK_VERSION=${{ env.OPENSTACK_VERSION }}
           pull: true  # ensure we always have an up to date source
           push: true
           tags: ${{ steps.meta.outputs.tags }}
