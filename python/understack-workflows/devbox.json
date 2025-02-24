@@ -6,7 +6,7 @@
     "zsh@latest",
     "argo@latest",
     "argocd@latest",
-    "kubectl@latest",
+    "kubectl@1.32.2",
     "kubeseal@0.28.0",
     "kustomize@3.10.0",
     "telepresence2@2.21.3",
