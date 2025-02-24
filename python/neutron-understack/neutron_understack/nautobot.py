@@ -11,7 +11,7 @@ LOG = log.getLogger(__name__)
 
 
 class NautobotRequestError(exc.NeutronException):
-    message = "Nautobot API returned error %(code)s for %(url)s: %(body)s"
+    message = "Nautobot API ERROR %(code)s for %(url)s %(method)s %(payload)s: %(body)s"
 
 
 class NautobotOSError(exc.NeutronException):
@@ -24,6 +24,14 @@ class NautobotNotFoundError(exc.NeutronException):
 
 class NautobotCustomFieldNotFoundError(exc.NeutronException):
     message = "Custom field with name %(cf_name)s not found for %(obj)s"
+
+
+def _truncated(message: str | bytes, maxlen=200) -> str:
+    input = str(message)
+    if len(input) <= maxlen:
+        return input
+
+    return f"{input[:maxlen]}...{len(input) - maxlen} more chars"
 
 
 class Nautobot:
@@ -56,16 +64,25 @@ class Nautobot:
         except Exception as e:
             raise NautobotOSError(err=e) from e
 
+        if response.content:
+            try:
+                response_data = response.json()
+            except requests.exceptions.JSONDecodeError:
+                response_data = {"body": _truncated(response.content)}
+
+        else:
+            response_data = {"status_code": response.status_code, "body": ""}
+
         if response.status_code >= 300:
+            response_data = response_data.get("error", response_data)
+
             raise NautobotRequestError(
-                code=response.status_code, url=full_url, body=response.content
+                code=response.status_code,
+                url=full_url,
+                method=method,
+                payload=payload,
+                body=response_data,
             )
-        if not response.content:
-            response_data = {"status_code": response.status_code}
-        try:
-            response_data = response.json()
-        except requests.exceptions.JSONDecodeError:
-            response_data = {"body": response.content}
 
         caller_function = inspect.stack()[1].function
         LOG.debug(
