@@ -4,7 +4,7 @@
     "yq-go@3.4.1",
     "python3@3.12.8",
     "zsh@latest",
-    "argo@latest",
+    "argo@2.12.10",
     "argocd@latest",
     "kubectl@latest",
     "kubeseal@0.28.0",
