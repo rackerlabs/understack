@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -17,8 +18,19 @@ def current_context() -> dict:
 
 
 @pytest.fixture
-def context(current_context) -> MagicMock:
-    return MagicMock(current=current_context)
+def original_context(current_context) -> dict:
+    original = deepcopy(current_context)
+    return original
+
+
+@pytest.fixture
+def context(current_context, original_context) -> MagicMock:
+    return MagicMock(
+        current=current_context,
+        original=original_context,
+        original_vif_type=original_context["binding:vif_type"],
+        vif_type=current_context["binding:vif_type"],
+    )
 
 
 @pytest.fixture
@@ -91,6 +103,52 @@ def test_success_update_port_post_commit(
     mocked_fetch_connected_interface_uuid.assert_called_once()
     mocked_update_nautobot.assert_called_once()
     undersync_client.sync_devices.assert_called_once()
+
+
+@patch("neutron_understack.neutron_understack_mech.UnderstackDriver.update_nautobot")
+@patch("neutron_understack.utils.fetch_subport_network_id", return_value="112233")
+def test_update_port_post_commit_when_trunk_details_are_present(
+    mocked_update_nautobot,
+    mocked_fetch_subport_network_id,
+    nautobot_client,
+    context,
+):
+    context.current["trunk_details"] = {
+        "trunk_id": "11223344",
+        "sub_ports": [
+            {"port_id": "aabbcc"},
+        ],
+    }
+    driver.nb = nautobot_client
+    driver.update_port_postcommit(context)
+    nautobot_client.prep_switch_interface.assert_called_once_with(
+        connected_interface_id="03921f8d-b4de-412e-a733-f8eade4c6268",
+        ucvni_uuid="112233",
+        modify_native_vlan=False,
+        vlan_tag=None,
+    )
+
+
+@patch("neutron_understack.utils.fetch_subport_network_id", return_value="112233")
+def test_delete_tenant_port_on_unbound_when_trunk_details_are_present(
+    nautobot_client,
+    context,
+):
+    context.current["trunk_details"] = {
+        "trunk_id": "11223344",
+        "sub_ports": [
+            {"port_id": "aabbcc"},
+        ],
+    }
+    context.vif_type = "unbound"
+    context.original_vif_type = "other"
+    attrs = {"detach_port.return_value": "304bd384-338a-4365-9394-0c356ec698ed"}
+    nautobot_client.configure_mock(**attrs)
+    driver.nb = nautobot_client
+    driver._delete_tenant_port_on_unbound(context)
+    nautobot_client.detach_port.assert_any_call(
+        "03921f8d-b4de-412e-a733-f8eade4c6268", "112233"
+    )
 
 
 @patch(
