@@ -28,6 +28,7 @@ jobs:
 
     strategy:
       matrix:
+        # if you add a container here, add it to the 'clean_containers' job below
         project: [ironic, neutron, keystone, nova, openstack-client]
 
     steps:
@@ -116,6 +117,7 @@ jobs:
 
     strategy:
       matrix:
+        # if you add a container here, add it to the 'clean_containers' job below
         container:
           - name: ironic-nautobot-client
           - name: nova-flavors
@@ -171,10 +173,13 @@ jobs:
       matrix:
         container:
           - ironic
-          - keystone
           - neutron
+          - keystone
+          - nova
+          - openstack-client
           - dnsmasq
           - ironic-nautobot-client
+          - nova-flavors
 
     steps:
       - name: clean up PR container
