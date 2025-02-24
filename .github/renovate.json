@@ -25,5 +25,8 @@
       ],
       "datasourceTemplate": "helm"
     }
-  ]
+  ],
+  "devbox": {
+    "enabled": false
+  }
 }
