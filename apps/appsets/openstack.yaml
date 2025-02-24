@@ -71,6 +71,7 @@ spec:
               - $understack/components/openstack-{{.openstackRelease}}-jammy.yaml
               - $understack/components/{{.component}}/values.yaml
               - $deploy/{{.name}}/manifests/secret-openstack.yaml
+              - $deploy/{{.name}}/manifests/images-openstack.yaml
               - $deploy/{{.name}}/helm-configs/{{.component}}.yaml
             # don't require all the values files
             ignoreMissingValueFiles: true
