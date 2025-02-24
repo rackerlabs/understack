@@ -41,11 +41,11 @@ def do_action(
         "ironic_provision_state": provision_state,
         "resource_class": resource_class,
     }
-    nautobot.update_cf(
-        device_id=device_uuid, tenant_id=tenant_id, fields=custom_fields_to_update
-    )
 
     if new_status:
+        nautobot.update_cf(
+            device_id=device_uuid, tenant_id=tenant_id, fields=custom_fields_to_update
+        )
         nautobot.update_device_status(device_uuid, new_status)
 
 
