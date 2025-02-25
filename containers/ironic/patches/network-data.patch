@@ -1,0 +1,14 @@
+diff --git a/ironic/common/pxe_utils.py b/ironic/common/pxe_utils.py
+index b6c3a11d1..5db35707c 100644
+--- a/ironic/common/pxe_utils.py
++++ b/ironic/common/pxe_utils.py
+@@ -1068,6 +1068,9 @@ def build_kickstart_config_options(task):
+         deploy_utils.get_ironic_api_url().rstrip('/'),
+         node.uuid
+     )
++    # gather network_data
++    params['network_data'] = task.driver.network.get_node_network_data(task)
++
+     params['heartbeat_url'] = heartbeat_url
+     params['config_drive'] = ks_utils.prepare_config_drive(task)
+     return {'ks_options': params}
