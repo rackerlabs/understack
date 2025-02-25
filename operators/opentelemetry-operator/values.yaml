@@ -1,10 +1,8 @@
 admissionWebhooks:
   certManager:
-    issuerRef:
-      kind: ClusterIssuer
-      name: understack-cluster-issuer
-  autoGenerateCert:
     enabled: false
+  autoGenerateCert:
+    enabled: true
 
 manager:
   collectorImage:
