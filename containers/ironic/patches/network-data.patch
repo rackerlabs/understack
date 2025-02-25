@@ -1,0 +1,76 @@
+diff --git a/ironic/common/kickstart_utils.py b/ironic/common/kickstart_utils.py
+index 317c5620d..0b496b12e 100644
+--- a/ironic/common/kickstart_utils.py
++++ b/ironic/common/kickstart_utils.py
+@@ -121,26 +121,7 @@ def _fetch_config_drive_from_url(url):
+ def _write_config_drive_content(content, file_path):
+     """Generate post ks script to write each userdata content."""
+ 
+-    content = base64.b64encode(str.encode(content))
+-    kickstart_data = []
+-    kickstart_data.append("\n")
+-    kickstart_data.append("%post\n")
+-    kickstart_data.append(("DIRPATH=`/usr/bin/dirname "
+-                           "{file_path}`\n").format(
+-        file_path=file_path))
+-    kickstart_data.append("/bin/mkdir -p $DIRPATH\n")
+-    kickstart_data.append("CONTENT='{content}'\n".format(
+-        content=content))
+-    kickstart_data.append("echo $CONTENT | "
+-                          "/usr/bin/base64 --decode > "
+-                          "{file_path}".format(file_path=file_path))
+-    kickstart_data.append("\n")
+-    kickstart_data.append(
+-        "/bin/chmod 600 {file_path}\n".format(file_path=file_path)
+-    )
+-    kickstart_data.append("%end\n\n")
+-
+-    return "".join(kickstart_data)
++    return base64.b64encode(str.encode(content))
+ 
+ 
+ def prepare_config_drive(task,
+@@ -149,7 +130,7 @@ def prepare_config_drive(task,
+     LOG.debug("Preparing config_drive to write to kickstart file")
+     node = task.node
+     config_drive = node.instance_info.get('configdrive')
+-    ks_config_drive = ''
++    ks_config_drive = {}
+     if not config_drive:
+         return ks_config_drive
+ 
+@@ -162,10 +143,6 @@ def prepare_config_drive(task,
+         config_drive_iso = decode_and_extract_config_drive_iso(config_drive)
+         config_drive = read_iso9600_config_drive(config_drive_iso)
+ 
+-    for key in sorted(config_drive.keys()):
+-        target_path = os.path.join(config_drive_path, key)
+-        ks_config_drive += _write_config_drive_content(
+-            config_drive[key], target_path
+-        )
+-
++    ks_config_drive = {key: str(base64.b64encode(str.encode(config_drive[key])))
++                       for key in sorted(config_drive.keys())}
+     return ks_config_drive
+diff --git a/ironic/common/pxe_utils.py b/ironic/common/pxe_utils.py
+index b6c3a11d1..f407c44d5 100644
+--- a/ironic/common/pxe_utils.py
++++ b/ironic/common/pxe_utils.py
+@@ -1068,6 +1068,9 @@ def build_kickstart_config_options(task):
+         deploy_utils.get_ironic_api_url().rstrip('/'),
+         node.uuid
+     )
++    # gather network_data
++    params['network_data'] = task.driver.network.get_node_network_data(task)
++
+     params['heartbeat_url'] = heartbeat_url
+     params['config_drive'] = ks_utils.prepare_config_drive(task)
+     return {'ks_options': params}
+@@ -1156,6 +1159,7 @@ def validate_kickstart_template(ks_template):
+     ks_options = {'liveimg_url': 'fake_image_url',
+                   'agent_token': 'fake_token',
+                   'config_drive': '',
++                  'network_data': '',
+                   'heartbeat_url': 'fake_heartbeat_url'}
+     params = {'ks_options': ks_options}
+     try:

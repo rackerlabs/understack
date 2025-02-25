@@ -37,7 +37,7 @@ conf:
       default_deploy_interface: direct
       enabled_bios_interfaces: no-bios,redfish,idrac-redfish,ilo
       enabled_boot_interfaces: http-ipxe,ipxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,ilo-virtual-media,ilo-uefi-https,ilo-ipxe
-      enabled_deploy_interfaces: direct,ramdisk
+      enabled_deploy_interfaces: direct,ramdisk,anaconda
       enabled_firmware_interfaces: redfish,no-firmware
       enabled_hardware_types: redfish,idrac,ilo5,ilo
       enabled_inspect_interfaces: redfish,agent,idrac-redfish,ilo
@@ -52,6 +52,8 @@ conf:
       # service project
       # see: https://review.opendev.org/c/openstack/ironic/+/907148
       rbac_service_role_elevated_access: true
+    anaconda:
+      use_provisioning_network: true
     deploy:
       erase_devices_priority: 0
       erase_devices_metadata_priority: 0
@@ -72,6 +74,7 @@ conf:
     pxe:
       images_path: /var/lib/understack/master_iso_images
       instance_master_path: /var/lib/understack/master_iso_images
+      ipxe_config_template: /var/lib/ipxe-template/ipxe_config.template
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
       hooks: "$default_hooks,parse-lldp,local-link-connection,physical-network"
