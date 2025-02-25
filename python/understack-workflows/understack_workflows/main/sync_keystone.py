@@ -74,7 +74,7 @@ def is_valid_domain(
 
 def _create_outside_network(conn: Connection, project_id: uuid.UUID):
     payload = _outside_network_payload(project_id)
-    network = conn.network.find_network(**payload)
+    network = conn.network.find_network(**payload)  # type: ignore
     if network:
         logger.info(
             "%s Network %s already exists for this tenant",
@@ -83,7 +83,7 @@ def _create_outside_network(conn: Connection, project_id: uuid.UUID):
         )
     else:
         payload.update(name=payload.pop("name_or_id"))
-        network = conn.network.create_network(**payload)
+        network = conn.network.create_network(**payload)  # type: ignore
         logger.info(
             "Created %s Network %s for tenant", OUTSIDE_NETWORK_NAME, network.id
         )
@@ -91,7 +91,7 @@ def _create_outside_network(conn: Connection, project_id: uuid.UUID):
 
 def _delete_outside_network(conn: Connection, project_id: uuid.UUID):
     payload = _outside_network_payload(project_id)
-    network = conn.network.find_network(**payload)
+    network = conn.network.find_network(**payload)  # type: ignore
     if network:
         conn.delete_network(network.id)
         logger.info(
