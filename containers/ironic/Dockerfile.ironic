@@ -7,8 +7,16 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         genisoimage \
         isolinux \
+        patch \
+        quilt \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY python/ironic-understack /tmp/ironic-understack
 COPY python/understack-flavor-matcher /tmp/understack-flavor-matcher
 RUN /var/lib/openstack/bin/python -m pip install --no-cache --no-cache-dir /tmp/ironic-understack /tmp/understack-flavor-matcher sushy-oem-idrac==6.0.0
+
+# copy in any patches we have
+COPY containers/ironic/patches /tmp/patches
+# change to our installed directory and use quilt to apply patches
+RUN cd $(/var/lib/openstack/bin/python -c "import site; print(site.getsitepackages()[0])") && \
+    QUILT_PATCHES=/tmp/patches quilt push -a

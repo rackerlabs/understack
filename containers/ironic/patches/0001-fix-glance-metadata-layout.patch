@@ -1,0 +1,152 @@
+From 74fac79fcf1abdd2aa2145c3b475d5266996f73a Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Sat, 22 Feb 2025 18:34:59 -0600
+Subject: [PATCH 1/3] fix glance metadata layout
+
+The code here builds a dictionary from a glance v2 image object that
+roughly resembles the glance v2 image object. The current behavior
+nests the 'properties' set on the image under it's own 'properties' key
+resulting in the image properties never being seen by the Ironic code.
+The breakage results from the change from glanceclient to the SDK which
+changed the shape of the returned object. The glanceclient object shape
+was that of FakeImage while the SDK returns a Resource based object
+which includes attributes for all possible fields which are defined at
+the top-level of the object. Since the tests run against a different
+value they did not cature the failure. Just changing to the SDK object
+results in us copying all these new values to the properties dict which
+is definitely not the intention. For maximum compatibility to backport
+this filters any value not set from being set into properties and sets
+the rest. The broken path is any user of get_image_properties()
+(both copies from common/images and deploy_utils) checking for user
+supplied properties.
+
+Closes-Bug: 2099953
+Change-Id: I1842e2651fd2bd8455646db9a3a80c3b9ece5c97
+Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
+---
+ ironic/common/glance_service/service_utils.py | 18 ++++++++++---
+ .../tests/unit/common/test_glance_service.py  |  6 +++--
+ ironic/tests/unit/stubs.py                    | 27 -------------------
+ ...age-properties-check-2a11337c9e517a5c.yaml | 13 +++++++++
+ 4 files changed, 32 insertions(+), 32 deletions(-)
+ create mode 100644 releasenotes/notes/bug-2099275-glance-image-properties-check-2a11337c9e517a5c.yaml
+
+diff --git a/ironic/common/glance_service/service_utils.py b/ironic/common/glance_service/service_utils.py
+index 20cc21ffa..315395d97 100644
+--- a/ironic/common/glance_service/service_utils.py
++++ b/ironic/common/glance_service/service_utils.py
+@@ -34,14 +34,26 @@ _IMAGE_ATTRIBUTES = ['size', 'disk_format', 'owner',
+ 
+ def _extract_attributes(image):
+     output = {}
++    # copies attributes from the openstacksdk Image object
++    # to a dictionary
+     for attr in _IMAGE_ATTRIBUTES:
+         output[attr] = getattr(image, attr, None)
+ 
+-    output['properties'] = {}
++    # copy the properties over to start so that image properties
++    # are not nested in another properties key
++    output['properties'] = getattr(image, 'properties', {})
+     output['schema'] = image.schema
+ 
+-    for image_property in set(image) - set(_IMAGE_ATTRIBUTES):
+-        output['properties'][image_property] = image[image_property]
++    # attributes already copied so we copy the rest into properties
++    copied = set(_IMAGE_ATTRIBUTES)
++    copied.add('properties')
++
++    for image_property in set(image) - copied:
++        # previously with glanceclient only set things
++        # were on the object that came back but the SDK
++        # defines every possible attribute so we need to filter
++        if image[image_property]:
++            output['properties'][image_property] = image[image_property]
+ 
+     return output
+ 
+diff --git a/ironic/tests/unit/common/test_glance_service.py b/ironic/tests/unit/common/test_glance_service.py
+index e02156ae1..f997dea64 100644
+--- a/ironic/tests/unit/common/test_glance_service.py
++++ b/ironic/tests/unit/common/test_glance_service.py
+@@ -100,9 +100,11 @@ class TestGlanceImageService(base.TestCase):
+     @staticmethod
+     def _make_fixture(**kwargs):
+         fixture = {'name': None,
++                   'owner': None,
++                   'properties': {},
+                    'status': "active"}
+         fixture.update(kwargs)
+-        return stubs.FakeImage(fixture)
++        return openstack.image.v2.image.Image.new(**fixture)
+ 
+     @property
+     def endpoint(self):
+@@ -142,7 +144,7 @@ class TestGlanceImageService(base.TestCase):
+             'schema': None,
+             'size': None,
+             'status': "active",
+-            'tags': None,
++            'tags': [],
+             'updated_at': None,
+             'visibility': None,
+             'os_hash_algo': None,
+diff --git a/ironic/tests/unit/stubs.py b/ironic/tests/unit/stubs.py
+index 6927f38d2..a73c2ab37 100644
+--- a/ironic/tests/unit/stubs.py
++++ b/ironic/tests/unit/stubs.py
+@@ -51,33 +51,6 @@ class FakeImageDownload(object):
+         self.content = content
+ 
+ 
+-class FakeImage(dict):
+-    def __init__(self, metadata):
+-        IMAGE_ATTRIBUTES = ['size', 'disk_format', 'owner',
+-                            'container_format', 'checksum', 'id',
+-                            'name', 'deleted', 'status',
+-                            'min_disk', 'min_ram', 'tags', 'visibility',
+-                            'protected', 'file', 'schema', 'os_hash_algo',
+-                            'os_hash_value']
+-        raw = dict.fromkeys(IMAGE_ATTRIBUTES)
+-        raw.update(metadata)
+-        # raw['created_at'] = NOW_GLANCE_FORMAT
+-        # raw['updated_at'] = NOW_GLANCE_FORMAT
+-        super(FakeImage, self).__init__(raw)
+-
+-    def __getattr__(self, key):
+-        try:
+-            return self[key]
+-        except KeyError:
+-            raise AttributeError(key)
+-
+-    def __setattr__(self, key, value):
+-        if key in self:
+-            self[key] = value
+-        else:
+-            raise AttributeError(key)
+-
+-
+ class FakeNeutronPort(dict):
+     def __init__(self, **attrs):
+         PORT_ATTRS = ['admin_state_up',
+diff --git a/releasenotes/notes/bug-2099275-glance-image-properties-check-2a11337c9e517a5c.yaml b/releasenotes/notes/bug-2099275-glance-image-properties-check-2a11337c9e517a5c.yaml
+new file mode 100644
+index 000000000..ed1be77d1
+--- /dev/null
++++ b/releasenotes/notes/bug-2099275-glance-image-properties-check-2a11337c9e517a5c.yaml
+@@ -0,0 +1,13 @@
++---
++fixes:
++  - |
++    validate_image_properties() was unable to read the properties set on a
++    Glance  image due to an issue where the properties loaded being nested
++    under another properties key. This resulted in the Anaconda deploy
++    interface being unable to use Glance images due to the requirement of
++    the stage2_id field. Even when passing this the field would not be
++    read correctly. For other deploy interfaces the value for kernel and
++    ramdisk ended up coming from deploy_info instead of the image properties.
++    This fixes the data to come from image properties as is documented.
++    See `bug 2099275 <https://bugs.launchpad.net/ironic/+bug/2099953>`_ for
++    more details.
+-- 
+2.39.5 (Apple Git-154)
