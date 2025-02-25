@@ -138,10 +138,11 @@ class UnderstackDriver(MechanismDriver):
            Don't have an SVI, which means we don't associate them with a VNI in
            nautobot.
         """
-        subnet_uuid = context.current["id"]
-        network_uuid = context.current["network_id"]
-        prefix = context.current["cidr"]
-        external = context.current["router:external"]
+        subnet_uuid: str = context.current["id"]
+        network_uuid: str = context.current["network_id"]
+        prefix: str = context.current["cidr"]
+        external: bool = context.current["router:external"]
+        service_types: list[str] = context.current["service_types"]
 
         if external:
             namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
@@ -154,7 +155,7 @@ class UnderstackDriver(MechanismDriver):
             namespace_name=namespace,
         )
 
-        if external:
+        if external and "network:understack_svi" in service_types:
             self.nb.associate_subnet_with_network(
                 role="svi_vxlan_anycast_gateway",
                 network_uuid=network_uuid,
