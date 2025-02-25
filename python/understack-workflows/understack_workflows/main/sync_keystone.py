@@ -19,6 +19,8 @@ _EXIT_SUCCESS = 0
 _EXIT_API_ERROR = 1
 _EXIT_EVENT_UNKNOWN = 2
 
+OUTSIDE_NETWORK_NAME = "OUTSIDE"
+
 
 class Event(StrEnum):
     ProjectCreate = "identity.project.created"
@@ -70,6 +72,41 @@ def is_valid_domain(
     return ret
 
 
+def _create_outside_network(conn: Connection, project_id: uuid.UUID):
+    payload = _outside_network_payload(project_id)
+    network = conn.network.find_network(**payload)
+    if network:
+        logger.info(
+            "%s Network %s already exists for this tenant",
+            OUTSIDE_NETWORK_NAME,
+            network.id,
+        )
+    else:
+        payload.update(name=payload.pop("name_or_id"))
+        network = conn.network.create_network(**payload)
+        logger.info(
+            "Created %s Network %s for tenant", OUTSIDE_NETWORK_NAME, network.id
+        )
+
+
+def _delete_outside_network(conn: Connection, project_id: uuid.UUID):
+    payload = _outside_network_payload(project_id)
+    network = conn.network.find_network(**payload)
+    if network:
+        conn.delete_network(network.id)
+        logger.info(
+            "Deleted %s Network %s for this tenant", OUTSIDE_NETWORK_NAME, network.id
+        )
+
+
+def _outside_network_payload(project_id: uuid.UUID) -> dict:
+    return {
+        "project_id": project_id,
+        "name_or_id": OUTSIDE_NETWORK_NAME,
+        "router:external": True,
+    }
+
+
 def handle_project_create(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
@@ -80,6 +117,7 @@ def handle_project_create(
         ten = ten_api.create(
             id=str(project_id), name=project.name, description=project.description
         )
+        _create_outside_network(conn, project_id)
     except Exception:
         logger.exception(
             "Unable to create project %s / %s", str(project_id), project.name
@@ -113,6 +151,8 @@ def handle_project_update(
                 project_id,
                 existing_tenant.last_updated,  # type: ignore
             )
+
+        _create_outside_network(conn, project_id)
     except Exception:
         logger.exception(
             "Unable to update project %s / %s", str(project_id), project.name
@@ -129,6 +169,8 @@ def handle_project_delete(
     if not ten:
         logger.warning("tenant %s does not exist, nothing to delete", project_id)
         return _EXIT_SUCCESS
+
+    _delete_outside_network(conn, project_id)
     ten.delete()  # type: ignore
     logger.info("deleted tenant %s", project_id)
     return _EXIT_SUCCESS
