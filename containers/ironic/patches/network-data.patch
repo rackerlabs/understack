@@ -1,5 +1,5 @@
 diff --git a/ironic/common/pxe_utils.py b/ironic/common/pxe_utils.py
-index b6c3a11d1..5db35707c 100644
+index b6c3a11d1..f407c44d5 100644
 --- a/ironic/common/pxe_utils.py
 +++ b/ironic/common/pxe_utils.py
 @@ -1068,6 +1068,9 @@ def build_kickstart_config_options(task):
@@ -12,3 +12,11 @@ index b6c3a11d1..5db35707c 100644
      params['heartbeat_url'] = heartbeat_url
      params['config_drive'] = ks_utils.prepare_config_drive(task)
      return {'ks_options': params}
+@@ -1156,6 +1159,7 @@ def validate_kickstart_template(ks_template):
+     ks_options = {'liveimg_url': 'fake_image_url',
+                   'agent_token': 'fake_token',
+                   'config_drive': '',
++                  'network_data': '',
+                   'heartbeat_url': 'fake_heartbeat_url'}
+     params = {'ks_options': ks_options}
+     try:
