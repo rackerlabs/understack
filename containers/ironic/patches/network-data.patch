@@ -1,3 +1,57 @@
+diff --git a/ironic/common/kickstart_utils.py b/ironic/common/kickstart_utils.py
+index 317c5620d..661815880 100644
+--- a/ironic/common/kickstart_utils.py
++++ b/ironic/common/kickstart_utils.py
+@@ -121,26 +121,7 @@ def _fetch_config_drive_from_url(url):
+ def _write_config_drive_content(content, file_path):
+     """Generate post ks script to write each userdata content."""
+ 
+-    content = base64.b64encode(str.encode(content))
+-    kickstart_data = []
+-    kickstart_data.append("\n")
+-    kickstart_data.append("%post\n")
+-    kickstart_data.append(("DIRPATH=`/usr/bin/dirname "
+-                           "{file_path}`\n").format(
+-        file_path=file_path))
+-    kickstart_data.append("/bin/mkdir -p $DIRPATH\n")
+-    kickstart_data.append("CONTENT='{content}'\n".format(
+-        content=content))
+-    kickstart_data.append("echo $CONTENT | "
+-                          "/usr/bin/base64 --decode > "
+-                          "{file_path}".format(file_path=file_path))
+-    kickstart_data.append("\n")
+-    kickstart_data.append(
+-        "/bin/chmod 600 {file_path}\n".format(file_path=file_path)
+-    )
+-    kickstart_data.append("%end\n\n")
+-
+-    return "".join(kickstart_data)
++    return base64.b64encode(str.encode(content))
+ 
+ 
+ def prepare_config_drive(task,
+@@ -149,7 +130,7 @@ def prepare_config_drive(task,
+     LOG.debug("Preparing config_drive to write to kickstart file")
+     node = task.node
+     config_drive = node.instance_info.get('configdrive')
+-    ks_config_drive = ''
++    ks_config_drive = {}
+     if not config_drive:
+         return ks_config_drive
+ 
+@@ -162,10 +143,6 @@ def prepare_config_drive(task,
+         config_drive_iso = decode_and_extract_config_drive_iso(config_drive)
+         config_drive = read_iso9600_config_drive(config_drive_iso)
+ 
+-    for key in sorted(config_drive.keys()):
+-        target_path = os.path.join(config_drive_path, key)
+-        ks_config_drive += _write_config_drive_content(
+-            config_drive[key], target_path
+-        )
+-
++    ks_config_drive = {key: base64.b64encode(str.encode(config_drive[key]))
++                       for key in sorted(config_drive.keys()}
+     return ks_config_drive
 diff --git a/ironic/common/pxe_utils.py b/ironic/common/pxe_utils.py
 index b6c3a11d1..f407c44d5 100644
 --- a/ironic/common/pxe_utils.py
