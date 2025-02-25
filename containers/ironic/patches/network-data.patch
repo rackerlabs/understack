@@ -1,5 +1,5 @@
 diff --git a/ironic/common/kickstart_utils.py b/ironic/common/kickstart_utils.py
-index 317c5620d..661815880 100644
+index 317c5620d..78510e686 100644
 --- a/ironic/common/kickstart_utils.py
 +++ b/ironic/common/kickstart_utils.py
 @@ -121,26 +121,7 @@ def _fetch_config_drive_from_url(url):
@@ -50,7 +50,7 @@ index 317c5620d..661815880 100644
 -        )
 -
 +    ks_config_drive = {key: base64.b64encode(str.encode(config_drive[key]))
-+                       for key in sorted(config_drive.keys()}
++                       for key in sorted(config_drive.keys())}
      return ks_config_drive
 diff --git a/ironic/common/pxe_utils.py b/ironic/common/pxe_utils.py
 index b6c3a11d1..f407c44d5 100644
