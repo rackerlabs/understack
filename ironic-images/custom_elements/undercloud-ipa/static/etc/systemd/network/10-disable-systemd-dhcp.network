@@ -1,0 +1,8 @@
+# We need to explicitly disable systemd-networkd's default of launching DHCP
+# client on all ethernet interfaces because this is already handled by the
+# dhcp-all-interfaces script that comes with IPA
+[Match]
+Name=en*
+
+[Network]
+DHCP=no

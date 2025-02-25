@@ -136,7 +136,7 @@ jobs:
           make_latest: true
           fail_on_unmatched_files: true
           files: ironic-images/upload/*
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: ${{ github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' }}
 
   cleanup:
     runs-on: ubuntu-latest
