@@ -1,0 +1,43 @@
+[tool.poetry]
+name = "esxi-netinit"
+version = "0.1.0"
+description = "Script to initialize networking on ESXi hosts with usage of Openstack network_data.json"
+authors = ["Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "netinit"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = [
+    "tests",
+]
+filterwarnings = []
+
+[tool.ruff]
+# use our default and override anything we need specifically
+extend = "../pyproject.toml"
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",     # allow 'assert' for pytest
+    "S105",     # allow hardcoded passwords for testing
+    "S104",     # false positive on binding to all ifaces
+]
+"tests/test_esxconfig.py" = [
+  "E501" # esxcli outputs with long lines
+]
+"netinit.py" = [
+  "S104",     # false positive on binding to all ifaces
+]
