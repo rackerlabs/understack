@@ -145,8 +145,17 @@ class ESXConfig:
 
     def configure_interfaces(self):
         for net in self.network_data.networks:
+            if net.default_routes():
+                # we handle the management interface differently
+                continue
             nic = self.nics.find_by_mac(net.link.ethernet_mac_address)
             self._change_ip(nic.name, net.ip_address, net.netmask)
+
+    def configure_management_interface(self):
+        mgmt_network = next(
+            net for net in self.network_data.networks if net.default_routes()
+        )
+        return self._change_ip("vmk0", mgmt_network.ip_address, mgmt_network.netmask)
 
     @cached_property
     def nics(self):
@@ -175,14 +184,15 @@ class ESXConfig:
             subprocess.run(cmd, check=True)  # noqa: S603
 
 
-
 ###
+
 
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
     esx = ESXConfig(network_data, dry_run=dry_run)
-    esx.configure_interfaces()
+    esx.configure_management_interface()
     esx.configure_default_route()
+    esx.configure_interfaces()
 
 
 if __name__ == "__main__":
@@ -195,4 +205,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error configuring network: {str(e)}")
         sys.exit(1)
-
