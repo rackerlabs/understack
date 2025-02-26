@@ -1,7 +1,7 @@
 import json
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
 
 
@@ -12,6 +12,7 @@ class Link:
     mtu: int
     type: str
     vif_id: str
+    vlan_link: 'Link | None' = field(default=None)
 
 
 @dataclass
@@ -120,6 +121,12 @@ class ESXConfig:
         self.network_data = network_data
         self.dry_run = dry_run
 
+    def __execute(self, cmd: list[str]):
+        if self.dry_run:
+            print(f"Executing: {cmd}")
+        else:
+            subprocess.run(cmd, check=True)  # noqa: S603
+
     def configure_default_route(self):
         """Configures default route.
 
@@ -138,10 +145,7 @@ class ESXConfig:
             "-n",
             "default",
         ]
-        if self.dry_run:
-            print(f"Executing: {cmd}")
-        else:
-            return subprocess.run(cmd, check=True)  # noqa: S603
+        return self.__execute(cmd)
 
     def configure_interfaces(self):
         for net in self.network_data.networks:
@@ -156,6 +160,38 @@ class ESXConfig:
             net for net in self.network_data.networks if net.default_routes()
         )
         return self._change_ip("vmk0", mgmt_network.ip_address, mgmt_network.netmask)
+
+    def portgroup_add(self, portgroup_name, switch_name="vswitch0"):
+        """Adds Portgroup to a vSwitch."""
+        cmd = [
+            "esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "portgroup",
+            "add",
+            "--portgroup-name",
+            portgroup_name,
+            "--vswitch-name",
+            switch_name,
+        ]
+        return self.__execute(cmd)
+
+    def portgroup_set_vlan(self, portgroup_name, vlan_id):
+        """Configures VLANid to be used on a portgroup."""
+        cmd = [
+            "esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "portgroup",
+            "add",
+            "--portgroup-name",
+            portgroup_name,
+            "--vlan-id",
+            vlan_id,
+        ]
+        return self.__execute(cmd)
 
     @cached_property
     def nics(self):
@@ -178,10 +214,7 @@ class ESXConfig:
             "-t",
             "static",
         ]
-        if self.dry_run:
-            print(f"Executing: {cmd}")
-        else:
-            subprocess.run(cmd, check=True)  # noqa: S603
+        return self.__execute(cmd)
 
 
 ###
