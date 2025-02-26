@@ -12,7 +12,9 @@ class Link:
     mtu: int
     type: str
     vif_id: str
-    vlan_link: 'Link | None' = field(default=None)
+    vlan_id: int | None = field(default=None)
+    vlan_mac_address: str | None = field(default=None)
+    vlan_link: "Link | None" = field(default=None)
 
 
 @dataclass
@@ -34,7 +36,7 @@ class Network:
     link: Link
     type: str
     routes: list
-    services: list
+    services: list | None = field(default=None)
 
     def default_routes(self):
         return [route for route in self.routes if route.is_default()]
@@ -51,7 +53,7 @@ class NetworkData:
 
     def __init__(self, data: dict) -> None:
         self.data = data
-        self.links = [Link(**link) for link in data.get("links", [])]
+        self.links = self._init_links(data.get("links", []))
         self.networks = []
 
         for net_data in data.get("networks", []):
@@ -63,6 +65,19 @@ class NetworkData:
             self.networks.append(Network(**net_data, routes=routes, link=relevant_link))
 
         self.services = [Service(**service) for service in data.get("services", [])]
+
+    def _init_links(self, links_data):
+        links_data = links_data.copy()
+        links = []
+        for link in links_data:
+            if "vlan_link" in link:
+                phy_link = next(
+                    plink for plink in links if plink.id == link["vlan_link"]
+                )
+                link["vlan_link"] = phy_link
+
+            links.append(Link(**link))
+        return links
 
     def default_route(self) -> Route:
         return next(
@@ -123,7 +138,7 @@ class ESXConfig:
 
     def __execute(self, cmd: list[str]):
         if self.dry_run:
-            print(f"Executing: {cmd}")
+            print(f"Would exececute: {' '.join(cmd)}")
         else:
             subprocess.run(cmd, check=True)  # noqa: S603
 
@@ -147,13 +162,13 @@ class ESXConfig:
         ]
         return self.__execute(cmd)
 
-    def configure_interfaces(self):
-        for net in self.network_data.networks:
-            if net.default_routes():
-                # we handle the management interface differently
-                continue
-            nic = self.nics.find_by_mac(net.link.ethernet_mac_address)
-            self._change_ip(nic.name, net.ip_address, net.netmask)
+    def configure_portgroups(self):
+        for link in self.network_data.links:
+            if link.type == "vlan":
+                vid = link.vlan_id
+                pg_name = f"internal_net_vid_{vid}"
+                self.portgroup_add(portgroup_name=pg_name)
+                self.portgroup_set_vlan(portgroup_name=pg_name, vlan_id=vid)
 
     def configure_management_interface(self):
         mgmt_network = next(
@@ -164,32 +179,32 @@ class ESXConfig:
     def portgroup_add(self, portgroup_name, switch_name="vswitch0"):
         """Adds Portgroup to a vSwitch."""
         cmd = [
-            "esxcli",
+            "/bin/esxcli",
             "network",
             "vswitch",
             "standard",
             "portgroup",
             "add",
             "--portgroup-name",
-            portgroup_name,
+            str(portgroup_name),
             "--vswitch-name",
-            switch_name,
+            str(switch_name),
         ]
         return self.__execute(cmd)
 
     def portgroup_set_vlan(self, portgroup_name, vlan_id):
         """Configures VLANid to be used on a portgroup."""
         cmd = [
-            "esxcli",
+            "/bin/esxcli",
             "network",
             "vswitch",
             "standard",
             "portgroup",
             "add",
             "--portgroup-name",
-            portgroup_name,
+            str(portgroup_name),
             "--vlan-id",
-            vlan_id,
+            str(vlan_id),
         ]
         return self.__execute(cmd)
 
@@ -225,7 +240,7 @@ def main(json_file, dry_run):
     esx = ESXConfig(network_data, dry_run=dry_run)
     esx.configure_management_interface()
     esx.configure_default_route()
-    esx.configure_interfaces()
+    esx.configure_portgroups()
 
 
 if __name__ == "__main__":
