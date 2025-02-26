@@ -13,8 +13,8 @@ class Link:
     mtu: int
     type: str
     vif_id: str
-    vlan_id: int | None = field(default=None)
-    vlan_mac_address: str | None = field(default=None)
+    vlan_id: "int | None" = field(default=None)
+    vlan_mac_address: "str | None" = field(default=None)
     vlan_link: "Link | None" = field(default=None)
 
 
@@ -37,7 +37,7 @@ class Network:
     link: Link
     type: str
     routes: list
-    services: list | None = field(default=None)
+    services: "list | None" = field(default=None)
 
     def default_routes(self):
         return [route for route in self.routes if route.is_default()]
@@ -142,9 +142,9 @@ class ESXConfig:
         self.network_data = network_data
         self.dry_run = dry_run
 
-    def __execute(self, cmd: list[str]):
+    def __execute(self, cmd: list):
         if self.dry_run:
-            print(f"Would exececute: {' '.join(cmd)}")
+            print(f"Would execute: {' '.join(cmd)}")
             return cmd
         else:
             subprocess.run(cmd, check=True)  # noqa: S603
@@ -252,6 +252,7 @@ class ESXConfig:
             "--vswitch-name",
             str(name),
         ]
+
         return self.__execute(cmd)
 
     def uplink_add(self, nic, switch_name="vSwitch0"):
@@ -358,6 +359,51 @@ class ESXConfig:
         self.vswitch_security(name=switch_name)
         self.vswitch_settings(mtu=mtu, name=switch_name)
 
+    def configure_dns(self, servers=None, search=None):
+        """Sets up arbitrary DNS servers."""
+        if not servers:
+            servers = []
+        if not search:
+            search = []
+
+        for server in servers:
+            self.__execute(
+                [
+                    "/bin/esxcli",
+                    "network",
+                    "ip",
+                    "dns",
+                    "server",
+                    "add",
+                    "--server",
+                    server,
+                ]
+            )
+
+        for domain in search:
+            self.__execute(
+                [
+                    "/bin/esxcli",
+                    "network",
+                    "ip",
+                    "dns",
+                    "search",
+                    "add",
+                    "--domain",
+                    domain,
+                ]
+            )
+
+    def configure_requested_dns(self):
+        """Configures DNS servers that were provided in network_data.json."""
+        dns_servers = [
+            srv.address for srv in self.network_data.services if srv.type == "dns"
+        ]
+        if not dns_servers:
+            return
+
+        return self.configure_dns(servers=dns_servers)
+
 
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
@@ -367,7 +413,9 @@ def main(json_file, dry_run):
     esx.configure_vswitch(
         uplink=esx.identify_uplink(), switch_name="vSwitch0", mtu=9000
     )
+
     esx.configure_portgroups()
+    esx.configure_requested_dns()
 
 
 if __name__ == "__main__":

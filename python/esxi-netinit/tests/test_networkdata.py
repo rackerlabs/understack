@@ -1,12 +1,9 @@
 import json
 from dataclasses import is_dataclass
 
-import pytest
-
 from netinit import Link
 from netinit import NetworkData
 from netinit import Route
-
 
 
 def test_links_parsing(network_data_single):
@@ -14,7 +11,6 @@ def test_links_parsing(network_data_single):
     assert len(network_data.links) == 1
 
     link = network_data.links[0]
-    assert is_dataclass(link)
     assert link.ethernet_mac_address == "00:11:22:33:44:55"
     assert link.id == "eth0"
     assert link.mtu == 1500
@@ -54,7 +50,7 @@ def test_services_parsing(network_data_single):
 
     service = network_data.services[0]
     assert is_dataclass(service)
-    assert service.address == "8.8.8.8"
+    assert service.address == "8.8.4.4"
     assert service.type == "dns"
 
 

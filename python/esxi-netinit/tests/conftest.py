@@ -35,7 +35,7 @@ def network_data_single():
                 ],
             }
         ],
-        "services": [{"address": "8.8.8.8", "type": "dns"}],
+        "services": [{"address": "8.8.4.4", "type": "dns"}],
     }
 
 
