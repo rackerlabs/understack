@@ -1,2 +1,3 @@
 0001-fix-glance-metadata-layout.patch
 0002-deploy-allow-anaconda-to-use-the-provisioning-networ.patch
+0003-anaconda-more-flexible-config_drive-in-kickstart.patch

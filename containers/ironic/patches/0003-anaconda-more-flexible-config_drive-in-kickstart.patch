@@ -1,0 +1,218 @@
+From e0b1f8b44963f1c8528970250991b89b385ce6b3 Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Wed, 26 Feb 2025 12:29:18 -0600
+Subject: [PATCH 3/3] anaconda: more flexible config_drive in kickstart
+
+Provide a more flexible consumption of the config_drive data inside of
+kickstart. The existing templated variable hardcoded paths and binaries
+and operations. Some versions of kickstart don't support the %end tag as
+well (VMware's installer). Removed any hardcoded path in the generation
+of the data and shifted that to the kickstart template, which gives the
+user more flexibility to support more distros and kickstart versions.
+Updated the kickstart template file to use the new v2 format while
+behaving identical to the original version.
+
+Change-Id: I42e499437c92b09cc37983ee4a1d6d98f68dde6e
+Co-Authored-by: Marek Skrobacki <skrobul@skrobul.com>
+Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
+---
+ .../admin/anaconda-deploy-interface.rst       | 31 ++++++++++++++++
+ ironic/common/kickstart_utils.py              | 36 +++++++++++++++----
+ ironic/common/pxe_utils.py                    |  8 ++++-
+ ironic/drivers/modules/ks.cfg.template        | 13 ++++++-
+ .../tests/unit/common/test_kickstart_utils.py | 31 +++++++++++++++-
+ ...nfig-drive-kickstart-d3edd17b745db314.yaml | 11 ++++++
+ 6 files changed, 120 insertions(+), 10 deletions(-)
+ create mode 100644 releasenotes/notes/anaconda-config-drive-kickstart-d3edd17b745db314.yaml
+
+diff --git a/ironic/common/kickstart_utils.py b/ironic/common/kickstart_utils.py
+index 4e02e2ea7..4a7533d54 100644
+--- a/ironic/common/kickstart_utils.py
++++ b/ironic/common/kickstart_utils.py
+@@ -28,15 +28,11 @@ from ironic.conf import CONF
+ LOG = logging.getLogger(__name__)
+
+
+-def _get_config_drive_dict_from_iso(
+-        iso_reader, drive_dict,
+-        target_path='/var/lib/cloud/seed/config_drive'):
++def _get_config_drive_dict_from_iso(iso_reader, drive_dict):
+     """Traverse the config drive iso and extract content and filenames
+
+     :param iso_reader: pycdlib.PyCdlib object representing ISO files.
+     :param drive_dict: Mutable dictionary to store path and contents.
+-    :param target_path: Path on the local disk in which the files in config
+-                        drive files has to be written.
+     """
+     for path, dirlist, filelist in iso_reader.walk(iso_path='/'):
+         for f in filelist:
+@@ -50,14 +46,13 @@ def _get_config_drive_dict_from_iso(
+             # Path to which the file in config drive to be written on the
+             # server.
+             posix_file_path = posix_file_path.lstrip('/')
+-            target_file_path = os.path.join(target_path, posix_file_path)
+             b_buf = io.BytesIO()
+             iso_reader.get_file_from_iso_fp(
+                 iso_path=iso_file_path, outfp=b_buf
+             )
+             b_buf.seek(0)
+             content = b"".join(b_buf.readlines()).decode('utf-8')
+-            drive_dict[target_file_path] = content
++            drive_dict[posix_file_path] = content
+
+
+ def read_iso9600_config_drive(config_drive):
+@@ -169,3 +164,30 @@ def prepare_config_drive(task,
+         )
+
+     return ks_config_drive
++
++
++def prepare_config_drive_v2(task):
++    """Prepare config_drive for writing to kickstart file"""
++    LOG.debug("Preparing config_drive (v2) to write to kickstart file")
++    node = task.node
++    config_drive = node.instance_info.get('configdrive')
++    if not config_drive:
++        return {}
++
++    if ironic_utils.is_http_url(config_drive):
++        config_drive = _fetch_config_drive_from_url(config_drive)
++
++    if not isinstance(config_drive, dict):
++        # The config drive is in iso6600 format, gzipped and base-64-encoded.
++        # Convert it to a dict.
++        config_drive_iso = decode_and_extract_config_drive_iso(config_drive)
++        config_drive = read_iso9600_config_drive(config_drive_iso)
++
++    # dictionary comprehension to create a dictionary with the
++    # filename as the key and the base64 encoded content as the
++    # value to allow the kickstart template to consume this in
++    # a more flexible fashion
++    return {
++        key: base64.b64encode(str.encode(data)).decode('ascii')
++        for key, data in config_drive.items()
++    }
+diff --git a/ironic/common/pxe_utils.py b/ironic/common/pxe_utils.py
+index c49607648..3b61f3f8c 100644
+--- a/ironic/common/pxe_utils.py
++++ b/ironic/common/pxe_utils.py
+@@ -1071,6 +1071,7 @@ def build_kickstart_config_options(task):
+     )
+     params['heartbeat_url'] = heartbeat_url
+     params['config_drive'] = ks_utils.prepare_config_drive(task)
++    params['config_drive_v2'] = ks_utils.prepare_config_drive_v2(task)
+     return {'ks_options': params}
+
+
+@@ -1159,6 +1160,7 @@ def validate_kickstart_template(ks_template):
+     ks_options = {'liveimg_url': 'fake_image_url',
+                   'agent_token': 'fake_token',
+                   'config_drive': '',
++                  'config_drive_v2': {},
+                   'heartbeat_url': 'fake_heartbeat_url'}
+     params = {'ks_options': ks_options}
+     try:
+@@ -1173,7 +1175,11 @@ def validate_kickstart_template(ks_template):
+
+     missing_required_options = []
+     for var, value in ks_options.items():
+-        if rendered_tmpl.find(value) == -1:
++        # this just searches the rendered template to see if the 'fake'
++        # data above did not appear in the template. this can only be
++        # done for string types and if they aren't empty
++        if (isinstance(value, str) and value
++            and (rendered_tmpl.find(value) == -1)):
+             missing_required_options.append(var)
+     if missing_required_options:
+         msg = (_("Following required kickstart option variables are missing "
+diff --git a/ironic/drivers/modules/ks.cfg.template b/ironic/drivers/modules/ks.cfg.template
+index 93788fdb8..4cb958360 100644
+--- a/ironic/drivers/modules/ks.cfg.template
++++ b/ironic/drivers/modules/ks.cfg.template
+@@ -44,7 +44,18 @@ liveimg --url {{ ks_options.liveimg_url }}
+ %end
+
+ # Config-drive information, if any.
+-{{ ks_options.config_drive }}
++{% if ks_options.config_drive_v2 %}
++{% for k, v in ks_options.config_drive_v2.items() %}
++%post
++DIRPATH=`/user/bin/dirname {{ k }}`
++mkdir -p /var/lib/cloud/seed/config_drive/{{ k }}
++CONTENT='{{ v }}'
++echo $CONTENT | /usr/bin/base64 --decode > /var/lib/cloud/seed/config_drive/{{ k }}
++/bin/chmod 600 /var/lib/cloud/seed/config_drive/{{ k }}
++%end
++
++{% endfor %}
++{% endif %}
+
+ # Sending callback after the installation is mandatory.
+ # This ought to be the last thing done; otherwise the
+diff --git a/ironic/tests/unit/common/test_kickstart_utils.py b/ironic/tests/unit/common/test_kickstart_utils.py
+index 52ea0324d..fa2b46de6 100644
+--- a/ironic/tests/unit/common/test_kickstart_utils.py
++++ b/ironic/tests/unit/common/test_kickstart_utils.py
+@@ -78,8 +78,13 @@ echo $CONTENT | /usr/bin/base64 --decode > {file_path}\n\
+             )
+         return config_drive_ks
+
+-    def test_prepare_config_drive(self):
++    def _get_expected_ks_config_drive_v2(self, config_drive_dict):
++        return {
++            key: base64.b64encode(str.encode(data)).decode('ascii')
++            for key, data in config_drive_dict.items()
++        }
+
++    def test_prepare_config_drive(self):
+         expected = self._get_expected_ks_config_drive(self.config_drive_dict)
+         with task_manager.acquire(self.context, self.node.uuid) as task:
+             i_info = task.node.instance_info
+@@ -100,3 +105,27 @@ echo $CONTENT | /usr/bin/base64 --decode > {file_path}\n\
+             self.assertEqual(expected, ks_utils.prepare_config_drive(task))
+             mock_get.assert_called_with('http://server/fake-configdrive-url',
+                                         timeout=60)
++
++    def test_prepare_config_drive_v2(self):
++        expected = self._get_expected_ks_config_drive_v2(
++            self.config_drive_dict)
++        with task_manager.acquire(self.context, self.node.uuid) as task:
++            i_info = task.node.instance_info
++            i_info['configdrive'] = CONFIG_DRIVE
++            task.node.instance_info = i_info
++            task.node.save()
++            self.assertEqual(expected, ks_utils.prepare_config_drive_v2(task))
++
++    @mock.patch('requests.get', autospec=True)
++    def test_prepare_config_drive_v2_in_swift(self, mock_get):
++        expected = self._get_expected_ks_config_drive_v2(
++            self.config_drive_dict)
++        mock_get.return_value = mock.MagicMock(content=CONFIG_DRIVE)
++        with task_manager.acquire(self.context, self.node.uuid) as task:
++            i_info = task.node.instance_info
++            i_info['configdrive'] = 'http://server/fake-configdrive-url'
++            task.node.instance_info = i_info
++            task.node.save()
++            self.assertEqual(expected, ks_utils.prepare_config_drive_v2(task))
++            mock_get.assert_called_with('http://server/fake-configdrive-url',
++                                        timeout=60)
+diff --git a/releasenotes/notes/anaconda-config-drive-kickstart-d3edd17b745db314.yaml b/releasenotes/notes/anaconda-config-drive-kickstart-d3edd17b745db314.yaml
+new file mode 100644
+index 000000000..51000e869
+--- /dev/null
++++ b/releasenotes/notes/anaconda-config-drive-kickstart-d3edd17b745db314.yaml
+@@ -0,0 +1,11 @@
++---
++features:
++  - |
++    Updated the kickstart template variables to include ``config_drive_v2``
++    which is a dictionary of data. The keys are the relative path of the
++    file while the value for those keys are the base64 encoded content. This
++    supersedes the ``config_drive`` kickstart template variable which included
++    the same data but with hardcoded paths and kickstart variables. This allows
++    users of the kickstart template to have more control over the config drive
++    data in their kickstart template. The default kickstart template has been
++    updated to utilize this new format.
+--
+2.39.5 (Apple Git-154)
