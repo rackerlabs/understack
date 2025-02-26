@@ -73,8 +73,7 @@ def is_valid_domain(
 
 
 def _create_outside_network(conn: Connection, project_id: uuid.UUID):
-    payload = _outside_network_payload(project_id)
-    network = conn.network.find_network(**payload)  # type: ignore
+    network = _find_outside_network(conn, project_id)
     if network:
         logger.info(
             "%s Network %s already exists for this tenant",
@@ -82,16 +81,25 @@ def _create_outside_network(conn: Connection, project_id: uuid.UUID):
             network.id,
         )
     else:
-        payload.update(name=payload.pop("name_or_id"))
+        payload = {
+            "project_id": project_id,
+            "name": OUTSIDE_NETWORK_NAME,
+            "router:external": False,
+        }
         network = conn.network.create_network(**payload)  # type: ignore
         logger.info(
             "Created %s Network %s for tenant", OUTSIDE_NETWORK_NAME, network.id
         )
+        conn.network.create_rbac_policy(  # type: ignore
+            object_type="network",
+            object_id=network.id,
+            action="access_as_external",
+            target_project_id=project_id,
+        )
 
 
 def _delete_outside_network(conn: Connection, project_id: uuid.UUID):
-    payload = _outside_network_payload(project_id)
-    network = conn.network.find_network(**payload)  # type: ignore
+    network = _find_outside_network(conn, project_id)
     if network:
         conn.delete_network(network.id)
         logger.info(
@@ -99,12 +107,11 @@ def _delete_outside_network(conn: Connection, project_id: uuid.UUID):
         )
 
 
-def _outside_network_payload(project_id: uuid.UUID) -> dict:
-    return {
-        "project_id": project_id,
-        "name_or_id": OUTSIDE_NETWORK_NAME,
-        "router:external": True,
-    }
+def _find_outside_network(conn, project_id):
+    return conn.network.find_network(  # type: ignore
+        project_id=project_id,
+        name_or_id=OUTSIDE_NETWORK_NAME,
+    )
 
 
 def handle_project_create(
