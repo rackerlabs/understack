@@ -60,7 +60,7 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - name: build and deploy openstack container image to registry
-        uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
         with:
           file: containers/${{ matrix.project }}/Dockerfile.${{ matrix.project }}
           build-args: OPENSTACK_VERSION=${{ env.OPENSTACK_VERSION }}
@@ -103,7 +103,7 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - name: build and deploy dnsmasq container to registry
-        uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
         with:
           context: "{{defaultContext}}:containers/dnsmasq"
           file: Dockerfile.dnsmasq
@@ -151,7 +151,7 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - name: build and deploy container image to registry
-        uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
         with:
           file: containers/${{ matrix.container.name }}/Dockerfile.${{ matrix.container.name }}
           pull: true  # ensure we always have an up to date source
