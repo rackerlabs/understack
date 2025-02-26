@@ -220,6 +220,7 @@ class ESXConfig:
         return NICList()
 
     def _change_ip(self, interface, ip, netmask):
+        """Configures IP address on logical interface."""
         cmd = [
             "/bin/esxcli",
             "network",
@@ -237,6 +238,38 @@ class ESXConfig:
             "static",
         ]
         return self.__execute(cmd)
+
+    def create_vswitch(self, name="vSwitch0", ports=256):
+        """Creates vSwitch."""
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "add",
+            "--ports",
+            str(ports),
+            "--vswitch-name",
+            str(name),
+        ]
+        return self.__execute(cmd)
+
+    def uplink_add(self, nic, switch_name="vSwitch0"):
+        """Adds uplink to a vSwitch."""
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "uplink",
+            "add",
+            "--uplink-name",
+            str(nic),
+            "--vswitch-name",
+            str(switch_name),
+        ]
+        return self.__execute(cmd)
+
 
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
