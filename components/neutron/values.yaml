@@ -59,13 +59,17 @@ conf:
         vni_ranges: ""
   neutron:
     DEFAULT:
-      # the 'trunk' plugin allows for us to create and configure trunk ports to allow
-      # multiple networks to be trunked into the node and let the node apply the VLAN
-      # the 'network_segment_range' plugin allows us to set the allowed VNIs or VLANs
-      # for a given network and let's OpenStack select one from the available pool. We
-      # are also able to see which ones are used from the OpenStack API.
-      # the 'ovn-router' plugin enables OVN to be our L3 router
-      service_plugins: "ovn-router,trunk,network_segment_range"
+      # We enable the following plugins:
+      # - 'ovn-router' enables OVN to be our L3 router.
+      # - 'trunk' allows for us to create and configure trunk ports to allow
+      # multiple networks to be trunked to a node and let the node apply the
+      # VLAN
+      # - 'network_segment_range' allows us to set the allowed VNIs or VLANs for
+      # a given network and let's OpenStack select one from the available pool.
+      # We are also able to see which ones are used from the OpenStack API.
+      # - 'segments' enables the /segments API for CRUD operations on network
+      # segments.
+      service_plugins: "ovn-router,trunk,network_segment_range,segments"
       # we don't want HA L3 routers. It's a Python value so we need to quote it in YAML.
       l3_ha: "False"
       # we aren't using availability zones so having calls attempt to add things to
