@@ -8,42 +8,9 @@ from netinit import NetworkData
 from netinit import Route
 
 
-@pytest.fixture
-def sample_data():
-    return {
-        "links": [
-            {
-                "ethernet_mac_address": "00:11:22:33:44:55",
-                "id": "eth0",
-                "mtu": 1500,
-                "type": "vif",
-                "vif_id": "vif-12345",
-            }
-        ],
-        "networks": [
-            {
-                "id": "net0",
-                "ip_address": "192.168.1.10",
-                "netmask": "255.255.255.0",
-                "network_id": "public",
-                "link": "eth0",
-                "type": "ipv4",
-                "routes": [
-                    {
-                        "gateway": "192.168.1.1",
-                        "netmask": "255.255.255.0",
-                        "network": "192.168.1.0",
-                    },
-                    {"gateway": "10.0.0.1", "netmask": "0.0.0.0", "network": "0.0.0.0"},
-                ],
-            }
-        ],
-        "services": [{"address": "8.8.8.8", "type": "dns"}],
-    }
 
-
-def test_links_parsing(sample_data):
-    network_data = NetworkData(sample_data)
+def test_links_parsing(network_data_single):
+    network_data = NetworkData(network_data_single)
     assert len(network_data.links) == 1
 
     link = network_data.links[0]
@@ -55,8 +22,8 @@ def test_links_parsing(sample_data):
     assert link.vif_id == "vif-12345"
 
 
-def test_networks_parsing(sample_data):
-    network_data = NetworkData(sample_data)
+def test_networks_parsing(network_data_single):
+    network_data = NetworkData(network_data_single)
     assert len(network_data.networks) == 1
 
     network = network_data.networks[0]
@@ -81,8 +48,8 @@ def test_networks_parsing(sample_data):
     assert network.routes[1].network == "0.0.0.0"
 
 
-def test_services_parsing(sample_data):
-    network_data = NetworkData(sample_data)
+def test_services_parsing(network_data_single):
+    network_data = NetworkData(network_data_single)
     assert len(network_data.services) == 1
 
     service = network_data.services[0]
@@ -101,11 +68,11 @@ def test_route_default_check():
     assert non_default_route.is_default() is False
 
 
-def test_from_json_file(tmp_path, sample_data):
+def test_from_json_file(tmp_path, network_data_single):
     # Create temporary JSON file
     file_path = tmp_path / "test.json"
     with open(file_path, "w") as f:
-        json.dump(sample_data, f)
+        json.dump(network_data_single, f)
 
     # Test loading from file
     network_data = NetworkData.from_json_file(file_path)

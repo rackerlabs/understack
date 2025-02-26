@@ -1,38 +1,81 @@
-import pytest
-
-from netinit import NICList
-
-
-@pytest.fixture
-def sample_niclist_data():
-    return """Name    PCI Device    Driver   Admin Status  Link Status  Speed  Duplex  MAC Address         MTU  Description
-------  ------------  -------  ------------  -----------  -----  ------  -----------------  ----  -----------
-vmnic0  0000:c3:00.0  ntg3     Up            Down             0  Half    c4:cb:e1:bf:79:b6  1500  Broadcom Corporation NetXtreme BCM5720 Gigabit Ethernet
-vmnic1  0000:c3:00.1  ntg3     Up            Down             0  Half    c4:cb:e1:bf:79:b7  1500  Broadcom Corporation NetXtreme BCM5720 Gigabit Ethernet
-vmnic2  0000:c5:00.0  bnxtnet  Up            Up           25000  Full    d4:04:e6:50:3e:9c  1500  Broadcom NetXtreme E-Series Dual-port 25Gb SFP28 Ethernet OCP 3.0 Adapter
-vmnic3  0000:c5:00.1  bnxtnet  Up            Up           25000  Full    d4:04:e6:50:3e:9d  1500  Broadcom NetXtreme E-Series Dual-port 25Gb SFP28 Ethernet OCP 3.0 Adapter
-vmnic4  0000:c4:00.0  bnxtnet  Up            Up           25000  Full    14:23:f3:f5:21:50  1500  Broadcom BCM57414 NetXtreme-E 10Gb/25Gb RDMA Ethernet Controller
-vmnic5  0000:c4:00.1  bnxtnet  Up            Up           25000  Full    14:23:f3:f5:21:51  1500  Broadcom BCM57414 NetXtreme-E 10Gb/25Gb RDMA Ethernet Controller"""
+from netinit import ESXConfig
+from netinit import NetworkData
 
 
-def test_parse_niclist(sample_niclist_data):
-    nics = NICList.parse(sample_niclist_data)
+def test_configure_default_route(fp, network_data_single):
+    fp.register(["/bin/esxcli", fp.any()])
+    ndata = NetworkData(network_data_single)
+    ec = ESXConfig(ndata, dry_run=False)
+    ec.configure_default_route()
+    assert fp.call_count("/bin/esxcli network ip route ipv4 add -g 192.168.1.1 -n default") == 1
 
-    assert len(nics) == 6
-    assert nics[0].name == "vmnic0"
-    assert nics[0].mac == "c4:cb:e1:bf:79:b6"
-    assert nics[0].status == "Up"
-    assert nics[0].link == "Down"
-    assert nics[2].name == "vmnic2"
-    assert nics[2].mac == "d4:04:e6:50:3e:9c"
-    assert nics[2].status == "Up"
-    assert nics[2].link == "Up"
+def test_configure_management_interface(fp, network_data_single):
+    fp.register(["/bin/esxcli", fp.any()])
+    ndata = NetworkData(network_data_single)
+    ec = ESXConfig(ndata, dry_run=False)
+    ec.configure_management_interface()
+    assert fp.call_count("/bin/esxcli network ip interface ipv4 set -i vmk0 -I 192.168.1.10 -N 255.255.255.0 -t static") == 1
 
+def test_portgroup_add(fp):
+    fp.register(["/bin/esxcli", fp.any()])
+    ec = ESXConfig(NetworkData({}))
+    ec.portgroup_add("mypg")
+    print(fp.calls)
+    assert fp.call_count("/bin/esxcli network vswitch standard portgroup add --portgroup-name mypg --vswitch-name vswitch0") == 1
 
-def test_find_by_mac(sample_niclist_data):
-    nics = NICList(sample_niclist_data)
+def test_portgroup_set_vlan(fp):
+    fp.register(["/bin/esxcli", fp.any()])
+    ec = ESXConfig(NetworkData({}))
+    ec.portgroup_set_vlan("mypg", 1984)
+    print(fp.calls)
+    assert fp.call_count("/bin/esxcli network vswitch standard portgroup set --portgroup-name mypg --vlan-id 1984") == 1
 
-    found = nics.find_by_mac("d4:04:e6:50:3e:9c")
+def test_configure_portgroups(fp, mocker, network_data_multi) :
+    fp.register(["/bin/esxcli", fp.any()])
+    ndata = NetworkData(network_data_multi)
+    ec = ESXConfig(ndata, dry_run=False)
+    pgadd_mock = mocker.patch.object(ec, "portgroup_add")
+    pgset_mock = mocker.patch.object(ec, "portgroup_set_vlan")
+    ec.configure_portgroups()
+    assert pgadd_mock.call_count == 3
+    assert pgset_mock.call_count == 3
+    pgset_mock.assert_called_with(portgroup_name="internal_net_vid_444", vlan_id=444)
 
-    assert found.name == "vmnic2"
-    assert found.mac == "d4:04:e6:50:3e:9c"
+def test_create_vswitch(fp, empty_ec):
+    empty_ec.create_vswitch(name="vSwitch8", ports=512)
+    assert fp.call_count("/bin/esxcli network vswitch standard add --ports 512 --vswitch-name vSwitch8") == 1
+
+def test_uplink_add(fp, empty_ec):
+    empty_ec.uplink_add(switch_name="vSwitch8", nic="vmnic4")
+    assert fp.call_count("/bin/esxcli network vswitch standard uplink add --uplink-name vmnic4 --vswitch-name vSwitch8") == 1
+
+def test_vswitch_settings(fp, empty_ec):
+    empty_ec.vswitch_settings(mtu=9000, cdp="listen", name="vSwitch8")
+    assert fp.call_count("/bin/esxcli network vswitch standard set --mtu 9000 --cdp-status listen --vswitch-name vSwitch8") == 1
+
+def test_vswitch_failover_uplinks_active(fp, empty_ec):
+    empty_ec.vswitch_failover_uplinks(active_uplinks=["vmnic4", "vmnic10"])
+    assert fp.call_count("/bin/esxcli network vswitch standard policy failover set --active-uplinks vmnic4,vmnic10 --vswitch-name vSwitch0")
+
+def test_vswitch_failover_uplinks_standby(fp, empty_ec):
+    empty_ec.vswitch_failover_uplinks(standby_uplinks=["vmnic3", "vmnic7"])
+    assert fp.call_count("/bin/esxcli network vswitch standard policy failover set --standby-uplinks vmnic3,vmnic7 --vswitch-name vSwitch0")
+
+def test_vswitch_security(fp, empty_ec):
+    empty_ec.vswitch_security(allow_forged_transmits="no", allow_mac_change="no", allow_promiscuous="yes", name="vSwitch7")
+    assert fp.call_count("/bin/esxcli network vswitch standard policy security set --allow-forged-transmits no --allow-mac-change no --allow-promiscuous yes --vswitch-name vSwitch7") == 1
+
+def test_configure_dns(fp, empty_ec):
+    fp.register(["/bin/esxcli", fp.any()])
+    fp.keep_last_process(True)
+    empty_ec.configure_dns(servers=['8.8.8.8', '4.4.4.4'], search=["example.com"])
+    assert fp.call_count("/bin/esxcli network ip dns server add --server 8.8.8.8") == 1
+    assert fp.call_count("/bin/esxcli network ip dns server add --server 4.4.4.4") == 1
+    assert fp.call_count("/bin/esxcli network ip dns search add --domain example.com") == 1
+
+def test_configure_requested_dns(fp, network_data_single):
+    fp.register(["/bin/esxcli", fp.any()])
+    ndata = NetworkData(network_data_single)
+    ec = ESXConfig(ndata, dry_run=False)
+    ec.configure_requested_dns()
+    assert fp.call_count("/bin/esxcli network ip dns server add --server 8.8.4.4") == 1

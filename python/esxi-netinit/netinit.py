@@ -1,7 +1,8 @@
 import json
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from functools import cached_property
 
 
@@ -61,7 +62,12 @@ class NetworkData:
             routes_data = net_data.pop("routes", [])
             routes = [Route(**route) for route in routes_data]
             link_id = net_data.pop("link", [])
-            relevant_link = next(link for link in self.links if link.id == link_id)
+            try:
+                relevant_link = next(link for link in self.links if link.id == link_id)
+            except StopIteration:
+                raise ValueError(
+                    f"Link {link_id} is not defined in links section"
+                ) from None
             self.networks.append(Network(**net_data, routes=routes, link=relevant_link))
 
         self.services = [Service(**service) for service in data.get("services", [])]
@@ -139,6 +145,7 @@ class ESXConfig:
     def __execute(self, cmd: list[str]):
         if self.dry_run:
             print(f"Would exececute: {' '.join(cmd)}")
+            return cmd
         else:
             subprocess.run(cmd, check=True)  # noqa: S603
 
@@ -200,7 +207,7 @@ class ESXConfig:
             "vswitch",
             "standard",
             "portgroup",
-            "add",
+            "set",
             "--portgroup-name",
             str(portgroup_name),
             "--vlan-id",
@@ -230,10 +237,6 @@ class ESXConfig:
             "static",
         ]
         return self.__execute(cmd)
-
-
-###
-
 
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
