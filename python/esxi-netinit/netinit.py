@@ -316,8 +316,8 @@ class ESXConfig:
         self,
         allow_forged_transmits="no",
         allow_mac_change="no",
-        allow_promiscuous="yes",
-        name="vSwitch7",
+        allow_promiscuous="no",
+        name="vSwitch0",
     ):
         cmd = [
             "/bin/esxcli",
@@ -338,12 +338,35 @@ class ESXConfig:
         ]
         return self.__execute(cmd)
 
+    def identify_uplink(self) -> NIC:
+        eligible_networks = [
+            net for net in self.network_data.networks if net.default_routes()
+        ]
+        if len(eligible_networks) != 1:
+            raise ValueError(
+                "the network_data.json should only contain a single default route."
+                "Unable to identify uplink interface"
+            )
+        link = eligible_networks[0].link
+        return self.nics.find_by_mac(link.ethernet_mac_address)
+
+    def configure_vswitch(self, uplink: NIC, switch_name: str, mtu: int):
+        """Sets up vSwitch."""
+        self.create_vswitch(switch_name)
+        self.uplink_add(nic=uplink.name, switch_name=switch_name)
+        self.vswitch_failover_uplinks(active_uplinks=[uplink.name], name=switch_name)
+        self.vswitch_security(name=switch_name)
+        self.vswitch_settings(mtu=mtu, name=switch_name)
+
 
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
     esx = ESXConfig(network_data, dry_run=dry_run)
     esx.configure_management_interface()
     esx.configure_default_route()
+    esx.configure_vswitch(
+        uplink=esx.identify_uplink(), switch_name="vSwitch0", mtu=9000
+    )
     esx.configure_portgroups()
 
 
