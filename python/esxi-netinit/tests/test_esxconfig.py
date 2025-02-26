@@ -1,6 +1,13 @@
+import pytest
+
 from netinit import ESXConfig
 from netinit import NetworkData
 
+
+@pytest.fixture
+def empty_ec(fp):
+    fp.register(["/bin/esxcli", fp.any()])
+    return ESXConfig(NetworkData({}))
 
 def test_configure_default_route(fp, network_data_single):
     fp.register(["/bin/esxcli", fp.any()])
@@ -16,18 +23,12 @@ def test_configure_management_interface(fp, network_data_single):
     ec.configure_management_interface()
     assert fp.call_count("/bin/esxcli network ip interface ipv4 set -i vmk0 -I 192.168.1.10 -N 255.255.255.0 -t static") == 1
 
-def test_portgroup_add(fp):
-    fp.register(["/bin/esxcli", fp.any()])
-    ec = ESXConfig(NetworkData({}))
-    ec.portgroup_add("mypg")
-    print(fp.calls)
+def test_portgroup_add(fp, empty_ec):
+    empty_ec.portgroup_add("mypg")
     assert fp.call_count("/bin/esxcli network vswitch standard portgroup add --portgroup-name mypg --vswitch-name vswitch0") == 1
 
-def test_portgroup_set_vlan(fp):
-    fp.register(["/bin/esxcli", fp.any()])
-    ec = ESXConfig(NetworkData({}))
-    ec.portgroup_set_vlan("mypg", 1984)
-    print(fp.calls)
+def test_portgroup_set_vlan(fp, empty_ec):
+    empty_ec.portgroup_set_vlan("mypg", 1984)
     assert fp.call_count("/bin/esxcli network vswitch standard portgroup set --portgroup-name mypg --vlan-id 1984") == 1
 
 def test_configure_portgroups(fp, mocker, network_data_multi) :

@@ -270,6 +270,74 @@ class ESXConfig:
         ]
         return self.__execute(cmd)
 
+    def vswitch_settings(self, mtu=9000, cdp="listen", name="vSwitch0"):
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "set",
+            "--mtu",
+            str(mtu),
+            "--cdp-status",
+            cdp,
+            "--vswitch-name",
+            str(name),
+        ]
+        return self.__execute(cmd)
+
+    def vswitch_failover_uplinks(
+        self, active_uplinks=None, standby_uplinks=None, name="vSwitch0"
+    ):
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "policy",
+            "failover",
+            "set",
+        ]
+
+        if active_uplinks:
+            cmd.extend(["--active-uplinks", ",".join(active_uplinks)])
+        if standby_uplinks:
+            cmd.extend(["--standby-uplinks", ",".join(standby_uplinks)])
+
+        cmd.extend(
+            [
+                "--vswitch-name",
+                str(name),
+            ]
+        )
+        return self.__execute(cmd)
+
+    def vswitch_security(
+        self,
+        allow_forged_transmits="no",
+        allow_mac_change="no",
+        allow_promiscuous="yes",
+        name="vSwitch7",
+    ):
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "policy",
+            "security",
+            "set",
+            "--allow-forged-transmits",
+            allow_forged_transmits,
+            "--allow-mac-change",
+            allow_mac_change,
+            "--allow-promiscuous",
+            allow_promiscuous,
+            "--vswitch-name",
+            str(name),
+        ]
+        return self.__execute(cmd)
+
 
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
