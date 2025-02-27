@@ -439,6 +439,8 @@ class ESXConfig:
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
     esx = ESXConfig(network_data, dry_run=dry_run)
+    esx.portgroup_remove(switch_name="vSwitch0", portgroup_name="Management Network")
+    esx.destroy_vswitch(name="vSwitch0")
     esx.configure_vswitch(
         uplink=esx.identify_uplink(), switch_name="vSwitch0", mtu=9000
     )
