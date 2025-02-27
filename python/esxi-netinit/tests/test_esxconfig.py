@@ -46,6 +46,10 @@ def test_create_vswitch(fp, empty_ec):
     empty_ec.create_vswitch(name="vSwitch8", ports=512)
     assert fp.call_count("/bin/esxcli network vswitch standard add --ports 512 --vswitch-name vSwitch8") == 1
 
+def test_destroy_vswitch(fp, empty_ec):
+    empty_ec.destroy_vswitch(name="vSwitch8")
+    assert fp.call_count("/bin/esxcli network vswitch standard remove --vswitch-name vSwitch8") == 1
+
 def test_uplink_add(fp, empty_ec):
     empty_ec.uplink_add(switch_name="vSwitch8", nic="vmnic4")
     assert fp.call_count("/bin/esxcli network vswitch standard uplink add --uplink-name vmnic4 --vswitch-name vSwitch8") == 1

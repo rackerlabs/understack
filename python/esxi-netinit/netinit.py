@@ -107,6 +107,7 @@ class NIC:
     link: str
     mac: str
 
+
 class NICList(list):
     def __init__(self, data=None) -> None:
         nic_data = data or self._esxi_nics()
@@ -255,6 +256,19 @@ class ESXConfig:
 
         return self.__execute(cmd)
 
+    def destroy_vswitch(self, name):
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "remove",
+            "--vswitch-name",
+            name
+        ]
+
+        return self.__execute(cmd)
+
     def uplink_add(self, nic, switch_name="vSwitch0"):
         """Adds uplink to a vSwitch."""
         cmd = [
@@ -353,6 +367,7 @@ class ESXConfig:
 
     def configure_vswitch(self, uplink: NIC, switch_name: str, mtu: int):
         """Sets up vSwitch."""
+        self.destroy_vswitch(switch_name)
         self.create_vswitch(switch_name)
         self.uplink_add(nic=uplink.name, switch_name=switch_name)
         self.vswitch_failover_uplinks(active_uplinks=[uplink.name], name=switch_name)
@@ -408,11 +423,11 @@ class ESXConfig:
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
     esx = ESXConfig(network_data, dry_run=dry_run)
-    esx.configure_management_interface()
-    esx.configure_default_route()
     esx.configure_vswitch(
         uplink=esx.identify_uplink(), switch_name="vSwitch0", mtu=9000
     )
+    esx.configure_management_interface()
+    esx.configure_default_route()
 
     esx.configure_portgroups()
     esx.configure_requested_dns()
