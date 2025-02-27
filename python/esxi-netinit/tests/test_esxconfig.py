@@ -50,6 +50,10 @@ def test_destroy_vswitch(fp, empty_ec):
     empty_ec.destroy_vswitch(name="vSwitch8")
     assert fp.call_count("/bin/esxcli network vswitch standard remove --vswitch-name vSwitch8") == 1
 
+def test_portgroup_remove(fp, empty_ec):
+    empty_ec.portgroup_remove(switch_name="vSwitch20", portgroup_name="Management")
+    assert fp.call_count('/bin/esxcli network vswitch standard portgroup remove --portgroup-name Management --vswitch-name vSwitch20') == 1
+
 def test_uplink_add(fp, empty_ec):
     empty_ec.uplink_add(switch_name="vSwitch8", nic="vmnic4")
     assert fp.call_count("/bin/esxcli network vswitch standard uplink add --uplink-name vmnic4 --vswitch-name vSwitch8") == 1

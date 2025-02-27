@@ -199,6 +199,22 @@ class ESXConfig:
             str(switch_name),
         ]
         return self.__execute(cmd)
+    #
+    def portgroup_remove(self, portgroup_name, switch_name):
+        """Removes Portgroup from a vSwitch."""
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "portgroup",
+            "remove",
+            "--portgroup-name",
+            str(portgroup_name),
+            "--vswitch-name",
+            str(switch_name),
+        ]
+        return self.__execute(cmd)
 
     def portgroup_set_vlan(self, portgroup_name, vlan_id):
         """Configures VLANid to be used on a portgroup."""
