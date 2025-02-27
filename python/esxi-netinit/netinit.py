@@ -1,3 +1,4 @@
+import argparse
 import json
 import subprocess
 import sys
@@ -419,12 +420,17 @@ def main(json_file, dry_run):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <json-file> [--dry-run]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Network configuration script")
+    parser.add_argument("json_file", help="Path to the JSON configuration file")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Perform a dry run without making any changes",
+    )
+    args = parser.parse_args()
 
     try:
-        main(sys.argv[1], sys.argv[2] == "--dry-run")
+        main(args.json_file, args.dry_run)
     except Exception as e:
         print(f"Error configuring network: {str(e)}")
         sys.exit(1)
