@@ -170,7 +170,6 @@ def test_create_subnet_postcommit_private(nautobot_client):
             "network_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
             "cidr": "1.0.0.0/24",
             "router:external": False,
-            "service_types": [],
         }
     )
 
@@ -184,14 +183,13 @@ def test_create_subnet_postcommit_private(nautobot_client):
     )
 
 
-def test_create_subnet_postcommit_public_svi(nautobot_client, undersync_client):
+def test_create_subnet_postcommit_public(nautobot_client, undersync_client):
     context = MagicMock(
         current={
             "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             "network_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
             "cidr": "1.0.0.0/24",
             "router:external": True,
-            "service_types": ["network:understack_svi"],
         }
     )
 
@@ -205,27 +203,6 @@ def test_create_subnet_postcommit_public_svi(nautobot_client, undersync_client):
         prefix="1.0.0.0/24",
         namespace_name="Global",
     )
-    nautobot_client.associate_subnet_with_network.assert_called_once()
-
-
-def test_create_subnet_postcommit_public_non_svi(nautobot_client, undersync_client):
-    context = MagicMock(
-        current={
-            "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-            "network_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-            "cidr": "1.0.0.0/24",
-            "router:external": True,
-            "service_types": ["not_an_svi_type"],
-        }
-    )
-
-    driver.nb = nautobot_client
-    driver.undersync = undersync_client
-
-    driver.create_subnet_postcommit(context)
-
-    nautobot_client.subnet_create.assert_called_once()
-    nautobot_client.associate_subnet_with_network.assert_not_called()
 
 
 def test_delete_subnet_postcommit_public(nautobot_client, undersync_client):
