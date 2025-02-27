@@ -107,10 +107,10 @@ class NIC:
     link: str
     mac: str
 
-
-class NICList:
+class NICList(list):
     def __init__(self, data=None) -> None:
-        self.nics = NICList.parse(data or self._esxi_nics())
+        nic_data = data or self._esxi_nics()
+        return super().__init__(NICList.parse(nic_data))
 
     @staticmethod
     def parse(data):
@@ -135,8 +135,7 @@ class NICList:
         ).stdout.decode()
 
     def find_by_mac(self, mac) -> NIC:
-        return next(nic for nic in self.nics if nic.mac == mac)
-
+        return next(nic for nic in self if nic.mac == mac)
 
 class ESXConfig:
     def __init__(self, network_data: NetworkData, dry_run=False) -> None:
