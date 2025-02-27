@@ -73,7 +73,7 @@ def is_valid_domain(
 
 
 def _create_outside_network(conn: Connection, project_id: uuid.UUID):
-    network = _find_outside_network(conn, project_id)
+    network = _find_outside_network(conn, project_id.hex)
     if network:
         logger.info(
             "%s Network %s already exists for this tenant",
@@ -82,7 +82,7 @@ def _create_outside_network(conn: Connection, project_id: uuid.UUID):
         )
     else:
         payload = {
-            "project_id": project_id,
+            "project_id": project_id.hex,
             "name": OUTSIDE_NETWORK_NAME,
             "router:external": False,
         }
@@ -94,12 +94,12 @@ def _create_outside_network(conn: Connection, project_id: uuid.UUID):
             object_type="network",
             object_id=network.id,
             action="access_as_external",
-            target_project_id=project_id,
+            target_project_id=project_id.hex,
         )
 
 
 def _delete_outside_network(conn: Connection, project_id: uuid.UUID):
-    network = _find_outside_network(conn, project_id)
+    network = _find_outside_network(conn, project_id.hex)
     if network:
         conn.delete_network(network.id)
         logger.info(
@@ -107,7 +107,7 @@ def _delete_outside_network(conn: Connection, project_id: uuid.UUID):
         )
 
 
-def _find_outside_network(conn, project_id):
+def _find_outside_network(conn: Connection, project_id: str):
     return conn.network.find_network(  # type: ignore
         project_id=project_id,
         name_or_id=OUTSIDE_NETWORK_NAME,
