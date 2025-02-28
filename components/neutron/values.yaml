@@ -48,6 +48,11 @@ conf:
   plugins:
     ml2_conf:
       ml2:
+        # at this time due to physical switches not doing OpenFlow and enabling
+        # port security rules being different per model (or supported at all)
+        # disable it by default. this is necessary because openstack-helm enables
+        # it by default
+        extension_drivers: ''
         # set the default ml2 backend to our plugin, neutron_understack
         # we'll need to use the ovn ML2 plugin to hook the routers to our network
         mechanism_drivers: "understack,ovn"
@@ -75,6 +80,8 @@ conf:
       # we aren't using availability zones so having calls attempt to add things to
       # availability zones won't work.
       default_availability_zones: ""
+      # add 50 to the max MTU we want of 9000 to handle Neutron's -50 for VXLAN type
+      global_physnet_mtu: 9050
     service_providers:
       service_provider: "L3_ROUTER_NAT:cisco-asa:neutron_understack.l3_service_cisco_asa.CiscoAsa"
     ovn:
