@@ -96,6 +96,12 @@ def _create_outside_network(conn: Connection, project_id: uuid.UUID):
             action="access_as_external",
             target_project_id=project_id.hex,
         )
+        conn.network.create_rbac_policy(  # type: ignore
+            object_type="network",
+            object_id=network.id,
+            action="access_as_shared",
+            target_project_id=project_id.hex,
+        )
 
 
 def _delete_outside_network(conn: Connection, project_id: uuid.UUID):
