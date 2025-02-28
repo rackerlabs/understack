@@ -1,0 +1,9 @@
+admissionWebhooks:
+  certManager:
+    issuerRef:
+      kind: Issuer
+      name: cert-manager-issuer
+manager:
+  collectorImage:
+    # The contrib image contains additional modules (i.e. exporters) that increase the compatibility
+    repository: "otel/opentelemetry-collector-contrib"
