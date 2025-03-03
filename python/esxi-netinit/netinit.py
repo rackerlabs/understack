@@ -170,13 +170,16 @@ class ESXConfig:
         ]
         return self.__execute(cmd)
 
-    def configure_portgroups(self):
+    def configure_portgroups(self, switch_name="vSwitch0"):
+        portgroups = []
         for link in self.network_data.links:
             if link.type == "vlan":
                 vid = link.vlan_id
                 pg_name = f"internal_net_vid_{vid}"
-                self.portgroup_add(portgroup_name=pg_name)
+                self.portgroup_add(portgroup_name=pg_name, switch_name=switch_name)
                 self.portgroup_set_vlan(portgroup_name=pg_name, vlan_id=vid)
+                portgroups.append(pg_name)
+        return portgroups
 
     def configure_management_interface(self):
         mgmt_network = next(
@@ -383,7 +386,6 @@ class ESXConfig:
 
     def configure_vswitch(self, uplink: NIC, switch_name: str, mtu: int):
         """Sets up vSwitch."""
-        self.destroy_vswitch(switch_name)
         self.create_vswitch(switch_name)
         self.uplink_add(nic=uplink.name, switch_name=switch_name)
         self.vswitch_failover_uplinks(active_uplinks=[uplink.name], name=switch_name)
@@ -435,19 +437,42 @@ class ESXConfig:
 
         return self.configure_dns(servers=dns_servers)
 
+    def delete_vmknic(self, portgroup_name):
+        """Deletes a vmknic from a portgroup."""
+        return self.__execute(["/bin/esxcfg-vmknic", "-d", portgroup_name])
+
+    def add_ip_interface(self, name, portgroup_name):
+        """Adds IP interface."""
+        return self.__execute(
+            [
+                "/bin/esxcli",
+                "network",
+                "ip",
+                "interface",
+                "add",
+                "--interface-name",
+                name,
+                "--portgroup-name",
+                portgroup_name,
+            ]
+        )
+
 
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
     esx = ESXConfig(network_data, dry_run=dry_run)
+    esx.delete_vmknic(portgroup_name="Management Network")
     esx.portgroup_remove(switch_name="vSwitch0", portgroup_name="Management Network")
     esx.destroy_vswitch(name="vSwitch0")
     esx.configure_vswitch(
-        uplink=esx.identify_uplink(), switch_name="vSwitch0", mtu=9000
+        uplink=esx.identify_uplink(), switch_name="vSwitch22", mtu=9000
     )
-    esx.configure_management_interface()
-    esx.configure_default_route()
 
     esx.configure_portgroups()
+    esx.portgroup_add(portgroup_name="mgmt", switch_name="vSwitch22")
+    esx.add_ip_interface(name="vmk0", portgroup_name="mgmt")
+    esx.configure_management_interface()
+    esx.configure_default_route()
     esx.configure_requested_dns()
 
 

@@ -88,3 +88,12 @@ def test_configure_requested_dns(fp, network_data_single):
     ec = ESXConfig(ndata, dry_run=False)
     ec.configure_requested_dns()
     assert fp.call_count("/bin/esxcli network ip dns server add --server 8.8.4.4") == 1
+
+def test_delete_vmknic(fp, empty_ec):
+    fp.register(["/bin/esxcfg-vmknic", fp.any()])
+    empty_ec.delete_vmknic(portgroup_name="ManagementPG")
+    assert fp.call_count("/bin/esxcfg-vmknic -d ManagementPG") == 1
+
+def test_add_ip_interface(fp, empty_ec):
+    empty_ec.add_ip_interface(name="vmk1", portgroup_name="VMNet-Mgmt")
+    assert fp.call_count("/bin/esxcli network ip interface add --interface-name vmk1 --portgroup-name VMNet-Mgmt") == 1
