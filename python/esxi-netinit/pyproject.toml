@@ -40,6 +40,9 @@ target-version = "py310"
 "tests/test_esxconfig.py" = [
   "E501" # esxcli outputs with long lines
 ]
+"tests/test_esxhost.py" = [
+  "E501" # esxcli outputs with long lines
+]
 "netinit.py" = [
   "S104",     # false positive on binding to all ifaces
 ]

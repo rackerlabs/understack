@@ -142,6 +142,77 @@ class ESXConfig:
     def __init__(self, network_data: NetworkData, dry_run=False) -> None:
         self.network_data = network_data
         self.dry_run = dry_run
+        self.host = ESXHost(dry_run)
+
+    def configure_default_route(self):
+        """Configures default route.
+
+        If multiple default routes are present, only first one is used.
+        """
+        route = self.network_data.default_route()
+        self.host.configure_default_route(route.gateway)
+
+    def configure_portgroups(self, switch_name="vSwitch0"):
+        portgroups = []
+        for link in self.network_data.links:
+            if link.type == "vlan":
+                vid = link.vlan_id
+                pg_name = f"internal_net_vid_{vid}"
+                self.host.portgroup_add(portgroup_name=pg_name, switch_name=switch_name)
+                self.host.portgroup_set_vlan(portgroup_name=pg_name, vlan_id=vid)
+                portgroups.append(pg_name)
+        return portgroups
+
+    def configure_management_interface(self):
+        mgmt_network = next(
+            net for net in self.network_data.networks if net.default_routes()
+        )
+        return self.host.change_ip(
+            "vmk0", mgmt_network.ip_address, mgmt_network.netmask
+        )
+
+    def configure_vswitch(self, uplink: NIC, switch_name: str, mtu: int):
+        """Sets up vSwitch."""
+        self.host.create_vswitch(switch_name)
+        self.host.uplink_add(nic=uplink.name, switch_name=switch_name)
+        self.host.vswitch_failover_uplinks(
+            active_uplinks=[uplink.name], name=switch_name
+        )
+        self.host.vswitch_security(name=switch_name)
+        self.host.vswitch_settings(mtu=mtu, name=switch_name)
+
+    def configure_requested_dns(self):
+        """Configures DNS servers that were provided in network_data.json."""
+        dns_servers = [
+            srv.address for srv in self.network_data.services if srv.type == "dns"
+        ]
+        if not dns_servers:
+            return
+
+        return self.host.configure_dns(servers=dns_servers)
+
+    def identify_uplink(self) -> NIC:
+        eligible_networks = [
+            net for net in self.network_data.networks if net.default_routes()
+        ]
+        if len(eligible_networks) != 1:
+            raise ValueError(
+                "the network_data.json should only contain a single default route."
+                "Unable to identify uplink interface"
+            )
+        link = eligible_networks[0].link
+        return self.nics.find_by_mac(link.ethernet_mac_address)
+
+    @cached_property
+    def nics(self):
+        return NICList()
+
+
+class ESXHost:
+    """Low level commands for configuring various aspects of ESXi hypervisor."""
+
+    def __init__(self, dry_run=False) -> None:
+        self.dry_run = dry_run
 
     def __execute(self, cmd: list):
         if self.dry_run:
@@ -150,12 +221,23 @@ class ESXConfig:
         else:
             subprocess.run(cmd, check=True)  # noqa: S603
 
-    def configure_default_route(self):
-        """Configures default route.
+    def add_ip_interface(self, name, portgroup_name):
+        """Adds IP interface."""
+        return self.__execute(
+            [
+                "/bin/esxcli",
+                "network",
+                "ip",
+                "interface",
+                "add",
+                "--interface-name",
+                name,
+                "--portgroup-name",
+                portgroup_name,
+            ]
+        )
 
-        If multiple default routes are present, only first one is used.
-        """
-        route = self.network_data.default_route()
+    def configure_default_route(self, gateway):
         cmd = [
             "/bin/esxcli",
             "network",
@@ -164,28 +246,99 @@ class ESXConfig:
             "ipv4",
             "add",
             "-g",
-            route.gateway,
+            gateway,
             "-n",
             "default",
         ]
         return self.__execute(cmd)
 
-    def configure_portgroups(self, switch_name="vSwitch0"):
-        portgroups = []
-        for link in self.network_data.links:
-            if link.type == "vlan":
-                vid = link.vlan_id
-                pg_name = f"internal_net_vid_{vid}"
-                self.portgroup_add(portgroup_name=pg_name, switch_name=switch_name)
-                self.portgroup_set_vlan(portgroup_name=pg_name, vlan_id=vid)
-                portgroups.append(pg_name)
-        return portgroups
+    def change_ip(self, interface, ip, netmask):
+        """Configures IP address on logical interface."""
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "ip",
+            "interface",
+            "ipv4",
+            "set",
+            "-i",
+            interface,
+            "-I",
+            ip,
+            "-N",
+            netmask,
+            "-t",
+            "static",
+        ]
+        return self.__execute(cmd)
 
-    def configure_management_interface(self):
-        mgmt_network = next(
-            net for net in self.network_data.networks if net.default_routes()
-        )
-        return self._change_ip("vmk0", mgmt_network.ip_address, mgmt_network.netmask)
+    def configure_dns(self, servers=None, search=None):
+        """Sets up arbitrary DNS servers."""
+        if not servers:
+            servers = []
+        if not search:
+            search = []
+
+        for server in servers:
+            self.__execute(
+                [
+                    "/bin/esxcli",
+                    "network",
+                    "ip",
+                    "dns",
+                    "server",
+                    "add",
+                    "--server",
+                    server,
+                ]
+            )
+
+        for domain in search:
+            self.__execute(
+                [
+                    "/bin/esxcli",
+                    "network",
+                    "ip",
+                    "dns",
+                    "search",
+                    "add",
+                    "--domain",
+                    domain,
+                ]
+            )
+
+    def create_vswitch(self, name="vSwitch0", ports=256):
+        """Creates vSwitch."""
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "add",
+            "--ports",
+            str(ports),
+            "--vswitch-name",
+            str(name),
+        ]
+
+        return self.__execute(cmd)
+
+    def delete_vmknic(self, portgroup_name):
+        """Deletes a vmknic from a portgroup."""
+        return self.__execute(["/bin/esxcfg-vmknic", "-d", portgroup_name])
+
+    def destroy_vswitch(self, name):
+        cmd = [
+            "/bin/esxcli",
+            "network",
+            "vswitch",
+            "standard",
+            "remove",
+            "--vswitch-name",
+            name,
+        ]
+
+        return self.__execute(cmd)
 
     def portgroup_add(self, portgroup_name, switch_name="vswitch0"):
         """Adds Portgroup to a vSwitch."""
@@ -202,6 +355,7 @@ class ESXConfig:
             str(switch_name),
         ]
         return self.__execute(cmd)
+
     #
     def portgroup_remove(self, portgroup_name, switch_name):
         """Removes Portgroup from a vSwitch."""
@@ -233,59 +387,6 @@ class ESXConfig:
             "--vlan-id",
             str(vlan_id),
         ]
-        return self.__execute(cmd)
-
-    @cached_property
-    def nics(self):
-        return NICList()
-
-    def _change_ip(self, interface, ip, netmask):
-        """Configures IP address on logical interface."""
-        cmd = [
-            "/bin/esxcli",
-            "network",
-            "ip",
-            "interface",
-            "ipv4",
-            "set",
-            "-i",
-            interface,
-            "-I",
-            ip,
-            "-N",
-            netmask,
-            "-t",
-            "static",
-        ]
-        return self.__execute(cmd)
-
-    def create_vswitch(self, name="vSwitch0", ports=256):
-        """Creates vSwitch."""
-        cmd = [
-            "/bin/esxcli",
-            "network",
-            "vswitch",
-            "standard",
-            "add",
-            "--ports",
-            str(ports),
-            "--vswitch-name",
-            str(name),
-        ]
-
-        return self.__execute(cmd)
-
-    def destroy_vswitch(self, name):
-        cmd = [
-            "/bin/esxcli",
-            "network",
-            "vswitch",
-            "standard",
-            "remove",
-            "--vswitch-name",
-            name
-        ]
-
         return self.__execute(cmd)
 
     def uplink_add(self, nic, switch_name="vSwitch0"):
@@ -372,105 +473,26 @@ class ESXConfig:
         ]
         return self.__execute(cmd)
 
-    def identify_uplink(self) -> NIC:
-        eligible_networks = [
-            net for net in self.network_data.networks if net.default_routes()
-        ]
-        if len(eligible_networks) != 1:
-            raise ValueError(
-                "the network_data.json should only contain a single default route."
-                "Unable to identify uplink interface"
-            )
-        link = eligible_networks[0].link
-        return self.nics.find_by_mac(link.ethernet_mac_address)
 
-    def configure_vswitch(self, uplink: NIC, switch_name: str, mtu: int):
-        """Sets up vSwitch."""
-        self.create_vswitch(switch_name)
-        self.uplink_add(nic=uplink.name, switch_name=switch_name)
-        self.vswitch_failover_uplinks(active_uplinks=[uplink.name], name=switch_name)
-        self.vswitch_security(name=switch_name)
-        self.vswitch_settings(mtu=mtu, name=switch_name)
-
-    def configure_dns(self, servers=None, search=None):
-        """Sets up arbitrary DNS servers."""
-        if not servers:
-            servers = []
-        if not search:
-            search = []
-
-        for server in servers:
-            self.__execute(
-                [
-                    "/bin/esxcli",
-                    "network",
-                    "ip",
-                    "dns",
-                    "server",
-                    "add",
-                    "--server",
-                    server,
-                ]
-            )
-
-        for domain in search:
-            self.__execute(
-                [
-                    "/bin/esxcli",
-                    "network",
-                    "ip",
-                    "dns",
-                    "search",
-                    "add",
-                    "--domain",
-                    domain,
-                ]
-            )
-
-    def configure_requested_dns(self):
-        """Configures DNS servers that were provided in network_data.json."""
-        dns_servers = [
-            srv.address for srv in self.network_data.services if srv.type == "dns"
-        ]
-        if not dns_servers:
-            return
-
-        return self.configure_dns(servers=dns_servers)
-
-    def delete_vmknic(self, portgroup_name):
-        """Deletes a vmknic from a portgroup."""
-        return self.__execute(["/bin/esxcfg-vmknic", "-d", portgroup_name])
-
-    def add_ip_interface(self, name, portgroup_name):
-        """Adds IP interface."""
-        return self.__execute(
-            [
-                "/bin/esxcli",
-                "network",
-                "ip",
-                "interface",
-                "add",
-                "--interface-name",
-                name,
-                "--portgroup-name",
-                portgroup_name,
-            ]
-        )
+OLD_MGMT_PG = "Management Network"
+OLD_VSWITCH = "vSwitch0"
+NEW_MGMT_PG = "mgmt"
+NEW_VSWITCH = "vSwitch22"
 
 
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
     esx = ESXConfig(network_data, dry_run=dry_run)
-    esx.delete_vmknic(portgroup_name="Management Network")
-    esx.portgroup_remove(switch_name="vSwitch0", portgroup_name="Management Network")
-    esx.destroy_vswitch(name="vSwitch0")
+    esx.host.delete_vmknic(portgroup_name=OLD_MGMT_PG)
+    esx.host.portgroup_remove(switch_name=OLD_VSWITCH, portgroup_name=OLD_MGMT_PG)
+    esx.host.destroy_vswitch(name=OLD_VSWITCH)
     esx.configure_vswitch(
-        uplink=esx.identify_uplink(), switch_name="vSwitch22", mtu=9000
+        uplink=esx.identify_uplink(), switch_name=NEW_VSWITCH, mtu=9000
     )
 
     esx.configure_portgroups()
-    esx.portgroup_add(portgroup_name="mgmt", switch_name="vSwitch22")
-    esx.add_ip_interface(name="vmk0", portgroup_name="mgmt")
+    esx.host.portgroup_add(portgroup_name=NEW_MGMT_PG, switch_name=NEW_VSWITCH)
+    esx.host.add_ip_interface(name="vmk0", portgroup_name=NEW_MGMT_PG)
     esx.configure_management_interface()
     esx.configure_default_route()
     esx.configure_requested_dns()
