@@ -144,6 +144,21 @@ class ESXConfig:
         self.dry_run = dry_run
         self.host = ESXHost(dry_run)
 
+    def add_default_mgmt_interface(
+        self, portgroup_name, switch_name, interface_name="vmk0"
+    ):
+        self.host.portgroup_add(portgroup_name=portgroup_name, switch_name=switch_name)
+        self.host.add_ip_interface(name=interface_name, portgroup_name=portgroup_name)
+
+
+    def clean_default_network_setup(self, portgroup_name, switch_name):
+        """Removes default networking setup left by the installer."""
+        self.host.delete_vmknic(portgroup_name=portgroup_name)
+        self.host.portgroup_remove(
+            switch_name=switch_name, portgroup_name=portgroup_name
+        )
+        self.host.destroy_vswitch(name=switch_name)
+
     def configure_default_route(self):
         """Configures default route.
 
@@ -483,16 +498,13 @@ NEW_VSWITCH = "vSwitch22"
 def main(json_file, dry_run):
     network_data = NetworkData.from_json_file(json_file)
     esx = ESXConfig(network_data, dry_run=dry_run)
-    esx.host.delete_vmknic(portgroup_name=OLD_MGMT_PG)
-    esx.host.portgroup_remove(switch_name=OLD_VSWITCH, portgroup_name=OLD_MGMT_PG)
-    esx.host.destroy_vswitch(name=OLD_VSWITCH)
+    esx.clean_default_network_setup(OLD_MGMT_PG, OLD_VSWITCH)
     esx.configure_vswitch(
         uplink=esx.identify_uplink(), switch_name=NEW_VSWITCH, mtu=9000
     )
 
     esx.configure_portgroups()
-    esx.host.portgroup_add(portgroup_name=NEW_MGMT_PG, switch_name=NEW_VSWITCH)
-    esx.host.add_ip_interface(name="vmk0", portgroup_name=NEW_MGMT_PG)
+    esx.add_default_mgmt_interface(NEW_MGMT_PG, NEW_VSWITCH)
     esx.configure_management_interface()
     esx.configure_default_route()
     esx.configure_requested_dns()
