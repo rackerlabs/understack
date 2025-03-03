@@ -1,6 +1,6 @@
 import pytest
 
-from netinit import NICList
+from netinit.nic_list import NICList
 
 
 @pytest.fixture

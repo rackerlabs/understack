@@ -1,9 +1,9 @@
 import json
 from dataclasses import is_dataclass
 
-from netinit import Link
-from netinit import NetworkData
-from netinit import Route
+from netinit.link import Link
+from netinit.network_data import NetworkData
+from netinit.route import Route
 
 
 def test_links_parsing(network_data_single):
