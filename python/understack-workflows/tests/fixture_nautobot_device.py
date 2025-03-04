@@ -24,6 +24,7 @@ FIXTURE_DELL_NAUTOBOT_DEVICE = NautobotDevice(
             neighbor_chassis_mac="9C:54:16:F5:AB:27",
             neighbor_location_name="IAD3",
             neighbor_rack_name="F20-2",
+            vlan_group_name="F20-2[1-2]",
             ucvni_group_name="spine402-1.iad3",
         ),
         NautobotInterface(
@@ -41,6 +42,7 @@ FIXTURE_DELL_NAUTOBOT_DEVICE = NautobotDevice(
             neighbor_chassis_mac="9C:54:16:F5:AC:27",
             neighbor_location_name="IAD3",
             neighbor_rack_name="F20-2",
+            vlan_group_name="F20-2[1-2]",
             ucvni_group_name="spine402-1.iad3",
         ),
         NautobotInterface(
@@ -58,6 +60,7 @@ FIXTURE_DELL_NAUTOBOT_DEVICE = NautobotDevice(
             neighbor_chassis_mac="9C:54:16:F5:AD:27",
             neighbor_location_name="IAD3",
             neighbor_rack_name="F20-2",
+            vlan_group_name="F20-2[1-2]",
             ucvni_group_name="spine402-1.iad3",
         ),
         NautobotInterface(
@@ -75,6 +78,7 @@ FIXTURE_DELL_NAUTOBOT_DEVICE = NautobotDevice(
             neighbor_chassis_mac="9C:54:16:F5:AD:27",
             neighbor_location_name="IAD3",
             neighbor_rack_name="F20-2",
+            vlan_group_name="F20-2[1-2]",
             ucvni_group_name="spine402-1.iad3",
         ),
         NautobotInterface(
@@ -92,6 +96,7 @@ FIXTURE_DELL_NAUTOBOT_DEVICE = NautobotDevice(
             neighbor_chassis_mac="9C:54:16:F5:AE:27",
             neighbor_location_name="IAD3",
             neighbor_rack_name="F20-2",
+            vlan_group_name=None,
             ucvni_group_name=None,
         ),
     ],

@@ -35,6 +35,7 @@ class NautobotInterface:
     neighbor_chassis_mac: str | None
     neighbor_location_name: str | None
     neighbor_rack_name: str | None
+    vlan_group_name: str | None = None
     ucvni_group_name: str | None = None
 
 
@@ -254,6 +255,7 @@ def nautobot_server(nautobot, serial: str) -> NautobotDevice | None:
                             location { id name }
                             rack { id name }
                             vlan_group: rel_vlan_group_to_devices {
+                              name
                               ucvni_group: rel_ucvnigroup_vlangroup { name }
                             }
                         }
@@ -316,6 +318,7 @@ def parse_interface(data: dict) -> NautobotInterface:
         neighbor_chassis_mac=connected and connected["device"]["mac"],
         neighbor_location_name=connected and connected["device"]["location"]["name"],
         neighbor_rack_name=connected and connected["device"]["rack"]["name"],
+        vlan_group_name=vlan_group and vlan_group["name"],
         ucvni_group_name=ucvni_group and ucvni_group["name"],
     )
 
