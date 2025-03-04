@@ -3,3 +3,4 @@ inetutils-telnet:
 mtr-tiny:
 tcpdump:
 bind9-dnsutils:
+bsdextrautils:
