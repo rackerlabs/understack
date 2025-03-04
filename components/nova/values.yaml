@@ -64,6 +64,10 @@ conf:
       project_domain_name: infra
       project_name: baremetal
   nova:
+    filter_scheduler:
+      available_filters: nova.scheduler.filters.all_filters
+      enabled_filters: AggregateInstanceExtraSpecsFilter
+
     quota:
       # adjust default quotas to make it possible to use baremetal
       cores: 512
