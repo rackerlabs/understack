@@ -1,1 +1,0 @@
-# ESX Networking setup scripts
