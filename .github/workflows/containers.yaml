@@ -18,6 +18,9 @@ on:
   merge_group:
     types: [checks_requested]
 
+env:
+  OPENSTACK_VERSION: 2024.2
+
 jobs:
   openstack:
     if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
@@ -25,12 +28,12 @@ jobs:
 
     strategy:
       matrix:
+        # if you add a container here, add it to the 'clean_containers' job below
         project: [ironic, neutron, keystone, nova, openstack-client]
-        openstack: [2024.2]
 
     steps:
       - name: setup docker buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
       - name: login to ghcr.io
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
@@ -40,12 +43,12 @@ jobs:
 
       - name: image metadata
         id: meta
-        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
         with:
           images: ghcr.io/${{ github.repository }}/${{ matrix.project }}
           tags: |
-            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable={{is_default_branch}}
-            type=raw,value=${{ matrix.openstack }}-ubuntu_jammy,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=${{ env.OPENSTACK_VERSION }}-ubuntu_jammy,enable={{is_default_branch}}
+            type=raw,value=${{ env.OPENSTACK_VERSION }}-ubuntu_jammy,enable=${{ github.event_name == 'workflow_dispatch' }}
             type=ref,event=tag
             type=ref,event=pr
         env:
@@ -57,10 +60,10 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - name: build and deploy openstack container image to registry
-        uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
         with:
           file: containers/${{ matrix.project }}/Dockerfile.${{ matrix.project }}
-          build-args: OPENSTACK_VERSION=${{ matrix.openstack }}
+          build-args: OPENSTACK_VERSION=${{ env.OPENSTACK_VERSION }}
           pull: true  # ensure we always have an up to date source
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -73,7 +76,7 @@ jobs:
 
     steps:
       - name: setup docker buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
       - name: login to ghcr.io
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
@@ -83,7 +86,7 @@ jobs:
 
       - name: image metadata
         id: meta
-        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
         with:
           images: ghcr.io/${{ github.repository }}/dnsmasq
           tags: |
@@ -100,7 +103,7 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - name: build and deploy dnsmasq container to registry
-        uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
         with:
           context: "{{defaultContext}}:containers/dnsmasq"
           file: Dockerfile.dnsmasq
@@ -114,13 +117,14 @@ jobs:
 
     strategy:
       matrix:
+        # if you add a container here, add it to the 'clean_containers' job below
         container:
           - name: ironic-nautobot-client
           - name: nova-flavors
 
     steps:
       - name: setup docker buildx
-        uses: docker/setup-buildx-action@f7ce87c1d6bead3e36075b2ce75da1f6cc28aaca # v3
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3
       - name: login to ghcr.io
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
         with:
@@ -130,7 +134,7 @@ jobs:
 
       - name: image metadata
         id: meta
-        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
         with:
           images: ghcr.io/${{ github.repository }}/${{ matrix.container.name }}
           tags: |
@@ -147,7 +151,7 @@ jobs:
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
 
       - name: build and deploy container image to registry
-        uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497 # v6
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6
         with:
           file: containers/${{ matrix.container.name }}/Dockerfile.${{ matrix.container.name }}
           pull: true  # ensure we always have an up to date source
@@ -169,10 +173,13 @@ jobs:
       matrix:
         container:
           - ironic
-          - keystone
           - neutron
+          - keystone
+          - nova
+          - openstack-client
           - dnsmasq
           - ironic-nautobot-client
+          - nova-flavors
 
     steps:
       - name: clean up PR container

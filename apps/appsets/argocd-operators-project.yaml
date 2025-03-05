@@ -25,6 +25,8 @@ spec:
   # kube-system is used by kube-prometheus-stack
   - namespace: 'kube-system'
     server: '*'
+  - namespace: 'opentelemetry-operator'
+    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'

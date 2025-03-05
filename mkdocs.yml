@@ -112,6 +112,8 @@ nav:
       - networking.md
     - Components:
       - component-overview.md
+      - Networking:
+        - component-networking-neutron.md
       - component-argo-workflows.md
       - component-understack-workflows.md
   - 'Deployment Guide':

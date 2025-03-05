@@ -211,6 +211,13 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
+                - component: otel-collector
+                  componentNamespace: otel-collector
+                  skipComponent: '{{has "otel-collector" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: '{{.name}}/manifests/otel-collector'
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
