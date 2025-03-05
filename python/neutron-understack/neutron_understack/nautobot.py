@@ -125,12 +125,14 @@ class Nautobot:
     def ucvni_create(
         self,
         network_id: str,
+        project_id: str,
         ucvni_group: str,
         network_name: str,
         segment_id: int | None = None,
-    ):
+    ) -> dict:
         payload = {
             "id": network_id,
+            "tenant": project_id,
             "name": network_name,
             "ucvni_group": ucvni_group,
             "status": {"name": "Active"},
