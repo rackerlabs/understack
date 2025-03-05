@@ -46,3 +46,26 @@ grafana:
         gnetId: 14057
         revision: 1
         datasource: Prometheus
+
+# prevent ArgoCD from getting hung up on the webhook jobs
+# https://github.com/prometheus-community/helm-charts/issues/4500#issuecomment-2693911587
+prometheusOperator:
+  admissionWebhooks:
+    enabled: true
+
+    annotations:
+      argocd.argoproj.io/hook: PreSync
+      argocd.argoproj.io/hook-delete-policy: HookSucceeded
+
+    patch:
+      annotations:
+        argocd.argoproj.io/hook: PreSync
+        argocd.argoproj.io/hook-delete-policy: HookSucceeded
+
+    mutatingWebhookConfiguration:
+      annotations:
+        argocd.argoproj.io/hook: PreSync
+
+    validatingWebhookConfiguration:
+      annotations:
+        argocd.argoproj.io/hook: PreSync
