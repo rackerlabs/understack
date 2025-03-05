@@ -1,4 +1,5 @@
 import inspect
+import uuid
 from pprint import pformat
 from urllib.parse import urljoin
 from uuid import UUID
@@ -98,12 +99,14 @@ class Nautobot:
     def ucvni_create(
         self,
         network_id: str,
+        project_id: str,
         ucvni_group: str,
         network_name: str,
         segment_id: int | None = None,
     ):
         payload = {
             "id": network_id,
+            "tenant": str(uuid.UUID(project_id)),
             "name": network_name,
             "ucvni_group": ucvni_group,
             "status": {"name": "Active"},
