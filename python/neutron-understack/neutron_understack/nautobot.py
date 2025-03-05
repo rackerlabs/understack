@@ -1,4 +1,5 @@
 import inspect
+import json
 import uuid
 from pprint import pformat
 from urllib.parse import urljoin
@@ -116,6 +117,7 @@ class Nautobot:
             payload["ucvni_id"] = segment_id
             payload["ucvni_type"] = "INFRA"
 
+        LOG.info(f"haseeb payload is {json.dumps(payload)}")
         url = "/api/plugins/undercloud-vni/ucvnis/"
         return self.make_api_request("POST", url, payload)
 
