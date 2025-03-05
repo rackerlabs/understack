@@ -56,7 +56,7 @@ conf:
         # set the default ml2 backend to our plugin, neutron_understack
         # we'll need to use the ovn ML2 plugin to hook the routers to our network
         mechanism_drivers: "understack,ovn"
-        tenant_network_types: "vlan"
+        tenant_network_types: "vxlan"
         type_drivers: "vlan,vxlan"
       ml2_type_vxlan:
         # OSH sets a default range here but we want to use network_segment_range plugin
