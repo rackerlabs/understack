@@ -117,7 +117,8 @@ class Nautobot:
             payload["ucvni_id"] = segment_id
             payload["ucvni_type"] = "INFRA"
 
-        LOG.info(f"haseeb payload is {json.dumps(payload)}")
+        LOG.info("haseeb payload is")
+        LOG.info(json.dumps(payload))
         url = "/api/plugins/undercloud-vni/ucvnis/"
         return self.make_api_request("POST", url, payload)
 
