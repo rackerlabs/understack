@@ -7,6 +7,8 @@ import requests
 from neutron_lib import exceptions as exc
 from oslo_log import log
 
+from neutron_understack import utils
+
 LOG = log.getLogger(__name__)
 
 
@@ -98,12 +100,14 @@ class Nautobot:
     def ucvni_create(
         self,
         network_id: str,
+        project_id: str,
         ucvni_group: str,
         network_name: str,
         segment_id: int | None = None,
     ):
         payload = {
             "id": network_id,
+            "tenant": utils.uuid_formatted_str(project_id),
             "name": network_name,
             "ucvni_group": ucvni_group,
             "status": {"name": "Active"},
