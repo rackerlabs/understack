@@ -2,6 +2,7 @@ import logging
 from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
+from neutron.plugins.ml2.driver_context import PortContext
 from neutron_lib import constants as p_const
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
@@ -223,31 +224,6 @@ class UnderstackDriver(MechanismDriver):
     def update_port_postcommit(self, context):
         self._delete_tenant_port_on_unbound(context)
 
-        vif_type = context.current["binding:vif_type"]
-
-        if vif_type != portbindings.VIF_TYPE_OTHER:
-            return
-
-        trunk_details = context.current.get("trunk_details", {})
-        network_id = context.current["network_id"]
-        network_type = context.network.current.get("provider:network_type")
-        connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
-
-        if trunk_details:
-            self._configure_trunk(trunk_details, connected_interface_uuid)
-        if network_type == p_const.TYPE_VLAN:
-            vlan_tag = int(context.network.current.get("provider:segmentation_id"))
-        else:
-            vlan_tag = None
-        nb_vlan_group_id = self.update_nautobot(
-            network_id, connected_interface_uuid, vlan_tag
-        )
-
-        self.undersync.sync_devices(
-            vlan_group_uuids=str(nb_vlan_group_id),
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
-
     def delete_port_precommit(self, context):
         pass
 
@@ -273,7 +249,28 @@ class UnderstackDriver(MechanismDriver):
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
             )
 
-    def bind_port(self, context):
+    def _configure_switchport_on_bind(self, context: PortContext) -> None:
+        trunk_details = context.current.get("trunk_details", {})
+        network_id = context.current["network_id"]
+        network_type = context.network.current.get("provider:network_type")
+        connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
+
+        if trunk_details:
+            self._configure_trunk(trunk_details, connected_interface_uuid)
+        if network_type == p_const.TYPE_VLAN:
+            vlan_tag = int(context.network.current.get("provider:segmentation_id"))
+        else:
+            vlan_tag = None
+        nb_vlan_group_id = self.update_nautobot(
+            network_id, connected_interface_uuid, vlan_tag
+        )
+
+        self.undersync.sync_devices(
+            vlan_group_uuids=str(nb_vlan_group_id),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
+
+    def bind_port(self, context: PortContext) -> None:
         for segment in context.network.network_segments:
             if self.check_segment(segment):
                 context.set_binding(
@@ -283,6 +280,7 @@ class UnderstackDriver(MechanismDriver):
                     status=p_const.PORT_STATUS_ACTIVE,
                 )
                 LOG.debug("Bound segment: %s", segment)
+                self._configure_switchport_on_bind(context)
                 return
             else:
                 LOG.debug(
