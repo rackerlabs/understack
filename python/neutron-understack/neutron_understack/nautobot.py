@@ -148,12 +148,13 @@ class Nautobot:
     def namespace_delete(self, uuid: str) -> dict:
         return self.make_api_request("DELETE", f"/api/ipam/namespaces/{uuid}/")
 
-    def subnet_create(self, subnet_uuid: str, prefix: str, namespace_name: str) -> dict:
+    def subnet_create(self, subnet_uuid: str, prefix: str, namespace_name: str, tenant_uuid: str) -> dict:
         payload = {
             "id": subnet_uuid,
             "prefix": prefix,
             "status": "Active",
             "namespace": {"name": namespace_name},
+            "tenant": {"id": tenant_uuid},
         }
         return self.make_api_request("POST", "/api/ipam/prefixes/", payload)
 
