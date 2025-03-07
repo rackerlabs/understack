@@ -1,3 +1,5 @@
+from unittest.mock import ANY
+
 import pytest
 from neutron_lib.api.definitions import portbindings
 
@@ -115,6 +117,7 @@ class TestCreateSubnetPostCommit:
             subnet_uuid=subnet.id,
             prefix=subnet.cidr,
             namespace_name=subnet.network_id,
+            tenant_uuid=ANY,
         )
 
     @pytest.mark.parametrize("subnet", [{"external": True}], indirect=True)
@@ -125,6 +128,7 @@ class TestCreateSubnetPostCommit:
             subnet_uuid=subnet.id,
             prefix=subnet.cidr,
             namespace_name="Global",
+            tenant_uuid=ANY,
         )
         understack_driver.nb.associate_subnet_with_network.assert_called_once_with(
             role="svi_vxlan_anycast_gateway",
