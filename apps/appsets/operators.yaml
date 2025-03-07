@@ -74,7 +74,7 @@ spec:
                   sources:
                     - repoURL: https://prometheus-community.github.io/helm-charts
                       chart: kube-prometheus-stack
-                      targetRevision: 69.7.0
+                      targetRevision: 62.6.0
                       helm:
                         releaseName: kube-prometheus-stack
                         valueFiles:

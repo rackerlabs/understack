@@ -45,19 +45,7 @@ class TestUpdateNautobot:
         understack_driver.nb.fetch_vlan_group_uuid.assert_called_once_with("444")
 
 
-@pytest.mark.usefixtures("update_nautobot_patch")
 class TestUpdatePortPostcommit:
-    def test_vif_type_other_no_trunk(self, mocker, port_context, understack_driver):
-        mocker.patch.object(understack_driver, "_configure_trunk")
-        mocker.patch.object(understack_driver, "fetch_connected_interface_uuid")
-
-        understack_driver.update_port_postcommit(port_context)
-
-        understack_driver.update_nautobot.assert_called_once()
-        understack_driver._configure_trunk.assert_not_called()
-        understack_driver.fetch_connected_interface_uuid.assert_called_once()
-        understack_driver.undersync.sync_devices.assert_called_once()
-
     @pytest.mark.parametrize(
         "port_dict", [{"vif_type": portbindings.VIF_TYPE_UNBOUND}], indirect=True
     )
@@ -70,13 +58,27 @@ class TestUpdatePortPostcommit:
         spy_delete_tenant_port.assert_called_once()
         assert result is None
 
+
+@pytest.mark.usefixtures("update_nautobot_patch")
+class TestBindPort:
+    def test_with_no_trunk(self, mocker, port_context, understack_driver):
+        mocker.patch.object(understack_driver, "_configure_trunk")
+        mocker.patch.object(understack_driver, "fetch_connected_interface_uuid")
+
+        understack_driver.bind_port(port_context)
+
+        understack_driver.update_nautobot.assert_called_once()
+        understack_driver._configure_trunk.assert_not_called()
+        understack_driver.fetch_connected_interface_uuid.assert_called_once()
+        understack_driver.undersync.sync_devices.assert_called_once()
+
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
     def test_with_trunk_details(self, mocker, understack_driver, port_context, port_id):
         mocker.patch(
             "neutron_understack.utils.fetch_subport_network_id", return_value="112233"
         )
 
-        understack_driver.update_port_postcommit(port_context)
+        understack_driver.bind_port(port_context)
         understack_driver.nb.prep_switch_interface.assert_called_once_with(
             connected_interface_id=str(port_id),
             ucvni_uuid="112233",

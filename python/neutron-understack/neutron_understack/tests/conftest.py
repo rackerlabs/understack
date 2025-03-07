@@ -3,6 +3,7 @@ import json
 import uuid
 
 import pytest
+from neutron.db.models.segment import NetworkSegment
 from neutron.db.models_v2 import Network
 from neutron.db.models_v2 import Port
 from neutron.db.models_v2 import Subnet
@@ -73,12 +74,17 @@ def network_dict(ml2_plugin) -> dict:
 
 
 @pytest.fixture
-def network_context(ml2_plugin, network_dict) -> NetworkContext:
+def network_segment() -> NetworkSegment:
+    return NetworkSegment(network_type="vxlan")
+
+
+@pytest.fixture
+def network_context(ml2_plugin, network_dict, network_segment) -> NetworkContext:
     return NetworkContext(
         ml2_plugin,
         "plugin_context",
         network_dict,
-        segments=[],
+        segments=[network_segment],
     )
 
 
