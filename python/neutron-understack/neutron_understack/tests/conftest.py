@@ -115,6 +115,11 @@ def subnet_context(ml2_plugin, subnet_dict) -> SubnetContext:
 
 
 @pytest.fixture
+def trunk(subport) -> Trunk:
+    return Trunk(sub_ports=[subport])
+
+
+@pytest.fixture
 def binding_profile(request, port_id) -> str:
     req = getattr(request, "param", {})
     return json.dumps(
@@ -127,11 +132,6 @@ def binding_profile(request, port_id) -> str:
             ]
         }
     )
-
-
-@pytest.fixture
-def trunk(subport) -> Trunk:
-    return Trunk(sub_ports=[subport])
 
 
 @pytest.fixture
