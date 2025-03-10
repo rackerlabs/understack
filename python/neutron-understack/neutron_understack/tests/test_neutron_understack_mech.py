@@ -3,6 +3,8 @@ from unittest.mock import ANY
 import pytest
 from neutron_lib.api.definitions import portbindings
 
+from neutron_understack import utils
+
 
 class TestFetchConnectedInterfaceUUID:
     def test_with_normal_uuid(self, port_context, understack_driver, port_id):
@@ -143,3 +145,67 @@ class TestDeleteSubnetPostCommit:
         understack_driver.delete_subnet_postcommit(subnet_context)
 
         understack_driver.nb.subnet_delete.assert_called_once()
+
+
+class TestCreateNetworkPostCommit:
+    def test_tenant_assignment_to_ucvni(
+        self,
+        mocker,
+        understack_driver,
+        network_context,
+        ml2_understack_conf,
+        ucvni_create_response,
+        vlan_group_id,
+    ):
+        network_context.current.update(
+            {
+                "provider:network_type": "vlan",
+                "provider:segmentation_id": 100,
+                "provider:physical_network": "physnet1",
+                "router:external": "Internal",
+                "project_id": "d3c2c85bdbf24ff5843f323524b63768",
+            }
+        )
+
+        mocker.patch.object(
+            understack_driver.nb,
+            "prep_switch_interface",
+            return_value={"vlan_group_id": str(vlan_group_id), "vlan_tag": 100},
+        )
+        mocker.patch.object(
+            understack_driver.nb, "make_api_request", return_value=ucvni_create_response
+        )
+        mocker.patch.object(understack_driver, "_create_nautobot_namespace")
+
+        understack_driver.create_network_postcommit(network_context)
+
+        understack_driver.nb.ucvni_create.assert_called_once_with(
+            network_id=network_context.current["id"],
+            project_id=network_context.current["project_id"],
+            ucvni_group="f6843091-845d-4195-8132-960125e05f7b",
+            network_name=network_context.current["name"],
+        )
+
+        ucvni_create_actual_response = (
+            understack_driver.nb.make_api_request.return_value
+        )
+        assert "tenant" in ucvni_create_actual_response[0]
+        tenant_obj = ucvni_create_actual_response[0].get("tenant", {})
+        assert tenant_obj.get("id") == utils.uuid_formatted_str(
+            network_context.current["project_id"]
+        )
+
+        understack_driver._create_nautobot_namespace.assert_called_once_with(
+            network_context.current["id"],
+            network_context.current["router:external"],
+        )
+        understack_driver.nb.prep_switch_interface.assert_called_once_with(
+            connected_interface_id="a27f7260-a7c5-4f0c-ac70-6258b026d368",
+            ucvni_uuid=network_context.current["id"],
+            modify_native_vlan=False,
+            vlan_tag=100,
+        )
+        understack_driver.undersync.sync_devices.assert_called_once_with(
+            vlan_group_uuids=str(vlan_group_id),
+            dry_run=False,
+        )
