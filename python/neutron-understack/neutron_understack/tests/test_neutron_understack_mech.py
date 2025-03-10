@@ -53,10 +53,11 @@ class TestUpdatePortPostcommit:
         spy_delete_tenant_port = mocker.spy(
             understack_driver, "_delete_tenant_port_on_unbound"
         )
-        result = understack_driver.update_port_postcommit(port_context)
+        port_context._original_vif_type = portbindings.VIF_TYPE_OTHER
+        understack_driver.update_port_postcommit(port_context)
 
         spy_delete_tenant_port.assert_called_once()
-        assert result is None
+        understack_driver.undersync.sync_devices.assert_called_once()
 
 
 @pytest.mark.usefixtures("update_nautobot_patch")
@@ -95,15 +96,10 @@ class Test_DeleteTenantPortOnUnbound:
         mocker.patch(
             "neutron_understack.utils.fetch_subport_network_id", return_value="112233"
         )
-
-        mocker.patch.object(
-            understack_driver.nb,
-            "detach_port",
-            return_value=str(port_id),
-        )
+        mocker.patch.object(understack_driver.nb, "detach_port")
         port_context._binding.vif_type = portbindings.VIF_TYPE_UNBOUND
 
-        understack_driver._delete_tenant_port_on_unbound(port_context)
+        understack_driver._delete_tenant_port_on_unbound(port_context, str(port_id))
         understack_driver.nb.detach_port.assert_any_call(str(port_id), "112233")
 
 

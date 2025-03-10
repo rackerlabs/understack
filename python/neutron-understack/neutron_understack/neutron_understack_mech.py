@@ -221,8 +221,42 @@ class UnderstackDriver(MechanismDriver):
                 vlan_tag=None,
             )
 
+    def _update_trunk(
+        self, changed_subports: dict, connected_interface_uuid: str
+    ) -> None:
+        for subport in changed_subports.get("subports_added", []):
+            network_uuid = utils.fetch_subport_network_id(subport.get("port_id"))
+            self.nb.prep_switch_interface(
+                connected_interface_id=connected_interface_uuid,
+                ucvni_uuid=network_uuid,
+                modify_native_vlan=False,
+                vlan_tag=None,
+            )
+
+        for subport in changed_subports.get("subports_removed", []):
+            network_uuid = utils.fetch_subport_network_id(subport.get("port_id"))
+            self.nb.detach_port(connected_interface_uuid, network_uuid)
+
+    def _trigger_undersync(self, connected_interface_uuid: str) -> None:
+        nb_vlan_group_id = self.nb.fetch_interface_vlan_group_uuid(
+            connected_interface_uuid
+        )
+        self.undersync.sync_devices(
+            vlan_group_uuids=str(nb_vlan_group_id),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
+
     def update_port_postcommit(self, context):
-        self._delete_tenant_port_on_unbound(context)
+        connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
+        if utils.baremetal_vif_type_other_changed_to_unbound(context):
+            self._delete_tenant_port_on_unbound(context, connected_interface_uuid)
+        elif utils.baremetal_vif_type_other_not_changed(context) and (
+            changed_subports := utils.changed_subports(context)
+        ):
+            self._update_trunk(changed_subports, connected_interface_uuid)
+        else:
+            return
+        self._trigger_undersync(connected_interface_uuid)
 
     def delete_port_precommit(self, context):
         pass
@@ -373,7 +407,9 @@ class UnderstackDriver(MechanismDriver):
         for network_uuid in network_uuids:
             self.nb.detach_port(connected_interface_uuid, network_uuid)
 
-    def _delete_tenant_port_on_unbound(self, context):
+    def _delete_tenant_port_on_unbound(
+        self, context: PortContext, connected_interface_uuid: str
+    ) -> None:
         """Tenant network port cleanup in the UnderCloud infrastructure.
 
         This is triggered in the update_port_postcommit call as in the
@@ -384,26 +420,13 @@ class UnderstackDriver(MechanismDriver):
         Only in the update_port_postcommit we have access to the original context,
         from which we can access the binding information.
         """
-        if (
-            context.current["binding:vnic_type"] == "baremetal"
-            and context.vif_type == portbindings.VIF_TYPE_UNBOUND
-            and context.original_vif_type == portbindings.VIF_TYPE_OTHER
-        ):
-            connected_interface_uuid = self.fetch_connected_interface_uuid(
-                context.original
-            )
-            trunk_details = context.current.get("trunk_details", {})
-            if trunk_details:
-                self._clean_trunks(trunk_details, connected_interface_uuid)
+        trunk_details = context.current.get("trunk_details", {})
+        if trunk_details:
+            self._clean_trunks(trunk_details, connected_interface_uuid)
 
-            network_id = context.current["network_id"]
-            nb_vlan_group_id = UUID(
-                self.nb.detach_port(connected_interface_uuid, network_id)
-            )
-            self.undersync.sync_devices(
-                vlan_group_uuids=str(nb_vlan_group_id),
-                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-            )
+        network_id = context.current["network_id"]
+
+        self.nb.detach_port(connected_interface_uuid, network_id)
 
     def _fetch_and_delete_nautobot_namespace(self, name: str) -> None:
         namespace_uuid = self.nb.fetch_namespace_by_name(name)

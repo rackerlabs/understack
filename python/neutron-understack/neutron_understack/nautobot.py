@@ -226,6 +226,14 @@ class Nautobot:
         payload = {"status": {"name": status}}
         return self.make_api_request("PATCH", url, payload)
 
+    def fetch_interface(self, interface_uuid: str) -> dict:
+        url = f"/api/dcim/interfaces/{interface_uuid}/"
+        return self.make_api_request("GET", url)
+
+    def fetch_interface_vlan_group_uuid(self, interface_uuid: str) -> str:
+        device_uuid = self.fetch_interface(interface_uuid).get("device", {}).get("id")
+        return self.fetch_vlan_group_uuid(device_uuid)
+
     def fetch_vlan_group_uuid(self, device_uuid: str) -> str:
         url = f"/api/dcim/devices/{device_uuid}/?include=relationships"
 
