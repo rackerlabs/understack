@@ -138,11 +138,18 @@ class UnderstackDriver(MechanismDriver):
 
            Don't have an SVI, which means we don't associate them with a VNI in
            nautobot.
+
+        The openstack tenant_id is a hex string without dashes.  We convert this
+        to a normal UUID format for compatibility with Nautobot.
         """
         subnet_uuid = context.current["id"]
         network_uuid = context.current["network_id"]
         prefix = context.current["cidr"]
         external = context.current["router:external"]
+        tenant_uuid = context.current["tenant_id"]
+
+        if tenant_uuid:
+            tenant_uuid = str(UUID(tenant_uuid))
 
         if external:
             namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
@@ -153,6 +160,7 @@ class UnderstackDriver(MechanismDriver):
             subnet_uuid=subnet_uuid,
             prefix=prefix,
             namespace_name=namespace,
+            tenant_uuid=tenant_uuid,
         )
 
         if external:
