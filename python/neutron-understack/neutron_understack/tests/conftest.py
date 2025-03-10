@@ -190,3 +190,40 @@ def undersync_sync_devices_patch(mocker, understack_driver) -> None:
 @pytest.fixture
 def update_nautobot_patch(mocker, understack_driver) -> None:
     mocker.patch.object(understack_driver, "update_nautobot")
+
+
+@pytest.fixture
+def ml2_understack_conf(mocker) -> None:
+    mocker.patch(
+        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.ucvni_group",
+        "f6843091-845d-4195-8132-960125e05f7b",
+    )
+    mocker.patch(
+        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.network_node_switchport_uuid",
+        "a27f7260-a7c5-4f0c-ac70-6258b026d368",
+    )
+    mocker.patch(
+        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.undersync_dry_run",
+        False,
+    )
+
+
+@pytest.fixture
+def ucvni_create_response() -> list[dict]:
+    return [
+        {
+            "id": "63a2da8b-9da5-493a-b5ac-2ae62f663e1a",
+            "name": "PROV-NET500",
+            "ucvni_id": 200054,
+            "ucvni_type": "TENANT",
+            "ucvni_group": {
+                "id": "f6843091-845d-4195-8132-960125e05f7b",
+            },
+            "tenant": {
+                "id": "d3c2c85b-dbf2-4ff5-843f-323524b63768",
+            },
+            "status": {
+                "id": "d4bcbafa-3033-433b-b21b-a20acf9d1324",
+            },
+        }
+    ]
