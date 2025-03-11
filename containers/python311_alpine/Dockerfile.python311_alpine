@@ -1,4 +1,4 @@
-FROM python:3.11.8-alpine3.19 AS builder
+FROM python:3.13.1-alpine3.19 AS builder
 
 LABEL org.opencontainers.image.title="Python 3.11 image base image"
 LABEL org.opencontainers.image.base.name="ghcr.io/rackerlabs/understack/python3.11.8-alpine3.19"
