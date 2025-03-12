@@ -1,7 +1,8 @@
-from understack_workflows.nautobot_device import NautobotDevice
+from understack_workflows.bmc_chassis_info import InterfaceInfo
+from understack_workflows.data_center import switch_for_mac
 
 
-def pxe_interface_name(nautobot_device: NautobotDevice) -> str:
+def pxe_interface_name(interfaces: list[InterfaceInfo]) -> str:
     """Answer the interface that connects to a -1 switch with following rules.
 
     Of the interfaces connected to the "-1" switch,
@@ -17,7 +18,7 @@ def pxe_interface_name(nautobot_device: NautobotDevice) -> str:
     However the switch roles, etc., don't seem set in stone and so I don't want
     to rely on that data for now.
     """
-    switches = switch_connections(nautobot_device)
+    switches = switch_connections(interfaces)
 
     for interface_name, switch_name in switches.items():
         if get_preferred_interface(interface_name, switch_name, "Integrated"):
@@ -39,9 +40,11 @@ def get_preferred_interface(interface_name, switch_name, keyword):
     return keyword in interface_name and switch_name.split(".")[0].endswith("-1")
 
 
-def switch_connections(nautobot_device: NautobotDevice) -> dict:
+def switch_connections(interfaces: list[InterfaceInfo]) -> dict[str, str]:
     return {
-        i.name: i.neighbor_device_name
-        for i in nautobot_device.interfaces
-        if i.neighbor_device_name
+        i.name: switch_for_mac(
+            i.remote_switch_mac_address, i.remote_switch_port_name
+        ).name
+        for i in interfaces
+        if i.remote_switch_mac_address and i.remote_switch_port_name
     }

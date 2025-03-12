@@ -76,7 +76,7 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
     interfaces = interface_data(bmc)
 
     return ChassisInfo(
-        manufacturer=chassis_data["Manufacturer"],
+        manufacturer=normalise_manufacturer(chassis_data["Manufacturer"]),
         model_number=chassis_data["Model"],
         serial_number=chassis_data["SKU"],
         bios_version=chassis_data["BiosVersion"],
@@ -257,3 +257,9 @@ def normalise_mac(mac: str) -> str:
 
 def server_interface_name(name: str) -> str:
     return "iDRAC" if name.startswith("iDRAC.Embedded") else name
+
+
+def normalise_manufacturer(name: str) -> str:
+    if "DELL" in name.upper():
+        return "Dell"
+    raise ValueError(f"Server manufacturer {name} not supported")

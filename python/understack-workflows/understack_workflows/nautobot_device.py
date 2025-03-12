@@ -52,7 +52,9 @@ class NautobotDevice:
     interfaces: list[NautobotInterface]
 
 
-def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
+def find_or_create(
+    chassis_info: ChassisInfo, device_name: str, nautobot
+) -> NautobotDevice:
     """Update existing or create new device using the Nautobot API."""
     # TODO: performance: our single graphql query here fetches the device from
     # nautobot with all existing interfaces, macs, cable and connected switches.
@@ -82,7 +84,7 @@ def find_or_create(chassis_info: ChassisInfo, nautobot) -> NautobotDevice:
         logger.info("Device %s not in Nautobot, creating", chassis_info.serial_number)
 
         location_id, rack_id = location_from(list(switches.values()))
-        payload = server_device_payload(location_id, rack_id, chassis_info)
+        payload = server_device_payload(location_id, rack_id, chassis_info, device_name)
         logger.debug("Server device: %s", payload)
         nautobot.dcim.devices.create(**payload)
         # Re-run the graphql query to fetch any auto-created defaults from
@@ -211,29 +213,20 @@ def base_mac(mac: str, port_name: str) -> str:
 
 
 def server_device_payload(
-    location_id: str, rack_id: str, chassis_info: ChassisInfo
+    location_id: str, rack_id: str, chassis_info: ChassisInfo, device_name: str
 ) -> dict:
-    manufacturer = _parse_manufacturer(chassis_info.manufacturer)
-    name = f"{manufacturer}-{chassis_info.serial_number}"
-
     return {
         "status": {"name": DEVICE_INITIAL_STATUS},
         "role": {"name": DEVICE_ROLE},
         "device_type": {
-            "manufacturer": {"name": manufacturer},
+            "manufacturer": {"name": chassis_info.manufacturer},
             "model": chassis_info.model_number,
         },
-        "name": name,
+        "name": device_name,
         "serial": chassis_info.serial_number,
         "rack": rack_id,
         "location": location_id,
     }
-
-
-def _parse_manufacturer(name: str) -> str:
-    if "DELL" in name.upper():
-        return "Dell"
-    raise ValueError(f"Server manufacturer {name} not supported")
 
 
 def nautobot_server(nautobot, serial: str) -> NautobotDevice | None:

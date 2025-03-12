@@ -2,107 +2,125 @@ from ironicclient.v1.port import Port
 
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
-from understack_workflows.nautobot_device import NautobotDevice
-from understack_workflows.nautobot_device import NautobotInterface
 from understack_workflows.port_configuration import PortConfiguration
+from understack_workflows.bmc_chassis_info import InterfaceInfo
+from understack_workflows import data_center
 
 logger = setup_logger(__name__)
 
 
-def from_nautobot_to_ironic(
-    nautobot_device: NautobotDevice, pxe_interface: str, ironic_client=None
+def update_ironic_baremetal_ports(
+    ironic_node,
+    discovered_interfaces: list[InterfaceInfo],
+    pxe_interface_name: str,
+    ironic_client: IronicClient | None = None,
 ):
-    """Update Ironic ports to match information found in Nautobot Interfaces."""
-    logger.info("Syncing Interfaces / Ports for Device %s ...", nautobot_device.id)
-
-    nautobot_ports = dict_by_uuid(
-        get_nautobot_interfaces(nautobot_device, pxe_interface)
-    )
-    logger.debug("%s", nautobot_ports)
-
+    """Update Ironic baremetal ports to match interfaces indicated by BMC."""
+    device_uuid: str = ironic_node.uuid
     if ironic_client is None:
         ironic_client = IronicClient()
+    logger.info("Syncing Interfaces / Ports for Device %s ...", device_uuid)
+
+    discovered_ports = dict_by_mac_address(
+        make_port_infos(
+            interfaces=discovered_interfaces,
+            pxe_interface_name=pxe_interface_name,
+            device_name=ironic_node.name,
+            device_uuid=device_uuid,
+        )
+    )
+    logger.debug("Actual ports according to BMC: %s", discovered_ports)
 
     logger.info("Fetching Ironic Ports ...")
-    ironic_ports = dict_by_uuid(ironic_client.list_ports(nautobot_device.id))
+    ironic_ports = dict_by_mac_address(ironic_client.list_ports(device_uuid))
 
-    for port_id, interface in ironic_ports.items():
-        if port_id not in nautobot_ports:
+    for mac_address, ironic_port in ironic_ports.items():
+        if mac_address not in discovered_ports:
             logger.info(
-                "Nautobot Interface %s no longer exists, "
-                "deleting corresponding Ironic Port",
-                interface.uuid,
+                "Server Interface %s no longer exists, "
+                "deleting corresponding Ironic Port %s",
+                mac_address,
+                ironic_port.uuid,
             )
-            response = ironic_client.delete_port(interface.uuid)
+            response = ironic_client.delete_port(ironic_port.uuid)
             logger.debug("Deleted: %s", response)
 
-    for port_id, nb_port in nautobot_ports.items():
-        if port_id in ironic_ports:
-            patch = get_patch(nb_port, ironic_ports[port_id])
+    for mac_address, actual_port in discovered_ports.items():
+        ironic_port = ironic_ports.get(mac_address)
+        if ironic_port:
+            patch = get_patch(actual_port, ironic_port)
             if patch:
-                logger.info("Updating Ironic Port %s ...", nb_port)
-                response = ironic_client.update_port(port_id, patch)
+                logger.info("Updating Ironic Port %s, setting %s", ironic_port, patch)
+                response = ironic_client.update_port(ironic_port.uuid, patch)
                 logger.debug("Updated: %s", response)
             else:
-                logger.debug("No changes required for Ironic Port %s", port_id)
+                logger.debug("No changes required for Ironic Port %s", mac_address)
         else:
-            logger.info("Creating Ironic Port %s ...", nb_port)
-            response = ironic_client.create_port(nb_port.model_dump())
+            logger.info("Creating Ironic Port %s ...", actual_port)
+            response = ironic_client.create_port(actual_port.dict())
             logger.debug("Created: %s", response)
 
 
-def dict_by_uuid(items: list) -> dict:
-    return {item.uuid: item for item in items}
+def dict_by_mac_address(items: list) -> dict:
+    return {item.address: item for item in items}
 
 
-def get_nautobot_interfaces(
-    nautobot_device: NautobotDevice, pxe_interface: str
+def make_port_infos(
+    interfaces: list[InterfaceInfo],
+    pxe_interface_name: str,
+    device_uuid: str,
+    device_name: str,
 ) -> list[PortConfiguration]:
-    """Get Nautobot interfaces for a device.
+    """Convert InterfaceInfo into PortConfiguration
 
-    Returns a list of PortConfiguration
+    Excludes BMC interfaces and interfaces without a MAC address.
 
-    Excludes interfaces with no MAC address
-
+    Adds local_link and physical_network for interfaces that are connected to a
+    "network" switch.
     """
     return [
-        port_configuration(interface, pxe_interface, nautobot_device)
-        for interface in nautobot_device.interfaces
-        if interface_is_relevant(interface)
+        port_configuration(interface, pxe_interface_name, device_uuid, device_name)
+        for interface in interfaces
+        if (
+            interface.mac_address
+            and interface.name != "iDRAC"
+            and interface.name != "iLo"
+        )
     ]
 
 
 def port_configuration(
-    interface: NautobotInterface, pxe_interface: str, device: NautobotDevice
+    interface: InterfaceInfo,
+    pxe_interface_name: str,
+    device_uuid: str,
+    device_name: str,
 ) -> PortConfiguration:
-    # Interface names have their UUID prepended because Ironic wants them
+    # Interface names have device name prepended because Ironic wants them
     # globally unique across all devices.
-    name = f"{device.name}:{interface.name}"
-    pxe_enabled = interface.name == pxe_interface
+    name = f"{device_name}:{interface.name}"
+    pxe_enabled = interface.name == pxe_interface_name
+    physical_network = None
+    local_link_connection = {}
 
-    if interface.neighbor_chassis_mac:
-        local_link_connection = {
-            "switch_id": interface.neighbor_chassis_mac.lower(),
-            "port_id": interface.neighbor_interface_name,
-            "switch_info": interface.neighbor_device_name,
-        }
-    else:
-        local_link_connection = {}
+    if interface.remote_switch_mac_address and interface.remote_switch_port_name:
+        switch = data_center.switch_for_mac(
+            interface.remote_switch_mac_address, interface.remote_switch_port_name
+        )
+        if str(switch.vlan_group_name).endswith("-network"):
+            physical_network = switch.vlan_group_name
+            local_link_connection = {
+                "switch_id": interface.remote_switch_mac_address.lower(),
+                "port_id": interface.remote_switch_port_name,
+                "switch_info": switch.name,
+            }
 
     return PortConfiguration(
-        node_uuid=device.id,
+        node_uuid=device_uuid,
         address=interface.mac_address.lower(),
-        uuid=interface.id,
         name=name,
         pxe_enabled=pxe_enabled,
         local_link_connection=local_link_connection,
-        physical_network=interface.vlan_group_name,
-    )
-
-
-def interface_is_relevant(interface: NautobotInterface) -> bool:
-    return bool(
-        interface.mac_address and interface.name != "iDRAC" and interface.name != "iLo"
+        physical_network=physical_network,
     )
 
 
