@@ -113,7 +113,7 @@ class FakeNautobot:
 def test_find_or_create(dell_nautobot_device):
     nautobot = FakeNautobot()
     chassis_info = ChassisInfo(
-        manufacturer="Dell Inc.",
+        manufacturer="Dell",
         model_number="PowerEdge R7615",
         serial_number="33GSW04",
         bios_version="1.6.10",
@@ -147,6 +147,6 @@ def test_find_or_create(dell_nautobot_device):
         ],
     )
 
-    device = nautobot_device.find_or_create(chassis_info, nautobot)
+    device = nautobot_device.find_or_create(chassis_info, "Dell-33GSW04", nautobot)
 
     assert device == dell_nautobot_device

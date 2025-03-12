@@ -45,7 +45,7 @@ def test_chassis_neighbors():
 def test_chassis_info_R7615():
     bmc = FakeBmc(read_fixtures("json_samples/bmc_chassis_info/R7615"))
     assert bmc_chassis_info.chassis_info(bmc) == bmc_chassis_info.ChassisInfo(
-        manufacturer="Dell Inc.",
+        manufacturer="Dell",
         model_number="PowerEdge R7615",
         serial_number="33GSW04",
         bios_version="1.6.10",
