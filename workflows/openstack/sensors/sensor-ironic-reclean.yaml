@@ -1,0 +1,64 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ironic-node-reclean
+  annotations:
+    workflows.argoproj.io/title: Reclean ironic node if it hits cleaned failed state
+    workflows.argoproj.io/description: |+
+      Sensor to issue an ironic reclean of a node if it hits 'clean failed' state.
+      ```
+
+      Defined in `workflows/argo-events/sensors/sensor-ironic-reclean.yaml`
+spec:
+  dependencies:
+  - eventName: openstack
+    eventSourceName: openstack-ironic
+    name: ironic-dep
+    transform:
+      # the event is a string-ified JSON so we need to decode it
+      jq: ".body[\"oslo.message\"] | fromjson"
+    filters:
+      # applies each of the items in data with 'and' but there's only one
+      dataLogicalOperator: "and"
+      data:
+        - path: "event_type"
+          type: "string"
+          value:
+            - "baremetal.node.power_set.end"
+        - path: payload.ironic_object\.data.provision_state
+          type: "string"
+          value:
+            - "clean failed"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: ironic-reclean
+        # uses 'argo' CLI instead of 'kubectl'
+        argoWorkflow:
+          # sets the operation to 'argo submit'
+          operation: submit
+          # edits source section
+          parameters:
+            # first parameter's value is replaced with the uuid
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: payload.ironic_object\.data.uuid
+                dependencyName: ironic-dep
+          source:
+            # create a workflow in argo-events prefixed with ironic-reclean-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: ironic-reclean-
+                namespace: argo-events
+              spec:
+                # defines the parameters being replaced above
+                arguments:
+                  parameters:
+                    - name: device_uuid
+                # references the workflow
+                workflowTemplateRef:
+                  name: reclean-server
