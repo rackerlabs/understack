@@ -3,7 +3,9 @@ from uuid import UUID
 
 from neutron.objects import ports as port_obj
 from neutron.plugins.ml2.driver_context import portbindings
+from neutron_lib import constants
 from neutron_lib import context as n_context
+from neutron_lib.api.definitions import segment as segment_def
 
 
 def fetch_port_object(port_id: str) -> port_obj.Port:
@@ -48,3 +50,10 @@ def parent_port_is_bound(port: port_obj.Port) -> bool:
 def fetch_subport_network_id(subport_id: str) -> str:
     neutron_port = fetch_port_object(subport_id)
     return neutron_port.network_id
+
+
+def is_valid_vlan_network_segment(network_segment: dict):
+    return (
+        network_segment.get(segment_def.NETWORK_TYPE) == constants.TYPE_VLAN
+        and network_segment.get(segment_def.PHYSICAL_NETWORK) is not None
+    )

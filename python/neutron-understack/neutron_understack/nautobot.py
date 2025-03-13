@@ -1,8 +1,10 @@
 import inspect
+from dataclasses import dataclass
 from pprint import pformat
 from urllib.parse import urljoin
 from uuid import UUID
 
+import pynautobot
 import requests
 from neutron_lib import exceptions as exc
 from oslo_log import log
@@ -26,6 +28,27 @@ class NautobotCustomFieldNotFoundError(exc.NeutronException):
     message = "Custom field with name %(cf_name)s not found for %(obj)s"
 
 
+@dataclass
+class VlanPayload:
+    id: str
+    network_id: str
+    vid: int
+    vlan_group_name: str
+    status: str = "Active"
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "vid": self.vid,
+            "name": self.id,
+            "vlan_group": self.vlan_group_name,
+            "status": self.status,
+            "relationships": {
+                "ucvni_vlans": {"source": {"objects": [{"id": self.network_id}]}}
+            },
+        }
+
+
 def _truncated(message: str | bytes, maxlen=200) -> str:
     input = str(message)
     if len(input) <= maxlen:
@@ -41,6 +64,10 @@ class Nautobot:
         self.base_url = nb_url
         self.session = requests.Session()
         self.session.headers.update({"Authorization": f"Token {nb_token}"})
+        self.api = pynautobot.api(
+            url=nb_url,
+            token=nb_token,
+        )
 
     def make_api_request(
         self,
@@ -257,3 +284,21 @@ class Nautobot:
 
         response = self.make_api_request("GET", url, params=params) or {}
         return response.get("available", False)
+
+    def delete_vlan(self, vlan_id: str):
+        return self.api.ipam.vlans.delete([vlan_id])
+
+    def create_vlan_and_associate_vlan_to_ucvni(self, vlan: VlanPayload):
+        try:
+            result = self.api.ipam.vlans.create(vlan.to_dict())
+        except pynautobot.core.query.RequestError as error:
+            LOG.error("Nautobot error: %(error)s", {"error": error})
+            raise NautobotRequestError(
+                code=error.req.status_code,
+                url=error.base,
+                method="POST",
+                payload=error.request_body,
+                body=vlan.to_dict(),
+            ) from error
+        else:
+            return result

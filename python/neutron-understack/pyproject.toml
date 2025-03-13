@@ -29,6 +29,7 @@ python = "^3.10"
 requests = "^2"
 neutron-lib = "^3"
 neutron = "^25"
+pynautobot = "^2.6.1"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.2"

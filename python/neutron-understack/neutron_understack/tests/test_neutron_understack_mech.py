@@ -4,6 +4,7 @@ import pytest
 from neutron_lib.api.definitions import portbindings
 
 from neutron_understack import utils
+from neutron_understack.nautobot import VlanPayload
 
 
 class TestUpdateNautobot:
@@ -134,3 +135,51 @@ class TestDeleteSubnetPostCommit:
         understack_driver.delete_subnet_postcommit(subnet_context)
 
         understack_driver.nb.subnet_delete.assert_called_once()
+
+
+class TestNetworkSegmentEventCallbacks:
+    @pytest.mark.parametrize(
+        "vlan_network_segment", [{"physical_network": "f20-2-network"}], indirect=True
+    )
+    def test__create_vlan_valid_segment(
+        self, mocker, vlan_network_segment, understack_driver
+    ):
+        mocker.patch(
+            "neutron_understack.utils.is_valid_vlan_network_segment", return_value=True
+        )
+
+        mock_create = mocker.patch.object(
+            understack_driver.nb, "create_vlan_and_associate_vlan_to_ucvni"
+        )
+
+        understack_driver._create_vlan(vlan_network_segment)
+
+        mock_create.assert_called_once()
+        vlan_payload: VlanPayload = mock_create.call_args[0][0]
+
+        assert vlan_payload.vid == 1800
+        assert vlan_payload.vlan_group_name == "f20-2-network"
+
+    def test__create_vlan_invalid_segment(
+        self, mocker, vlan_network_segment, understack_driver
+    ):
+        mocker.patch(
+            "neutron_understack.utils.is_valid_vlan_network_segment", return_value=False
+        )
+        mock_create = mocker.patch.object(
+            understack_driver.nb, "create_vlan_and_associate_vlan_to_ucvni"
+        )
+
+        understack_driver._create_vlan(vlan_network_segment)
+
+        mock_create.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "vlan_network_segment",
+        [{"physical_network": "f20-2-network", "segmentation_id": 100}],
+        indirect=True,
+    )
+    def test__delete_vlan(self, mocker, vlan_network_segment, understack_driver):
+        mock_delete = mocker.patch.object(understack_driver.nb, "delete_vlan")
+        understack_driver._delete_vlan(vlan_network_segment)
+        mock_delete.assert_called_once_with(vlan_id=vlan_network_segment.get("id"))

@@ -4,6 +4,10 @@ from uuid import UUID
 import neutron_lib.api.definitions.portbindings as portbindings
 from neutron.plugins.ml2.driver_context import PortContext
 from neutron_lib import constants as p_const
+from neutron_lib.api.definitions import segment as segment_def
+from neutron_lib.callbacks import events
+from neutron_lib.callbacks import registry
+from neutron_lib.callbacks import resources
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
 from neutron_lib.plugins.ml2.api import NetworkContext
@@ -12,12 +16,12 @@ from oslo_config import cfg
 from neutron_understack import config
 from neutron_understack import utils
 from neutron_understack.nautobot import Nautobot
+from neutron_understack.nautobot import VlanPayload
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
 from neutron_understack.vlan_manager import VlanManager
 
 LOG = logging.getLogger(__name__)
-
 
 config.register_ml2_type_understack_opts(cfg.CONF)
 config.register_ml2_understack_opts(cfg.CONF)
@@ -37,6 +41,21 @@ class UnderstackDriver(MechanismDriver):
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         self.vlan_manager = VlanManager(self.nb, conf)
+        self.subscribe()
+
+    def subscribe(self):
+        registry.subscribe(
+            self._create_segment,
+            resources.SEGMENT,
+            events.PRECOMMIT_CREATE,
+            cancellable=True,
+        )
+        registry.subscribe(
+            self._delete_segment,
+            resources.SEGMENT,
+            events.BEFORE_DELETE,
+            cancellable=True,
+        )
 
     def create_network_precommit(self, context: NetworkContext):
         if cfg.CONF.ml2_understack.enforce_unique_vlans_in_fabric:
@@ -107,6 +126,11 @@ class UnderstackDriver(MechanismDriver):
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
             )
         elif provider_type == p_const.TYPE_VXLAN:
+            network_segments = utils.valid_network_segments(context.network_segments)
+            vlans_to_delete = [segment.get("id") for segment in network_segments]
+            self.nb.delete_vlans(
+                vlan_ids=vlans_to_delete,
+            )
             self.nb.ucvni_delete(network_id)
         else:
             return
@@ -432,3 +456,37 @@ class UnderstackDriver(MechanismDriver):
                     "shared_nautobot_namespace": shared_namespace,
                 },
             )
+
+    def _create_segment(self, resource, event, trigger, payload):
+        self._create_vlan(payload.latest_state)
+
+    def _delete_segment(self, resource, event, trigger, payload):
+        self._delete_vlan(payload.latest_state)
+
+    def _create_vlan(self, segment):
+        if not utils.is_valid_vlan_network_segment(segment):
+            return
+
+        vlan_payload = VlanPayload(
+            id=segment.get("id"),
+            vid=segment.get(segment_def.SEGMENTATION_ID),
+            vlan_group_name=segment.get(segment_def.PHYSICAL_NETWORK),
+            network_id=segment.get("network_id"),
+        )
+
+        LOG.info(
+            "creating vlan in nautobot for segment %(segment)s",
+            {"segment": segment},
+        )
+        self.nb.create_vlan_and_associate_vlan_to_ucvni(vlan_payload)
+
+    def _delete_vlan(self, segment):
+        if not utils.is_valid_vlan_network_segment(segment):
+            return
+        LOG.info(
+            "deleting vlan in nautobot for segment %(segment)s",
+            {"segment": segment},
+        )
+        self.nb.delete_vlan(
+            vlan_id=segment.get("id"),
+        )

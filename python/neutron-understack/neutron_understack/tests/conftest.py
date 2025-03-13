@@ -8,6 +8,7 @@ from neutron.db.models.segment import NetworkSegment
 from neutron.db.models_v2 import Network
 from neutron.db.models_v2 import Port as PortModel
 from neutron.db.models_v2 import Subnet
+from neutron.objects.network import NetworkSegment as SegmentObj
 from neutron.objects.ports import Port as PortObject
 from neutron.objects.trunk import SubPort
 from neutron.objects.trunk import Trunk
@@ -54,6 +55,11 @@ def vlan_num() -> int:
 
 
 @pytest.fixture
+def network_segment_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
 def patch_extend_subnet(mocker) -> None:
     """Ml2 Plugin extend subnet patch.
 
@@ -87,6 +93,22 @@ def network_dict(ml2_plugin) -> dict:
 @pytest.fixture
 def network_segment() -> NetworkSegment:
     return NetworkSegment(network_type="vxlan")
+
+
+@pytest.fixture
+def vlan_network_segment(request, network_segment_id, network_id) -> SegmentObj:
+    req = getattr(request, "param", {})
+    return SegmentObj(
+        id=network_segment_id,
+        network_type="vlan",
+        network_id=network_id,
+        physical_network=req.get("physical_network"),
+        revision_number=1,
+        segment_index=1,
+        is_dynamic=False,
+        name="puc-abc",
+        segmentation_id=req.get("segmentation_id", 1800),
+    )
 
 
 @pytest.fixture
