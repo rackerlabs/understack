@@ -91,6 +91,9 @@ conf:
       ovn_metadata_enabled: false
       # by default let's have OVN's DB be updated with what is in neutron on startup
       neutron_sync_mode: repair
+    quotas:
+      # https://github.com/openstack/neutron/blob/master/neutron/conf/quota.py#L101-L105
+      quota_rbac_policy: 100
 
 # disable the neutron-ironic-agent from loading a non-existent config
 pod:

@@ -13,6 +13,7 @@
             "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
           },
           "vlan_group": {
+              "name": "F20-2[1-2]",
               "ucvni_group": {
                   "name": "spine402-1.iad3"
               }
@@ -43,6 +44,7 @@
             "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
           },
           "vlan_group": {
+              "name": "F20-2[1-2]",
               "ucvni_group": {
                   "name": "spine402-1.iad3"
               }
@@ -73,6 +75,7 @@
             "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
           },
           "vlan_group": {
+              "name": "F20-2[1-2]",
               "ucvni_group": {
                   "name": "spine402-1.iad3"
               }
@@ -103,6 +106,7 @@
             "id": "1ccd4b4a-7ba3-4557-b1ad-1ba87aee96a6"
           },
           "vlan_group": {
+              "name": "F20-2[1-2]",
               "ucvni_group": {
                   "name": "spine402-1.iad3"
               }
