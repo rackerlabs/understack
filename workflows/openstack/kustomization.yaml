@@ -16,4 +16,5 @@ resources:
   - sensors/sensor-ironic-node-update.yaml
   - sensors/sensor-keystone-event-project.yaml
   - sensors/sensor-neutron-deployment.yaml
+  - sensors/sensor-ironic-reclean.yaml
   - secrets/nautobot-token.yaml

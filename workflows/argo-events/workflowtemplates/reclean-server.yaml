@@ -1,0 +1,95 @@
+---
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: reclean-server
+  annotations:
+    workflows.argoproj.io/title: Perform a re-clean of a server if the clean failed.
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/reclean-server.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: device_id
+  templates:
+    - name: main
+      steps:
+        - - name: manage-server
+            template: openstack-wait-cmd
+            arguments:
+              parameters:
+                - name: operation
+                  value: "manage"
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
+        - - name: server-manage-state
+            template: openstack-state-cmd
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
+        - - name: avail-server
+            template: openstack-wait-cmd
+            arguments:
+              parameters:
+                - name: operation
+                  value: "provide"
+                - name: device_id
+                  value: "{{workflow.parameters.device_id}}"
+            when: "{{steps.server-manage-state.outputs.result}} == manageable"
+    - name: openstack-wait-cmd
+      inputs:
+        parameters:
+          - name: operation
+          - name: device_id
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        command:
+          - openstack
+        args:
+          - baremetal
+          - node
+          - "{{inputs.parameters.operation}}"
+          - --wait
+          - "0"
+          - "{{inputs.parameters.device_id}}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      volumes:
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct
+    - name: openstack-state-cmd
+      inputs:
+        parameters:
+          - name: device_id
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        command:
+          - openstack
+        args:
+          - baremetal
+          - node
+          - show
+          - "-f"
+          - value
+          - "-c"
+          - provision_state
+          - "{{inputs.parameters.device_id}}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      volumes:
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct

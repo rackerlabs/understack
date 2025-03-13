@@ -19,3 +19,4 @@ resources:
   - workflowtemplates/undersync-switch.yaml
   - workflowtemplates/keystone-event-project.yaml
   - workflowtemplates/enroll-server.yaml
+  - workflowtemplates/reclean-server.yaml
