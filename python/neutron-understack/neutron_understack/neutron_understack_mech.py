@@ -27,6 +27,10 @@ class UnderstackDriver(MechanismDriver):
     # See MechanismDriver docs for resource_provider_uuid5_namespace
     resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
 
+    @property
+    def connectivity(self):
+        return portbindings.CONNECTIVITY_L2
+
     def initialize(self):
         conf = cfg.CONF.ml2_understack
         self.nb = Nautobot(conf.nb_url, conf.nb_token)
