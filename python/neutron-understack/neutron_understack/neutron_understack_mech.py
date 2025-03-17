@@ -379,13 +379,19 @@ class UnderstackDriver(MechanismDriver):
         GROUP.  If none are found then we create a new one with a dynamically
         allocated VLAN ID.
         """
-        switch_name = str(
-            context.current["binding:profile"]["local_link_information"][0][
-                "switch_info"
-            ]
+        local_link_info = context.current.get("binding:profile", {}).get(
+            "local_link_information"
         )
+        if not local_link_info:
+            raise ValueError(f"Context is missing local_link_info: {context.current}")
+        switch_name = local_link_info[0].get("switch_info")
+        if not switch_name:
+            raise ValueError("Context is missing switch_info")
 
         vlan_group_name = vlan_group_name_convention.for_switch(switch_name)
+        LOG.info(
+            "Need a VLAN for switch %s VLAN Group %s", switch_name, vlan_group_name
+        )
 
         for segment in context.network.network_segments:
             if (
