@@ -13,7 +13,7 @@ VLAN_GROUP_SUFFIXES = {
 def for_switch(switch_name: str) -> str:
     switch_name = switch_name.split(".")[0]
 
-    for switch_name_suffix, vlan_group_suffix in VLAN_GROUP_SUFFIXES:
+    for switch_name_suffix, vlan_group_suffix in VLAN_GROUP_SUFFIXES.items():
         if switch_name.endswith(switch_name_suffix):
             cabinet_name = switch_name.removesuffix(switch_name_suffix)
             return f"{cabinet_name}-{vlan_group_suffix}"
