@@ -275,6 +275,7 @@ class UnderstackDriver(MechanismDriver):
             vlan_tag = int(context.network.current.get("provider:segmentation_id"))
         else:
             vlan_tag = None
+
         nb_vlan_group_id = self.update_nautobot(
             network_id, connected_interface_uuid, vlan_tag
         )
