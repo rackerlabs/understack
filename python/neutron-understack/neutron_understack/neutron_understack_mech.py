@@ -11,6 +11,7 @@ from oslo_config import cfg
 
 from neutron_understack import config
 from neutron_understack import utils
+from neutron_understack import vlan_group_name_convention
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
@@ -18,6 +19,11 @@ from neutron_understack.vlan_manager import VlanManager
 
 LOG = logging.getLogger(__name__)
 
+# We take interest in port binding events for Networks of these types:
+RELEVANT_NETWORK_TYPES = [
+    p_const.TYPE_VXLAN,
+    p_const.TYPE_VLAN,
+]
 
 config.register_ml2_type_understack_opts(cfg.CONF)
 config.register_ml2_understack_opts(cfg.CONF)
@@ -286,8 +292,18 @@ class UnderstackDriver(MechanismDriver):
         )
 
     def bind_port(self, context: PortContext) -> None:
+        """Bind port hook.
+
+        Example segment: {
+            'id': '308b7fd5-e3bc-4b64-b491-910480e4c3e4',
+            'network_type': 'vxlan',
+            'physical_network': None,
+            'segmentation_id': 200025,
+            'network_id': '6af047b2-65ff-48dc-aa57-9647119c4883'
+        }
+        """
         for segment in context.network.network_segments:
-            if self.check_segment(segment):
+            if segment[api.NETWORK_TYPE] in RELEVANT_NETWORK_TYPES:
                 context.set_binding(
                     segment[api.ID],
                     portbindings.VIF_TYPE_OTHER,
@@ -295,13 +311,16 @@ class UnderstackDriver(MechanismDriver):
                     status=p_const.PORT_STATUS_ACTIVE,
                 )
                 LOG.debug("Bound segment: %s", segment)
+                self._find_or_create_network_segment(context)
                 self._configure_switchport_on_bind(context)
-                return
+
+                return  # bind one segment only
             else:
                 LOG.debug(
-                    "Refusing to bind port for segment ID %(id)s, "
+                    "Ignoring bind_port for segment ID %(id)s, "
                     "segment %(seg)s, phys net %(physnet)s, and "
-                    "network type %(nettype)s",
+                    "network type %(nettype)s because network_type "
+                    "is not VXLAN or VLAN type",
                     {
                         "id": segment[api.ID],
                         "seg": segment[api.SEGMENTATION_ID],
@@ -310,17 +329,42 @@ class UnderstackDriver(MechanismDriver):
                     },
                 )
 
-    def check_segment(self, segment):
-        """Verify a segment is valid for the Understack MechanismDriver.
+    def _find_or_create_network_segment(self, context: PortContext):
+        """Ensure that a VLAN-type network segment is present for this network.
 
-        Verify the requested segment is supported by Understack and return True or
-        False to indicate this to callers.
+        In the VXLAN fabric, a Network has a VLAN created on every switch where
+        that network is in use.  The VLAN is local to the VLAN GROUP (pair of
+        switches) and must be assigned an arbitrary vlan number that is unique
+        within that VLAN GROUP.
+
+        We use the switch name to figure out which VLAN GROUP this network is
+        being bound to.  We then look for existing network segments in that VLAN
+        GROUP.  If none are found then we create a new one with a dynamically
+        allocated VLAN ID.
         """
-        network_type = segment[api.NETWORK_TYPE]
-        return network_type in [
-            p_const.TYPE_VXLAN,
-            p_const.TYPE_VLAN,
-        ]
+        switch_name = str(
+            context.current["binding:profile"]["local_link_information"][0][
+                "switch_info"
+            ]
+        )
+
+        vlan_group_name = vlan_group_name_convention.for_switch(switch_name)
+
+        for segment in context.network.network_segments:
+            if (
+                segment.get(api.NETWORK_TYPE) == p_const.TYPE_VLAN
+                and segment.get(api.PHYSICAL_NETWORK) == vlan_group_name
+            ):
+                LOG.info("Using existing VLAN network segment %s", segment)
+                return segment
+
+        segment_args = {
+            api.NETWORK_TYPE: p_const.TYPE_VLAN,
+            api.PHYSICAL_NETWORK: vlan_group_name,
+        }
+        segment = context.allocate_dynamic_segment(segment_args)
+        LOG.info("Allocated new VLAN network segment %s", segment)
+        return segment
 
     def check_vlan_transparency(self, context):
         pass
