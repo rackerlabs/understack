@@ -10,7 +10,7 @@ VLAN_GROUP_SUFFIXES = {
 }
 
 
-def for_switch(switch_name: str) -> str | None:
+def for_switch(switch_name: str) -> str:
     switch_name = switch_name.split(".")[0]
 
     for switch_name_suffix, vlan_group_suffix in VLAN_GROUP_SUFFIXES:
