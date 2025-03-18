@@ -247,8 +247,8 @@ class UnderstackDriver(MechanismDriver):
 
         network_id = context.current["network_id"]
         if network_id == provisioning_network:
-            connected_interface_uuid = self.fetch_connected_interface_uuid(
-                context.current
+            connected_interface_uuid = utils.fetch_connected_interface_uuid(
+                context.current["binding:profile"], LOG
             )
             port_status = "Active"
             configure_port_status_data = self.nb.configure_port_status(
@@ -265,7 +265,9 @@ class UnderstackDriver(MechanismDriver):
         trunk_details = context.current.get("trunk_details", {})
         network_id = context.current["network_id"]
         network_type = context.network.current.get("provider:network_type")
-        connected_interface_uuid = self.fetch_connected_interface_uuid(context.current)
+        connected_interface_uuid = utils.fetch_connected_interface_uuid(
+            context.current["binding:profile"], LOG
+        )
 
         if trunk_details:
             self._configure_trunk(trunk_details, connected_interface_uuid)
@@ -321,26 +323,6 @@ class UnderstackDriver(MechanismDriver):
 
     def check_vlan_transparency(self, context):
         pass
-
-    def fetch_connected_interface_uuid(self, context: dict) -> str:
-        """Fetches the connected interface UUID from the port context.
-
-        :param context: The context of the port.
-        :return: The connected interface UUID.
-        """
-        connected_interface_uuid = (
-            context["binding:profile"].get("local_link_information")[0].get("port_id")
-        )
-        try:
-            UUID(str(connected_interface_uuid))
-        except ValueError:
-            LOG.debug(
-                "Local link information port_id is not a valid UUID type"
-                " port_id: %(connected_interface_uuid)s",
-                {"connected_interface_uuid": connected_interface_uuid},
-            )
-            raise
-        return connected_interface_uuid
 
     def update_nautobot(
         self,
@@ -401,8 +383,8 @@ class UnderstackDriver(MechanismDriver):
             and context.vif_type == portbindings.VIF_TYPE_UNBOUND
             and context.original_vif_type == portbindings.VIF_TYPE_OTHER
         ):
-            connected_interface_uuid = self.fetch_connected_interface_uuid(
-                context.original
+            connected_interface_uuid = utils.fetch_connected_interface_uuid(
+                context.original["binding:profile"], LOG
             )
             trunk_details = context.current.get("trunk_details", {})
             if trunk_details:
