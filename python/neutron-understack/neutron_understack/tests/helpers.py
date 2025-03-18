@@ -17,7 +17,7 @@ class Ml2PluginNoInit(Ml2Plugin):
     """
 
     def __init__(self):
-        self.type_manager = TypeManager()
+        self.type_manager = FakeTypeManager()
 
     def construct_port_dict(self, port: Port) -> dict:
         port_dict = self._make_port_dict(port, process_extensions=False)
@@ -41,6 +41,12 @@ class Ml2PluginNoInit(Ml2Plugin):
             network_dict, [segment_dict]
         )
         return network_dict
+
+
+class FakeTypeManager:
+    def allocate_dynamic_segment(self, *_):
+        print(f"FakeTypeManager trace: allocate_dynamic_segment{_}")
+        pass
 
 
 def extend_port_dict_with_trunk(port_dict: dict, port: Port) -> dict:
