@@ -49,11 +49,24 @@ nautobot:
       cpu: "2000m"
       memory: "8704M"
 
+  livenessProbe:
+    periodSeconds: 120
+    timeoutSeconds: 60
+
 celery:
   replicaCount: 1
   extraEnvVarsSecret:
     - nautobot-django
     - nautobot-custom-env
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 120
+    timeoutSeconds: 60
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 120
+    timeoutSeconds: 60
+
 
 postgresql:
   enabled: false
