@@ -9,8 +9,8 @@ spec:
     key: root-password
     generate: false
 
-  # renovate: image:mariadb
-  image: mariadb:11.0.3
+  # renovate: datasource=docker
+  image: docker-registry1.mariadb.com/library/mariadb:11.4.4
   imagePullPolicy: IfNotPresent
 
   port: 3306
@@ -29,27 +29,15 @@ spec:
     binlog_format=row
     innodb_autoinc_lock_mode=2
     max_allowed_packet=256M
-  # ArgoCD diff for server side apply
-  myCnfConfigMapKeyRef:
-    key: my.cnf
-    name: mariadb-config
 
   metrics:
     enabled: true
-    # ArgoCD diff due to server side apply
-    exporter:
-      image: prom/mysqld-exporter:v0.15.1
-      port: 9104
-    passwordSecretKeyRef:
-      key: password
-      name: mariadb-metrics-password
-      generate: true
+    username: mariadb-metrics
     serviceMonitor:
       prometheusRelease: kube-prometheus-stack
       jobLabel: mariadb-monitoring
       interval: 10s
       scrapeTimeout: 10s
-    username: mariadb-metrics
 ---
 # mariadb-operator backups for openstack
 # https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/BACKUP.md
