@@ -1,3 +1,4 @@
+{{- if .Values.mariadb.enabled -}}
 ---
 apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
@@ -5,17 +6,24 @@ metadata:
   name: mariadb  # this name is referenced by other resource kinds
 spec:
   rootPasswordSecretKeyRef:
-    name: mariadb
-    key: root-password
-    generate: false
+    name: {{ .Values.mariadb.rootAuth.name }}
+    key: {{ .Values.mariadb.rootAuth.key }}
+    generate: {{ .Values.mariadb.rootAuth.generate }}
 
   # renovate: datasource=docker
-  image: docker-registry1.mariadb.com/library/mariadb:11.4.4
-  imagePullPolicy: IfNotPresent
+  image: {{ .Values.mariadb.image.repository }}:{{ .Values.mariadb.image.tag }}
+  imagePullPolicy: {{ .Values.mariadb.image.pullPolicy }}
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 
   port: 3306
   storage:
-    size: 10Gi
+    size: {{ .Values.mariadb.storage.size }}
+    {{- if .Values.mariadb.storage.storageClassName }}
+    storageClassName: {{ .Values.mariadb.storage.storageClassName }}
+    {{- end }}
     resizeInUseVolumes: true
     waitForVolumeResize: true
 
@@ -61,4 +69,4 @@ spec:
           storage: 20Gi
       accessModes:
         - ReadWriteOnce
----
+{{- end }}
