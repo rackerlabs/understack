@@ -15,7 +15,7 @@ metadata:
 spec:
   vhost: "keystone"
   userReference:
-    name: "argo"  # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
+    name: "argo-keystone"  # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
   permissions:
     write: ".*"
     configure: ".*"

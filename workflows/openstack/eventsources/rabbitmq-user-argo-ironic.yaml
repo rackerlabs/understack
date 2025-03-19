@@ -15,7 +15,7 @@ metadata:
 spec:
   vhost: "ironic"
   userReference:
-    name: "argo"  # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
+    name: "argo-ironic"  # name of a user.rabbitmq.com in the same namespace; must specify either spec.userReference or spec.user
   permissions:
     write: ".*"
     configure: ".*"
