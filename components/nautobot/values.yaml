@@ -40,6 +40,15 @@ nautobot:
   extraEnvVarsSecret:
     - nautobot-custom-env
 
+  resources:
+    # Increases CPU as the defaults are a little too low for our needs
+    requests:
+      cpu: "1000m"
+      memory: "1536M"
+    limits:
+      cpu: "2000m"
+      memory: "8704M"
+
 celery:
   replicaCount: 1
   extraEnvVarsSecret:

@@ -1,5 +1,7 @@
+from neutron.db.models_v2 import Port
 from neutron.objects.trunk import SubPort
 from neutron.services.trunk.drivers import base as trunk_base
+from neutron.services.trunk.models import Trunk
 from neutron_lib import exceptions as exc
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
@@ -45,6 +47,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             can_trunk_bound_port=can_trunk_bound_port,
         )
         self.nb = self.plugin_driver.nb
+        self.undersync = self.plugin_driver.undersync
 
     @property
     def is_loaded(self):
@@ -75,7 +78,22 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
-            self.trunk_created, resources.TRUNK, events.AFTER_CREATE, cancellable=True
+            self.subports_deleted,
+            resources.SUBPORTS,
+            events.AFTER_DELETE,
+            cancellable=True,
+        )
+        registry.subscribe(
+            self.trunk_created,
+            resources.TRUNK,
+            events.AFTER_CREATE,
+            cancellable=True,
+        )
+        registry.subscribe(
+            self.trunk_deleted,
+            resources.TRUNK,
+            events.AFTER_DELETE,
+            cancellable=True,
         )
 
     def _handle_segmentation_id_mismatch(
@@ -100,31 +118,116 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             {"seg_id": subport_seg_id, "ucvni_uuid": ucvni_uuid},
         )
 
-    def _subports_added(self, subports: list[SubPort]) -> None:
+    def _handle_tenant_vlan_id_config(
+        self, subport_network_id: str, subport: SubPort
+    ) -> None:
+        ucvni_tenant_vlan_id = self.nb.fetch_ucvni_tenant_vlan_id(
+            network_id=subport_network_id
+        )
+        if not ucvni_tenant_vlan_id:
+            self._configure_tenant_vlan_id(
+                ucvni_uuid=subport_network_id, subport=subport
+            )
+        elif ucvni_tenant_vlan_id != subport.segmentation_id:
+            self._handle_segmentation_id_mismatch(
+                subport=subport,
+                ucvni_uuid=subport_network_id,
+                tenant_vlan_id=ucvni_tenant_vlan_id,
+            )
+
+    def _handle_parent_port_switchport_config(
+        self, parent_port_id: str, subport_network_id: str
+    ) -> None:
+        parent_port_obj = utils.fetch_port_object(parent_port_id)
+
+        if utils.parent_port_is_bound(parent_port_obj):
+            self._add_subport_network_to_parent_port_switchport(
+                parent_port_obj, subport_network_id
+            )
+
+    def _handle_tenant_vlan_id_and_switchport_config(
+        self, subports: list[SubPort], trunk: Trunk
+    ) -> None:
         for subport in subports:
             subport_network_id = utils.fetch_subport_network_id(
                 subport_id=subport.port_id
             )
-            ucvni_tenant_vlan_id = self.nb.fetch_ucvni_tenant_vlan_id(
-                network_id=subport_network_id
+            self._handle_tenant_vlan_id_config(subport_network_id, subport)
+
+            self._handle_parent_port_switchport_config(
+                trunk.port_id, subport_network_id
             )
-            if not ucvni_tenant_vlan_id:
-                self._configure_tenant_vlan_id(
-                    ucvni_uuid=subport_network_id, subport=subport
-                )
-            elif ucvni_tenant_vlan_id != subport.segmentation_id:
-                self._handle_segmentation_id_mismatch(
-                    subport=subport,
-                    ucvni_uuid=subport_network_id,
-                    tenant_vlan_id=ucvni_tenant_vlan_id,
-                )
+
+    def _add_subport_network_to_parent_port_switchport(
+        self, parent_port: Port, subport_network_id: str
+    ) -> None:
+        connected_interface_id = utils.fetch_connected_interface_uuid(
+            parent_port.bindings[0].profile, LOG
+        )
+
+        vlan_group_id = self.nb.prep_switch_interface(
+            connected_interface_id=connected_interface_id,
+            ucvni_uuid=subport_network_id,
+            vlan_tag=None,
+            modify_native_vlan=False,
+        )["vlan_group_id"]
+
+        self.undersync.sync_devices(
+            vlan_group_uuids=str(vlan_group_id),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
+
+    def _remove_subport_network_from_parent_port_switchport(
+        self, parent_port: Port, subport_network_id: str
+    ) -> None:
+        connected_interface_id = utils.fetch_connected_interface_uuid(
+            parent_port.bindings[0].profile, LOG
+        )
+
+        vlan_group_id = self.nb.detach_port(
+            connected_interface_id=connected_interface_id,
+            ucvni_uuid=subport_network_id,
+        )
+
+        self.undersync.sync_devices(
+            vlan_group_uuids=str(vlan_group_id),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
+
+    def _clean_parent_port_switchport_config(
+        self, trunk: Trunk, subports: [SubPort]
+    ) -> None:
+        parent_port_obj = utils.fetch_port_object(trunk.port_id)
+
+        if not utils.parent_port_is_bound(parent_port_obj):
+            return
+
+        for subport in subports:
+            subport_network_id = utils.fetch_subport_network_id(
+                subport_id=subport.port_id
+            )
+            self._remove_subport_network_from_parent_port_switchport(
+                parent_port_obj, subport_network_id
+            )
 
     def subports_added(self, resource, event, trunk_plugin, payload):
+        trunk = payload.states[0]
         subports = payload.metadata["subports"]
-        self._subports_added(subports)
+        self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
+
+    def subports_deleted(self, resource, event, trunk_plugin, payload):
+        trunk = payload.states[0]
+        subports = payload.metadata["subports"]
+        self._clean_parent_port_switchport_config(trunk, subports)
 
     def trunk_created(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = trunk.sub_ports
         if subports:
-            self._subports_added(subports)
+            self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
+
+    def trunk_deleted(self, resource, event, trunk_plugin, payload):
+        trunk = payload.states[0]
+        subports = trunk.sub_ports
+        if subports:
+            self._clean_parent_port_switchport_config(trunk, subports)

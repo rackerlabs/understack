@@ -1409,13 +1409,13 @@ WebOb = ">=1.8.2"
 
 [[package]]
 name = "neutron-lib"
-version = "3.18.1"
+version = "3.18.2"
 description = "Neutron shared routines and utilities"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "neutron_lib-3.18.1-py3-none-any.whl", hash = "sha256:f448ebab1900fc12de6242382d94a4c12ccab2945a691f8770b6b317f1e3d920"},
-    {file = "neutron_lib-3.18.1.tar.gz", hash = "sha256:25f7c8c765fe9e8b410a6181160e3985b5d400ed08541528fab1df2a50edd27b"},
+    {file = "neutron_lib-3.18.2-py3-none-any.whl", hash = "sha256:5f5a6ef61f2bedf735d5a6d22f3987e3415a3f5a06acdc52830c4f7037c75476"},
+    {file = "neutron_lib-3.18.2.tar.gz", hash = "sha256:faa9d54c164b32d8ac773f3031abb050836cda9a6483479762726a8490bd2fb0"},
 ]
 
 [package.dependencies]
@@ -2401,13 +2401,13 @@ win_inet_pton = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
 name = "pytest"
-version = "8.3.4"
+version = "8.3.5"
 description = "pytest: simple powerful testing with Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "pytest-8.3.4-py3-none-any.whl", hash = "sha256:50e16d954148559c9a74109af1eaf0c945ba2d8f30f0a3d3335edde19788b6f6"},
-    {file = "pytest-8.3.4.tar.gz", hash = "sha256:965370d062bce11e73868e0335abac31b4d3de0e82f4007408d242b4f8610761"},
+    {file = "pytest-8.3.5-py3-none-any.whl", hash = "sha256:c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820"},
+    {file = "pytest-8.3.5.tar.gz", hash = "sha256:f4efe70cc14e511565ac476b57c279e12a855b11f48f212af1080ef2263d3845"},
 ]
 
 [package.dependencies]

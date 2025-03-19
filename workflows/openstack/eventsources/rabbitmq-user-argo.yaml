@@ -1,9 +1,0 @@
----
-apiVersion: rabbitmq.com/v1beta1
-kind: User
-metadata:
-  name: argo
-spec:
-  rabbitmqClusterReference:
-    name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
-    namespace: openstack

@@ -30,8 +30,8 @@ spec:
       # use secret selectors
       auth:
         username:
-          name: argo-user-credentials
+          name: argo-keystone-user-credentials
           key: username
         password:
-          name: argo-user-credentials
+          name: argo-keystone-user-credentials
           key: password

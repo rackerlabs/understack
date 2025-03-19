@@ -3,16 +3,7 @@ from unittest.mock import ANY
 import pytest
 from neutron_lib.api.definitions import portbindings
 
-
-class TestFetchConnectedInterfaceUUID:
-    def test_with_normal_uuid(self, port_context, understack_driver, port_id):
-        result = understack_driver.fetch_connected_interface_uuid(port_context.current)
-        assert result == str(port_id)
-
-    @pytest.mark.parametrize("binding_profile", [{"port_id": 11}], indirect=True)
-    def test_with_integer(self, port_context, understack_driver):
-        with pytest.raises(ValueError):
-            understack_driver.fetch_connected_interface_uuid(port_context.current)
+from neutron_understack import utils
 
 
 class TestUpdateNautobot:
@@ -65,13 +56,13 @@ class TestUpdatePortPostcommit:
 class TestBindPort:
     def test_with_no_trunk(self, mocker, port_context, understack_driver):
         mocker.patch.object(understack_driver, "_configure_trunk")
-        mocker.patch.object(understack_driver, "fetch_connected_interface_uuid")
+        mocker.patch("neutron_understack.utils.fetch_connected_interface_uuid")
 
         understack_driver.bind_port(port_context)
 
         understack_driver.update_nautobot.assert_called_once()
         understack_driver._configure_trunk.assert_not_called()
-        understack_driver.fetch_connected_interface_uuid.assert_called_once()
+        utils.fetch_connected_interface_uuid.assert_called_once()
         understack_driver.undersync.sync_devices.assert_called_once()
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
@@ -92,7 +83,7 @@ class TestBindPort:
 class Test_DeleteTenantPortOnUnbound:
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
     def test_when_trunk_details_are_present(
-        self, mocker, understack_driver, port_context, port_id
+        self, mocker, understack_driver, port_context, vlan_group_id, port_id
     ):
         mocker.patch(
             "neutron_understack.utils.fetch_subport_network_id", return_value="112233"
@@ -101,7 +92,7 @@ class Test_DeleteTenantPortOnUnbound:
         mocker.patch.object(
             understack_driver.nb,
             "detach_port",
-            return_value=str(port_id),
+            return_value=str(vlan_group_id),
         )
         port_context._binding.vif_type = portbindings.VIF_TYPE_UNBOUND
 

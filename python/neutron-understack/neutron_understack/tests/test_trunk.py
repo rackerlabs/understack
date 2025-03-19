@@ -1,89 +1,241 @@
-from unittest.mock import MagicMock
-from unittest.mock import patch
-
 import pytest
+from neutron.plugins.ml2.driver_context import portbindings
+from oslo_config import cfg
 
-from neutron_understack.nautobot import Nautobot
-from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.trunk import SubportSegmentationIDError
-from neutron_understack.trunk import UnderStackTrunkDriver
 
 
-@pytest.fixture
-def subport() -> MagicMock:
-    return MagicMock(port_id="portUUID", segmentation_id=555)
+class TestSubportsAdded:
+    def test_that_handler_is_called(
+        self, mocker, understack_trunk_driver, trunk_payload, subport, trunk
+    ):
+        mocker.patch.object(
+            understack_trunk_driver, "_handle_tenant_vlan_id_and_switchport_config"
+        )
+
+        understack_trunk_driver.subports_added("", "", "", trunk_payload)
+
+        (
+            understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config.assert_called_once_with(
+                [subport], trunk
+            )
+        )
 
 
-@pytest.fixture
-def trunk(subport) -> MagicMock:
-    return MagicMock(sub_ports=[subport])
+class TestTrunkCreated:
+    def test_when_subports_are_present(
+        self, mocker, understack_trunk_driver, trunk_payload, subport, trunk
+    ):
+        mocker.patch.object(
+            understack_trunk_driver, "_handle_tenant_vlan_id_and_switchport_config"
+        )
+        understack_trunk_driver.trunk_created("", "", "", trunk_payload)
+
+        (
+            understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config.assert_called_once_with(
+                [subport], trunk
+            )
+        )
+
+    def test_when_subports_are_not_present(
+        self, mocker, understack_trunk_driver, trunk_payload, subport, trunk
+    ):
+        mocker.patch.object(
+            understack_trunk_driver, "_handle_tenant_vlan_id_and_switchport_config"
+        )
+        trunk.sub_ports = []
+        understack_trunk_driver.trunk_created("", "", "", trunk_payload)
+
+        (
+            understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config.assert_not_called()
+        )
 
 
-@pytest.fixture
-def payload_metadata(subport) -> dict:
-    return {"subports": [subport]}
+@pytest.mark.usefixtures("utils_fetch_subport_network_id_patch")
+class Test_HandleTenantVlanIDAndSwitchportConfig:
+    def test_when_ucvni_tenant_vlan_id_is_not_set_yet(
+        self, mocker, understack_trunk_driver, trunk, subport, network_id, vlan_num
+    ):
+        mocker.patch.object(
+            understack_trunk_driver.nb, "fetch_ucvni_tenant_vlan_id", return_value=None
+        )
+        mocker.patch.object(
+            understack_trunk_driver, "_handle_parent_port_switchport_config"
+        )
+        understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
+            [subport], trunk
+        )
+
+        understack_trunk_driver.nb.add_tenant_vlan_tag_to_ucvni.assert_called_once_with(
+            network_uuid=str(network_id), vlan_tag=vlan_num
+        )
+        understack_trunk_driver._handle_parent_port_switchport_config.assert_called_once()
+
+    def test_when_segmentation_id_is_different_to_tenant_vlan_id(
+        self, mocker, understack_trunk_driver, vlan_num, subport, trunk
+    ):
+        mocker.patch.object(
+            understack_trunk_driver.nb,
+            "fetch_ucvni_tenant_vlan_id",
+            return_value=(vlan_num + 1),
+        )
+        mocker.patch.object(
+            understack_trunk_driver, "_handle_parent_port_switchport_config"
+        )
+        mocker.patch.object(subport, "delete")
+
+        with pytest.raises(SubportSegmentationIDError):
+            understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
+                [subport], trunk
+            )
+
+    def test_when_parent_port_is_bound(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk,
+        subport,
+        port_object,
+        vlan_group_id,
+        port_id,
+        network_id,
+    ):
+        mocker.patch.object(understack_trunk_driver, "_handle_tenant_vlan_id_config")
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch.object(
+            understack_trunk_driver.nb,
+            "prep_switch_interface",
+            return_value={"vlan_group_id": vlan_group_id},
+        )
+        understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
+            [subport], trunk
+        )
+
+        understack_trunk_driver.nb.prep_switch_interface.assert_called_once_with(
+            connected_interface_id=str(port_id),
+            ucvni_uuid=str(network_id),
+            vlan_tag=None,
+            modify_native_vlan=False,
+        )
+        understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
+            vlan_group_uuids=str(vlan_group_id),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
+
+    def test_when_parent_port_is_unbound(
+        self, mocker, understack_trunk_driver, trunk, subport, port_object
+    ):
+        mocker.patch.object(understack_trunk_driver, "_handle_tenant_vlan_id_config")
+        port_object.bindings[0].vif_type = portbindings.VIF_TYPE_UNBOUND
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch.object(
+            understack_trunk_driver, "_add_subport_network_to_parent_port_switchport"
+        )
+        understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
+            [subport], trunk
+        )
+
+        (
+            understack_trunk_driver._add_subport_network_to_parent_port_switchport.assert_not_called()
+        )
 
 
-@pytest.fixture
-def payload(payload_metadata, trunk) -> MagicMock:
-    return MagicMock(metadata=payload_metadata, states=[trunk])
+class TestSubportsDeleted:
+    def test_that_clean_parent_port_is_triggered(
+        self, mocker, understack_trunk_driver, trunk_payload, trunk, subport
+    ):
+        mocker.patch.object(
+            understack_trunk_driver, "_clean_parent_port_switchport_config"
+        )
+
+        understack_trunk_driver.subports_deleted("", "", "", trunk_payload)
+
+        (
+            understack_trunk_driver._clean_parent_port_switchport_config.assert_called_once_with(
+                trunk, [subport]
+            )
+        )
 
 
-@pytest.fixture
-def nautobot_client() -> Nautobot:
-    return MagicMock(spec_set=Nautobot)
+class TestTrunkDeleted:
+    def test_when_subports_are_present(
+        self, mocker, understack_trunk_driver, trunk_payload, trunk, subport
+    ):
+        mocker.patch.object(
+            understack_trunk_driver, "_clean_parent_port_switchport_config"
+        )
+
+        understack_trunk_driver.trunk_deleted("", "", "", trunk_payload)
+
+        (
+            understack_trunk_driver._clean_parent_port_switchport_config.assert_called_once_with(
+                trunk, [subport]
+            )
+        )
+
+    def test_when_subports_are_not_present(
+        self, mocker, understack_trunk_driver, trunk_payload, trunk, subport
+    ):
+        mocker.patch.object(
+            understack_trunk_driver, "_clean_parent_port_switchport_config"
+        )
+
+        trunk.sub_ports = []
+        understack_trunk_driver.trunk_deleted("", "", "", trunk_payload)
+
+        (
+            understack_trunk_driver._clean_parent_port_switchport_config.assert_not_called()
+        )
 
 
-driver = UnderstackDriver()
-driver.nb = Nautobot("", "")
-trunk_driver = UnderStackTrunkDriver.create(driver)
+@pytest.mark.usefixtures("utils_fetch_subport_network_id_patch")
+class Test_CleanParentPortSwitchportConfig:
+    def test_when_parent_port_is_bound(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk,
+        subport,
+        port_object,
+        vlan_group_id,
+        port_id,
+        network_id,
+    ):
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch.object(
+            understack_trunk_driver.nb, "detach_port", return_value=str(vlan_group_id)
+        )
 
+        understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
 
-@patch("neutron_understack.utils.fetch_subport_network_id", return_value="112233")
-def test_subports_added_when_ucvni_tenan_vlan_id_is_not_set_yet(
-    nautobot_client, payload
-):
-    trunk_driver.nb = nautobot_client
-    attrs = {"fetch_ucvni_tenant_vlan_id.return_value": None}
-    nautobot_client.configure_mock(**attrs)
-    trunk_driver.subports_added("", "", "", payload)
+        understack_trunk_driver.nb.detach_port.assert_called_once_with(
+            connected_interface_id=str(port_id), ucvni_uuid=str(network_id)
+        )
+        understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
+            vlan_group_uuids=str(vlan_group_id),
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
 
-    nautobot_client.add_tenant_vlan_tag_to_ucvni.assert_called_once_with(
-        network_uuid="112233", vlan_tag=555
-    )
+    def test_when_parent_port_is_unbound(
+        self, mocker, understack_trunk_driver, port_object, trunk, subport
+    ):
+        port_object.bindings[0].vif_type = portbindings.VIF_TYPE_UNBOUND
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch.object(
+            understack_trunk_driver,
+            "_remove_subport_network_from_parent_port_switchport",
+        )
 
+        understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
 
-@patch("neutron_understack.utils.fetch_subport_network_id", return_value="223344")
-def test_subports_added_when_segmentation_id_is_different_to_tenant_vlan_id(
-    nautobot_client, payload
-):
-    trunk_driver.nb = nautobot_client
-    attrs = {"fetch_ucvni_tenant_vlan_id.return_value": 123}
-    nautobot_client.configure_mock(**attrs)
-    with pytest.raises(SubportSegmentationIDError):
-        trunk_driver.subports_added("", "", "", payload)
-
-
-@patch("neutron_understack.utils.fetch_subport_network_id", return_value="112233")
-def test_trunk_created_when_ucvni_tenan_vlan_id_is_not_set_yet(
-    nautobot_client, payload
-):
-    trunk_driver.nb = nautobot_client
-    attrs = {"fetch_ucvni_tenant_vlan_id.return_value": None}
-    nautobot_client.configure_mock(**attrs)
-    trunk_driver.trunk_created("", "", "", payload)
-
-    nautobot_client.add_tenant_vlan_tag_to_ucvni.assert_called_once_with(
-        network_uuid="112233", vlan_tag=555
-    )
-
-
-@patch("neutron_understack.utils.fetch_subport_network_id", return_value="223344")
-def test_trunk_created_when_segmentation_id_is_different_to_tenant_vlan_id(
-    nautobot_client, payload
-):
-    trunk_driver.nb = nautobot_client
-    attrs = {"fetch_ucvni_tenant_vlan_id.return_value": 123}
-    nautobot_client.configure_mock(**attrs)
-    with pytest.raises(SubportSegmentationIDError):
-        trunk_driver.trunk_created("", "", "", payload)
+        (
+            understack_trunk_driver._remove_subport_network_from_parent_port_switchport.assert_not_called()
+        )

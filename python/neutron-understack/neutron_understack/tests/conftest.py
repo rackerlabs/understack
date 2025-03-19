@@ -1,24 +1,30 @@
 import copy
 import json
+import random
 import uuid
 
 import pytest
 from neutron.db.models.segment import NetworkSegment
 from neutron.db.models_v2 import Network
-from neutron.db.models_v2 import Port
+from neutron.db.models_v2 import Port as PortModel
 from neutron.db.models_v2 import Subnet
+from neutron.objects.ports import Port as PortObject
+from neutron.objects.trunk import SubPort
+from neutron.objects.trunk import Trunk
 from neutron.plugins.ml2.driver_context import NetworkContext
 from neutron.plugins.ml2.driver_context import PortContext
 from neutron.plugins.ml2.driver_context import SubnetContext
 from neutron.plugins.ml2.models import PortBinding
-from neutron.services.trunk.models import SubPort
-from neutron.services.trunk.models import Trunk
+from neutron.services.trunk.models import SubPort as SubPortModel
+from neutron.services.trunk.models import Trunk as TrunkModel
 from neutron_lib.api.definitions import portbindings
+from neutron_lib.callbacks.events import DBEventPayload
 
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.tests.helpers import Ml2PluginNoInit
 from neutron_understack.tests.helpers import extend_port_dict_with_trunk
+from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
 
 
@@ -43,6 +49,11 @@ def vlan_group_id() -> uuid.UUID:
 
 
 @pytest.fixture
+def vlan_num() -> int:
+    return random.randint(1, 4094)
+
+
+@pytest.fixture
 def patch_extend_subnet(mocker) -> None:
     """Ml2 Plugin extend subnet patch.
 
@@ -64,8 +75,8 @@ def ml2_plugin(patch_extend_subnet) -> Ml2PluginNoInit:
 
 
 @pytest.fixture
-def subport() -> SubPort:
-    return SubPort(segmentation_type="vlan", segmentation_id=333)
+def subport(port_id, vlan_num) -> SubPort:
+    return SubPort(segmentation_type="vlan", segmentation_id=vlan_num, port_id=port_id)
 
 
 @pytest.fixture
@@ -130,15 +141,30 @@ def binding_profile(request, port_id) -> str:
 
 
 @pytest.fixture
-def trunk(subport) -> Trunk:
-    return Trunk(sub_ports=[subport])
+def trunk_model(subport_model) -> TrunkModel:
+    return TrunkModel(sub_ports=[subport_model])
 
 
 @pytest.fixture
-def port_binding(binding_profile) -> PortBinding:
+def subport_model(vlan_num) -> SubPortModel:
+    return SubPortModel(segmentation_type="vlan", segmentation_id=vlan_num)
+
+
+@pytest.fixture
+def port_model() -> PortModel:
+    return PortModel()
+
+
+@pytest.fixture
+def trunk(subport, port_id) -> Trunk:
+    return Trunk(sub_ports=[subport], port_id=port_id)
+
+
+@pytest.fixture
+def port_binding(binding_profile, port_model) -> PortBinding:
     binding = PortBinding(
         profile=binding_profile,
-        port=Port(),
+        port=port_model,
         vif_type=portbindings.VIF_TYPE_OTHER,
         vnic_type=portbindings.VNIC_BAREMETAL,
     )
@@ -146,12 +172,19 @@ def port_binding(binding_profile) -> PortBinding:
 
 
 @pytest.fixture
-def port_dict(request, port_binding, trunk, ml2_plugin) -> dict:
+def port_object(port_binding) -> PortObject:
+    port_obj = PortObject()
+    port_obj.from_db_object(port_binding.port)
+    return port_obj
+
+
+@pytest.fixture
+def port_dict(request, port_binding, trunk_model, ml2_plugin) -> dict:
     req = getattr(request, "param", {})
     port_binding.vif_type = req.get("vif_type", port_binding.vif_type)
     portdict = ml2_plugin.construct_port_dict(port_binding.port)
     if req.get("trunk"):
-        trunk.port = port_binding.port
+        trunk_model.port = port_binding.port
         return extend_port_dict_with_trunk(portdict, port_binding.port)
     return portdict
 
@@ -182,6 +215,11 @@ def understack_driver(nautobot_client) -> UnderstackDriver:
     return driver
 
 
+@pytest.fixture
+def understack_trunk_driver(understack_driver) -> UnderStackTrunkDriver:
+    return UnderStackTrunkDriver.create(understack_driver)
+
+
 @pytest.fixture(autouse=True)
 def undersync_sync_devices_patch(mocker, understack_driver) -> None:
     mocker.patch.object(understack_driver.undersync, "sync_devices")
@@ -190,3 +228,21 @@ def undersync_sync_devices_patch(mocker, understack_driver) -> None:
 @pytest.fixture
 def update_nautobot_patch(mocker, understack_driver) -> None:
     mocker.patch.object(understack_driver, "update_nautobot")
+
+
+@pytest.fixture
+def utils_fetch_subport_network_id_patch(mocker, network_id) -> None:
+    mocker.patch(
+        "neutron_understack.utils.fetch_subport_network_id",
+        return_value=str(network_id),
+    )
+
+
+@pytest.fixture
+def trunk_payload_metadata(subport) -> dict:
+    return {"subports": [subport]}
+
+
+@pytest.fixture
+def trunk_payload(trunk_payload_metadata, trunk) -> DBEventPayload:
+    return DBEventPayload("context", metadata=trunk_payload_metadata, states=[trunk])

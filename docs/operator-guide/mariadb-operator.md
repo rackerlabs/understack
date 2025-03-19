@@ -39,3 +39,45 @@ ROOTPASSWORD=$(kubectl get secret -n openstack mariadb -o json | jq -r '.data["r
 # perform the db dump
 /usr/local/opt/mariadb/bin/mariadb-dump -h 127.0.0.1 --skip-ssl -u root --password=$ROOTPASSWORD $DB_TO_DUMP | gzip > $DB_TO_DUMP.sql.gz
 ```
+
+## Restore from a point in time backup
+
+This assumes you have backups enabled with regularly scheduled backups: <https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/BACKUP.md/#scheduling>
+
+Create a manifest with a point in time to restore from:
+
+``` yaml
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Restore
+metadata:
+  name: restore
+spec:
+  mariaDbRef:
+    name: mariadb
+  backupRef:
+    name: backup
+  targetRecoveryTime: 2025-03-13T09:00:00Z
+```
+
+Apply the manifest:
+
+``` text
+ kubectl apply -f restore-time.yaml
+restore.k8s.mariadb.com/restore created
+```
+
+Check the status:
+
+``` text
+ kubectl get restore
+NAME      COMPLETE   STATUS    MARIADB   AGE
+restore   False      Running   mariadb   4s
+```
+
+Watch the restore logs:
+
+``` text
+ kubectl logs -f restore-jtd9x
+Defaulted container "mariadb" out of: mariadb, mariadb-operator (init)
+💾 Restoring backup: /backup/backup.2025-03-13T09:00:05Z.sql
+```

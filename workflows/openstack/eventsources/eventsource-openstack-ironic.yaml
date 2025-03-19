@@ -29,8 +29,8 @@ spec:
       # use secret selectors
       auth:
         username:
-          name: argo-user-credentials
+          name: argo-ironic-user-credentials
           key: username
         password:
-          name: argo-user-credentials
+          name: argo-ironic-user-credentials
           key: password

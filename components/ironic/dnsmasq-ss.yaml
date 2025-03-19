@@ -60,6 +60,7 @@ spec:
           envFrom:
             - configMapRef:
                 name: ironic-dnsmasq
+                optional: true
           ports:
             - name: dns
               containerPort: 53
