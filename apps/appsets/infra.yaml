@@ -64,30 +64,6 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
-                - component: provisioning-ingress-nginx
-                  componentNamespace: ingress-nginx
-                  skipComponent: '{{has "provisioning-ingress-nginx" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
-                  sources:
-                    - repoURL: https://kubernetes.github.io/ingress-nginx
-                      chart: ingress-nginx
-                      targetRevision: 4.9.1
-                      helm:
-                        releaseName: provisioning-ingress-nginx
-                        valuesObject:
-                          controller:
-                            electionID: ingress-controller-leader
-                            ingressClass: provisioning-nginx  # default: nginx
-                            ingressClassResource:
-                              name: provisioning-nginx  # default: nginx
-                              enabled: true
-                              default: false
-                              controllerValue: "k8s.io/provisioning-ingress-nginx"  # default: k8s.io/ingress-nginx
-                        valueFiles:
-                          - $deploy/{{.name}}/helm-configs/provisioning-ingress-nginx.yaml
-                        ignoreMissingValueFiles: true
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      ref: deploy
                 - component: cilium
                   skipComponent: '{{has "cilium" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:

@@ -1,0 +1,846 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: understack-infra
+spec:
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: 'cert-manager'
+    server: '*'
+  - namespace: 'ingress-nginx'
+    server: '*'
+  - namespace: 'cilium'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: openstack
+spec:
+  sourceRepos:
+  - '*'
+  destinations:
+  # make sure our operators don't install in the wrong place
+  - namespace: 'openstack'
+    server: '*'
+  - namespace: 'argo-events'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: understack-operators
+spec:
+  sourceRepos:
+  - '*'
+  destinations:
+  # make sure our operators don't install in the wrong place
+  - namespace: 'rabbitmq-system'
+    server: '*'
+  - namespace: 'mariadb-operator'
+    server: '*'
+  - namespace: 'cnpg-system'
+    server: '*'
+  - namespace: 'external-secrets'
+    server: '*'
+  - namespace: 'rook-ceph'
+    server: '*'
+  - namespace: 'monitoring'
+    server: '*'
+  - namespace: 'opentelemetry-operator'
+    server: '*'
+  # kube-system is used by kube-prometheus-stack
+  - namespace: 'kube-system'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: understack
+spec:
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: 'argo'
+    server: '*'
+  - namespace: 'argo-events'
+    server: '*'
+  - namespace: 'cert-manager'
+    server: '*'
+  - namespace: 'dex'
+    server: '*'
+  - namespace: 'nautobot'
+    server: '*'
+  - namespace: 'undersync'
+    server: '*'
+  - namespace: 'openstack'
+    server: '*'
+  - namespace: 'monitoring'
+    server: '*'
+  - namespace: 'global-secrets-sync'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: understack
+  namespace: argocd
+spec:
+  syncPolicy:
+    applicationsSync: create-update
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchExpressions:
+                  - key: understack.rackspace.com/role
+                    operator: In
+                    values:
+                      - "global"
+                      - "regional"
+                      - "aio"
+              values:
+                uc_skip_components: '{{ default "[]" (index .metadata.annotations "uc_skip_components") }}'
+                uc_repo_git_url: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                uc_repo_ref: '{{index .metadata.annotations "uc_repo_ref"}}'
+                uc_deploy_git_url: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                uc_deploy_ref: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                uc_role: '{{index .metadata.labels "understack.rackspace.com/role"}}'
+                uc_dns_zone: '{{index .metadata.annotations "dns_zone" }}'
+                uc_cluster_issuer: '{{index .metadata.annotations "uc_cluster_issuer" }}'
+                uc_global_dns_zone: '{{index .metadata.annotations "uc_global_dns_zone" }}'
+          - list:
+              elements:
+                - component: cert-manager
+                  componentProject: understack-infra
+                  skipComponent: '{{has "cert-manager" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: https://charts.jetstack.io
+                      chart: cert-manager
+                      targetRevision: '1.15.2'
+                      helm:
+                        releaseName: cert-manager
+                        valuesObject:
+                          crds:
+                            enabled: true
+                - component: ingress-nginx
+                  componentProject: understack-infra
+                  skipComponent: '{{has "ingress-nginx" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: https://kubernetes.github.io/ingress-nginx
+                      chart: ingress-nginx
+                      targetRevision: 4.9.1
+                      helm:
+                        releaseName: ingress-nginx
+                        valueFiles:
+                          - $deploy/{{.name}}/helm-configs/ingress-nginx.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
+                - component: cilium
+                  componentProject: understack-infra
+                  skipComponent: '{{or (has "cilium" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    # Cilium itself is deployed before ArgoCD so we only include project
+                    # and environment specific stuff here
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/cilium'
+
+                - component: rook
+                  componentNamespace: rook-ceph
+                  componentProject: understack-operators
+                  skipComponent: '{{or (has "rook" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://charts.rook.io/release
+                      chart: rook-ceph
+                      targetRevision: v1.15.0
+                      helm:
+                        releaseName: rook-ceph
+                        valueFiles:
+                          - $understack/operators/rook/values-operator.yaml
+                          - $deploy/{{.name}}/helm-configs/rook-operator.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: https://charts.rook.io/release
+                      chart: rook-ceph-cluster
+                      targetRevision: v1.15.0
+                      helm:
+                        releaseName: rook-ceph-cluster
+                        valueFiles:
+                          - $understack/operators/rook/values-cluster.yaml
+                          - $deploy/{{.name}}/helm-configs/rook-cluster.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'operators/rook'
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
+                - component: cnpg-system
+                  componentProject: understack-operators
+                  skipComponent: '{{or (has "cnpg-system" (.values.uc_skip_components | fromJson)) (eq "regional" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'operators/cnpg-system'
+                - component: external-secrets
+                  componentProject: understack-operators
+                  skipComponent: '{{has "external-secrets" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'operators/external-secrets'
+                - component: mariadb-operator
+                  componentProject: understack-operators
+                  skipComponent: '{{has "mariadb-operator" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'operators/mariadb-operator'
+                - component: rabbitmq-system
+                  componentProject: understack-operators
+                  skipComponent: '{{has "rabbitmq-system" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'operators/rabbitmq-system'
+                - component: monitoring
+                  componentProject: understack-operators
+                  skipComponent: '{{has "monitoring" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: https://prometheus-community.github.io/helm-charts
+                      chart: kube-prometheus-stack
+                      targetRevision: 62.6.0
+                      helm:
+                        releaseName: kube-prometheus-stack
+                        valueFiles:
+                          - $understack/operators/monitoring/values.yaml
+                          - $deploy/{{.name}}/helm-configs/monitoring.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'operators/monitoring'
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
+                - component: opentelemetry-operator
+                  componentProject: understack-operators
+                  skipComponent: '{{has "opentelemetry-operator" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+                      chart: opentelemetry-operator
+                      targetRevision: 0.79.0
+                      helm:
+                        releaseName: opentelemetry-operator
+                        valueFiles:
+                          - $understack/operators/opentelemetry-operator/values.yaml
+                          - $deploy/{{.name}}/helm-configs/opentelemetry-operator.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      ref: understack
+                      path: 'operators/opentelemetry-operator'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
+
+                - component: understack-cluster-issuer
+                  componentNamespace: cert-manager
+                  componentProject: understack
+                  skipComponent: '{{has "understack-cluster-issuer" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/cert-manager'
+                - component: dex
+                  componentProject: understack
+                  skipComponent: '{{or (has "dex" (.values.uc_skip_components | fromJson)) (eq "regional" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://charts.dexidp.io
+                      chart: dex
+                      targetRevision: 0.16.0
+                      helm:
+                        releaseName: dex
+                        valuesObject:
+                          config:
+                            issuer: 'https://dex.{{ .values.uc_dns_zone }}'
+                          env:
+                            DNS_ZONE: '{{ .values.uc_dns_zone }}'
+
+                          ingress:
+                            hosts:
+                              - host: 'dex.{{ .values.uc_dns_zone }}'
+                                paths:
+                                  - path: /
+                                    pathType: ImplementationSpecific
+                            tls:
+                              - secretName: dex-ingress-tls
+                                hosts:
+                                  - 'dex.{{ .values.uc_dns_zone }}'
+                        valueFiles:
+                          - $understack/components/dex/values.yaml
+                          - $deploy/{{.name}}/helm-configs/dex.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'components/dex'
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
+                      path: '{{.name}}/manifests/dex'
+                - component: dex-regional
+                  componentProject: understack
+                  componentNamespace: dex
+                  skipComponent: '{{or (has "dex" (.values.uc_skip_components | fromJson)) (ne "regional" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/dex'
+                - component: openstack
+                  skipComponent: '{{has "openstack" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'components/openstack'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/openstack'
+                  ignoreDifferences:
+                    - group: "k8s.mariadb.com"
+                      kind: "Backup"
+                      jqPathExpressions:
+                      - ".spec.mariaDbRef.waitForIt"
+                - component: undersync
+                  componentProject: understack
+                  skipComponent: '{{or (has "undersync" (.values.uc_skip_components | fromJson)) (eq "regional" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'components/undersync'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/undersync'
+                - component: nautobot
+                  componentProject: understack
+                  skipComponent: '{{or (has "nautobot" (.values.uc_skip_components | fromJson)) (eq "regional" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://nautobot.github.io/helm-charts/
+                      chart: nautobot
+                      targetRevision: 2.4.6
+                      helm:
+                        releaseName: nautobot
+                        valuesObject:
+                          ingress:
+                            hostname: 'nautobot.{{ .values.uc_dns_zone }}'
+                        valueFiles:
+                          - $understack/components/nautobot/values.yaml
+                          - $deploy/{{.name}}/helm-configs/nautobot.yaml
+                        ignoreMissingValueFiles: true
+                        fileParameters:
+                          - name: nautobot.config
+                            path: $understack/components/nautobot/nautobot_config.py
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'components/nautobot'
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/nautobot'
+                      ref: deploy
+                - component: nautobot-regional
+                  componentProject: understack
+                  componentNamespace: nautobot
+                  skipComponent: '{{or (has "nautobot-regional" (.values.uc_skip_components | fromJson)) (ne "regional" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/nautobot'
+                - component: argo
+                  componentProject: understack
+                  skipComponent: '{{or (has "argo" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'components/argo'
+                      kustomize:
+                        patches:
+                          - target:
+                              kind: ConfigMap
+                              name: workflow-controller-configmap
+                            patch: |-
+                              - op: replace
+                                path: /data/sso
+                                value: |-
+                                  # This is the root URL of the OIDC provider (required).
+                                  issuer: https://dex.{{ default .values.uc_dns_zone .values.uc_global_dns_zone }}
+                                  # This defines how long your login is valid for (in hours). (optional)
+                                  # If omitted, defaults to 10h. Example below is 10 days.
+                                  sessionExpiry: 240h
+                                  # This is name of the secret and the key in it that contain OIDC client
+                                  # ID issued to the application by the provider (required).
+                                  clientId:
+                                    name: argo-sso
+                                    key: client-id
+                                  # This is name of the secret and the key in it that contain OIDC client
+                                  # secret issued to the application by the provider (required).
+                                  clientSecret:
+                                    name: argo-sso
+                                    key: client-secret
+                                  # This is the redirect URL supplied to the provider (optional). It must
+                                  # be in the form <argo-server-root-url>/oauth2/callback. It must be
+                                  # browser-accessible. If omitted, will be automatically generated.
+                                  redirectUrl: https://workflows.{{ .values.uc_dns_zone }}/oauth2/callback
+                                  # Additional scopes to request. Typically needed for SSO RBAC. >= v2.12
+                                  scopes:
+                                    - groups
+                                    - email
+                                    - profile
+                                  # RBAC Config. >= v2.12
+                                  rbac:
+                                    enabled: false
+                          - target:
+                              kind: Ingress
+                              name: argo-workflows
+                            patch: |-
+                              - op: replace
+                                path: /metadata/annotations/cert-manager.io~1cluster-issuer
+                                value: {{ default "understack-cluster-issuer" .values.uc_cluster_issuer }}
+                              - op: replace
+                                path: /spec/rules/0/host
+                                value: workflows.{{ .values.uc_dns_zone }}
+                              - op: replace
+                                path: /spec/tls/0/hosts/0
+                                value: workflows.{{ .values.uc_dns_zone }}
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/argo'
+                - component: argo-events
+                  componentProject: understack
+                  skipComponent: '{{or (has "argo-events" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'components/argo-events'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/argo-events'
+                - component: understack-workflows
+                  componentProject: understack
+                  componentNamespace: argo-events
+                  skipComponent: '{{or (has "understack-workflows" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'workflows'
+                - component: global-secrets-sync
+                  componentProject: understack
+                  componentNamespace: global-secrets-sync
+                  skipComponent: '{{or (has "global-secrets-sync" (.values.uc_skip_components | fromJson)) (eq "aio" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/global-secrets-sync'
+                - component: chrony
+                  componentProject: understack
+                  componentNamespace: openstack
+                  skipComponent: '{{or (has "chrony" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'components/chrony'
+                - component: openstack-exporter
+                  componentProject: understack
+                  componentNamespace: monitoring
+                  skipComponent: '{{or (has "openstack-exporter" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: registry.scs.community/openstack-exporter
+                      chart: prometheus-openstack-exporter
+                      targetRevision: 0.4.5
+                      helm:
+                        releaseName: prometheus-openstack-exporter
+                        valueFiles:
+                          - $deploy/{{.name}}/helm-configs/openstack-exporter.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
+                - component: snmp-exporter
+                  componentProject: understack
+                  componentNamespace: monitoring
+                  skipComponent: '{{or (has "snmp-exporter" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://prometheus-community.github.io/helm-charts
+                      chart: prometheus-snmp-exporter
+                      targetRevision: 5.6.0
+                      helm:
+                        releaseName: prometheus-snmp-exporter
+                        valueFiles:
+                          - $deploy/{{.name}}/helm-configs/prometheus-snmp-exporter.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
+                - component: otel-collector
+                  componentNamespace: otel-collector
+                  skipComponent: '{{has "otel-collector" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/otel-collector'
+
+                - component: keystone
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{has "keystone" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+                      chart: keystone
+                      targetRevision: 2024.2.4+79d4b689-eb60e37c
+                      helm:
+                        releaseName: keystone
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/keystone/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/keystone.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/keystone/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/keystone'
+                      ref: deploy
+                  ignoreDifferences:
+                    - kind: Secret
+                      name: keystone-fernet-keys
+                      jqPathExpressions:
+                        - .data
+                    - kind: Secret
+                      name: keystone-credential-keys
+                      jqPathExpressions:
+                        - .data
+                - component: openvswitch
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{or (has "openvswitch" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
+                      chart: openvswitch
+                      targetRevision: 2024.2.0
+                      helm:
+                        releaseName: openvswitch
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/openvswitch/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/openvswitch.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/openvswitch/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/openvswitch'
+                      ref: deploy
+                - component: ovn
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{or (has "ovn" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
+                      chart: ovn
+                      targetRevision: 2024.2.0
+                      helm:
+                        releaseName: ovn
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/ovn/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/ovn.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/ovn/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/ovn'
+                      ref: deploy
+                  ignoreDifferences:
+                    - group: "apps"
+                      kind: "StatefulSet"
+                      jqPathExpressions:
+                      - ".spec.volumeClaimTemplates[].apiVersion"
+                      - ".spec.volumeClaimTemplates[].kind"
+                - component: ironic
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{or (has "ironic" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+                      chart: ironic
+                      targetRevision: 0.2.21
+                      helm:
+                        releaseName: ironic
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/ironic/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/ironic.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/ironic/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/ironic'
+                      ref: deploy
+                - component: placement
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{or (has "placement" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+                      chart: placement
+                      targetRevision: 2024.2.1+34d1672a-93ed069c
+                      helm:
+                        releaseName: placement
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/placement/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/placement.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/placement/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/placement'
+                      ref: deploy
+                - component: neutron
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{or (has "neutron" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+                      chart: neutron
+                      targetRevision: 0.3.47
+                      helm:
+                        releaseName: neutron
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/neutron/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/neutron.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/neutron/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/neutron'
+                      ref: deploy
+                  ignoreDifferences:
+                    - group: "external-secrets.io"
+                      kind: "ExternalSecret"
+                      jqPathExpressions:
+                      - ".spec.data[].remoteRef.conversionStrategy"
+                      - ".spec.data[].remoteRef.decodingStrategy"
+                      - ".spec.data[].remoteRef.metadataPolicy"
+                - component: glance
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{or (has "glance" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+                      chart: glance
+                      targetRevision: 0.5.2
+                      helm:
+                        releaseName: glance
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/glance/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/glance.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/glance/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/glance'
+                      ref: deploy
+                - component: nova
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{or (has "nova" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+                      chart: nova
+                      targetRevision: 0.3.47
+                      helm:
+                        releaseName: nova
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/nova/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/nova.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/nova/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/nova'
+                      ref: deploy
+                - component: horizon
+                  componentNamespace: openstack
+                  componentProject: openstack
+                  skipComponent: '{{or (has "horizon" (.values.uc_skip_components | fromJson)) (eq "regional" .values.uc_role)}}'
+                  sources:
+                    - repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+                      chart: horizon
+                      targetRevision: 2024.2.1+34d1672a-93ed069c
+                      helm:
+                        releaseName: horizon
+                        valueFiles:
+                          # default upstream images
+                          - $understack/components/images-openstack.yaml
+                          # default values for each component
+                          - $understack/components/horizon/values.yaml
+                          # current global secret data per deployment
+                          - $deploy/{{.name}}/manifests/secret-openstack.yaml
+                          # optional file to allow users to override upstream images
+                          - $deploy/{{.name}}/manifests/images-openstack.yaml
+                          # optional file to allow users to override component values
+                          - $deploy/{{.name}}/helm-configs/horizon.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: components/horizon/
+                      ref: understack
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/horizon'
+                      ref: deploy
+
+            selector:
+              # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
+              # ArgoCD's templating operates with strings so it's the string "true"
+              matchExpressions:
+                - key: skipComponent
+                  operator: NotIn
+                  values:
+                    - "true"
+  template:
+    metadata:
+      name: '{{.name}}-{{.component}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: '{{coalesce (get . "componentProject") .component}}'
+      destination:
+        server: '{{.server}}'
+        namespace: '{{coalesce (get . "componentNamespace") .component}}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+  templatePatch: |
+    spec:
+      sources:
+      {{- range $source := .sources }}
+        # indentation matters so collapse to single line with toJson to keep it
+        - {{ $source | toJson }}
+      {{- end }}
+    {{- if hasKey . "ignoreDifferences" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      ignoreDifferences: {{ .ignoreDifferences | toJson }}
+    {{- end }}

@@ -30,6 +30,16 @@ spec:
                             issuer: 'https://dex.{{index .metadata.annotations "dns_zone" }}'
                           env:
                             DNS_ZONE: '{{index .metadata.annotations "dns_zone" }}'
+                          ingress:
+                            hosts:
+                              - host: dex.{{index .metadata.annotations "dns_zone" }}
+                                paths:
+                                  - path: /
+                                    pathType: Prefix
+                            tls:
+                              - secretName: dex-ingress-tls
+                                hosts:
+                                  - dex.{{index .metadata.annotations "dns_zone" }}
                         valueFiles:
                           - $understack/components/dex/values.yaml
                           - $deploy/{{.name}}/helm-configs/dex.yaml
@@ -38,18 +48,6 @@ spec:
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'components/dex'
                       ref: understack
-                      kustomize:
-                        patches:
-                          - target:
-                              kind: Ingress
-                              name: dex
-                            patch: |-
-                              - op: replace
-                                path: /spec/rules/0/host
-                                value: dex.{{index .metadata.annotations "dns_zone" }}
-                              - op: replace
-                                path: /spec/tls/0/hosts/0
-                                value: dex.{{index .metadata.annotations "dns_zone" }}
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       ref: deploy
@@ -89,9 +87,7 @@ spec:
                         ignoreMissingValueFiles: true
                         fileParameters:
                           - name: nautobot.config
-                            # until ArgoCD 2.13.0 is released we cannot use a reference
-                            # path: $understack/components/nautobot/nautobot_config.py
-                            path: 'https://raw.githubusercontent.com/rackerlabs/understack/{{index .metadata.annotations "uc_repo_ref" }}/components/nautobot/nautobot_config.py'
+                            path: $understack/components/nautobot/nautobot_config.py
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'components/nautobot'
