@@ -15,6 +15,7 @@ from oslo_config import cfg
 
 from neutron_understack import config
 from neutron_understack import utils
+from neutron_understack import vlan_group_name_convention
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.nautobot import VlanPayload
 from neutron_understack.trunk import UnderStackTrunkDriver
@@ -32,7 +33,7 @@ class UnderstackDriver(MechanismDriver):
     resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
 
     @property
-    def connectivity(self):
+    def connectivity(self):  # type: ignore
         return portbindings.CONNECTIVITY_L2
 
     def initialize(self):
@@ -285,7 +286,7 @@ class UnderstackDriver(MechanismDriver):
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
             )
 
-    def _configure_switchport_on_bind(self, context: PortContext) -> None:
+    def _configure_switchport_on_bind(self, context: PortContext, vlan_group_name):
         trunk_details = context.current.get("trunk_details", {})
         network_id = context.current["network_id"]
         network_type = context.network.current.get("provider:network_type")
@@ -294,11 +295,33 @@ class UnderstackDriver(MechanismDriver):
         )
 
         if trunk_details:
-            self._configure_trunk(trunk_details, connected_interface_uuid)
+            for network_uuid in self._fetch_subports_network_ids(trunk_details):
+                LOG.debug(
+                    "Allocating a VLAN segment for trunk network: %s vlan group: %s",
+                    network_uuid,
+                    vlan_group_name,
+                )
+                new_segment = self._allocate_dynamic_vlan_segment(
+                    context, vlan_group_name, network_uuid
+                )
+                LOG.debug(
+                    "Creating Nautobot VLAN ucvni: %s interface: %s segment: %s",
+                    network_uuid,
+                    connected_interface_uuid,
+                    new_segment,
+                )
+                self.nb.prep_switch_interface(
+                    connected_interface_id=connected_interface_uuid,
+                    ucvni_uuid=network_uuid,
+                    modify_native_vlan=False,
+                    vlan_tag=new_segment["segmentation_id"],
+                )
+
         if network_type == p_const.TYPE_VLAN:
             vlan_tag = int(context.network.current.get("provider:segmentation_id"))
         else:
             vlan_tag = None
+
         nb_vlan_group_id = self.update_nautobot(
             network_id, connected_interface_uuid, vlan_tag
         )
@@ -308,42 +331,83 @@ class UnderstackDriver(MechanismDriver):
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
+    def _allocate_dynamic_vlan_segment(self, context, vlan_group_name, network_id):
+        segment = {
+            "network_type": p_const.TYPE_VLAN,
+            "physical_network": vlan_group_name,
+        }
+        return context._plugin.type_manager.allocate_dynamic_segment(
+            context._plugin_context, network_id, segment
+        )
+
     def bind_port(self, context: PortContext) -> None:
-        for segment in context.network.network_segments:
-            if self.check_segment(segment):
-                context.set_binding(
-                    segment[api.ID],
-                    portbindings.VIF_TYPE_OTHER,
-                    {},
-                    status=p_const.PORT_STATUS_ACTIVE,
-                )
-                LOG.debug("Bound segment: %s", segment)
-                self._configure_switchport_on_bind(context)
-                return
-            else:
-                LOG.debug(
-                    "Refusing to bind port for segment ID %(id)s, "
-                    "segment %(seg)s, phys net %(physnet)s, and "
-                    "network type %(nettype)s",
-                    {
-                        "id": segment[api.ID],
-                        "seg": segment[api.SEGMENTATION_ID],
-                        "physnet": segment[api.PHYSICAL_NETWORK],
-                        "nettype": segment[api.NETWORK_TYPE],
-                    },
-                )
+        """Bind the VXLAN network segment and allocate dynamic VLAN segments.
 
-    def check_segment(self, segment):
-        """Verify a segment is valid for the Understack MechanismDriver.
+        Find the first (hopefully only) segment of type vxlan.  This is the one
+        we bind.  There may be other segments, but we only bind the vxlan one.
 
-        Verify the requested segment is supported by Understack and return True or
-        False to indicate this to callers.
+        Allocate a dynamic segment for it (this method is idempotent)
+
+        Then call context.set_binding for it.
         """
-        network_type = segment[api.NETWORK_TYPE]
-        return network_type in [
-            p_const.TYPE_VXLAN,
-            p_const.TYPE_VLAN,
+        segments = context.network.network_segments
+        LOG.debug("bind_port() in considering %s segments", len(segments))
+        vlan_group_name = self._vlan_group_name(context)
+
+        for segment in segments:
+            if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
+                self._bind_port_baremetal(context, segment)
+                self._allocate_dynamic_segment(context, segment, vlan_group_name)
+                self._configure_switchport_on_bind(context, vlan_group_name)
+                return
+
+    def _vlan_group_name(self, context: PortContext) -> str:
+        binding_profile = context.current.get("binding:profile", {})
+        local_link_info = binding_profile.get("local_link_information", [])
+        switch_names = [
+            link["switch_info"] for link in local_link_info if "switch_info" in link
         ]
+        if not switch_names:
+            raise ValueError(f"Missing switch_info in {context.current=}")
+
+        return vlan_group_name_convention.for_switch(switch_names[0])
+
+    def _allocate_dynamic_segment(self, context: PortContext, segment, vlan_group_name):
+        """Allocate a dynamic VLAN-type network segment, if none already exist.
+
+        In the VXLAN fabric, a Network has a VLAN created on every switch where
+        that network is in use.  The VLAN is local to the VLAN GROUP (pair of
+        switches) and must be assigned an arbitrary vlan number that is unique
+        within that VLAN GROUP.
+        """
+        LOG.info("Assigning a VLAN from VLAN Group %s", vlan_group_name)
+
+        next_segment = context.allocate_dynamic_segment(
+            {
+                "network_type": p_const.TYPE_VLAN,
+                "physical_network": vlan_group_name,
+            }
+        )
+        LOG.debug(
+            "bind_port for port %(port)s: "
+            "current_segment=%(current_segment)s, "
+            "next_segment=%(next_segment)s",
+            {
+                "port": context.current["id"],
+                "current_segment": segment,
+                "next_segment": next_segment,
+            },
+        )
+        context.continue_binding(segment["id"], [next_segment])
+
+    def _bind_port_baremetal(self, context: PortContext, segment):
+        context.set_binding(
+            segment[api.ID],
+            portbindings.VIF_TYPE_OTHER,
+            {},
+            status=p_const.PORT_STATUS_ACTIVE,
+        )
+        LOG.debug("Bound segment: %s", segment)
 
     def check_vlan_transparency(self, context):
         pass
