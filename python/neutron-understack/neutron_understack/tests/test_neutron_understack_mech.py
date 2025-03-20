@@ -77,7 +77,7 @@ class TestBindPort:
             connected_interface_id=str(port_id),
             ucvni_uuid="112233",
             modify_native_vlan=False,
-            vlan_tag=None,
+            vlan_tag=666,
         )
 
 

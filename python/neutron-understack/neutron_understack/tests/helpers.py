@@ -46,7 +46,7 @@ class Ml2PluginNoInit(Ml2Plugin):
 class FakeTypeManager:
     def allocate_dynamic_segment(self, *_):
         print(f"FakeTypeManager trace: allocate_dynamic_segment{_}")
-        pass
+        return {"segmentation_id": 666}
 
 
 def extend_port_dict_with_trunk(port_dict: dict, port: Port) -> dict:
