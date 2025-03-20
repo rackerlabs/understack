@@ -16,6 +16,8 @@ configMapGenerator:
       - NAUTOBOT_SSO_CLAIMS_GROUP="groups"
       # comma separated list to get these permissions
       - NAUTOBOT_SSO_STAFF_GROUPS="ucadmin"
-      - NAUTOBOT_SSO_SUPERUSER_GROUPS="ucadmin"
+      # superuser really ignores all permissions so probably not something
+      # which should have a default
+      - NAUTOBOT_SSO_SUPERUSER_GROUPS=""
     options:
       disableNameSuffixHash: true
