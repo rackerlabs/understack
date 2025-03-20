@@ -2,6 +2,8 @@ name: container builds
 
 on:
   push:
+    tags:
+      - v*
     branches:
       - main
     paths:
