@@ -24,9 +24,15 @@ from neutron_lib.callbacks.events import DBEventPayload
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.tests.helpers import Ml2PluginNoInit
+from neutron_understack.tests.helpers import extend_network_dict
 from neutron_understack.tests.helpers import extend_port_dict_with_trunk
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
+
+
+@pytest.fixture
+def ucvni_group_id() -> uuid.UUID:
+    return uuid.uuid4()
 
 
 @pytest.fixture
@@ -60,6 +66,16 @@ def network_segment_id() -> uuid.UUID:
 
 
 @pytest.fixture
+def project_id() -> str:
+    return uuid.uuid4().hex
+
+
+@pytest.fixture
+def network(project_id, network_id) -> Network:
+    return Network(id=str(network_id), project_id=project_id, external=None)
+
+
+@pytest.fixture
 def patch_extend_subnet(mocker) -> None:
     """Ml2 Plugin extend subnet patch.
 
@@ -86,13 +102,16 @@ def subport(port_id, vlan_num) -> SubPort:
 
 
 @pytest.fixture
-def network_dict(ml2_plugin) -> dict:
-    return ml2_plugin._make_network_dict(Network(), process_extensions=False)
+def network_dict(ml2_plugin, network, network_segment) -> dict:
+    network_details = ml2_plugin._make_network_dict(network, process_extensions=False)
+    extend_network_dict(network_details, network)
+    ml2_plugin.extend_network_dict_with_segment(network_segment, network_details)
+    return network_details
 
 
 @pytest.fixture
-def network_segment() -> NetworkSegment:
-    return NetworkSegment(network_type="vxlan")
+def network_segment(network) -> NetworkSegment:
+    return NetworkSegment(network_type="vxlan", network=network)
 
 
 @pytest.fixture
@@ -268,3 +287,40 @@ def trunk_payload_metadata(subport) -> dict:
 @pytest.fixture
 def trunk_payload(trunk_payload_metadata, trunk) -> DBEventPayload:
     return DBEventPayload("context", metadata=trunk_payload_metadata, states=[trunk])
+
+
+@pytest.fixture
+def ml2_understack_conf(mocker, ucvni_group_id) -> None:
+    mocker.patch(
+        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.ucvni_group",
+        str(ucvni_group_id),
+    )
+    mocker.patch(
+        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.network_node_switchport_uuid",
+        "a27f7260-a7c5-4f0c-ac70-6258b026d368",
+    )
+    mocker.patch(
+        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.undersync_dry_run",
+        False,
+    )
+
+
+@pytest.fixture
+def ucvni_create_response(ucvni_group_id) -> list[dict]:
+    return [
+        {
+            "id": "63a2da8b-9da5-493a-b5ac-2ae62f663e1a",
+            "name": "PROV-NET500",
+            "ucvni_id": 200054,
+            "ucvni_type": "TENANT",
+            "ucvni_group": {
+                "id": str(ucvni_group_id),
+            },
+            "tenant": {
+                "id": "d3c2c85b-dbf2-4ff5-843f-323524b63768",
+            },
+            "status": {
+                "id": "d4bcbafa-3033-433b-b21b-a20acf9d1324",
+            },
+        }
+    ]
