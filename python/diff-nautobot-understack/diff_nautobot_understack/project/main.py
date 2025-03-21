@@ -2,7 +2,9 @@ from diffsync.diff import Diff
 from diffsync.enum import DiffSyncFlags
 
 from diff_nautobot_understack.project.adapters.nautobot_tenant import Tenant
+from diff_nautobot_understack.project.adapters.nautobot_tenant import Tenants
 from diff_nautobot_understack.project.adapters.openstack_project import Project
+from diff_nautobot_understack.project.adapters.openstack_project import Projects
 from diff_nautobot_understack.settings import app_settings as settings
 
 
@@ -12,6 +14,18 @@ def openstack_project_diff_from_nautobot_tenant(os_project=None) -> Diff:
     openstack_project.load()
 
     nautobot_tenant = Tenant(name=project_name)
+    nautobot_tenant.load()
+    tenant_destination_openstack_project_source = nautobot_tenant.diff_from(
+        openstack_project, flags=DiffSyncFlags.CONTINUE_ON_FAILURE
+    )
+    return tenant_destination_openstack_project_source
+
+
+def openstack_all_projects_diff_from_nautobot_tenant() -> Diff:
+    openstack_project = Projects()
+    openstack_project.load()
+
+    nautobot_tenant = Tenants()
     nautobot_tenant.load()
     tenant_destination_openstack_project_source = nautobot_tenant.diff_from(
         openstack_project, flags=DiffSyncFlags.CONTINUE_ON_FAILURE

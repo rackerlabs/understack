@@ -11,6 +11,9 @@ from diff_nautobot_understack.network.main import (
     openstack_network_diff_from_ucvni_network,
 )
 from diff_nautobot_understack.project.main import (
+    openstack_all_projects_diff_from_nautobot_tenant,
+)
+from diff_nautobot_understack.project.main import (
     openstack_project_diff_from_nautobot_tenant,
 )
 from diff_nautobot_understack.settings import app_settings as settings
@@ -63,6 +66,19 @@ def tabular_output(diffs, title, id_column_name):
 
 
 @app.command()
+def projects(
+    debug: bool = typer.Option(False, "--debug", "-v", help="Enable debug mode"),
+    output_format: str = typer.Option(
+        "json", "--format", help="Available formats json, table"
+    ),
+):
+    """OpenStack projects ⟹ Nautobot tenants"""
+    settings.debug = debug
+    diff_result = openstack_all_projects_diff_from_nautobot_tenant()
+    display_output(diff_result, "project", output_format)
+
+
+@app.command()
 def project(
     name: str,
     debug: bool = typer.Option(False, "--debug", "-v", help="Enable debug mode"),
@@ -70,7 +86,7 @@ def project(
         "json", "--format", help="Available formats json, table"
     ),
 ):
-    """Nautobot tenants ⟹ Openstack projects"""
+    """OpenStack projects ⟹ Nautobot tenants"""
     settings.debug = debug
     diff_result = openstack_project_diff_from_nautobot_tenant(os_project=name)
     display_output(diff_result, "project", output_format)
@@ -83,7 +99,7 @@ def network(
         "json", "--format", help="Available formats json, table"
     ),
 ):
-    """Nautobot ucvnis ⟹ Openstack networks"""
+    """OpenStack networks ⟹ Nautobot UCVNIs"""
     settings.debug = debug
     diff_result = openstack_network_diff_from_ucvni_network()
     display_output(diff_result, "network", output_format)
