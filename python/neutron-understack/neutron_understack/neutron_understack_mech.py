@@ -176,9 +176,12 @@ class UnderstackDriver(MechanismDriver):
 
         if external:
             self.nb.associate_subnet_with_network(
-                role="svi_vxlan_anycast_gateway",
                 network_uuid=network_uuid,
                 subnet_uuid=subnet_uuid,
+            )
+            self.nb.set_svi_role_on_network(
+                role="svi_vxlan_anycast_gateway",
+                network_uuid=network_uuid,
             )
 
         LOG.info(
