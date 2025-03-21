@@ -183,3 +183,28 @@ class TestNetworkSegmentEventCallbacks:
         mock_delete = mocker.patch.object(understack_driver.nb, "delete_vlan")
         understack_driver._delete_vlan(vlan_network_segment)
         mock_delete.assert_called_once_with(vlan_id=vlan_network_segment.get("id"))
+
+
+class TestCreateNetworkPostCommit:
+    @pytest.mark.usefixtures("ml2_understack_conf")
+    def test_vxlan_network(
+        self,
+        mocker,
+        understack_driver,
+        network_context,
+        network_id,
+        ucvni_group_id,
+        project_id,
+    ):
+        mocker.patch.object(understack_driver, "_create_nautobot_namespace")
+        understack_driver.create_network_postcommit(network_context)
+        understack_driver.nb.ucvni_create.assert_called_once_with(
+            network_id=str(network_id),
+            project_id=str(project_id),
+            ucvni_group=str(ucvni_group_id),
+            network_name=network_context.current["name"],
+        )
+        understack_driver._create_nautobot_namespace.assert_called_once_with(
+            str(network_id),
+            network_context.current["router:external"],
+        )

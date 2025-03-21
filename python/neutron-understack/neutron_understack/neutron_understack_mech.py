@@ -65,6 +65,7 @@ class UnderstackDriver(MechanismDriver):
         network = context.current
         network_id = network["id"]
         network_name = network["name"]
+        project_id = network["project_id"]
         external = network["router:external"]
         provider_type = network.get("provider:network_type")
         segmentation_id = network.get("provider:segmentation_id")
@@ -74,11 +75,22 @@ class UnderstackDriver(MechanismDriver):
         if provider_type not in [p_const.TYPE_VLAN, p_const.TYPE_VXLAN]:
             return
         ucvni_group = conf.ucvni_group
-        self.nb.ucvni_create(network_id, ucvni_group, network_name)
+        ucvni_response = self.nb.ucvni_create(
+            network_id=network_id,
+            project_id=project_id,
+            ucvni_group=ucvni_group,
+            network_name=network_name,
+        )
         LOG.info(
             "network %(net_id)s has been added on ucvni_group %(ucvni_group)s, "
             "physnet %(physnet)s",
-            {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
+            {
+                "net_id": network_id,
+                "nautobot_ucvni_uuid": ucvni_response.get("id"),
+                "nautobot_tenant_id": ucvni_response.get("tenant", {}).get("id"),
+                "ucvni_group": ucvni_group,
+                "physnet": physnet,
+            },
         )
         self._create_nautobot_namespace(network_id, external)
 

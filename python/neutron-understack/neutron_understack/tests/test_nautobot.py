@@ -1,3 +1,4 @@
+import uuid
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -57,3 +58,26 @@ def test_create_vlan_and_associate_vlan_to_ucvni(nautobot, mock_pynautobot_api):
     nautobot.create_vlan_and_associate_vlan_to_ucvni(payload)
 
     mock_ipam.vlans.create.assert_called_once_with(expected_payload_dict)
+
+
+def test_ucvni_create(
+    mocker,
+    network_id,
+    ucvni_create_response,
+    nautobot,
+):
+    mocker.patch.object(
+        nautobot, "make_api_request", return_value=ucvni_create_response
+    )
+    project_id = "d3c2c85bdbf24ff5843f323524b63768"
+    response = nautobot.ucvni_create(
+        network_id=network_id.hex,
+        project_id=project_id,
+        ucvni_group="f6843091-845d-4195-8132-960125e05f7b",
+        network_name="PROV-NET500",
+    )
+
+    assert "tenant" in response[0]
+    tenant_obj = response[0].get("tenant", {})
+
+    assert tenant_obj.get("id") == str(uuid.UUID(project_id))
