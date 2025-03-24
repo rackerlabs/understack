@@ -225,7 +225,7 @@ class Nautobot:
             allowed_vlans_ids: set[int],
             vlan_group_name: str
     ) -> dict:
-        """Adds the spcified vlan(s) to interface untagged/tagged vlans."""
+        """Adds the specified vlan(s) to interface untagged/tagged vlans."""
         url = f"/api/dcim/interfaces/{interface_uuid}/"
 
         current_state = self.make_api_request("GET", f"{url}?depth=1")
