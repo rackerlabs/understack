@@ -250,7 +250,7 @@ class Nautobot:
 
         return self.make_api_request("PATCH", url, payload)
 
-    def remove_port_newtork_associations(
+    def remove_port_network_associations(
             self, interface_uuid: str, network_ids_to_remove: set[str]
     ):
         query = """
