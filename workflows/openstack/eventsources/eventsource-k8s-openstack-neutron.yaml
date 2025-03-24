@@ -1,11 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:
-  name: openstack-neutron
+  name: k8s-openstack-neutron
   namespace: openstack
 spec:
   template:
-    serviceAccountName: openstack-events
+    serviceAccountName: k8s-openstack-events
   # Kubernetes resource event sources
   resource:
     neutron-deployment:
