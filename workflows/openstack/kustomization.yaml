@@ -8,8 +8,10 @@ resources:
   - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
   - eventsources/eventsource-openstack-ironic.yaml
   - eventsources/eventsource-openstack-keystone.yaml
+  - eventsources/eventsource-openstack-neutron.yaml
   - eventsources/rabbitmq-user-argo-ironic.yaml
   - eventsources/rabbitmq-user-argo-keystone.yaml
+  - eventsources/rabbitmq-user-argo-neutron.yaml
   - eventsources/eventsource-k8s-openstack-neutron.yaml
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
   - serviceaccounts/serviceaccount-k8s-openstack-events.yaml
