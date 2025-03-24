@@ -4,7 +4,6 @@ from neutron.db.models.segment import NetworkSegment
 from neutron.db.models_v2 import Network
 from neutron.db.models_v2 import Port
 from neutron.db.models_v2 import Subnet
-from neutron.plugins.ml2.managers import TypeManager
 from neutron.plugins.ml2.plugin import Ml2Plugin
 from neutron.services.trunk.plugin import TrunkPlugin
 
@@ -47,6 +46,9 @@ class FakeTypeManager:
     def allocate_dynamic_segment(self, *_):
         print(f"FakeTypeManager trace: allocate_dynamic_segment{_}")
         return {"segmentation_id": 666}
+
+    def extend_network_with_provider_segments(self, *_):
+        print(f"FakeTypeManager trace: extend_network_with_provider_segments{_}")
 
 
 def extend_port_dict_with_trunk(port_dict: dict, port: Port) -> dict:

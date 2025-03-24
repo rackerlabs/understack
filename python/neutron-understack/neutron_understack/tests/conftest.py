@@ -268,11 +268,6 @@ def undersync_sync_devices_patch(mocker, understack_driver) -> None:
 
 
 @pytest.fixture
-def update_nautobot_patch(mocker, understack_driver) -> None:
-    mocker.patch.object(understack_driver, "update_nautobot")
-
-
-@pytest.fixture
 def utils_fetch_subport_network_id_patch(mocker, network_id) -> None:
     mocker.patch(
         "neutron_understack.utils.fetch_subport_network_id",

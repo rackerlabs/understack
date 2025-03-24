@@ -208,15 +208,8 @@ class Test_CleanParentPortSwitchportConfig:
         mocker.patch(
             "neutron_understack.utils.fetch_port_object", return_value=port_object
         )
-        mocker.patch.object(
-            understack_trunk_driver.nb, "detach_port", return_value=str(vlan_group_id)
-        )
-
         understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
 
-        understack_trunk_driver.nb.detach_port.assert_called_once_with(
-            connected_interface_id=str(port_id), ucvni_uuid=str(network_id)
-        )
         understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
             vlan_group_uuids=str(vlan_group_id),
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
