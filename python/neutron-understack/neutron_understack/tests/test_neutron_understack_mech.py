@@ -202,6 +202,7 @@ class TestCreateNetworkPostCommit:
             network_id=str(network_id),
             project_id=str(project_id),
             ucvni_group=str(ucvni_group_id),
+            segmentation_id=network_context.current["provider:segmentation_id"],
             network_name=network_context.current["name"],
         )
         understack_driver._create_nautobot_namespace.assert_called_once_with(

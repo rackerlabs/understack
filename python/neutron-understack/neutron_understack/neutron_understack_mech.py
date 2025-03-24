@@ -80,6 +80,7 @@ class UnderstackDriver(MechanismDriver):
             project_id=project_id,
             ucvni_group=ucvni_group,
             network_name=network_name,
+            segmentation_id=segmentation_id,
         )
         LOG.info(
             "network %(net_id)s has been added on ucvni_group %(ucvni_group)s, "

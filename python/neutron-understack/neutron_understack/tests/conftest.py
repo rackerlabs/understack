@@ -111,7 +111,7 @@ def network_dict(ml2_plugin, network, network_segment) -> dict:
 
 @pytest.fixture
 def network_segment(network) -> NetworkSegment:
-    return NetworkSegment(network_type="vxlan", network=network)
+    return NetworkSegment(network_type="vxlan", network=network, segmentation_id=100)
 
 
 @pytest.fixture
