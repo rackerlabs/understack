@@ -141,7 +141,7 @@ class UnderstackDriver(MechanismDriver):
         ucvni_group = conf.ucvni_group
 
         if provider_type == p_const.TYPE_VLAN:
-            self.nb.remove_port_vlan_associations(
+            self.nb.remove_port_newtork_associations(
                 conf.network_node_switchport_uuid, {network_id}
             )
             self.nb.ucvni_delete(network_id)
@@ -302,7 +302,7 @@ class UnderstackDriver(MechanismDriver):
                 networks_to_remove, connected_interface_uuid
             )
 
-            self.nb.remove_port_vlan_associations(
+            self.nb.remove_port_newtork_associations(
                 connected_interface_uuid, networks_to_remove
             )
             self.undersync.sync_devices(
