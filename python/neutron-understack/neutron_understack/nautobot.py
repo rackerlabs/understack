@@ -251,7 +251,7 @@ class Nautobot:
 
         return self.make_api_request("PATCH", url, payload)
 
-    def remove_port_vlan_associations(
+    def remove_port_newtork_associations(
             self, interface_uuid: str, network_ids_to_remove: set[str]
     ):
         query = """
@@ -277,8 +277,8 @@ class Nautobot:
         payload["tagged_vlans"] = [
             tagged_vlan["id"]
             for tagged_vlan in current["tagged_vlans"]
-            if (tagged_vlan.get["network"] and
-               tagged_vlan.get["network"]["id"] not in network_ids_to_remove)
+            if (tagged_vlan.get("network") and
+               tagged_vlan.get("network")["id"] not in network_ids_to_remove)
         ]
 
         return self.make_api_request("PATCH", url, payload)
