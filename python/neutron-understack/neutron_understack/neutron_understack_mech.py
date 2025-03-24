@@ -138,11 +138,6 @@ class UnderstackDriver(MechanismDriver):
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
             )
         elif provider_type == p_const.TYPE_VXLAN:
-            network_segments = utils.valid_network_segments(context.network_segments)
-            vlans_to_delete = [segment.get("id") for segment in network_segments]
-            self.nb.delete_vlans(
-                vlan_ids=vlans_to_delete,
-            )
             self.nb.ucvni_delete(network_id)
         else:
             return
