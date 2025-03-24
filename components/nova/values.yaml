@@ -195,7 +195,7 @@ annotations:
     nova_cell_setup:
       argocd.argoproj.io/hook: PostSync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
+      argocd.argoproj.io/sync-options: Force=true,Replace=true
     nova_bootstrap:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
