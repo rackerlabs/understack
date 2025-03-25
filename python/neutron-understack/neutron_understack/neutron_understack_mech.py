@@ -69,7 +69,6 @@ class UnderstackDriver(MechanismDriver):
         project_id = network["project_id"]
         external = network["router:external"]
         provider_type = network.get("provider:network_type")
-        segmentation_id = network.get("provider:segmentation_id")
         physnet = network.get("provider:physical_network")
         conf = cfg.CONF.ml2_understack
 
@@ -320,11 +319,6 @@ class UnderstackDriver(MechanismDriver):
             # put the port back to its normal tenant mode:
             self._set_nautobot_port_status(context, "Active")
             self.invoke_undersync(vlan_group_name=self._vlan_group_name(context))
-
-        self.undersync.sync_devices(
-            vlan_group=vlan_group_name,
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
 
     def _allocate_dynamic_vlan_segment(
         self, context: PortContext, physical_network: str, network_id: str
