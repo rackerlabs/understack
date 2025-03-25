@@ -1,4 +1,5 @@
 from logging import Logger
+from pprint import pprint
 from uuid import UUID
 
 from neutron.objects import ports as port_obj
@@ -20,14 +21,15 @@ def allocate_dynamic_segment_from_plugin(
     context = n_context.get_admin_context()
     core_plugin = directory.get_plugin()  # Get the core plugin
 
-    if hasattr(core_plugin, 'allocate_dynamic_segment'):
+    if hasattr(core_plugin.type_manager, 'allocate_dynamic_segment'):
         segment_dict = {
             "physical_network": physnet,
             "network_type": network_type,
         }
 
-        segment = core_plugin.allocate_dynamic_segment(
+        segment = core_plugin.type_manager.allocate_dynamic_segment(
             context, network_id, segment_dict)
+        pprint(segment)
         return segment
     return {}
 
