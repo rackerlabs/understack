@@ -7,6 +7,12 @@ from neutron_understack import utils
 from neutron_understack.nautobot import VlanPayload
 
 
+class TestUpdatePortPostCommit:
+    def test_with_simple_port(self, understack_driver, port_context):
+        understack_driver.update_port_postcommit(port_context)
+
+        understack_driver.undersync.sync_devices.assert_called_once()
+
 class TestBindPort:
     def test_with_no_trunk(self, mocker, port_context, understack_driver):
         mocker.patch("neutron_understack.utils.fetch_connected_interface_uuid")
@@ -14,7 +20,6 @@ class TestBindPort:
         understack_driver.bind_port(port_context)
 
         utils.fetch_connected_interface_uuid.assert_called_once()
-        understack_driver.undersync.sync_devices.assert_called_once()
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
     def test_with_trunk_details(self, mocker, understack_driver, port_context, port_id):
