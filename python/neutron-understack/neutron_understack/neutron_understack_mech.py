@@ -335,17 +335,22 @@ class UnderstackDriver(MechanismDriver):
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
             )
 
-    def _configure_switchport_on_bind(self, context: PortContext, vlan_group_name, segment):
+    def _bind_port_segment(self, context: PortContext, segment):
         trunk_details = context.current.get("trunk_details", {})
         network_id = context.current["network_id"]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             context.current["binding:profile"], LOG
         )
+        vlan_group_name = self._vlan_group_name(context)
+
+        if is_provisioning_network(network_id):
+            LOG.debug("bind_port_segment side-stepping provisioning interface")
+            self._set_nautobot_port_status(context, "Provisioning-Interface")
+            return
+
         LOG.debug(
-            "Update switchport interface %s network %s type %s",
-            connected_interface_uuid,
-            network_id,
-            network_type
+            "bind_port_segment interface %s network %s type %s",
+            connected_interface_uuid, network_id, network_type
         )
 
         new_segment = self._allocate_dynamic_vlan_segment(
@@ -358,15 +363,14 @@ class UnderstackDriver(MechanismDriver):
         native_vlan_id = new_segment["segmentation_id"]
         allowed_vlan_ids = set([native_vlan_id])
 
-        if trunk_details:
-            for network_uuid in self._fetch_subports_network_ids(trunk_details):
-                trunked_segment = self._allocate_dynamic_vlan_segment(
-                    context,
-                    physical_network=vlan_group_name,
-                    network_id=network_uuid
-                )
-                allowed_vlan_ids.add(trunked_segment["segmentation_id"])
-                LOG.debug("Trunked VLAN segment %s", trunked_segment)
+        for network_uuid in self._fetch_subports_network_ids(trunk_details):
+            trunked_segment = self._allocate_dynamic_vlan_segment(
+                context,
+                physical_network=vlan_group_name,
+                network_id=network_uuid
+            )
+            allowed_vlan_ids.add(trunked_segment["segmentation_id"])
+            LOG.debug("Trunked VLAN segment %s", trunked_segment)
 
         LOG.debug(
             "Required switchport settings for interface %s on network %s "
@@ -385,23 +389,14 @@ class UnderstackDriver(MechanismDriver):
             vlan_group_name
         )
 
-        provisioning_network = (
-            cfg.CONF.ml2_understack.provisioning_network
-            or cfg.CONF.ml2_type_understack.provisioning_network
+        LOG.debug("set_binding for segment: %s", segment)
+        context.set_binding(
+            segment[api.ID],
+            portbindings.VIF_TYPE_OTHER,
+            {},
+            status=p_const.PORT_STATUS_ACTIVE,
         )
-        if network_id == provisioning_network:
-            LOG.debug(
-                "Set interface %s to Provisioning-Interface status",
-                connected_interface_uuid
-            )
-            self.nb.configure_port_status(
-                connected_interface_uuid, "Provisioning-Interface"
-            )
 
-        self.undersync.sync_devices(
-            vlan_group=vlan_group_name,
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
 
     def _allocate_dynamic_vlan_segment(
             self, context: PortContext, physical_network: str, network_id: str
@@ -440,15 +435,17 @@ class UnderstackDriver(MechanismDriver):
 
         We obtain the dynamic segment for this network and vlan_group.
 
-        We configure nautobot and the switch with the new VLAN(s).
+        We configure the nautobot switch interface with the new VLAN(s).
 
         Then make the required call in to the black box: context.set_binding.
+
+        We expect to see a call to update_port_postcommit soon after this.
+        Changes made here will get pushed to the switch at that time.
         """
-        segments = context.network.network_segments
-        vlan_group_name = self._vlan_group_name(context)
-        LOG.debug(
-            "bind_port() considering %s segment(s) in %s",
-            len(segments), vlan_group_name
+        for segment in context.network.network_segments:
+            if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
+                self._bind_port_segment(context, segment)
+                return
 
     def invoke_undersync(self, vlan_group_name: str):
         self.undersync.sync_devices(
@@ -456,11 +453,6 @@ class UnderstackDriver(MechanismDriver):
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
-        for segment in segments:
-            if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
-                self._bind_port_baremetal(context, segment)
-                self._configure_switchport_on_bind(context, vlan_group_name, segment)
-                return
 
     def _vlan_group_name(self, context: PortContext) -> str:
         binding_profile = context.current.get("binding:profile", {})
@@ -474,27 +466,8 @@ class UnderstackDriver(MechanismDriver):
         return vlan_group_name_convention.for_switch(switch_names[0])
 
 
-    def _bind_port_baremetal(self, context: PortContext, segment):
-        """Call set_binding to associate segment with the port."""
-        context.set_binding(
-            segment[api.ID],
-            portbindings.VIF_TYPE_OTHER,
-            {},
-            status=p_const.PORT_STATUS_ACTIVE,
-        )
-        LOG.debug("Bound segment: %s", segment)
-
     def check_vlan_transparency(self, context):
         pass
-
-        if network_id == provisioning_network:
-            port_status = "Provisioning-Interface"
-            configure_port_status_data = self.nb.configure_port_status(
-                connected_interface_uuid, port_status
-            )
-            switch_uuid = configure_port_status_data.get("device", {}).get("id")
-            return UUID(self.nb.fetch_vlan_group_uuid(switch_uuid))
-
 
     def _fetch_and_delete_nautobot_namespace(self, name: str) -> None:
         namespace_uuid = self.nb.fetch_namespace_by_name(name)
@@ -563,3 +536,16 @@ class UnderstackDriver(MechanismDriver):
         self.nb.delete_vlan(
             vlan_id=segment.get("id"),
         )
+
+    def _set_nautobot_port_status(self, context: PortContext, status: str):
+        profile = context.current["binding:profile"]
+        interface_uuid = utils.fetch_connected_interface_uuid(profile, LOG)
+        LOG.debug("Set interface %s to %s status", interface_uuid, status)
+        self.nb.configure_port_status(interface_uuid, status="Active")
+
+def is_provisioning_network(network_id: str) -> bool:
+    provisioning_network = (
+        cfg.CONF.ml2_understack.provisioning_network
+        or cfg.CONF.ml2_type_understack.provisioning_network
+    )
+    return network_id == provisioning_network
