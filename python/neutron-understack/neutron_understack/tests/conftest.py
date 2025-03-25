@@ -175,6 +175,7 @@ def binding_profile(request, port_id) -> str:
                 {
                     "port_id": req.get("port_id", str(port_id)),
                     "switch_id": "11:22:33:44:55:66",
+                    "switch_info": "a1-1-1.iad3.rackspace.net",
                 }
             ]
         }
@@ -264,11 +265,6 @@ def understack_trunk_driver(understack_driver) -> UnderStackTrunkDriver:
 @pytest.fixture(autouse=True)
 def undersync_sync_devices_patch(mocker, understack_driver) -> None:
     mocker.patch.object(understack_driver.undersync, "sync_devices")
-
-
-@pytest.fixture
-def update_nautobot_patch(mocker, understack_driver) -> None:
-    mocker.patch.object(understack_driver, "update_nautobot")
 
 
 @pytest.fixture

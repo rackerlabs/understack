@@ -1,4 +1,5 @@
 from logging import Logger
+from pprint import pprint
 from uuid import UUID
 
 from neutron.objects import ports as port_obj
@@ -6,11 +7,31 @@ from neutron.plugins.ml2.driver_context import portbindings
 from neutron_lib import constants
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
+from neutron_lib.plugins import directory
 
 
 def fetch_port_object(port_id: str) -> port_obj.Port:
     context = n_context.get_admin_context()
     return port_obj.Port.get_object(context, id=port_id)
+
+
+def allocate_dynamic_segment_from_plugin(
+    network_id: str, network_type: str = "vlan", physnet: str | None = None,
+) -> dict:
+    context = n_context.get_admin_context()
+    core_plugin = directory.get_plugin()  # Get the core plugin
+
+    if hasattr(core_plugin.type_manager, 'allocate_dynamic_segment'):
+        segment_dict = {
+            "physical_network": physnet,
+            "network_type": network_type,
+        }
+
+        segment = core_plugin.type_manager.allocate_dynamic_segment(
+            context, network_id, segment_dict)
+        pprint(segment)
+        return segment
+    return {}
 
 
 def fetch_connected_interface_uuid(

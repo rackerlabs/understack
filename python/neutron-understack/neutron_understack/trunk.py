@@ -210,10 +210,21 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
                 parent_port_obj, subport_network_id
             )
 
+    def _allocate_dynamic_segment_for_subports_network(self, subports: list) -> None:
+        for subport in subports:
+            subport_network_id = utils.fetch_subport_network_id(
+                subport_id=subport.port_id
+            )
+            utils.allocate_dynamic_segment_from_plugin(
+                network_id=subport_network_id,
+                physnet="test",
+            )
+
     def subports_added(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = payload.metadata["subports"]
-        self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
+        self._allocate_dynamic_segment_for_subports_network(subports)
+        # self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
 
     def subports_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
