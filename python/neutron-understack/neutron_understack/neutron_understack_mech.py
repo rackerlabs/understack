@@ -330,6 +330,55 @@ class UnderstackDriver(MechanismDriver):
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
+    def _allocate_dynamic_vlan_segment(
+            self, context: PortContext, physical_network: str, network_id: str
+    ) -> dict:
+        """Allocate a dynamic VLAN-type network segment, if none already exist.
+
+        This will result in exactly one Segment per physical_network per
+        Newtork.  If a Segment already exists for this physical_network then it
+        will not create another one.
+
+        Does the same as ml2 driver context.allocate_dynamic_segment method,
+        except that this method allows the caller to specify the network_id.
+        """
+        LOG.info(
+            "Obtaining Dynamic Segment of type VLAN, "
+            "physical_network=%s network=%s",
+            physical_network, network_id
+        )
+        return context._plugin.type_manager.allocate_dynamic_segment(
+            context._plugin_context,
+            network_id,
+            {
+                "network_type": p_const.TYPE_VLAN,
+                "physical_network": physical_network,
+            }
+        )
+
+    def bind_port(self, context: PortContext) -> None:
+        """Bind the VXLAN network segment and allocate dynamic VLAN segments.
+
+        Our "context" knows a Port, a Network and a list of Segments.
+
+        We find the first (hopefully only) segment of type vxlan.  This is the
+        one we bind.  There may be other segments, but we only bind the vxlan
+        one.
+
+        We obtain the dynamic segment for this network and vlan_group.
+
+        We configure the nautobot switch interface with the new VLAN(s).
+
+        Then make the required call in to the black box: context.set_binding.
+
+        We expect to see a call to update_port_postcommit soon after this.
+        Changes made here will get pushed to the switch at that time.
+        """
+        for segment in context.network.network_segments:
+            if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
+                self._bind_port_segment(context, segment)
+                return
+
     def _bind_port_segment(self, context: PortContext, segment):
         trunk_details = context.current.get("trunk_details", {})
         network_id = context.current["network_id"]
@@ -394,54 +443,6 @@ class UnderstackDriver(MechanismDriver):
         )
 
 
-    def _allocate_dynamic_vlan_segment(
-            self, context: PortContext, physical_network: str, network_id: str
-    ) -> dict:
-        """Allocate a dynamic VLAN-type network segment, if none already exist.
-
-        This will result in exactly one Segment per physical_network per
-        Newtork.  If a Segment already exists for this physical_network then it
-        will not create another one.
-
-        Does the same as ml2 driver context.allocate_dynamic_segment method,
-        except that this method allows the caller to specify the network_id.
-        """
-        LOG.info(
-            "Obtaining Dynamic Segment of type VLAN, "
-            "physical_network=%s network=%s",
-            physical_network, network_id
-        )
-        return context._plugin.type_manager.allocate_dynamic_segment(
-            context._plugin_context,
-            network_id,
-            {
-                "network_type": p_const.TYPE_VLAN,
-                "physical_network": physical_network,
-            }
-        )
-
-    def bind_port(self, context: PortContext) -> None:
-        """Bind the VXLAN network segment and allocate dynamic VLAN segments.
-
-        Our "context" knows a Port, a Network and a list of Segments.
-
-        We find the first (hopefully only) segment of type vxlan.  This is the
-        one we bind.  There may be other segments, but we only bind the vxlan
-        one.
-
-        We obtain the dynamic segment for this network and vlan_group.
-
-        We configure the nautobot switch interface with the new VLAN(s).
-
-        Then make the required call in to the black box: context.set_binding.
-
-        We expect to see a call to update_port_postcommit soon after this.
-        Changes made here will get pushed to the switch at that time.
-        """
-        for segment in context.network.network_segments:
-            if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
-                self._bind_port_segment(context, segment)
-                return
 
     def invoke_undersync(self, vlan_group_name: str):
         self.undersync.sync_devices(
