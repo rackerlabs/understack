@@ -305,10 +305,12 @@ class UnderstackDriver(MechanismDriver):
             self.nb.remove_port_network_associations(
                 connected_interface_uuid, networks_to_remove
             )
-            self.undersync.sync_devices(
-                vlan_group=vlan_group_name,
-                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-            )
+
+        # Run undersync on every update port operation.  If this transpires to
+        # be causing too much unneccecary work, we can always make this
+        # conditional based on what appears to have changed in the provided
+        # context versus the "original".
+        self.invoke_undersync(vlan_group_name=self._vlan_group_name(context))
 
 
     def delete_port_precommit(self, context):
@@ -451,6 +453,11 @@ class UnderstackDriver(MechanismDriver):
         LOG.debug(
             "bind_port() considering %s segment(s) in %s",
             len(segments), vlan_group_name
+
+    def invoke_undersync(self, vlan_group_name: str):
+        self.undersync.sync_devices(
+            vlan_group=vlan_group_name,
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
         for segment in segments:
