@@ -95,20 +95,6 @@ class UnderstackDriver(MechanismDriver):
         )
         self._create_nautobot_namespace(network_id, external)
 
-        if provider_type != p_const.TYPE_VLAN:
-            return
-
-        vlan_group_id_and_vlan_tag = self.nb.prep_switch_interface(
-            connected_interface_id=conf.network_node_switchport_uuid,
-            ucvni_uuid=network_id,
-            modify_native_vlan=False,
-            vlan_tag=int(segmentation_id),
-        )
-        self.undersync.sync_devices(
-            vlan_group_uuids=str(vlan_group_id_and_vlan_tag["vlan_group_id"]),
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
-
     def update_network_precommit(self, context):
         pass
 
@@ -128,21 +114,10 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
         ucvni_group = conf.ucvni_group
 
-        if provider_type == p_const.TYPE_VLAN:
-            vlan_group_id = self.nb.detach_port(
-                connected_interface_id=conf.network_node_switchport_uuid,
-                ucvni_uuid=network_id,
-            )
-            self.nb.ucvni_delete(network_id)
-            self.undersync.sync_devices(
-                vlan_group_uuids=str(vlan_group_id),
-                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-            )
-        elif provider_type == p_const.TYPE_VXLAN:
-            self.nb.ucvni_delete(network_id)
-        else:
+        if provider_type != p_const.TYPE_VXLAN:
             return
 
+        self.nb.ucvni_delete(network_id)
         LOG.info(
             "network %(net_id)s has been deleted from ucvni_group %(ucvni_group)s, "
             "physnet %(physnet)s",
@@ -296,19 +271,15 @@ class UnderstackDriver(MechanismDriver):
     def _configure_switchport_on_bind(self, context: PortContext) -> None:
         trunk_details = context.current.get("trunk_details", {})
         network_id = context.current["network_id"]
-        network_type = context.network.current.get("provider:network_type")
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             context.current["binding:profile"], LOG
         )
 
         if trunk_details:
             self._configure_trunk(trunk_details, connected_interface_uuid)
-        if network_type == p_const.TYPE_VLAN:
-            vlan_tag = int(context.network.current.get("provider:segmentation_id"))
-        else:
-            vlan_tag = None
+
         nb_vlan_group_id = self.update_nautobot(
-            network_id, connected_interface_uuid, vlan_tag
+            network_id, connected_interface_uuid, None
         )
 
         self.undersync.sync_devices(
