@@ -40,7 +40,6 @@ class Undersync:
     def sync_devices(
         self, vlan_group: str, force=False, dry_run=False
     ) -> requests.Response:
-
         if dry_run:
             return self.dry_run(vlan_group)
         elif force:

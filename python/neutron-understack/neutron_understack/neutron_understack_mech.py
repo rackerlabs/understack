@@ -258,7 +258,7 @@ class UnderstackDriver(MechanismDriver):
     def update_port_precommit(self, context):
         pass
 
-    def _fetch_subports_network_ids(self, trunk_details: dict|None) -> list:
+    def _fetch_subports_network_ids(self, trunk_details: dict | None) -> list:
         if trunk_details is None:
             return []
 
@@ -290,14 +290,13 @@ class UnderstackDriver(MechanismDriver):
                 context.original["binding:profile"], LOG
             )
 
-            networks_to_remove = set(
-                self._fetch_subports_network_ids(trunk_details)
-            )
+            networks_to_remove = set(self._fetch_subports_network_ids(trunk_details))
             networks_to_remove.add(network_id)
 
             LOG.debug(
                 "update_port_postcommit removing vlans %s from interface %s ",
-                networks_to_remove, connected_interface_uuid
+                networks_to_remove,
+                connected_interface_uuid,
             )
 
             self.nb.remove_port_network_associations(
@@ -309,7 +308,6 @@ class UnderstackDriver(MechanismDriver):
         # conditional based on what appears to have changed in the provided
         # context versus the "original".
         self.invoke_undersync(vlan_group_name=self._vlan_group_name(context))
-
 
     def delete_port_precommit(self, context):
         pass
@@ -329,7 +327,7 @@ class UnderstackDriver(MechanismDriver):
         )
 
     def _allocate_dynamic_vlan_segment(
-            self, context: PortContext, physical_network: str, network_id: str
+        self, context: PortContext, physical_network: str, network_id: str
     ) -> dict:
         """Allocate a dynamic VLAN-type network segment, if none already exist.
 
@@ -341,9 +339,9 @@ class UnderstackDriver(MechanismDriver):
         except that this method allows the caller to specify the network_id.
         """
         LOG.info(
-            "Obtaining Dynamic Segment of type VLAN, "
-            "physical_network=%s network=%s",
-            physical_network, network_id
+            "Obtaining Dynamic Segment of type VLAN, physical_network=%s network=%s",
+            physical_network,
+            network_id,
         )
         return context._plugin.type_manager.allocate_dynamic_segment(
             context._plugin_context,
@@ -351,7 +349,7 @@ class UnderstackDriver(MechanismDriver):
             {
                 "network_type": p_const.TYPE_VLAN,
                 "physical_network": physical_network,
-            }
+            },
         )
 
     def bind_port(self, context: PortContext) -> None:
@@ -392,7 +390,9 @@ class UnderstackDriver(MechanismDriver):
 
         LOG.debug(
             "bind_port_segment interface %s network %s type %s",
-            connected_interface_uuid, network_id, network_type
+            connected_interface_uuid,
+            network_id,
+            network_type,
         )
 
         new_segment = self._allocate_dynamic_vlan_segment(
@@ -407,9 +407,7 @@ class UnderstackDriver(MechanismDriver):
 
         for network_uuid in self._fetch_subports_network_ids(trunk_details):
             trunked_segment = self._allocate_dynamic_vlan_segment(
-                context,
-                physical_network=vlan_group_name,
-                network_id=network_uuid
+                context, physical_network=vlan_group_name, network_id=network_uuid
             )
             allowed_vlan_ids.add(trunked_segment["segmentation_id"])
             LOG.debug("Trunked VLAN segment %s", trunked_segment)
@@ -425,10 +423,7 @@ class UnderstackDriver(MechanismDriver):
         )
 
         self.nb.add_port_vlan_associations(
-            connected_interface_uuid,
-            native_vlan_id,
-            allowed_vlan_ids,
-            vlan_group_name
+            connected_interface_uuid, native_vlan_id, allowed_vlan_ids, vlan_group_name
         )
 
         LOG.debug("set_binding for segment: %s", segment)
@@ -439,14 +434,11 @@ class UnderstackDriver(MechanismDriver):
             status=p_const.PORT_STATUS_ACTIVE,
         )
 
-
-
     def invoke_undersync(self, vlan_group_name: str):
         self.undersync.sync_devices(
             vlan_group=vlan_group_name,
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
-
 
     def _vlan_group_name(self, context: PortContext) -> str:
         binding_profile = context.current.get("binding:profile", {})
@@ -458,7 +450,6 @@ class UnderstackDriver(MechanismDriver):
             raise ValueError(f"Missing switch_info in {context.current=}")
 
         return vlan_group_name_convention.for_switch(switch_names[0])
-
 
     def check_vlan_transparency(self, context):
         pass
@@ -536,6 +527,7 @@ class UnderstackDriver(MechanismDriver):
         interface_uuid = utils.fetch_connected_interface_uuid(profile, LOG)
         LOG.debug("Set interface %s to %s status", interface_uuid, status)
         self.nb.configure_port_status(interface_uuid, status="Active")
+
 
 def is_provisioning_network(network_id: str) -> bool:
     provisioning_network = (
