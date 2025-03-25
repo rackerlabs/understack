@@ -1,7 +1,7 @@
+from dataclasses import dataclass
 from unittest.mock import ANY
 
 import pytest
-from neutron_lib.api.definitions import portbindings
 
 from neutron_understack import utils
 from neutron_understack.nautobot import VlanPayload
@@ -12,6 +12,7 @@ class TestUpdatePortPostCommit:
         understack_driver.update_port_postcommit(port_context)
 
         understack_driver.undersync.sync_devices.assert_called_once()
+
 
 class TestBindPort:
     def test_with_no_trunk(self, mocker, port_context, understack_driver):
@@ -126,15 +127,57 @@ class TestCreateNetworkPostCommit:
         project_id,
     ):
         mocker.patch.object(understack_driver, "_create_nautobot_namespace")
-        understack_driver.create_network_postcommit(network_context)
+
+        @dataclass
+        class FakeContext:
+            current = {
+                "id": "3b5f0bb1-cd53-4c71-b129-1fe7550dfdf4",
+                "name": "humpback",
+                "tenant_id": "f9b40d4a39c4403ab5567da17e71906a",
+                "admin_state_up": True,
+                "mtu": 9000,
+                "status": "ACTIVE",
+                "subnets": [],
+                "standard_attr_id": 3926,
+                "shared": False,
+                "project_id": "f9b40d4a39c4403ab5567da17e71906a",
+                "router:external": False,
+                "provider:network_type": "vxlan",
+                "provider:physical_network": None,
+                "provider:segmentation_id": 200025,
+                "is_default": False,
+                "availability_zone_hints": [],
+                "availability_zones": [],
+                "ipv4_address_scope": None,
+                "ipv6_address_scope": None,
+                "vlan_transparent": None,
+                "description": "",
+                "l2_adjacency": True,
+                "tags": [],
+                "created_at": "2025-03-14T07:06:52Z",
+                "updated_at": "2025-03-14T07:06:52Z",
+                "revision_number": 1,
+            }
+            network_segments = [
+                {
+                    "id": "9e56eb8d-f9ec-47d2-ac80-3fde76087c38",
+                    "network_type": "vxlan",
+                    "physical_network": None,
+                    "segmentation_id": 200025,
+                    "network_id": "3b5f0bb1-cd53-4c71-b129-1fe7550dfdf4",
+                }
+            ]
+
+        understack_driver.create_network_postcommit(FakeContext())
+
         understack_driver.nb.ucvni_create.assert_called_once_with(
-            network_id=str(network_id),
-            project_id=str(project_id),
+            network_id="3b5f0bb1-cd53-4c71-b129-1fe7550dfdf4",
+            project_id="f9b40d4a39c4403ab5567da17e71906a",
             ucvni_group=str(ucvni_group_id),
-            segmentation_id=network_context.current["provider:segmentation_id"],
-            network_name=network_context.current["name"],
+            segmentation_id=200025,
+            network_name="humpback",
         )
         understack_driver._create_nautobot_namespace.assert_called_once_with(
-            str(network_id),
+            "3b5f0bb1-cd53-4c71-b129-1fe7550dfdf4",
             network_context.current["router:external"],
         )
