@@ -75,6 +75,7 @@ class UnderstackDriver(MechanismDriver):
 
         if provider_type not in [p_const.TYPE_VLAN, p_const.TYPE_VXLAN]:
             return
+
         ucvni_group = conf.ucvni_group
         ucvni_response = self.nb.ucvni_create(
             network_id=network_id,
