@@ -118,8 +118,6 @@ class UnderstackDriver(MechanismDriver):
         # its vlan group, then allow that newly allocated vlan id on that
         # switchport.  The network.segmentation_id might be pre-determined for
         # network s of this nature.
-        #
-        # After we have updated nautobot, call self.undersync.sync_devices()
 
     def update_network_precommit(self, context):
         pass
@@ -141,20 +139,21 @@ class UnderstackDriver(MechanismDriver):
         ucvni_group = conf.ucvni_group
 
         if provider_type == p_const.TYPE_VLAN:
+            # Networks of this type have an OVN router running on our "network
+            # node" so we should clean up the configuration we made to trunk this
+            # network to the network node.
             self.nb.remove_port_network_associations(
                 conf.network_node_switchport_uuid, {network_id}
             )
-            self.nb.ucvni_delete(network_id)
-            self.undersync.sync_devices(
-                vlan_group_uuids=str(vlan_group_id),
-                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-            )
-        elif provider_type == p_const.TYPE_VXLAN:
-            self.nb.ucvni_delete(network_id)
-        else:
+            # TODO: because undersync is now called with a vlan group name
+            # inmstead of id, we need to find out the vlan group name for the
+            # network node:
+            # self.invoke_undersync(vlan_group_name=_network_node_vlan_group_id)
+        elif provider_type != p_const.TYPE_VXLAN:
             return
 
         self.nb.ucvni_delete(network_id)
+
         LOG.info(
             "network %(net_id)s has been deleted from ucvni_group %(ucvni_group)s, "
             "physnet %(physnet)s",
@@ -286,16 +285,14 @@ class UnderstackDriver(MechanismDriver):
         ):
             network_id = context.current["network_id"]
             trunk_details = context.current.get("trunk_details", {})
-            vlan_group_name = self._vlan_group_name(context)
             connected_interface_uuid = utils.fetch_connected_interface_uuid(
                 context.original["binding:profile"], LOG
             )
 
-            networks_to_remove = set()
+            networks_to_remove = set(
+                self._fetch_subports_network_ids(trunk_details)
+            )
             networks_to_remove.add(network_id)
-            if trunk_details:
-                for id in self._fetch_subports_network_ids(trunk_details):
-                    networks_to_remove.add(id)
 
             LOG.debug(
                 "update_port_postcommit removing vlans %s from interface %s ",
