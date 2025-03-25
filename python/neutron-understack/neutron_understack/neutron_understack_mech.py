@@ -317,26 +317,18 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def delete_port_postcommit(self, context):
-        provisioning_network = (
-            cfg.CONF.ml2_understack.provisioning_network
-            or cfg.CONF.ml2_type_understack.provisioning_network
-        )
+        # Only clean up provisioning ports.  Everything else is left to get
+        # cleaned up upon the next change in that cabinet.
+        if is_provisioning_network(context.current["network_id"]):
+            # Signals end of the provisioning / cleaning cycle, so we
+            # put the port back to its normal tenant mode:
+            self._set_nautobot_port_status(context, "Active")
+            self.invoke_undersync(vlan_group_name=self._vlan_group_name(context))
 
-        network_id = context.current["network_id"]
-        if network_id == provisioning_network:
-            connected_interface_uuid = utils.fetch_connected_interface_uuid(
-                context.current["binding:profile"], LOG
-            )
-            port_status = "Active"
-            configure_port_status_data = self.nb.configure_port_status(
-                connected_interface_uuid, port_status
-            )
-            switch_uuid = configure_port_status_data.get("device", {}).get("id")
-            nb_vlan_group_id = UUID(self.nb.fetch_vlan_group_uuid(switch_uuid))
-            self.undersync.sync_devices(
-                vlan_group_uuids=str(nb_vlan_group_id),
-                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-            )
+        self.undersync.sync_devices(
+            vlan_group=vlan_group_name,
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
 
     def _bind_port_segment(self, context: PortContext, segment):
         trunk_details = context.current.get("trunk_details", {})
