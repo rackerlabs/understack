@@ -140,3 +140,15 @@ annotations:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Replace=true
+    glance_metadefs_load:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Replace=true
+    glance_storage_init:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Replace=true
+    glance_bootstrap:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Replace=true
