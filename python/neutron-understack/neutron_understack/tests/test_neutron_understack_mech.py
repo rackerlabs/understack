@@ -25,25 +25,6 @@ class TestBindPort:
         understack_driver.bind_port(port_context)
 
 
-class Test_DeleteTenantPortOnUnbound:
-    @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
-    def test_when_trunk_details_are_present(
-        self, mocker, understack_driver, port_context, vlan_group_id, port_id
-    ):
-        mocker.patch(
-            "neutron_understack.utils.fetch_subport_network_id", return_value="112233"
-        )
-
-        mocker.patch.object(
-            understack_driver.nb,
-            "detach_port",
-            return_value=str(vlan_group_id),
-        )
-        port_context._binding.vif_type = portbindings.VIF_TYPE_UNBOUND
-
-        understack_driver._delete_tenant_port_on_unbound(port_context)
-
-
 class TestCreateSubnetPostCommit:
     def test_create_private(self, understack_driver, subnet_context, subnet):
         understack_driver.create_subnet_postcommit(subnet_context)
