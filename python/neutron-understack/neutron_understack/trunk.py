@@ -210,7 +210,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
                 parent_port_obj, subport_network_id
             )
 
-    def _allocate_dynamic_segment_for_subports_network(subports: list) -> None:
+    def _allocate_dynamic_segment_for_subports_network(self, subports: list) -> None:
         for subport in subports:
             subport_network_id = utils.fetch_subport_network_id(
                 subport_id=subport.port_id
