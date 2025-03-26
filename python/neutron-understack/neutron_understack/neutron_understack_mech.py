@@ -302,11 +302,13 @@ class UnderstackDriver(MechanismDriver):
                 connected_interface_uuid, networks_to_remove
             )
 
-        # Run undersync on every update port operation.  If this transpires to
+        # Run undersync on every possible port operation.  If this transpires to
         # be causing too much unnecessary work, we can always make this
         # conditional based on what appears to have changed in the provided
         # context versus the "original".
-        self.invoke_undersync(vlan_group_name=self._vlan_group_name(context))
+        vlan_group_name = self._vlan_group_name(context)
+        if vlan_group_name and context.vif_type == portbindings.VIF_TYPE_OTHER:
+            self.invoke_undersync(vlan_group_name)
 
     def delete_port_precommit(self, context):
         pass
@@ -314,11 +316,12 @@ class UnderstackDriver(MechanismDriver):
     def delete_port_postcommit(self, context):
         # Only clean up provisioning ports.  Everything else is left to get
         # cleaned up upon the next change in that cabinet.
-        if is_provisioning_network(context.current["network_id"]):
+        vlan_group_name = self._vlan_group_name(context)
+        if vlan_group_name and is_provisioning_network(context.current["network_id"]):
             # Signals end of the provisioning / cleaning cycle, so we
             # put the port back to its normal tenant mode:
             self._set_nautobot_port_status(context, "Active")
-            self.invoke_undersync(vlan_group_name=self._vlan_group_name(context))
+            self.invoke_undersync(vlan_group_name)
 
     def _allocate_dynamic_vlan_segment(
         self, context: PortContext, physical_network: str, network_id: str
@@ -434,16 +437,14 @@ class UnderstackDriver(MechanismDriver):
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
-    def _vlan_group_name(self, context: PortContext) -> str:
+    def _vlan_group_name(self, context: PortContext) -> str|None:
         binding_profile = context.current.get("binding:profile", {})
         local_link_info = binding_profile.get("local_link_information", [])
         switch_names = [
             link["switch_info"] for link in local_link_info if "switch_info" in link
         ]
-        if not switch_names:
-            raise ValueError(f"Missing switch_info in {context.current=}")
-
-        return vlan_group_name_convention.for_switch(switch_names[0])
+        if switch_names:
+            return vlan_group_name_convention.for_switch(switch_names[0])
 
     def check_vlan_transparency(self, context):
         pass
