@@ -70,6 +70,7 @@ class UnderstackDriver(MechanismDriver):
         external = network["router:external"]
         provider_type = network.get("provider:network_type")
         physnet = network.get("provider:physical_network")
+        segmentation_id = network.get("provider:segmentation_id")
         conf = cfg.CONF.ml2_understack
 
         if provider_type not in [p_const.TYPE_VLAN, p_const.TYPE_VXLAN]:
