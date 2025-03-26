@@ -545,7 +545,7 @@ class UnderstackDriver(MechanismDriver):
         profile = context.current["binding:profile"]
         interface_uuid = utils.fetch_connected_interface_uuid(profile, LOG)
         LOG.debug("Set interface %s to %s status", interface_uuid, status)
-        self.nb.configure_port_status(interface_uuid, status="Active")
+        self.nb.configure_port_status(interface_uuid, status=status)
 
 
 def is_provisioning_network(network_id: str) -> bool:
