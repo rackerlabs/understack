@@ -104,8 +104,8 @@ class UnderstackDriver(MechanismDriver):
         #
         # We trunk all such Networks to that network node.
         #
-        # This router topology has no representaion in openstack, we need to
-        # have the knowlege here.
+        # This router topology has no representation in openstack, we need to
+        # have the knowledge here.
         #
         # TODO: this needs to be re-implemented to explicitly create a network
         # segment, which will in turn create the VLAN in the right cabinet.
@@ -303,7 +303,7 @@ class UnderstackDriver(MechanismDriver):
             )
 
         # Run undersync on every update port operation.  If this transpires to
-        # be causing too much unneccecary work, we can always make this
+        # be causing too much unnecessary work, we can always make this
         # conditional based on what appears to have changed in the provided
         # context versus the "original".
         self.invoke_undersync(vlan_group_name=self._vlan_group_name(context))
@@ -326,7 +326,7 @@ class UnderstackDriver(MechanismDriver):
         """Allocate a dynamic VLAN-type network segment, if none already exist.
 
         This will result in exactly one Segment per physical_network per
-        Newtork.  If a Segment already exists for this physical_network then it
+        Network.  If a Segment already exists for this physical_network then it
         will not create another one.
 
         Does the same as ml2 driver context.allocate_dynamic_segment method,
