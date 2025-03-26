@@ -308,6 +308,10 @@ class UnderstackDriver(MechanismDriver):
         # conditional based on what appears to have changed in the provided
         # context versus the "original".
         vlan_group_name = self._vlan_group_name(context)
+        LOG.debug(
+            "update_port_postcommit vlan_group=%s vif_type=%s",
+            vlan_group_name, context.vif_type
+        )
         if vlan_group_name and context.vif_type == portbindings.VIF_TYPE_OTHER:
             self.invoke_undersync(vlan_group_name)
 
@@ -361,6 +365,9 @@ class UnderstackDriver(MechanismDriver):
 
         We obtain the dynamic segment for this network and vlan_group.
 
+        If there are no VXLAN segments, then bind a VLAN segment instead (this
+        is required for VALN_type networks like the provisioning network).
+
         We configure the nautobot switch interface with the new VLAN(s).
 
         Then make the required call in to the black box: context.set_binding.
@@ -368,10 +375,31 @@ class UnderstackDriver(MechanismDriver):
         We expect to see a call to update_port_postcommit soon after this.
         Changes made here will get pushed to the switch at that time.
         """
+        if is_provisioning_network(context.current["network_id"]):
+            self._set_nautobot_port_status(context, "Provisioning-Interface")
+
         for segment in context.network.network_segments:
             if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
                 self._bind_port_segment(context, segment)
                 return
+
+        for segment in context.network.network_segments:
+            if segment[api.NETWORK_TYPE] == p_const.TYPE_VLAN:
+                self._bind_port_vlan_segment(context, segment)
+                return
+
+    def _bind_port_vlan_segment(self, context: PortContext, segment: dict):
+        # We don't use VLAN-type networks for anything, so there is no real
+        # action to take here, but we have to call set_binding to keep neutron
+        # happy.
+        LOG.debug("bind_port_vlan_segment %s", segment)
+
+        context.set_binding(
+            segment[api.ID],
+            portbindings.VIF_TYPE_OTHER,
+            {},
+            status=p_const.PORT_STATUS_ACTIVE,
+        )
 
     def _bind_port_segment(self, context: PortContext, segment):
         trunk_details = context.current.get("trunk_details", {})
@@ -380,11 +408,6 @@ class UnderstackDriver(MechanismDriver):
             context.current["binding:profile"], LOG
         )
         vlan_group_name = self._vlan_group_name(context)
-
-        if is_provisioning_network(network_id):
-            LOG.debug("bind_port_segment side-stepping provisioning interface")
-            self._set_nautobot_port_status(context, "Provisioning-Interface")
-            return
 
         LOG.debug(
             "bind_port_segment interface %s network %s type %s",
