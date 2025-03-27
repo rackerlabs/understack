@@ -310,7 +310,8 @@ class UnderstackDriver(MechanismDriver):
         vlan_group_name = self._vlan_group_name(context)
         LOG.debug(
             "update_port_postcommit vlan_group=%s vif_type=%s",
-            vlan_group_name, context.vif_type
+            vlan_group_name,
+            context.vif_type,
         )
         if vlan_group_name and context.vif_type == portbindings.VIF_TYPE_OTHER:
             self.invoke_undersync(vlan_group_name)
@@ -445,7 +446,7 @@ class UnderstackDriver(MechanismDriver):
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
-    def _vlan_group_name(self, context: PortContext) -> str|None:
+    def _vlan_group_name(self, context: PortContext) -> str | None:
         binding_profile = context.current.get("binding:profile", {})
         local_link_info = binding_profile.get("local_link_information", [])
         switch_names = [
