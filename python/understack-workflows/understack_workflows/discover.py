@@ -29,11 +29,15 @@ def discover_chassis_info(bmc: Bmc) -> ChassisInfo:
 
     attempts_remaining = LLDP_DISCOVERY_ATTEMPTS
     while len(device_info.neighbors) < MIN_REQUIRED_NEIGHBOR_COUNT:
+        lldp_table = {
+            i.name: f"{i.remote_switch_mac_address}/{i.remote_switch_port_name}"
+            for i in device_info.interfaces
+        }
         logger.info(
-            "%s does not have enough LLDP neighbors (saw %d), need at least %d. ",
+            "%s does not have enough LLDP neighbors, need %d or more, got %s",
             bmc,
-            len(device_info.neighbors),
             MIN_REQUIRED_NEIGHBOR_COUNT,
+            lldp_table,
         )
         if not attempts_remaining:
             raise Exception(

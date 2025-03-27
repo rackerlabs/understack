@@ -11,7 +11,6 @@ def required_bios_settings(pxe_interface: str) -> dict:
     return {
         "PxeDev1EnDis": "Enabled",
         "PxeDev1Interface": pxe_interface,
-        "HttpDev1Interface": pxe_interface,
         "TimeZone": "UTC",
     }
 
