@@ -128,7 +128,7 @@ class Nautobot:
         project_id: str,
         ucvni_group: str,
         network_name: str,
-        segment_id: int | None = None,
+        segmentation_id: int,
     ) -> dict:
         payload = {
             "id": network_id,
@@ -136,14 +136,13 @@ class Nautobot:
             "name": network_name,
             "ucvni_group": ucvni_group,
             "status": {"name": "Active"},
+            "ucvni_id": segmentation_id,
         }
 
-        if segment_id:
-            payload["ucvni_id"] = segment_id
-            payload["ucvni_type"] = "INFRA"
-
-        url = "/api/plugins/undercloud-vni/ucvnis/"
-        return self.make_api_request("POST", url, payload)
+        ucvni: pynautobot.core.response.Record = (
+            self.api.plugins.undercloud_vni.ucvnis.create(payload)
+        )
+        return dict(ucvni)
 
     def ucvni_delete(self, network_id):
         url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
