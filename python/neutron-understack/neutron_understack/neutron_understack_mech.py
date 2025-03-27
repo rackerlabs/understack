@@ -408,12 +408,16 @@ class UnderstackDriver(MechanismDriver):
             context.current["binding:profile"], LOG
         )
         vlan_group_name = self._vlan_group_name(context)
+        if vlan_group_name is None:
+            LOG.debug("bind ignoring %s, no vlan group yet", segment)
+            return
 
         LOG.debug(
-            "bind_port_segment interface %s network %s type %s",
+            "bind_port_segment interface %s network %s type %s vlan group %s",
             connected_interface_uuid,
             network_id,
             network_type,
+            vlan_group_name,
         )
 
         new_segment = self._allocate_dynamic_vlan_segment(
