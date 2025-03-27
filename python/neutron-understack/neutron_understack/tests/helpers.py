@@ -45,7 +45,7 @@ class Ml2PluginNoInit(Ml2Plugin):
 class FakeTypeManager:
     def allocate_dynamic_segment(self, *_):
         print(f"FakeTypeManager trace: allocate_dynamic_segment{_}")
-        return {"segmentation_id": 666}
+        return {"id": "22222222-3333-4444-5555-666666666666", "segmentation_id": 666}
 
     def extend_network_with_provider_segments(self, *_):
         print(f"FakeTypeManager trace: extend_network_with_provider_segments{_}")

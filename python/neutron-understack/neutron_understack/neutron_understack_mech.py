@@ -383,24 +383,6 @@ class UnderstackDriver(MechanismDriver):
                 self._bind_port_segment(context, segment)
                 return
 
-        for segment in context.network.network_segments:
-            if segment[api.NETWORK_TYPE] == p_const.TYPE_VLAN:
-                self._bind_port_vlan_segment(context, segment)
-                return
-
-    def _bind_port_vlan_segment(self, context: PortContext, segment: dict):
-        # We don't use VLAN-type networks for anything, so there is no real
-        # action to take here, but we have to call set_binding to keep neutron
-        # happy.
-        LOG.debug("bind_port_vlan_segment %s", segment)
-
-        context.set_binding(
-            segment[api.ID],
-            portbindings.VIF_TYPE_OTHER,
-            {},
-            status=p_const.PORT_STATUS_ACTIVE,
-        )
-
     def _bind_port_segment(self, context: PortContext, segment):
         trunk_details = context.current.get("trunk_details", {})
         network_id = context.current["network_id"]
@@ -413,10 +395,9 @@ class UnderstackDriver(MechanismDriver):
             return
 
         LOG.debug(
-            "bind_port_segment interface %s network %s type %s vlan group %s",
+            "bind_port_segment interface %s network %s vlan group %s",
             connected_interface_uuid,
             network_id,
-            network_type,
             vlan_group_name,
         )
 
@@ -425,7 +406,6 @@ class UnderstackDriver(MechanismDriver):
             physical_network=vlan_group_name,
             network_id=network_id,
         )
-        context.continue_binding(segment["id"], [new_segment])
         LOG.debug("Native VLAN segment %s", new_segment)
         native_vlan_id = new_segment["segmentation_id"]
         allowed_vlan_ids = set([native_vlan_id])
@@ -453,7 +433,7 @@ class UnderstackDriver(MechanismDriver):
 
         LOG.debug("set_binding for segment: %s", segment)
         context.set_binding(
-            segment[api.ID],
+            new_segment[api.ID],
             portbindings.VIF_TYPE_OTHER,
             {},
             status=p_const.PORT_STATUS_ACTIVE,
