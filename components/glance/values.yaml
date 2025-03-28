@@ -73,6 +73,9 @@ pod:
         min_available: 0
   resources:
     enabled: true
+    api:
+      limits:
+        memory: 6144Mi
   probes:
     api:
       glance-api:
