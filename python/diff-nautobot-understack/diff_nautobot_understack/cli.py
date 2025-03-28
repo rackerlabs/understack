@@ -46,6 +46,9 @@ def display_output(
             diff_output_props.get("title"),
             diff_output_props.get("id_column_name"),
         )
+    elif __output_format == "human":
+        print("Summary:\n")
+        print(diff_result.str())
     else:
         print(diff_result.dict())
 
@@ -96,7 +99,7 @@ def project(
 def network(
     debug: bool = typer.Option(False, "--debug", "-v", help="Enable debug mode"),
     output_format: str = typer.Option(
-        "json", "--format", help="Available formats json, table"
+        "json", "--format", help="Available formats: json, table, human"
     ),
 ):
     """OpenStack networks ⟹ Nautobot UCVNIs"""
