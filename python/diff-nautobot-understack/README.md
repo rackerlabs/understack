@@ -9,15 +9,14 @@ This tool compares data between Nautobot and OpenStack.
 | Project   | Tenant                |
 | Network   | UCVNI & Namespace     |
 
-
 ---
 
 ## Setup Instructions
 
 1. cd python/diff-nautobot-understack
-2. `poetry install`
-   1. poetry will handle the creation of this virtual environment for you. It'll use .venv in the project if you configure it to do so locally on your machine with `poetry config virtualenvs.in-project true`.
-   2. user can create a shell with poetry shell and then when they exit it will clean up auth variables. Or they can run source .venv/bin/activate or poetry run <commands-below>
+2. `uv sync`
+   1. `uv` will handle the creation of this virtual environment for you. It'll use .venv in the project.
+   2. user can create a shell with `uv shell` and then when they exit it will clean up auth variables. Or they can run source .venv/bin/activate or `uv run <commands-below>`
 
 3. Export environment variables (or add them to a .env file):
    1. export NAUTOBOT_URL=https://nautobot.url.here
