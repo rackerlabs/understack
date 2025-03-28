@@ -50,3 +50,26 @@ spec:
   grantOption: true
   host: "%"
   retryInterval: 5s
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Connection
+metadata:
+  name: horizon-db-conn
+spec:
+  mariaDbRef:
+    name: mariadb
+  username: horizon
+  passwordSecretKeyRef:
+    name: horizon-db-password
+    key: password
+  database: horizon
+  secretName: horizon-db-conn
+  secretTemplate:
+    key: db_conn.conf
+    format: |
+      [database]
+      connection = mysql+pymysql://{{ .Username }}:{{ .Password }}@{{ .Host }}:{{ .Port }}/{{ .Database }}{{ .Params }}
+  healthCheck:
+    interval: 30s
+    retryInterval: 3s
+  serviceName: mariadb
