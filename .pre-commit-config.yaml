@@ -48,19 +48,25 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-  - repo: https://github.com/python-poetry/poetry
-    rev: '1.7.1'
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.6.11
     hooks:
-      - id: poetry-check
-        language_version: "3.11"
-        name: "poetry-check (understack-workflows)"
-        files: '^python/understack-workflows/'
-        args: ["-C", "python/understack-workflows"]
-      - id: poetry-lock
-        language_version: "3.11"
-        name: "poetry-lock (understack-workflows)"
-        files: '^python/understack-workflows/'
-        args: ["-C", "python/understack-workflows", "--no-update"]
+      - id: uv-lock
+        name: diff-nautobot-understack
+        args: ["-D", "python/diff-nautobot-understack"]
+      - id: uv-lock
+        name: ironic-understack
+        args: ["-D", "python/ironic-understack"]
+      - id: uv-lock
+        name: neutron-understack
+        args: ["-D", "python/neutron-understack"]
+      - id: uv-lock
+        name: understack-flavor-matcher
+        args: ["-D", "python/understack-flavor-matcher"]
+      - id: uv-lock
+        name: understack-workflows
+        args: ["-D", "python/understack-workflows"]
   - repo: https://github.com/renovatebot/pre-commit-hooks
     rev: 39.174.0
     hooks:
