@@ -47,6 +47,9 @@ def display_output(
             diff_output_props.get("id_column_name"),
         )
     else:
+        print("Summary:\n")
+        print(diff_result.str())
+        print("\n")
         print(diff_result.dict())
 
 
