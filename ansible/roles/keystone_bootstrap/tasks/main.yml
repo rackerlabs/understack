@@ -1,0 +1,17 @@
+---
+
+- name: Admin needs admin role for default domain
+  openstack.cloud.role_assignment:
+    user: "{{ lookup('ansible.builtin.env', 'OS_USERNAME', default=Undefined) }}"
+    domain: "{{ lookup('ansible.builtin.env', 'OS_DEFAULT_DOMAIN', default=Undefined) }}"
+    role: admin
+    state: present
+
+- name: Define baremetal
+  ansible.builtin.include_tasks: baremetal.yml
+
+- name: Define SSO
+  ansible.builtin.include_tasks: sso.yml
+
+- name: Define misc keystone
+  ansible.builtin.include_tasks: misc.yml
