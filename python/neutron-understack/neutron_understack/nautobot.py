@@ -188,21 +188,21 @@ class Nautobot:
         }
         return self.make_api_request("POST", "/api/ipam/prefixes/", payload)
 
-    def associate_subnet_with_network(
-        self, network_uuid: str, subnet_uuid: str, role: str
-    ):
+    def set_svi_role_on_network(self, network_uuid: str, role: str):
         url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}/"
-        payload = {
-            "role": {"name": role},
-            "relationships": {
-                "ucvni_prefixes": {
-                    "destination": {
-                        "objects": [subnet_uuid],
-                    },
-                },
-            },
-        }
+        payload = {"role": {"name": role}}
         self.make_api_request("PATCH", url, payload)
+
+    def associate_subnet_with_network(self, network_uuid: str, subnet_uuid: str):
+        url = "/api/extras/relationship-associations/"
+        payload = {
+            "relationship": {"key": "ucvni_prefixes"},
+            "source_type": "vni_custom_model.ucvni",
+            "source_id": network_uuid,
+            "destination_type": "ipam.prefix",
+            "destination_id": subnet_uuid,
+        }
+        self.make_api_request("POST", url, payload)
 
     def add_tenant_vlan_tag_to_ucvni(self, network_uuid: str, vlan_tag: int) -> dict:
         url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}/"

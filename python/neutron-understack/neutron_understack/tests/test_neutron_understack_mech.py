@@ -123,9 +123,12 @@ class TestCreateSubnetPostCommit:
             tenant_uuid=ANY,
         )
         understack_driver.nb.associate_subnet_with_network.assert_called_once_with(
-            role="svi_vxlan_anycast_gateway",
             network_uuid=subnet.network_id,
             subnet_uuid=subnet.id,
+        )
+        understack_driver.nb.set_svi_role_on_network.assert_called_once_with(
+            network_uuid=subnet.network_id,
+            role="svi_vxlan_anycast_gateway",
         )
 
 
