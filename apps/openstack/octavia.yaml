@@ -1,0 +1,4 @@
+---
+component: octavia
+repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+chartVersion: 2025.1.12+80041dfbb

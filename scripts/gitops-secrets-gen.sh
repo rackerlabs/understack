@@ -299,7 +299,7 @@ create_os_secret() {
 ## OpenStack component secret generation
 ## each openstack component is very similar to collapse this
 ## into a loop to generate the same thing for each
-for component in keystone ironic placement neutron nova glance cinder; do
+for component in keystone ironic placement neutron nova glance cinder octavia; do
     echo "Checking ${component}"
     mkdir -p "${DEST_DIR}/${component}/"
     # keystone service account username

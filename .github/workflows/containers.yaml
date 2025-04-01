@@ -33,7 +33,7 @@ jobs:
     strategy:
       matrix:
         # if you add a container here, add it to the 'clean_containers' job below
-        project: [ironic, neutron, keystone, nova, openstack-client, cinder]
+        project: [ironic, neutron, keystone, nova, openstack-client, cinder, octavia]
 
     steps:
       - name: setup docker buildx
@@ -182,6 +182,7 @@ jobs:
           - neutron
           - keystone
           - nova
+          - octavia
           - openstack-client
           - dnsmasq
           - ironic-nautobot-client
