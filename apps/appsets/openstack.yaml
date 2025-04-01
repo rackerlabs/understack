@@ -43,6 +43,9 @@ spec:
                 - component: horizon
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   chartVersion: 2024.2.1+34d1672a-93ed069c
+                - component: octavia
+                  repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+                  chartVersion: 2024.2.4+6b985e51b
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
