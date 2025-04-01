@@ -90,4 +90,18 @@ images:
     # skyline
     skyline: "quay.io/airshipit/skyline:latest"
     skyline_db_sync: "quay.io/airshipit/skyline:latest"
+
+    # octavia
+    # octavia_api: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    # octavia_db_sync: "quay.io/airshipit/octavia:2024.2-ubuntu_jammy"
+    # octavia_worker: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    # octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    # octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    # octavia_health_manager_init: "docker.io/openstackhelm/heat:2024.2-ubuntu_jammy"
+    octavia_api: "ghcr.io/rackerlabs/genestack/octavia-ovn:2024.1-ubuntu_jammy-1737651745"
+    octavia_db_sync: "ghcr.io/rackerlabs/genestack/octavia-ovn:2024.1-ubuntu_jammy-1737651745"
+    octavia_worker: "ghcr.io/rackerlabs/genestack/octavia-ovn:2024.1-ubuntu_jammy-1737651745"
+    octavia_housekeeping: "ghcr.io/rackerlabs/genestack/octavia-ovn:2024.1-ubuntu_jammy-1737651745"
+    octavia_health_manager: "ghcr.io/rackerlabs/genestack/octavia-ovn:2024.1-ubuntu_jammy-1737651745"
+    octavia_health_manager_init: "docker.io/openstackhelm/heat:2024.2-ubuntu_jammy"
 ...
