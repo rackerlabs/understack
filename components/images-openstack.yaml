@@ -70,6 +70,8 @@ images:
     # openvswitch
     openvswitch_db_server: "docker.io/openstackhelm/openvswitch:ubuntu_jammy-dpdk-20250127"
     openvswitch_vswitchd: "docker.io/openstackhelm/openvswitch:ubuntu_jammy-dpdk-20250127"
+    # openvswitch_db_server: "ghcr.io/rackerlabs/understack/openvswitch:pr-813"
+    # openvswitch_vswitchd: "ghcr.io/rackerlabs/understack/openvswitch:pr-813"
 
     # ovn
     ovn_ovsdb_nb: "docker.io/openstackhelm/ovn:ubuntu_jammy-20250111"
@@ -90,4 +92,18 @@ images:
     # skyline
     skyline: "quay.io/airshipit/skyline:latest"
     skyline_db_sync: "quay.io/airshipit/skyline:latest"
+
+    # octavia
+    # octavia_api: "quay.io/airshipit/octavia:2024.2-ubuntu_jammy"
+    # octavia_db_sync: "quay.io/airshipit/octavia:2024.2-ubuntu_jammy"
+    # octavia_worker: "quay.io/airshipit/octavia:2024.2-ubuntu_jammy"
+    # octavia_housekeeping: "quay.io/airshipit/octavia:2024.2-ubuntu_jammy"
+    # octavia_health_manager: "quay.io/airshipit/octavia:2024.2-ubuntu_jammy"
+    # octavia_health_manager_init: "docker.io/openstackhelm/heat:2024.2-ubuntu_jammy"
+    octavia_api: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    octavia_db_sync: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    octavia_worker: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:pr-813"
+    octavia_health_manager_init: "docker.io/openstackhelm/heat:2024.2-ubuntu_jammy"
 ...
