@@ -1,0 +1,47 @@
+# Default values for os-infra.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+# this declares how the mariadb instance is configured for OpenStack
+mariadb:
+  # create a mariadb instance
+  enabled: true
+
+  # mariadb image
+  image:
+    # the image to use
+    repository: docker-registry1.mariadb.com/library/mariadb
+    # whats our pull policy
+    pullPolicy: IfNotPresent
+    # image tag
+    tag: "11.4.4"
+
+  # storage for the DB
+  storage:
+    # the size of the database
+    size: 1Gi
+    # set a storage class if you want one
+    storageClassName: ""
+
+  # root password configuration
+  rootAuth:
+    # name of the secret
+    name: mariadb
+    # key with the root password
+    key: root-password
+    # should we generate it
+    generate: true
+
+memcached:
+  enabled: true
+
+  fullnameOverride: "memcached"
+
+  metrics:
+    enabled: true
