@@ -12,6 +12,7 @@ from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
 from neutron_lib.plugins.ml2.api import NetworkContext
 from oslo_config import cfg
+from neutron.objects import ports
 
 from neutron_understack import config
 from neutron_understack import utils
@@ -278,6 +279,11 @@ class UnderstackDriver(MechanismDriver):
 
         Only in the update_port_postcommit we have access to the original context,
         from which we can access the binding information.
+
+        # TODO: garbage collection of unused VLAN-type network segments.  We
+        # create these dynamic segments on the fly so they might get left behind
+        # as the ports dissappear.   If a VLAN is left in a cabinet with nobody
+        # using it, it can be deleted.
         """
         if (
             context.current["binding:vnic_type"] == "baremetal"
@@ -313,6 +319,7 @@ class UnderstackDriver(MechanismDriver):
             vlan_group_name,
             context.vif_type,
         )
+        # TODO: also call this in the case above, i.e. previos vif type was other and current vif type is unbound.
         if vlan_group_name and context.vif_type == portbindings.VIF_TYPE_OTHER:
             self.invoke_undersync(vlan_group_name)
 
@@ -385,7 +392,7 @@ class UnderstackDriver(MechanismDriver):
                 return
 
     def _bind_port_segment(self, context: PortContext, segment):
-        trunk_details = context.current.get("trunk_details", {})
+        trunk_details = context.current.get("trunk_details") or {}
         network_id = context.current["network_id"]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             context.current["binding:profile"], LOG
@@ -409,14 +416,37 @@ class UnderstackDriver(MechanismDriver):
         )
         LOG.debug("Native VLAN segment %s", new_segment)
         native_vlan_id = new_segment["segmentation_id"]
+
+        # Traffic to the native vlan is always allowed:
         allowed_vlan_ids = set([native_vlan_id])
 
-        for network_uuid in self._fetch_subports_network_ids(trunk_details):
+        subports = trunk_details.get("sub_ports", [])
+        for subport in subports:
+            port_id = subport["port_id"]
+            network_uuid = utils.fetch_subport_network_id(port_id)
+
             trunked_segment = self._allocate_dynamic_vlan_segment(
-                context, physical_network=vlan_group_name, network_id=network_uuid
+                context,
+                physical_network=vlan_group_name,
+                network_id=network_uuid
             )
+            LOG.debug("Dynamic VLAN segment (trunked): %s", trunked_segment)
+
+            binding_level = 0
+            driver_name = "understack"
+            pbl_obj = ports.PortBindingLevel(
+                context.plugin_context,
+                port_id=port_id,
+                host=context.host,
+                level=binding_level,
+                driver=driver_name,
+                segment_id=trunked_segment["id"]
+            )
+            LOG.debug("PortBindingLevel for sub-port %s: %s", port_id, pbl_obj)
+            result = pbl_obj.create()
+            LOG.debug("Create()d BindingLevel: %s", result)
+
             allowed_vlan_ids.add(trunked_segment["segmentation_id"])
-            LOG.debug("Trunked VLAN segment %s", trunked_segment)
 
         LOG.debug(
             "Required switchport settings for interface %s on network %s "
