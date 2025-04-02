@@ -3,63 +3,54 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - https://github.com/argoproj/argo-workflows/releases/download/v3.5.10/namespace-install.yaml
+  # the same as using namespace-install.yaml but easier to follow what the
+  # actual pieces we are using are
+  - https://github.com/argoproj/argo-workflows/manifests/base?ref=v3.5.10
+  - https://github.com/argoproj/argo-workflows/manifests/namespace-install/argo-server-rbac?ref=v3.5.10
+  - https://github.com/argoproj/argo-workflows/manifests/namespace-install/workflow-controller-rbac?ref=v3.5.10
+
+  # ingress for workflows.${DNS_ZONE} to the argo server for the UI
   - ingress.yaml
 
   # external secret for SSO auth
   - external-secret-argo-sso.yaml
 
+# keep all the images consistent
+images:
+  - name: quay.io/argoproj/workflow-controller
+    newTag: v3.5.10
+  - name: quay.io/argoproj/argoexec
+    newTag: v3.5.10
+  - name: quay.io/argoproj/argocli
+    newTag: v3.5.10
+
 patches:
-- target:  # configure argo-server to use sso and client auth and monitor argo-events namespace
+# see the patch for details on the change
+- target:
     group: apps
     version: v1
     kind: Deployment
     name: argo-server
-  patch: |-
-    - op: replace
-      path: /spec/template/spec/containers/0/args
-      value:
-        - server
-        - --auth-mode=sso
-        - --auth-mode=client
-        - --namespaced
-        - --managed-namespace
-        - argo-events
+  path: ./argo-server-deployment.yaml
 
-- target:  # configure the workflow controller to monitor the argo-events namespace
+# see the patch for details on the change
+- target:
     group: apps
     version: v1
     kind: Deployment
     name: workflow-controller
-  patch: |-
-    - op: replace
-      path: /spec/template/spec/containers/0/args
-      value:
-        - --namespaced
-        - --managed-namespace
-        - argo-events
+  path: ./workflow-controller-deployment.yaml
 
+# see the patch for details on the change
 - target:
     group: rbac.authorization.k8s.io
     version: v1
     kind: Role
+    # this is the role that the workflow-controller runs with
     name: argo-role
-  patch: |-
-    # grant configmap create, update to allow for memoization of argo workflows
-    - op: add
-      path: /rules/0
-      value:
-        apiGroups:
-        - ""
-        resources:
-        - configmaps
-        verbs:
-        - get
-        - watch
-        - list
-        - create
-        - update
+  path: ./workflow-controller-role.yaml
 
+# apply our configuration changes to the configmap
 configMapGenerator:
   - name: workflow-controller-configmap
     behavior: merge

@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: argo-server
+spec:
+  template:
+    spec:
+      containers:
+      - name: argo-server
+        args:
+        - server
+        # allow SSO, which currently has all clients use the server's ServiceAccount
+        - --auth-mode=sso
+        # all other auth via Kubernetes bearer tokens
+        - --auth-mode=client
+        # running in namespaced mode and not cluster wide
+        - --namespaced
+        # configures the namespace where workflows actually run
+        - --managed-namespace
+        - argo-events
