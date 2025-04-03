@@ -458,7 +458,7 @@ class UnderstackDriver(MechanismDriver):
             allowed_vlan_ids,
         )
 
-        self.nb.add_port_vlan_associations(
+        self.nb.set_port_vlan_associations(
             connected_interface_uuid, native_vlan_id, allowed_vlan_ids, vlan_group_name
         )
 

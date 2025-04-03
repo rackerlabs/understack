@@ -217,27 +217,19 @@ class Nautobot:
         payload = {"status": {"name": status}}
         return self.make_api_request("PATCH", url, payload)
 
-    def add_port_vlan_associations(
+    def set_port_vlan_associations(
         self,
         interface_uuid: str,
         native_vlan_id: int | None,
         allowed_vlans_ids: set[int],
         vlan_group_name: str,
     ) -> dict:
-        """Adds the specified vlan(s) to interface untagged/tagged vlans."""
+        """Set the tagged and untagged vlan(s) on an interface."""
         url = f"/api/dcim/interfaces/{interface_uuid}/"
-
-        current_state = self.make_api_request("GET", f"{url}?depth=1")
-
-        current_tagged_vlans = {
-            tagged_vlan["vid"] for tagged_vlan in current_state.get("tagged_vlans", [])
-        }
-
-        tagged_vlans = current_tagged_vlans.union(allowed_vlans_ids)
 
         payload: dict = {
             "tagged_vlans": [
-                _vlan_payload(vlan_group_name, vlan_id) for vlan_id in tagged_vlans
+                _vlan_payload(vlan_group_name, vlan_id) for vlan_id in allowed_vlans_ids
             ],
         }
 
