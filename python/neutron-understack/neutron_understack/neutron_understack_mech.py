@@ -392,7 +392,6 @@ class UnderstackDriver(MechanismDriver):
                 return
 
     def _bind_port_segment(self, context: PortContext, segment):
-        trunk_details = context.current.get("trunk_details") or {}
         network_id = context.current["network_id"]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             context.current["binding:profile"], LOG
@@ -420,47 +419,17 @@ class UnderstackDriver(MechanismDriver):
         # Traffic to the native vlan is always allowed:
         allowed_vlan_ids = set([native_vlan_id])
 
-        subports = trunk_details.get("sub_ports", [])
-        for subport in subports:
-            port_id = subport["port_id"]
-            network_uuid = utils.fetch_subport_network_id(port_id)
-
-            trunked_segment = self._allocate_dynamic_vlan_segment(
-                context,
-                physical_network=vlan_group_name,
-                network_id=network_uuid
-            )
-            LOG.debug("Dynamic VLAN segment (trunked): %s", trunked_segment)
-
-            binding_level = 0
-            driver_name = "understack"
-            pbl_obj = ports.PortBindingLevel(
-                context.plugin_context,
-                port_id=port_id,
-                host=context.host,
-                level=binding_level,
-                driver=driver_name,
-                segment_id=trunked_segment["id"]
-            )
-            LOG.debug("PortBindingLevel for sub-port %s: %s", port_id, pbl_obj)
-            result = pbl_obj.create()
-            LOG.debug("Create()d BindingLevel: %s", result)
-
-            allowed_vlan_ids.add(trunked_segment["segmentation_id"])
-
-        LOG.debug(
-            "Required switchport settings for interface %s on network %s "
-            "VLAN Group %s: native vlan %s, VLAN ID(s) %s",
+        self.nb.set_port_vlan_associations(
             connected_interface_uuid,
-            network_id,
-            vlan_group_name,
             native_vlan_id,
             allowed_vlan_ids,
+            vlan_group_name,
         )
 
-        self.nb.set_port_vlan_associations(
-            connected_interface_uuid, native_vlan_id, allowed_vlan_ids, vlan_group_name
-        )
+        trunk_details = context.current.get("trunk_details") or {}
+        port_id = context.current["id"]
+        if trunk_details:
+            self.trunk_driver.configure_trunk(trunk_details, port_id)
 
         LOG.debug("set_binding for segment: %s", segment)
         context.set_binding(
