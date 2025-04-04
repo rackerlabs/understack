@@ -436,9 +436,6 @@ spec:
                               - op: replace
                                 path: /spec/tls/0/hosts/0
                                 value: workflows.{{ .values.uc_dns_zone }}
-                    - repoURL: '{{ .values.uc_deploy_git_url }}'
-                      targetRevision: '{{ .values.uc_deploy_ref }}'
-                      path: '{{.name}}/manifests/argo'
                 - component: argo-events
                   componentProject: understack
                   skipComponent: '{{or (has "argo-events" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
