@@ -95,29 +95,6 @@ class UnderstackDriver(MechanismDriver):
         )
         self._create_nautobot_namespace(network_id, external)
 
-        if provider_type != p_const.TYPE_VLAN:
-            return
-
-        # Networks of type VLAN might be using a OVS/OVN router that we
-        # configure on a specific "network node" in our cluster.
-        #
-        # We trunk all such Networks to that network node.
-        #
-        # This router topology has no representation in openstack, we need to
-        # have the knowledge here.
-        #
-        # TODO: this needs to be re-implemented to explicitly create a network
-        # segment, which will in turn create the VLAN in the right cabinet.
-        #
-        # Perhaps we can drop the network_node_switchport_uuid and just know the
-        # VLAN Group name instead, then leave an open trunk to that network node
-        # (since that is almost what we are doing anyway).
-
-        # Take conf.network_node_switchport_uuid and make a network segment for
-        # its vlan group, then allow that newly allocated vlan id on that
-        # switchport.  The network.segmentation_id might be pre-determined for
-        # network s of this nature.
-
     def update_network_precommit(self, context):
         pass
 
@@ -137,18 +114,7 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
         ucvni_group = conf.ucvni_group
 
-        if provider_type == p_const.TYPE_VLAN:
-            # Networks of this type have an OVN router running on our "network
-            # node" so we should clean up the configuration we made to trunk this
-            # network to the network node.
-            self.nb.remove_port_network_associations(
-                conf.network_node_switchport_uuid, {network_id}
-            )
-            # TODO: because undersync is now called with a vlan group name
-            # inmstead of id, we need to find out the vlan group name for the
-            # network node:
-            # self.invoke_undersync(vlan_group_name=_network_node_vlan_group_id)
-        elif provider_type != p_const.TYPE_VXLAN:
+        if provider_type != p_const.TYPE_VXLAN:
             return
 
         self.nb.ucvni_delete(network_id)
