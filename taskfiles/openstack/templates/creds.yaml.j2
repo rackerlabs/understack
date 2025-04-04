@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ ENV.SECRET_NAME }}
+stringData:
+  username: {{ ENV.USERNAME }}
+  password: {{ ENV.PASSWORD }}

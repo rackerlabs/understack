@@ -1,0 +1,8 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+includes:
+  creds:
+    taskfile: ./creds.taskfile.yaml
+    flatten: true

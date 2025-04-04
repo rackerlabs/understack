@@ -1,0 +1,142 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+tasks:
+
+  creds-gen:
+    desc: Generates all OpenStack Helm credentials
+    cmds:
+      - for:
+          matrix:
+            TYPE: ["db", "rabbitmq", "keystone"]
+            SVC: ["keystone", "ironic", "neutron", "nova", "glance"]
+        task: creds-gen-{{.ITEM.TYPE}}-{{.ITEM.SVC}}
+      # these do not need all the credentials of above
+      - task: creds-gen-db-horizon
+      - task: creds-gen-db-placement
+      - task: creds-gen-keystone-placement
+
+  creds-gen-*-*:
+    desc: |-
+      Generates credentials for an OpenStack service e.g. creds-gen-db-keystone
+
+    cmds:
+      - task: have-kustomization-yaml
+        vars:
+          PATH: '{{.BASE_PATH_SVC}}'
+      - minijinja-cli --env --select=ENV {{.ROOT_DIR}}/taskfiles/openstack/templates/creds.yaml.j2
+        {{ if .KUBESEAL }}| kubeseal --scope namespace-wide -o yaml{{ end }}
+        > '{{.BASE_PATH_SVC}}/secret-{{.TYPE}}-password.yaml'
+      - cd {{.BASE_PATH_SVC}} && kustomize edit add resource 'secret-{{.TYPE}}-password.yaml'
+      - task: replace-secret-openstack-yaml-{{.TYPE}}
+        vars:
+          PATH: '{{.BASE_PATH}}'
+          PASSWORD: '{{.USEPASS}}'
+          SVC: '{{.SVC}}'
+
+    env:
+      SECRET_NAME: '{{.SVC}}-{{.TYPE}}-password'
+      USERNAME: '{{.SVC}}'
+      PASSWORD: '{{.USEPASS}}'
+
+    requires:
+      vars:
+        - UC_DEPLOY
+        - DEPLOY_NAME
+
+    generates:
+      - '{{.BASE_PATH_SVC}}/secret-{{.TYPE}}-password.yaml'
+
+    vars:
+      TYPE: '{{ index .MATCH 0 }}'
+      SVC: '{{ index .MATCH 1 }}'
+      BASE_PATH: '{{ if isAbs .UC_DEPLOY }}{{.UC_DEPLOY}}/{{.DEPLOY_NAME}}/manifests{{ else }}{{.USER_WORKING_DIR}}/{{.UC_DEPLOY}}/{{.DEPLOY_NAME}}/manifests{{end}}'
+      BASE_PATH_SVC: '{{ joinPath .BASE_PATH .SVC }}'
+      CURRPASS:
+        sh: kubectl -n openstack get secret '{{.SVC}}-{{.TYPE}}-password' -o jsonpath='{.data.password}' 2> /dev/null | base64 -d
+      NEWPASS:
+        sh: dd bs=512 if=/dev/urandom count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9\-' | head -c 32
+      USEPASS: '{{if .CURRPASS}}{{.CURRPASS}}{{else}}{{.NEWPASS}}{{end}}'
+    preconditions:
+      - sh: command -v minijinja-cli >/dev/null
+        msg: "minijinja-cli is required but not installed"
+      - sh: command -v kubectl >/dev/null
+        msg: "kubectl is required but not installed"
+      - sh: "command -v kubeseal >/dev/null"
+        msg: "kubeseal is required but not installed"
+
+  have-kustomization-yaml:
+    internal: true
+
+    requires:
+      vars:
+        - PATH
+
+    cmds:
+      - mkdir -p '{{.PATH}}'
+      - minijinja-cli -o {{.PATH}}/kustomization.yaml {{.ROOT_DIR}}/taskfiles/openstack/templates/kustomization.yaml.j2
+
+    status:
+      - test -f {{.PATH}}/kustomization.yaml
+
+  replace-secret-openstack-yaml-keystone:
+    internal: true
+
+    cmds:
+      - yq eval '.endpoints.identity.auth.{{.SVC}}.password = strenv(PASSWORD)' -i '{{.PATH}}/secret-openstack.yaml'
+
+    requires:
+      vars:
+        - PASSWORD
+        - SVC
+        - PATH
+
+    vars:
+      SVC: '{{ if eq .SVC "keystone" }}admin{{else}}{{.SVC}}{{end}}'
+
+    env:
+      PASSWORD: '{{.PASSWORD}}'
+
+    preconditions:
+      - test -f '{{.PATH }}/secret-openstack.yaml'
+
+  replace-secret-openstack-yaml-rabbitmq:
+    internal: true
+
+    cmds:
+      - yq eval '.endpoints.oslo_messaging.auth.{{.SVC}}.password = strenv(PASSWORD)' -i '{{.PATH}}/secret-openstack.yaml'
+
+    requires:
+      vars:
+        - PASSWORD
+        - SVC
+        - PATH
+
+    env:
+      PASSWORD: '{{.PASSWORD}}'
+
+    preconditions:
+      - test -f '{{.PATH }}/secret-openstack.yaml'
+
+  replace-secret-openstack-yaml-db:
+    internal: true
+
+    cmds:
+      - cmd: yq eval '.endpoints.{{.ITEM}}.auth.{{.SVC}}.password = strenv(PASSWORD)' -i '{{.PATH}}/secret-openstack.yaml'
+        for: {var: OSLO}
+
+    requires:
+      vars:
+        - PASSWORD
+        - SVC
+        - PATH
+
+    vars:
+      OSLO: 'oslo_db{{ if eq .SVC "nova"}} oslo_db_api oslo_db_cell0{{end}}'
+
+    env:
+      PASSWORD: '{{.PASSWORD}}'
+
+    preconditions:
+      - test -f '{{.PATH }}/secret-openstack.yaml'
