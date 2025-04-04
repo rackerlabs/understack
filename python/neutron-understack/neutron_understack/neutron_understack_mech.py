@@ -277,51 +277,48 @@ class UnderstackDriver(MechanismDriver):
         anymore, hence there is no way for us to identify which baremetal port
         needs cleanup.
 
-        Only in the update_port_postcommit we have access to the original context,
-        from which we can access the binding information.
+        Only in the update_port_postcommit do we have access to the original
+        context, from which we can access the binding information.
 
         # TODO: garbage collection of unused VLAN-type network segments.  We
         # create these dynamic segments on the fly so they might get left behind
         # as the ports dissappear.   If a VLAN is left in a cabinet with nobody
         # using it, it can be deleted.
         """
-        if (
-            context.current["binding:vnic_type"] == "baremetal"
-            and context.vif_type == portbindings.VIF_TYPE_UNBOUND
-            and context.original_vif_type == portbindings.VIF_TYPE_OTHER
-        ):
-            network_id = context.current["network_id"]
-            trunk_details = context.current.get("trunk_details", {})
-            connected_interface_uuid = utils.fetch_connected_interface_uuid(
-                context.original["binding:profile"], LOG
-            )
-
-            networks_to_remove = set(self._fetch_subports_network_ids(trunk_details))
-            networks_to_remove.add(network_id)
-
-            LOG.debug(
-                "update_port_postcommit removing vlans %s from interface %s ",
-                networks_to_remove,
-                connected_interface_uuid,
-            )
-
-            self.nb.remove_port_network_associations(
-                connected_interface_uuid, networks_to_remove
-            )
-
-        # Run undersync on every possible port operation.  If this transpires to
-        # be causing too much unnecessary work, we can always make this
-        # conditional based on what appears to have changed in the provided
-        # context versus the "original".
         vlan_group_name = self._vlan_group_name(context)
+
+        baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
+        current_vif_unbound = context.vif_type == portbindings.VIF_TYPE_UNBOUND
+        original_vif_other = context.original_vif_type == portbindings.VIF_TYPE_OTHER
+        current_vif_other = context.vif_type == portbindings.VIF_TYPE_OTHER
+
+        if baremetal_vnic and current_vif_unbound and original_vif_other:
+            self._tenant_network_port_cleanup(context)
+        elif current_vif_other and vlan_group_name:
+            self.invoke_undersync(vlan_group_name)
+
+    def _tenant_network_port_cleanup(self, context: PortContext):
+        network_id = context.current["network_id"]
+        trunk_details = context.current.get("trunk_details", {})
+        connected_interface_uuid = utils.fetch_connected_interface_uuid(
+            context.original["binding:profile"], LOG
+        )
+
+        networks_to_remove = set(self._fetch_subports_network_ids(trunk_details))
+        networks_to_remove.add(network_id)
+
+        # TODO: does this needs to clean up subports too?
+
         LOG.debug(
-            "update_port_postcommit vlan_group=%s vif_type=%s",
-            vlan_group_name,
-            context.vif_type,
+            "update_port_postcommit removing vlans %s from interface %s ",
+            networks_to_remove,
+            connected_interface_uuid,
+        )
+
+        self.nb.remove_port_network_associations(
+            connected_interface_uuid, networks_to_remove
         )
         # TODO: also call this in the case above, i.e. previos vif type was other and current vif type is unbound.
-        if vlan_group_name and context.vif_type == portbindings.VIF_TYPE_OTHER:
-            self.invoke_undersync(vlan_group_name)
 
     def delete_port_precommit(self, context):
         pass
