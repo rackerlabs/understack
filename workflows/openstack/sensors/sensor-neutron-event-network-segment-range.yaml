@@ -1,0 +1,100 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: neutron-event-network-segment-range
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/title: Add/edit Nautobot UCVNIGroup range field on Neutron network-segment-range operations
+    workflows.argoproj.io/description: |+
+      Triggers on the following Events:
+
+      - network_segment_range.create.end
+      - network_segment_range.update.end
+      - network_segment_range.delete.end
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/neutron-event-network-segment-range \
+      -p event_type network_segment_range.create.end -p segment_min_range=1800 segment_max_range=3799
+      ```
+
+      Defined in `workflows/openstack/sensor-neutron-event-network-segment-range.yaml`
+spec:
+  dependencies:
+  - eventName: notifications
+    eventSourceName: openstack-neutron
+    name: network-segment-range-msg
+    transform:
+      # the event is a string-ified JSON so we need to decode it
+      jq: ".body[\"oslo.message\"] | fromjson"
+    filters:
+      dataLogicalOperator: "and"
+      data:
+        - path: "event_type"
+          type: "string"
+          # any of the values will trigger
+          value:
+            - "network_segment_range.create.end"
+            - "network_segment_range.update.end"
+            - "network_segment_range.delete.end"
+        - path: "payload.network_segment_range.network_type"
+          type: "string"
+          value:
+            - "vxlan"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: neutron-event-network-segment-range
+        # uses 'argo' CLI instead of 'kubectl'
+        argoWorkflow:
+          # sets the operation to 'argo submit'
+          operation: submit
+          # edits the source section
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dependencyName: network-segment-range-msg
+                dataKey: event_type
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dependencyName: network-segment-range-msg
+                dataKey: payload.network_segment_range.name
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dependencyName: network-segment-range-msg
+                dataKey: payload.network_segment_range.network_type
+            - dest: spec.arguments.parameters.3.value
+              src:
+                dependencyName: network-segment-range-msg
+                dataKey: payload.network_segment_range.id
+            - dest: spec.arguments.parameters.4.value
+              src:
+                dependencyName: network-segment-range-msg
+                dataKey: payload.network_segment_range.minimum
+            - dest: spec.arguments.parameters.5.value
+              src:
+                dependencyName: network-segment-range-msg
+                dataKey: payload.network_segment_range.maximum
+
+          source:
+            # create a workflow in argo-events prefixed with neutron-event-network-segment-range-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: neutron-event-network-segment-range-
+                namespace: argo-events
+              spec:
+                # defines the parameters being replaced above
+                arguments:
+                  parameters:
+                    - name: event_type
+                    - name: segment_name
+                    - name: network_type
+                    - name: segment_range_id
+                    - name: segment_min_range
+                    - name: segment_max_range
+                # references the workflow
+                workflowTemplateRef:
+                  name: neutron-event-network-segment-range
