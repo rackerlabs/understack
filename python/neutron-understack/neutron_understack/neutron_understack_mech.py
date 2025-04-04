@@ -294,6 +294,8 @@ class UnderstackDriver(MechanismDriver):
 
         if baremetal_vnic and current_vif_unbound and original_vif_other:
             self._tenant_network_port_cleanup(context)
+            if vlan_group_name:
+                self.invoke_undersync(vlan_group_name)
         elif current_vif_other and vlan_group_name:
             self.invoke_undersync(vlan_group_name)
 
@@ -318,7 +320,6 @@ class UnderstackDriver(MechanismDriver):
         self.nb.remove_port_network_associations(
             connected_interface_uuid, networks_to_remove
         )
-        # TODO: also call this in the case above, i.e. previos vif type was other and current vif type is unbound.
 
     def delete_port_precommit(self, context):
         pass
