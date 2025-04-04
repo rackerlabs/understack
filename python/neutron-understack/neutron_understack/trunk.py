@@ -1,4 +1,4 @@
-from neutron.db.models_v2 import Port
+from neutron.objects.ports import Port
 from neutron.objects.trunk import SubPort
 from neutron.services.trunk.drivers import base as trunk_base
 from neutron.services.trunk.models import Trunk
@@ -161,8 +161,17 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
                 parent_port_obj, subports
             )
 
+    def configure_trunk(self, trunk_details: dict, port_id: str) -> None:
+        parent_port_obj = utils.fetch_port_object(port_id)
+        subports = trunk_details.get("sub_ports", [])
+        self._add_subports_networks_to_parent_port_switchport(
+            parent_port=parent_port_obj,
+            subports=subports,
+            invoke_undersync=False,
+        )
+
     def _add_subports_networks_to_parent_port_switchport(
-        self, parent_port: Port, subports: list[SubPort]
+        self, parent_port: Port, subports: list[SubPort], invoke_undersync: bool = True
     ) -> None:
         binding_profile = parent_port.bindings[0].profile
         binding_host = parent_port.bindings[0].host
@@ -176,7 +185,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
 
         for subport in subports:
             subport_network_id = utils.fetch_subport_network_id(
-                subport_id=subport.port_id
+                subport_id=subport["port_id"]
             )
             network_segment = utils.allocate_dynamic_segment_from_plugin(
                 network_id=subport_network_id,
@@ -197,18 +206,34 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             allowed_vlan_ids=allowed_vlan_ids,
         )
 
-        self.undersync.sync_devices(
-            vlan_group=vlan_group_name,
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        if invoke_undersync:
+            self.undersync.sync_devices(
+                vlan_group=vlan_group_name,
+                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+            )
+
+    def clean_trunk(self, trunk_details: dict, port_id: str) -> None:
+        subports = trunk_details.get("sub_ports", [])
+        parent_port_obj = utils.fetch_port_object(port_id)
+        self._handle_subports_removal(
+            parent_port=parent_port_obj,
+            subports=subports,
+            invoke_undersync=False,
         )
 
     def _clean_parent_port_switchport_config(
         self, trunk: Trunk, subports: [SubPort]
     ) -> None:
-        if not utils.parent_port_is_bound(parent_port_obj):
-            return
-
         parent_port_obj = utils.fetch_port_object(trunk.port_id)
+        if utils.parent_port_is_bound(parent_port_obj):
+            self._handle_subports_removal(
+                parent_port=parent_port_obj,
+                subports=subports,
+            )
+
+    def _handle_subports_removal(
+        self, parent_port: Port, subports: list[SubPort], invoke_undersync: bool = True
+    ) -> None:
         binding_profile = parent_port.bindings[0].profile
         vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
         connected_interface_id = utils.fetch_connected_interface_uuid(
@@ -218,7 +243,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         segmentation_ids_to_remove = set()
         for subport in subports:
             subport_binding_level = utils.port_binding_level_by_port_id(
-                port_id=subport.port_id
+                port_id=subport["port_id"]
             )
 
             network_segment = utils.network_segment_by_id(
@@ -231,10 +256,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
 
         # self.nb.remove_port_vlan_associations
 
-        self.undersync.sync_devices(
-            vlan_group=vlan_group_name,
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
+        if invoke_undersync:
+            self.undersync.sync_devices(
+                vlan_group=vlan_group_name,
+                dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+            )
 
     def subports_added(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
