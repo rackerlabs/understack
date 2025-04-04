@@ -1,0 +1,81 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+tasks:
+
+  creds-gen:
+    desc: Generates all OpenStack Helm credentials
+    cmds:
+      - task: creds-gen-db-keystone
+      - task: creds-gen-rabbitmq-keystone
+      - task: creds-gen-keystone-keystone
+      - task: creds-gen-db-ironic
+      - task: creds-gen-rabbitmq-ironic
+      - task: creds-gen-keystone-ironic
+      - task: creds-gen-db-placement
+      - task: creds-gen-rabbitmq-placement
+      - task: creds-gen-keystone-placement
+      - task: creds-gen-db-neutron
+      - task: creds-gen-rabbitmq-neutron
+      - task: creds-gen-keystone-neutron
+      - task: creds-gen-db-nova
+      - task: creds-gen-rabbitmq-nova
+      - task: creds-gen-keystone-nova
+      - task: creds-gen-db-glance
+      - task: creds-gen-rabbitmq-glance
+      - task: creds-gen-keystone-glance
+      - task: creds-gen-db-horizon
+
+  creds-gen-*-*:
+    desc: |-
+      Generates credentials for an OpenStack service e.g. creds-gen-db-keystone
+
+    cmds:
+      - mkdir -p '{{.BASE_PATH}}'
+      - minijinja-cli --env --select=ENV {{.ROOT_DIR}}/taskfiles/openstack/templates/creds.yaml.j2
+        {{ if .KUBESEAL }}| kubeseal --scope namespace-wide -o yaml{{ end }}
+        > '{{.BASE_PATH}}/secret-{{.TYPE}}-password.yaml'
+      - task: have-kustomization-yaml
+        vars:
+          PATH: '{{.BASE_PATH}}'
+      - cd {{.BASE_PATH}} && kustomize edit add resource 'secret-{{.TYPE}}-password.yaml'
+
+    env:
+      SECRET_NAME: '{{.SVC}}-{{.TYPE}}-password'
+      USERNAME: '{{.SVC}}'
+      PASSWORD: '{{.USEPASS}}'
+
+    requires:
+      vars:
+        - UC_DEPLOY
+        - DEPLOY_NAME
+
+    generates:
+      - '{{.DEPLOY_NAME}}/manifests/{{.SVC}}/secret-{{.TYPE}}-password.yaml'
+
+    vars:
+      TYPE: '{{ index .MATCH 0 }}'
+      SVC: '{{ index .MATCH 1 }}'
+      BASE_PATH: '{{ if isAbs .UC_DEPLOY }}{{.UC_DEPLOY}}/{{.DEPLOY_NAME}}/manifests/{{.SVC}}{{ else }}{{.USER_WORKING_DIR}}/{{.UC_DEPLOY}}/{{.DEPLOY_NAME}}/manifests/{{.SVC}}{{end}}'
+      CURRPASS:
+        sh: kubectl -n openstack get secret '{{.SVC}}-{{.TYPE}}-password' -o jsonpath='{.data.password}' 2> /dev/null | base64 -d
+      NEWPASS:
+        sh: dd bs=512 if=/dev/urandom count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9\-' | head -c 32
+      USEPASS: '{{if .CURRPASS}}{{.CURRPASS}}{{else}}{{.NEWPASS}}{{end}}'
+    preconditions:
+      - which minijinja-cli
+      - which kubectl
+
+  have-kustomization-yaml:
+    internal: true
+
+    requires:
+      vars:
+        - PATH
+
+    cmd:
+      minijinja-cli -o {{.PATH}}/kustomization.yaml {{.ROOT_DIR}}/taskfiles/openstack/templates/kustomization.yaml.j2
+
+    status:
+      - test -f {{.PATH}}/kustomization.yaml
