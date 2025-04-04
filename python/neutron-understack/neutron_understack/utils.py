@@ -3,11 +3,13 @@ from pprint import pprint
 from uuid import UUID
 
 from neutron.objects import ports as port_obj
+from neutron.objects.network import NetworkSegment
 from neutron.plugins.ml2.driver_context import portbindings
 from neutron_lib import constants
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
+from neutron_understack import vlan_group_name_convention
 
 
 def fetch_port_object(port_id: str) -> port_obj.Port:
@@ -32,6 +34,48 @@ def allocate_dynamic_segment_from_plugin(
         pprint(segment)
         return segment
     return {}
+
+def create_binding_profile_level(
+    port_id: str, host: str, level: int, segment_id: str
+) -> None:
+    context = n_context.get_admin_context()
+    pbl = port_obj.PortBindingLevel(
+            context,
+            port_id=port_id,
+            host=host,
+            level=level,
+            driver="understack",
+            segment_id=segment_id,
+        )
+    pbl.create()
+
+def port_binding_level_by_port_id(port_id: str) -> port_obj.PortBindingLevel:
+    context = n_context.get_admin_context()
+    return port_obj.PortBindingLevel.get_object(context, port_id=port_id)
+
+def ports_bound_to_segment(segment_id: str) -> list[port_obj.PortBindingLevel]:
+    context = n_context.get_admin_context()
+    return port_obj.PortBindingLevel.get_objects(context, segment_id=segment_id)
+
+def network_segment_by_id(id: str) -> NetworkSegment:
+    context = n_context.get_admin_context()
+    return NetworkSegment.get_object(id=id)
+
+def release_dynamic_segment(segment_id: str) -> None:
+    context = n_context.get_admin_context()
+    core_plugin = directory.get_plugin()  # Get the core plugin
+
+    if hasattr(core_plugin.type_manager, 'release_dynamic_segment'):
+        core_plugin.type_manager.release_dynamic_segment(context, segment_id)
+
+
+def vlan_group_name_from_binding_profile(binding_profile: dict) -> str | None:
+    local_link_info = binding_profile.get("local_link_information", [])
+    switch_names = [
+        link["switch_info"] for link in local_link_info if "switch_info" in link
+    ]
+    if switch_names:
+        return vlan_group_name_convention.for_switch(switch_names[0])
 
 
 def fetch_connected_interface_uuid(

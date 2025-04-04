@@ -154,77 +154,92 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             )
             self._handle_tenant_vlan_id_config(subport_network_id, subport)
 
-            self._handle_parent_port_switchport_config(
-                trunk.port_id, subport_network_id
+        parent_port_obj = utils.fetch_port_object(trunk.port_id)
+
+        if utils.parent_port_is_bound(parent_port_obj):
+            self._add_subports_networks_to_parent_port_switchport(
+                parent_port_obj, subports
             )
 
-    def _add_subport_network_to_parent_port_switchport(
-        self, parent_port: Port, subport_network_id: str
+    def _add_subports_networks_to_parent_port_switchport(
+        self, parent_port: Port, subports: list[SubPort]
     ) -> None:
+        binding_profile = parent_port.bindings[0].profile
+        binding_host = parent_port.bindings[0].host
         connected_interface_id = utils.fetch_connected_interface_uuid(
-            parent_port.bindings[0].profile, LOG
+            binding_profile, LOG
         )
 
-        vlan_group_id = self.nb.prep_switch_interface(
-            connected_interface_id=connected_interface_id,
-            ucvni_uuid=subport_network_id,
-            vlan_tag=None,
-            modify_native_vlan=False,
-        )["vlan_group_id"]
+        vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
+
+        allowed_vlan_ids = set()
+
+        for subport in subports:
+            subport_network_id = utils.fetch_subport_network_id(
+                subport_id=subport.port_id
+            )
+            network_segment = utils.allocate_dynamic_segment_from_plugin(
+                network_id=subport_network_id,
+                physnet=vlan_group_name,
+            )
+            allowed_vlan_ids.add(network_segment["segmentation_id"])
+
+            utils.create_binding_profile_level(
+                port_id=subport["port_id"],
+                host=binding_host,
+                level=0,
+                segment_id=network_segment["id"]
+            )
+
+        self.nb.add_port_vlan_associations(
+            interface_uuid=connected_interface_id,
+            vlan_group_name=vlan_group_name,
+            allowed_vlan_ids=allowed_vlan_ids,
+        )
 
         self.undersync.sync_devices(
-            vlan_group_uuids=str(vlan_group_id),
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
-
-    def _remove_subport_network_from_parent_port_switchport(
-        self, parent_port: Port, subport_network_id: str
-    ) -> None:
-        connected_interface_id = utils.fetch_connected_interface_uuid(
-            parent_port.bindings[0].profile, LOG
-        )
-
-        vlan_group_id = self.nb.detach_port(
-            connected_interface_id=connected_interface_id,
-            ucvni_uuid=subport_network_id,
-        )
-
-        self.undersync.sync_devices(
-            vlan_group_uuids=str(vlan_group_id),
+            vlan_group=vlan_group_name,
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
     def _clean_parent_port_switchport_config(
         self, trunk: Trunk, subports: [SubPort]
     ) -> None:
-        parent_port_obj = utils.fetch_port_object(trunk.port_id)
-
         if not utils.parent_port_is_bound(parent_port_obj):
             return
 
+        parent_port_obj = utils.fetch_port_object(trunk.port_id)
+        binding_profile = parent_port.bindings[0].profile
+        vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
+        connected_interface_id = utils.fetch_connected_interface_uuid(
+            binding_profile, LOG
+        )
+
+        segmentation_ids_to_remove = set()
         for subport in subports:
-            subport_network_id = utils.fetch_subport_network_id(
-                subport_id=subport.port_id
-            )
-            self._remove_subport_network_from_parent_port_switchport(
-                parent_port_obj, subport_network_id
+            subport_binding_level = utils.port_binding_level_by_port_id(
+                port_id=subport.port_id
             )
 
-    def _allocate_dynamic_segment_for_subports_network(self, subports: list) -> None:
-        for subport in subports:
-            subport_network_id = utils.fetch_subport_network_id(
-                subport_id=subport.port_id
-            )
-            utils.allocate_dynamic_segment_from_plugin(
-                network_id=subport_network_id,
-                physnet="test",
-            )
+            network_segment = utils.network_segment_by_id(
+                subport_binding_level.segment_id)
+            segmentation_ids_to_remove.add(network_segment.segmentation_id)
+            subport_binding_level.delete()
+
+            if not utils.ports_bound_to_segment(network_segment.id):
+                network_segment.delete()
+
+        # self.nb.remove_port_vlan_associations
+
+        self.undersync.sync_devices(
+            vlan_group=vlan_group_name,
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
 
     def subports_added(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
         subports = payload.metadata["subports"]
-        self._allocate_dynamic_segment_for_subports_network(subports)
-        # self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
+        self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
 
     def subports_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
