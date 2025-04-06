@@ -11,6 +11,11 @@ def required_bios_settings(pxe_interface: str) -> dict:
     return {
         "PxeDev1EnDis": "Enabled",
         "PxeDev1Interface": pxe_interface,
+        "HttpDev1EnDis": "Enabled",
+        "HttpDev1Interface": pxe_interface,
+        # at this time ironic conductor returns http URLs
+        # when its serving data from its own http server
+        "HttpDev1TlsMode": "None",
         "TimeZone": "UTC",
     }
 
