@@ -12,7 +12,6 @@ from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
 from neutron_lib.plugins.ml2.api import NetworkContext
 from oslo_config import cfg
-from neutron.objects import ports
 
 from neutron_understack import config
 from neutron_understack import utils
