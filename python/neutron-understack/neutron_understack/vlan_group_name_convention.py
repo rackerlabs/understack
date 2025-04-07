@@ -19,9 +19,7 @@ def for_switch(switch_name: str) -> str:
             return f"{cabinet_name}-{vlan_group_suffix}"
 
     raise ValueError(
-        "Could not determine the VLAN GROUP name for Switch %s.  We "
-        "only have a convention to do this for switch names ending "
-        "in one of the suffixes %s",
-        switch_name,
-        VLAN_GROUP_SUFFIXES.keys(),
+        f"Could not determine the VLAN GROUP name for Switch {switch_name}.  We "
+        f"only have a convention to do this for switch names ending "
+        f"in one of the suffixes {list(VLAN_GROUP_SUFFIXES.keys())}"
     )

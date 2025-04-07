@@ -12,7 +12,7 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
     context = n_context.get_admin_context()
     port = port_obj.Port.get_object(context, id=port_id)
     if port is None:
-        raise ValueError("Failed to fetch Port with ID %s, port_id")
+        raise ValueError(f"Failed to fetch Port with ID {port_id}")
     return port
 
 
