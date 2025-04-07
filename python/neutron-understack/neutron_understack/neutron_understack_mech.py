@@ -75,8 +75,7 @@ class UnderstackDriver(MechanismDriver):
             return
         ucvni_group = conf.ucvni_group
         if segmentation_id is None:
-            raise ValueError("Network %s missing provider:segmentation_id", network_id)
-
+            raise ValueError(f"Network {network_id} missing provider:segmentation_id")
         ucvni_response = self.nb.ucvni_create(
             network_id=network_id,
             project_id=project_id,
