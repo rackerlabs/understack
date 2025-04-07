@@ -4,7 +4,7 @@ from neutron.db.models.plugins.ml2.vlanallocation import VlanAllocation
 from neutron.db.models.segment import NetworkSegment
 from neutron_lib import constants as p_const
 from neutron_lib import context as neutron_context
-from neutron_lib.plugins.ml2.api import NetworkContext
+from .ml2_type_annotations import NetworkContext, PortContext
 from sqlalchemy import update
 
 LOG = logging.getLogger(__name__)
