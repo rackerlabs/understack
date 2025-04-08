@@ -61,3 +61,7 @@ kubectl -n openstack exec -it rabbitmq-server-0 -c rabbitmq -- rabbitmqadmin --v
 kubectl -n openstack exec -it rabbitmq-server-0 -c rabbitmq -- rabbitmqadmin --vhost=nova get queue=notifications.info ackmode=ack_requeue_true payload_file=/tmp/test.json
 kubectl -n openstack cp rabbitmq-server-0:/tmp/test.json -c rabbitmq /tmp/test.json
 ```
+
+### To dump, print, list-events, and requeue an openstack notifications rabbitmq queue
+
+use [OpenStack RabbitMQ Queue Dump Tool](https://github.com/rackerlabs/understack/tree/main/examples/openstack-notifications)

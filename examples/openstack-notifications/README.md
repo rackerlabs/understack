@@ -21,13 +21,16 @@ export RABBIT_PASS=$(kubectl -n openstack get secret rabbitmq-default-user -o js
 kubectl -n openstack port-forward svc/rabbitmq 5672
 ```
 
-3. Run the `queue_dump.py` tool:
+4. Use RabbitMq management UI to know more about Virtualhosts, Exchanges, Queues etc, follow the instructions [provided here](https://rackerlabs.github.io/understack/operator-guide/rabbitmq/):
+
+
+5. Run the `queue_dump.py` tool:
 
 ``` text
  python queue_dump.py -h
 usage: queue-dump [-h] -u USERNAME -p PASSWORD [--host HOST] [--port PORT] [--virtualhost VIRTUALHOST] [--queue QUEUE] [-v] [--destroy]
 
-dump, print, and requeue an openstack notifications rabbitmq queue
+dump, print, list-events, and requeue an openstack notifications rabbitmq queue
 
 options:
   -h, --help            show this help message and exit
@@ -50,6 +53,14 @@ options:
 
 ```
 python queue_dump.py -u $RABBIT_USER -p $RABBIT_PASS
+```
+
+## List OpenStack notifications event types
+
+If you want to understand what are the different event-types being emitted by OpenStack notifications system, you can use:
+
+```
+python queue_dump.py --virtualhost $VIRTUAL_HOST -u $RABBIT_USER -p $RABBIT_PASS --queue notifications.info --list-event-types
 ```
 
 ## Find OpenStack notifications for a specific event type

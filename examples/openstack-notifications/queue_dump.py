@@ -31,6 +31,11 @@ parser.add_argument(
     help="Scan for a specific OpenStack notification event type",
 )
 parser.add_argument(
+    "--list-event-types",
+    action="store_true",
+    help="List event_type values found in the queue",
+)
+parser.add_argument(
     "--provision-state",
     type=str,
     required=False,
@@ -73,32 +78,37 @@ def callback(ch, method, properties, body):
     if message:
         parsed["oslo.message"] = message
 
-    if args.event_type or args.provision_state:
-        if args.event_type:
-            event_type = message.get("event_type")
-            if event_type == args.event_type:
-                print(json.dumps(parsed, indent=4))
+    event_type = message.get("event_type")
 
-        if args.provision_state:
-            payload = message.get("payload", {})
-            ironic_object = payload.get("ironic_object.data", {})
-            provision_state = ironic_object.get("provision_state")
-            if provision_state == args.provision_state:
-                print(json.dumps(parsed, indent=4))
+    if args.list_event_types and message.get("event_type", None):
+        print(event_type)
     else:
-        print(json.dumps(parsed, indent=4))
+        if args.event_type or args.provision_state:
+            if args.event_type:
+                event_type = message.get("event_type")
+                if event_type == args.event_type:
+                    print(json.dumps(parsed, indent=4))
 
-    if args.destroy:
-        print("Destroying message.")
-        # Acknowledge that the message has been handled, removing it from the queue.
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+            if args.provision_state:
+                payload = message.get("payload", {})
+                ironic_object = payload.get("ironic_object.data", {})
+                provision_state = ironic_object.get("provision_state")
+                if provision_state == args.provision_state:
+                    print(json.dumps(parsed, indent=4))
+        else:
+            print(json.dumps(parsed, indent=4))
 
-    else:
-        if args.verbose:
-            print("Re-queueing the message.")
+        if args.destroy:
+            print("Destroying message.")
+            # Acknowledge that the message has been handled, removing it from the queue.
+            ch.basic_ack(delivery_tag=method.delivery_tag)
 
-        # Requeue the message using using nack
-        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        else:
+            if args.verbose:
+                print("Re-queueing the message.")
+
+            # Requeue the message using using nack
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
 
 # Set up the consumer to pull messages from the queue
@@ -108,6 +118,7 @@ print(f"Waiting for messages in queue '{args.queue}'. To exit press CTRL+C")
 try:
     # Start consuming messages
     channel.start_consuming()
+
 except KeyboardInterrupt:
     # Gracefully stop the consumer on CTRL+C
     print("\nStopping consumer.")
