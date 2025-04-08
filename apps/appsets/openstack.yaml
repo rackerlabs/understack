@@ -39,7 +39,7 @@ spec:
                   chartVersion: 0.5.2
                 - component: nova
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  chartVersion: 0.3.47
+                  chartVersion: 2024.2.8+f37dd907f
                 - component: horizon
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
                   chartVersion: 2024.2.1+34d1672a-93ed069c
