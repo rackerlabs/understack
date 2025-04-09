@@ -10,7 +10,10 @@ from neutron_lib.api.definitions import segment as segment_def
 
 def fetch_port_object(port_id: str) -> port_obj.Port:
     context = n_context.get_admin_context()
-    return port_obj.Port.get_object(context, id=port_id)
+    port = port_obj.Port.get_object(context, id=port_id)
+    if port is None:
+        raise ValueError(f"Failed to fetch Port with ID {port_id}")
+    return port
 
 
 def fetch_connected_interface_uuid(
