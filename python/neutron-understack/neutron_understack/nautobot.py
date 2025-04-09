@@ -212,49 +212,88 @@ class Nautobot:
     def subnet_delete(self, uuid: str) -> dict:
         return self.make_api_request("DELETE", f"/api/ipam/prefixes/{uuid}/")
 
-    def prep_switch_interface(
-        self,
-        connected_interface_id: str,
-        ucvni_uuid: str,
-        vlan_tag: int | None,
-        modify_native_vlan: bool | None = True,
-    ) -> dict:
-        """Runs a Nautobot Job to update a switch interface for tenant mode.
-
-        The nautobot job will assign vlans as required and set the interface
-        into the correct mode for "normal" tenant operation.
-
-        The dictionary with vlan group ID and vlan tag is returned.
-        """
-        url = "/api/plugins/undercloud-vni/prep_switch_interface"
-        payload = {
-            "ucvni_id": str(ucvni_uuid),
-            "connected_interface_id": str(connected_interface_id),
-            "modify_native_vlan": modify_native_vlan,
-            "vlan_tag": vlan_tag,
-        }
-        return self.make_api_request("POST", url, payload)
-
-    def detach_port(self, connected_interface_id: str, ucvni_uuid: str) -> str:
-        """Runs a Nautobot Job to cleanup a switch interface.
-
-        The nautobot job will find a VLAN that is bound to the UCVNI, remove it
-        from the Interface and if the VLAN is unused it will delete it.
-
-        The vlan group ID is returned.
-        """
-        url = "/api/plugins/undercloud-vni/detach_port"
-        payload = {
-            "ucvni_uuid": str(ucvni_uuid),
-            "connected_interface_id": str(connected_interface_id),
-        }
-        resp_data = self.make_api_request("POST", url, payload)
-
-        return resp_data["vlan_group_id"]
-
     def configure_port_status(self, interface_uuid: str, status: str) -> dict:
         url = f"/api/dcim/interfaces/{interface_uuid}/"
         payload = {"status": {"name": status}}
+        return self.make_api_request("PATCH", url, payload)
+
+    def set_port_vlan_associations(
+        self,
+        interface_uuid: str,
+        native_vlan_id: int | None,
+        allowed_vlans_ids: set[int],
+        vlan_group_name: str,
+    ) -> dict:
+        """Set the tagged and untagged vlan(s) on an interface."""
+        url = f"/api/dcim/interfaces/{interface_uuid}/"
+
+        payload: dict = {
+            "tagged_vlans": [
+                _vlan_payload(vlan_group_name, vlan_id) for vlan_id in allowed_vlans_ids
+            ],
+        }
+
+        if native_vlan_id is not None:
+            payload["untagged_vlan"] = _vlan_payload(vlan_group_name, native_vlan_id)
+
+        return self.make_api_request("PATCH", url, payload)
+
+    def add_port_vlan_associations(
+        self,
+        interface_uuid: str,
+        allowed_vlans_ids: set[int],
+        vlan_group_name: str,
+    ) -> dict:
+        """Adds the specified vlan(s) to interface untagged/tagged vlans."""
+        url = f"/api/dcim/interfaces/{interface_uuid}/"
+
+        current_state = self.make_api_request("GET", f"{url}?depth=1")
+
+        current_tagged_vlans = {
+            tagged_vlan["vid"] for tagged_vlan in current_state.get("tagged_vlans", [])
+        }
+
+        tagged_vlans = current_tagged_vlans.union(allowed_vlans_ids)
+
+        payload = {
+            "tagged_vlans": [
+                _vlan_payload(vlan_group_name, vlan_id) for vlan_id in tagged_vlans
+            ],
+        }
+        return self.make_api_request("PATCH", url, payload)
+
+    def remove_port_network_associations(
+        self, interface_uuid: str, network_ids_to_remove: set[str]
+    ):
+        query = """
+            query($interface_id: ID!){
+              interface(id: $interface_id){
+                name
+                untagged_vlan {id network: rel_ucvni_vlans { id }}
+                tagged_vlans {id network: rel_ucvni_vlans { id }}
+              }
+            }
+        """
+        variables = {"interface_id": interface_uuid}
+        current = self.api.graphql.query(query, variables).json["data"]["interface"]
+        LOG.debug("Nautobot %s query result: %s", variables, current)
+
+        url = f"/api/dcim/interfaces/{interface_uuid}/"
+        payload = {}
+
+        current_untagged_network = current["untagged_vlan"]["network"]["id"]
+        if current_untagged_network in network_ids_to_remove:
+            payload["untagged_vlan"] = None
+
+        payload["tagged_vlans"] = [
+            tagged_vlan["id"]
+            for tagged_vlan in current["tagged_vlans"]
+            if (
+                tagged_vlan.get("network")
+                and tagged_vlan.get("network")["id"] not in network_ids_to_remove
+            )
+        ]
+
         return self.make_api_request("PATCH", url, payload)
 
     def fetch_vlan_group_uuid(self, device_uuid: str) -> str:
@@ -303,3 +342,10 @@ class Nautobot:
             ) from error
         else:
             return result
+
+
+def _vlan_payload(vlan_group_name: str, vlan_id: int) -> dict:
+    return {
+        "vlan_group": {"name": vlan_group_name},
+        "vid": vlan_id,
+    }
