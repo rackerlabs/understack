@@ -1,8 +1,8 @@
 import logging
 from uuid import UUID
+from .ml2_type_annotations import NetworkContext, PortContext
 
 import neutron_lib.api.definitions.portbindings as portbindings
-from neutron.plugins.ml2.driver_context import PortContext
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.callbacks import events
@@ -10,7 +10,6 @@ from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
-from neutron_lib.plugins.ml2.api import NetworkContext
 from oslo_config import cfg
 
 from neutron_understack import config
@@ -61,7 +60,7 @@ class UnderstackDriver(MechanismDriver):
         if cfg.CONF.ml2_understack.enforce_unique_vlans_in_fabric:
             self.vlan_manager.create_vlan_for_network(context)
 
-    def create_network_postcommit(self, context):
+    def create_network_postcommit(self, context: NetworkContext):
         network = context.current
         network_id = network["id"]
         network_name = network["name"]
@@ -75,6 +74,8 @@ class UnderstackDriver(MechanismDriver):
         if provider_type not in [p_const.TYPE_VLAN, p_const.TYPE_VXLAN]:
             return
         ucvni_group = conf.ucvni_group
+        if segmentation_id is None:
+            raise ValueError(f"Network {network_id} missing provider:segmentation_id")
         ucvni_response = self.nb.ucvni_create(
             network_id=network_id,
             project_id=project_id,
@@ -95,16 +96,16 @@ class UnderstackDriver(MechanismDriver):
         )
         self._create_nautobot_namespace(network_id, external)
 
-    def update_network_precommit(self, context):
+    def update_network_precommit(self, context: NetworkContext):
         pass
 
-    def update_network_postcommit(self, context):
+    def update_network_postcommit(self, context: NetworkContext):
         pass
 
-    def delete_network_precommit(self, context):
+    def delete_network_precommit(self, context: NetworkContext):
         pass
 
-    def delete_network_postcommit(self, context):
+    def delete_network_postcommit(self, context: NetworkContext):
         network = context.current
         network_id = network["id"]
         external = network["router:external"]
