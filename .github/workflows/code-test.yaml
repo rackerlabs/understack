@@ -20,15 +20,25 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
-  python:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.set-projects.outputs.projects }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find all projects with pyproject.toml
+        id: set-projects
+        run: |
+          projects=$(find . -name pyproject.toml | jq -R -s -c 'split("\n")[:-1] | map(capture("python/(?<name>[^/]+)/pyproject.toml").name)')
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
+
+  uv:
+    needs: [discover]
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        project:
-          - understack-workflows
-          - understack-flavor-matcher
-          - neutron-understack
+        project: ${{ fromJson(needs.discover.outputs.projects) }}
 
     defaults:
       run:
@@ -36,22 +46,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - run: pipx install poetry==1.7.1 && poetry self add 'poetry-dynamic-versioning[plugin]'
+      - uses: astral-sh/setup-uv@v5
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
         with:
           python-version-file: python/${{ matrix.project }}/pyproject.toml
-          cache: "poetry"
-      - run: poetry install --sync --with test
-      - run: poetry build
-      - run: "poetry run pytest --cov --cov-report xml:coverage.xml"
+      - run: uv sync
+      - run: uv build --wheel
+      - run: "uv run pytest --cov --cov-report xml:coverage.xml"
       - uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
         with:
           name: coverage-${{ matrix.project }}
           path: python/${{ matrix.project }}/coverage.xml
           retention-days: 1
 
+
   coverage-upload:
-    needs: python
+    needs: [uv]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@b14cf4c92620c250e1c074ab0a5800e37df86765 # v4
