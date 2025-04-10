@@ -1,23 +1,25 @@
-import inspect
 from dataclasses import dataclass
-from pprint import pformat
-from urllib.parse import urljoin
-from uuid import UUID
+from typing import cast
 
 import pynautobot
-import requests
 from neutron_lib import exceptions as exc
 from oslo_log import log
+from pynautobot.core.response import Record
 
 LOG = log.getLogger(__name__)
 
 
 class NautobotRequestError(exc.NeutronException):
-    message = "Nautobot API ERROR %(code)s for %(url)s %(method)s %(payload)s: %(body)s"
+    message = "Nautobot API ERROR %(code)s for %(url)s %(payload)s: %(body)s"
 
-
-class NautobotOSError(exc.NeutronException):
-    message = "Error occurred querying Nautobot: %(err)s"
+    @classmethod
+    def from_nautobot_request_error(cls, error: pynautobot.RequestError):
+        return cls(
+            code=error.req.status_code,
+            url=error.base,
+            payload=error.request_body,
+            body=error.args[0],
+        )
 
 
 class NautobotNotFoundError(exc.NeutronException):
@@ -58,69 +60,11 @@ def _truncated(message: str | bytes, maxlen=200) -> str:
 
 
 class Nautobot:
-    """Basic Nautobot wrapper because pynautobot doesn't expose plugin APIs."""
-
     def __init__(self, nb_url: str, nb_token: str):
-        self.base_url = nb_url
-        self.session = requests.Session()
-        self.session.headers.update({"Authorization": f"Token {nb_token}"})
         self.api = pynautobot.api(
             url=nb_url,
             token=nb_token,
         )
-
-    def make_api_request(
-        self,
-        method: str,
-        url: str,
-        payload: dict | None = None,
-        params: dict[str, str] | None = None,
-        timeout: int = 10,
-    ) -> dict:
-        full_url = urljoin(self.base_url, url)
-
-        try:
-            response = self.session.request(
-                method,
-                full_url,
-                timeout=timeout,
-                json=payload,
-                params=params,
-                allow_redirects=False,
-            )
-        except Exception as e:
-            raise NautobotOSError(err=e) from e
-
-        if response.content:
-            try:
-                response_data = response.json()
-            except requests.exceptions.JSONDecodeError:
-                response_data = {"body": _truncated(response.content)}
-
-        else:
-            response_data = {"status_code": response.status_code, "body": ""}
-
-        if response.status_code >= 300:
-            response_data = response_data.get("error", response_data)
-
-            raise NautobotRequestError(
-                code=response.status_code,
-                url=full_url,
-                method=method,
-                payload=payload,
-                body=response_data,
-            )
-
-        caller_function = inspect.stack()[1].function
-        LOG.debug(
-            "[%s] %s %s %s ==> %s",
-            caller_function,
-            full_url,
-            method,
-            pformat(payload),
-            pformat(response_data),
-        )
-        return response_data
 
     def ucvni_create(
         self,
@@ -139,22 +83,27 @@ class Nautobot:
             "ucvni_id": segmentation_id,
         }
 
-        ucvni: pynautobot.core.response.Record = (
-            self.api.plugins.undercloud_vni.ucvnis.create(payload)
-        )
+        try:
+            ucvni = cast(Record, self.api.plugins.undercloud_vni.ucvnis.create(payload))
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
         return dict(ucvni)
 
-    def ucvni_delete(self, network_id):
-        url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
-        return self.make_api_request("DELETE", url)
-
-    def fetch_ucvni(self, network_id: str) -> dict:
-        url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
-        return self.make_api_request("GET", url)
+    def ucvni_delete(self, network_id: str) -> bool:
+        try:
+            return self.api.plugins.undercloud_vni.ucnvis.delete([network_id])
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
     def fetch_ucvni_tenant_vlan_id(self, network_id: str) -> int | None:
-        ucvni_data = self.fetch_ucvni(network_id=network_id)
-        custom_fields = ucvni_data.get("custom_fields", {})
+        try:
+            ucvni_raw = self.api.plugins.undercloud_vni.ucvnis.get(network_id)
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
+        if ucvni_raw is None:
+            raise NautobotNotFoundError(obj="ucvni", ref=network_id)
+        ucvni = cast(Record, ucvni_raw)
+        custom_fields = cast(dict, ucvni.custom_fields or {})
         if "tenant_vlan_id" not in custom_fields:
             raise NautobotCustomFieldNotFoundError(
                 cf_name="tenant_vlan_id", obj="UCVNI"
@@ -162,19 +111,28 @@ class Nautobot:
         return custom_fields.get("tenant_vlan_id")
 
     def fetch_namespace_by_name(self, name: str) -> str:
-        url = f"/api/ipam/namespaces/?name={name}&depth=1"
-        resp_data = self.make_api_request("GET", url)
         try:
-            return resp_data["results"][0]["id"]
-        except (IndexError, KeyError) as error:
-            raise NautobotNotFoundError(obj="namespace", ref=name) from error
+            ns_raw = self.api.ipam.namespaces.get(name=name)
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
+        if ns_raw is None:
+            raise NautobotNotFoundError(obj="namespace", ref=name)
+        ns = cast(Record, ns_raw)
+        return cast(str, ns.id)
 
     def namespace_create(self, name: str) -> dict:
         payload = {"name": name}
-        return self.make_api_request("POST", "/api/ipam/namespaces/", payload)
+        try:
+            namespace = cast(Record, self.api.ipam.namespaces.create(payload))
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
+        return dict(namespace)
 
-    def namespace_delete(self, uuid: str) -> dict:
-        return self.make_api_request("DELETE", f"/api/ipam/namespaces/{uuid}/")
+    def namespace_delete(self, namespace_id: str):
+        try:
+            self.api.ipam.namespaces.delete([namespace_id])
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
     def subnet_create(
         self, subnet_uuid: str, prefix: str, namespace_name: str, tenant_uuid: str
@@ -186,15 +144,27 @@ class Nautobot:
             "namespace": {"name": namespace_name},
             "tenant": {"id": tenant_uuid},
         }
-        return self.make_api_request("POST", "/api/ipam/prefixes/", payload)
+        try:
+            subnet = cast(Record, self.api.ipam.prefixes.create(payload))
+            return dict(subnet)
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
-    def set_svi_role_on_network(self, network_uuid: str, role: str):
-        url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}/"
+    def set_svi_role_on_network(self, network_uuid: str, role: str) -> bool:
         payload = {"role": {"name": role}}
-        self.make_api_request("PATCH", url, payload)
+        try:
+            return cast(
+                bool,
+                self.api.plugins.undercloud_vni.ucvnis.update(
+                    id=network_uuid, data=payload
+                ),
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
-    def associate_subnet_with_network(self, network_uuid: str, subnet_uuid: str):
-        url = "/api/extras/relationship-associations/"
+    def associate_subnet_with_network(
+        self, network_uuid: str, subnet_uuid: str
+    ) -> Record:
         payload = {
             "relationship": {"key": "ucvni_prefixes"},
             "source_type": "vni_custom_model.ucvni",
@@ -202,20 +172,39 @@ class Nautobot:
             "destination_type": "ipam.prefix",
             "destination_id": subnet_uuid,
         }
-        self.make_api_request("POST", url, payload)
+        try:
+            return cast(
+                Record, self.api.extras.relationship_associations.create(payload)
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
-    def add_tenant_vlan_tag_to_ucvni(self, network_uuid: str, vlan_tag: int) -> dict:
-        url = f"/api/plugins/undercloud-vni/ucvnis/{network_uuid}/"
+    def add_tenant_vlan_tag_to_ucvni(self, network_uuid: str, vlan_tag: int) -> bool:
         payload = {"custom_fields": {"tenant_vlan_id": vlan_tag}}
-        return self.make_api_request("PATCH", url, payload)
+        try:
+            return cast(
+                bool,
+                self.api.plugins.undercloud_vni.ucvnis.update(
+                    id=network_uuid, data=payload
+                ),
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
-    def subnet_delete(self, uuid: str) -> dict:
-        return self.make_api_request("DELETE", f"/api/ipam/prefixes/{uuid}/")
+    def subnet_delete(self, uuid: str) -> bool:
+        try:
+            return self.api.ipam.prefixes.delete([uuid])
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
-    def configure_port_status(self, interface_uuid: str, status: str) -> dict:
-        url = f"/api/dcim/interfaces/{interface_uuid}/"
+    def configure_port_status(self, interface_uuid: str, status: str) -> bool:
         payload = {"status": {"name": status}}
-        return self.make_api_request("PATCH", url, payload)
+        try:
+            return cast(
+                bool, self.api.dcim.interfaces.update(id=interface_uuid, data=payload)
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
     def set_port_vlan_associations(
         self,
@@ -223,10 +212,8 @@ class Nautobot:
         native_vlan_id: int | None,
         allowed_vlans_ids: set[int],
         vlan_group_name: str,
-    ) -> dict:
+    ) -> bool:
         """Set the tagged and untagged vlan(s) on an interface."""
-        url = f"/api/dcim/interfaces/{interface_uuid}/"
-
         payload: dict = {
             "tagged_vlans": [
                 _vlan_payload(vlan_group_name, vlan_id) for vlan_id in allowed_vlans_ids
@@ -236,23 +223,31 @@ class Nautobot:
         if native_vlan_id is not None:
             payload["untagged_vlan"] = _vlan_payload(vlan_group_name, native_vlan_id)
 
-        return self.make_api_request("PATCH", url, payload)
+        try:
+            return cast(
+                bool, self.api.dcim.interfaces.update(id=interface_uuid, data=payload)
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
     def add_port_vlan_associations(
         self,
         interface_uuid: str,
         allowed_vlans_ids: set[int],
         vlan_group_name: str,
-    ) -> dict:
+    ) -> bool:
         """Adds the specified vlan(s) to interface untagged/tagged vlans."""
-        url = f"/api/dcim/interfaces/{interface_uuid}/"
-
-        current_state = self.make_api_request("GET", f"{url}?depth=1")
-
+        try:
+            current_state = cast(
+                Record | None, self.api.dcim.interfaces.get(interface_uuid)
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
+        if current_state is None:
+            raise NautobotNotFoundError(obj="interface", ref=interface_uuid)
         current_tagged_vlans = {
-            tagged_vlan["vid"] for tagged_vlan in current_state.get("tagged_vlans", [])
+            tagged_vlan.vid for tagged_vlan in current_state.tagged_vlans
         }
-
         tagged_vlans = current_tagged_vlans.union(allowed_vlans_ids)
 
         payload = {
@@ -260,97 +255,72 @@ class Nautobot:
                 _vlan_payload(vlan_group_name, vlan_id) for vlan_id in tagged_vlans
             ],
         }
-        return self.make_api_request("PATCH", url, payload)
+        try:
+            return cast(
+                bool, self.api.dcim.interfaces.update(id=interface_uuid, data=payload)
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
     def remove_port_network_associations(
-        self, interface_uuid: str, network_ids_to_remove: set[str]
-    ):
-        query = """
-            query($interface_id: ID!){
-              interface(id: $interface_id){
-                name
-                untagged_vlan {id network: rel_ucvni_vlans { id }}
-                tagged_vlans {id network: rel_ucvni_vlans { id }}
-              }
-            }
-        """
-        variables = {"interface_id": interface_uuid}
-        current = self.api.graphql.query(query, variables).json["data"]["interface"]
-        LOG.debug("Nautobot %s query result: %s", variables, current)
+        self, interface_uuid: str, vlan_ids_to_remove: set[str]
+    ) -> bool:
+        interface = cast(Record | None, self.api.dcim.interfaces.get(interface_uuid))
 
-        url = f"/api/dcim/interfaces/{interface_uuid}/"
+        if not interface:
+            LOG.error("Interface %s not found in Nautobot", interface_uuid)
+            return False
+
+        current = {
+            "name": interface.name,
+            "untagged_vlan": interface.untagged_vlan,
+            "tagged_vlans": interface.tagged_vlans,
+        }
+
+        LOG.debug("Nautobot %s query result: %s", interface_uuid, current)
         payload = {}
-
         if (
             current["untagged_vlan"]
-            and current["untagged_vlan"]["id"] in network_ids_to_remove
+            and current["untagged_vlan"]["id"] in vlan_ids_to_remove
         ):
             payload["untagged_vlan"] = None
 
         payload["tagged_vlans"] = [
             tagged_vlan["id"]
             for tagged_vlan in current["tagged_vlans"]
-            if tagged_vlan["id"] not in network_ids_to_remove
+            if tagged_vlan["id"] not in vlan_ids_to_remove
         ]
-
-        return self.make_api_request("PATCH", url, payload)
-
-    def fetch_vlan_group_uuid(self, device_uuid: str) -> str:
-        url = f"/api/dcim/devices/{device_uuid}/?include=relationships"
-
-        resp_data = self.make_api_request("GET", url)
         try:
-            vlan_group_uuid = resp_data["relationships"]["vlan_group_to_devices"][
-                "source"
-            ]["objects"][0]["id"]
-        except (KeyError, IndexError, TypeError) as err:
-            raise NautobotNotFoundError(obj="device", ref=device_uuid) from err
+            return cast(
+                bool, self.api.dcim.interfaces.update(id=interface_uuid, data=payload)
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
-        LOG.debug(
-            "Device %s belongs to vlan_group_uuid %s", device_uuid, vlan_group_uuid
-        )
-        return vlan_group_uuid
-
-    def check_vlan_availability(self, interface_id: str | UUID, vlan_tag: int) -> bool:
-        """Checks if particular vlan_tag is available in a fabric.
-
-        This method checks if a VLAN number, specified as `vlan_tag`, is used
-        in any of the VLAN groups associated with the fabric to which the
-        interface, identified by `interface_id`, is connected.
-        """
-        url = "/api/plugins/undercloud-vni/vlan_availability_check"
-        params = {"interface_id": interface_id, "vlan_tag": str(vlan_tag)}
-
-        response = self.make_api_request("GET", url, params=params) or {}
-        return response.get("available", False)
-
-    def delete_vlan(self, vlan_id: str):
-        return self.api.ipam.vlans.delete([vlan_id])
-
-    def create_vlan_and_associate_vlan_to_ucvni(self, vlan: VlanPayload):
+    def delete_vlan(self, vlan_id: str) -> bool:
         try:
-            result = self.api.ipam.vlans.create(vlan.to_dict())
-        except pynautobot.core.query.RequestError as error:  # type: ignore
-            LOG.error("Nautobot error: %(error)s", {"error": error})
-            raise NautobotRequestError(
-                code=error.req.status_code,
-                url=error.base,
-                method="POST",
-                payload=error.request_body,
-                body=vlan.to_dict(),
-            ) from error
-        else:
-            return result
+            return self.api.ipam.vlans.delete([vlan_id])
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
+
+    def create_vlan_and_associate_vlan_to_ucvni(self, vlan: VlanPayload) -> Record:
+        try:
+            return cast(Record, self.api.ipam.vlans.create(vlan.to_dict()))
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
 
     def get_interface_uuid(self, device_name: str, interface_name: str) -> str:
         device = self.api.dcim.devices.get(name=device_name)
         if not device:
             raise NautobotNotFoundError(obj="device", ref=device_name)
 
-        interface = self.api.dcim.interfaces.get(
-            name=interface_name,
-            device=device.id,  # type: ignore
-        )
+        try:
+            interface = self.api.dcim.interfaces.get(
+                name=interface_name,
+                device=device.id,  # type: ignore
+            )
+        except pynautobot.RequestError as e:
+            raise NautobotRequestError.from_nautobot_request_error(e) from e
         if not interface:
             raise NautobotNotFoundError(obj="interface", ref=interface_name)
 
