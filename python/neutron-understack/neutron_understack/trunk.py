@@ -209,7 +209,6 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
 
         self.nb.add_port_vlan_associations(
             interface_uuid=connected_interface_id,
-            native_vlan_id=None,
             vlan_group_name=vlan_group_name,
             allowed_vlans_ids=allowed_vlan_ids,
         )
@@ -220,11 +219,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
                 dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
             )
 
-    def clean_trunk(self, trunk_details: dict, port_id: str) -> None:
+    def clean_trunk(self, trunk_details: dict, binding_profile: dict, host: str) -> None:
         subports = trunk_details.get("sub_ports", [])
-        parent_port_obj = utils.fetch_port_object(port_id)
         self._handle_subports_removal(
-            parent_port=parent_port_obj,
+            binding_profile=binding_profile,
+            binding_host=host,
             subports=subports,
             invoke_undersync=False,
         )
@@ -233,11 +232,15 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         self, trunk: Trunk, subports: [SubPort]
     ) -> None:
         parent_port_obj = utils.fetch_port_object(trunk.port_id)
-        if utils.parent_port_is_bound(parent_port_obj):
-            self._handle_subports_removal(
-                parent_port=parent_port_obj,
-                subports=subports,
-            )
+        if not utils.parent_port_is_bound(parent_port_obj):
+            return
+        binding_profile = parent_port_obj.bindings[0].profile
+        binding_host = parent_port_obj.bindings[0].host
+        self._handle_subports_removal(
+            binding_profile=binding_profile,
+            binding_host=binding_host,
+            subports=subports,
+        )
 
     def _delete_binding_level(self, port_id: str, host: str) -> PortBindingLevel:
         binding_level = utils.port_binding_level_by_port_id(port_id, host)
@@ -267,10 +270,12 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         )
 
     def _handle_subports_removal(
-        self, parent_port: Port, subports: list[SubPort], invoke_undersync: bool = True
+        self,
+        binding_profile: dict,
+        binding_host: str,
+        subports: list[SubPort],
+        invoke_undersync: bool = True
     ) -> None:
-        binding_profile = parent_port.bindings[0].profile
-        binding_host = parent_port.bindings[0].host
         vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
         connected_interface_id = utils.fetch_connected_interface_uuid(
             binding_profile, LOG

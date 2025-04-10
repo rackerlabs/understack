@@ -281,17 +281,16 @@ class Nautobot:
         url = f"/api/dcim/interfaces/{interface_uuid}/"
         payload = {}
 
-        current_untagged_network = current["untagged_vlan"]["network"]["id"]
-        if current_untagged_network in network_ids_to_remove:
+        if (
+            current["untagged_vlan"] and current["untagged_vlan"]["id"]
+            in network_ids_to_remove
+        ):
             payload["untagged_vlan"] = None
 
         payload["tagged_vlans"] = [
             tagged_vlan["id"]
             for tagged_vlan in current["tagged_vlans"]
-            if (
-                tagged_vlan.get("network")
-                and tagged_vlan.get("network")["id"] not in network_ids_to_remove
-            )
+            if tagged_vlan["id"] not in network_ids_to_remove
         ]
 
         return self.make_api_request("PATCH", url, payload)

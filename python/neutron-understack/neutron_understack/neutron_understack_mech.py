@@ -265,16 +265,17 @@ class UnderstackDriver(MechanismDriver):
             self.invoke_undersync(vlan_group_name)
 
     def _tenant_network_port_cleanup(self, context: PortContext):
-        network_id = context.current["network_id"]
         trunk_details = context.current.get("trunk_details", {})
+        segment_id = context.original_top_bound_segment["id"]
+        original_binding = context.original["binding:profile"]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
-            context.original["binding:profile"], LOG
-        )
+            original_binding, LOG)
 
-        networks_to_remove = set(self._fetch_subports_network_ids(trunk_details))
-        networks_to_remove.add(network_id)
+        if not utils.ports_bound_to_segment(segment_id):
+            context.release_dynamic_segment(segment_id)
+            self.nb.delete_vlan(segment_id)
 
-        # TODO: does this needs to clean up subports too?
+        networks_to_remove = {segment_id}
 
         LOG.debug(
             "update_port_postcommit removing vlans %s from interface %s ",
@@ -285,6 +286,13 @@ class UnderstackDriver(MechanismDriver):
         self.nb.remove_port_network_associations(
             connected_interface_uuid, networks_to_remove
         )
+
+        if trunk_details:
+            self.trunk_driver.clean_trunk(
+                trunk_details=trunk_details,
+                binding_profile=original_binding,
+                host=context.original_host,
+            )
 
     def delete_port_precommit(self, context):
         pass
