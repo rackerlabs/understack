@@ -1,6 +1,7 @@
 import inspect
 from dataclasses import dataclass
 from pprint import pformat
+from typing import cast
 from urllib.parse import urljoin
 from uuid import UUID
 
@@ -8,6 +9,7 @@ import pynautobot
 import requests
 from neutron_lib import exceptions as exc
 from oslo_log import log
+from pynautobot.core.response import Record
 
 LOG = log.getLogger(__name__)
 
@@ -139,22 +141,18 @@ class Nautobot:
             "ucvni_id": segmentation_id,
         }
 
-        ucvni: pynautobot.core.response.Record = (
-            self.api.plugins.undercloud_vni.ucvnis.create(payload)
-        )
+        ucvni = cast(Record, self.api.plugins.undercloud_vni.ucvnis.create(payload))
         return dict(ucvni)
 
-    def ucvni_delete(self, network_id):
-        url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
-        return self.make_api_request("DELETE", url)
+    def ucvni_delete(self, network_id: str) -> bool:
+        return self.api.plugins.undercloud_vni.ucnvis.delete([network_id])
 
-    def fetch_ucvni(self, network_id: str) -> dict:
-        url = f"/api/plugins/undercloud-vni/ucvnis/{network_id}/"
-        return self.make_api_request("GET", url)
+    def fetch_ucvni(self, network_id: str) -> Record:
+        return cast(Record, self.api.plugins.undercloud_vni.ucvnis.get(network_id))
 
     def fetch_ucvni_tenant_vlan_id(self, network_id: str) -> int | None:
-        ucvni_data = self.fetch_ucvni(network_id=network_id)
-        custom_fields = ucvni_data.get("custom_fields", {})
+        ucvni = self.fetch_ucvni(network_id=network_id)
+        custom_fields = cast(dict, ucvni.custom_fields or {})
         if "tenant_vlan_id" not in custom_fields:
             raise NautobotCustomFieldNotFoundError(
                 cf_name="tenant_vlan_id", obj="UCVNI"
@@ -171,10 +169,8 @@ class Nautobot:
 
     def namespace_create(self, name: str) -> dict:
         payload = {"name": name}
-        return self.make_api_request("POST", "/api/ipam/namespaces/", payload)
-
-    def namespace_delete(self, uuid: str) -> dict:
-        return self.make_api_request("DELETE", f"/api/ipam/namespaces/{uuid}/")
+        namespace = cast(Record, self.api.ipam.namespaces.create(payload))
+        return dict(namespace)
 
     def subnet_create(
         self, subnet_uuid: str, prefix: str, namespace_name: str, tenant_uuid: str

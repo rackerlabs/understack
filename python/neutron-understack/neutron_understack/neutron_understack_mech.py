@@ -409,7 +409,7 @@ class UnderstackDriver(MechanismDriver):
             "namespace %(name)s nautobot uuid: %(ns_uuid)s",
             {"name": name, "ns_uuid": namespace_uuid},
         )
-        self.nb.namespace_delete(namespace_uuid)
+        self.nb.api.ipam.namespace.delete([namespace_uuid])
         LOG.info(
             "namespace with name: %(name)s and uuid: %(ns_uuid)s has been deleted "
             "from nautobot",
