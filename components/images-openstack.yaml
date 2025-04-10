@@ -14,7 +14,6 @@ images:
 
     # keystone
     keystone_api: "ghcr.io/rackerlabs/understack/keystone:2024.2-ubuntu_jammy"
-    keystone_bootstrap: "docker.io/openstackhelm/heat:2024.2-ubuntu_jammy"
     keystone_credential_rotate: "ghcr.io/rackerlabs/understack/keystone:2024.2-ubuntu_jammy"
     keystone_credential_setup: "ghcr.io/rackerlabs/understack/keystone:2024.2-ubuntu_jammy"
     keystone_db_sync: "ghcr.io/rackerlabs/understack/keystone:2024.2-ubuntu_jammy"

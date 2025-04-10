@@ -1,0 +1,28 @@
+FROM python:3.12-slim AS prod
+
+ENV PIP_NO_CACHE_DIR=off \
+    PIP_DISABLE_PIP_VERSION_CHECK=on \
+    PIP_DEFAULT_TIMEOUT=100
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      git \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY ansible/requirements.txt ansible/requirements.yml /
+
+RUN --mount=type=cache,target=/root/.cache/pip pip install -r /requirements.txt dumb-init==1.2.5
+
+RUN useradd -m -d /runner -s /bin/bash runner
+WORKDIR /runner
+USER runner
+
+RUN --mount=type=cache,target=/root/.cache/pip ansible-galaxy collection install -r /requirements.yml
+
+COPY ansible/playbooks/ /runner/project/
+COPY ansible/roles/ /runner/project/roles/
+
+ENTRYPOINT ["dumb-init"]
+CMD ["ansible-runner"]
