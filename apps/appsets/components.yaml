@@ -17,6 +17,13 @@ spec:
                   argocd.argoproj.io/secret-type: cluster
           - list:
               elements:
+                - component: understack-cluster-issuer
+                  componentNamespace: cert-manager
+                  skipComponent: '{{has "understack-cluster-issuer" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      path: '{{.name}}/manifests/cert-manager'
                 - component: dex
                   skipComponent: '{{has "dex" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:

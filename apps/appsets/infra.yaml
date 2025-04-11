@@ -27,9 +27,6 @@ spec:
                         valuesObject:
                           crds:
                             enabled: true
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: '{{.name}}/manifests/cert-manager'
                 - component: ingress-nginx
                   skipComponent: '{{has "ingress-nginx" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
