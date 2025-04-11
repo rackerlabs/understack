@@ -1,0 +1,33 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: understack
+  # Finalizer that ensures that project is not deleted until it is not referenced by any application
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: 'argo'
+    server: '*'
+  - namespace: 'argo-events'
+    server: '*'
+  - namespace: 'cert-manager'
+    server: '*'
+  - namespace: 'dex'
+    server: '*'
+  - namespace: 'nautobot'
+    server: '*'
+  - namespace: 'undersync'
+    server: '*'
+  - namespace: 'openstack'
+    server: '*'
+  - namespace: 'monitoring'
+    server: '*'
+  - namespace: 'kube-system'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'
