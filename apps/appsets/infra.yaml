@@ -30,26 +30,6 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
                       path: '{{.name}}/manifests/cert-manager'
-                - component: metallb-system
-                  skipComponent: '{{has "metallb" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
-                  sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-                      path: 'bootstrap/metallb'
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                      path: '{{.name}}/manifests/metallb'
-                  ignoreDifferences:
-                    - group: "apiextensions.k8s.io"
-                      kind: CustomResourceDefinition
-                      name: bgppeers.metallb.io
-                      jsonPointers:
-                        - /spec/conversion/webhook/clientConfig/caBundle
-                    - group: "apiextensions.k8s.io"
-                      kind: CustomResourceDefinition
-                      name: addresspools.metallb.io
-                      jsonPointers:
-                        - /spec/conversion/webhook/clientConfig/caBundle
                 - component: ingress-nginx
                   skipComponent: '{{has "ingress-nginx" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
                   sources:
