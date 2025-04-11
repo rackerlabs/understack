@@ -1,10 +1,16 @@
+---
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: operators
+  name: understack-operators
+  finalizers:
+    # ensure applicationset is not deleted until its unreferenced
+    - resources-finalizer.argocd.argoproj.io
 spec:
   syncPolicy:
     applicationsSync: create-update
+    # for infrastructure resources we don't want to delete things automatically
+    preserveResourcesOnDeletion: true
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
@@ -12,13 +18,28 @@ spec:
         generators:
           - clusters:
               selector:
-                matchLabels:
-                  argocd.argoproj.io/secret-type: cluster
+                matchExpressions:
+                  - key: understack.rackspace.com/role
+                    operator: In
+                    values:
+                      - "global"
+                      - "regional"
+                      - "aio"
+              values:
+                uc_skip_components: '{{ default "[]" (index .metadata.annotations "uc_skip_components") }}'
+                uc_repo_git_url: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                uc_repo_ref: '{{index .metadata.annotations "uc_repo_ref"}}'
+                uc_deploy_git_url: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                uc_deploy_ref: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                uc_role: '{{index .metadata.labels "understack.rackspace.com/role"}}'
+                uc_dns_zone: '{{index .metadata.annotations "dns_zone" }}'
+                uc_cluster_issuer: '{{index .metadata.annotations "uc_cluster_issuer" }}'
+                uc_global_dns_zone: '{{index .metadata.annotations "uc_global_dns_zone" }}'
           - list:
               elements:
                 - component: rook
                   componentNamespace: rook-ceph
-                  skipComponent: '{{has "rook" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{or (has "rook" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
                   sources:
                     - repoURL: https://charts.rook.io/release
                       chart: rook-ceph
@@ -38,39 +59,39 @@ spec:
                           - $understack/operators/rook/values-cluster.yaml
                           - $deploy/{{.name}}/helm-configs/rook-cluster.yaml
                         ignoreMissingValueFiles: true
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
                       path: 'operators/rook'
                       ref: understack
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
                       ref: deploy
                 - component: cnpg-system
-                  skipComponent: '{{has "cnpg-system" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{or (has "cnpg-system" (.values.uc_skip_components | fromJson)) (eq "regional" .values.uc_role)}}'
                   sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
                       path: 'operators/cnpg-system'
                 - component: external-secrets
-                  skipComponent: '{{has "external-secrets" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{has "external-secrets" (.values.uc_skip_components | fromJson)}}'
                   sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
                       path: 'operators/external-secrets'
                 - component: mariadb-operator
-                  skipComponent: '{{has "mariadb-operator" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{has "mariadb-operator" (.values.uc_skip_components | fromJson)}}'
                   sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
                       path: 'operators/mariadb-operator'
                 - component: rabbitmq-system
-                  skipComponent: '{{has "rabbitmq-system" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{has "rabbitmq-system" (.values.uc_skip_components | fromJson)}}'
                   sources:
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
                       path: 'operators/rabbitmq-system'
                 - component: monitoring
-                  skipComponent: '{{has "monitoring" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{has "monitoring" (.values.uc_skip_components | fromJson)}}'
                   sources:
                     - repoURL: https://prometheus-community.github.io/helm-charts
                       chart: kube-prometheus-stack
@@ -81,15 +102,15 @@ spec:
                           - $understack/operators/monitoring/values.yaml
                           - $deploy/{{.name}}/helm-configs/monitoring.yaml
                         ignoreMissingValueFiles: true
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
                       path: 'operators/monitoring'
                       ref: understack
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
                       ref: deploy
                 - component: opentelemetry-operator
-                  skipComponent: '{{has "opentelemetry-operator" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{has "opentelemetry-operator" (.values.uc_skip_components | fromJson)}}'
                   sources:
                     - repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
                       chart: opentelemetry-operator
@@ -100,12 +121,12 @@ spec:
                           - $understack/operators/opentelemetry-operator/values.yaml
                           - $deploy/{{.name}}/helm-configs/opentelemetry-operator.yaml
                         ignoreMissingValueFiles: true
-                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
                       ref: understack
                       path: 'operators/opentelemetry-operator'
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
                       ref: deploy
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
@@ -136,18 +157,12 @@ spec:
           - RespectIgnoreDifferences=true
   templatePatch: |
     spec:
-      {{- if hasKey . "source" }}
-      # indentation matters here. need to collapse to a single line to preserve it
-      source: {{ .source | toJson }}
-      {{- end }}
-      {{- if hasKey . "sources" }}
       sources:
-        {{- range $source := .sources }}
+      {{- range $source := .sources }}
         # indentation matters so collapse to single line with toJson to keep it
         - {{ $source | toJson }}
-        {{- end }}
       {{- end }}
-      {{- if hasKey . "ignoreDifferences" }}
+    {{- if hasKey . "ignoreDifferences" }}
       # indentation matters so collapse to single line with toJson to keep it
       ignoreDifferences: {{ .ignoreDifferences | toJson }}
-      {{- end }}
+    {{- end }}
