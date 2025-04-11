@@ -1,0 +1,20 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: understack-infra
+spec:
+  sourceRepos:
+  - '*'
+  destinations:
+  - namespace: 'cert-manager'
+    server: '*'
+  - namespace: 'ingress-nginx'
+    server: '*'
+  - namespace: 'cilium'
+    server: '*'
+  - namespace: 'kube-system'
+    server: '*'
+  clusterResourceWhitelist:
+  - group: '*'
+    kind: '*'

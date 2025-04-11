@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
-  name: operators
+  name: understack-operators
 spec:
   sourceRepos:
   - '*'
@@ -12,11 +12,9 @@ spec:
     server: '*'
   - namespace: 'mariadb-operator'
     server: '*'
-  - namespace: 'postgres-operator'
+  - namespace: 'cnpg-system'
     server: '*'
   - namespace: 'external-secrets'
-    server: '*'
-  - namespace: 'cnpg-system'
     server: '*'
   - namespace: 'rook-ceph'
     server: '*'
