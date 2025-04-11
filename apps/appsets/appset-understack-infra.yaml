@@ -1,10 +1,16 @@
+---
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: infra
+  name: understack-infra
+  finalizers:
+    # ensure applicationset is not deleted until its unreferenced
+    - resources-finalizer.argocd.argoproj.io
 spec:
   syncPolicy:
     applicationsSync: create-update
+    # for infrastructure resources we don't want to delete things automatically
+    preserveResourcesOnDeletion: true
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
@@ -12,12 +18,27 @@ spec:
         generators:
           - clusters:
               selector:
-                matchLabels:
-                  argocd.argoproj.io/secret-type: cluster
+                matchExpressions:
+                  - key: understack.rackspace.com/role
+                    operator: In
+                    values:
+                      - "global"
+                      - "regional"
+                      - "aio"
+              values:
+                uc_skip_components: '{{ default "[]" (index .metadata.annotations "uc_skip_components") }}'
+                uc_repo_git_url: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                uc_repo_ref: '{{index .metadata.annotations "uc_repo_ref"}}'
+                uc_deploy_git_url: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                uc_deploy_ref: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                uc_role: '{{index .metadata.labels "understack.rackspace.com/role"}}'
+                uc_dns_zone: '{{index .metadata.annotations "dns_zone" }}'
+                uc_cluster_issuer: '{{index .metadata.annotations "uc_cluster_issuer" }}'
+                uc_global_dns_zone: '{{index .metadata.annotations "uc_global_dns_zone" }}'
           - list:
               elements:
                 - component: cert-manager
-                  skipComponent: '{{has "cert-manager" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{has "cert-manager" (.values.uc_skip_components | fromJson)}}'
                   sources:
                     - repoURL: https://charts.jetstack.io
                       chart: cert-manager
@@ -28,26 +49,26 @@ spec:
                           crds:
                             enabled: true
                 - component: ingress-nginx
-                  skipComponent: '{{has "ingress-nginx" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{has "ingress-nginx" (.values.uc_skip_components | fromJson)}}'
                   sources:
                     - repoURL: https://kubernetes.github.io/ingress-nginx
                       chart: ingress-nginx
-                      targetRevision: 4.9.1
+                      targetRevision: 4.12.1
                       helm:
                         releaseName: ingress-nginx
                         valueFiles:
                           - $deploy/{{.name}}/helm-configs/ingress-nginx.yaml
                         ignoreMissingValueFiles: true
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
                       ref: deploy
                 - component: cilium
-                  skipComponent: '{{has "cilium" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  skipComponent: '{{or (has "cilium" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
                   sources:
                     # Cilium itself is deployed before ArgoCD so we only include project
                     # and environment specific stuff here
-                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
                       path: '{{.name}}/manifests/cilium'
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
@@ -65,13 +86,12 @@ spec:
       annotations:
         argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
     spec:
-      project: default
+      project: understack-infra
       destination:
         server: '{{.server}}'
         namespace: '{{coalesce (get . "componentNamespace") .component}}'
       syncPolicy:
         automated:
-          prune: true
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
@@ -79,18 +99,12 @@ spec:
           - RespectIgnoreDifferences=true
   templatePatch: |
     spec:
-      {{- if hasKey . "source" }}
-      # indentation matters so collapse to single line with toJson to keep it
-      source: {{ .source | toJson }}
-      {{- end }}
-      {{- if hasKey . "sources" }}
       sources:
-        {{- range $source := .sources }}
+      {{- range $source := .sources }}
         # indentation matters so collapse to single line with toJson to keep it
         - {{ $source | toJson }}
-        {{- end }}
       {{- end }}
-      {{- if hasKey . "ignoreDifferences" }}
+    {{- if hasKey . "ignoreDifferences" }}
       # indentation matters so collapse to single line with toJson to keep it
       ignoreDifferences: {{ .ignoreDifferences | toJson }}
-      {{- end }}
+    {{- end }}

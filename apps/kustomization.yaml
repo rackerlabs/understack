@@ -4,7 +4,7 @@ resources:
 - appsets/project-understack-infra.yaml
 - appsets/project-understack-operators.yaml
 - appsets/project-understack.yaml
-- appsets/infra.yaml
+- appsets/appset-understack-infra.yaml
 - appsets/operators.yaml
 - appsets/components.yaml
 - appsets/openstack.yaml
