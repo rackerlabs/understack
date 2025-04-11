@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: neutron-event-network-segment-range
+  annotations:
+    workflows.argoproj.io/title: CRUD UCVNI Group range with network-segment-range
+    workflows.argoproj.io/description: |
+      Updates Nautobot UCVNI Group range field from a network-segment-range min, max values.
+
+      To test this workflow you can run it with the following:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/neutron-event-network-segment-range \
+      -p event_type network_segment_range.create.end -p segment_min_range=1800 segment_max_range=3799
+      ```
+
+      Defined in `workflows/argo-events/workflowtemplates/neutron-event-network-segment-range.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: sync-network-segment-range
+  serviceAccountName: workflow
+  arguments:
+    parameters:
+      - name: event_type
+      - name: segment_name
+      - name: network_type
+      - name: segment_range_id
+      - name: segment_min_range
+      - name: segment_max_range
+  templates:
+    - name: sync-network-segment-range
+      inputs:
+        parameters:
+          - name: event_type
+          - name: segment_name
+          - name: network_type
+          - name: segment_range_id
+          - name: segment_min_range
+          - name: segment_max_range
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - sync-network-segment-range
+        args:
+          - "{{inputs.parameters.event_type}}"
+          - "{{inputs.parameters.segment_name}}"
+          - "{{inputs.parameters.network_type}}"
+          - "{{inputs.parameters.segment_range_id}}"
+          - "{{inputs.parameters.segment_min_range}}"
+          - "{{inputs.parameters.segment_max_range}}"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct
