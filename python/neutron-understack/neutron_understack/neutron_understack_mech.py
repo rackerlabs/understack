@@ -19,7 +19,6 @@ from neutron_understack.nautobot import Nautobot
 from neutron_understack.nautobot import VlanPayload
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
-from neutron_understack.vlan_manager import VlanManager
 
 LOG = logging.getLogger(__name__)
 
@@ -40,7 +39,6 @@ class UnderstackDriver(MechanismDriver):
         self.nb = Nautobot(conf.nb_url, conf.nb_token)
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
         self.trunk_driver = UnderStackTrunkDriver.create(self)
-        self.vlan_manager = VlanManager(self.nb, conf)
         self.subscribe()
 
     def subscribe(self):
@@ -57,9 +55,8 @@ class UnderstackDriver(MechanismDriver):
             cancellable=True,
         )
 
-    def create_network_precommit(self, context: NetworkContext):
-        if cfg.CONF.ml2_understack.enforce_unique_vlans_in_fabric:
-            self.vlan_manager.create_vlan_for_network(context)
+    def create_network_precommit(self, context):
+        pass
 
     def create_network_postcommit(self, context):
         network = context.current
