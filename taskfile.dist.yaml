@@ -1,0 +1,16 @@
+---
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+version: '3'
+
+set: [pipefail]
+shopt: [globstar]
+
+includes:
+  openstack: taskfiles/openstack
+
+tasks:
+
+  default:
+    desc: Lists available commands
+    cmd: task --list
+    silent: true
