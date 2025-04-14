@@ -3,6 +3,9 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: nautobot-cluster
+  annotations:
+    # do not allow ArgoCD to delete our DB
+    argocd.argoproj.io/sync-options: Delete=false
 spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:15.5
   instances: 3
