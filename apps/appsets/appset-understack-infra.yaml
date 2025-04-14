@@ -1,0 +1,114 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: understack-infra
+  finalizers:
+    # ensure applicationset is not deleted until its unreferenced
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  syncPolicy:
+    applicationsSync: create-update
+    # for infrastructure resources we don't want to delete things automatically
+    preserveResourcesOnDeletion: true
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - clusters:
+              selector:
+                matchExpressions:
+                  - key: understack.rackspace.com/role
+                    operator: In
+                    values:
+                      - "global"
+                      - "regional"
+                      - "aio"
+              values:
+                uc_skip_components: '{{ default "[]" (index .metadata.annotations "uc_skip_components") }}'
+                uc_repo_git_url: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                uc_repo_ref: '{{index .metadata.annotations "uc_repo_ref"}}'
+                uc_deploy_git_url: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                uc_deploy_ref: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                uc_role: '{{index .metadata.labels "understack.rackspace.com/role"}}'
+                uc_dns_zone: '{{index .metadata.annotations "dns_zone" }}'
+                uc_cluster_issuer: '{{index .metadata.annotations "uc_cluster_issuer" }}'
+                uc_global_dns_zone: '{{index .metadata.annotations "uc_global_dns_zone" }}'
+          - list:
+              elements:
+                - component: cert-manager
+                  skipComponent: '{{has "cert-manager" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: https://charts.jetstack.io
+                      chart: cert-manager
+                      targetRevision: '1.15.2'
+                      helm:
+                        releaseName: cert-manager
+                        valuesObject:
+                          crds:
+                            enabled: true
+                - component: ingress-nginx
+                  skipComponent: '{{has "ingress-nginx" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: https://kubernetes.github.io/ingress-nginx
+                      chart: ingress-nginx
+                      targetRevision: 4.12.1
+                      helm:
+                        releaseName: ingress-nginx
+                        valueFiles:
+                          - $deploy/{{.name}}/helm-configs/ingress-nginx.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
+                - component: cilium
+                  skipComponent: '{{or (has "cilium" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
+                  sources:
+                    # Cilium itself is deployed before ArgoCD so we only include project
+                    # and environment specific stuff here
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      path: '{{.name}}/manifests/cilium'
+            selector:
+              # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
+              # ArgoCD's templating operates with strings so it's the string "true"
+              matchExpressions:
+                - key: skipComponent
+                  operator: NotIn
+                  values:
+                    - "true"
+  template:
+    metadata:
+      name: '{{.name}}-{{.component}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+    spec:
+      project: understack-infra
+      destination:
+        server: '{{.server}}'
+        namespace: '{{coalesce (get . "componentNamespace") .component}}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+        managedNamespaceMetadata:
+          annotations:
+            # ArgoCD can create our namespace but let's not delete it
+            argocd.argoproj.io/sync-options: Delete=false
+  templatePatch: |
+    spec:
+      sources:
+      {{- range $source := .sources }}
+        # indentation matters so collapse to single line with toJson to keep it
+        - {{ $source | toJson }}
+      {{- end }}
+    {{- if hasKey . "ignoreDifferences" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      ignoreDifferences: {{ .ignoreDifferences | toJson }}
+    {{- end }}

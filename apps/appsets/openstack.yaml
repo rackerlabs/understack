@@ -99,6 +99,9 @@ spec:
           - ServerSideApply=true
           - RespectIgnoreDifferences=true
         managedNamespaceMetadata:
+          annotations:
+            # ArgoCD can create our namespace but let's not delete it
+            argocd.argoproj.io/sync-options: Delete=false
           labels:
             kubernetes.io/metadata.name: openstack
             name: openstack
