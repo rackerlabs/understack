@@ -76,6 +76,9 @@ redis:
   auth:
     existingSecret: nautobot-redis
     existingSecretPasswordKey: NAUTOBOT_REDIS_PASSWORD
+  commonAnnotations:
+    # do not allow ArgoCD to delete our redis
+    argocd.argoproj.io/sync-options: Delete=false
 
 ingress:
   enabled: true

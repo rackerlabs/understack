@@ -1,2 +1,8 @@
+---
+
+commonAnnotations:
+  # do not allow ArgoCD to delete our memcached
+  argocd.argoproj.io/sync-options: Delete=false
+
 metrics:
   enabled: true

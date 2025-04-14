@@ -3,6 +3,9 @@ apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
 metadata:
   name: mariadb  # this name is referenced by other resource kinds
+  annotations:
+    # do not allow ArgoCD to delete our DB
+    argocd.argoproj.io/sync-options: Delete=false
 spec:
   rootPasswordSecretKeyRef:
     name: mariadb
