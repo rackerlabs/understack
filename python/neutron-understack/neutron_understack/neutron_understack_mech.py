@@ -31,7 +31,7 @@ class UnderstackDriver(MechanismDriver):
     resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
 
     @property
-    def connectivity(self):
+    def connectivity(self):  # type: ignore
         return portbindings.CONNECTIVITY_L2
 
     def initialize(self):
