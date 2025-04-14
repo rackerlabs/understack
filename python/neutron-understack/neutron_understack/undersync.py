@@ -38,17 +38,14 @@ class Undersync:
             raise UndersyncError() from error
 
     def sync_devices(
-        self, vlan_group_uuids: str | list[str], force=False, dry_run=False
+        self, vlan_group: str, force=False, dry_run=False
     ) -> requests.Response:
-        if isinstance(vlan_group_uuids, list):
-            vlan_group_uuids = ",".join(vlan_group_uuids)
-
         if dry_run:
-            return self.dry_run(vlan_group_uuids)
+            return self.dry_run(vlan_group)
         elif force:
-            return self.force(vlan_group_uuids)
+            return self.force(vlan_group)
         else:
-            return self.sync(vlan_group_uuids)
+            return self.sync(vlan_group)
 
     @cached_property
     def client(self):
@@ -59,9 +56,9 @@ class Undersync:
         }
         return session
 
-    def _undersync_post(self, action: str, uuids: str) -> requests.Response:
+    def _undersync_post(self, action: str, vlan_group: str) -> requests.Response:
         response = self.client.post(
-            f"{self.api_url}/v1/vlan-group/{uuids}/{action}", timeout=self.timeout
+            f"{self.api_url}/v1/vlan-group/{vlan_group}/{action}", timeout=self.timeout
         )
         LOG.debug(
             "undersync %(action)s resp: %(resp)s",
@@ -70,11 +67,11 @@ class Undersync:
         self._log_and_raise_for_status(response)
         return response
 
-    def sync(self, uuids: str) -> requests.Response:
-        return self._undersync_post("sync", uuids)
+    def sync(self, vlan_group: str) -> requests.Response:
+        return self._undersync_post("sync", vlan_group)
 
-    def dry_run(self, uuids: str) -> requests.Response:
-        return self._undersync_post("dry-run", uuids)
+    def dry_run(self, vlan_group: str) -> requests.Response:
+        return self._undersync_post("dry-run", vlan_group)
 
-    def force(self, uuids: str) -> requests.Response:
-        return self._undersync_post("force", uuids)
+    def force(self, vlan_group: str) -> requests.Response:
+        return self._undersync_post("force", vlan_group)
