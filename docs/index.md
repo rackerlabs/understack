@@ -11,14 +11,18 @@ hide:
 <div class="grid cards" markdown>
 -   :material-cloud:{ .lg} __What is UnderStack?__
 
-    UnderStack is an opinionated installation of OpenStack centered around Ironic
-    and related services to be able to provision bare metal hardware to be
-    consumable by genestack for the full OpenStack suite.
+    UnderStack is an opinionated deployment of OpenStack focused on bare metal
+    provisioning through Ironic and its related services. This allows for efficiently
+    and consistently managed hardware deployed via API-driven workflows across multiple
+    data centers at scale.
 
-    The requirements are a Kubernetes cluster, which these docs will contain
-    information about building different clusters and then a pile of bare metal
-    systems that can be ingested into the stack to be available to be consumed via
-    Openstack Ironic.
+    Core requirements include a pool of bare metal systems which can be controlled by
+    Ironic as well as switches that can be programmed by a Neutron ML2 driver and
+    infrastructure nodes which can host a Kubernetes cluster for the necessary services.
+
+    The documentation covers both Kubernetes cluster deployment options and configuration
+    of the UnderStack components for bare metal resource management in a multi-data center
+    environment.
 
 -   :material-abacus:{ .xl .middle } __Getting Started__
 
