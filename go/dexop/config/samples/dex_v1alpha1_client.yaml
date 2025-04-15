@@ -2,8 +2,10 @@ apiVersion: dex.rax.io/v1alpha1
 kind: Client
 metadata:
   labels:
-    app.kubernetes.io/name: dexop
-    app.kubernetes.io/managed-by: kustomize
-  name: client-sample
+  name: fred-client
 spec:
-  # TODO(user): Add fields here
+  name: fred
+  secretName: fred-password
+  redirectURIs:
+    - http://localhost:8080
+    - https://some.service.example.com/
