@@ -1232,13 +1232,13 @@ six = ">=1.5"
 
 [[package]]
 name = "python-ironicclient"
-version = "5.10.0"
+version = "5.10.1"
 description = "OpenStack Bare Metal Provisioning API Client Library"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "python-ironicclient-5.10.0.tar.gz", hash = "sha256:120d9e6a4ae2e7ed613ee2b2abdf9fe1d2f7de297a1b82d82d9be85987d4e0b6"},
-    {file = "python_ironicclient-5.10.0-py3-none-any.whl", hash = "sha256:4fe07f4c9a4c5f22c423f38a0d2284fb023a41f673470810e71f3ac279b9b9de"},
+    {file = "python_ironicclient-5.10.1-py3-none-any.whl", hash = "sha256:662cfd05c91a1aec5d93705b6aa1a0b204cc4cd24c3c180dc311985844837932"},
+    {file = "python_ironicclient-5.10.1.tar.gz", hash = "sha256:d263411bf590eda7d51ed8c515333f2092d4e13032a588acdaadbd11db5d05f7"},
 ]
 
 [package.dependencies]
