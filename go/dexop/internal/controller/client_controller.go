@@ -115,6 +115,7 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	// update
 	if existing != nil {
+		reqLogger.Info("making an UpdateOauth2Client call")
 		mgr.UpdateOauth2Client(clientSpec)
 	}
 	return ctrl.Result{}, nil

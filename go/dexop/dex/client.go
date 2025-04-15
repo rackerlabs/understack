@@ -52,7 +52,6 @@ func (d *DexManager) GetOauth2Client(clientId string) (*dexapi.GetClientResp, er
 // Patches/updates the Oauth2 client
 
 func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.UpdateClientResp, error) {
-
 	existing, err := d.GetOauth2Client(clientSpec.Spec.Name)
 	if err != nil {
 		return nil, err
@@ -70,6 +69,9 @@ func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi
 	updateRequest := &dexapi.UpdateClientReq{
 		Id:           clientSpec.Spec.Name,
 		RedirectUris: clientSpec.Spec.RedirectURIs,
+		TrustedPeers: clientSpec.Spec.TrustedPeers,
+		LogoUrl:      clientSpec.Spec.LogoUrl,
+		Name:         clientSpec.Spec.Name,
 	}
 	return d.Client.UpdateClient(context.TODO(), updateRequest)
 }
