@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
+  dexmgr "github.com/rackerlbals/understack/go/dexop/dex/client"
 )
 
 // ClientReconciler reconciles a Client object
@@ -49,8 +50,12 @@ type ClientReconciler struct {
 func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
-
+	clientSpec := &dexv1alpha1.Client{}
+	if err := r.Get(ctx, req.NamespacedName, clientSpec); err != nil {
+		return ctrl.Result{}, err
+	}
+	ctrl.Log.Info("reconciling Client", "Name", clientSpec.Spec.Name)
+  mgr := new(dexmgr.DexManager)
 	return ctrl.Result{}, nil
 }
 
