@@ -1,0 +1,27 @@
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: understack-cluster-issuer
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  acme:
+    email: {{ .UC_DEPLOY_EMAIL }}
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx
+        selector:
+          matchLabels:
+            authorizeWith: http
+      - dns01:
+          webhook:
+            groupName: acme.undercloud.rackspace.net
+            solverName: rackspace
+            config:
+              authSecretRef: cert-manager-webhook-rackspace-creds
+              domainName: {{ .DNS_ZONE }}

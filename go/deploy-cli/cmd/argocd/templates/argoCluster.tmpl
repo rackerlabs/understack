@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .DEPLOY_NAME }}-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repo-creds
+data:
+  sshPrivateKey: {{ .UC_DEPLOY_SSH_FILE }}
+  type: {{ .Type | b64enc }}
+  url: {{ .UC_DEPLOY_GIT_URL | b64enc }}
