@@ -18,15 +18,21 @@ package controller
 
 import (
 	"context"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/go-logr/logr"
 	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
-  dexmgr "github.com/rackerlbals/understack/go/dexop/dex/client"
+	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
 )
+
+const dexFinalizer = "dex.rax.io/finalizer"
 
 // ClientReconciler reconciles a Client object
 type ClientReconciler struct {
@@ -49,13 +55,68 @@ type ClientReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
+	reqLogger := ctrl.Log.WithValues("client", req.NamespacedName)
+
+	mgr, err := dexmgr.NewDexManager("127.0.0.1:5557", "./grpc_ca.crt", "./grpc_client.key", "./grpc_client.crt")
+	if err != nil {
+		ctrl.Log.Error(err, "While getting the DexManager")
+		return ctrl.Result{}, err
+	}
 
 	clientSpec := &dexv1alpha1.Client{}
 	if err := r.Get(ctx, req.NamespacedName, clientSpec); err != nil {
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
 		return ctrl.Result{}, err
 	}
-	ctrl.Log.Info("reconciling Client", "Name", clientSpec.Spec.Name)
-  mgr := new(dexmgr.DexManager)
+
+	reqLogger.Info("reconciling Client")
+
+	// delete if no longer needed
+	deleteRequested := clientSpec.GetDeletionTimestamp() != nil
+	if deleteRequested {
+		if controllerutil.ContainsFinalizer(clientSpec, dexFinalizer) {
+			if err := r.finalizeDeletion(reqLogger, clientSpec, mgr); err != nil {
+				return ctrl.Result{}, err
+			}
+
+			// remove finalizer
+			controllerutil.RemoveFinalizer(clientSpec, dexFinalizer)
+			err := r.Update(ctx, clientSpec)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	// add finalizer
+	if !controllerutil.ContainsFinalizer(clientSpec, dexFinalizer) {
+		controllerutil.AddFinalizer(clientSpec, dexFinalizer)
+		err := r.Update(ctx, clientSpec)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
+	existing, err := mgr.GetOauth2Client(clientSpec.Spec.Name)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			ctrl.Log.Info("Client does not exist in Dex. Creating one.", "name", clientSpec.Spec.Name)
+			if _, err = mgr.CreateOauth2Client(clientSpec); err != nil {
+				reqLogger.Error(err, "Unable to create client in dex")
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
+		}
+		return ctrl.Result{}, err
+	}
+
+	// update
+	if existing != nil {
+		mgr.UpdateOauth2Client(clientSpec)
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -64,4 +125,12 @@ func (r *ClientReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&dexv1alpha1.Client{}).
 		Complete(r)
+}
+
+func (r *ClientReconciler) finalizeDeletion(reqLogger logr.Logger, c *dexv1alpha1.Client, mgr *dexmgr.DexManager) error {
+	reqLogger.Info("Client is being removed")
+	if _, err := mgr.RemoveOauth2Client(c.Spec.Name); err != nil {
+		return err
+	}
+	return nil
 }
