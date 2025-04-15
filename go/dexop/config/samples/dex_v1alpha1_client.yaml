@@ -1,0 +1,9 @@
+apiVersion: dex.rax.io/v1alpha1
+kind: Client
+metadata:
+  labels:
+    app.kubernetes.io/name: dexop
+    app.kubernetes.io/managed-by: kustomize
+  name: client-sample
+spec:
+  # TODO(user): Add fields here
