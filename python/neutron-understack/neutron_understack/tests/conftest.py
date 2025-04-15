@@ -10,6 +10,7 @@ from neutron.db.models_v2 import Port as PortModel
 from neutron.db.models_v2 import Subnet
 from neutron.objects.network import NetworkSegment as SegmentObj
 from neutron.objects.ports import Port as PortObject
+from neutron.objects.ports import PortBindingLevel
 from neutron.objects.trunk import SubPort
 from neutron.objects.trunk import Trunk
 from neutron.plugins.ml2.driver_context import NetworkContext
@@ -68,6 +69,11 @@ def network_segment_id() -> uuid.UUID:
 @pytest.fixture
 def project_id() -> str:
     return uuid.uuid4().hex
+
+
+@pytest.fixture
+def host_id() -> uuid.UUID:
+    return uuid.uuid4()
 
 
 @pytest.fixture
@@ -175,6 +181,7 @@ def binding_profile(request, port_id) -> str:
                 {
                     "port_id": req.get("port_id", str(port_id)),
                     "switch_id": "11:22:33:44:55:66",
+                    "switch_info": "a1-1-1.iad3.rackspace.net",
                 }
             ]
         }
@@ -202,12 +209,13 @@ def trunk(subport, port_id) -> Trunk:
 
 
 @pytest.fixture
-def port_binding(binding_profile, port_model) -> PortBinding:
+def port_binding(binding_profile, port_model, host_id) -> PortBinding:
     binding = PortBinding(
         profile=binding_profile,
         port=port_model,
         vif_type=portbindings.VIF_TYPE_OTHER,
         vnic_type=portbindings.VNIC_BAREMETAL,
+        host=str(host_id),
     )
     return binding
 
@@ -267,11 +275,6 @@ def undersync_sync_devices_patch(mocker, understack_driver) -> None:
 
 
 @pytest.fixture
-def update_nautobot_patch(mocker, understack_driver) -> None:
-    mocker.patch.object(understack_driver, "update_nautobot")
-
-
-@pytest.fixture
 def utils_fetch_subport_network_id_patch(mocker, network_id) -> None:
     mocker.patch(
         "neutron_understack.utils.fetch_subport_network_id",
@@ -324,3 +327,8 @@ def ucvni_create_response(ucvni_group_id) -> list[dict]:
             },
         }
     ]
+
+
+@pytest.fixture
+def port_binding_level(network_segment_id) -> PortBindingLevel:
+    return PortBindingLevel(segment_id=network_segment_id)

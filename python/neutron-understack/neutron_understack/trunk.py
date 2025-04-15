@@ -1,4 +1,6 @@
-from neutron.db.models_v2 import Port
+from neutron.objects.network import NetworkSegment
+from neutron.objects.ports import Port
+from neutron.objects.ports import PortBindingLevel
 from neutron.objects.trunk import SubPort
 from neutron.services.trunk.drivers import base as trunk_base
 from neutron.services.trunk.models import Trunk
@@ -74,7 +76,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         registry.subscribe(
             self.subports_added,
             resources.SUBPORTS,
-            events.AFTER_CREATE,
+            events.PRECOMMIT_CREATE,
             cancellable=True,
         )
         registry.subscribe(
@@ -86,7 +88,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         registry.subscribe(
             self.trunk_created,
             resources.TRUNK,
-            events.AFTER_CREATE,
+            events.PRECOMMIT_CREATE,
             cancellable=True,
         )
         registry.subscribe(
@@ -135,16 +137,6 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
                 tenant_vlan_id=ucvni_tenant_vlan_id,
             )
 
-    def _handle_parent_port_switchport_config(
-        self, parent_port_id: str, subport_network_id: str
-    ) -> None:
-        parent_port_obj = utils.fetch_port_object(parent_port_id)
-
-        if utils.parent_port_is_bound(parent_port_obj):
-            self._add_subport_network_to_parent_port_switchport(
-                parent_port_obj, subport_network_id
-            )
-
     def _handle_tenant_vlan_id_and_switchport_config(
         self, subports: list[SubPort], trunk: Trunk
     ) -> None:
@@ -154,61 +146,140 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             )
             self._handle_tenant_vlan_id_config(subport_network_id, subport)
 
-            self._handle_parent_port_switchport_config(
-                trunk.port_id, subport_network_id
+        parent_port_obj = utils.fetch_port_object(trunk.port_id)
+
+        if utils.parent_port_is_bound(parent_port_obj):
+            self._add_subports_networks_to_parent_port_switchport(
+                parent_port_obj, subports
             )
 
-    def _add_subport_network_to_parent_port_switchport(
-        self, parent_port: Port, subport_network_id: str
+    def configure_trunk(self, trunk_details: dict, port_id: str) -> None:
+        parent_port_obj = utils.fetch_port_object(port_id)
+        subports = trunk_details.get("sub_ports", [])
+        self._add_subports_networks_to_parent_port_switchport(
+            parent_port=parent_port_obj,
+            subports=subports,
+            invoke_undersync=False,
+        )
+
+    def _handle_segment_allocation(
+        self, subports: list[SubPort], vlan_group_name: str, binding_host: str
+    ) -> set:
+        allowed_vlan_ids = set()
+        for subport in subports:
+            subport_network_id = utils.fetch_subport_network_id(
+                subport_id=subport["port_id"]
+            )
+            network_segment = utils.allocate_dynamic_segment(
+                network_id=subport_network_id,
+                physnet=vlan_group_name,
+            )
+            allowed_vlan_ids.add(int(network_segment["segmentation_id"]))
+
+            utils.create_binding_profile_level(
+                port_id=subport["port_id"],
+                host=binding_host,
+                level=0,
+                segment_id=network_segment["id"],
+            )
+        return allowed_vlan_ids
+
+    def _add_subports_networks_to_parent_port_switchport(
+        self, parent_port: Port, subports: list[SubPort], invoke_undersync: bool = True
     ) -> None:
+        binding_profile = parent_port.bindings[0].profile
+        binding_host = parent_port.bindings[0].host
         connected_interface_id = utils.fetch_connected_interface_uuid(
-            parent_port.bindings[0].profile, LOG
+            binding_profile, LOG
         )
 
-        vlan_group_id = self.nb.prep_switch_interface(
-            connected_interface_id=connected_interface_id,
-            ucvni_uuid=subport_network_id,
-            vlan_tag=None,
-            modify_native_vlan=False,
-        )["vlan_group_id"]
-
-        self.undersync.sync_devices(
-            vlan_group_uuids=str(vlan_group_id),
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
+        allowed_vlan_ids = self._handle_segment_allocation(
+            subports, vlan_group_name, binding_host
         )
 
-    def _remove_subport_network_from_parent_port_switchport(
-        self, parent_port: Port, subport_network_id: str
+        self.nb.add_port_vlan_associations(
+            interface_uuid=connected_interface_id,
+            vlan_group_name=vlan_group_name,
+            allowed_vlans_ids=allowed_vlan_ids,
+        )
+
+        if invoke_undersync:
+            self._trigger_undersync(vlan_group_name)
+
+    def clean_trunk(
+        self, trunk_details: dict, binding_profile: dict, host: str
     ) -> None:
-        connected_interface_id = utils.fetch_connected_interface_uuid(
-            parent_port.bindings[0].profile, LOG
-        )
-
-        vlan_group_id = self.nb.detach_port(
-            connected_interface_id=connected_interface_id,
-            ucvni_uuid=subport_network_id,
-        )
-
-        self.undersync.sync_devices(
-            vlan_group_uuids=str(vlan_group_id),
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        subports = trunk_details.get("sub_ports", [])
+        self._handle_subports_removal(
+            binding_profile=binding_profile,
+            binding_host=host,
+            subports=subports,
+            invoke_undersync=False,
         )
 
     def _clean_parent_port_switchport_config(
-        self, trunk: Trunk, subports: [SubPort]
+        self, trunk: Trunk, subports: list[SubPort]
     ) -> None:
         parent_port_obj = utils.fetch_port_object(trunk.port_id)
-
         if not utils.parent_port_is_bound(parent_port_obj):
             return
+        binding_profile = parent_port_obj.bindings[0].profile
+        binding_host = parent_port_obj.bindings[0].host
+        self._handle_subports_removal(
+            binding_profile=binding_profile,
+            binding_host=binding_host,
+            subports=subports,
+        )
 
+    def _delete_binding_level(self, port_id: str, host: str) -> PortBindingLevel:
+        binding_level = utils.port_binding_level_by_port_id(port_id, host)
+        binding_level.delete()
+        return binding_level
+
+    def _delete_unused_segment(self, segment_id: str) -> NetworkSegment:
+        network_segment = utils.network_segment_by_id(segment_id)
+        if not utils.ports_bound_to_segment(segment_id):
+            utils.release_dynamic_segment(segment_id)
+            self.nb.delete_vlan(vlan_id=segment_id)
+        return network_segment
+
+    def _handle_segment_deallocation(self, subports: list[SubPort], host: str) -> set:
+        vlan_ids_to_remove = set()
         for subport in subports:
-            subport_network_id = utils.fetch_subport_network_id(
-                subport_id=subport.port_id
+            subport_binding_level = self._delete_binding_level(subport["port_id"], host)
+            network_segment = self._delete_unused_segment(
+                subport_binding_level.segment_id
             )
-            self._remove_subport_network_from_parent_port_switchport(
-                parent_port_obj, subport_network_id
-            )
+            vlan_ids_to_remove.add(network_segment.id)
+        return vlan_ids_to_remove
+
+    def _trigger_undersync(self, vlan_group_name: str) -> None:
+        self.undersync.sync_devices(
+            vlan_group=vlan_group_name,
+            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
+        )
+
+    def _handle_subports_removal(
+        self,
+        binding_profile: dict,
+        binding_host: str,
+        subports: list[SubPort],
+        invoke_undersync: bool = True,
+    ) -> None:
+        vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
+        connected_interface_id = utils.fetch_connected_interface_uuid(
+            binding_profile, LOG
+        )
+
+        vlan_ids_to_remove = self._handle_segment_deallocation(subports, binding_host)
+        self.nb.remove_port_network_associations(
+            interface_uuid=connected_interface_id,
+            network_ids_to_remove=vlan_ids_to_remove,
+        )
+
+        if invoke_undersync:
+            self._trigger_undersync(vlan_group_name)
 
     def subports_added(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
