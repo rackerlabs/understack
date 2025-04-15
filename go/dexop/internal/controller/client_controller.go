@@ -18,18 +18,19 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/go-logr/logr"
+	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
+	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	"github.com/go-logr/logr"
-	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
-	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
 )
 
 const dexFinalizer = "dex.rax.io/finalizer"
@@ -100,6 +101,18 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		}
 	}
 
+	// if secretName specified, read the secret
+	if clientSpec.Spec.SecretName != "" {
+		if clientSpec.Spec.SecretNamespace == "" {
+			clientSpec.Spec.SecretNamespace = req.NamespacedName.Namespace
+		}
+		value, err := r.readSecret(ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
+		if err != nil {
+			reqLogger.Error(err, "Unable to read secret", "secretName", clientSpec.Spec.SecretName)
+		}
+		clientSpec.Spec.SecretValue = value
+	}
+
 	existing, err := mgr.GetOauth2Client(clientSpec.Spec.Name)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "not found") {
@@ -134,4 +147,18 @@ func (r *ClientReconciler) finalizeDeletion(reqLogger logr.Logger, c *dexv1alpha
 		return err
 	}
 	return nil
+}
+
+func (r *ClientReconciler) readSecret(ctx context.Context, name, namespace string) (string, error) {
+	secret := &v1.Secret{}
+
+	err := r.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, secret)
+	if err != nil {
+		return "", err
+	}
+
+	if value, ok := secret.Data["secret"]; ok {
+		return string(value), nil
+	}
+	return "", fmt.Errorf("secret key not found")
 }
