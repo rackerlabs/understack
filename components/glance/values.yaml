@@ -92,6 +92,38 @@ pod:
             periodSeconds: 10
             timeoutSeconds: 8
             failureThreshold: 6
+  mounts:
+    # oslo.config autoloads certain paths in alphabetical order
+    # which gives us the opportunity to inject secrets and extra
+    # configs here. likely the best paths are:
+    # /etc/${project}/${prog}.conf.d/*.conf
+    # /etc/${project}/${project}.conf.d/*.conf
+    # the first would be best for per service separation but since each
+    # service is in its own pod they won't overlap. further more there
+    # is an issue with that see https://bugs.launchpad.net/oslo.config/+bug/2098514
+    # so we'll use the bottom one
+    glance_api:
+      glance_api:
+        volumeMounts:
+          - mountPath: /etc/glance/glance.conf.d/db_conn.conf
+            name: glance-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: glance-db-conn
+            secret:
+              secretName: glance-db-conn
+    glance_db_sync:
+      glance_db_sync:
+        volumeMounts:
+          - mountPath: /etc/glance/glance.conf.d/db_conn.conf
+            name: glance-db-conn
+            subPath: db_conf.conf
+            readOnly: true
+        volumes:
+          - name: glance-db-conn
+            secret:
+              secretName: glance-db-conn
 
 conf:
   glance_api_uwsgi:
