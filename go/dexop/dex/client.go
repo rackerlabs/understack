@@ -11,7 +11,6 @@ import (
 	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type DexManager struct {
@@ -24,27 +23,28 @@ func (d *DexManager) init() {
 	if err != nil {
 		// ctrl.Log.Error(err, "failed creating dex client")
 	}
-  d.Client = client
-
+	d.Client = client
 }
 
 // Creates new Oauth2 client in Dex
-func (d *DexManager) CreateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.CreateClientResp, error)  {
-			 request := &dexapi.CreateClientReq{
-							 Client: &dexapi.Client{
-											 Id:					 clientSpec.Spec.Name,
-											 Name:				 clientSpec.Spec.Name,
-											 Secret:			 clientSpec.Spec.SecretName,
-											 RedirectUris: clientSpec.Spec.RedirectURIs,
-							 },
-			 }
+func (d *DexManager) CreateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.CreateClientResp, error) {
+	request := &dexapi.CreateClientReq{
+		Client: &dexapi.Client{
+			Id:           clientSpec.Spec.Name,
+			Secret:       clientSpec.Spec.SecretName,
+			RedirectUris: clientSpec.Spec.RedirectURIs,
+			TrustedPeers: clientSpec.Spec.TrustedPeers,
+			Public:       clientSpec.Spec.Public,
+			Name:         clientSpec.Spec.Name,
+			LogoUrl:      clientSpec.Spec.LogoUrl,
+		},
+	}
 
 	return d.Client.CreateClient(context.TODO(), request)
 }
 
-
 // Deletes an Oauth2 client
-func (d *DexManager) RemoveOauth2Client(clientSpec *dexv1alpha1.Client, ) (*dexapi.DeleteClientResp, error)  {
+func (d *DexManager) RemoveOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.DeleteClientResp, error) {
 	request := &dexapi.DeleteClientReq{
 		Id: clientSpec.Spec.Name,
 	}
@@ -58,7 +58,7 @@ func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi
 		Id: clientSpec.Spec.Name,
 	}
 
-	existing, err := d.Client.GetClient(context.TODO(), request);
+	existing, err := d.Client.GetClient(context.TODO(), request)
 	if err != nil {
 		return nil, err
 	}
@@ -68,22 +68,16 @@ func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi
 	}
 
 	if existing.Client.Secret != clientSpec.Spec.SecretName ||
-		 existing.Client.Public != clientSpec.Spec.Public {
+		existing.Client.Public != clientSpec.Spec.Public {
 		// dex does not support secret updates so it needs to be recreated
 	}
 
 	updateRequest := &dexapi.UpdateClientReq{
-		Id: clientSpec.Spec.Name,
+		Id:           clientSpec.Spec.Name,
 		RedirectUris: clientSpec.Spec.RedirectURIs,
 	}
 	return d.Client.UpdateClient(context.TODO(), updateRequest)
 }
-
-
-
-
-
-
 
 func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexClient, error) {
 	cPool := x509.NewCertPool()
