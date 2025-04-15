@@ -17,15 +17,6 @@ type DexManager struct {
 	Client dexapi.DexClient
 }
 
-func (d *DexManager) init() {
-	// start of dex iface
-	client, err := newDexClient("127.0.0.1:5557", "./grpc_ca.crt", "./grpc_client.key", "./grpc_client.crt")
-	if err != nil {
-		// ctrl.Log.Error(err, "failed creating dex client")
-	}
-	d.Client = client
-}
-
 // Creates new Oauth2 client in Dex
 func (d *DexManager) CreateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.CreateClientResp, error) {
 	request := &dexapi.CreateClientReq{
@@ -44,21 +35,25 @@ func (d *DexManager) CreateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi
 }
 
 // Deletes an Oauth2 client
-func (d *DexManager) RemoveOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.DeleteClientResp, error) {
+func (d *DexManager) RemoveOauth2Client(clientId string) (*dexapi.DeleteClientResp, error) {
 	request := &dexapi.DeleteClientReq{
-		Id: clientSpec.Spec.Name,
+		Id: clientId,
 	}
 	return d.Client.DeleteClient(context.TODO(), request)
+}
+
+func (d *DexManager) GetOauth2Client(clientId string) (*dexapi.GetClientResp, error) {
+	request := &dexapi.GetClientReq{
+		Id: clientId,
+	}
+	return d.Client.GetClient(context.TODO(), request)
 }
 
 // Patches/updates the Oauth2 client
 
 func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.UpdateClientResp, error) {
-	request := &dexapi.GetClientReq{
-		Id: clientSpec.Spec.Name,
-	}
 
-	existing, err := d.Client.GetClient(context.TODO(), request)
+	existing, err := d.GetOauth2Client(clientSpec.Spec.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -105,4 +100,12 @@ func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexC
 		return nil, fmt.Errorf("dial: %v", err)
 	}
 	return dexapi.NewDexClient(conn), nil
+}
+
+func NewDexManager(host, caCert, clientKey, clientCert string) (*DexManager, error) {
+	client, err := newDexClient(host, caCert, clientKey, clientCert)
+	if err != nil {
+		return nil, fmt.Errorf("failed creating dex client: %w", err)
+	}
+	return &DexManager{Client: client}, nil
 }
