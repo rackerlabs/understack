@@ -22,7 +22,7 @@ func (d *DexManager) CreateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi
 	request := &dexapi.CreateClientReq{
 		Client: &dexapi.Client{
 			Id:           clientSpec.Spec.Name,
-			Secret:       clientSpec.Spec.SecretName,
+			Secret:       clientSpec.Spec.SecretValue,
 			RedirectUris: clientSpec.Spec.RedirectURIs,
 			TrustedPeers: clientSpec.Spec.TrustedPeers,
 			Public:       clientSpec.Spec.Public,
@@ -61,7 +61,7 @@ func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi
 		return nil, fmt.Errorf("oauth2 client id: %s does not exist in Dex", clientSpec.Spec.Name)
 	}
 
-	if existing.Client.Secret != clientSpec.Spec.SecretName ||
+	if existing.Client.Secret != clientSpec.Spec.SecretValue ||
 		existing.Client.Public != clientSpec.Spec.Public {
 		// dex does not support secret updates so it needs to be recreated
 	}
