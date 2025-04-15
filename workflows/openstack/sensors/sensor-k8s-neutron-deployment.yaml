@@ -6,11 +6,11 @@ metadata:
   namespace: openstack
 spec:
   template:
-    serviceAccountName: openstack-events
+    serviceAccountName: k8s-openstack-events
   # events the Sensor listens for
   dependencies:
     - eventName: neutron-deployment
-      eventSourceName: openstack-neutron
+      eventSourceName: k8s-openstack-neutron
       name: openstack-neutron-server-deployment
   # actions executed when dependencies are satisfied (StandardK8STrigger designed to create or update a generic Kubernetes resource.)
   triggers:
