@@ -23,7 +23,7 @@ understack-flavor-matcher = {path = "../understack-flavor-matcher"}
 [tool.poetry.group.test.dependencies]
 pytest = "^8.3.2"
 pytest-github-actions-annotate-failures = "*"
-pytest-cov = "^5.0.0"
+pytest-cov = "^6.0.0"
 
 [tool.poetry.plugins."ironic.inspection.hooks"]
 "resource-class" = "ironic_understack.resource_class:UndercloudResourceClassHook"
