@@ -5,7 +5,7 @@ metadata:
   name: fred-client
 spec:
   name: fred
-  secretName: fred-password
+  secretName: my-secret
   redirectURIs:
     - http://localhost:8080
     - https://some.service.example.com/

@@ -28,6 +28,7 @@ type ClientSpec struct {
 	Name            string   `json:"name"`
 	SecretName      string   `json:"secretName,omitempty"`
 	SecretNamespace string   `json:"secretNamespace,omitempty"`
+	SecretValue     string   `json:"-"`
 	RedirectURIs    []string `json:"redirectURIs"`
 	LogoUrl         string   `json:"logoURL,omitempty"`
 	TrustedPeers    []string `json:"trustedPeers,omitempty"`
