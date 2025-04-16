@@ -39,6 +39,8 @@ spec:
           spec:
             description: ClientSpec defines the desired state of Client
             properties:
+              generateSecret:
+                type: boolean
               logoURL:
                 type: string
               name:

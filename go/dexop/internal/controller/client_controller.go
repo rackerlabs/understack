@@ -24,8 +24,9 @@ import (
 	"github.com/go-logr/logr"
 	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
 	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -106,9 +107,28 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		if clientSpec.Spec.SecretNamespace == "" {
 			clientSpec.Spec.SecretNamespace = req.NamespacedName.Namespace
 		}
+		// read existing or generate a secret
 		value, err := r.readSecret(ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
 		if err != nil {
-			reqLogger.Error(err, "Unable to read secret", "secretName", clientSpec.Spec.SecretName)
+			if errors.IsNotFound(err) && clientSpec.Spec.GenerateSecret {
+				secret, err := r.writeSecret(ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace, "ABRACADAXRA")
+				if err != nil {
+					reqLogger.Error(err, "Unable to write secret", "secretName", clientSpec.Spec.SecretName)
+					return ctrl.Result{}, err
+				}
+
+				if secret.Data["secret"] == nil {
+					reqLogger.Error(nil, "Secret data is missing", "SecretName", clientSpec.Spec.SecretName)
+				}
+				value = string(secret.Data["secret"])
+				ctrl.SetControllerReference(clientSpec, secret, r.Scheme)
+				if err = r.Update(ctx, secret); err != nil {
+					return ctrl.Result{}, err
+				}
+			} else {
+				reqLogger.Error(err, "Unable to read secret", "secretName", clientSpec.Spec.SecretName)
+				return ctrl.Result{}, err
+			}
 		}
 		clientSpec.Spec.SecretValue = value
 	}
@@ -161,4 +181,22 @@ func (r *ClientReconciler) readSecret(ctx context.Context, name, namespace strin
 		return string(value), nil
 	}
 	return "", fmt.Errorf("secret key not found")
+}
+
+func (r *ClientReconciler) writeSecret(ctx context.Context, name, namespace, value string) (*v1.Secret, error) {
+	secret := &v1.Secret{
+		TypeMeta: metav1.TypeMeta{},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{"secret": []byte(value)},
+		Type: "Opaque",
+	}
+
+	err := r.Create(ctx, secret)
+	if err != nil {
+		return nil, err
+	}
+	return secret, nil
 }
