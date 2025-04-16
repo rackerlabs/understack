@@ -90,6 +90,8 @@ spec:
     server: '*'
   - namespace: 'monitoring'
     server: '*'
+  - namespace: 'otel-collector'
+    server: '*'
   - namespace: 'global-secrets-sync'
     server: '*'
   - namespace: 'kube-system'
@@ -509,6 +511,7 @@ spec:
                       targetRevision: '{{ .values.uc_deploy_ref }}'
                       ref: deploy
                 - component: otel-collector
+                  componentProject: understack
                   componentNamespace: otel-collector
                   skipComponent: '{{has "otel-collector" (.values.uc_skip_components | fromJson)}}'
                   sources:
