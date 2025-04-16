@@ -56,21 +56,22 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	_ = log.FromContext(ctx)
 	reqLogger := ctrl.Log.WithValues("client", req.NamespacedName)
 
-	mgr, err := dexmgr.NewDexManager("127.0.0.1:5557", "./grpc_ca.crt", "./grpc_client.key", "./grpc_client.crt")
+	mgr, err := r.newDexManager()
 	if err != nil {
-		ctrl.Log.Error(err, "While getting the DexManager")
 		return ctrl.Result{}, err
 	}
 
-	clientSpec := &dexv1alpha1.Client{}
-	if err := r.Get(ctx, req.NamespacedName, clientSpec); err != nil {
-		if errors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
+	clientSpec, err := r.getClientSpec(ctx, req.NamespacedName)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	reqLogger.Info("reconciling Client")
+	// resource was deleted but it is being finalized
+	if clientSpec == nil {
+		return ctrl.Result{}, nil
+	}
+
+	reqLogger.Info("Reconciling Client")
 
 	// delete if no longer needed
 	deleteRequested := clientSpec.GetDeletionTimestamp() != nil
@@ -159,10 +160,31 @@ func (r *ClientReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// finalizeDeletion removes an OAuth2 client from Dex when the corresponding Client resource is deleted.
+// It uses the DexManager to send a request to Dex over gRPC to delete the client.
 func (r *ClientReconciler) finalizeDeletion(reqLogger logr.Logger, c *dexv1alpha1.Client, mgr *dexmgr.DexManager) error {
 	reqLogger.Info("Client is being removed")
 	if _, err := mgr.RemoveOauth2Client(c.Spec.Name); err != nil {
 		return err
 	}
 	return nil
+}
+
+func (r *ClientReconciler) newDexManager() (*dexmgr.DexManager, error) {
+	mgr, err := dexmgr.NewDexManager("127.0.0.1:5557", "./grpc_ca.crt", "./grpc_client.key", "./grpc_client.crt")
+	if err != nil {
+		ctrl.Log.Error(err, "While getting the DexManager")
+	}
+	return mgr, err
+}
+
+func (r *ClientReconciler) getClientSpec(ctx context.Context, namespacedName types.NamespacedName) (*dexv1alpha1.Client, error) {
+	clientSpec := &dexv1alpha1.Client{}
+	if err := r.Get(ctx, namespacedName, clientSpec); err != nil {
+		if errors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return clientSpec, nil
 }
