@@ -1,0 +1,120 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: understack-openstack
+spec:
+  syncPolicy:
+    applicationsSync: create-update
+    # for infrastructure resources we don't want to delete things automatically
+    preserveResourcesOnDeletion: true
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # matrixes clusters with the applications
+    - matrix:
+        generators:
+          # figure out the clusters and the source repos based on the clusters
+          - merge:
+              mergeKeys:
+                # merge cluster configs based on cluster name
+                - name
+              generators:
+                # load all clusters for regional or aio
+                - clusters:
+                    selector:
+                      matchExpressions:
+                        - key: understack.rackspace.com/role
+                          operator: In
+                          values:
+                            # openstack is deployed at the site level
+                            - "site"
+                            - "aio"
+                # dev clusters allow some overrides
+                - clusters:
+                    selector:
+                      matchLabels:
+                        understack.rackspace.com/env: dev
+                    values:
+                      understack_url: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      understack_ref: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      deploy_url: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      deploy_ref: '{{index .metadata.annotations "uc_deploy_ref"}}'
+          # now the applications matrixed with the clusters
+          - merge:
+              mergeKeys:
+                # merge config based on component name
+                - component
+              generators:
+                - git:
+                    repoURL: '{{ .values.understack_url }}'
+                    revision: '{{ .values.understack_ref }}'
+                    files:
+                      - path: "apps/openstack/*.yaml"
+                - git:
+                    repoURL: '{{ .values.deploy_url }}'
+                    revision: '{{ .values.deploy_ref }}'
+                    files:
+                      # due to https://github.com/argoproj/argo-cd/issues/22051
+                      # we need to do this workaround
+                      - path: '{{ "{{.name}}" }}/apps.yaml'
+      selector:
+        matchExpressions:
+          # if you set skip to any value for the component in apps.yaml, this will disable it
+          - key: skip
+            operator: DoesNotExist
+  template:
+    metadata:
+      name: '{{.name}}-{{.component}}'
+      # we should never set the finalizer here as the applicationsSync policy will handle it
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+    spec:
+      project: understack
+      sources:
+        - repoURL: '{{.repoURL}}'
+          chart: '{{.component}}'
+          targetRevision: '{{.chartVersion}}'
+          helm:
+            releaseName: '{{.component}}'
+            valueFiles:
+              # default upstream images
+              - $understack/components/images-openstack.yaml
+              # default values for each component
+              - $understack/components/{{.component}}/values.yaml
+              # current global secret data per deployment
+              - $deploy/{{.name}}/manifests/secret-openstack.yaml
+              # optional file to allow users to override upstream images
+              - $deploy/{{.name}}/manifests/images-openstack.yaml
+              # optional file to allow users to override component values
+              - $deploy/{{.name}}/helm-configs/{{.component}}.yaml
+            # don't require all the values files
+            ignoreMissingValueFiles: true
+        - repoURL: '{{ .values.understack_url }}'
+          path: components/{{.component}}/
+          targetRevision: '{{ .values.understack_ref }}'
+          ref: understack
+        - repoURL: '{{ .values.deploy_url }}'
+          targetRevision: '{{ .values.deploy_ref }}'
+          path: '{{.name}}/manifests/{{.component}}'
+          ref: deploy
+      destination:
+        server: '{{.server}}'
+        namespace: openstack
+      syncPolicy:
+        automated:
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+        managedNamespaceMetadata:
+          annotations:
+            # ArgoCD can create our namespace but let's not delete it
+            argocd.argoproj.io/sync-options: Delete=false
+          labels:
+            kubernetes.io/metadata.name: openstack
+            name: openstack
+  templatePatch: |
+    spec:
+      ignoreDifferences: {{ dig "ignoreDifferences" list . | toJson }}
