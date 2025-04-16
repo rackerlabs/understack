@@ -2,7 +2,6 @@ import logging
 from uuid import UUID
 
 import neutron_lib.api.definitions.portbindings as portbindings
-from neutron.plugins.ml2.driver_context import PortContext
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.callbacks import events
@@ -19,6 +18,9 @@ from neutron_understack.nautobot import Nautobot
 from neutron_understack.nautobot import VlanPayload
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
+
+from .ml2_type_annotations import NetworkContext
+from .ml2_type_annotations import PortContext
 
 LOG = logging.getLogger(__name__)
 
@@ -58,7 +60,7 @@ class UnderstackDriver(MechanismDriver):
     def create_network_precommit(self, context):
         pass
 
-    def create_network_postcommit(self, context):
+    def create_network_postcommit(self, context: NetworkContext):
         network = context.current
         network_id = network["id"]
         network_name = network["name"]
@@ -73,6 +75,9 @@ class UnderstackDriver(MechanismDriver):
             return
 
         ucvni_group = conf.ucvni_group
+        if segmentation_id is None:
+            raise ValueError("Network %s missing provider:segmentation_id", network_id)
+
         ucvni_response = self.nb.ucvni_create(
             network_id=network_id,
             project_id=project_id,
@@ -93,16 +98,16 @@ class UnderstackDriver(MechanismDriver):
         )
         self._create_nautobot_namespace(network_id, external)
 
-    def update_network_precommit(self, context):
+    def update_network_precommit(self, context: NetworkContext):
         pass
 
-    def update_network_postcommit(self, context):
+    def update_network_postcommit(self, context: NetworkContext):
         pass
 
-    def delete_network_precommit(self, context):
+    def delete_network_precommit(self, context: NetworkContext):
         pass
 
-    def delete_network_postcommit(self, context):
+    def delete_network_postcommit(self, context: NetworkContext):
         network = context.current
         network_id = network["id"]
         external = network["router:external"]
