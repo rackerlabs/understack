@@ -342,6 +342,20 @@ class Nautobot:
         else:
             return result
 
+    def get_interface_uuid(self, device_name: str, interface_name: str) -> str:
+        device = self.api.dcim.devices.get(name=device_name)
+        if not device:
+            raise NautobotNotFoundError(obj="device", ref=device_name)
+
+        interface = self.api.dcim.interfaces.get(
+            name=interface_name,
+            device=device.id,  # type: ignore
+        )
+        if not interface:
+            raise NautobotNotFoundError(obj="interface", ref=interface_name)
+
+        return interface.id  # type: ignore
+
 
 def _vlan_payload(vlan_group_name: str, vlan_id: int) -> dict:
     return {
