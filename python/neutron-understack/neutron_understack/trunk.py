@@ -190,7 +190,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_profile = parent_port.bindings[0].profile
         binding_host = parent_port.bindings[0].host
         connected_interface_id = utils.fetch_connected_interface_uuid(
-            binding_profile, LOG
+            binding_profile, self.nb
         )
 
         vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
@@ -269,7 +269,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
     ) -> None:
         vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
         connected_interface_id = utils.fetch_connected_interface_uuid(
-            binding_profile, LOG
+            binding_profile, self.nb
         )
 
         vlan_ids_to_remove = self._handle_segment_deallocation(subports, binding_host)

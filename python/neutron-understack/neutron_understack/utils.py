@@ -1,4 +1,3 @@
-from logging import Logger
 from uuid import UUID
 
 from neutron.objects import ports as port_obj
@@ -10,6 +9,7 @@ from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
 
 from neutron_understack import vlan_group_name_convention
+from neutron_understack.nautobot import Nautobot
 
 
 def fetch_port_object(port_id: str) -> port_obj.Port:
@@ -94,28 +94,27 @@ def vlan_group_name_from_binding_profile(binding_profile: dict) -> str | None:
         return vlan_group_name_convention.for_switch(switch_names[0])
 
 
-def fetch_connected_interface_uuid(
-    binding_profile: dict, logger: Logger | None = None
-) -> str:
+def fetch_connected_interface_uuid(binding_profile: dict, nautobot: Nautobot) -> str:
     """Fetches the connected interface UUID from the port's binding profile.
 
-    :param binding_profile: The bindng profile of the port.
+    If the binding_profile contains a UUID then assume this is a nautotbot
+    interface UUID, else look up the interface in Nautobot
+
+    :param binding_profile: The binding profile of the port.
     :return: The connected interface UUID.
     """
-    connected_interface_uuid = binding_profile.get("local_link_information")[0].get(
-        "port_id"
-    )
+    local_link_info = binding_profile.get("local_link_information", [{}])[0]
+    port_id = local_link_info["port_id"]
+    device_name = local_link_info["switch_info"]
+
     try:
-        UUID(str(connected_interface_uuid))
+        UUID(str(port_id))
     except ValueError:
-        if logger:
-            logger.debug(
-                "Local link information port_id is not a valid UUID type"
-                " port_id: %(connected_interface_uuid)s",
-                {"connected_interface_uuid": connected_interface_uuid},
-            )
-        raise
-    return connected_interface_uuid
+        port_id = nautobot.get_interface_uuid(
+            device_name=device_name,
+            interface_name=port_id,
+        )
+    return port_id
 
 
 def parent_port_is_bound(port: port_obj.Port) -> bool:
