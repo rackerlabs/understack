@@ -85,7 +85,7 @@ def port_configuration(
     if interface.neighbor_chassis_mac:
         local_link_connection = {
             "switch_id": interface.neighbor_chassis_mac.lower(),
-            "port_id": interface.neighbor_interface_id,
+            "port_id": interface.neighbor_interface_name,
             "switch_info": interface.neighbor_device_name,
         }
     else:

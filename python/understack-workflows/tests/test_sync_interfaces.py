@@ -24,7 +24,7 @@ def test_sync_with_no_existing_interfaces(dell_nautobot_device):
             "pxe_enabled": False,
             "local_link_connection": {
                 "switch_id": "9c:54:16:f5:ad:27",
-                "port_id": "c210be75-1038-4ba3-9923-60050e1c5362",
+                "port_id": "Ethernet1/6",
                 "switch_info": "f20-2-1.iad3.rackspace.net",
             },
             "physical_network": "F20-2[1-2]",
@@ -40,7 +40,7 @@ def test_sync_with_no_existing_interfaces(dell_nautobot_device):
             "pxe_enabled": False,
             "local_link_connection": {
                 "switch_id": "9c:54:16:f5:ac:27",
-                "port_id": "2148cf50-f70e-42c9-9f68-8ce98d61498c",
+                "port_id": "Ethernet1/5",
                 "switch_info": "f20-2-2.iad3.rackspace.net",
             },
             "physical_network": "F20-2[1-2]",
@@ -56,7 +56,7 @@ def test_sync_with_no_existing_interfaces(dell_nautobot_device):
             "pxe_enabled": False,
             "local_link_connection": {
                 "switch_id": "9c:54:16:f5:ad:27",
-                "port_id": "f72bb830-3f3c-4aba-b7d5-9680ea4d358e",
+                "port_id": "Ethernet1/6",
                 "switch_info": "f20-2-2.iad3.rackspace.net",
             },
             "physical_network": "F20-2[1-2]",
@@ -72,7 +72,7 @@ def test_sync_with_no_existing_interfaces(dell_nautobot_device):
             "pxe_enabled": False,
             "local_link_connection": {
                 "switch_id": "9c:54:16:f5:ab:27",
-                "port_id": "f9a5cc87-d10a-4827-99e8-48961fd1d773",
+                "port_id": "Ethernet1/5",
                 "switch_info": "f20-2-1.iad3.rackspace.net",
             },
             "physical_network": "F20-2[1-2]",
