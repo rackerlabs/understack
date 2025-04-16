@@ -18,15 +18,12 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/go-logr/logr"
 	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
 	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -103,15 +100,16 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	// if secretName specified, read the secret
+	secretmgr := new(SecretManager)
 	if clientSpec.Spec.SecretName != "" {
 		if clientSpec.Spec.SecretNamespace == "" {
 			clientSpec.Spec.SecretNamespace = req.NamespacedName.Namespace
 		}
 		// read existing or generate a secret
-		value, err := r.readSecret(ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
+		value, err := secretmgr.readSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
 		if err != nil {
 			if errors.IsNotFound(err) && clientSpec.Spec.GenerateSecret {
-				secret, err := r.writeSecret(ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace, "ABRACADAXRA")
+				secret, err := secretmgr.generateSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
 				if err != nil {
 					reqLogger.Error(err, "Unable to write secret", "secretName", clientSpec.Spec.SecretName)
 					return ctrl.Result{}, err
@@ -167,36 +165,4 @@ func (r *ClientReconciler) finalizeDeletion(reqLogger logr.Logger, c *dexv1alpha
 		return err
 	}
 	return nil
-}
-
-func (r *ClientReconciler) readSecret(ctx context.Context, name, namespace string) (string, error) {
-	secret := &v1.Secret{}
-
-	err := r.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, secret)
-	if err != nil {
-		return "", err
-	}
-
-	if value, ok := secret.Data["secret"]; ok {
-		return string(value), nil
-	}
-	return "", fmt.Errorf("secret key not found")
-}
-
-func (r *ClientReconciler) writeSecret(ctx context.Context, name, namespace, value string) (*v1.Secret, error) {
-	secret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{"secret": []byte(value)},
-		Type: "Opaque",
-	}
-
-	err := r.Create(ctx, secret)
-	if err != nil {
-		return nil, err
-	}
-	return secret, nil
 }
