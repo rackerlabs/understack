@@ -8,3 +8,28 @@ resources:
 - appsets/appset-understack-operators.yaml
 - appsets/components.yaml
 - appsets/openstack.yaml
+- appsets/appset-understack-openstack.yaml
+
+# you can do something like below to allow your deployment repo
+# to define the exact versions that you want to use
+# you will need to replace your $DEPLOY_URL and $DEPLOY_REF
+#patches:
+#  - target:
+#      group: argoproj.io
+#      version: v1alpha1
+#      kind: ApplicationSet
+#      name: understack-openstack
+#    patch:
+#      - op: add
+#        path: /spec/generators/0/matrix/generators/0/merge/generators/1
+#        value: |
+#         git:
+#           repoURL: $DEPLOY_URL
+#           revision: $DEPLOY_REF
+#           files:
+#             - path: "*/deploy.yaml"
+#           values:
+#             understack_url: '{{ get . "understack_url" }}'
+#             understack_ref: '{{ get . "understack_ref" }}'
+#             deploy_url: '{{ get . "deploy_url" }}'
+#             deploy_ref: '{{ get . "deploy_ref" }}'

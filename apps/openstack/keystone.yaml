@@ -1,0 +1,13 @@
+---
+component: keystone
+repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+chartVersion: 2024.2.6+06d763432
+ignoreDifferences:
+  - kind: Secret
+    name: keystone-fernet-keys
+    jqPathExpressions:
+      - .data
+  - kind: Secret
+    name: keystone-credential-keys
+    jqPathExpressions:
+      - .data

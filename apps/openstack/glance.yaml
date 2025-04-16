@@ -1,0 +1,4 @@
+---
+component: glance
+repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+chartVersion: 0.5.2
