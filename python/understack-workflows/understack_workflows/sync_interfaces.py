@@ -47,7 +47,7 @@ def from_nautobot_to_ironic(
                 logger.debug("No changes required for Ironic Port %s", port_id)
         else:
             logger.info("Creating Ironic Port %s ...", nb_port)
-            response = ironic_client.create_port(nb_port.dict())
+            response = ironic_client.create_port(nb_port.model_dump())
             logger.debug("Created: %s", response)
 
 
