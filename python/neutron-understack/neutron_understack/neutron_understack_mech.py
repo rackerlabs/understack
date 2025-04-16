@@ -268,7 +268,7 @@ class UnderstackDriver(MechanismDriver):
         segment_id = context.original_top_bound_segment["id"]
         original_binding = context.original["binding:profile"]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
-            original_binding, LOG
+            original_binding, self.nb
         )
 
         if not utils.ports_bound_to_segment(segment_id):
@@ -342,7 +342,7 @@ class UnderstackDriver(MechanismDriver):
     def _bind_port_segment(self, context: PortContext, segment):
         network_id = context.current["network_id"]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
-            context.current["binding:profile"], LOG
+            context.current["binding:profile"], self.nb
         )
         vlan_group_name = self._vlan_group_name(context)
         if vlan_group_name is None:
@@ -473,7 +473,7 @@ class UnderstackDriver(MechanismDriver):
 
     def _set_nautobot_port_status(self, context: PortContext, status: str):
         profile = context.current["binding:profile"]
-        interface_uuid = utils.fetch_connected_interface_uuid(profile, LOG)
+        interface_uuid = utils.fetch_connected_interface_uuid(profile, self.nb)
         LOG.debug("Set interface %s to %s status", interface_uuid, status)
         self.nb.configure_port_status(interface_uuid, status=status)
 

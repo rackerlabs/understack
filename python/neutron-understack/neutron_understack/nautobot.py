@@ -330,7 +330,7 @@ class Nautobot:
     def create_vlan_and_associate_vlan_to_ucvni(self, vlan: VlanPayload):
         try:
             result = self.api.ipam.vlans.create(vlan.to_dict())
-        except pynautobot.core.query.RequestError as error:
+        except pynautobot.core.query.RequestError as error:  # type: ignore
             LOG.error("Nautobot error: %(error)s", {"error": error})
             raise NautobotRequestError(
                 code=error.req.status_code,
@@ -341,6 +341,20 @@ class Nautobot:
             ) from error
         else:
             return result
+
+    def get_interface_uuid(self, device_name: str, interface_name: str) -> str:
+        device = self.api.dcim.devices.get(name=device_name)
+        if not device:
+            raise NautobotNotFoundError(obj="device", ref=device_name)
+
+        interface = self.api.dcim.interfaces.get(
+            name=interface_name,
+            device=device.id,  # type: ignore
+        )
+        if not interface:
+            raise NautobotNotFoundError(obj="interface", ref=interface_name)
+
+        return interface.id  # type: ignore
 
 
 def _vlan_payload(vlan_group_name: str, vlan_id: int) -> dict:
