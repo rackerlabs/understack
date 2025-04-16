@@ -84,6 +84,12 @@ console:
   # connected to QEMU
   console_kind: none
 
+bootstrap:
+  structured:
+    flavors:
+      # this script adds hardcoded flavors which we never use so disable it
+      enabled: false
+
 # (nicholas.kuechler) Using custom dependencies in order to
 # prevent the nova-db-init and nova-rabbit-init jobs from running
 dependencies:
