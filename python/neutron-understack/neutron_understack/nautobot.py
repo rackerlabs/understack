@@ -330,7 +330,7 @@ class Nautobot:
     def create_vlan_and_associate_vlan_to_ucvni(self, vlan: VlanPayload):
         try:
             result = self.api.ipam.vlans.create(vlan.to_dict())
-        except pynautobot.core.query.RequestError as error:
+        except pynautobot.core.query.RequestError as error:  # type: ignore
             LOG.error("Nautobot error: %(error)s", {"error": error})
             raise NautobotRequestError(
                 code=error.req.status_code,
