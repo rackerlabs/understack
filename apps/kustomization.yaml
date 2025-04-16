@@ -8,3 +8,16 @@ resources:
 - appsets/appset-understack-operators.yaml
 - appsets/components.yaml
 - appsets/openstack.yaml
+
+components:
+- appsets
+
+patches:
+ - target:
+    group: argoproj.io
+    version: v1alpha1
+    kind: ApplicationSet
+    name: understack-openstack
+   patch: |
+     - op: remove
+       path: /spec/generators/0/matrix/generators/0/merge/generators/1
