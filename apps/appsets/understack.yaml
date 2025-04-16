@@ -105,9 +105,14 @@ kind: ApplicationSet
 metadata:
   name: understack
   namespace: argocd
+  finalizers:
+    # ensure applicationset is not deleted until its unreferenced
+    - resources-finalizer.argocd.argoproj.io
 spec:
   syncPolicy:
     applicationsSync: create-update
+    # for infrastructure resources we don't want to delete things automatically
+    preserveResourcesOnDeletion: true
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
