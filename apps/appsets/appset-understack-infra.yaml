@@ -81,8 +81,7 @@ spec:
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
-      finalizers:
-        - resources-finalizer.argocd.argoproj.io
+      # we should never set the finalizer here as the applicationsSync policy will handle it
       annotations:
         argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
     spec:
