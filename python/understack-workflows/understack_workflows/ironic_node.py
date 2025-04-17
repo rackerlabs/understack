@@ -59,6 +59,7 @@ def update_ironic_node(client, node_meta, bmc):
         f"driver_info/redfish_username={bmc.username}",
         f"driver_info/redfish_password={bmc.password}",
         f"resource_class={node_meta.resource_class}",
+        "boot_interface=http-ipxe",
     ]
 
     patches = args_array_to_patch("add", updates)
@@ -85,5 +86,6 @@ def create_ironic_node(
                 "redfish_password": bmc.password,
             },
             "resource_class": node_meta.resource_class,
+            "boot_interface": "http-ipxe",
         }
     )
