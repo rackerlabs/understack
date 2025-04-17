@@ -38,7 +38,7 @@ var _ = Describe("Client Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		client := &dexv1alpha1.Client{}
 
@@ -51,14 +51,19 @@ var _ = Describe("Client Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: dexv1alpha1.ClientSpec{
+						Name:           "fred-client",
+						SecretName:     "freds-secret",
+						GenerateSecret: true,
+						RedirectURIs:   []string{"http://localhost:8080", "https://some.service.example.com/callback"},
+						LogoUrl:        "http://logoserver.local/xyz.png",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
 		})
 
 		AfterEach(func() {
-			// TODO(user): Cleanup logic after each test, like removing the resource instance.
 			resource := &dexv1alpha1.Client{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
