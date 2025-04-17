@@ -1,0 +1,166 @@
+package other
+
+var SecretOpenStackTemplate = `
+# The purpose of this file is to serve as a template for OpenStack Helm
+# based endpoints configuration so that OpenStack Helm populates the
+# correct URLs in the configs that it generates for the various services
+---
+endpoints:
+  # 'identity' endpoints are for keystone access
+  identity:
+    auth:
+      # this is the 'admin' user created in keystone by the initial start
+      # and used by the other services to create their service accounts
+      # and endpoint in the service catalog.
+      admin:
+        password: "{{ .KEYSTONE_ADMIN_PASSWORD }}"
+      # this user is the service account that glance uses
+      glance:
+        password: "{{ .GLANCE_KEYSTONE_PASSWORD }}"
+      # this user is the service account that ironic uses
+      ironic:
+        password: "{{ .IRONIC_KEYSTONE_PASSWORD }}"
+      # this user is the service account that neutron uses
+      neutron:
+        password: "{{ .NEUTRON_KEYSTONE_PASSWORD }}"
+      # this user is the service account that nova uses
+      nova:
+        password: "{{ .NOVA_KEYSTONE_PASSWORD }}"
+      # this user is the service account that placement uses
+      placement:
+        password: "{{ .PLACEMENT_KEYSTONE_PASSWORD }}"
+
+    # set our public facing URL
+    host_fqdn_override:
+      public:
+        host: keystone.{{ .DNS_ZONE }}
+
+  # 'oslo_cache' is the memcache layer
+  oslo_cache:
+    auth:
+      # this is used for encrypting / protecting the memcache tokens
+      memcache_secret_key: "{{ .MEMCACHE_SECRET_KEY }}"
+
+  # 'oslo_db' is for MariaDB
+  oslo_db:
+    auth:
+      # this is what the keystone service uses to connect to MariaDB
+      keystone:
+        password: "{{ .KEYSTONE_DB_PASSWORD }}"
+      # this is what the glance service uses to connect to MariaDB
+      glance:
+        password: "{{ .GLANCE_DB_PASSWORD }}"
+      # this is what the ironic service uses to connect to MariaDB
+      ironic:
+        password: "{{ .IRONIC_DB_PASSWORD }}"
+      # this is what the neutron service uses to connect to MariaDB
+      neutron:
+        password: "{{ .NEUTRON_DB_PASSWORD }}"
+      # this is what the nova service uses to connect to MariaDB
+      nova:
+        password: "{{ .NOVA_DB_PASSWORD }}"
+      # this is what the placement service uses to connect to MariaDB
+      placement:
+        password: "{{ .PLACEMENT_DB_PASSWORD }}"
+      # this is what the horizon dashboard service uses to connect to MariaDB
+      horizon:
+        password: "{{ .HORIZON_DB_PASSWORD }}"
+
+  # 'oslo_db_api' is for MariaDB specific for nova
+  oslo_db_api:
+    auth:
+      nova:
+        password: "{{ .NOVA_DB_PASSWORD }}"
+
+  # 'oslo_db_cell0' is for MariaDB specific for nova
+  oslo_db_cell0:
+    auth:
+      nova:
+        password: "{{ .NOVA_DB_PASSWORD }}"
+
+  # 'oslo_messaging' is for RabbitMQ
+  oslo_messaging:
+    auth:
+      # this is what the keystone service uses to connect to RabbitMQ
+      keystone:
+        password: "{{ .KEYSTONE_RABBITMQ_PASSWORD }}"
+      # this is what the glance service uses to connect to RabbitMQ
+      glance:
+        password: "{{ .GLANCE_RABBITMQ_PASSWORD }}"
+      # this is what the ironic service uses to connect to RabbitMQ
+      ironic:
+        password: "{{ .IRONIC_RABBITMQ_PASSWORD }}"
+      # this is what the neutron service uses to connect to RabbitMQ
+      neutron:
+        password: "{{ .NEUTRON_RABBITMQ_PASSWORD }}"
+      # this is what the nova service uses to connect to RabbitMQ
+      nova:
+        password: "{{ .NOVA_RABBITMQ_PASSWORD }}"
+
+  # 'baremetal' is the ironic service
+  baremetal:
+    # set our public facing URL
+    host_fqdn_override:
+      public:
+        host: ironic.{{ .DNS_ZONE }}
+
+  # 'image' is the glance service
+  image:
+    # set our public facing URL
+    host_fqdn_override:
+      public:
+        host: glance.{{ .DNS_ZONE }}
+
+  # 'network' is the neutron service
+  network:
+    # set our public facing URL
+    host_fqdn_override:
+      public:
+        host: neutron.{{ .DNS_ZONE }}
+
+  # 'compute' is the nova service
+  compute:
+    # set our public facing URL
+    host_fqdn_override:
+      public:
+        host: nova.{{ .DNS_ZONE }}
+
+  # 'placement' is the nova service
+  placement:
+    # set our public facing URL
+    host_fqdn_override:
+      public:
+        host: placement.{{ .DNS_ZONE }}
+
+  # 'dashboard' is the horizon service
+  dashboard:
+    # set our public facing URL
+    host_fqdn_override:
+      public:
+        host: horizon.{{ .DNS_ZONE }}
+
+# necessary cause the ingress definition in openstack-helm-infra helm-toolkit hardcodes this
+secrets:
+  tls:
+    baremetal:
+      api:
+        public: ironic-tls-public
+    image:
+      api:
+        public: glance-tls-public
+    identity:
+      api:
+        public: keystone-tls-public
+    network:
+      server:
+        public: neutron-tls-public
+    compute:
+      osapi:
+        public: nova-tls-public
+    placement:
+      api:
+        public: placement-tls-public
+    dashboard:
+      dashboard:
+        public: horizon-tls-public
+`
