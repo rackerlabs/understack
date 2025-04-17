@@ -1,0 +1,66 @@
+---
+# Copyright (c) 2025 Rackspace Technology, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+- name: Create 'sso' domain
+  openstack.cloud.identity_domain:
+    name: sso
+    description: 'SSO to dex'
+    state: present
+  register: _domain_sso
+
+- name: Display 'sso' configuration
+  ansible.builtin.debug:
+    var: keystone_bootstrap_dex_url
+
+- name: Create 'sso' identity provider
+  openstack.cloud.federation_idp:
+    name: sso
+    domain_id: "{{ _domain_sso.domain.id }}"
+    description: 'Identity Provider to dex'
+    remote_ids:
+      - "{{ keystone_bootstrap_dex_url }}"
+
+- name: Create sso mapping
+  openstack.cloud.federation_mapping:
+    name: sso_mapping
+    rules:
+      - local:
+          - user:
+              id: '{0}'
+              name: '{1}'
+              email: '{2}'
+            groups: '{3}'
+            domain:
+              id: "{{ _domain_sso.domain.id }}"
+        remote:
+          - type: HTTP_OIDC_SUB
+          - type: REMOTE_USER
+          - type: HTTP_OIDC_EMAIL
+          - type: HTTP_OIDC_GROUPS
+
+- name: Create openid protocol
+  openstack.cloud.keystone_federation_protocol:
+    name: openid
+    idp: sso
+    mapping: sso_mapping
+
+- name: Create federated group mappings
+  ansible.builtin.include_tasks: sso_member_groups.yml
+  loop: "{{ keystone_bootstrap_groups }}"
+
+- name: Grant admin for groups
+  ansible.builtin.include_tasks: sso_role_admin.yml
+  loop:
+    - ucadmin

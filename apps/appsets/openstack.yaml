@@ -18,7 +18,7 @@ spec:
               elements:
                 - component: keystone
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-                  chartVersion: 2024.2.4+79d4b689-eb60e37c
+                  chartVersion: 2024.2.6+06d763432
                 - component: openvswitch
                   repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
                   chartVersion: 2024.2.0
