@@ -25,6 +25,7 @@ import (
 	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -171,7 +172,7 @@ func (r *ClientReconciler) finalizeDeletion(reqLogger logr.Logger, c *dexv1alpha
 }
 
 func (r *ClientReconciler) newDexManager() (*dexmgr.DexManager, error) {
-	mgr, err := dexmgr.NewDexManager("127.0.0.1:5557", "./grpc_ca.crt", "./grpc_client.key", "./grpc_client.crt")
+	mgr, err := dexmgr.NewDexManager("127.0.0.1:5557", "/home/skrobul/devel/understack/go/dexop/grpc_ca.crt", "/home/skrobul/devel/understack/go/dexop/grpc_client.key", "/home/skrobul/devel/understack/go/dexop/grpc_client.crt")
 	if err != nil {
 		ctrl.Log.Error(err, "While getting the DexManager")
 	}
