@@ -22,6 +22,6 @@ hide:
 
 -   :material-abacus:{ .xl .middle } __Getting Started__
 
-    See our [Deploy Guide](deploy-guide/index.md) to begin with your own deployment.
+    See our [Deploy Guide](deploy-guide/welcome.md) to begin with your own deployment.
 </div>
 <!-- markdownlint-restore -->

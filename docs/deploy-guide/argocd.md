@@ -1,5 +1,7 @@
-# External ArgoCD
+# ArgoCD
 
+Unlike the [Quick Start](./gitops-install.md) you will not want to run
+ArgoCD, the deployment tool/engine on the same cluster hosting your workload.
 In most cases you will not want to run ArgoCD, the deployment tool/engine on
 the same cluster that is hosting your workload. The [Quick Start](./gitops-install.md)
 used the [apps/aio-app-of-apps.yaml][aio-app-of-apps] to initialize ArgoCD
