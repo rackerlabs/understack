@@ -178,6 +178,22 @@ spec:
                     - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
                       targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
                       path: 'components/chrony'
+                - component: etcdbackup
+                  componentNamespace: kube-system
+                  skipComponent: '{{has "etcdbackup" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
+                  sources:
+                    - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      path: 'components/etcdbackup'
+                      ref: understack
+                      helm:
+                        valueFiles:
+                          - $understack/components/etcdbackup/values.yaml
+                          - $deploy/{{.name}}/helm-configs/etcdbackup.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
+                      ref: deploy
                 - component: openstack-exporter
                   componentNamespace: monitoring
                   skipComponent: '{{has "openstack-exporter" ((default "[]" (index .metadata.annotations "uc_skip_components") | fromJson))}}'
