@@ -1,8 +1,16 @@
 from typing import Any
 from typing import Literal
-from typing import NotRequired
+
+try:
+    from typing import NotRequired
+    from typing import TypedDict
+    # neutron container currently runs with Python 3.10 which does not have
+    # support for NotRequired, so we have to fallback to the backported version
+except ImportError:
+    from typing_extensions import NotRequired
+    from typing_extensions import TypedDict
+
 from typing import TypeAlias
-from typing import TypedDict
 
 NetworkTypeName: TypeAlias = Literal["vxlan", "vlan"]
 PortStatusName: TypeAlias = Literal["DOWN", "ACTIVE"]
