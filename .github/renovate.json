@@ -26,6 +26,9 @@
       "datasourceTemplate": "helm"
     }
   ],
+  "argocd": {
+    "fileMatch": ["apps/.+\\.yaml$"]
+  },
   "devbox": {
     "enabled": false
   }
