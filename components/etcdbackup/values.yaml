@@ -1,0 +1,6 @@
+backup:
+  # hostPath where the backups are to be stored
+  backupPath: /var/backups/
+  # node on which the etcd backup job will be scheduled to
+  nodeName: controlPlane1
+  fileName: mycluster.etcd.snapshot
