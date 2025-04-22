@@ -1,0 +1,146 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: understack-site
+spec:
+  syncPolicy:
+    applicationsSync: create-update
+    # for infrastructure resources we don't want to delete things automatically
+    preserveResourcesOnDeletion: true
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # matrixes clusters with the applications
+    - matrix:
+        generators:
+          - merge:
+              mergeKeys:
+                # merge cluster configs based on cluster name
+                - name
+              generators:
+                # load all clusters for site or aio
+                - clusters:
+                    selector:
+                      matchExpressions:
+                        - key: understack.rackspace.com/role
+                          operator: In
+                          values:
+                            - "site"
+                            - "aio"
+                # dev clusters allow some overrides
+                - clusters:
+                    selector:
+                      matchLabels:
+                        understack.rackspace.com/env: dev
+                    values:
+                      understack_url: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      understack_ref: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      deploy_url: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      deploy_ref: '{{index .metadata.annotations "uc_deploy_ref"}}'
+          # now the applications matrixed with the clusters
+          - merge:
+              mergeKeys:
+                # merge config based on component name
+                - component
+              generators:
+                - git:
+                    repoURL: '{{ .values.understack_url }}'
+                    revision: '{{ .values.understack_ref }}'
+                    files:
+                      - path: "apps/site/*.yaml"
+                - git:
+                    repoURL: '{{ .values.deploy_url }}'
+                    revision: '{{ .values.deploy_ref }}'
+                    files:
+                      # due to https://github.com/argoproj/argo-cd/issues/22051
+                      # we need to do this workaround. this reads the apps.yaml
+                      # for per cluster
+                      - path: '{{ "{{.name}}" }}/apps.yaml'
+      selector:
+        matchExpressions:
+          # if you set skip to any value for the component in apps.yaml, this will disable it
+          - key: skip
+            operator: DoesNotExist
+  template:
+    metadata:
+      name: '{{.name}}-{{.component}}'
+      # we should never set the finalizer here as the applicationsSync policy will handle it
+      annotations:
+        argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+    spec:
+      project: understack
+      destination:
+        server: '{{.server}}'
+        namespace: '{{coalesce (get . "componentNamespace") .component}}'
+      syncPolicy:
+        automated:
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+          - RespectIgnoreDifferences=true
+        managedNamespaceMetadata:
+          annotations:
+            # ArgoCD can create our namespace but let's not delete it
+            argocd.argoproj.io/sync-options: Delete=false
+  templatePatch: |
+    spec:
+      {{- $root := . }}
+      {{- if hasKey . "sources" }}
+      sources:
+        {{- range $source := .sources }}
+        {{- if hasKey $source "ref" }}
+        - ref: {{ $source.ref }}
+          {{- if eq $source.ref "understack" }}
+          repoURL: {{ $root.values.understack_url }}
+          targetRevision: {{ $root.values.understack_ref }}
+          {{- else if eq $source.ref "deploy" }}
+          repoURL: {{ $root.values.deploy_url }}
+          targetRevision: {{ $root.values.deploy_ref }}
+          {{- end }}
+        {{- else}}
+        - repoURL: {{ $source.repoURL }}
+          targetRevision: {{ $source.targetRevision }}
+        {{- end }}
+          {{- if hasKey $source "chart" }}
+          chart: {{ $source.chart }}
+          {{- end }}
+          {{- if hasKey $source "helm" }}
+          helm:
+            {{- if hasKey $source "chart" }}
+            releaseName: {{ $source.chart }}
+            {{- end }}
+            {{- if hasKey $source.helm "valueFiles" }}
+            valueFiles:
+            {{- range $vf := $source.helm.valueFiles }}
+            # until dynamic parameters exist this must be done
+            - {{ $vf | replace "{{.name}}" $root.name }}
+            {{- end }}
+            ignoreMissingValueFiles: true
+            {{- end }}
+            {{- if hasKey $source.helm "fileParameters" }}
+            fileParameters:
+            {{- range $fp := $source.helm.fileParameters }}
+            # until dynamic parameters exist this must be done
+            - name: {{ $fp.name }}
+              path: {{ $fp.path | replace "{{.name}}" $root.name }}
+            {{- end }}
+            {{- end }}
+            {{- if hasKey $source.helm "valuesObject" }}
+            valuesObject: {{ $source.helm.valuesObject | toJson }}
+            # indentation matters so collapse to single line with toJson to keep it
+            {{- end }}
+          {{- end }}
+          {{- if hasKey $source "kustomize" }}
+          kustomize: {{ $source.kustomize | toJson }}
+          {{- end }}
+          {{- if hasKey $source "path" }}
+          path: {{ $source.path | replace "{{.name}}" $root.name }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if hasKey . "ignoreDifferences" }}
+      # indentation matters so collapse to single line with toJson to keep it
+      ignoreDifferences: {{ .ignoreDifferences | toJson }}
+      {{- end }}

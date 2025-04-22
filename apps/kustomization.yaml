@@ -8,6 +8,8 @@ resources:
 - appsets/appset-understack-operators.yaml
 - appsets/components.yaml
 - appsets/openstack.yaml
+- appsets/appset-understack-global.yaml
+- appsets/appset-understack-site.yaml
 - appsets/appset-understack-openstack.yaml
 
 # you can do something like below to allow your deployment repo
