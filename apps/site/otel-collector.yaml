@@ -1,0 +1,6 @@
+---
+component: otel-collector
+componentNamespace: otel-collector
+sources:
+  - ref: deploy
+    path: '{{.name}}/manifests/otel-collector'

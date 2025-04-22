@@ -1,0 +1,6 @@
+---
+component: understack-cluster-issuer
+componentNamespace: cert-manager
+sources:
+  - ref: deploy
+    path: '{{.name}}/manifests/cert-manager'
