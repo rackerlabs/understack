@@ -36,7 +36,6 @@ spec:
                           - >-
                             openstack network create --description "${PROVISIONING_NETWORK_DESCRIPTION}" \
                             --no-share --provider-network-type "${PROVISIONING_NETWORK_TYPE}" \
-                            --provider-physical-network "${PROVISIONING_PHYSICAL_NETWORK}" \
                             --tag "${PROVISIONING_NETWORK_TAGS}" \
                             "${PROVISIONING_NETWORK_NAME}"
                         env:
@@ -50,11 +49,6 @@ spec:
                               configMapKeyRef:
                                 name: provisioning-network-config
                                 key: network_type
-                          - name: PROVISIONING_PHYSICAL_NETWORK
-                            valueFrom:
-                              configMapKeyRef:
-                                name: provisioning-network-config
-                                key: physical_network
                           - name: PROVISIONING_NETWORK_TAGS
                             valueFrom:
                               configMapKeyRef:
