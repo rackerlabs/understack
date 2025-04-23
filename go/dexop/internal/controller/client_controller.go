@@ -46,11 +46,6 @@ type ClientReconciler struct {
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Client object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.19.0/pkg/reconcile
 func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -149,7 +144,11 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// update
 	if existing != nil {
 		reqLogger.Info("making an UpdateOauth2Client call")
-		mgr.UpdateOauth2Client(clientSpec)
+		err = mgr.UpdateOauth2Client(clientSpec)
+		if err != nil {
+			reqLogger.Error(err, "after UpdateOauth2Client")
+			return ctrl.Result{}, err
+		}
 	}
 	return ctrl.Result{}, nil
 }

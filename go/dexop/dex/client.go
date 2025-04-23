@@ -51,19 +51,27 @@ func (d *DexManager) GetOauth2Client(clientId string) (*dexapi.GetClientResp, er
 
 // Patches/updates the Oauth2 client
 
-func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.UpdateClientResp, error) {
+func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) error {
 	existing, err := d.GetOauth2Client(clientSpec.Spec.Name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if existing == nil {
-		return nil, fmt.Errorf("oauth2 client id: %s does not exist in Dex", clientSpec.Spec.Name)
+		return fmt.Errorf("oauth2 client id: %s does not exist in Dex", clientSpec.Spec.Name)
 	}
 
 	if existing.Client.Secret != clientSpec.Spec.SecretValue ||
 		existing.Client.Public != clientSpec.Spec.Public {
 		// dex does not support secret updates so it needs to be recreated
+		_, err = d.RemoveOauth2Client(clientSpec.Spec.Name)
+		if err != nil {
+			return err
+		}
+		_, err := d.CreateOauth2Client(clientSpec)
+		if err != nil {
+			return err
+		}
 	}
 
 	updateRequest := &dexapi.UpdateClientReq{
@@ -73,7 +81,8 @@ func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi
 		LogoUrl:      clientSpec.Spec.LogoUrl,
 		Name:         clientSpec.Spec.Name,
 	}
-	return d.Client.UpdateClient(context.TODO(), updateRequest)
+	_, err = d.Client.UpdateClient(context.TODO(), updateRequest)
+	return err
 }
 
 func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexClient, error) {
