@@ -21,3 +21,4 @@ resources:
   - sensors/sensor-neutron-event-network-segment-range.yaml
   - sensors/sensor-ironic-reclean.yaml
   - secrets/nautobot-token.yaml
+  - secrets/openstack-svc-acct.yaml
