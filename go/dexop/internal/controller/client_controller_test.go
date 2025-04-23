@@ -196,9 +196,8 @@ var _ = Describe("Client Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-
 			By("deleting the Secret")
-			secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: typesNamespacedSecretName.Name, Namespace: typesNamespacedSecretName.Namespace }}
+			secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: typesNamespacedSecretName.Name, Namespace: typesNamespacedSecretName.Namespace}}
 			Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
 			Expect(k8sClient.Get(ctx, typesNamespacedSecretName, secret)).NotTo(Succeed())
 
@@ -209,7 +208,7 @@ var _ = Describe("Client Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if the Secret has been recreated")
-			newSecret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: typesNamespacedSecretName.Name, Namespace: typesNamespacedSecretName.Namespace }}
+			newSecret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: typesNamespacedSecretName.Name, Namespace: typesNamespacedSecretName.Namespace}}
 			Expect(k8sClient.Get(ctx, typesNamespacedSecretName, newSecret))
 		})
 	})
@@ -240,8 +239,8 @@ var _ = Describe("Client Controller", func() {
 
 			By("creating secret")
 			secret := &v1.Secret{
-				ObjectMeta: metav1.ObjectMeta{Name: testSecretName, Namespace: "default" },
-				Data: map[string][]byte{"secret": []byte("abc") },
+				ObjectMeta: metav1.ObjectMeta{Name: testSecretName, Namespace: "default"},
+				Data:       map[string][]byte{"secret": []byte("abc")},
 			}
 			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
 
