@@ -36,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
+	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
 	"github.com/rackerlabs/understack/go/dexop/internal/controller"
 	// +kubebuilder:scaffold:imports
 )
@@ -59,6 +60,7 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
+	dexConf := new(DexConfig)
 	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -69,6 +71,14 @@ func main() {
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.StringVar(&dexConf.Address, "dex-host", "127.0.0.1:5557",
+		"The address:port of the Dex GRPC API to manage.")
+	flag.StringVar(&dexConf.CAPath, "dex-ca-path", "./grpc_ca.crt",
+		"Path to a CA certificate for Dex")
+	flag.StringVar(&dexConf.ClientCertPath, "dex-cert-path", "./grpc_client.crt",
+		"Path to the client certificate for Dex API")
+	flag.StringVar(&dexConf.ClientKeyPath, "dex-key-path", "./grpc_client.key",
+		"Path to the client key for Dex API")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -144,9 +154,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	dexMgr, err := newDexManager(dexConf)
+	if err != nil {
+		setupLog.Error(err, "unable to create dex manager")
+		os.Exit(1)
+	}
+
 	if err = (&controller.ClientReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		DexManager: dexMgr,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Client")
 		os.Exit(1)
@@ -167,4 +184,19 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+type DexConfig struct {
+	Address        string
+	CAPath         string
+	ClientKeyPath  string
+	ClientCertPath string
+}
+
+func newDexManager(config *DexConfig) (*dexmgr.DexManager, error) {
+	mgr, err := dexmgr.NewDexManager(config.Address, config.CAPath, config.ClientKeyPath, config.ClientCertPath)
+	if err != nil {
+		setupLog.Error(err, "While getting the DexManager")
+	}
+	return mgr, err
 }

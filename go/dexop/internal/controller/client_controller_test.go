@@ -88,8 +88,9 @@ var _ = Describe("Client Controller", func() {
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 			// we need to run reconciler again to process finalizer
 			controllerReconciler := &ClientReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
 			}
 			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -104,8 +105,9 @@ var _ = Describe("Client Controller", func() {
 
 		It("should create a secret with a non-empty value", func() {
 			controllerReconciler := &ClientReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -121,8 +123,9 @@ var _ = Describe("Client Controller", func() {
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &ClientReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -133,8 +136,9 @@ var _ = Describe("Client Controller", func() {
 		It("should update the password after secret changes", func() {
 			By("Reconciling the created resource")
 			controllerReconciler := &ClientReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
 			}
 
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
@@ -160,8 +164,9 @@ var _ = Describe("Client Controller", func() {
 		It("updates RedirectURIs", func() {
 			By("updating redirectURIs in dex")
 			controllerReconciler := &ClientReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
 			}
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -188,8 +193,9 @@ var _ = Describe("Client Controller", func() {
 		It("creates the secret if it is missing", func() {
 			By("reconciling the first time")
 			controllerReconciler := &ClientReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
 			}
 			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -246,8 +252,9 @@ var _ = Describe("Client Controller", func() {
 
 			By("doing another round of reconciliation")
 			controllerReconciler := &ClientReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
 			}
 			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,
@@ -269,8 +276,9 @@ var _ = Describe("Client Controller", func() {
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 			// we need to run reconciler again to process finalizer
 			controllerReconciler := &ClientReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
 			}
 			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
 				NamespacedName: typeNamespacedName,

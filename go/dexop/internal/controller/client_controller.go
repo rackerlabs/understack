@@ -37,7 +37,8 @@ const dexFinalizer = "dex.rax.io/finalizer"
 // ClientReconciler reconciles a Client object
 type ClientReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme     *runtime.Scheme
+	DexManager *dexmgr.DexManager
 }
 
 // +kubebuilder:rbac:groups=dex.rax.io,resources=clients,verbs=get;list;watch;create;update;patch;delete
@@ -52,11 +53,6 @@ type ClientReconciler struct {
 func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 	reqLogger := ctrl.Log.WithValues("client", req.NamespacedName)
-
-	mgr, err := r.newDexManager()
-	if err != nil {
-		return ctrl.Result{}, err
-	}
 
 	clientSpec, err := r.getClientSpec(ctx, req.NamespacedName)
 	if err != nil {
@@ -74,7 +70,7 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	deleteRequested := clientSpec.GetDeletionTimestamp() != nil
 	if deleteRequested {
 		if controllerutil.ContainsFinalizer(clientSpec, dexFinalizer) {
-			if err := r.finalizeDeletion(reqLogger, clientSpec, mgr); err != nil {
+			if err := r.finalizeDeletion(reqLogger, clientSpec, r.DexManager); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -129,11 +125,11 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		clientSpec.Spec.SecretValue = value
 	}
 
-	existing, err := mgr.GetOauth2Client(clientSpec.Spec.Name)
+	existing, err := r.DexManager.GetOauth2Client(clientSpec.Spec.Name)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "not found") {
 			ctrl.Log.Info("Client does not exist in Dex. Creating one.", "name", clientSpec.Spec.Name)
-			if _, err = mgr.CreateOauth2Client(clientSpec); err != nil {
+			if _, err = r.DexManager.CreateOauth2Client(clientSpec); err != nil {
 				reqLogger.Error(err, "Unable to create client in dex")
 				return ctrl.Result{}, err
 			}
@@ -145,7 +141,7 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	// update
 	if existing != nil {
 		reqLogger.Info("making an UpdateOauth2Client call")
-		err = mgr.UpdateOauth2Client(clientSpec)
+		err = r.DexManager.UpdateOauth2Client(clientSpec)
 		if err != nil {
 			reqLogger.Error(err, "after UpdateOauth2Client")
 			return ctrl.Result{}, err
@@ -169,14 +165,6 @@ func (r *ClientReconciler) finalizeDeletion(reqLogger logr.Logger, c *dexv1alpha
 		return err
 	}
 	return nil
-}
-
-func (r *ClientReconciler) newDexManager() (*dexmgr.DexManager, error) {
-	mgr, err := dexmgr.NewDexManager("127.0.0.1:5557", "/home/skrobul/devel/understack/go/dexop/grpc_ca.crt", "/home/skrobul/devel/understack/go/dexop/grpc_client.key", "/home/skrobul/devel/understack/go/dexop/grpc_client.crt")
-	if err != nil {
-		ctrl.Log.Error(err, "While getting the DexManager")
-	}
-	return mgr, err
 }
 
 func (r *ClientReconciler) getClientSpec(ctx context.Context, namespacedName types.NamespacedName) (*dexv1alpha1.Client, error) {
