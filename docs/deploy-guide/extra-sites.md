@@ -1,6 +1,6 @@
-# Extra Regions
+# Extra Sites
 
-To create extra regions the operation will be very similar to
+To create extra sites the operation will be very similar to
 creating the initial UnderStack deployment.
 
 ## Getting the source
@@ -20,13 +20,13 @@ git clone https://path/to/my/uc-deploy
 ## Secret Creation
 
 To avoid defining many environment variables we'll simplify by creating an
-`.env` file for our deployment. In this case we'll call it `my-region.env` and
+`.env` file for our deployment. In this case we'll call it `my-site.env` and
 place it where we've cloned understack. A complete file would look like:
 
-```bash title="/path/to/uc-deploy/my-region.env"
+```bash title="/path/to/uc-deploy/my-site.env"
 # this can remain as the literal value and will ensure it computes the right path
 UC_DEPLOY="$(cd "$(dirname ${BASH_SOURCE[0]})" && git rev-parse --show-toplevel)"
-DEPLOY_NAME="my-region"
+DEPLOY_NAME="my-site"
 DNS_ZONE=home.lab
 UC_DEPLOY_EMAIL="my@email"
 NO_ARGOCD=yes
@@ -40,10 +40,10 @@ for production deployments.
 
 ```bash
 # from your understack checkout
-./scripts/gitops-secrets-gen.sh ${UC_DEPLOY}/my-region.env
+./scripts/gitops-secrets-gen.sh ${UC_DEPLOY}/my-site.env
 pushd "${UC_DEPLOY}"
-git add my-region
-git commit -m "my-region: secrets generation"
+git add my-site
+git commit -m "my-site: secrets generation"
 popd
 ```
 
@@ -56,7 +56,7 @@ add the file to the `kustomization.yaml` resources.
 
 ```bash title="generating a cluster config"
 (
-source ${UC_DEPLOY}/my-region.env
+source ${UC_DEPLOY}/my-site.env
 
 cat << EOF > cluster-config.yaml
 apiVersion: v1
@@ -84,14 +84,14 @@ EOF
 
 This unfortunately does not give a working cluster config. You must determine
 what the correct process is for ArgoCD to authenticate and access your other
-regional cluster. For information on how to do this see
+siteal cluster. For information on how to do this see
 [ArgoCD Declarative Setup][argocd-decl-setup].
 
 Once you've completed your cluster config you can run it through `kubeseal`
 with:
 
 ```bash
-cat cluster-config.yaml | kubeseal -o yaml -w $UC_DEPLOY/$MAIN_DEPLOY/secrets/argocd/secret-my-region-cluster.yaml
+cat cluster-config.yaml | kubeseal -o yaml -w $UC_DEPLOY/$MAIN_DEPLOY/secrets/argocd/secret-my-site-cluster.yaml
 ```
 
 [gitops]: <https://about.gitlab.com/topics/gitops/>

@@ -48,9 +48,9 @@ The layout of this repo will be something like:
 2. helm `values.yaml` files per application/component will be here for `management`.
 3. Any Kubernetes manifests per application/component will be here for `management`.
 4. This contains data which the cluster labeled as `iad3-prod` will consume.
-5. The definitions of the hardware flavors that this cluster, which later you will see maps to a region will use.
+5. The definitions of the hardware flavors that this cluster, which later you will see maps to a site.
 6. This contains data which the cluster labeled as `iad3-staging` will consume.
-7. The definitions of the hardware flavors that this cluster, which later you will see maps to a region will use. Notice it is different than staging.
+7. The definitions of the hardware flavors that this cluster, which later you will see maps to a site. Notice it is different than staging.
 8. The cluster labeled as `global-prod` will have resources consumed here.
 
 ### Deploy repository permissions

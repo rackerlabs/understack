@@ -19,43 +19,43 @@ that are referred to in the documentation as:
 
 - Management
 - Global
-- Region(s)
+- Site(s)
 
 ```mermaid
 flowchart TD
 
   A[Management] --> B[Global];
-  B[Global] --> C[Region A];
-  B[Global] --> D[Region B...];
-  B[Global] --> E[Region N];
+  B[Global] --> C[Site A];
+  B[Global] --> D[Site B...];
+  B[Global] --> E[Site N];
 ```
 
 A fully functioning system only needs one _Management_ tier, one _Global_
-tier and one or more _Region_ tier(s). In this configuration,
+tier and one or more _Site_ tier(s). In this configuration,
 the _Management_ tier is responsible for utilizing our [GitOps][gitops]
 tool, [ArgoCD][argocd] to deploy the expected state to all other tier.
 While the _Global_ tier is
 responsible for hosting any services that are expected to exist only once
-for a whole system deployment such as the DCIM/IPAM tool. While the _Region_
+for a whole system deployment such as the DCIM/IPAM tool. While the _Site_
 tiers will run the tools and services that need to live close to the
 actual hardware.
 
 In fact, one _Management_ tier can control multiple _Global_ tiers
-and their associated _Region_ tiers. We call the grouping of the _Global_
-tier and it's associated _Region_ tiers a _partition_. An example
+and their associated _Site_ tiers. We call the grouping of the _Global_
+tier and it's associated _Site_ tiers a _partition_. An example
 would be a staging partition and a production partition.
 
 ```mermaid
 flowchart TD
 
   A[Management] --> |staging| B[Global];
-  B[Global] --> C[Region A];
-  B[Global] --> D[Region B...];
-  B[Global] --> E[Region N];
+  B[Global] --> C[Site A];
+  B[Global] --> D[Site B...];
+  B[Global] --> E[Site N];
   A[Management] --> |production| F[Global];
-  F[Global] --> G[Region D];
-  F[Global] --> H[Region E...];
-  F[Global] --> I[Region Z];
+  F[Global] --> G[Site D];
+  F[Global] --> H[Site E...];
+  F[Global] --> I[Site Z];
 ```
 
 [argocd]: <https://argo-cd.readthedocs.io/en/stable/>

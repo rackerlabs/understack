@@ -20,7 +20,7 @@ then be customized further.
 kubectl kustomize --enable-helm https://github.com/rackerlabs/understack/bootstrap/argocd/ | kubectl apply -f -
 ```
 
-## Configuring your Regional / Global Cluster in ArgoCD
+## Configuring your Global and/or Site Cluster in ArgoCD
 
 For [ArgoCD][argocd] to be able to deploy to your cluster, you must define your cluster in
 ArgoCD. You can do this one of two ways, via the `argocd` CLI tool or via the
@@ -45,7 +45,7 @@ metadata:
   annotations:
     dns_zone: "${DNS_ZONE}"
     understack.rackspace.com/env: prod
-    understack.rackspace.com/role: regional
+    understack.rackspace.com/role: site
   labels:
     argocd.argoproj.io/secret-type: cluster
 type: Opaque
@@ -70,9 +70,9 @@ different configurations.
   various settings can be overridden so allow an easier development experience.
 
 `understack.rackspace.com/role`
-: Possible values are `regional`, `global`, and `aio`. Which defines what
+: Possible values are `site`, `global`, and `aio`. Which defines what
   services should be deployed to this cluster based on its role. The `aio`
-  role stands for "All In One" and combines both `regional` and `global`.
+  role stands for "All In One" and combines both `site` and `global`.
 
 `dns_zone`
 : The DNS zone under which all services in this cluster will have their DNS

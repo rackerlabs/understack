@@ -122,7 +122,7 @@ nav:
     - Quick Start: deploy-guide/gitops-install.md
     - deploy-guide/argocd.md
     - deploy-guide/auth.md
-    - deploy-guide/extra-regions.md
+    - deploy-guide/extra-sites.md
     - deploy-guide/add-remove-app.md
     - deploy-guide/override-openstack-svc-config.md
   - 'Operator Guide':
