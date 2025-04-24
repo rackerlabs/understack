@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -34,13 +33,7 @@ import (
 	dexmgr "github.com/rackerlabs/understack/go/dexop/dex"
 )
 
-func newDexMgr() (*dexmgr.DexManager, error) {
-	mgr, err := dexmgr.NewDexManager("127.0.0.1:5557", "/home/skrobul/devel/understack/go/dexop/grpc_ca.crt", "/home/skrobul/devel/understack/go/dexop/grpc_client.key", "/home/skrobul/devel/understack/go/dexop/grpc_client.crt")
-	if err != nil {
-		return nil, fmt.Errorf("While getting the DexManager")
-	}
-	return mgr, err
-}
+const testDexHostAddr = "127.0.0.1:15557"
 
 var _ = Describe("Client Controller", func() {
 	const resourceName = "test-resource"
@@ -54,7 +47,7 @@ var _ = Describe("Client Controller", func() {
 		}
 		typesNamespacedSecretName := types.NamespacedName{Namespace: typeNamespacedName.Namespace, Name: secretName}
 		client := &dexv1alpha1.Client{}
-		dex, err := newDexMgr()
+		dex, err := dexmgr.NewInsecureTestManager(testDexHostAddr)
 		Expect(err).NotTo(HaveOccurred())
 
 		BeforeEach(func() {
@@ -224,7 +217,7 @@ var _ = Describe("Client Controller", func() {
 			Name:      resourceName,
 			Namespace: "default",
 		}
-		dex, err := newDexMgr()
+		dex, err := dexmgr.NewInsecureTestManager(testDexHostAddr)
 		Expect(err).NotTo(HaveOccurred())
 		It("copies the secret value", func() {
 			By("creating Client resource")

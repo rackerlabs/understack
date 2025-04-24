@@ -11,6 +11,7 @@ import (
 	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type DexManager struct {
@@ -111,6 +112,15 @@ func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexC
 		return nil, fmt.Errorf("dial: %v", err)
 	}
 	return dexapi.NewDexClient(conn), nil
+}
+
+func NewInsecureTestManager(grpcAddr string) (*DexManager, error) {
+	// Establish gRPC connection for tests to use
+	grpcConn, err := grpc.Dial(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, err
+	}
+	return &DexManager{Client: dexapi.NewDexClient(grpcConn)}, nil
 }
 
 func NewDexManager(host, caCert, clientKey, clientCert string) (*DexManager, error) {
