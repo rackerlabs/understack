@@ -113,7 +113,10 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 					reqLogger.Error(nil, "Secret data is missing", "SecretName", clientSpec.Spec.SecretName)
 				}
 				value = string(secret.Data["secret"])
-				ctrl.SetControllerReference(clientSpec, secret, r.Scheme)
+				if err = ctrl.SetControllerReference(clientSpec, secret, r.Scheme); err != nil {
+					return ctrl.Result{}, err
+				}
+
 				if err = r.Update(ctx, secret); err != nil {
 					return ctrl.Result{}, err
 				}

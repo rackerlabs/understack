@@ -92,7 +92,7 @@ func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexC
 	if err != nil {
 		return nil, fmt.Errorf("invalid CA crt file: %s", caPath)
 	}
-	if cPool.AppendCertsFromPEM(caCert) != true {
+	if !cPool.AppendCertsFromPEM(caCert) {
 		return nil, fmt.Errorf("failed to parse CA crt")
 	}
 
