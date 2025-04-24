@@ -32,21 +32,6 @@ spec:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
             when: "{{steps.server-enroll-state.outputs.result}} == enroll"
-        - - name: server-manage-state-for-inspect
-            template: openstack-state-cmd
-            arguments:
-              parameters:
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
-        - - name: redfish-inspect
-            template: openstack-wait-cmd
-            arguments:
-              parameters:
-                - name: operation
-                  value: "inspect"
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
-            when: "{{steps.server-manage-state-for-inspect.outputs.result}} == manageable"
         - - name: openstack-set-baremetal-node-raid-config
             template: openstack-set-baremetal-node-raid-config
             arguments:
