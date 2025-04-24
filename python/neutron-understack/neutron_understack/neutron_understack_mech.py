@@ -14,6 +14,7 @@ from oslo_config import cfg
 from neutron_understack import config
 from neutron_understack import utils
 from neutron_understack import vlan_group_name_convention
+from neutron_understack.ironic import IronicClient
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.nautobot import VlanPayload
 from neutron_understack.trunk import UnderStackTrunkDriver
@@ -40,6 +41,7 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
         self.nb = Nautobot(conf.nb_url, conf.nb_token)
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
+        self.ironic_client = IronicClient()
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         self.subscribe()
 
@@ -254,12 +256,14 @@ class UnderstackDriver(MechanismDriver):
         # as the ports disappear.   If a VLAN is left in a cabinet with nobody
         # using it, it can be deleted.
         """
-        vlan_group_name = self._vlan_group_name(context)
 
         baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
         current_vif_unbound = context.vif_type == portbindings.VIF_TYPE_UNBOUND
         original_vif_other = context.original_vif_type == portbindings.VIF_TYPE_OTHER
         current_vif_other = context.vif_type == portbindings.VIF_TYPE_OTHER
+        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+            context.current["mac_address"]
+        )
 
         if baremetal_vnic and current_vif_unbound and original_vif_other:
             self._tenant_network_port_cleanup(context)
@@ -305,7 +309,10 @@ class UnderstackDriver(MechanismDriver):
     def delete_port_postcommit(self, context):
         # Only clean up provisioning ports.  Everything else is left to get
         # cleaned up upon the next change in that cabinet.
-        vlan_group_name = self._vlan_group_name(context)
+        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+            context.current["mac_address"]
+        )
+
         if vlan_group_name and is_provisioning_network(context.current["network_id"]):
             # Signals end of the provisioning / cleaning cycle, so we
             # put the port back to its normal tenant mode:
@@ -349,7 +356,11 @@ class UnderstackDriver(MechanismDriver):
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             context.current["binding:profile"], self.nb
         )
-        vlan_group_name = self._vlan_group_name(context)
+
+        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+            context.current["mac_address"]
+        )
+
         if vlan_group_name is None:
             raise Exception("bind_port_segment: no switch info in local_link_info")
 

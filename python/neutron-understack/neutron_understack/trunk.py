@@ -50,6 +50,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         )
         self.nb = self.plugin_driver.nb
         self.undersync = self.plugin_driver.undersync
+        self.ironic_client = self.plugin_driver.ironic_client
 
     @property
     def is_loaded(self):
@@ -193,7 +194,9 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             binding_profile, self.nb
         )
 
-        vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
+        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+            parent_port.mac_address
+        )
         allowed_vlan_ids = self._handle_segment_allocation(
             subports, vlan_group_name, binding_host
         )
@@ -226,10 +229,14 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             return
         binding_profile = parent_port_obj.bindings[0].profile
         binding_host = parent_port_obj.bindings[0].host
+        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+            parent_port_obj.mac_address
+        )
         self._handle_subports_removal(
             binding_profile=binding_profile,
             binding_host=binding_host,
             subports=subports,
+            vlan_group_name=vlan_group_name,
         )
 
     def _delete_binding_level(self, port_id: str, host: str) -> PortBindingLevel:
@@ -266,8 +273,8 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_host: str,
         subports: list[SubPort],
         invoke_undersync: bool = True,
+        vlan_group_name: str | None = None,
     ) -> None:
-        vlan_group_name = utils.vlan_group_name_from_binding_profile(binding_profile)
         connected_interface_id = utils.fetch_connected_interface_uuid(
             binding_profile, self.nb
         )
@@ -278,7 +285,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             network_ids_to_remove=vlan_ids_to_remove,
         )
 
-        if invoke_undersync:
+        if invoke_undersync and vlan_group_name:
             self._trigger_undersync(vlan_group_name)
 
     def subports_added(self, resource, event, trunk_plugin, payload):
