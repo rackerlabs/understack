@@ -22,6 +22,7 @@ from neutron.services.trunk.models import Trunk as TrunkModel
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks.events import DBEventPayload
 
+from neutron_understack.ironic import IronicClient
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.tests.helpers import Ml2PluginNoInit
@@ -74,6 +75,19 @@ def project_id() -> str:
 @pytest.fixture
 def host_id() -> uuid.UUID:
     return uuid.uuid4()
+
+
+@pytest.fixture
+def mac_address() -> str:
+    mac = [
+        0x00,
+        0x16,
+        0x3E,
+        random.randint(0x00, 0x7F),
+        random.randint(0x00, 0xFF),
+        random.randint(0x00, 0xFF),
+    ]
+    return ":".join([f"{i:02x}" for i in mac])
 
 
 @pytest.fixture
@@ -199,8 +213,8 @@ def subport_model(vlan_num) -> SubPortModel:
 
 
 @pytest.fixture
-def port_model() -> PortModel:
-    return PortModel()
+def port_model(mac_address) -> PortModel:
+    return PortModel(mac_address=mac_address)
 
 
 @pytest.fixture
@@ -257,16 +271,31 @@ def nautobot_client(mocker) -> Nautobot:
 
 
 @pytest.fixture
-def understack_driver(nautobot_client) -> UnderstackDriver:
+def ironic_client(mocker) -> IronicClient:
+    return mocker.MagicMock(spec_set=IronicClient)
+
+
+@pytest.fixture
+def understack_driver(nautobot_client, ironic_client) -> UnderstackDriver:
     driver = UnderstackDriver()
     driver.nb = nautobot_client
     driver.undersync = Undersync("auth_token", "api_url")
+    driver.ironic_client = ironic_client
     return driver
 
 
 @pytest.fixture
 def understack_trunk_driver(understack_driver) -> UnderStackTrunkDriver:
     return UnderStackTrunkDriver.create(understack_driver)
+
+
+@pytest.fixture
+def ironic_baremetal_port_physical_network(mocker, understack_driver) -> None:
+    mocker.patch.object(
+        understack_driver.ironic_client,
+        "baremetal_port_physical_network",
+        return_value="physnet",
+    )
 
 
 @pytest.fixture(autouse=True)
