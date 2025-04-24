@@ -93,7 +93,7 @@ var _ = BeforeSuite(func() {
 	_, err = os.Stat(dexConfigPath)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Dex test config file %s not found", dexConfigPath))
 	_, err = exec.LookPath("dex")
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("dex is not available in the $PATH"))
+	Expect(err).NotTo(HaveOccurred(), "dex is not available in the $PATH")
 
 	dexCmd = exec.Command(dexBinaryName, "serve", dexConfigPath)
 	dexCmd.Stdout = GinkgoWriter

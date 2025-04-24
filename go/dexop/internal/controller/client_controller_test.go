@@ -109,7 +109,7 @@ var _ = Describe("Client Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			secretObj := &v1.Secret{}
-			k8sClient.Get(ctx, types.NamespacedName{Namespace: typeNamespacedName.Namespace, Name: secretName}, secretObj)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: typeNamespacedName.Namespace, Name: secretName}, secretObj)
 			Expect(len(secretObj.Data["secret"])).To(Equal(48))
 			Expect(err).NotTo(HaveOccurred())
 		})
