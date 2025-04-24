@@ -11,16 +11,15 @@ class IronicClient:
 
     def _get_session(self, group: str) -> ks_loading.session.Session:
         auth = ks_loading.load_auth_from_conf_options(cfg.CONF, group)
-        session = ks_loading.load_session_from_conf_options(
-            cfg.CONF, group, auth=auth)
+        session = ks_loading.load_session_from_conf_options(cfg.CONF, group, auth=auth)
         return session
 
     def _get_ironic_client(self) -> BaremetalService:
         session = self._get_session("ironic")
 
         return connection.Connection(
-            session=session, oslo_conf=cfg.CONF,
-            connect_retries=cfg.CONF.http_retries).baremetal
+            session=session, oslo_conf=cfg.CONF, connect_retries=cfg.CONF.http_retries
+        ).baremetal
 
     def baremetal_port_by_mac(self, mac_addr: str) -> BaremetalPort | None:
         try:

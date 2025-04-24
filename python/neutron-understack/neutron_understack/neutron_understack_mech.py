@@ -245,7 +245,6 @@ class UnderstackDriver(MechanismDriver):
         # as the ports disappear.   If a VLAN is left in a cabinet with nobody
         # using it, it can be deleted.
         """
-
         baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
         current_vif_unbound = context.vif_type == portbindings.VIF_TYPE_UNBOUND
         original_vif_other = context.original_vif_type == portbindings.VIF_TYPE_OTHER
