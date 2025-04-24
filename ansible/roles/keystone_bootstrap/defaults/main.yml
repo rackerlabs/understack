@@ -1,0 +1,21 @@
+---
+keystone_bootstrap_dex_url: "{{ dex_url | default('https://dex.' + lookup('ansible.builtin.env', 'DNS_ZONE', default='localnet')) }}"
+
+keystone_bootstrap_groups:
+  - name: ucadmin
+    desc: 'Users Federated with Admin'
+    roles:
+      - member
+      - admin
+  - name: ucuser
+    desc: 'Regular Federated Users'
+    roles:
+      - member
+  - name: ucneteng
+    desc: 'Federated Network Engineers'
+    roles:
+      - member
+  - name: ucdctech
+    desc: 'Federated DC Technicians'
+    roles:
+      - member

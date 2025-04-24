@@ -2,102 +2,15 @@
 ---
 release_group: null
 
+images:
+  tags:
+    bootstrap: "ghcr.io/rackerlabs/understack/ansible:latest"
+
 bootstrap:
   enabled: true
   ks_user: admin
   script: |
-    # admin needs the admin role for the default domain
-    openstack role add \
-          --user="${OS_USERNAME}" \
-          --domain="${OS_DEFAULT_DOMAIN}" \
-          "admin"
-    # create 'infra' domain
-    openstack domain create --or-show infra
-    # create 'baremetal' project for our ironic nodes to live in
-    openstack project create --or-show --domain infra baremetal
-    # create 'argoworkflow' user for automation
-    openstack user create --or-show --domain infra --password demo argoworkflow
-    # give 'argoworkflow' 'admin' over the 'baremetal' project
-    openstack role add --user-domain infra --project-domain infra --user argoworkflow --project baremetal admin
-
-    # create 'flavorsync' user to allow synchronization of the flavors to nova
-    openstack user create --or-show --domain service --password abcd1234 flavorsync
-    openstack role create --or-show flavorsync
-    openstack role add --user flavorsync --user-domain service --domain default --inherited  flavorsync
-
-    # create 'monitoring' user for monitoring usage
-    openstack user create --or-show --domain infra --password monitoring_demo monitoring
-    # give 'monitoring' the 'admin' over the 'baremetal' project
-    openstack role add --user-domain infra --project-domain infra --user monitoring --project baremetal admin
-
-    # this is too early because ironic won't exist
-    openstack role add --project service --user ironic --user-domain service service
-
-    # OIDC integration
-    RULES_FILE=$(mktemp)
-    cat <<EOF > ${RULES_FILE}
-    [
-        {
-            "local": [
-                {
-                    "user": {
-                        "id": "{0}",
-                        "name": "{1}",
-                        "email": "{2}"
-                    },
-                    "groups": "{3}",
-                     "domain": {
-                        "name": "sso"
-                    }
-                }
-            ],
-            "remote": [
-                {
-                    "type": "HTTP_OIDC_SUB"
-                },
-                {
-                    "type": "REMOTE_USER"
-                },
-                {
-                    "type": "HTTP_OIDC_EMAIL"
-                },
-                {
-                    "type": "HTTP_OIDC_GROUPS"
-                }
-            ]
-        }
-    ]
-    EOF
-    # look up or create our domain for SSO integration, called 'sso'
-    sso_domain_id=$(openstack domain create --or-show --description "Domain for 'sso' identity provider" -f value -c id sso)
-
-    # define our identity provider 'sso' for the domain 'sso'
-    openstack identity provider show sso 2>/dev/null || openstack identity provider create --domain "${sso_domain_id}" --description "Identity Provider to our dex" --remote-id https://dex.dev.undercloud.rackspace.net sso
-
-    # create or update the mapping that we'll use for the 'sso' identity
-    if openstack mapping show sso_mapping 2>/dev/null; then
-      openstack mapping set --rules ${RULES_FILE} sso_mapping;
-    else
-      openstack mapping create --rules ${RULES_FILE} sso_mapping;
-    fi
-
-    # clean up
-    rm -f "${RULES_FILE}"
-
-    # create the federation protocol 'openid' to use the identity provider 'sso' with the 'sso_mapping'
-    openstack federation protocol show openid --identity-provider sso || openstack federation protocol create openid --mapping sso_mapping --identity-provider sso
-
-    for group in ucadmin ucuser ucneteng ucdctech; do
-      # create groups which map to our groups claim from dex which can be mapped to permissions
-      openstack group create --domain "${sso_domain_id}" ${group} --or-show
-      # give each of the groups the member role on the domain and have them inherit it to each project
-      # in the domain
-      openstack role add --group-domain "${sso_domain_id}" --group ${group} --inherited --domain default member
-    done
-    # ucadmin can manage the standard project domain
-    openstack role add --group-domain "${sso_domain_id}" --group ucadmin --inherited --domain default manager
-    # ucadmin can manage the infra domain
-    openstack role add --group-domain "${sso_domain_id}" --group ucadmin --inherited --domain infra manager
+    ansible-runner run /runner --playbook keystone_bootstrap.yaml -vv
 
 network:
   # configure OpenStack Helm to use Undercloud's ingress
@@ -238,6 +151,20 @@ pod:
           - name: oidc-secret
             secret:
               secretName: sso-passphrase
+    keystone_bootstrap:
+      keystone_bootstrap:
+        volumeMounts:
+          - name: ansible-inventory
+            mountPath: /runner/inventory/
+          - name: ansible-group-vars
+            mountPath: /runner/inventory/group_vars/
+        volumes:
+          - name: ansible-inventory
+            configMap:
+              name: ansible-inventory
+          - name: ansible-group-vars
+            configMap:
+              name: ansible-group-vars
   replicas:
     api: 2
   lifecycle:

@@ -48,6 +48,15 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+  - repo: https://github.com/ansible/ansible-lint
+    rev: v25.1.2
+    hooks:
+      - id: ansible-lint
+        entry: "sh -c 'cd ansible && python3 -m ansiblelint -v --force-color'"
+        additional_dependencies:
+          - ansible
+          - jmespath
+        files: '^ansible/.*$'
   - repo: https://github.com/python-poetry/poetry
     rev: '1.7.1'
     hooks:
