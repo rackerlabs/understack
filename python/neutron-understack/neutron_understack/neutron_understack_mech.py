@@ -13,7 +13,6 @@ from oslo_config import cfg
 
 from neutron_understack import config
 from neutron_understack import utils
-from neutron_understack import vlan_group_name_convention
 from neutron_understack.ironic import IronicClient
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.nautobot import VlanPayload
@@ -230,16 +229,6 @@ class UnderstackDriver(MechanismDriver):
     def update_port_precommit(self, context):
         pass
 
-    def _fetch_subports_network_ids(self, trunk_details: dict | None) -> list:
-        if trunk_details is None:
-            return []
-
-        network_uuids = [
-            utils.fetch_subport_network_id(subport.get("port_id"))
-            for subport in trunk_details.get("sub_ports", [])
-        ]
-        return network_uuids
-
     def update_port_postcommit(self, context):
         """Tenant network port cleanup in the UnderCloud infrastructure.
 
@@ -406,15 +395,6 @@ class UnderstackDriver(MechanismDriver):
             vlan_group=vlan_group_name,
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
-
-    def _vlan_group_name(self, context: PortContext) -> str | None:
-        binding_profile = context.current.get("binding:profile", {})
-        local_link_info = binding_profile.get("local_link_information", [])
-        switch_names = [
-            link["switch_info"] for link in local_link_info if "switch_info" in link
-        ]
-        if switch_names:
-            return vlan_group_name_convention.for_switch(switch_names[0])
 
     def check_vlan_transparency(self, context):
         pass

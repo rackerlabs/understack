@@ -8,7 +8,6 @@ from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
 
-from neutron_understack import vlan_group_name_convention
 from neutron_understack.nautobot import Nautobot
 
 
@@ -83,15 +82,6 @@ def release_dynamic_segment(segment_id: str) -> None:
 
     if hasattr(core_plugin.type_manager, "release_dynamic_segment"):
         core_plugin.type_manager.release_dynamic_segment(context, segment_id)
-
-
-def vlan_group_name_from_binding_profile(binding_profile: dict) -> str | None:
-    local_link_info = binding_profile.get("local_link_information", [])
-    switch_names = [
-        link["switch_info"] for link in local_link_info if "switch_info" in link
-    ]
-    if switch_names:
-        return vlan_group_name_convention.for_switch(switch_names[0])
 
 
 def fetch_connected_interface_uuid(binding_profile: dict, nautobot: Nautobot) -> str:
