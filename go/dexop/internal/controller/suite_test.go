@@ -19,12 +19,17 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -40,11 +45,14 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
-var ctx context.Context
-var cancel context.CancelFunc
+var (
+	cfg       *rest.Config
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	ctx       context.Context
+	cancel    context.CancelFunc
+	dexCmd    *exec.Cmd
+)
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -77,6 +85,31 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
+	// Start local Dex server
+	By("starting local Dex instance")
+	dexConfigPath := "../../test/support/testdex_config.yaml"
+	dexBinaryName := "dex"
+
+	_, err = os.Stat(dexConfigPath)
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Dex test config file %s not found", dexConfigPath))
+	_, err = exec.LookPath("dex")
+	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("dex is not available in the $PATH"))
+
+	dexCmd = exec.Command(dexBinaryName, "serve", dexConfigPath)
+	dexCmd.Stdout = GinkgoWriter
+	dexCmd.Stderr = GinkgoWriter
+
+	err = dexCmd.Start()
+	Expect(err).NotTo(HaveOccurred(), "failed to start Dex command")
+
+	// Wait for Dex gRPC server to be ready
+	grpcAddr := testDexHostAddr
+	Eventually(func(g Gomega) {
+		conn, dialErr := grpc.Dial(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(), grpc.WithTimeout(1*time.Second))
+		g.Expect(dialErr).NotTo(HaveOccurred(), "waiting for Dex gRPC server to be ready")
+		Expect(conn.Close()).To(Succeed())
+	}, 10*time.Second, 1*time.Second).Should(Succeed())
+
 	err = dexv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -85,11 +118,26 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-
 })
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
+
+	// --- Stop Dex Server ---
+	By("stopping Dex server")
+	if dexCmd != nil && dexCmd.Process != nil {
+		if err := dexCmd.Process.Kill(); err != nil {
+			GinkgoWriter.Println("failed to kill Dex process: %v", err)
+		}
+		// Wait for the process to exit to avoid zombies
+		_, err := dexCmd.Process.Wait()
+		if err != nil && err.Error() != "signal: killed" {
+			GinkgoWriter.Println("error waiting for Dex process to exit: %v", err)
+
+		}
+		GinkgoWriter.Println("Dex server stopped.")
+	}
+
 	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
