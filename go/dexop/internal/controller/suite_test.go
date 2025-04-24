@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"k8s.io/client-go/kubernetes/scheme"
@@ -38,6 +39,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	dexapi "github.com/dexidp/dex/api/v2"
 	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
@@ -105,9 +107,15 @@ var _ = BeforeSuite(func() {
 	// Wait for Dex gRPC server to be ready
 	grpcAddr := testDexHostAddr
 	Eventually(func(g Gomega) {
-		conn, dialErr := grpc.Dial(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithBlock(), grpc.WithTimeout(1*time.Second))
+		conn, dialErr := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		g.Expect(dialErr).NotTo(HaveOccurred(), "waiting for Dex gRPC server to be ready")
-		Expect(conn.Close()).To(Succeed())
+		state := conn.GetState()
+		g.Expect(state).To(Equal(connectivity.Idle))
+		result := conn.WaitForStateChange(ctx, connectivity.Ready)
+		g.Expect(result).To(Equal(true))
+		err = conn.Invoke(ctx, "/api.Dex/ListPasswords", nil, new(dexapi.ListPasswordResp), grpc.StaticMethod())
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(conn.Close()).To(Succeed())
 	}, 10*time.Second, 1*time.Second).Should(Succeed())
 
 	err = dexv1alpha1.AddToScheme(scheme.Scheme)
@@ -133,7 +141,6 @@ var _ = AfterSuite(func() {
 		_, err := dexCmd.Process.Wait()
 		if err != nil && err.Error() != "signal: killed" {
 			GinkgoWriter.Println("error waiting for Dex process to exit: %v", err)
-
 		}
 		GinkgoWriter.Println("Dex server stopped.")
 	}

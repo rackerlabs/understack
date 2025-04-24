@@ -107,7 +107,7 @@ func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexC
 	}
 	creds := credentials.NewTLS(clientTLSConfig)
 
-	conn, err := grpc.Dial(hostAndPort, grpc.WithTransportCredentials(creds))
+	conn, err := grpc.NewClient(hostAndPort, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, fmt.Errorf("dial: %v", err)
 	}
@@ -116,7 +116,7 @@ func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexC
 
 func NewInsecureTestManager(grpcAddr string) (*DexManager, error) {
 	// Establish gRPC connection for tests to use
-	grpcConn, err := grpc.Dial(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	grpcConn, err := grpc.NewClient(grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
