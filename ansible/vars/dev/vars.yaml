@@ -1,0 +1,15 @@
+---
+fabric_wide_layer_3_infrastructure_networks:
+  - name: provisioning_network_config
+    namespace: Rackspace
+    vlan_name: PROV-NET
+    vid: 4010
+    ip_prefix: 10.4.50.64/26
+    ip_address: 10.4.50.65/26
+    dhcp_relay_ipv4_address: 10.46.100.86
+    ucvni_group: spine402-1.iad3
+    ucvni_id: 504010
+    ucvni_name: PROV-NET
+    relationship_key: ucvni_vlans
+    interface_name: vlan4010
+    interface_type: Virtual

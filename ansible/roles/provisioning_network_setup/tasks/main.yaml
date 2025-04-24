@@ -1,0 +1,8 @@
+- name: Provisioning network config
+  ansible.builtin.set_fact:
+    provisioning_network_config: >-
+      {{
+        fabric_wide_layer_3_infrastructure_networks |
+        selectattr('name', 'equalto', 'provisioning_network_config') |
+        first
+      }}
