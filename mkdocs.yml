@@ -117,14 +117,12 @@ nav:
       - component-argo-workflows.md
       - component-understack-workflows.md
   - 'Deployment Guide':
-    - deploy-guide/index.md
+    - deploy-guide/welcome.md
+    - deploy-guide/getting-started.md
     - Quick Start: deploy-guide/gitops-install.md
-    - Full Deploy:
-      - deploy-guide/getting-started.md
-      - deploy-guide/deploy-repo.md
+    - deploy-guide/argocd.md
     - deploy-guide/auth.md
-    - deploy-guide/extra-regions.md
-    - deploy-guide/external-argocd.md
+    - deploy-guide/extra-sites.md
     - deploy-guide/add-remove-app.md
     - deploy-guide/override-openstack-svc-config.md
   - 'Operator Guide':
