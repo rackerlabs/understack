@@ -292,7 +292,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         self._clean_parent_port_switchport_config(trunk, subports)
 
     def trunk_created(self, resource, event, trunk_plugin, payload):
-        trunk = payload.states[0]
+        trunk = payload.latest_state
         subports = trunk.sub_ports
         if subports:
             self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
