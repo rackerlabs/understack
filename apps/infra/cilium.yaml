@@ -1,0 +1,7 @@
+---
+component: cilium
+sources:
+  # Cilium itself is deployed before ArgoCD so we only include project
+  # and environment specific stuff here
+  - ref: deploy
+    path: '{{.name}}/manifests/cilium'

@@ -1,0 +1,5 @@
+---
+component: mariadb-operator
+sources:
+  - ref: understack
+    path: 'operators/mariadb-operator'

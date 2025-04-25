@@ -1,0 +1,12 @@
+---
+component: etcdbackup
+componentNamespace: kube-system
+sources:
+  - ref: understack
+    path: 'components/etcdbackup'
+    helm:
+      valueFiles:
+        - $understack/components/etcdbackup/values.yaml
+        - $deploy/{{.name}}/helm-configs/etcdbackup.yaml
+      ignoreMissingValueFiles: true
+  - ref: deploy

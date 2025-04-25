@@ -1,0 +1,25 @@
+---
+component: rook
+componentNamespace: rook-ceph
+sources:
+  - repoURL: https://charts.rook.io/release
+    chart: rook-ceph
+    targetRevision: v1.16.4
+    helm:
+      releaseName: rook-ceph
+      valueFiles:
+        - $understack/operators/rook/values-operator.yaml
+        - $deploy/{{.name}}/helm-configs/rook-operator.yaml
+      ignoreMissingValueFiles: true
+  - repoURL: https://charts.rook.io/release
+    chart: rook-ceph-cluster
+    targetRevision: v1.16.4
+    helm:
+      releaseName: rook-ceph-cluster
+      valueFiles:
+        - $understack/operators/rook/values-cluster.yaml
+        - $deploy/{{.name}}/helm-configs/rook-cluster.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+    path: 'operators/rook'
+  - ref: deploy

@@ -11,86 +11,58 @@ spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
+    # matrixes clusters with the applications
     - matrix:
         generators:
-          - clusters:
-              selector:
-                matchExpressions:
-                  - key: understack.rackspace.com/role
-                    operator: In
+          - merge:
+              mergeKeys:
+                # merge cluster configs based on cluster name
+                - name
+              generators:
+                # load all clusters
+                - clusters:
+                    selector:
+                      matchExpressions:
+                        - key: understack.rackspace.com/role
+                          operator: In
+                          values:
+                            - "global"
+                            - "site"
+                            - "aio"
+                # dev clusters allow some overrides
+                - clusters:
+                    selector:
+                      matchLabels:
+                        understack.rackspace.com/env: dev
                     values:
-                      - "global"
-                      - "regional"
-                      - "aio"
-              values:
-                uc_skip_components: '{{ default "[]" (index .metadata.annotations "uc_skip_components") }}'
-                uc_repo_git_url: '{{index .metadata.annotations "uc_repo_git_url"}}'
-                uc_repo_ref: '{{index .metadata.annotations "uc_repo_ref"}}'
-                uc_deploy_git_url: '{{index .metadata.annotations "uc_deploy_git_url"}}'
-                uc_deploy_ref: '{{index .metadata.annotations "uc_deploy_ref"}}'
-                uc_role: '{{index .metadata.labels "understack.rackspace.com/role"}}'
-                uc_dns_zone: '{{index .metadata.annotations "dns_zone" }}'
-                uc_cluster_issuer: '{{index .metadata.annotations "uc_cluster_issuer" }}'
-                uc_global_dns_zone: '{{index .metadata.annotations "uc_global_dns_zone" }}'
-          - list:
-              elements:
-                - component: cert-manager
-                  skipComponent: '{{has "cert-manager" (.values.uc_skip_components | fromJson)}}'
-                  sources:
-                    - repoURL: https://charts.jetstack.io
-                      chart: cert-manager
-                      targetRevision: '1.15.2'
-                      helm:
-                        releaseName: cert-manager
-                        valuesObject:
-                          crds:
-                            enabled: true
-                - component: ingress-nginx
-                  skipComponent: '{{has "ingress-nginx" (.values.uc_skip_components | fromJson)}}'
-                  sources:
-                    - repoURL: https://kubernetes.github.io/ingress-nginx
-                      chart: ingress-nginx
-                      targetRevision: 4.12.1
-                      helm:
-                        releaseName: ingress-nginx
-                        valueFiles:
-                          - $deploy/{{.name}}/helm-configs/ingress-nginx.yaml
-                        ignoreMissingValueFiles: true
-                    - repoURL: '{{ .values.uc_deploy_git_url }}'
-                      targetRevision: '{{ .values.uc_deploy_ref }}'
-                      ref: deploy
-                - component: cilium
-                  skipComponent: '{{or (has "cilium" (.values.uc_skip_components | fromJson)) (eq "global" .values.uc_role)}}'
-                  sources:
-                    # Cilium itself is deployed before ArgoCD so we only include project
-                    # and environment specific stuff here
-                    - repoURL: '{{ .values.uc_deploy_git_url }}'
-                      targetRevision: '{{ .values.uc_deploy_ref }}'
-                      path: '{{.name}}/manifests/cilium'
-                - component: etcdbackup
-                  componentNamespace: kube-system
-                  skipComponent: '{{has "etcdbackup" (.values.uc_skip_components | fromJson)}}'
-                  sources:
-                    - repoURL: '{{ .values.uc_repo_git_url }}'
-                      targetRevision: '{{ .values.uc_repo_ref }}'
-                      path: 'components/etcdbackup'
-                      ref: understack
-                      helm:
-                        valueFiles:
-                          - $understack/components/etcdbackup/values.yaml
-                          - $deploy/{{.name}}/helm-configs/etcdbackup.yaml
-                        ignoreMissingValueFiles: true
-                    - repoURL: '{{ .values.uc_deploy_git_url }}'
-                      targetRevision: '{{ .values.uc_deploy_ref }}'
-                      ref: deploy
-            selector:
-              # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
-              # ArgoCD's templating operates with strings so it's the string "true"
-              matchExpressions:
-                - key: skipComponent
-                  operator: NotIn
-                  values:
-                    - "true"
+                      understack_url: '{{index .metadata.annotations "uc_repo_git_url"}}'
+                      understack_ref: '{{index .metadata.annotations "uc_repo_ref"}}'
+                      deploy_url: '{{index .metadata.annotations "uc_deploy_git_url"}}'
+                      deploy_ref: '{{index .metadata.annotations "uc_deploy_ref"}}'
+          # now the applications matrixed with the clusters
+          - merge:
+              mergeKeys:
+                # merge config based on component name
+                - component
+              generators:
+                - git:
+                    repoURL: '{{ .values.understack_url }}'
+                    revision: '{{ .values.understack_ref }}'
+                    files:
+                      - path: "apps/infra/*.yaml"
+                - git:
+                    repoURL: '{{ .values.deploy_url }}'
+                    revision: '{{ .values.deploy_ref }}'
+                    files:
+                      # due to https://github.com/argoproj/argo-cd/issues/22051
+                      # we need to do this workaround. this reads the apps.yaml
+                      # for per cluster
+                      - path: '{{ "{{.name}}" }}/apps.yaml'
+      selector:
+        matchExpressions:
+          # if you set skip to any value for the component in apps.yaml, this will disable it
+          - key: skip
+            operator: DoesNotExist
   template:
     metadata:
       name: '{{.name}}-{{.component}}'
@@ -115,12 +87,61 @@ spec:
             argocd.argoproj.io/sync-options: Delete=false
   templatePatch: |
     spec:
+      {{- $root := . }}
+      {{- if hasKey . "sources" }}
       sources:
-      {{- range $source := .sources }}
-        # indentation matters so collapse to single line with toJson to keep it
-        - {{ $source | toJson }}
+        {{- range $source := .sources }}
+        {{- if hasKey $source "ref" }}
+        - ref: {{ $source.ref }}
+          {{- if eq $source.ref "understack" }}
+          repoURL: {{ $root.values.understack_url }}
+          targetRevision: {{ $root.values.understack_ref }}
+          {{- else if eq $source.ref "deploy" }}
+          repoURL: {{ $root.values.deploy_url }}
+          targetRevision: {{ $root.values.deploy_ref }}
+          {{- end }}
+        {{- else }}
+        - repoURL: {{ $source.repoURL }}
+          targetRevision: {{ $source.targetRevision }}
+        {{- end }}
+          {{- if hasKey $source "chart" }}
+          chart: {{ $source.chart }}
+          {{- end }}
+          {{- if hasKey $source "helm" }}
+          helm:
+            {{- if hasKey $source "chart" }}
+            releaseName: {{ $source.chart }}
+            {{- end }}
+            {{- if hasKey $source.helm "valueFiles" }}
+            valueFiles:
+            {{- range $vf := $source.helm.valueFiles }}
+            # until dynamic parameters exist this must be done
+            - {{ $vf | replace "{{.name}}" $root.name }}
+            {{- end }}
+            ignoreMissingValueFiles: true
+            {{- end }}
+            {{- if hasKey $source.helm "fileParameters" }}
+            fileParameters:
+            {{- range $fp := $source.helm.fileParameters }}
+            # until dynamic parameters exist this must be done
+            - name: {{ $fp.name }}
+              path: {{ $fp.path | replace "{{.name}}" $root.name }}
+            {{- end }}
+            {{- end }}
+            {{- if hasKey $source.helm "valuesObject" }}
+            valuesObject: {{ $source.helm.valuesObject | toJson }}
+            # indentation matters so collapse to single line with toJson to keep it
+            {{- end }}
+          {{- end }}
+          {{- if hasKey $source "kustomize" }}
+          kustomize: {{ $source.kustomize | toJson }}
+          {{- end }}
+          {{- if hasKey $source "path" }}
+          path: {{ $source.path | replace "{{.name}}" $root.name }}
+          {{- end }}
+        {{- end }}
       {{- end }}
-    {{- if hasKey . "ignoreDifferences" }}
+      {{- if hasKey . "ignoreDifferences" }}
       # indentation matters so collapse to single line with toJson to keep it
       ignoreDifferences: {{ .ignoreDifferences | toJson }}
-    {{- end }}
+      {{- end }}

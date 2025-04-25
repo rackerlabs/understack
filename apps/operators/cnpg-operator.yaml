@@ -1,0 +1,5 @@
+---
+component: cnpg-system
+sources:
+  - ref: understack
+    path: 'operators/cnpg-system'
