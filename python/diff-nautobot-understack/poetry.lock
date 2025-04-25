@@ -229,6 +229,7 @@ description = "Cross-platform colored terminal text."
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 groups = ["main"]
+markers = "platform_system == \"Windows\""
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
@@ -298,19 +299,18 @@ files = [
 
 [[package]]
 name = "diffsync"
-version = "2.0.1"
+version = "2.1.0"
 description = "Library to easily sync/diff/update 2 different data sources"
 optional = false
-python-versions = "<4.0,>=3.8"
+python-versions = "<4.0,>=3.9"
 groups = ["main"]
 files = [
-    {file = "diffsync-2.0.1-py3-none-any.whl", hash = "sha256:c375139d2d0c060106ef4f724044bd70ec03296f90255cd41831946e0544a585"},
-    {file = "diffsync-2.0.1.tar.gz", hash = "sha256:7f6fe7705b0669f0249b18c97231b74bdfa2530117ad98f3b79a563c07ff7728"},
+    {file = "diffsync-2.1.0-py3-none-any.whl", hash = "sha256:ffffdab7db9c3a1fc201da34b8803ad2a4d3088f30f424f60b0490850bd55437"},
+    {file = "diffsync-2.1.0.tar.gz", hash = "sha256:fb513c4a66f5c62b781796de23f361f8b1710901844667f8ccbe650ae58b27f0"},
 ]
 
 [package.dependencies]
-colorama = ">=0.4.3,<0.5.0"
-packaging = ">=21.3,<24.0"
+packaging = ">=21.3"
 pydantic = ">=2.0.0,<3.0.0"
 structlog = ">=20.1.0"
 typing-extensions = {version = ">=4.0.1", markers = "python_version < \"3.11\""}
