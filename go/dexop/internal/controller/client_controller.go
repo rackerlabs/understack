@@ -63,7 +63,6 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if clientSpec == nil {
 		return ctrl.Result{}, nil
 	}
-
 	reqLogger.Info("Reconciling Client")
 
 	deleteRequested, err := r.handleDeletion(ctx, clientSpec)
@@ -81,25 +80,15 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	existing, err := r.DexManager.GetOauth2Client(clientSpec.Spec.Name)
+	already_exists, err := r.createClient(clientSpec, reqLogger)
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "not found") {
-			ctrl.Log.Info("Client does not exist in Dex. Creating one.", "name", clientSpec.Spec.Name)
-			if _, err = r.DexManager.CreateOauth2Client(clientSpec); err != nil {
-				reqLogger.Error(err, "Unable to create client in dex")
-				return ctrl.Result{}, err
-			}
-			return ctrl.Result{}, nil
-		}
 		return ctrl.Result{}, err
 	}
 
 	// update
-	if existing != nil {
-		reqLogger.Info("making an UpdateOauth2Client call")
-		err = r.DexManager.UpdateOauth2Client(clientSpec)
-		if err != nil {
-			reqLogger.Error(err, "after UpdateOauth2Client")
+	if already_exists {
+		if err := r.DexManager.UpdateOauth2Client(clientSpec); err != nil {
+			reqLogger.Error(err, "failed on UpdateOauth2Client")
 			return ctrl.Result{}, err
 		}
 	}
@@ -192,9 +181,19 @@ func (r *ClientReconciler) manageSecret(ctx context.Context, req ctrl.Request, c
 			} else {
 				reqLogger.Error(err, "Unable to read secret", "secretName", clientSpec.Spec.SecretName)
 				return  err
+func (r *ClientReconciler) createClient(clientSpec *dexv1alpha1.Client, reqLogger logr.Logger) (bool, error) {
+	_, err := r.DexManager.GetOauth2Client(clientSpec.Spec.Name)
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			ctrl.Log.Info("Client does not exist in Dex. Creating one.", "name", clientSpec.Spec.Name)
+			if _, err = r.DexManager.CreateOauth2Client(clientSpec); err != nil {
+				reqLogger.Error(err, "Unable to create client in dex")
+				return false, err
 			}
+			return true, nil
 		}
-		clientSpec.Spec.SecretValue = value
+		// other errors
+		return false, err
 	}
-	return nil
+	return true, nil
 }
