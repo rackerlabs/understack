@@ -70,6 +70,22 @@ spec:
                     - repoURL: '{{ .values.uc_deploy_git_url }}'
                       targetRevision: '{{ .values.uc_deploy_ref }}'
                       path: '{{.name}}/manifests/cilium'
+                - component: etcdbackup
+                  componentNamespace: kube-system
+                  skipComponent: '{{has "etcdbackup" (.values.uc_skip_components | fromJson)}}'
+                  sources:
+                    - repoURL: '{{ .values.uc_repo_git_url }}'
+                      targetRevision: '{{ .values.uc_repo_ref }}'
+                      path: 'components/etcdbackup'
+                      ref: understack
+                      helm:
+                        valueFiles:
+                          - $understack/components/etcdbackup/values.yaml
+                          - $deploy/{{.name}}/helm-configs/etcdbackup.yaml
+                        ignoreMissingValueFiles: true
+                    - repoURL: '{{ .values.uc_deploy_git_url }}'
+                      targetRevision: '{{ .values.uc_deploy_ref }}'
+                      ref: deploy
             selector:
               # by setting the key in the elements 'skipComponent' to 'true' it will skip installing it
               # ArgoCD's templating operates with strings so it's the string "true"
