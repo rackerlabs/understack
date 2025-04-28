@@ -66,21 +66,10 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	reqLogger.Info("Reconciling Client")
 
-	// delete if no longer needed
-	deleteRequested := clientSpec.GetDeletionTimestamp() != nil
-	if deleteRequested {
-		if controllerutil.ContainsFinalizer(clientSpec, dexFinalizer) {
-			if err := r.finalizeDeletion(reqLogger, clientSpec, r.DexManager); err != nil {
-				return ctrl.Result{}, err
-			}
-
-			// remove finalizer
-			controllerutil.RemoveFinalizer(clientSpec, dexFinalizer)
-			err := r.Update(ctx, clientSpec)
-			if err != nil {
-				return ctrl.Result{}, err
-			}
-		}
+	deleteRequested, err := r.handleDeletion(ctx, clientSpec)
+	if err != nil {
+		return ctrl.Result{}, err
+	} else if deleteRequested {
 		return ctrl.Result{}, nil
 	}
 
@@ -160,16 +149,6 @@ func (r *ClientReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// finalizeDeletion removes an OAuth2 client from Dex when the corresponding Client resource is deleted.
-// It uses the DexManager to send a request to Dex over gRPC to delete the client.
-func (r *ClientReconciler) finalizeDeletion(reqLogger logr.Logger, c *dexv1alpha1.Client, mgr *dexmgr.DexManager) error {
-	reqLogger.Info("Client is being removed")
-	if _, err := mgr.RemoveOauth2Client(c.Spec.Name); err != nil {
-		return err
-	}
-	return nil
-}
-
 func (r *ClientReconciler) getClientSpec(ctx context.Context, namespacedName types.NamespacedName) (*dexv1alpha1.Client, error) {
 	clientSpec := &dexv1alpha1.Client{}
 	if err := r.Get(ctx, namespacedName, clientSpec); err != nil {
@@ -179,4 +158,27 @@ func (r *ClientReconciler) getClientSpec(ctx context.Context, namespacedName typ
 		return nil, err
 	}
 	return clientSpec, nil
+}
+
+// handleDeletion() removes an OAuth2 client from Dex when the corresponding Client resource is deleted.
+// It uses the DexManager to send a request to Dex over gRPC to delete the client.
+func (r *ClientReconciler) handleDeletion(ctx context.Context, clientSpec *dexv1alpha1.Client) (bool, error) {
+	// delete if no longer needed
+	deleteRequested := clientSpec.GetDeletionTimestamp() != nil
+	if deleteRequested {
+		if controllerutil.ContainsFinalizer(clientSpec, dexFinalizer) {
+			if _, err := r.DexManager.RemoveOauth2Client(clientSpec.Spec.Name); err != nil {
+				return deleteRequested, err
+			}
+
+			// remove finalizer
+			controllerutil.RemoveFinalizer(clientSpec, dexFinalizer)
+			err := r.Update(ctx, clientSpec)
+			if err != nil {
+				return deleteRequested, err
+			}
+		}
+		return deleteRequested, nil
+	}
+	return deleteRequested, nil
 }
