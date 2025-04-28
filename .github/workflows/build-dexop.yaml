@@ -3,16 +3,11 @@ name: build-dexop-images
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - "go/dexop/**"
   push:
     tags:
       - dexop-v*
     paths:
       - "go/dexop/**"
-  merge_group:
-    types: [checks_requested]
 
 jobs:
   build-ghcr-registry:
