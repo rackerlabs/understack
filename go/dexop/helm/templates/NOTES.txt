@@ -1,0 +1,11 @@
+dexop has been installed.
+
+Please make sure that you have created Secret '{{ .Values.dex.secret}}' in '{{ .Release.Namespace }} namespace so that it can connect to your Dex instance ({{
+    .Values.dex.address }}).
+
+
+The '{{ .Values.dex.secret }}' should be of `kubernetes.io/tls` type and MUST have following keys:
+
+- tls.crt
+- tls.key
+- ca.pem
