@@ -151,36 +151,67 @@ func (r *ClientReconciler) addFinalizer(ctx context.Context, clientSpec *dexv1al
 
 // Handle reading/generating Kubernetes secret to setup the password that will be used by Oauth2 client
 func (r *ClientReconciler) manageSecret(ctx context.Context, req ctrl.Request, clientSpec *dexv1alpha1.Client, reqLogger logr.Logger) error {
-	// if secretName specified, read the secret
 	secretmgr := new(SecretManager)
-	if clientSpec.Spec.SecretName != "" {
-		if clientSpec.Spec.SecretNamespace == "" {
-			clientSpec.Spec.SecretNamespace = req.NamespacedName.Namespace
+	if clientSpec.Spec.SecretName == "" {
+		return nil
+	}
+
+	if clientSpec.Spec.SecretNamespace == "" {
+		clientSpec.Spec.SecretNamespace = req.NamespacedName.Namespace
+	}
+
+	secretValue, err := r.readOrGenerateSecret(ctx, secretmgr, clientSpec, reqLogger)
+	if err != nil {
+		return err
+	}
+
+	clientSpec.Spec.SecretValue = secretValue
+	return nil
+}
+
+// reads the password from an existing Secret, fallback to generating new one
+func (r *ClientReconciler) readOrGenerateSecret(ctx context.Context, secretmgr *SecretManager, clientSpec *dexv1alpha1.Client, reqLogger logr.Logger) (string, error) {
+	secret, err := secretmgr.readSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
+	if err != nil {
+		if errors.IsNotFound(err) && clientSpec.Spec.GenerateSecret {
+			return r.generateSecret(ctx, secretmgr, clientSpec, reqLogger)
 		}
-		// read existing or generate a secret
-		value, err := secretmgr.readSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
-		if err != nil {
-			if errors.IsNotFound(err) && clientSpec.Spec.GenerateSecret {
-				secret, err := secretmgr.generateSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
-				if err != nil {
-					reqLogger.Error(err, "Unable to write secret", "secretName", clientSpec.Spec.SecretName)
-					return err
-				}
+		reqLogger.Error(err, "Unable to read secret", "secretName", clientSpec.Spec.SecretName)
+		return "", err
+	}
 
-				if secret.Data["secret"] == nil {
-					reqLogger.Error(nil, "Secret data is missing", "SecretName", clientSpec.Spec.SecretName)
-				}
-				value = string(secret.Data["secret"])
-				if err = ctrl.SetControllerReference(clientSpec, secret, r.Scheme); err != nil {
-					return err
-				}
+	if secret == "" {
+		reqLogger.Error(nil, "Secret data is missing", "SecretName", clientSpec.Spec.SecretName)
+		return "", nil
+	}
 
-				if err = r.Update(ctx, secret); err != nil {
-					return err
-				}
-			} else {
-				reqLogger.Error(err, "Unable to read secret", "secretName", clientSpec.Spec.SecretName)
-				return  err
+	return secret, nil
+}
+
+// generateSecret creates a Kubernetes secret with randomly generated password.
+func (r *ClientReconciler) generateSecret(ctx context.Context, secretmgr *SecretManager, clientSpec *dexv1alpha1.Client, reqLogger logr.Logger) (string, error) {
+	secret, err := secretmgr.generateSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
+	if err != nil {
+		reqLogger.Error(err, "Unable to write secret", "secretName", clientSpec.Spec.SecretName)
+		return "", err
+	}
+
+	if err = ctrl.SetControllerReference(clientSpec, secret, r.Scheme); err != nil {
+		return "", err
+	}
+
+	if err = r.Update(ctx, secret); err != nil {
+		return "", err
+	}
+
+	if secret.Data["secret"] == nil {
+		reqLogger.Error(nil, "Secret data is missing", "SecretName", clientSpec.Spec.SecretName)
+		return "", nil
+	}
+
+	return string(secret.Data["secret"]), nil
+}
+
 func (r *ClientReconciler) createClient(clientSpec *dexv1alpha1.Client, reqLogger logr.Logger) (bool, error) {
 	_, err := r.DexManager.GetOauth2Client(clientSpec.Spec.Name)
 	if err != nil {
