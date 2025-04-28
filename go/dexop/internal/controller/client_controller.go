@@ -77,39 +77,8 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	// if secretName specified, read the secret
-	secretmgr := new(SecretManager)
-	if clientSpec.Spec.SecretName != "" {
-		if clientSpec.Spec.SecretNamespace == "" {
-			clientSpec.Spec.SecretNamespace = req.NamespacedName.Namespace
-		}
-		// read existing or generate a secret
-		value, err := secretmgr.readSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
-		if err != nil {
-			if errors.IsNotFound(err) && clientSpec.Spec.GenerateSecret {
-				secret, err := secretmgr.generateSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
-				if err != nil {
-					reqLogger.Error(err, "Unable to write secret", "secretName", clientSpec.Spec.SecretName)
-					return ctrl.Result{}, err
-				}
-
-				if secret.Data["secret"] == nil {
-					reqLogger.Error(nil, "Secret data is missing", "SecretName", clientSpec.Spec.SecretName)
-				}
-				value = string(secret.Data["secret"])
-				if err = ctrl.SetControllerReference(clientSpec, secret, r.Scheme); err != nil {
-					return ctrl.Result{}, err
-				}
-
-				if err = r.Update(ctx, secret); err != nil {
-					return ctrl.Result{}, err
-				}
-			} else {
-				reqLogger.Error(err, "Unable to read secret", "secretName", clientSpec.Spec.SecretName)
-				return ctrl.Result{}, err
-			}
-		}
-		clientSpec.Spec.SecretValue = value
+	if err = r.manageSecret(ctx, req, clientSpec, reqLogger); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	existing, err := r.DexManager.GetOauth2Client(clientSpec.Spec.Name)
@@ -187,6 +156,45 @@ func (r *ClientReconciler) addFinalizer(ctx context.Context, clientSpec *dexv1al
 		if err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// Handle reading/generating Kubernetes secret to setup the password that will be used by Oauth2 client
+func (r *ClientReconciler) manageSecret(ctx context.Context, req ctrl.Request, clientSpec *dexv1alpha1.Client, reqLogger logr.Logger) error {
+	// if secretName specified, read the secret
+	secretmgr := new(SecretManager)
+	if clientSpec.Spec.SecretName != "" {
+		if clientSpec.Spec.SecretNamespace == "" {
+			clientSpec.Spec.SecretNamespace = req.NamespacedName.Namespace
+		}
+		// read existing or generate a secret
+		value, err := secretmgr.readSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
+		if err != nil {
+			if errors.IsNotFound(err) && clientSpec.Spec.GenerateSecret {
+				secret, err := secretmgr.generateSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
+				if err != nil {
+					reqLogger.Error(err, "Unable to write secret", "secretName", clientSpec.Spec.SecretName)
+					return err
+				}
+
+				if secret.Data["secret"] == nil {
+					reqLogger.Error(nil, "Secret data is missing", "SecretName", clientSpec.Spec.SecretName)
+				}
+				value = string(secret.Data["secret"])
+				if err = ctrl.SetControllerReference(clientSpec, secret, r.Scheme); err != nil {
+					return err
+				}
+
+				if err = r.Update(ctx, secret); err != nil {
+					return err
+				}
+			} else {
+				reqLogger.Error(err, "Unable to read secret", "secretName", clientSpec.Spec.SecretName)
+				return  err
+			}
+		}
+		clientSpec.Spec.SecretValue = value
 	}
 	return nil
 }
