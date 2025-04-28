@@ -1,9 +1,8 @@
-# undercloud-deploy-cli
+# understack
 
-Undercloud Deploy cli helps quickly generate undercloud-deploy config files.
+UnderStack CLI helps quickly generate a deployment repository.
 
-
-## How to use.
+## How to use
 
 > Please make sure that you have kubeseal binary installed your system https://github.com/bitnami-labs/sealed-secrets
 
