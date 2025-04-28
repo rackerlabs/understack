@@ -1,0 +1,46 @@
+name: golangci-lint
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "go/**"
+      - .github/workflows/go-lint.yaml
+  pull_request:
+    paths:
+      - "go/**"
+      - .github/workflows/go-lint.yaml
+  workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
+    paths:
+      - "go/**"
+      - .github/workflows/go-lint.yaml
+
+permissions:
+  contents: read
+  # Optional: allow read access to pull request. Use with `only-new-issues` option.
+  # pull-requests: read
+
+env:
+  GO_VERSION: 1.23
+  GOLANGCI_LINT_VERSION: v2.1.2
+
+jobs:
+  golangci-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        apps:
+          - dexop
+          - deploy-cli
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: golangci-lint ${{ matrix.apps }}
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: go/${{ matrix.apps }}
