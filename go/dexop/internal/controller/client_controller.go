@@ -73,13 +73,8 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	// add finalizer
-	if !controllerutil.ContainsFinalizer(clientSpec, dexFinalizer) {
-		controllerutil.AddFinalizer(clientSpec, dexFinalizer)
-		err := r.Update(ctx, clientSpec)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+	if err = r.addFinalizer(ctx, clientSpec); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// if secretName specified, read the secret
@@ -181,4 +176,17 @@ func (r *ClientReconciler) handleDeletion(ctx context.Context, clientSpec *dexv1
 		return deleteRequested, nil
 	}
 	return deleteRequested, nil
+}
+
+// adds finalizer on the Resource so that deletion can be handled gracefully
+func (r *ClientReconciler) addFinalizer(ctx context.Context, clientSpec *dexv1alpha1.Client) error {
+	// add finalizer
+	if !controllerutil.ContainsFinalizer(clientSpec, dexFinalizer) {
+		controllerutil.AddFinalizer(clientSpec, dexFinalizer)
+		err := r.Update(ctx, clientSpec)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
