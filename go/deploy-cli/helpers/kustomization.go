@@ -39,12 +39,15 @@ func UpdateKustomizeFile(dir string) {
 func scanYamlFiles(dir string) ([]string, error) {
 	fileSet := make(map[string]bool)
 
-	fsutil.FindInDir(dir, func(filePath string, de fs.DirEntry) error {
+  err := fsutil.FindInDir(dir, func(filePath string, de fs.DirEntry) error {
 		fileSet[de.Name()] = true
 		return nil
 	}, fsutil.IncludeSuffix(".yaml", ".yml"),
 		fsutil.ExcludeDotFile,
 		fsutil.ExcludeNames(kustomizationFile))
+  if err != nil {
+    return nil, err
+  }
 
 	var uniqueFiles []string
 	for f := range fileSet {
