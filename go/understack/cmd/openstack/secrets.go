@@ -1,8 +1,8 @@
 package openstack
 
 import (
-	"github.com/rackerlabs/understack/go/deploy-cli/cmd"
-	"github.com/rackerlabs/understack/go/deploy-cli/helpers"
+	"github.com/rackerlabs/understack/go/understack/cmd"
+	"github.com/rackerlabs/understack/go/understack/helpers"
 
 	"github.com/charmbracelet/log"
 

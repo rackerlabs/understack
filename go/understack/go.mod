@@ -1,4 +1,4 @@
-module github.com/rackerlabs/understack/go/deploy-cli
+module github.com/rackerlabs/understack/go/understack
 
 go 1.23.6
 
