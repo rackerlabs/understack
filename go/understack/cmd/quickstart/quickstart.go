@@ -20,17 +20,17 @@ import (
 )
 
 func init() {
-	cmd.RootCmd.AddCommand(Init)
+	cmd.RootCmd.AddCommand(Quickstart)
 }
 
-var Init = &cobra.Command{
-	Use:   "init",
-	Short: "Run all the init the steps required",
-	Long:  "Run all the init the steps required",
-	Run:   initRun,
+var Quickstart = &cobra.Command{
+	Use:   "quickstart",
+	Short: "Run all the steps required",
+	Long:  "Run all the steps required",
+	Run:   qsRun,
 }
 
-func initRun(cmd *cobra.Command, args []string) {
+func qsRun(cmd *cobra.Command, args []string) {
 
 	log.Info("using envs",
 		"DEPLOY_NAME", envutil.Getenv("DEPLOY_NAME"),

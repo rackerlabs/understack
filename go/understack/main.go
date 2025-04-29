@@ -8,10 +8,10 @@ import (
 	_ "github.com/rackerlabs/understack/go/understack/cmd/certManager"
 	_ "github.com/rackerlabs/understack/go/understack/cmd/dex"
 	_ "github.com/rackerlabs/understack/go/understack/cmd/helmConfig"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/init"
 	_ "github.com/rackerlabs/understack/go/understack/cmd/node"
 	_ "github.com/rackerlabs/understack/go/understack/cmd/openstack"
 	_ "github.com/rackerlabs/understack/go/understack/cmd/other"
+	_ "github.com/rackerlabs/understack/go/understack/cmd/quickstart"
 )
 
 func main() {
