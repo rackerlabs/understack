@@ -72,6 +72,7 @@ conf:
     pxe:
       images_path: /var/lib/understack/master_iso_images
       instance_master_path: /var/lib/understack/master_iso_images
+      loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
       hooks: "$default_hooks,parse-lldp,local-link-connection,physical-network"
