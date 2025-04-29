@@ -27,20 +27,42 @@ env:
   GOLANGCI_LINT_VERSION: v2.1.2
 
 jobs:
-  golangci-lint:
+  # Initial Setup Job
+  setup:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        apps:
-          - dexop
-          - deploy-cli
     steps:
       - uses: actions/checkout@v4
+
+      # List directories and set as output
+      - name: List Applications
+        id: list_dirs
+        run: |
+          apps=$(ls -d go/* | xargs -n1 basename)
+          app_array=$(printf '%s\n' $apps | jq -R . | jq -cs .)
+          echo "apps=${app_array}"
+          printf "apps=%s\n" "${app_array}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      # Set up Go environment
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
-      - name: golangci-lint ${{ matrix.apps }}
+    outputs:
+      apps: ${{ steps.list_dirs.outputs.apps }}
+
+  golangci-lint:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix:
+        app: ${{ fromJson(needs.setup.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: golangci-lint ${{ matrix.app }}
         uses: golangci/golangci-lint-action@v7
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          working-directory: go/${{ matrix.apps }}
+          working-directory: go/${{ matrix.app }}
