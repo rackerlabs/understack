@@ -10,6 +10,6 @@ jobs:
 
     steps:
       - name: Block Autosquash Commits
-        uses: skrobul/block-autosquash-commits-action@v2.1.1
+        uses: skrobul/block-autosquash-commits-action@64e6a7a63dc735cb327fcff57a13bab3a2d3934b # v2.1.1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
