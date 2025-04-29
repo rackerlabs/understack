@@ -5,9 +5,13 @@ import (
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "",
+	Use:   "understack",
 	Short: "",
 	Long:  ``,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// If no subcommand, show help
+		return cmd.Help()
+	},
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 	},
 	PreRun: func(cmd *cobra.Command, args []string) {
