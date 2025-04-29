@@ -157,7 +157,7 @@ func (r *ClientReconciler) manageSecret(ctx context.Context, req ctrl.Request, c
 	}
 
 	if clientSpec.Spec.SecretNamespace == "" {
-		clientSpec.Spec.SecretNamespace = req.NamespacedName.Namespace
+		clientSpec.Spec.SecretNamespace = req.Namespace
 	}
 
 	secretValue, err := r.readOrGenerateSecret(ctx, secretmgr, clientSpec, reqLogger)
