@@ -64,7 +64,7 @@ func GenerateSecrets() error {
 func generateDeployRepoSecret(basePath string) error {
 	vars := map[string]any{
 		"Config":            `{"tlsClientConfig":{"insecure":false}}`,
-		"Name":              envutil.Getenv("UC_DEPLOY"),
+		"Name":              envutil.Getenv("DEPLOY_NAME"),
 		"Server":            "https://kubernetes.default.svc",
 		"DEPLOY_NAME":       envutil.Getenv("DEPLOY_NAME"),
 		"UC_DEPLOY_GIT_URL": envutil.Getenv("UC_DEPLOY_GIT_URL"),
