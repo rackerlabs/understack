@@ -16,7 +16,7 @@ func KubeSeal(inputData []byte, outputPath string) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(tmpFile.Name())
+	defer removeTempFile(tmpFile)
 
 	if _, err := tmpFile.Write([]byte(inputData)); err != nil {
 		return err
@@ -52,4 +52,10 @@ func KubeSeal(inputData []byte, outputPath string) error {
 		log.Fatal("error in kustomization.yaml file", "err", err)
 	}
 	return nil
+}
+
+func removeTempFile(file *os.File) {
+    if err := os.Remove(file.Name()); err != nil {
+        log.Printf("Failed to remove temporary file: %v", err)
+    }
 }

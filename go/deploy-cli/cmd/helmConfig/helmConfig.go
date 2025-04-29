@@ -25,10 +25,18 @@ var HelmConfig = &cobra.Command{
 }
 
 func helmConfigGen(cmd *cobra.Command, args []string) {
-	dex()
-	glance()
-	ironic()
-	rook()
+  functions := []func() error{
+    dex,
+    glance,
+    ironic,
+    rook,
+  }
+  for _, fn := range functions {
+    if err := fn(); err != nil {
+      fmt.Printf("Error helmConfigGen: %v\n", err)
+      os.Exit(1)
+    }
+  }
 }
 
 func dex() error {

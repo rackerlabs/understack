@@ -59,7 +59,9 @@ func generateOtherSecrets(_ *cobra.Command, _ []string) {
 	// Create Empty Dirs
 	emptyDirs := []string{"argo-events", "ovn", "metallb", "undersync", "cilium"}
 	for _, service := range emptyDirs {
-		fsutil.WriteFile(helpers.GetManifestPathToService(service)+"/.keep", "", os.ModePerm)
+    if err := fsutil.WriteFile(helpers.GetManifestPathToService(service)+"/.keep", "", os.ModePerm); err != nil {
+      log.Errorf("Failed creating .keep file for %s: %v", service, err)
+    }
 	}
 }
 

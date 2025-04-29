@@ -4,11 +4,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	// Viper config location
-	cfgFile string
-)
-
 var RootCmd = &cobra.Command{
 	Use:   "",
 	Short: "",

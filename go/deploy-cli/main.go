@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/rackerlabs/understack/go/deploy-cli/cmd"
 	_ "github.com/rackerlabs/understack/go/deploy-cli/cmd/argocd"
 	_ "github.com/rackerlabs/understack/go/deploy-cli/cmd/certManager"
@@ -13,5 +15,8 @@ import (
 )
 
 func main() {
-	cmd.Execute()
+  err := cmd.Execute()
+  if err != nil {
+    os.Exit(1)
+  }
 }
