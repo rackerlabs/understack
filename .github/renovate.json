@@ -24,6 +24,15 @@
         "\\s- component: (?<depName>.+)\\n\\s+repoURL: (?<packageName>.+)\\n\\s+chartVersion: (?<currentValue>.+)\\s"
       ],
       "datasourceTemplate": "helm"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^.*\\.ya?ml$"],
+      "matchStrings": [
+        "(?<depName>[^/]+/[^/]+)/releases/download/v(?<currentValue>[^/]+)"
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
     }
   ],
   "devbox": {
