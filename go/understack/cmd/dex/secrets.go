@@ -55,7 +55,7 @@ func generateDexServiceSecrets() error {
 		}
 	}
 
-	helpers.UpdateKustomizeFile(filepath.Join(envutil.Getenv("UC_DEPLOY"), envutil.Getenv("DEPLOY_NAME"), "manifests", "dex"))
+	helpers.UpdateKustomizeFile(filepath.Join(envutil.Getenv("DEPLOY_NAME"), "manifests", "dex"))
 
 	return nil
 }

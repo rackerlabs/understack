@@ -33,7 +33,6 @@ var Init = &cobra.Command{
 func initRun(cmd *cobra.Command, args []string) {
 
 	log.Info("using envs",
-		"UC_DEPLOY", envutil.Getenv("UC_DEPLOY"),
 		"DEPLOY_NAME", envutil.Getenv("DEPLOY_NAME"),
 		"UC_DEPLOY_GIT_URL", envutil.Getenv("UC_DEPLOY_GIT_URL"),
 		"UC_DEPLOY_SSH_FILE", envutil.Getenv("UC_DEPLOY_SSH_FILE"),
@@ -58,7 +57,6 @@ func initRun(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	fmt.Println(envutil.Getenv("UC_DEPLOY"))
 	fmt.Println(envutil.Getenv("DEPLOY_NAME"))
 
 	log.Info("== Node Update")

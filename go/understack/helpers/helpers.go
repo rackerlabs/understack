@@ -19,7 +19,6 @@ type SecretConfig struct {
 
 func GetManifestPathToService(service string) string {
 	return filepath.Join(
-		envutil.Getenv("UC_DEPLOY"),
 		envutil.Getenv("DEPLOY_NAME"),
 		"manifests",
 		service,

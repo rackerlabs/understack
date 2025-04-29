@@ -101,7 +101,6 @@ func updateOpenStackSecretsFile() error {
 	}
 
 	secretFilePath := filepath.Join(
-		envutil.Getenv("UC_DEPLOY"),
 		envutil.Getenv("DEPLOY_NAME"),
 		"manifests",
 		"secret-openstack.yaml",
