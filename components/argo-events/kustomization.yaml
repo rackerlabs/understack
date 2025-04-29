@@ -4,8 +4,8 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - https://github.com/argoproj/argo-events/releases/download/v1.9.1/install.yaml
-  - https://github.com/argoproj/argo-events/releases/download/v1.9.1/install-validating-webhook.yaml
+  - https://github.com/argoproj/argo-events/releases/download/v1.9.6/install.yaml
+  - https://github.com/argoproj/argo-events/releases/download/v1.9.6/install-validating-webhook.yaml
 
   ## configure rbac to integrate with argo-workflow
   # - default-role.yaml
