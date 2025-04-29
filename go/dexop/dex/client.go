@@ -16,6 +16,7 @@ import (
 
 type DexManager struct {
 	Client dexapi.DexClient
+	Issuer string
 }
 
 // Creates new Oauth2 client in Dex
@@ -86,6 +87,19 @@ func (d *DexManager) UpdateOauth2Client(clientSpec *dexv1alpha1.Client) error {
 	return err
 }
 
+func (d *DexManager) GetIssuer() (string, error) {
+	// fallback for dex versions that don't support Discovery over GRPC
+	if d.Issuer != "" {
+		return d.Issuer, nil
+	}
+
+	result, err := d.Client.GetDiscovery(context.TODO(), &dexapi.DiscoveryReq{})
+	if err != nil {
+		return "", err
+	}
+	return result.GetIssuer(), nil
+}
+
 func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexClient, error) {
 	cPool := x509.NewCertPool()
 	caCert, err := os.ReadFile(caPath)
@@ -120,13 +134,13 @@ func NewInsecureTestManager(grpcAddr string) (*DexManager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &DexManager{Client: dexapi.NewDexClient(grpcConn)}, nil
+	return &DexManager{Client: dexapi.NewDexClient(grpcConn), Issuer: "http://127.0.0.1:15556/dex"}, nil
 }
 
-func NewDexManager(host, caCert, clientKey, clientCert string) (*DexManager, error) {
+func NewDexManager(host, caCert, clientKey, clientCert, issuer string) (*DexManager, error) {
 	client, err := newDexClient(host, caCert, clientKey, clientCert)
 	if err != nil {
 		return nil, fmt.Errorf("failed creating dex client: %w", err)
 	}
-	return &DexManager{Client: client}, nil
+	return &DexManager{Client: client, Issuer: issuer}, nil
 }

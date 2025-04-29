@@ -104,3 +104,6 @@ volumeMounts: []
 dex:
   address: dex-api.dex.cluster.local:5557
   secret: dexop-dex-client
+  # 'issuer' must be set explicitly if using dex version older than 2.42
+  #
+  # issuer: http://dex.instance.local/dex

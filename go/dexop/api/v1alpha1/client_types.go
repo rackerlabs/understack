@@ -29,6 +29,7 @@ type ClientSpec struct {
 	SecretName      string   `json:"secretName,omitempty"`
 	SecretNamespace string   `json:"secretNamespace,omitempty"`
 	SecretValue     string   `json:"-"`
+	Issuer          string   `json:"-"`
 	GenerateSecret  bool     `json:"generateSecret,omitempty"`
 	RedirectURIs    []string `json:"redirectURIs"`
 	LogoUrl         string   `json:"logoURL,omitempty"`

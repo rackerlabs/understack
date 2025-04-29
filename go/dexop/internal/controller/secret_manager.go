@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	dexv1alpha1 "github.com/rackerlabs/understack/go/dexop/api/v1alpha1"
 	"github.com/sethvargo/go-password/password"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,20 +22,20 @@ func (s SecretManager) readSecret(r *ClientReconciler, ctx context.Context, name
 		return "", err
 	}
 
-	if value, ok := secret.Data["secret"]; ok {
+	if value, ok := secret.Data["client-secret"]; ok {
 		return string(value), nil
 	}
-	return "", fmt.Errorf("secret key not found")
+	return "", fmt.Errorf("client-secret key not found")
 }
 
-func (s SecretManager) writeSecret(r *ClientReconciler, ctx context.Context, name, namespace, value string) (*v1.Secret, error) {
+func (s SecretManager) writeSecret(r *ClientReconciler, ctx context.Context, clientSpec *dexv1alpha1.Client, value string) (*v1.Secret, error) {
 	secret := &v1.Secret{
 		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
+			Name:      clientSpec.Spec.SecretName,
+			Namespace: clientSpec.Spec.SecretNamespace,
 		},
-		Data: map[string][]byte{"secret": []byte(value)},
+		Data: map[string][]byte{"client-secret": []byte(value), "issuer": []byte(clientSpec.Spec.Issuer), "client-id": []byte(clientSpec.Spec.Name)},
 		Type: "Opaque",
 	}
 
@@ -45,10 +46,10 @@ func (s SecretManager) writeSecret(r *ClientReconciler, ctx context.Context, nam
 	return secret, nil
 }
 
-func (s SecretManager) generateSecret(r *ClientReconciler, ctx context.Context, name, namespace string) (*v1.Secret, error) {
+func (s SecretManager) generateSecret(r *ClientReconciler, ctx context.Context, clientSpec *dexv1alpha1.Client) (*v1.Secret, error) {
 	res, err := password.Generate(48, 10, 10, false, false)
 	if err != nil {
 		return nil, err
 	}
-	return s.writeSecret(r, ctx, name, namespace, res)
+	return s.writeSecret(r, ctx, clientSpec, res)
 }

@@ -110,7 +110,7 @@ var _ = Describe("Client Controller", func() {
 
 			secretObj := &v1.Secret{}
 			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: typeNamespacedName.Namespace, Name: secretName}, secretObj)
-			Expect(len(secretObj.Data["secret"])).To(Equal(48))
+			Expect(len(secretObj.Data["client-secret"])).To(Equal(48))
 			Expect(err).NotTo(HaveOccurred())
 		})
 		It("should successfully reconcile the resource", func() {
@@ -140,7 +140,7 @@ var _ = Describe("Client Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 			secretObj := &v1.Secret{}
 			Expect(k8sClient.Get(ctx, typesNamespacedSecretName, secretObj)).To(Succeed())
-			secretObj.Data["secret"] = []byte("newSecret")
+			secretObj.Data["client-secret"] = []byte("newSecret")
 
 			By("reconcile after changing the secret")
 			Expect(k8sClient.Update(ctx, secretObj)).To(Succeed())
@@ -208,7 +208,39 @@ var _ = Describe("Client Controller", func() {
 
 			By("checking if the Secret has been recreated")
 			newSecret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: typesNamespacedSecretName.Name, Namespace: typesNamespacedSecretName.Namespace}}
-			Expect(k8sClient.Get(ctx, typesNamespacedSecretName, newSecret))
+			Expect(k8sClient.Get(ctx, typesNamespacedSecretName, newSecret)).To(Succeed())
+		})
+
+		It("populates the issuer in Secret", func() {
+			By("reconciling the first time")
+			controllerReconciler := &ClientReconciler{
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
+			}
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: typesNamespacedSecretName.Name, Namespace: typesNamespacedSecretName.Namespace}}
+			Expect(k8sClient.Get(ctx, typesNamespacedSecretName, secret)).To(Succeed())
+			Expect(string(secret.Data["issuer"])).To(Equal("http://127.0.0.1:15556/dex"))
+		})
+
+		It("populates the client-id in Secret", func() {
+			By("reconciling the first time")
+			controllerReconciler := &ClientReconciler{
+				Client:     k8sClient,
+				Scheme:     k8sClient.Scheme(),
+				DexManager: dex,
+			}
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			secret := &v1.Secret{ObjectMeta: metav1.ObjectMeta{Name: typesNamespacedSecretName.Name, Namespace: typesNamespacedSecretName.Namespace}}
+			Expect(k8sClient.Get(ctx, typesNamespacedSecretName, secret)).To(Succeed())
+			Expect(string(secret.Data["client-id"])).To(Equal("fred-client"))
 		})
 	})
 
@@ -239,7 +271,7 @@ var _ = Describe("Client Controller", func() {
 			By("creating secret")
 			secret := &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: testSecretName, Namespace: "default"},
-				Data:       map[string][]byte{"secret": []byte("abc")},
+				Data:       map[string][]byte{"client-secret": []byte("abc")},
 			}
 			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
 

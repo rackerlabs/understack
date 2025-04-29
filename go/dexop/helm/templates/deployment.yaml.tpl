@@ -40,6 +40,9 @@ spec:
           - --dex-cert-path=/run/secrets/dex/tls.crt
           - --dex-key-path=/run/secrets/dex/tls.key
           - --dex-host={{ .Values.dex.address }}
+          {{ with .Values.dex.issuer }}
+          - --dex-issuer={{ . }}
+          {{- end }}
           command:
           - /manager
           securityContext:

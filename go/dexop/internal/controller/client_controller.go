@@ -110,6 +110,12 @@ func (r *ClientReconciler) getClientSpec(ctx context.Context, namespacedName typ
 		}
 		return nil, err
 	}
+	// populate issuer
+	issuer, err := r.DexManager.GetIssuer()
+	if err != nil {
+		return nil, err
+	}
+	clientSpec.Spec.Issuer = issuer
 	return clientSpec, nil
 }
 
@@ -190,7 +196,7 @@ func (r *ClientReconciler) readOrGenerateSecret(ctx context.Context, secretmgr *
 
 // generateSecret creates a Kubernetes secret with randomly generated password.
 func (r *ClientReconciler) generateSecret(ctx context.Context, secretmgr *SecretManager, clientSpec *dexv1alpha1.Client, reqLogger logr.Logger) (string, error) {
-	secret, err := secretmgr.generateSecret(r, ctx, clientSpec.Spec.SecretName, clientSpec.Spec.SecretNamespace)
+	secret, err := secretmgr.generateSecret(r, ctx, clientSpec)
 	if err != nil {
 		reqLogger.Error(err, "Unable to write secret", "secretName", clientSpec.Spec.SecretName)
 		return "", err

@@ -79,6 +79,7 @@ func main() {
 		"Path to the client certificate for Dex API")
 	flag.StringVar(&dexConf.ClientKeyPath, "dex-key-path", "./grpc_client.key",
 		"Path to the client key for Dex API")
+	flag.StringVar(&dexConf.Issuer, "dex-issuer", "", "force dex Issuer value to be inserted into created secrets.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -191,10 +192,11 @@ type DexConfig struct {
 	CAPath         string
 	ClientKeyPath  string
 	ClientCertPath string
+	Issuer         string
 }
 
-func newDexManager(config *DexConfig) (*dexmgr.DexManager, error) {
-	mgr, err := dexmgr.NewDexManager(config.Address, config.CAPath, config.ClientKeyPath, config.ClientCertPath)
+func newDexManager(cfg *DexConfig) (*dexmgr.DexManager, error) {
+	mgr, err := dexmgr.NewDexManager(cfg.Address, cfg.CAPath, cfg.ClientKeyPath, cfg.ClientCertPath, cfg.Issuer)
 	if err != nil {
 		setupLog.Error(err, "While getting the DexManager")
 	}
