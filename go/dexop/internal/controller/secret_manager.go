@@ -30,7 +30,6 @@ func (s SecretManager) readSecret(r *ClientReconciler, ctx context.Context, name
 
 func (s SecretManager) writeSecret(r *ClientReconciler, ctx context.Context, clientSpec *dexv1alpha1.Client, value string) (*v1.Secret, error) {
 	secret := &v1.Secret{
-		TypeMeta: metav1.TypeMeta{},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      clientSpec.Spec.SecretName,
 			Namespace: clientSpec.Spec.SecretNamespace,
