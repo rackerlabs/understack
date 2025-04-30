@@ -13,7 +13,7 @@ from oslo_config import cfg
 
 from neutron_understack import config
 from neutron_understack import utils
-from neutron_understack import vlan_group_name_convention
+from neutron_understack.ironic import IronicClient
 from neutron_understack.nautobot import Nautobot
 from neutron_understack.nautobot import VlanPayload
 from neutron_understack.trunk import UnderStackTrunkDriver
@@ -40,6 +40,7 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
         self.nb = Nautobot(conf.nb_url, conf.nb_token)
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
+        self.ironic_client = IronicClient()
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         self.subscribe()
 
@@ -228,16 +229,6 @@ class UnderstackDriver(MechanismDriver):
     def update_port_precommit(self, context):
         pass
 
-    def _fetch_subports_network_ids(self, trunk_details: dict | None) -> list:
-        if trunk_details is None:
-            return []
-
-        network_uuids = [
-            utils.fetch_subport_network_id(subport.get("port_id"))
-            for subport in trunk_details.get("sub_ports", [])
-        ]
-        return network_uuids
-
     def update_port_postcommit(self, context):
         """Tenant network port cleanup in the UnderCloud infrastructure.
 
@@ -248,20 +239,20 @@ class UnderstackDriver(MechanismDriver):
 
         Only in the update_port_postcommit do we have access to the original
         context, from which we can access the binding information.
-
-        # TODO: garbage collection of unused VLAN-type network segments.  We
-        # create these dynamic segments on the fly so they might get left behind
-        # as the ports disappear.   If a VLAN is left in a cabinet with nobody
-        # using it, it can be deleted.
         """
-        vlan_group_name = self._vlan_group_name(context)
-
         baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
         current_vif_unbound = context.vif_type == portbindings.VIF_TYPE_UNBOUND
         original_vif_other = context.original_vif_type == portbindings.VIF_TYPE_OTHER
         current_vif_other = context.vif_type == portbindings.VIF_TYPE_OTHER
 
-        if baremetal_vnic and current_vif_unbound and original_vif_other:
+        if not baremetal_vnic:
+            return
+
+        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+            context.current["mac_address"]
+        )
+
+        if current_vif_unbound and original_vif_other:
             self._tenant_network_port_cleanup(context)
             if vlan_group_name:
                 self.invoke_undersync(vlan_group_name)
@@ -305,7 +296,15 @@ class UnderstackDriver(MechanismDriver):
     def delete_port_postcommit(self, context):
         # Only clean up provisioning ports.  Everything else is left to get
         # cleaned up upon the next change in that cabinet.
-        vlan_group_name = self._vlan_group_name(context)
+
+        baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
+        if not baremetal_vnic:
+            return
+
+        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+            context.current["mac_address"]
+        )
+
         if vlan_group_name and is_provisioning_network(context.current["network_id"]):
             # Signals end of the provisioning / cleaning cycle, so we
             # put the port back to its normal tenant mode:
@@ -349,9 +348,19 @@ class UnderstackDriver(MechanismDriver):
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             context.current["binding:profile"], self.nb
         )
-        vlan_group_name = self._vlan_group_name(context)
-        if vlan_group_name is None:
-            raise Exception("bind_port_segment: no switch info in local_link_info")
+        mac_address = context.current["mac_address"]
+
+        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+            mac_address
+        )
+
+        if not vlan_group_name:
+            LOG.error(
+                "bind_port_segment: no physical_network found for baremetal "
+                "port with mac address: %(mac)s",
+                {"mac": mac_address},
+            )
+            return
 
         LOG.debug(
             "bind_port_segment: interface %s network %s vlan group %s",
@@ -395,15 +404,6 @@ class UnderstackDriver(MechanismDriver):
             vlan_group=vlan_group_name,
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
-
-    def _vlan_group_name(self, context: PortContext) -> str | None:
-        binding_profile = context.current.get("binding:profile", {})
-        local_link_info = binding_profile.get("local_link_information", [])
-        switch_names = [
-            link["switch_info"] for link in local_link_info if "switch_info" in link
-        ]
-        if switch_names:
-            return vlan_group_name_convention.for_switch(switch_names[0])
 
     def check_vlan_transparency(self, context):
         pass

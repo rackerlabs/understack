@@ -54,22 +54,3 @@ class TestParentPortIsBound:
         port_object.bindings[0].profile = {}
         result = utils.parent_port_is_bound(port_object)
         assert result is False
-
-
-class TestVlanGroupNameFromBindingProfile:
-    def test_when_switch_name_is_present(self, port_object):
-        binding_profile = port_object.bindings[0].profile
-        result = utils.vlan_group_name_from_binding_profile(binding_profile)
-        assert result == "a1-1-network"
-
-    def test_when_switch_name_is_not_present(self, port_object):
-        binding_profile = port_object.bindings[0].profile
-        binding_profile["local_link_information"][0].pop("switch_info")
-        result = utils.vlan_group_name_from_binding_profile(binding_profile)
-        assert result is None
-
-    def test_when_switch_name_is_non_standard(self, port_object):
-        binding_profile = port_object.bindings[0].profile
-        binding_profile["local_link_information"][0]["switch_info"] = "blah"
-        with pytest.raises(ValueError):
-            utils.vlan_group_name_from_binding_profile(binding_profile)

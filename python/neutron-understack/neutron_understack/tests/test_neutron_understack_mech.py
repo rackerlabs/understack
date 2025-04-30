@@ -14,6 +14,7 @@ class TestUpdatePortPostCommit:
         understack_driver.undersync.sync_devices.assert_called_once()
 
 
+@pytest.mark.usefixtures("ironic_baremetal_port_physical_network")
 class TestBindPort:
     def test_with_no_trunk(
         self,
@@ -42,7 +43,7 @@ class TestBindPort:
             interface_uuid="FAKE ID",
             native_vlan_id=1800,
             allowed_vlans_ids={1800},
-            vlan_group_name="a1-1-network",
+            vlan_group_name="physnet",
         )
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)

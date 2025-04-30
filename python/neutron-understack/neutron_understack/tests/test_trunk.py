@@ -52,6 +52,7 @@ class TestTrunkCreated:
         )
 
 
+@pytest.mark.usefixtures("ironic_baremetal_port_physical_network")
 @pytest.mark.usefixtures("utils_fetch_subport_network_id_patch")
 class Test_HandleTenantVlanIDAndSwitchportConfig:
     def test_when_ucvni_tenant_vlan_id_is_not_set_yet(
@@ -115,11 +116,11 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
 
         understack_trunk_driver.nb.add_port_vlan_associations.assert_called_once_with(
             interface_uuid=str(port_id),
-            vlan_group_name="a1-1-network",
+            vlan_group_name="physnet",
             allowed_vlans_ids={1800},
         )
         understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
-            vlan_group="a1-1-network",
+            vlan_group="physnet",
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
@@ -191,6 +192,7 @@ class TestTrunkDeleted:
         )
 
 
+@pytest.mark.usefixtures("ironic_baremetal_port_physical_network")
 @pytest.mark.usefixtures("utils_fetch_subport_network_id_patch")
 class Test_CleanParentPortSwitchportConfig:
     def test_when_parent_port_is_bound(
@@ -221,7 +223,7 @@ class Test_CleanParentPortSwitchportConfig:
             interface_uuid=str(port_id), network_ids_to_remove={network_id}
         )
         understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
-            vlan_group="a1-1-network",
+            vlan_group="physnet",
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
