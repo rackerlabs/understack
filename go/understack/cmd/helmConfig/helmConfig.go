@@ -68,7 +68,6 @@ func dex() error {
 	}
 
 	filePath := filepath.Join(
-		envutil.Getenv("UC_DEPLOY"),
 		envutil.Getenv("DEPLOY_NAME"),
 		"helm",
 		"dex.yaml",
@@ -86,7 +85,6 @@ func glance() error {
     size: 20Gi`
 
 	filePath := filepath.Join(
-		envutil.Getenv("UC_DEPLOY"),
 		envutil.Getenv("DEPLOY_NAME"),
 		"helm",
 		"glance.yaml",
@@ -119,7 +117,6 @@ func ironic() error {
             mountPath: /var/lib/openstack-helm`
 
 	filePath := filepath.Join(
-		envutil.Getenv("UC_DEPLOY"),
 		envutil.Getenv("DEPLOY_NAME"),
 		"helm",
 		"ironic.yaml",
@@ -216,7 +213,6 @@ func rook() error {
           memory: "50Mi"`
 
 	filePath := filepath.Join(
-		envutil.Getenv("UC_DEPLOY"),
 		envutil.Getenv("DEPLOY_NAME"),
 		"helm",
 		"rook-cluster.yaml",
