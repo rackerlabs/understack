@@ -1,0 +1,40 @@
+name: understack-cli-release
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+-understack-cli"
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  issues: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.1
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+          workdir: go/understack
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
