@@ -239,21 +239,20 @@ class UnderstackDriver(MechanismDriver):
 
         Only in the update_port_postcommit do we have access to the original
         context, from which we can access the binding information.
-
-        # TODO: garbage collection of unused VLAN-type network segments.  We
-        # create these dynamic segments on the fly so they might get left behind
-        # as the ports disappear.   If a VLAN is left in a cabinet with nobody
-        # using it, it can be deleted.
         """
         baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
         current_vif_unbound = context.vif_type == portbindings.VIF_TYPE_UNBOUND
         original_vif_other = context.original_vif_type == portbindings.VIF_TYPE_OTHER
         current_vif_other = context.vif_type == portbindings.VIF_TYPE_OTHER
+
+        if not baremetal_vnic:
+            return
+
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
             context.current["mac_address"]
         )
 
-        if baremetal_vnic and current_vif_unbound and original_vif_other:
+        if current_vif_unbound and original_vif_other:
             self._tenant_network_port_cleanup(context)
             if vlan_group_name:
                 self.invoke_undersync(vlan_group_name)
@@ -297,6 +296,11 @@ class UnderstackDriver(MechanismDriver):
     def delete_port_postcommit(self, context):
         # Only clean up provisioning ports.  Everything else is left to get
         # cleaned up upon the next change in that cabinet.
+
+        baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
+        if not baremetal_vnic:
+            return
+
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
             context.current["mac_address"]
         )
@@ -344,13 +348,19 @@ class UnderstackDriver(MechanismDriver):
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             context.current["binding:profile"], self.nb
         )
+        mac_address = context.current["mac_address"]
 
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            context.current["mac_address"]
+            mac_address
         )
 
-        if vlan_group_name is None:
-            raise Exception("bind_port_segment: no switch info in local_link_info")
+        if not vlan_group_name:
+            LOG.error(
+                "bind_port_segment: no physical_network found for baremetal "
+                "port with mac address: %(mac)s",
+                {"mac": mac_address},
+            )
+            return
 
         LOG.debug(
             "bind_port_segment: interface %s network %s vlan group %s",
