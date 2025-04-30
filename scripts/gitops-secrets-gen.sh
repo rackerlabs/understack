@@ -342,6 +342,25 @@ load_or_gen_os_secret "${VARNAME_DB_PASSWORD}" "${SECRET_DB_PASSWORD}" && \
 # export the variable for templating into the openstack secret / values.yaml
 export HORIZON_DB_PASSWORD
 
+echo "Checking skyline"
+# horizon credentials
+mkdir -p "${DEST_DIR}/skyline"
+# skyline user password for database
+VARNAME_DB_PASSWORD="SKYLINE_DB_PASSWORD"
+SECRET_DB_PASSWORD="skyline-db-password"
+load_or_gen_os_secret "${VARNAME_DB_PASSWORD}" "${SECRET_DB_PASSWORD}" && \
+    create_os_secret "DB_PASSWORD" "skyline" "skyline"
+# export the variable for templating into the openstack secret / values.yaml
+export SKYLINE_DB_PASSWORD
+
+VARNAME_KEYSTONE_PASSWORD="$(convert_to_var_name "skyline" "KEYSTONE_PASSWORD")"
+SECRET_KEYSTONE_PASSWORD="$(convert_to_secret_name "${VARNAME_KEYSTONE_PASSWORD}")"
+load_or_gen_os_secret "${VARNAME_KEYSTONE_PASSWORD}" "${SECRET_KEYSTONE_PASSWORD}" && \
+    create_os_secret "KEYSTONE_PASSWORD" "skyline" "skyline"
+
+export "${VARNAME_KEYSTONE_PASSWORD?}"
+
+
 # generate the secret-openstack.yaml file every time from our secrets data
 # this is a helm values.yaml but it contains secrets because of the lack
 # of secrets references in OpenStack Helm
