@@ -121,11 +121,15 @@ nav:
     - deploy-guide/welcome.md
     - deploy-guide/getting-started.md
     - Quick Start: deploy-guide/gitops-install.md
-    - deploy-guide/management-cluster.md
-    - deploy-guide/auth.md
-    - deploy-guide/extra-sites.md
-    - deploy-guide/add-remove-app.md
-    - deploy-guide/override-openstack-svc-config.md
+    - Preparing Our Deployment:
+      - deploy-guide/deploy-repo.md
+      - deploy-guide/auth.md
+    - Starting the Deployment:
+      - deploy-guide/management-cluster.md
+    - Further Actions:
+      - deploy-guide/extra-sites.md
+      - deploy-guide/add-remove-app.md
+      - deploy-guide/override-openstack-svc-config.md
   - 'Operator Guide':
     - operator-guide/index.md
     - 'OpenStack':
