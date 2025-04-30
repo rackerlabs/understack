@@ -231,19 +231,6 @@ for client in nautobot argo argocd keystone grafana; do
     fi
 done
 
-echo "Checking openstack"
-# OpenStack's mariadb secrets
-mkdir -p "${DEST_DIR}/openstack/"
-[ ! -f "${DEST_DIR}/openstack/secret-mariadb.yaml" ] && \
-kubectl --namespace openstack \
-    create secret generic mariadb \
-    --dry-run=client \
-    -o yaml \
-    --type Opaque \
-    --from-literal=root-password="$("${SCRIPTS_DIR}/pwgen.sh")" \
-    --from-literal=password="$("${SCRIPTS_DIR}/pwgen.sh")" \
-    | secret-seal-stdin "${DEST_DIR}/openstack/secret-mariadb.yaml"
-
 # create constant OpenStack memcache key to avoid cache invalidation on deploy
 MEMCACHE_SECRET_KEY=$(yq '.endpoints.oslo_cache.auth.memcache_secret_key' < "${DEST_DIR}/secret-openstack.yaml")
 if [[ $? -ne 0 || "${MEMCACHE_SECRET_KEY}" = "null" ]]; then

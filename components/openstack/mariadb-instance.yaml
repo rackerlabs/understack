@@ -10,7 +10,7 @@ spec:
   rootPasswordSecretKeyRef:
     name: mariadb
     key: root-password
-    generate: false
+    generate: true
 
   # renovate: datasource=docker
   image: docker-registry1.mariadb.com/library/mariadb:11.4.4
