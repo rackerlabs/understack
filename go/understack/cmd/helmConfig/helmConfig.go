@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	cmd.RootCmd.AddCommand(HelmConfig)
+	cmd.DeployCmd.AddCommand(HelmConfig)
 }
 
 var HelmConfig = &cobra.Command{

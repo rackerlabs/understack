@@ -20,7 +20,7 @@ import (
 )
 
 func init() {
-	cmd.RootCmd.AddCommand(Other)
+	cmd.DeployCmd.AddCommand(Other)
 }
 
 var openStackSecrets map[string]any

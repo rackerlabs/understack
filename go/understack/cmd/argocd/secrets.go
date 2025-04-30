@@ -41,7 +41,7 @@ var ArgoCMD = &cobra.Command{
 }
 
 func init() {
-	cmd.RootCmd.AddCommand(ArgoCMD)
+	cmd.DeployCmd.AddCommand(ArgoCMD)
 }
 
 // GenerateSecrets orchestrates the generation of all ArgoCD secrets

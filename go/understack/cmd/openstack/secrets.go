@@ -10,7 +10,7 @@ import (
 )
 
 func init() {
-	cmd.RootCmd.AddCommand(Openstack)
+	cmd.DeployCmd.AddCommand(Openstack)
 }
 
 var Openstack = &cobra.Command{

@@ -19,7 +19,7 @@ import (
 var clusterIssuerTemplate string
 
 func init() {
-	cmd.RootCmd.AddCommand(CertManager)
+	cmd.DeployCmd.AddCommand(CertManager)
 }
 
 var CertManager = &cobra.Command{

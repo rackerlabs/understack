@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	cmd.RootCmd.AddCommand(Dex)
+	cmd.DeployCmd.AddCommand(Dex)
 }
 
 var Dex = &cobra.Command{

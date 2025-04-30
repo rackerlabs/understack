@@ -20,7 +20,7 @@ import (
 )
 
 func init() {
-	cmd.RootCmd.AddCommand(Quickstart)
+	cmd.DeployCmd.AddCommand(Quickstart)
 }
 
 var Quickstart = &cobra.Command{

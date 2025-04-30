@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	cmd.RootCmd.AddCommand(Node)
+	cmd.DeployCmd.AddCommand(Node)
 }
 
 var Node = &cobra.Command{
