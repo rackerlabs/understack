@@ -121,7 +121,7 @@ nav:
     - deploy-guide/welcome.md
     - deploy-guide/getting-started.md
     - Quick Start: deploy-guide/gitops-install.md
-    - deploy-guide/argocd.md
+    - deploy-guide/management-cluster.md
     - deploy-guide/auth.md
     - deploy-guide/extra-sites.md
     - deploy-guide/add-remove-app.md

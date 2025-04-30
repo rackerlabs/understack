@@ -1,8 +1,8 @@
-# ArgoCD
+# Management Cluster
 
 The deployment of all the services into your Kubernetes cluster is handled
 by [ArgoCD][argocd]. The [System Division](./welcome.md#system-division)
-defines the location where [ArgoCD][argocd] runs as the __Management__ cluster.
+defines the location where [ArgoCD][argocd] runs as the __Management__ role.
 While it is possible to run ArgoCD from the same cluster that your services
 will run in, it is not advisable outside of a development setup. The
 approach that UnderStack uses to deploy it's services with ArgoCD is the

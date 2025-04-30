@@ -57,7 +57,7 @@ The layout of this repo will be something like:
 
 To get started, you'll need a Deploy Repository that you can commit to. This means you should have write access to this repository.
 
-For the deployment tool, [ArgoCD](./argocd.md), you'll need to set up read-only credentials. This allows ArgoCD to fetch the necessary data without making any changes to your repository. One way to achieve this is by using [GitHub Deploy Keys][gh-deploy-keys] or similar solutions.
+For the deployment tool, [ArgoCD][argocd], you'll need to set up read-only credentials. This allows ArgoCD to fetch the necessary data without making any changes to your repository. One way to achieve this is by using [GitHub Deploy Keys][gh-deploy-keys] or similar solutions.
 
 [GitHub Deploy Keys][gh-deploy-keys] will work.
 
