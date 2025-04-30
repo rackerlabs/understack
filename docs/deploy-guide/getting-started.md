@@ -21,6 +21,8 @@ be consumed by different tools. It is recommended that one Deploy Repository
 is used per Management tier, see [Introduction](./welcome.md) for information
 on what this is.
 
+### Layout
+
 The layout of this repo will be something like:
 
 ```shell
@@ -53,13 +55,23 @@ The layout of this repo will be something like:
 7. The definitions of the hardware flavors that this cluster, which later you will see maps to a site. Notice it is different than staging.
 8. The cluster labeled as `global-prod` will have resources consumed here.
 
-### Deploy repository permissions
+### Creation and Access
 
-To get started, you'll need a Deploy Repository that you can commit to. This means you should have write access to this repository.
+To effectively utilize [GitOps][gitops] we will need a Deploy Repository.
 
-For the deployment tool, [ArgoCD][argocd], you'll need to set up read-only credentials. This allows ArgoCD to fetch the necessary data without making any changes to your repository. One way to achieve this is by using [GitHub Deploy Keys][gh-deploy-keys] or similar solutions.
+```bash
+# create my-deploy locally
+git init my-deploy
+# or clone one down
+git clone https://url/to/my-deploy
+```
 
-[GitHub Deploy Keys][gh-deploy-keys] will work.
+This will need to be hosted somewhere that your ArgoCD instance in your
+Management Cluster will be able to access it. For ArgoCD, you will need
+to set up read-only credentials. This allows ArgoCD to fetch the
+necessary data being able to making any changes to your repository.
+One way to achieve this is by using [GitHub Deploy Keys][gh-deploy-keys]
+or check the [ArgoCD][argocd] documentation for other methods.
 
 ## UnderStack Repository
 
