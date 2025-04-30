@@ -1,5 +1,8 @@
 extends: default
 
+ignore:
+  - components/etcdbackup/templates/
+
 rules:
   comments:
     ignore: .github/workflows/

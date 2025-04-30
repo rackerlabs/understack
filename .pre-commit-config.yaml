@@ -12,7 +12,7 @@ repos:
       - id: check-yaml
         args:
           - --allow-multiple-documents
-        exclude: mkdocs.yml
+        exclude: "mkdocs.yml"
       - id: check-yaml
         name: check-yaml-mkdocs
         # --unsafe is a workaround for the use of !! in mkdocs.yml
