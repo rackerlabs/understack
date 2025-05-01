@@ -8,6 +8,7 @@ from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
 
+from neutron_understack.ml2_type_annotations import PortContext
 from neutron_understack.nautobot import Nautobot
 
 
@@ -112,7 +113,7 @@ def parent_port_is_bound(port: port_obj.Port) -> bool:
     return bool(
         port_binding
         and port_binding.vif_type == portbindings.VIF_TYPE_OTHER
-        and port_binding.vnic_type == "baremetal"
+        and port_binding.vnic_type == portbindings.VNIC_BAREMETAL
         and port_binding.profile
     )
 
@@ -127,3 +128,7 @@ def is_valid_vlan_network_segment(network_segment: dict):
         network_segment.get(segment_def.NETWORK_TYPE) == constants.TYPE_VLAN
         and network_segment.get(segment_def.PHYSICAL_NETWORK) is not None
     )
+
+
+def is_baremetal_port(context: PortContext) -> bool:
+    return context.current[portbindings.VNIC_TYPE] == portbindings.VNIC_BAREMETAL
