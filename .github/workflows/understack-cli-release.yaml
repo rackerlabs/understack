@@ -1,0 +1,48 @@
+name: Releases
+on:
+  push:
+    tags:
+      - "understack/v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  issues: write
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d632683dd7b4114ad314bca15554477dd762a938 # v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: actions/setup-go@0a12ed9d6a96ab950c8f026ed9f722fe0da7ef32 # v5.0.1
+        with:
+          go-version: stable
+          cache: true
+
+      - name: Install dependencies
+        run: sudo apt-get install -y zip tar make sed grep
+
+      - name: Build and Package
+        working-directory: go/understack
+        run: |
+          make build-all package-all checksums
+
+      - name: Upload release artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            go/understack/build/*.zip
+            go/understack/build/*.tar.gz
+            go/understack/build/checksums.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
