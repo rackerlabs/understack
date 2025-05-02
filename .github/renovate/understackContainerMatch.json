@@ -3,9 +3,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^.*\\.ya?ml$"],
+      "fileMatch": ["(^|/)images-openstack\\.ya?ml$"],
       "matchStrings": [
-        "ghcr\\.io/rackerlabs/understack/(?<depName>[\\w-]+):(?<currentValue>[\\w.-]+"
+        "ghcr\\.io/rackerlabs/understack/(?<depName>[\\w-]+):(?<currentValue>[\\w.-]+)"
       ],
       "datasourceTemplate": "docker",
       "packageNameTemplate": "ghcr.io/rackerlabs/understack/{{depName}}",
