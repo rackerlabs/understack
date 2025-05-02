@@ -215,6 +215,7 @@ class Nautobot:
     ) -> bool:
         """Set the tagged and untagged vlan(s) on an interface."""
         payload: dict = {
+            "mode": "tagged",
             "tagged_vlans": [
                 _vlan_payload(vlan_group_name, vlan_id) for vlan_id in allowed_vlans_ids
             ],
@@ -251,6 +252,7 @@ class Nautobot:
         tagged_vlans = current_tagged_vlans.union(allowed_vlans_ids)
 
         payload = {
+            "mode": "tagged",
             "tagged_vlans": [
                 _vlan_payload(vlan_group_name, vlan_id) for vlan_id in tagged_vlans
             ],
