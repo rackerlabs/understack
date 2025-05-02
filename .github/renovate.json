@@ -3,7 +3,8 @@
   "configMigration": true,
   "extends": [
     "github>rackerlabs/understack//.github/renovate/default",
-    "github>rackerlabs/understack//.github/renovate/nautobot"
+    "github>rackerlabs/understack//.github/renovate/nautobot",
+    "github>rackerlabs/understack//.github/renovate/understackContainerMatch"
   ],
   "packageRules": [
     {
