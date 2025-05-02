@@ -163,8 +163,12 @@ class PortContext:
     segments_to_bind: Any
 
     def set_binding(
-        self, new_segment: str, vif_type: str, _: dict, status: str
+        self, segment_id: str, vif_type: str, vif_details: dict, status: str
     ) -> None: ...
+
+    def allocate_dynamic_segment(self, segment: dict) -> dict: ...
+
+    def release_dynamic_segment(self, segment_id: str) -> dict: ...
 
 
 class BindingLevelsDict(TypedDict):

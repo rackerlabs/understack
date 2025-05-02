@@ -229,24 +229,14 @@ class UnderstackDriver(MechanismDriver):
     def update_port_precommit(self, context):
         pass
 
-    def update_port_postcommit(self, context):
-        """Tenant network port cleanup in the UnderCloud infrastructure.
+    def update_port_postcommit(self, context: PortContext) -> None:
+        if utils.is_baremetal_port(context):
+            self._update_port_baremetal(context)
 
-        This is triggered in the update_port_postcommit call as in the
-        delete_port_postcommit call there is no binding profile information
-        anymore, hence there is no way for us to identify which baremetal port
-        needs cleanup.
-
-        Only in the update_port_postcommit do we have access to the original
-        context, from which we can access the binding information.
-        """
-        baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
+    def _update_port_baremetal(self, context: PortContext) -> None:
         current_vif_unbound = context.vif_type == portbindings.VIF_TYPE_UNBOUND
         original_vif_other = context.original_vif_type == portbindings.VIF_TYPE_OTHER
         current_vif_other = context.vif_type == portbindings.VIF_TYPE_OTHER
-
-        if not baremetal_vnic:
-            return
 
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
             context.current["mac_address"]
@@ -260,6 +250,16 @@ class UnderstackDriver(MechanismDriver):
             self.invoke_undersync(vlan_group_name)
 
     def _tenant_network_port_cleanup(self, context: PortContext):
+        """Tenant network port cleanup in the UnderCloud infrastructure.
+
+        This is triggered in the update_port_postcommit call as in the
+        delete_port_postcommit call there is no binding profile information
+        anymore, hence there is no way for us to identify which baremetal port
+        needs cleanup.
+
+        Only in the update_port_postcommit do we have access to the original
+        context, from which we can access the binding information.
+        """
         trunk_details = context.current.get("trunk_details", {})
         segment_id = context.original_top_bound_segment["id"]
         original_binding = context.original["binding:profile"]
@@ -293,13 +293,13 @@ class UnderstackDriver(MechanismDriver):
     def delete_port_precommit(self, context):
         pass
 
-    def delete_port_postcommit(self, context):
-        # Only clean up provisioning ports.  Everything else is left to get
-        # cleaned up upon the next change in that cabinet.
+    def delete_port_postcommit(self, context: PortContext) -> None:
+        if utils.is_baremetal_port(context):
+            self._delete_port_baremetal(context)
 
-        baremetal_vnic = context.current["binding:vnic_type"] == "baremetal"
-        if not baremetal_vnic:
-            return
+    def _delete_port_baremetal(self, context: PortContext) -> None:
+        # Only clean up provisioning ports. Ports with tenant networks are cleaned
+        # up in _tenant_network_port_cleanup
 
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
             context.current["mac_address"]
