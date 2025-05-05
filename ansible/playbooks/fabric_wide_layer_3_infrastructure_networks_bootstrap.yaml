@@ -12,12 +12,24 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-
 - name: Fabric wide layer 3 infrastructure networks Bootstrap
-  hosts: localhost
+  hosts: nautobot
   connection: local
   vars_files:
     - ./vars/{{ env }}/vars.yaml
+
+  pre_tasks:
+    - name: Ensure nautobot is up and responding
+      ansible.builtin.uri:
+        url: "{{ nautobot_url }}/health/"
+        method: GET
+        validate_certs: false
+      register: nautobot_up_check
+      until: nautobot_up_check.status == 200
+      retries: 24  # Retries for 24 * 5 seconds = 120 seconds = 2 minutes
+      delay: 5  # Every 5 seconds
+      check_mode: false
+
 
   roles:
     - role: provisioning_network_setup

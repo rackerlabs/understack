@@ -24,6 +24,8 @@ RUN --mount=type=cache,target=/root/.cache/pip ansible-galaxy collection install
 COPY ansible/playbooks/ /runner/project/
 COPY ansible/roles/ /runner/project/roles/
 COPY ansible/vars/ /runner/project/vars/
+COPY ansible/inventory/ /runner/inventory/
+COPY ansible/env/ /runner/env/
 
 ENTRYPOINT ["dumb-init"]
 CMD ["ansible-runner"]

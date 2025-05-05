@@ -1,0 +1,19 @@
+---
+all:
+  vars:
+    env: dev
+    has_servers: false
+  children:
+    nautobot:
+      hosts:
+        nautobot:
+          # When using connection: local, Ansible does discovery instead of using
+          # the Python that ansible was executed with. So set it to what it was
+          # executed with
+          ansible_python_interpreter: "{{ ansible_playbook_python }}"
+          nautobot_url: http://nautobot:8080
+          # default from dev/default-creds.env
+          nautobot_token: 0123456789abcdef0123456789abcdef01234567
+          github_pat_device_types_repo: "{{ lookup('ansible.builtin.env', 'GITHUB_PAT_DEVICE_TYPES_REPO', default=Undefined) }}"
+          vars:
+            mock: false

@@ -1,4 +1,7 @@
 ---
+
+nautobot_api_version: 2.0
+
 fabric_wide_layer_3_infrastructure_networks:
   - name: provisioning_network_config
     namespace: Rackspace
