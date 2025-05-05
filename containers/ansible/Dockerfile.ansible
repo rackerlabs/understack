@@ -17,7 +17,6 @@ RUN --mount=type=cache,target=/root/.cache/pip pip install -r /requirements.txt 
 
 RUN useradd -m -d /runner -s /bin/bash runner
 WORKDIR /runner
-USER runner
 
 RUN --mount=type=cache,target=/root/.cache/pip ansible-galaxy collection install -r /requirements.yml
 
@@ -26,6 +25,9 @@ COPY ansible/roles/ /runner/project/roles/
 COPY ansible/vars/ /runner/project/vars/
 COPY ansible/inventory/ /runner/inventory/
 COPY ansible/env/ /runner/env/
+
+RUN chown -R runner:runner /runner
+USER runner
 
 ENTRYPOINT ["dumb-init"]
 CMD ["ansible-runner"]
