@@ -1,0 +1,18 @@
+---
+
+computed_fields_data:
+  - label: Device URN
+    key: urn
+    description: A string representing the URN for a device
+    weight: 100
+    content_type: dcim.device
+    advanced_ui: false
+    template: !unsafe >
+      {%- if obj.serial and obj.role and obj.location and obj.device_type and obj.device_type.manufacturer %}
+        {%- set role = obj.role.name | lower | replace(" ", "-") -%}
+        {%- set loc = obj.location.name | lower -%}
+        {%- set manufacturer = obj.device_type.manufacturer.name | lower -%}
+        {%- set serial = obj.serial | lower -%}
+        {%- set partition = "UC_PARTITION" | settings_or_config -%}
+      urn:rax:undercloud:{{ partition }}:nautobot:{{ role }}:{{ loc }}:{{ manufacturer }}-{{ serial }}
+      {%- endif %}

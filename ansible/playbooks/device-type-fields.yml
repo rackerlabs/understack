@@ -1,0 +1,18 @@
+---
+- name: Provision Device Types
+  connection: local
+  hosts: nautobot
+  gather_facts: false
+
+  # The goal is that this playbook synchronizes the device types
+  # repo with nautobot:
+  # https://github.com/RSS-Engineering/undercloud-nautobot-device-types
+
+  pre_tasks:
+    - name: Check for github_pat_device_types_repo
+      ansible.builtin.fail:
+        msg: Missing environment variable GITHUB_PAT_DEVICE_TYPES_REPO
+      when: github_pat_device_types_repo is undefined
+
+  roles:
+    - role: device_types

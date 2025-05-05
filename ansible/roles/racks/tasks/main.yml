@@ -1,0 +1,14 @@
+---
+
+- name: Create Instance Racks
+  networktocode.nautobot.rack:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    facility_id: "{{ item.facility }}"
+    rack_group: "{{ item.rack_group }}"
+    location: "{{ item.location }}"
+    u_height: " {{ item.u_height }}"
+    status: Active
+    state: present
+  loop: "{{ instance_racks }}"

@@ -1,0 +1,5 @@
+---
+
+- name: Set up UCVNI Groups
+  ansible.builtin.include_tasks: ucvni_groups.yml
+  loop: "{{ instance_ucvni_groups }}"

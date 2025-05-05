@@ -1,0 +1,72 @@
+---
+- name: Switch LAG Interfaces
+  loop: "{{ lag_interfaces }}"
+  networktocode.nautobot.device_interface:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device: "{{ item.switch_name }}"
+    name: "{{ item.name }}"
+    type: lag
+    mgmt_only: false
+    status: Active
+    state: present
+
+
+- name: Cabled Switch LAG members
+  loop: "{{ instance_cables }}"
+  when: "'lag' in item"
+  networktocode.nautobot.device_interface:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device: "{{ item.switch_name }}"
+    name: "{{ item.switch_port }}"
+    lag:
+      name: "{{ item.lag }}"
+    type: 25gbase-x-sfp28
+    mgmt_only: false
+    status: Active
+    state: present
+
+
+- name: HP Servers
+  loop: "{{ instance_servers }}"
+  networktocode.nautobot.device:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    rack: "{{ item.rack | default(omit) }}"
+    device_type: "{{ item.device_type }}"
+    role: server
+    status: Active
+    state: present
+  register: created_servers
+
+
+- name: Cabled HP Server Interfaces
+  loop: "{{ instance_cables }}"
+  networktocode.nautobot.device_interface:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device: "{{ item.server_name }}"
+    name: "{{ item.server_port }}"
+    type: 25gbase-x-sfp28
+    mgmt_only: false
+    status: Active
+    state: present
+
+
+- name: HP Server Cables
+  loop: "{{ instance_cables }}"
+  networktocode.nautobot.cable:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    state: present
+    status: Connected
+    termination_a_type: dcim.interface
+    termination_a:
+      device: "{{ item.server_name }}"
+      name: "{{ item.server_port }}"
+    termination_b_type: dcim.interface
+    termination_b:
+      device: "{{ item.switch_name }}"
+      name: "{{ item.switch_port }}"

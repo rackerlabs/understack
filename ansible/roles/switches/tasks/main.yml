@@ -1,0 +1,51 @@
+---
+
+- name: Create Switches
+  networktocode.nautobot.device:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+
+    name: "{{ item.name }}"
+    role: "{{ item.role }}"
+    status: "{{ item.status }}"
+    rack: "{{ item.rack | default(omit) }}"
+    location: "{{ item.location }}"
+    position: "{{ item.position | default(omit) }}"
+    face: "{{ item.face | default(omit) }}"
+    serial: "{{ item.serial | default(omit) }}"
+    platform: "{{ item.platform }}"
+    device_type: "{{ item.device_type }}"
+    custom_fields:
+      chassis_mac_address: "{{ item.chassis_mac_address | default(omit) }}"
+    primary_ip4: "{{ item.primary_ip4 | default(omit) }}"
+    state: present
+
+  loop: "{{ instance_switches }}"
+  register: created_switches
+
+- name: Set vlan-groups_for_switches
+  ansible.builtin.set_fact:
+    vlangroups_for_switch: "{{ vlan_groups_for_switches | default({}) | combine({item.name: item.vlan_group_to_devices | default('')}) }}"
+  loop: "{{ instance_switches }}"
+
+
+- name: Associate Switches with their vlan groups
+  ansible.builtin.uri:
+    url: "{{ item.device.url }}"
+    method: PATCH
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+    status_code: 200, 400
+    body_format: json
+    return_content: true
+    body:
+      relationships:
+        vlan_group_to_devices:
+          source:
+            objects:
+              - name: "{{ vlangroups_for_switch[item.device.name] }}"
+
+  register: patch_result
+  changed_when: patch_result.status == 200
+  loop: "{{ created_switches.results }}"
+  when: item.device.name in vlangroups_for_switch

@@ -1,0 +1,104 @@
+---
+statuses_defaults:
+  - name: Active
+    description: Unit is active
+    color: 4caf50
+    content_types:
+      - circuits.circuit
+      - dcim.device
+      - dcim.powerfeed
+      - dcim.rack
+      - ipam.ipaddress
+      - ipam.prefix
+      - ipam.vlan
+      - virtualization.virtualmachine
+      - virtualization.vminterface
+      - dcim.interface
+      - dcim.location
+      - dcim.deviceredundancygroup
+      - dcim.interfaceredundancygroup
+      - extras.contactassociation
+      - dcim.softwareimagefile
+      - dcim.softwareversion
+      - dcim.controller
+      - vni_custom_model.ucvni
+
+  - name: Provisioning
+    description: A device that is actively being provisioned
+    color: 9e9e9e
+    content_types:
+      - circuits.circuit
+      - dcim.device
+
+  - name: Inventory
+    description: A device that is idle and pending deployment to some customer solution
+    color: 9e9e9e
+    content_types:
+      - dcim.device
+      - dcim.controller
+
+  - name: Planned
+    description: A device that is being populated into Nautobot but not yet active in Ironic (new cabinet, new hardware, etc)
+    content_types:
+      - circuits.circuit
+      - dcim.cable
+      - dcim.device
+      - dcim.powerfeed
+      - dcim.rack
+      - virtualization.virtualmachine
+      - virtualization.vminterface
+      - dcim.interface
+      - dcim.location
+      - dcim.deviceredundancygroup
+      - dcim.interfaceredundancygroup
+      - dcim.controller
+
+  - name: ActivelyManaged
+    description: Device is online and should be managed by Undersync
+    content_types:
+      - dcim.device
+
+  - name: Allocated / In-Use
+    description: IP Block is in use
+    content_types:
+      - ipam.prefix
+    color: ff5722
+
+  - name: Provisioning-Interface
+    description: State for interface to be in provisioning network
+    content_types:
+      - dcim.interface
+    color: ff5722
+
+  - name: Quarantine
+    description: Device is quarantined
+    content_types:
+      - dcim.device
+
+  # https://rackspace.atlassian.net/browse/PUC-730
+  - name: Available
+    description: Unit is available
+    color: 4caf50
+    content_types:
+      - dcim.device
+      - dcim.rack
+
+  # https://rackspace.atlassian.net/browse/PUC-730
+  - name: Staged
+    description: Unit has been staged
+    color: 2196f3
+    content_types:
+      - dcim.device
+      - virtualization.virtualmachine
+      - dcim.controller
+      - dcim.module
+
+  # https://rackspace.atlassian.net/browse/PUC-730
+  - name: Decom
+    description: Unit has been staged
+    color: 2196f3
+    content_types:
+      - dcim.device
+      - virtualization.virtualmachine
+      - dcim.controller
+      - dcim.module

@@ -1,0 +1,28 @@
+---
+
+- name: Check if UCVNI group exists
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/plugins/undercloud-vni/ucvni-groups/?name={{ item.name }}"
+    method: GET
+    body_format: json
+    headers:
+      Accept: "application/json; version={{ nautobot_api_version }}"
+      Authorization: "Token {{ nautobot_token }}"
+  register: _group
+  check_mode: false
+
+- name: Create/update UCVNI group
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/plugins/undercloud-vni/ucvni-groups/{{ url_append }}"
+    method: "{{ method }}"
+    headers:
+      Accept: "application/json; version={{ nautobot_api_version }}"
+      Authorization: "Token {{ nautobot_token }}"
+    body_format: json
+    body: "{{ item }}"
+    status_code: "{{ status_code }}"
+  register: _group_create
+  vars:
+    url_append: "{{ _group.json.results[0].id | string + '/' if _group.json.count == 1 else '' }}"
+    method: "{{ 'PATCH' if _group.json.count == 1 else 'POST' }}"
+    status_code: "{{ 200 if _group.json.count == 1 else 201 }}"

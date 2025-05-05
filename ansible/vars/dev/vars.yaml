@@ -1,6 +1,562 @@
 ---
+# Dev instance variables
+# Eventually this can be split off into distinct dev instances, if so desired
 
-nautobot_api_version: 2.0
+instance_locations:
+  - name: IAD
+    description: IAD3 Metro
+    parent_location: Rackspace
+    location_type: Region
+    status: Active
+  - name: IAD3
+    description: IAD3 Data Center
+    parent_location: IAD
+    location_type: Site
+    status: Active
+
+instance_rack_groups:
+  - name: IAD3 DEV ENV
+    location: IAD3
+    description: Dev environment fabric
+
+instance_namespaces:
+  - name: Rackspace
+    description: Rackspace assets
+    location: Rackspace
+  - name: Undercloud IAD Dev Infrastructure
+    description: IAD3 Dev Environment
+    location: IAD3
+  - name: IAD UC Dev Test Project 1
+    description: IAD Dev Environment for BM Servers
+    location: IAD3
+  - name: IAD UC Dev Test Project 2
+    description: IAD Dev Environment for BM Servers
+    location: IAD3
+
+instance_racks:
+  - name: F20-1
+    facility: F20-1
+    rack_group: IAD3 DEV ENV
+    location: IAD3
+    u_height: 58
+  - name: F20-2
+    facility: F20-2
+    rack_group: IAD3 DEV ENV
+    location: IAD3
+    u_height: 58
+  - name: F20-3
+    facility: F20-3
+    rack_group: IAD3 DEV ENV
+    location: IAD3
+    u_height: 58
+
+instance_vlangroups:
+  - name: f20-1-network
+    location: IAD3
+    ucvni_group_name: spine402-1.iad3
+  - name: f20-2-network
+    location: IAD3
+    ucvni_group_name: spine402-1.iad3
+  - name: f20-3-network
+    location: IAD3
+    ucvni_group_name: spine402-1.iad3
+
+instance_prefixes:
+  - prefix: 10.46.96.128/26
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 192.168.100.0/23
+    type: network
+    status_name: Active
+    namespace_name: IAD UC Dev Test Project 2
+  - prefix: 10.4.0.0/16
+    type: container
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.4.41.0/26
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.4.50.64/26
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.4.204.0/29
+    type: network
+    description: VLAN4011 Provisioning Resources
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.5.0.0/16
+    type: container
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.17.192.0/21
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.19.192.0/25
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.46.0.0/16
+    type: container
+    status_name: Active
+    parent_namespace_name: NoObject
+    namespace_name: Rackspace
+  - prefix: 10.46.0.0/17
+    type: container
+    status_name: Active
+    parent_namespace_name: Rackspace
+    namespace_name: Rackspace
+  - prefix: 10.46.32.0/19
+    type: network
+    status_name: Active
+    parent_namespace_name: Rackspace
+    namespace_name: Rackspace
+  - prefix: 10.46.40.0/21
+    type: network
+    description: IAD mgmt
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.46.41.128/27
+    type: network
+    description: Spine402-1 mgmt
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.46.96.128/26
+    type: network
+    description: Undercloud Dev (IAD3) (5836965) (aggr404a/b-48.iad3_vlan900)
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 10.46.100.80/28
+    type: network
+    description: Front end IP block for Dev Infra
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 69.20.0.0/17
+    type: container
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 69.20.119.240/28
+    type: network
+    description: Net Device Block
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.0.0/16
+    type: container
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.224.0/19
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.240.0/20
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.240.0/21
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.240.0/22
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.240.0/23
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.241.0/24
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.241.128/25
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.241.192/26
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+  - prefix: 146.20.241.192/28
+    type: pool
+    status_name: Allocated / In-Use
+    namespace_name: Rackspace
+  - prefix: 146.20.241.208/28
+    type: pool
+    description:
+    status_name: Reserved
+    namespace_name: Rackspace
+  - prefix: 172.16.0.0/23
+    type: network
+    namespace_name: IAD UC Dev Test Project 1
+    status_name: Allocated / In-Use
+  - prefix: 192.168.0.0/23
+    type: network
+    status_name: Active
+    namespace_name: Undercloud IAD Dev Infrastructure
+
+instance_ip_addresses:
+  - address: 10.46.41.139
+    namespace: Rackspace
+    status: Active
+    device: f20-1-1.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.140
+    namespace: Rackspace
+    status: Active
+    device: f20-1-2.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.141
+    namespace: Rackspace
+    status: Active
+    device: f20-2-1.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.142
+    namespace: Rackspace
+    status: Active
+    device: f20-2-2.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.143
+    namespace: Rackspace
+    status: Active
+    device: f20-3-1.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.144
+    namespace: Rackspace
+    status: Active
+    device: f20-3-2.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.137
+    namespace: Rackspace
+    status: Active
+    device: spine402a-1.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.138
+    namespace: Rackspace
+    status: Active
+    device: spine402b-1.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.135
+    namespace: Rackspace
+    status: Active
+    device: edge402a-1.iad3.rackspace.net
+    interface: mgmt0
+  - address: 10.46.41.136
+    namespace: Rackspace
+    status: Active
+    device: edge402b-1.iad3.rackspace.net
+    interface: mgmt0
+
+instance_switches:
+  - name: f20-1-1.iad3.rackspace.net
+    rack: F20-1
+    position: 53
+    face: Front
+    location: IAD3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    serial: FLM27240BEC
+    role: Tenant leaf
+    vlan_group_to_devices: f20-1-network
+    chassis_mac_address: C4:7E:E0:E3:EC:2B
+    status: Active
+  - name: f20-1-2.iad3.rackspace.net
+    rack: F20-1
+    position: 51
+    face: Front
+    location: IAD3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    serial: FLM27240BBU
+    role: Tenant leaf
+    vlan_group_to_devices: f20-1-network
+    chassis_mac_address: C4:7E:E0:E4:2E:2F
+    status: Active
+  - name: f20-2-1.iad3.rackspace.net
+    rack: F20-2
+    position: 53
+    face: Front
+    location: IAD3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    serial: FLM27240CQ3
+    role: Tenant leaf
+    vlan_group_to_devices: f20-2-network
+    chassis_mac_address: C4:7E:E0:E4:10:7F
+    status: ActivelyManaged
+  - name: f20-2-2.iad3.rackspace.net
+    rack: F20-2
+    position: 51
+    face: Front
+    location: IAD3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    serial: FLM27240BE2
+    role: Tenant leaf
+    vlan_group_to_devices: f20-2-network
+    chassis_mac_address: C4:7E:E0:E4:32:DF
+    status: ActivelyManaged
+  - name: f20-3-1.iad3.rackspace.net
+    rack: F20-3
+    position: 53
+    face: Front
+    location: IAD3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    serial: FLM27240B8M
+    role: Tenant leaf
+    vlan_group_to_devices: F20-3[1-2]
+    chassis_mac_address: C4:7E:E0:E4:55:3F
+    status: ActivelyManaged
+  - name: f20-3-2.iad3.rackspace.net
+    rack: F20-3
+    position: 51
+    face: Front
+    location: IAD3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    serial: FLM27240BD2
+    role: Tenant leaf
+    vlan_group_to_devices: F20-3[1-2]
+    chassis_mac_address: C4:7E:E0:E4:03:37
+    status: ActivelyManaged
+  - name: edge402a-1.iad3.rackspace.net
+    location: IAD3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    serial: FLM27240EKY
+    role: Edge leaf
+    status: Active
+  - name: edge402b-1.iad3.rackspace.net
+    location: IAD3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    serial: FLM27240BC1
+    role: Edge leaf
+    status: Active
+  - name: spine402a-1.iad3.rackspace.net
+    location: IAD3
+    device_type: Nexus 9336C-FX2
+    platform: Cisco NX-OS
+    serial: FLM280404WF
+    role: Spine
+    status: Active
+  - name: spine402b-1.iad3.rackspace.net
+    location: IAD3
+    device_type: Nexus 9336C-FX2
+    platform: Cisco NX-OS
+    serial: FLM28040533
+    role: Spine
+    status: Active
+  - name: f20-1-1d.iad3.rackspace.net
+    rack: F20-1
+    position: 56
+    face: Front
+    location: IAD3
+    device_type: Catalyst 2960X-48TD-L
+    platform: Cisco IOS
+    serial: FJC254111TD
+    role: BMC Switch
+    chassis_mac_address: C4:4D:84:48:7A:00
+    status: Active
+  - name: f20-2-1d.iad3.rackspace.net
+    rack: F20-2
+    position: 56
+    face: Front
+    location: IAD3
+    device_type: Catalyst 2960X-48TD-L
+    platform: Cisco IOS
+    serial: FJC254111HZ
+    role: BMC Switch
+    chassis_mac_address: C4:4D:84:48:61:80
+    status: Active
+  - name: f20-3-1d.iad3.rackspace.net
+    rack: F20-3
+    position: 56
+    face: Front
+    location: IAD3
+    device_type: Catalyst 2960X-48TD-L
+    platform: Cisco IOS
+    serial: FCW2308B56D
+    role: BMC Switch
+    chassis_mac_address: C4:B3:6A:C8:33:80
+    status: Active
+
+instance_ucvni_groups:
+  - name: spine402-1.iad3
+    description: spine description, created by ansible ucvni_groups role
+    range: 1-16777214
+
+
+# HP servers are created here because they are not supported
+# by the enroll process
+instance_servers:
+  - name: 1327172-node1.dev.undercloud.rackspace.net
+    manufacturer: HPE
+    rack: F20-1
+    device_type: ProLiant DL380 Gen9
+  - name: 1327174-node2.dev.undercloud.rackspace.net
+    manufacturer: HPE
+    rack: F20-1
+    device_type: ProLiant DL380 Gen9
+  - name: 1327175-node3.dev.undercloud.rackspace.net
+    manufacturer: HPE
+    rack: F20-1
+    device_type: ProLiant DL380 Gen9
+  - name: 1327176-hp4.undercloud.iad3
+    manufacturer: HPE
+    rack: F20-1
+    device_type: ProLiant DL380 Gen9
+  - name: 1327177-hp5.undercloud.iad3
+    manufacturer: HPE
+    rack: F20-1
+    device_type: ProLiant DL380 Gen9
+  - name: 1327178-hp6.undercloud.iad3
+    manufacturer: HPE
+    rack: F20-1
+    device_type: ProLiant DL380 Gen9
+
+# cables to HP servers are created here because HP servers
+# are not supported by the enroll process
+instance_cables:
+  - server_name: 1327172-node1.dev.undercloud.rackspace.net
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-1
+    switch_port: Ethernet1/1
+    lag: port-channel101
+  - server_name: 1327172-node1.dev.undercloud.rackspace.net
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-2
+    switch_port: Ethernet1/2
+    lag: port-channel102
+  - server_name: 1327174-node2.dev.undercloud.rackspace.net
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-1
+    switch_port: Ethernet1/3
+    lag: port-channel103
+  - server_name: 1327174-node2.dev.undercloud.rackspace.net
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-2
+    switch_port: Ethernet1/4
+    lag: port-channel104
+  - server_name: 1327175-node3.dev.undercloud.rackspace.net
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-1
+    switch_port: Ethernet1/5
+    lag: port-channel105
+  - server_name: 1327175-node3.dev.undercloud.rackspace.net
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-2
+    switch_port: Ethernet1/6
+    lag: port-channel106
+  - server_name: 1327176-hp4.undercloud.iad3
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-1
+    switch_port: Ethernet1/7
+  - server_name: 1327176-hp4.undercloud.iad3
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-2
+    switch_port: Ethernet1/8
+  - server_name: 1327177-hp5.undercloud.iad3
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-1
+    switch_port: Ethernet1/9
+  - server_name: 1327177-hp5.undercloud.iad3
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-2
+    switch_port: Ethernet1/10
+  - server_name: 1327178-hp6.undercloud.iad3
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-1
+    switch_port: Ethernet1/11
+  - server_name: 1327178-hp6.undercloud.iad3
+    switch_name: f20-1-1.iad3.rackspace.net
+    server_port: NIC1-2
+    switch_port: Ethernet1/12
+
+  - server_name: 1327172-node1.dev.undercloud.rackspace.net
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-1
+    switch_port: Ethernet1/1
+    lag: port-channel101
+  - server_name: 1327172-node1.dev.undercloud.rackspace.net
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-2
+    switch_port: Ethernet1/2
+    lag: port-channel102
+  - server_name: 1327174-node2.dev.undercloud.rackspace.net
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-1
+    switch_port: Ethernet1/3
+    lag: port-channel103
+  - server_name: 1327174-node2.dev.undercloud.rackspace.net
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-2
+    switch_port: Ethernet1/4
+    lag: port-channel104
+  - server_name: 1327175-node3.dev.undercloud.rackspace.net
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-1
+    switch_port: Ethernet1/5
+    lag: port-channel105
+  - server_name: 1327175-node3.dev.undercloud.rackspace.net
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-2
+    switch_port: Ethernet1/6
+    lag: port-channel106
+  - server_name: 1327176-hp4.undercloud.iad3
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-1
+    switch_port: Ethernet1/7
+  - server_name: 1327176-hp4.undercloud.iad3
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-2
+    switch_port: Ethernet1/8
+  - server_name: 1327177-hp5.undercloud.iad3
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-1
+    switch_port: Ethernet1/9
+  - server_name: 1327177-hp5.undercloud.iad3
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-2
+    switch_port: Ethernet1/10
+  - server_name: 1327178-hp6.undercloud.iad3
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-1
+    switch_port: Ethernet1/11
+  - server_name: 1327178-hp6.undercloud.iad3
+    switch_name: f20-1-2.iad3.rackspace.net
+    server_port: NIC2-2
+    switch_port: Ethernet1/12
+
+lag_interfaces:
+  - name: port-channel101
+    switch_name: f20-1-1.iad3.rackspace.net
+  - name: port-channel102
+    switch_name: f20-1-1.iad3.rackspace.net
+  - name: port-channel103
+    switch_name: f20-1-1.iad3.rackspace.net
+  - name: port-channel104
+    switch_name: f20-1-1.iad3.rackspace.net
+  - name: port-channel105
+    switch_name: f20-1-1.iad3.rackspace.net
+  - name: port-channel106
+    switch_name: f20-1-1.iad3.rackspace.net
+
+  - name: port-channel101
+    switch_name: f20-1-2.iad3.rackspace.net
+  - name: port-channel102
+    switch_name: f20-1-2.iad3.rackspace.net
+  - name: port-channel103
+    switch_name: f20-1-2.iad3.rackspace.net
+  - name: port-channel104
+    switch_name: f20-1-2.iad3.rackspace.net
+  - name: port-channel105
+    switch_name: f20-1-2.iad3.rackspace.net
+  - name: port-channel106
+    switch_name: f20-1-2.iad3.rackspace.net
 
 fabric_wide_layer_3_infrastructure_networks:
   - name: provisioning_network_config

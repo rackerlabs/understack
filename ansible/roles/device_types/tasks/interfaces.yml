@@ -1,0 +1,11 @@
+---
+
+- name: Create device type interface templates
+  networktocode.nautobot.device_interface_template:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device_type: "{{ device_type_item.model }}"
+    name: "{{ interface_item.name }}"
+    type: "{{ interface_item.type }}"
+    mgmt_only: "{{ interface_item.mgmt_only | default('false') }}"
+    state: present

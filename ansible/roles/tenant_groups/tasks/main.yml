@@ -1,0 +1,8 @@
+---
+
+- name: Create default tenant_groups of "Rackspace"
+  networktocode.nautobot.tenant_group:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "Rackspace"
+    state: present

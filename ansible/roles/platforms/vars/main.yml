@@ -1,0 +1,21 @@
+---
+
+platforms_defaults:
+  - man: Arista
+    name: "Arista EOS"
+    driver: eos
+  - man: Cisco
+    name: "Cisco IOS"
+    driver: ios
+  - man: Dell
+    name: "Dell iDRAC9"
+    driver: idrac9
+  - man: HPE
+    name: "HPE iLO5"
+    driver: ilo5
+
+platforms_with_drivers:
+  - man: Cisco
+    name: "Cisco NX-OS"
+    driver: nxos
+    network: cisco_nxos

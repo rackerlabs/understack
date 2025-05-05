@@ -1,0 +1,28 @@
+---
+
+- name: Create IPs for Net Devices
+  networktocode.nautobot.ip_address:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    address: "{{ item.address }}"
+    namespace: "{{ item.namespace }}"
+    status: "{{ item.status }}"
+  register: address_info
+
+- name: Assigning those IPs interfaces
+  networktocode.nautobot.ip_address_to_interface:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    ip_address: "{{ address_info.ip_address.id }}"
+    interface:
+      name: "{{ item.interface }}"
+      device: "{{ item.device }}"
+
+- name: Set the IP as Primary
+  networktocode.nautobot.device:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+
+    name: "{{ item.device }}"
+    primary_ip4: "{{ item.address }}"
+    status: "Active"

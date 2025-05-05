@@ -1,0 +1,27 @@
+---
+
+relationships_defaults:
+  - name: "Namespace to Tenant"
+    source_type: "tenancy.tenant"
+    source_label: "Namespace Name"
+    source_hidden: false
+    type: "one-to-many"
+    destination_type: "ipam.namespace"
+    destination_label: "Tenant Name"
+    destination_hidden: true
+  - name: "Prefix Gateway"
+    source_type: "ipam.ipaddress"
+    source_label: "Prefix Gateway"
+    type: "one-to-one"
+    destination_type: "ipam.prefix"
+    destination_label: "Is the Gateway for the Prefix:"
+    source_hidden: false
+    destination_hidden: false
+  - name: "Vlan Group to Devices"
+    source_type: "ipam.vlangroup"
+    source_label: "Device List"
+    type: "one-to-many"
+    destination_type: "dcim.device"
+    destination_label: "VLAN Group"
+    source_hidden: false
+    destination_hidden: false

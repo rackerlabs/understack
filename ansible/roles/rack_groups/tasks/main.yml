@@ -1,0 +1,10 @@
+---
+
+- name: Building Rack Groups
+  networktocode.nautobot.rack_group:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    location: "{{ item.location }}"
+    state: present
+  loop: "{{ instance_rack_groups }}"

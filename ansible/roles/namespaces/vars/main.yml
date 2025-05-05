@@ -1,0 +1,35 @@
+---
+
+namespaces_defaults:
+  - name: "Rackspace"
+    location: Rackspace
+    description: Namespace for Rackspace
+  - name: "Infrastructure:DFW3"
+    location: DFW3
+    description: Namespace for DFW Infra
+  - name: "Infrastructure:IAD3"
+    location: IAD3
+    description: Namespace for IAD Infra
+  - name: "Infrastructure:SJC3"
+    location: SJC3
+    description: Namespace for SJC3 Infra
+
+namespaces_mock_data:
+  - name: ENV Bobs Flower Shop Prod
+    location: SJC3
+    description: Production Environment for Bob's Flower Shop
+  - name: ENV Jims Toy Shop Prod
+    location: SJC3
+    description: Production Environment for Jim's Toy Shop
+  - name: ENV Jacks Auto Detailing Prod
+    location: SJC3
+    description: Production Environment for Jack's Auto Detailing
+  - name: ENV Jims Toy Shop Staging
+    location: IAD3
+    description: Staging Environment for Jim's Toy Shop
+  - name: ENV Jacks Auto Detailing DR
+    location: IAD3
+    description: DR Environment for Jack's Auto Detailing
+  - name: ENV Jims Toy Shop Dev
+    location: DFW3
+    description: Dev Environment for Jim's Toy Shop

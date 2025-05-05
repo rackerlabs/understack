@@ -1,0 +1,11 @@
+---
+
+- name: Create Instance Namespaces
+  networktocode.nautobot.namespace:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    location: "{{ item.location }}"
+    state: present
+  loop: "{{ instance_namespaces }}"

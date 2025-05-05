@@ -1,0 +1,236 @@
+---
+instance_locations:
+  - name: DFW
+    description: DFW Metro
+    parent_location: Rackspace
+    location_type: Region
+    status: Active
+  - name: DFW3
+    description: DFW3 Data Center
+    parent_location: DFW
+    location_type: Site
+    status: Active
+
+instance_rack_groups:
+  - name: DFW3 PROD ENV
+    location: DFW3
+    description: Prod environment fabric
+
+instance_namespaces:
+  - name: Rackspace
+    description: Rackspace assets
+    location: Rackspace
+  - name: Undercloud DFW3 Prod Infrastructure
+    description: DFW3 Prod Environment
+    location: DFW3
+
+instance_racks:
+  - name: N11-21
+    facility: N11-21
+    rack_group: DFW3 PROD ENV
+    location: DFW3
+    u_height: 58
+  - name: N11-22
+    facility: N11-22
+    rack_group: DFW3 PROD ENV
+    location: DFW3
+    u_height: 58
+
+instance_vlangroups:
+  - name: n11-21-network
+    location: DFW3
+    ucvni_group_name: spine181-2.dfw3
+  - name: n11-22-network
+    location: DFW3
+    ucvni_group_name: spine181-2.dfw3
+  - name: n11-21-storage
+    location: DFW3
+    ucvni_group_name: spine181-1f.dfw3
+  - name: n11-22-storage
+    location: DFW3
+    ucvni_group_name: spine181-1f.dfw3
+
+instance_prefixes:
+  - prefix: 72.32.205.240/28
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+    description: NetDev for DFW3 Infra
+
+  - prefix: 10.5.30.0/24
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+    description: Provisioning Network DHCP Scope for DFW3
+
+  - prefix: 10.5.29.224/27
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+    description: DFW3 Infra k8s cluster nodes and VIPs
+
+  - prefix: 148.62.102.0/23
+    type: container
+    status_name: Active
+    namespace_name: Rackspace
+    description: DFW3 Tenant Space
+
+  - prefix: 10.15.149.0/24
+    type: network
+    status_name: Active
+    namespace_name: Rackspace
+    description: DFW3 BMC
+
+instance_ip_addresses: []
+
+instance_switches:
+  - name: n11-21-1d.dfw3.rackspace.net
+    rack: N11-21
+    position: 56
+    face: Front
+    location: DFW3
+    device_type: Nexus C92348GC-X
+    platform: Cisco NX-OS
+    role: BMC Switch
+    chassis_mac_address: 8C:44:A5:53:AE:F7
+    status: Active
+    serial: FLM281405X2
+
+  - name: n11-21-1.dfw3.rackspace.net
+    rack: N11-21
+    position: 53
+    face: Front
+    location: DFW3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    role: Tenant leaf
+    vlan_group_to_devices: n11-21-network
+    chassis_mac_address: CC:6A:33:D6:E6:E3
+    status: Active
+    serial: FDO28250XC4
+
+  - name: n11-21-2.dfw3.rackspace.net
+    rack: N11-21
+    position: 51
+    face: Front
+    location: DFW3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    role: Tenant leaf
+    vlan_group_to_devices: n11-21-network
+    chassis_mac_address: CC:6A:33:D6:D8:D3
+    status: Active
+    serial: FDO28250XHW
+
+
+  - name: n11-22-1d.dfw3.rackspace.net
+    rack: N11-22
+    position: 56
+    face: Front
+    location: DFW3
+    device_type: Nexus C92348GC-X
+    platform: Cisco NX-OS
+    role: BMC Switch
+    chassis_mac_address: B4:4C:90:7D:DB:AF
+    status: Active
+    serial: FLM281405XM
+
+  - name: n11-22-1.dfw3.rackspace.net
+    rack: N11-22
+    position: 53
+    face: Front
+    location: DFW3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    role: Tenant leaf
+    vlan_group_to_devices: n11-22-network
+    chassis_mac_address: CC:6A:33:C9:E9:E3
+    status: Active
+    serial: FDO28250M6N
+
+  - name: n11-22-2.dfw3.rackspace.net
+    rack: N11-22
+    position: 51
+    face: Front
+    location: DFW3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    role: Tenant leaf
+    vlan_group_to_devices: n11-22-network
+    chassis_mac_address: CC:6A:33:D6:DC:57
+    status: Active
+    serial: FDO28250XJH
+
+  - name: n11-21-1f.dfw3.rackspace.net
+    rack: N11-21
+    position: 48
+    face: Front
+    location: DFW3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    role: Tenant leaf
+    vlan_group_to_devices: n11-21-storage
+    chassis_mac_address: CC:6A:33:D6:E7:47
+    status: Active
+
+  - name: n11-21-2f.dfw3.rackspace.net
+    rack: N11-21
+    position: 46
+    face: Front
+    location: DFW3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    role: Tenant leaf
+    vlan_group_to_devices: n11-21-storage
+    chassis_mac_address: CC:6A:33:D6:E9:9F
+    status: Active
+
+  - name: n11-22-1f.dfw3.rackspace.net
+    rack: N11-22
+    position: 48
+    face: Front
+    location: DFW3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    role: Tenant leaf
+    vlan_group_to_devices: n11-22-storage
+    chassis_mac_address: D4:7F:35:A0:EB:23
+    status: Active
+
+  - name: n11-22-2f.dfw3.rackspace.net
+    rack: N11-22
+    position: 46
+    face: Front
+    location: DFW3
+    device_type: Nexus 93180YC-FX3
+    platform: Cisco NX-OS
+    role: Tenant leaf
+    vlan_group_to_devices: n11-22-storage
+    chassis_mac_address: D4:7F:35:A0:E8:CB
+    status: Active
+
+instance_ucvni_groups:
+  - name: spine181-2.dfw3
+    description: Prod DFW3 Network Fabric
+    infra_range: 1249995-1250004
+    tenant_range: 1250005-1274994
+
+instance_servers: []
+instance_cables: []
+lag_interfaces: []
+
+fabric_wide_layer_3_infrastructure_networks:
+  - name: provisioning_network_config
+    namespace: Rackspace
+    vlan_name: PROV-NET
+    vid: 4010
+    ip_prefix: 10.5.30.0/24
+    ip_address: 10.5.30.1
+    dhcp_relay_ipv4_address: 10.5.29.230
+    ucvni_group: spine181-2.dfw3
+    ucvni_id: 1274900
+    ucvni_name: PROV-NET
+    ucvni_type: TENANT
+    relationship_key: ucvni_vlans
+    interface_name: vlan4010
+    interface_type: Virtual

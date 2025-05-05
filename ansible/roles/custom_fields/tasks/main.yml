@@ -1,0 +1,57 @@
+---
+- name: Create Custom Field Chassis MAC Address
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: MAC address advertised to LLDP neighbors (for switches only)
+    label: Chassis MAC Address
+    type: text
+    key: chassis_mac_address
+    required: false
+    weight: 100
+    content_types: dcim.device
+    filter_logic: exact
+    validation_regex: ^[0-9A-F][0-9A-F](:[0-9A-F][0-9A-F]){5}$
+
+- name: Create Custom Field DHCP Relay IPv4 Address
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: >-
+        For certain interface Roles, configure a "DHCP Helper" service on the
+        router to forward DHCP requests from locally-connected clients to the
+        DHCP server specified by this option. The value is an IPv4 address
+        without the /prefixlen.
+    label: DHCP Relay IPv4 Address
+    type: text
+    key: dhcp_relay_ipv4_address
+    required: false
+    weight: 100
+    content_types:
+      - dcim.interface
+      - vni_custom_model.ucvni
+    validation_regex: ^\d+\.\d+\.\d+\.\d+$
+    filter_logic: exact
+
+- name: Create Custom Field Tenant VLAN ID
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: >-
+        VLAN ID visible to the Tenant, used in the dot1q tag when this VNI
+        appears on a trunk port.  Normally different to the actual VLAN created
+        on the switch - we use VLAN translation to gives the tenant a consistent
+        VLAN ID accross the whole fabric.
+    label: Tenant VLAN ID
+    type: integer
+    key: tenant_vlan_id
+    required: false
+    weight: 100
+    content_types:
+      - vni_custom_model.ucvni
+    validation_minimum: 1
+    validation_maximum: 4096
+    filter_logic: exact

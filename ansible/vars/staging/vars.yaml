@@ -1,0 +1,305 @@
+---
+instance_locations:
+  - name: IAD
+    description: IAD3 Metro
+    parent_location: Rackspace
+    location_type: Region
+    status: Active
+  - name: IAD3
+    description: IAD3 Data Center
+    parent_location: IAD
+    location_type: Site
+    status: Active
+instance_rack_groups:
+  - name: IAD3 STAGING ENV
+    location: IAD3
+    description: Staging environment fabric
+instance_namespaces:
+  - name: Rackspace
+    description: Rackspace assets
+    location: Rackspace
+  - name: Undercloud IAD Staging Infrastructure
+    description: IAD3 Staging Environment
+    location: IAD3
+instance_racks:
+  - name: F20-4
+    facility: F20-4
+    rack_group: IAD3 STAGING ENV
+    location: IAD3
+    u_height: 58
+  - name: F20-5
+    facility: F20-5
+    rack_group: IAD3 STAGING ENV
+    location: IAD3
+    u_height: 58
+  - name: F20-6
+    facility: F20-6
+    rack_group: IAD3 STAGING ENV
+    location: IAD3
+    u_height: 58
+instance_vlangroups:
+  - name: f20-4-network
+    location: IAD3
+    ucvni_group_name: spine402-2.iad3
+  - name: f20-5-network
+    location: IAD3
+    ucvni_group_name: spine402-2.iad3
+  - name: f20-6-network
+    location: IAD3
+    ucvni_group_name: spine402-2.iad3
+instance_switches:
+  - name: f20-4-1.iad3.rackspace.net
+    status: Active
+    vlan_group_to_devices: f20-4-network
+    role: Tenant leaf
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    chassis_mac_address: BC:5A:56:49:FD:37
+    location: IAD3
+    rack: F20-4
+    position: 53
+  - name: f20-4-1d.iad3.rackspace.net
+    position: 56
+    status: Active
+    role: BMC Switch
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    chassis_mac_address: 8C:44:A5:53:89:8F
+    location: IAD3
+    rack: F20-4
+  - name: f20-4-1f.iad3.rackspace.net
+    status: Active
+    role: storage-client-leaf
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    location: IAD3
+    rack: F20-4
+    chassis_mac_address: A0:BC:6F:D8:F6:7F
+  - name: f20-4-2.iad3.rackspace.net
+    vlan_group_to_devices: f20-4-network
+    status: Active
+    role: Tenant leaf
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    chassis_mac_address: CC:7F:76:F9:D4:9F
+    location: IAD3
+    rack: F20-4
+    position: 51
+  - name: f20-4-2f.iad3.rackspace.net
+    status: Active
+    role: storage-client-leaf
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    location: IAD3
+    rack: F20-4
+    chassis_mac_address: A0:BC:6F:FF:7C:9F
+  - name: f20-5-1.iad3.rackspace.net
+    vlan_group_to_devices: f20-5-network
+    status: ActivelyManaged
+    role: Tenant leaf
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    location: IAD3
+    rack: F20-5
+    position: 53
+    chassis_mac_address: 9C:54:16:F5:AB:27
+  - name: f20-5-1d.iad3.rackspace.net
+    position: 56
+    status: Active
+    role: BMC Switch
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    location: IAD3
+    rack: F20-5
+    chassis_mac_address: 8C:44:A5:53:A2:07
+  - name: f20-5-2.iad3.rackspace.net
+    vlan_group_to_devices: f20-5-network
+    status: ActivelyManaged
+    role: Tenant leaf
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    location: IAD3
+    rack: F20-5
+    position: 51
+    chassis_mac_address: 9C:54:16:F5:9F:6F
+  - name: f20-6-1.iad3.rackspace.net
+    vlan_group_to_devices: f20-6-network
+    status: ActivelyManaged
+    role: Tenant leaf
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    location: IAD3
+    rack: F20-6
+    position: 53
+    chassis_mac_address: 9C:54:16:F5:B2:93
+  - name: f20-6-1d.iad3.rackspace.net
+    status: Active
+    role: BMC Switch
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    location: IAD3
+    rack: F20-6
+    position: 56
+    chassis_mac_address: 8C:44:A5:53:A3:27
+  - name: f20-6-2.iad3.rackspace.net
+    vlan_group_to_devices: f20-6-network
+    status: ActivelyManaged
+    role: Tenant leaf
+    platform: Cisco NX-OS
+    device_type: Nexus 93180YC-FX3
+    serial:
+    location: IAD3
+    rack: F20-6
+    position: 51
+    chassis_mac_address: F4:EE:31:C0:6E:3B
+instance_ucvni_groups:
+  - name: spine402-2.iad3
+    description: Staging Fabric in IAD3
+    location:
+      name: IAD3
+      location_type:
+        name: Site
+    range: 1-16777214
+instance_ip_addresses: []
+
+fabric_wide_layer_3_infrastructure_networks:
+  - name: provisioning_network_config
+    namespace: Rackspace
+    vlan_name: PROV-NET
+    vid: 4010
+    ip_prefix: 10.4.35.128/26
+    ip_address: 10.4.35.129/26
+    dhcp_relay_ipv4_address: 10.4.35.198
+    ucvni_group: spine402-2.iad3
+    ucvni_id: 604010
+    ucvni_name: PROV-NET
+    relationship_key: ucvni_vlans
+    interface_name: vlan4010
+    interface_type: Virtual
+
+lag_interfaces:
+  - name: port-channel101
+    switch_name: f20-5-1.iad3.rackspace.net
+  - name: port-channel102
+    switch_name: f20-5-1.iad3.rackspace.net
+  - name: port-channel103
+    switch_name: f20-5-1.iad3.rackspace.net
+  - name: port-channel101
+    switch_name: f20-5-2.iad3.rackspace.net
+  - name: port-channel102
+    switch_name: f20-5-2.iad3.rackspace.net
+  - name: port-channel103
+    switch_name: f20-5-2.iad3.rackspace.net
+
+instance_cables:
+  - server_name: infra1
+    switch_name: f20-5-1.iad3.rackspace.net
+    server_port: NIC.Integrated.1-1
+    switch_port: Ethernet1/1
+    lag: port-channel101
+  - server_name: infra1
+    switch_name: f20-5-2.iad3.rackspace.net
+    server_port: NIC.Slot.1-1
+    switch_port: Ethernet1/1
+    lag: port-channel101
+
+  - server_name: infra2
+    switch_name: f20-5-1.iad3.rackspace.net
+    server_port: NIC.Integrated.1-1
+    switch_port: Ethernet1/2
+    lag: port-channel102
+  - server_name: infra2
+    switch_name: f20-5-2.iad3.rackspace.net
+    server_port: NIC.Slot.1-1
+    switch_port: Ethernet1/2
+    lag: port-channel102
+
+  - server_name: infra3
+    switch_name: f20-5-1.iad3.rackspace.net
+    server_port: NIC.Integrated.1-1
+    switch_port: Ethernet1/3
+    lag: port-channel103
+  - server_name: infra3
+    switch_name: f20-5-2.iad3.rackspace.net
+    server_port: NIC.Slot.1-1
+    switch_port: Ethernet1/3
+    lag: port-channel103
+
+
+instance_servers:
+  - name: infra1
+    manufacturer: Dell
+    rack: F20-5
+    device_type: PowerEdge R7615
+  - name: infra2
+    manufacturer: Dell
+    rack: F20-5
+    device_type: PowerEdge R7615
+  - name: infra3
+    manufacturer: Dell
+    rack: F20-5
+    device_type: PowerEdge R7615
+
+nb_secrets_groups:
+  gh_dev_type_pat:
+    - access_type: "HTTP(S)"
+      secret_type: token
+      name: gh_dev_type_pat
+      provider: pwsafe
+      parameters:
+        project: "37639"
+        cred: "329557"
+        field: password
+  gh_golden_config_pat:
+    - access_type: "HTTP(S)"
+      secret_type: token
+      name: Github_Golden_Config_PAT
+      provider: pwsafe
+      parameters:
+        project: "38518"
+        cred: "369286"
+        field: password
+  tacacs_user_a_http:
+    - access_type: "HTTP(S)"
+      secret_type: "username"
+      name: tacacs_user
+      provider: pwsafe
+      parameters:
+        project: "38518"
+        cred: "336939"
+        field: username
+    - access_type: "HTTP(S)"
+      secret_type: "password"
+      name: tacacs_pass
+      provider: pwsafe
+      parameters:
+        project: "38518"
+        cred: "336939"
+        field: password
+  tacacs_user_b_http:
+    - access_type: "HTTP(S)"
+      secret_type: "username"
+      name: tacacs_user
+      provider: pwsafe
+      parameters:
+        project: "38518"
+        cred: "336940"
+        field: username
+    - access_type: "HTTP(S)"
+      secret_type: "password"
+      name: tacacs_pass
+      provider: pwsafe
+      parameters:
+        project: "38518"
+        cred: "336940"
+        field: password

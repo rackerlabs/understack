@@ -15,3 +15,4 @@ all:
           # default from dev/default-creds.env
           nautobot_token: 0123456789abcdef0123456789abcdef01234567
           github_pat_device_types_repo: "{{ lookup('ansible.builtin.env', 'GITHUB_PAT_DEVICE_TYPES_REPO', default=Undefined) }}"
+          nautobot_api_version: 2.0
