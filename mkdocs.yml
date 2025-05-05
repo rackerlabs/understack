@@ -117,6 +117,9 @@ nav:
       - component-argo-workflows.md
       - component-understack-workflows.md
       - component-ansible.md
+  - 'Design Guide':
+    - design-guide/intro.md
+    - design-guide/neutron-networking.md
   - 'Deployment Guide':
     - deploy-guide/welcome.md
     - deploy-guide/getting-started.md
