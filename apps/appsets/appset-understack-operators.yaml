@@ -3,9 +3,6 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: understack-operators
-  finalizers:
-    # ensure applicationset is not deleted until its unreferenced
-    - resources-finalizer.argocd.argoproj.io
 spec:
   syncPolicy:
     applicationsSync: create-update
