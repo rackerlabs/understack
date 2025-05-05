@@ -95,3 +95,20 @@ metrics:
   enabled: true
   prometheusRule:
     enabled: true
+
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: database-host-haseeb
+      namespace: nautobot
+    data:
+      DATABASE_HOST: database.example.com
+  - |
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: database-user-haseeb
+      namespace: nautobot
+    data:
+      DATABASE_USER: db-admin
