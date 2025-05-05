@@ -137,6 +137,17 @@ openstack network create milantest
 +---------------------------+--------------------------------------+
 ```
 
+From the northbound side of OVN we see the following about this network:
+
+```bash
+ovn-nbctl show
+# snip extra output
+switch 9077901b-2a7b-46ed-a012-59bcce9a4da3 (neutron-783b4239-7220-4a74-8253-415539469860) (aka milantest)
+# snip extra output
+```
+
+You will see that a virtual switch is created with the same name and its ID matches the network ID.
+
 ### Attaching servers to networks
 
 Now there's a network that can be used to attach a server to. We'll go
@@ -196,6 +207,20 @@ This process will be repeated for every server that is connected to the network.
 server is connected to a leaf with an existing segment then an additional VLAN will not
 be consumed.
 
+Similarly on the northbound of OVN we will see the port appear on the virtual switch.
+
+```bash
+ovn-nbctl show
+# snip extra output
+switch 9077901b-2a7b-46ed-a012-59bcce9a4da3 (neutron-783b4239-7220-4a74-8253-415539469860) (aka milantest)
+    port 47bb4c37-f60d-474f-8ce5-c7c1d9982585 (aka trunk_parent11)
+        type: external
+        addresses: ["14:23:f3:f5:22:b0 192.168.100.170"]
+# snip extra output
+```
+
+Once again the naming and the IDs match up with the port as it exists in Neutron to aid debugging.
+
 ### Attaching routers to networks
 
 Attaching a router to a network operates similarly to attaching servers except that
@@ -220,7 +245,7 @@ openstack router create puc-908
 | external_gateways         | []                                   |
 | flavor_id                 | None                                 |
 | ha                        | False                                |
-| id                        | 87e0e66b-c720-41b2-bd8e-09d00c3563d3 |
+| id                        | 85533c29-d1f1-42f8-a133-d15099318f3a |
 | interfaces_info           | []                                   |
 | name                      | puc-908                              |
 | project_id                | d3c2c85bdbf24ff5843f323524b63768     |
@@ -233,7 +258,17 @@ openstack router create puc-908
 +---------------------------+--------------------------------------+
 ```
 
-Then we can attach our network's subnet to it.
+We'll see this object get created in OVN as well.
+
+```bash
+ovn-nbctl show
+# snip extra output
+router 81a34be1-bbb3-4ae4-8d3e-d9b7bf3992b4 (neutron-85533c29-d1f1-42f8-a133-d15099318f3a) (aka puc-908)
+# snip extra output
+```
+
+The name and the ID continue to match up with data inside of Neutron. Now we can attach our
+network's subnet to the router.
 
 ```bash
 openstack router add subnet puc-908 6f8e3a32-c7a7-4354-808f-75800b21efcf
@@ -306,6 +341,31 @@ openstack port list --network milantest
 | 47bb4c37-f60d-474f-8ce5-c7c1d9982585 | trunk_parent11  | 14:23:f3:f5:22:b0 | ip_address='192.168.100.170', subnet_id='6f8e3a32-c7a7-4354-808f-75800b21efcf' | ACTIVE |
 +--------------------------------------+-----------------+-------------------+--------------------------------------------------------------------------------+--------+
 ```
+
+Inside of OVN we see the following data:
+
+```bash
+ovn-nbctl show
+# snip extra output
+switch 9077901b-2a7b-46ed-a012-59bcce9a4da3 (neutron-783b4239-7220-4a74-8253-415539469860) (aka milantest)
+    port 47bb4c37-f60d-474f-8ce5-c7c1d9982585 (aka trunk_parent11)
+        type: external
+        addresses: ["14:23:f3:f5:22:b0 192.168.100.170"]
+    port 10099d3c-0ade-41b9-8a1c-1d50ace4bf22
+        type: router
+        router-port: lrp-10099d3c-0ade-41b9-8a1c-1d50ace4bf22
+    port provnet-059fd287-4fd1-446f-a506-e0ed9276f67d
+        type: localnet
+        tag: 1801
+        addresses: ["unknown"]
+router 81a34be1-bbb3-4ae4-8d3e-d9b7bf3992b4 (neutron-85533c29-d1f1-42f8-a133-d15099318f3a) (aka puc-908)
+    port lrp-10099d3c-0ade-41b9-8a1c-1d50ace4bf22
+        mac: "fa:16:3e:10:8f:f1"
+        networks: ["192.168.100.1/24"]
+# snip extra output
+```
+
+The names and the IDs all match, along with the VLAN ID of the segment where the node running OVN resides.
 
 ## ML2 Mechanism Operations
 
