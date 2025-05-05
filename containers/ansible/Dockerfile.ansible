@@ -11,21 +11,23 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+RUN useradd -m -d /runner -s /bin/bash runner
+
 COPY ansible/requirements.txt ansible/requirements.yml /
 
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r /requirements.txt dumb-init==1.2.5
-
-RUN useradd -m -d /runner -s /bin/bash runner
-WORKDIR /runner
-USER runner
-
-RUN --mount=type=cache,target=/root/.cache/pip ansible-galaxy collection install -r /requirements.yml
 
 COPY ansible/playbooks/ /runner/project/
 COPY ansible/roles/ /runner/project/roles/
 COPY ansible/vars/ /runner/project/vars/
 COPY ansible/inventory/ /runner/inventory/
 COPY ansible/env/ /runner/env/
+
+RUN chown -R runner:runner /runner
+USER runner
+WORKDIR /runner
+
+RUN --mount=type=cache,target=/root/.cache/pip ansible-galaxy collection install -r /requirements.yml
 
 ENTRYPOINT ["dumb-init"]
 CMD ["ansible-runner"]
