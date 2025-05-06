@@ -3,20 +3,20 @@ package root
 import (
 	"fmt"
 
-	"github.com/rackerlabs/understack/go/understack/cmd/argocd"
-	"github.com/rackerlabs/understack/go/understack/cmd/certManager"
-	"github.com/rackerlabs/understack/go/understack/cmd/deploy"
-	"github.com/rackerlabs/understack/go/understack/cmd/dex"
-	"github.com/rackerlabs/understack/go/understack/cmd/helmConfig"
-	"github.com/rackerlabs/understack/go/understack/cmd/node"
-	"github.com/rackerlabs/understack/go/understack/cmd/openstack"
-	"github.com/rackerlabs/understack/go/understack/cmd/other"
-	"github.com/rackerlabs/understack/go/understack/cmd/quickstart"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/argocd"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/certManager"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/deploy"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/dex"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/helmConfig"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/node"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/openstack"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/other"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/quickstart"
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "understack SUBCOMMAND ...",
+	Use:   "understackctl SUBCOMMAND ...",
 	Short: "UnderStack CLI",
 	Long:  ``,
 	RunE: func(cmd *cobra.Command, args []string) error {

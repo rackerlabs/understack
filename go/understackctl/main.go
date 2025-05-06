@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/rackerlabs/understack/go/understack/cmd/root"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/root"
 )
 
 func main() {

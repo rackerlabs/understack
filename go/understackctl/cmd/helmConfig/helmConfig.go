@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rackerlabs/understack/go/understack/helpers"
+	"github.com/rackerlabs/understack/go/understackctl/helpers"
 
 	"github.com/gookit/goutil/envutil"
 	"github.com/gookit/goutil/fsutil"

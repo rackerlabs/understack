@@ -1,4 +1,4 @@
-module github.com/rackerlabs/understack/go/understack
+module github.com/rackerlabs/understack/go/understackctl
 
 go 1.23.6
 
