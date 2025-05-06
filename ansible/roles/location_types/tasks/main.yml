@@ -1,0 +1,23 @@
+---
+
+- name: Create Global location type which has no parent
+  networktocode.nautobot.location_type:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "Global"
+    description: "Global"
+    content_types: []
+    nestable: "false"
+    state: present
+
+- name: Create default location types which are nested
+  networktocode.nautobot.location_type:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    content_types: "{{ item.content_types }}"
+    nestable: "{{ item.nestable }}"
+    parent: "{{ item.parent }}"
+    state: present
+  loop: "{{ location_types_defaults }}"

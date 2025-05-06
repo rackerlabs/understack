@@ -1,0 +1,28 @@
+---
+
+- name: Check if git repo exists
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/git-repositories/?slug={{ item.key }}"
+    method: GET
+    body_format: json
+    headers:
+      Accept: "application/json; version={{ nautobot_api_version }}"
+      Authorization: "Token {{ nautobot_token }}"
+  register: _secret
+  check_mode: false
+
+- name: Create/update secret group association
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/git-repositories/{{ url_append }}"
+    method: "{{ method }}"
+    headers:
+      Accept: "application/json; version={{ nautobot_api_version }}"
+      Authorization: "Token {{ nautobot_token }}"
+    body_format: json
+    body: "{{ item.value | combine({'slug': item.key}) }}"
+    status_code: "{{ status_code }}"
+  register: _secret_create
+  vars:
+    url_append: "{{ _secret.json.results[0].id + '/' if _secret.json.count == 1 else '' }}"
+    method: "{{ 'PATCH' if _secret.json.count == 1 else 'POST' }}"
+    status_code: "{{ 200 if _secret.json.count == 1 else 201 }}"

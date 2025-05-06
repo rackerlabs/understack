@@ -110,7 +110,7 @@ extraObjects:
             spec:
               containers:
                 - name: ansible-runner
-                  image: ghcr.io/rackerlabs/understack/ansible:latest
+                  image: ghcr.io/rackerlabs/understack/ansible:907
                   command: ["ansible-runner", "run", "/runner", "--playbook", "debug.yaml"]
                   env:
                     - name: NAUTOBOT_TOKEN
