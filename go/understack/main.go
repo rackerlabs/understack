@@ -3,20 +3,12 @@ package main
 import (
 	"os"
 
-	"github.com/rackerlabs/understack/go/understack/cmd"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/argocd"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/certManager"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/dex"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/helmConfig"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/node"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/openstack"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/other"
-	_ "github.com/rackerlabs/understack/go/understack/cmd/quickstart"
+	"github.com/rackerlabs/understack/go/understack/cmd/root"
 )
 
 func main() {
-  err := cmd.Execute()
-  if err != nil {
-    os.Exit(1)
-  }
+	err := root.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
 }

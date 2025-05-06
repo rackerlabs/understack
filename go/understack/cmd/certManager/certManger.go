@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/rackerlabs/understack/go/understack/cmd"
 	"github.com/rackerlabs/understack/go/understack/helpers"
 
 	"github.com/charmbracelet/log"
@@ -18,15 +17,13 @@ import (
 //go:embed templates/clusterIssuer.tmpl
 var clusterIssuerTemplate string
 
-func init() {
-	cmd.DeployCmd.AddCommand(CertManager)
-}
-
-var CertManager = &cobra.Command{
-	Use:   "certmanager-secrets",
-	Short: "Generate certmanager-secrets secrets",
-	Long:  "",
-	Run:   certManagerGen,
+func NewCmdCertManagerSecret() *cobra.Command {
+	return &cobra.Command{
+		Use:   "certmanager-secrets",
+		Short: "Generate certmanager-secrets secrets",
+		Long:  "",
+		Run:   certManagerGen,
+	}
 }
 
 func certManagerGen(cmd *cobra.Command, args []string) {

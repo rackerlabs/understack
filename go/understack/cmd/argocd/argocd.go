@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rackerlabs/understack/go/understack/cmd"
 	"github.com/rackerlabs/understack/go/understack/helpers"
 
 	"github.com/charmbracelet/log"
@@ -28,24 +27,22 @@ const (
 	argoNamespace        = "argocd"
 )
 
-var ArgoCMD = &cobra.Command{
-	Use:   "argocd-secrets",
-	Short: "Generate ArgoCD secrets",
-	Long:  "Generate repository and cluster secrets for ArgoCD deployment",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := GenerateSecrets(); err != nil {
-			log.Fatal("Failed to generate secrets", "error", err)
-			os.Exit(1)
-		}
-	},
+func NewCmdArgocdSecret() *cobra.Command {
+	return &cobra.Command{
+		Use:   "argocd-secrets",
+		Short: "Generate ArgoCD secrets",
+		Long:  "Generate repository and cluster secrets for ArgoCD deployment",
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := generateSecrets(); err != nil {
+				log.Fatal("Failed to generate secrets", "error", err)
+				os.Exit(1)
+			}
+		},
+	}
 }
 
-func init() {
-	cmd.DeployCmd.AddCommand(ArgoCMD)
-}
-
-// GenerateSecrets orchestrates the generation of all ArgoCD secrets
-func GenerateSecrets() error {
+// generateSecrets orchestrates the generation of all ArgoCD secrets
+func generateSecrets() error {
 	basePath := helpers.GetManifestPathToService("argocd")
 
 	if err := generateDeployRepoSecret(basePath); err != nil {

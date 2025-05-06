@@ -1,7 +1,6 @@
 package openstack
 
 import (
-	"github.com/rackerlabs/understack/go/understack/cmd"
 	"github.com/rackerlabs/understack/go/understack/helpers"
 
 	"github.com/charmbracelet/log"
@@ -9,15 +8,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	cmd.DeployCmd.AddCommand(Openstack)
-}
-
-var Openstack = &cobra.Command{
-	Use:   "openstack-secrets",
-	Short: "Generate openstack-secrets",
-	Long:  "Generate openstack-secrets",
-	Run:   openStackGen,
+func NewCmdOpenstackSecrets() *cobra.Command {
+	return &cobra.Command{
+		Use:   "openstack-secrets",
+		Short: "Generate openstack-secrets",
+		Long:  "Generate openstack-secrets",
+		Run:   openStackGen,
+	}
 }
 
 func openStackGen(cmd *cobra.Command, args []string) {

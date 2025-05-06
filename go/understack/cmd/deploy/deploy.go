@@ -94,5 +94,4 @@ func init() {
 		os.Exit(1)
 	}
 
-	rootCmd.AddCommand(DeployCmd)
 }

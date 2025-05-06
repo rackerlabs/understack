@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 
-	"github.com/rackerlabs/understack/go/understack/cmd"
 	"github.com/rackerlabs/understack/go/understack/helpers"
 
 	"github.com/charmbracelet/log"
@@ -13,15 +12,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func init() {
-	cmd.DeployCmd.AddCommand(Node)
-}
-
-var Node = &cobra.Command{
-	Use:   "node-update",
-	Short: "Will update k8s cluster node with labels and tags",
-	Long:  "Will update k8s cluster node with labels and tags",
-	Run:   updateNode,
+func NewCmdNode() *cobra.Command {
+	return &cobra.Command{
+		Use:   "node-update",
+		Short: "Will update k8s cluster node with labels and tags",
+		Long:  "Will update k8s cluster node with labels and tags",
+		Run:   updateNode,
+	}
 }
 
 func updateNode(cmd *cobra.Command, args []string) {
