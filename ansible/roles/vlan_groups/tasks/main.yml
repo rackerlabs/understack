@@ -1,0 +1,35 @@
+---
+
+- name: Create Instance Vlan Groups
+  networktocode.nautobot.vlan_group:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    location: "{{ item.location }}"
+    state: present
+  loop: "{{ instance_vlangroups }}"
+  register: created_vlangroups
+
+- name: Gather ucvni_group_for_vlan_group into a dict
+  ansible.builtin.set_fact:
+    ucvni_group_for_vlan_group: "{{ ucvni_group_for_vlan_group | default({}) | combine({item.name: item.ucvni_group_name}) }}"
+  loop: "{{ instance_vlangroups }}"
+
+- name: Associate Vlan Groups with their UCVNI Group
+  ansible.builtin.uri:
+    url: "{{ item.vlan_group.url }}"
+    method: PATCH
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+    status_code: 200, 400
+    body_format: json
+    return_content: true
+    body:
+      relationships:
+        ucvnigroup_vlangroup:
+          source:
+            objects:
+              - name: "{{ ucvni_group_for_vlan_group[item.vlan_group.name] }}"
+
+  register: patch_result
+  loop: "{{ created_vlangroups.results }}"

@@ -1,0 +1,15 @@
+---
+
+- name: Create Prefixes
+  networktocode.nautobot.prefix:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: "{{ item.description | default(omit) }}"
+    type: "{{ item.type | capitalize }}"
+    tags: "{{ item.tags | default(omit) }}"
+    tenant: "{{ item.tenant_name | default(omit) }}"
+    prefix: "{{ item.prefix }}"
+    namespace: "{{ item.namespace_name | default(omit) }}"
+    status: "{{ item.status_name }}"
+    state: present
+  loop: "{{ instance_prefixes }}"

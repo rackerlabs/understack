@@ -1,0 +1,10 @@
+---
+
+- name: Create device type console port templates
+  networktocode.nautobot.console_port_template:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device_type: "{{ device_type_item.model }}"
+    name: "{{ console_port_item.name }}"
+    type: "{{ console_port_item.type }}"
+    state: present

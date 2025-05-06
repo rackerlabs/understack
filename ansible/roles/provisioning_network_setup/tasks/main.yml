@@ -1,0 +1,207 @@
+---
+
+# Following are the steps performed in this role
+
+#  1. create virtual interface vlan4010  on all tenant leaf switches
+#  2. create VLAN with name PROV-NET and id 4010
+#  3. create a prefix 10.10.10.0/24 of type network
+#  4. create IP addresses within this prefix
+#  5. create a UCVNI with
+#        ucvni_id:			4010
+#        name:		 		PROV-NET
+#        VNI/network type: 	INFRA
+#        ucvni-group:		spine402-1-infra.iad3
+#
+#  6. assign IP addresses to devices/interfaces
+#  7. associate this UCVNI with the VLAN PROV-NET(4010)
+#  8. associate the VLAN with VLAN GROUP for the switch
+
+- name: Provisioning network config
+  ansible.builtin.set_fact:
+    provisioning_network_config: >-
+      {{
+        fabric_wide_layer_3_infrastructure_networks |
+        selectattr('name', 'equalto', 'provisioning_network_config') |
+        first
+      }}
+
+- name: Create VLAN with name PROV-NET and id 4010
+  networktocode.nautobot.vlan:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ provisioning_network_config.vlan_name }}"
+    vid: "{{ provisioning_network_config.vid }}"
+    vlan_group: "{{ item.name }}"
+    status: Active
+    state: present
+  register: vlans4010
+  loop: "{{ instance_vlangroups }}"
+
+- name: Set the VLAN IDs for relationship associations
+  ansible.builtin.set_fact:
+    vlan_ids: >-
+      {{
+        vlans4010.results
+        | map(attribute='vlan.id')
+        | list
+      }}
+  when: vlans4010 is defined and vlans4010.results | length > 0
+
+- name: Create prefix to contain IP block for vlan4010
+  networktocode.nautobot.prefix:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    prefix: "{{ provisioning_network_config.ip_prefix }}"
+    status: Active
+    type: Network
+    namespace: "{{ provisioning_network_config.namespace }}"
+    description: IP block for vlan4010
+    state: present
+
+- name: Create IP address to assign it to vlan4010 interface
+  networktocode.nautobot.ip_address:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    address: "{{ provisioning_network_config.ip_address }}"
+    namespace: "{{ provisioning_network_config.namespace }}"
+    status: Active
+    state: present
+  register: vlan4010_ip_address
+
+- name: Get infra ucvni-group
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/plugins/undercloud-vni/ucvni-groups/?name={{ provisioning_network_config.ucvni_group }}"
+    method: GET
+    body_format: json
+    headers:
+      Accept: application/json; version={{ nautobot_api_version }}
+      Authorization: Token {{ nautobot_token }}
+  register: ucvni_group_response
+  check_mode: false
+
+- name: Fetch all UCVNI objects for ucvni_id={{ provisioning_network_config.ucvni_id }}
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/plugins/undercloud-vni/ucvnis/?ucvni_id={{ provisioning_network_config.ucvni_id }}"
+    method: GET
+    headers:
+      Authorization: Token {{ nautobot_token }}
+      Accept: application/json; version={{ nautobot_api_version }}
+    return_content: true
+    status_code: 200
+  register: ucvni_response
+  check_mode: false
+
+- name: Filter UCVNI objects by ucvni_group
+  ansible.builtin.set_fact:
+    ucvni_check: "{{ ucvni_response.json.results | selectattr('ucvni_group.id', '==', ucvni_group_response.json.results[0].id) | list }}"
+  when: ucvni_group_response.json.results | length > 0
+
+- name: Extract UCVNI ID if it exists
+  ansible.builtin.set_fact:
+    existing_ucvni_id: >-
+      {{
+        ucvni_response.json.results[0].id
+        if ucvni_check | length > 0
+      }}
+
+- name: Create 4010 PROV-NET UCVNI
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/plugins/undercloud-vni/ucvnis/"
+    method: POST
+    headers:
+      Accept: application/json; version={{ nautobot_api_version }}
+      Authorization: Token {{ nautobot_token }}
+    body_format: json
+    body:
+      - ucvni_id: "{{ provisioning_network_config.ucvni_id }}"
+        status:
+          name: Active
+        name: "{{ provisioning_network_config.ucvni_name }}"
+        ucvni_group: "{{ provisioning_network_config.ucvni_group }}"
+    return_content: true
+    status_code: 201
+  register: ucvni_create_response
+  changed_when: ucvni_create_response.status == 201
+  when: existing_ucvni_id is undefined or existing_ucvni_id == ''
+
+- name: Set the UCVNI ID for relationship associations
+  ansible.builtin.set_fact:
+    ucvni_relationship_association_id: "{{ existing_ucvni_id if existing_ucvni_id is defined else ucvni_create_response.json.id }}"
+
+- name: Fetch UCVNI to VLANs relationship details
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/relationships?key={{ provisioning_network_config.relationship_key }}"
+    method: GET
+    headers:
+      Authorization: Token {{ nautobot_token }}
+      Accept: application/json; version={{ nautobot_api_version }}
+    return_content: true
+    status_code: 200
+  register: ucvni_vlans_relationship_response
+  check_mode: false
+
+- name: Associate UCVNI PROV-NET(4010) with the VLAN PROV-NET(4010)
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/relationship-associations/"
+    method: POST
+    headers:
+      Accept: application/json; version={{ nautobot_api_version }}
+      Authorization: Token {{ nautobot_token }}
+    body_format: json
+    status_code: 201, 400
+    body:
+      - source_type: "{{ ucvni_vlans_relationship_response.json.results[0].source_type }}"
+        destination_type: "{{ ucvni_vlans_relationship_response.json.results[0].destination_type }}"
+        source_id: "{{ ucvni_relationship_association_id }}"
+        destination_id: "{{ item }}"
+        relationship:
+          id: "{{ ucvni_vlans_relationship_response.json.results[0].id }}"
+  loop: "{{ vlan_ids }}"
+  register: association_result
+  changed_when: association_result.status == 201
+  when: ucvni_relationship_association_id is defined and ucvni_vlans_relationship_response.json.results | length > 0
+
+- name: Create vlan4010 interface on 'Tenant leaf' switches
+  networktocode.nautobot.device_interface:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device: "{{ item.name }}"
+    name: "{{ provisioning_network_config.interface_name }}"
+    type: "{{ provisioning_network_config.interface_type }}"
+    custom_fields:
+      dhcp_relay_ipv4_address: "{{provisioning_network_config.dhcp_relay_ipv4_address }}"
+    enabled: true
+    status: Active
+    state: present
+  loop: "{{ instance_switches }}"
+  when:
+    - item.role == "Tenant leaf"
+  register: vlan4010_interfaces
+
+- name: Set role on interface
+  loop: "{{ vlan4010_interfaces.results }}"
+  when: "'interface' in item"
+  ansible.builtin.uri:
+    url: "{{ item.interface.url }}"
+    method: PATCH
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+    status_code: 200, 400
+    body_format: json
+    return_content: true
+    body:
+      role:
+        name: svi_provisioning
+
+- name: Assign IP to vlan4010 interfaces on 'Tenant leaf' switches
+  networktocode.nautobot.ip_address_to_interface:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    interface:
+      name: "{{ provisioning_network_config.interface_name }}"
+      device: "{{ item.name }}"
+    ip_address: "{{ vlan4010_ip_address['ip_address']['id'] }}"
+    state: present
+  loop: "{{ instance_switches }}"
+  when:
+    - item.role == "Tenant leaf" and vlan4010_ip_address['ip_address']['id'] is defined

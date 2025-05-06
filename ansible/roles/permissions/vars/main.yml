@@ -1,0 +1,136 @@
+---
+permissions_groups:
+  - name: ucadmin
+  - name: ucdctech
+  - name: ucneteng
+  - name: ucuser
+
+permissions_permissions:
+  # escape hatch permission allowing ucadmin members
+  # to edit their own user to grant themselves superuser
+  - name: ucadmin-edit-users
+    description: allow user editing for ucadmin
+    display: User Edit for superuser granting
+    enabled: true
+    actions:
+      - view
+      - change
+    object_types:
+      - users.user
+    groups:
+      - ucadmin
+  - name: all-user-defaults
+    description: permissions granted to all users by default
+    enabled: true
+    groups:
+      - ucadmin
+      - ucdctech
+      - ucneteng
+      - ucuser
+    actions:
+      - view
+    object_types:
+      - dcim.cable
+      - dcim.device
+      - dcim.rack
+      - ipam.ipaddress
+      - ipam.prefix
+      - dcim.interface
+      - dcim.location
+      - extras.role
+      - dcim.deviceredundancygroup
+      - dcim.devicetype
+      - vni_custom_model.ucvni
+      - tenancy.tenant
+      - dcim.frontport
+      - dcim.manufacturer
+      - dcim.platform
+      - dcim.rackgroup
+      - dcim.locationtype
+      - extras.tag
+      - extras.status
+      - extras.objectchange
+      - extras.note
+      - tenancy.tenantgroup
+      - vni_custom_model.ucvnigroup
+  - name: all-users-api-tokens
+    description: allow users to manage their own API tokens
+    enabled: true
+    groups:
+      - ucuser
+    actions:
+      - add
+      - change
+      - delete
+    object_types:
+      - users.token
+    constraints:
+      - user: "$user"
+  - name: ucadmin-defaults
+    description: default ucadmin permissions
+    actions:
+      - view
+    enabled: true
+    groups:
+      - ucadmin
+    object_types:
+      - circuits.circuit
+      - dcim.powerfeed
+      - ipam.vlan
+      - dcim.interfaceredundancygroup
+      - dcim.inventoryitem
+      - circuits.circuittermination
+      - circuits.circuittype
+      - circuits.provider
+      - circuits.providernetwork
+      - dcim.cablepath
+      - dcim.consoleport
+      - dcim.devicebay
+      - dcim.poweroutlet
+      - dcim.powerpanel
+      - dcim.powerport
+      - dcim.rearport
+      - dcim.virtualchassis
+      - ipam.rir
+      - ipam.routetarget
+      - ipam.vrf
+      - ipam.vlangroup
+      - ipam.service
+      - ipam.ipaddresstointerface
+      - ipam.vrfprefixassignment
+      - ipam.vrfdeviceassignment
+      - ipam.namespace
+  - name: ucdctech-defaults
+    description: default ucdctech permissions
+    actions:
+      - view
+    enabled: true
+    groups:
+      - ucdctech
+    object_types:
+      - circuits.circuit
+      - dcim.powerfeed
+      - ipam.vlan
+      - dcim.interfaceredundancygroup
+      - dcim.inventoryitem
+      - circuits.circuittermination
+      - circuits.circuittype
+      - circuits.provider
+      - circuits.providernetwork
+      - dcim.cablepath
+      - dcim.consoleport
+      - dcim.devicebay
+      - dcim.poweroutlet
+      - dcim.powerpanel
+      - dcim.powerport
+      - dcim.rearport
+      - dcim.virtualchassis
+      - ipam.rir
+      - ipam.routetarget
+      - ipam.vrf
+      - ipam.vlangroup
+      - ipam.service
+      - ipam.ipaddresstointerface
+      - ipam.vrfprefixassignment
+      - ipam.vrfdeviceassignment
+      - ipam.namespace

@@ -1,0 +1,5 @@
+---
+
+- name: Looping over IPs
+  ansible.builtin.include_tasks: write_ips.yml
+  loop: "{{ instance_ip_addresses }}"

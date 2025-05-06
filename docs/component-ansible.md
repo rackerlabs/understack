@@ -21,7 +21,7 @@ of your system deployment data.
 
 ```bash
 docker run --rm -it ghcr.io/rackerlabs/understack/ansible:latest -- \
-  ansible-runner run /runner --playbook debug.yaml
+  ansible-runner run /runner --playbook debug.yaml  -i inventory/local --cmdline "--extra-vars '{\"env\":\"dev\"}'"
 ```
 
 [ansible-src]: <https://github.com/rackerlabs/understack/tree/main/ansible>

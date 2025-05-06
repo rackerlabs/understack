@@ -1,0 +1,37 @@
+---
+
+# Create a "Global" location which has no parent and will be
+# the parent for all other locations.
+# Note: there's no 'parent_location' in this block
+- name: Create Global Location
+  networktocode.nautobot.location:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "Global"
+    description: "Global"
+    location_type: "Global"
+    status: "Active"
+    state: present
+
+- name: Create Rackspace Location
+  networktocode.nautobot.location:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "Rackspace"
+    description: "Rackspace"
+    location_type: "Company"
+    parent_location: "Global"
+    status: "Active"
+    state: present
+
+- name: Create Location Specific Entries
+  networktocode.nautobot.location:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    parent_location: "{{ item.parent_location }}"
+    location_type: "{{ item.location_type }}"
+    status: "{{ item.status }}"
+    state: present
+  loop: "{{ instance_locations }}"

@@ -1,0 +1,22 @@
+---
+
+- name: "Create Relationships"
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/relationships/"
+    method: POST
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+    body_format: json
+    body:
+      label: "{{ item.name }}"
+      source_type: "{{ item.source_type }}"
+      source_label: "{{ item.source_label }}"
+      source_hidden: "{{ item.source_hidden }}"
+      type: "{{ item.type }}"
+      destination_type: "{{ item.destination_type }}"
+      destination_label: "{{ item.destination_label }}"
+      destination_hidden: "{{ item.destination_hidden }}"
+    status_code:
+      - 201
+      - 400
+  loop: "{{ relationships_defaults }}"
