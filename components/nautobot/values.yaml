@@ -95,3 +95,44 @@ metrics:
   enabled: true
   prometheusRule:
     enabled: true
+
+extraObjects:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      generateName: sync-nautobot-ansible-
+      namespace: nautobot
+      annotations:
+        "helm.sh/hook": post-install,post-upgrade
+    spec:
+      template:
+        spec:
+          containers:
+            - name: ansible-runner
+              image: ghcr.io/rackerlabs/understack/ansible:latest
+              imagePullPolicy: Always
+              command: ["ansible-runner", "run", "/runner", "--playbook", "nautobot-initial-setup.yaml"]
+              env:
+                - name: NAUTOBOT_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: nautobot-superuser
+                      key: apitoken
+                - name: NAUTOBOT_URL
+                  value: http://nautobot-default.nautobot.svc.cluster.local
+              volumeMounts:
+                - name: ansible-inventory
+                  mountPath: /runner/inventory/
+                - name: ansible-group-vars
+                  mountPath: /runner/inventory/group_vars/
+          restartPolicy: Never
+          volumes:
+            - name: runner-data
+              emptyDir: {}
+            - name: ansible-inventory
+              configMap:
+                name: ansible-inventory
+            - name: ansible-group-vars
+              configMap:
+                name: ansible-group-vars
+      backoffLimit: 1

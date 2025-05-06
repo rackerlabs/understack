@@ -1,0 +1,27 @@
+---
+
+- name: Check if compute field exists
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/computed-fields/?key={{ item.key }}"
+    method: GET
+    body_format: json
+    headers:
+      Accept: application/json; version={{ nautobot_api_version }}
+      Authorization: "Token {{ nautobot_token }}"
+  register: _computed_field
+  check_mode: false
+
+- name: Create/update computed fields
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/computed-fields/{{ url_append }}"
+    method: "{{ method }}"
+    headers:
+      Accept: application/json; version={{ nautobot_api_version }}
+      Authorization: "Token {{ nautobot_token }}"
+    body_format: json
+    body: "{{ item }}"
+    status_code: "{{ status_code }}"
+  vars:
+    url_append: "{{ _computed_field.json.results[0].id + '/' if _computed_field.json.count == 1 else '' }}"
+    method: "{{ 'PATCH' if _computed_field.json.count == 1 else 'POST' }}"
+    status_code: "{{ 200 if _computed_field.json.count == 1 else 201 }}"

@@ -17,6 +17,10 @@ The execution environment within the container is [ansible-runner][ansible-runne
 An inventory directory is necessary to be provided which would be part
 of your system deployment data.
 
+Anything which is rackspace specific will be mounted inside ansible container.
+
+For example ansible hosts file and group-vars which are [deployment specific](https://github.com/RSS-Engineering/undercloud-deploy/tree/main/bravo-uc-iad3-dev/inventory) are created as [config-maps](https://github.com/RSS-Engineering/undercloud-deploy/blob/main/bravo-uc-iad3-dev/manifests/nautobot/kustomization.yaml#L13-L23) and [mounted as volumes](https://github.com/rackerlabs/understack/blob/main/components/keystone/values.yaml#L156-L167)
+
 ## Sample Execution
 
 ```bash
