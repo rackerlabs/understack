@@ -33,14 +33,15 @@ upstream on how to best include this use case.
 
 ## Mapping Leaf/Spine to Neutron Networks
 
-The Leaf/Spine network is implemented as a VNI that exists on the fabric with
-endpoints on each of the leaves that need connectivity being mapped to a VLAN
-to provide connectivity to physical assets connected to that leaf.
+In a Leaf/Spine fabric, VXLAN VNIs are used to create virtual network segments
+that run over the IP underlay. On the leaf switches, traditional VLANs connected
+to physical assets are typically mapped to specific VNIs to provide connectivity
+across the fabric.
 
 ### VNIs
 
-To provide available VNIs a [network segment range][neutron-network-segment-range] is
-created of type VXLAN with the name of the fabric.
+An available pool of VNIs is defined by creating a VXLAN [network segment range][neutron-network-segment-range]
+with the same name as the fabric on which the VNIs will reside.
 
 <!-- markdownlint-capture -->
 <!-- markdownlint-disable MD046 -->
@@ -53,7 +54,7 @@ created of type VXLAN with the name of the fabric.
     the VXLAN type to have a `physical_network` value like VLAN networks.
 <!-- markdownlint-restore -->
 
-Provider networks and self-service networks are allocated VNIs from this range.
+Provider networks and self-serviced tenant networks are allocated VNIs from this range.
 
 ### VLANs
 
@@ -63,17 +64,23 @@ the name of the rack they serve could be used.
 
 ### Connecting a Server to a Network
 
-When a server needs to have a connection to a network, it's `local_link_connection`
-information is looked up. The `physical_network` is then used to attempt to map
-the port to how it connects on the network. This is documented in Ironic's
-Networking Guide as [VIF Attachment][ironic-vif-attachment].
+When a server needs to establish a connection to a network, Ironic takes all
+the baremetal ports assigned to that server and compares each
+baremetal port's `local_link_connection` and `physical_network` attributes to
+the desired network to determine the correct port to use.
+This process is documented is documented in Ironic's
+Networking Guide as [VIF Attachment][ironic-vif-attachment]. Changes to this
+process are coming in a forthcoming Ironic spec for [dynamic port attachment][ironic-spec-dpa].
 
-If that VNI is not already mapped to a VLAN on the leaf pair where the server
-is connected then there will not be a `physical_network` match. In this case
-we will not have a VLAN segment but only a VXLAN, so we will allocate a new VLAN
-in the correct leaf pair and attach it as a segment to the VXLAN network. The
-mechanism is responsible for then ensuring this configuration is pushed out. The
-code then re-attempts this operation and this time finds a match and is able to
+If the VNI that is associated with the VXLAN network is not already mapped to
+a VLAN on the leaf pair where the server is being connected
+then there will not be a `physical_network` match to a segment in the network and
+one of the baremetal port's of the server. In this case
+we will not have a VLAN segment, so we will allocate a new VLAN
+in the correct leaf pair by utilizing the `physical_network` of one of the
+baremetal ports to create a VLAN segment and attach it to the VXLAN network. The
+mechanism is then responsible for then ensuring the switch configuration is applied.
+The code then re-attempts this operation and this time finds a match and is able to
 use it.
 
 For more technical details on this operation see the Bind Port section.
@@ -95,7 +102,7 @@ handled.
 
 ## A View from the Neutron API/CLI
 
-First we'll create a self-service network with the following:
+First we'll create a self-serviced tenant network with the following:
 
 ```bash
 openstack network create milantest
@@ -181,7 +188,7 @@ openstack network segment show 5ab3339d-ae44-4f45-9293-7b41a83bf473
 +------------------+--------------------------------------+
 ```
 
-Now we can look at the ports and confirm that indeed this segment exists to provide
+Now we can check the ports to confirm that this segment exists to provide
 connectivity to this server.
 
 ```bash
@@ -381,7 +388,7 @@ While `bind_port()` is a distinct method inside of an ML2 mechanism, there is
 no direct call for this via the Neutron API. This method is triggered by
 Neutron based on certain data provided to port creation and update API calls.
 
-`bind_port()` will be triggered in the following situation:
+`bind_port()` will be triggered in the following situations:
 
 - the port has a binding host
 - the port is either unbound or has previously failed to bind
@@ -397,3 +404,4 @@ Neutron based on certain data provided to port creation and update API calls.
 [neutron-l2-adjacency]: <https://specs.openstack.org/openstack/neutron-specs/specs/newton/routed-networks.html>
 [networking-generic-switch]: <https://docs.openstack.org/networking-generic-switch/latest/>
 [ironic-vif-attachment]: <https://docs.openstack.org/ironic/latest/admin/networking.html#vif-attachment-flow>
+[ironic-spec-dpa]: <https://review.opendev.org/c/openstack/ironic-specs/+/945642>
