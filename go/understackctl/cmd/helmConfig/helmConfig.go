@@ -5,38 +5,34 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rackerlabs/understack/go/understack/cmd"
-	"github.com/rackerlabs/understack/go/understack/helpers"
+	"github.com/rackerlabs/understack/go/understackctl/helpers"
 
 	"github.com/gookit/goutil/envutil"
 	"github.com/gookit/goutil/fsutil"
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	cmd.RootCmd.AddCommand(HelmConfig)
+func NewCmdHelmConfig() *cobra.Command {
+	return &cobra.Command{
+		Use:   "helm-config",
+		Short: "Create helm config for individual services",
+		Long:  "",
+		Run:   helmConfigGen,
+	}
 }
-
-var HelmConfig = &cobra.Command{
-	Use:   "helm-config",
-	Short: "Create helm config for individual services",
-	Long:  "",
-	Run:   helmConfigGen,
-}
-
 func helmConfigGen(cmd *cobra.Command, args []string) {
-  functions := []func() error{
-    dex,
-    glance,
-    ironic,
-    rook,
-  }
-  for _, fn := range functions {
-    if err := fn(); err != nil {
-      fmt.Printf("Error helmConfigGen: %v\n", err)
-      os.Exit(1)
-    }
-  }
+	functions := []func() error{
+		dex,
+		glance,
+		ironic,
+		rook,
+	}
+	for _, fn := range functions {
+		if err := fn(); err != nil {
+			fmt.Printf("Error helmConfigGen: %v\n", err)
+			os.Exit(1)
+		}
+	}
 }
 
 func dex() error {

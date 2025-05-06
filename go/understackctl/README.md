@@ -21,7 +21,7 @@ export UC_AIO=yes
 * Run
 
 ```
-go run *.go init
+go run *.go quickstart
 go run *.go help
 ```
 

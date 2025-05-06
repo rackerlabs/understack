@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/rackerlabs/understack/go/understack/cmd"
-	"github.com/rackerlabs/understack/go/understack/helpers"
+	"github.com/rackerlabs/understack/go/understackctl/helpers"
 
 	"github.com/charmbracelet/log"
 	"github.com/gookit/goutil/envutil"
@@ -13,15 +12,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	cmd.RootCmd.AddCommand(Dex)
-}
-
-var Dex = &cobra.Command{
-	Use:   "dex-secrets",
-	Short: "Create dex secret for nautobot, argo, argocd, keystone, grafana",
-	Long:  "Create dex secret for nautobot, argo, argocd, keystone, grafana",
-	Run:   generateDexSecrets,
+func NewCmdDexSecrets() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dex-secrets",
+		Short: "Create dex secret for nautobot, argo, argocd, keystone, grafana",
+		Long:  "Create dex secret for nautobot, argo, argocd, keystone, grafana",
+		Run:   generateDexSecrets,
+	}
 }
 
 func generateDexSecrets(cmd *cobra.Command, args []string) {

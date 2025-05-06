@@ -4,8 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rackerlabs/understack/go/understack/cmd"
-	"github.com/rackerlabs/understack/go/understack/helpers"
+	"github.com/rackerlabs/understack/go/understackctl/helpers"
 
 	"github.com/charmbracelet/log"
 	"github.com/gookit/goutil/envutil"
@@ -19,17 +18,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func init() {
-	cmd.RootCmd.AddCommand(Other)
-}
-
 var openStackSecrets map[string]any
 
-var Other = &cobra.Command{
-	Use:   "other-secrets",
-	Short: "Create secret for keystone, ironic, placement, neutron, nova, glance",
-	Long:  "Create secret for keystone, ironic, placement, neutron, nova, glance",
-	Run:   generateOtherSecrets,
+func NewCmdOtherSecrets() *cobra.Command {
+	return &cobra.Command{
+		Use:   "other-secrets",
+		Short: "Create secret for keystone, ironic, placement, neutron, nova, glance",
+		Long:  "Create secret for keystone, ironic, placement, neutron, nova, glance",
+		Run:   generateOtherSecrets,
+	}
 }
 
 func generateOtherSecrets(_ *cobra.Command, _ []string) {
@@ -59,9 +56,9 @@ func generateOtherSecrets(_ *cobra.Command, _ []string) {
 	// Create Empty Dirs
 	emptyDirs := []string{"argo-events", "ovn", "metallb", "undersync", "cilium"}
 	for _, service := range emptyDirs {
-    if err := fsutil.WriteFile(helpers.GetManifestPathToService(service)+"/.keep", "", os.ModePerm); err != nil {
-      log.Errorf("Failed creating .keep file for %s: %v", service, err)
-    }
+		if err := fsutil.WriteFile(helpers.GetManifestPathToService(service)+"/.keep", "", os.ModePerm); err != nil {
+			log.Errorf("Failed creating .keep file for %s: %v", service, err)
+		}
 	}
 }
 

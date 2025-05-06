@@ -1,36 +1,32 @@
-package ironic
+package quickstart
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
 
-	"github.com/rackerlabs/understack/go/understack/cmd"
-	"github.com/rackerlabs/understack/go/understack/cmd/argocd"
-	"github.com/rackerlabs/understack/go/understack/cmd/certManager"
-	"github.com/rackerlabs/understack/go/understack/cmd/dex"
-	"github.com/rackerlabs/understack/go/understack/cmd/helmConfig"
-	"github.com/rackerlabs/understack/go/understack/cmd/node"
-	"github.com/rackerlabs/understack/go/understack/cmd/openstack"
-	"github.com/rackerlabs/understack/go/understack/cmd/other"
-
 	"github.com/charmbracelet/log"
 	"github.com/gookit/goutil/envutil"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/argocd"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/certManager"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/dex"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/helmConfig"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/node"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/openstack"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/other"
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	cmd.RootCmd.AddCommand(Init)
+func NewCmdQuickStart() *cobra.Command {
+	return &cobra.Command{
+		Use:   "quickstart",
+		Short: "Run all the steps required",
+		Long:  "Run all the steps required",
+		Run:   qsRun,
+	}
 }
 
-var Init = &cobra.Command{
-	Use:   "init",
-	Short: "Run all the init the steps required",
-	Long:  "Run all the init the steps required",
-	Run:   initRun,
-}
-
-func initRun(cmd *cobra.Command, args []string) {
+func qsRun(cmd *cobra.Command, args []string) {
 
 	log.Info("using envs",
 		"DEPLOY_NAME", envutil.Getenv("DEPLOY_NAME"),
@@ -60,23 +56,23 @@ func initRun(cmd *cobra.Command, args []string) {
 	fmt.Println(envutil.Getenv("DEPLOY_NAME"))
 
 	log.Info("== Node Update")
-	node.Node.Run(cmd, args)
+	node.NewCmdNode().Run(cmd, args)
 
 	log.Info("== Node ArgoCd")
-	argocd.ArgoCMD.Run(cmd, args)
+	argocd.NewCmdArgocdSecret().Run(cmd, args)
 
 	log.Info("== Node Cert Manager")
-	certManager.CertManager.Run(cmd, args)
+	certManager.NewCmdCertManagerSecret().Run(cmd, args)
 
 	log.Info("== Running Dex")
-	dex.Dex.Run(cmd, args)
+	dex.NewCmdDexSecrets().Run(cmd, args)
 
 	log.Info("== Running For Other Services")
-	other.Other.Run(cmd, args)
+	other.NewCmdOtherSecrets().Run(cmd, args)
 
 	log.Info("== Running Openstack")
-	openstack.Openstack.Run(cmd, args)
+	openstack.NewCmdOpenstackSecrets().Run(cmd, args)
 
 	log.Info("== Creating Helm Configs")
-	helmConfig.HelmConfig.Run(cmd, args)
+	helmConfig.NewCmdHelmConfig().Run(cmd, args)
 }
