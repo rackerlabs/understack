@@ -8,17 +8,6 @@ permissions_groups:
 permissions_permissions:
   # escape hatch permission allowing ucadmin members
   # to edit their own user to grant themselves superuser
-  - name: ucadmin-edit-users
-    description: allow user editing for ucadmin
-    display: User Edit for superuser granting
-    enabled: true
-    actions:
-      - view
-      - change
-    object_types:
-      - users.user
-    groups:
-      - ucadmin
   - name: all-user-defaults
     description: permissions granted to all users by default
     enabled: true

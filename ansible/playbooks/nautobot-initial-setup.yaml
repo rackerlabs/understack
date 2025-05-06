@@ -44,7 +44,6 @@
     - role: git_repos
     - role: location_types
     - role: locations
-    - role: tenant_groups
     - role: roles
     - role: statuses
     - role: custom_fields
@@ -52,4 +51,3 @@
     - role: manufacturers
     - role: platforms
     - role: relationships
-    - role: device_types

@@ -17,5 +17,5 @@ platforms_defaults:
 platforms_with_drivers:
   - man: Cisco
     name: "Cisco NX-OS"
-    driver: nxos
+    driver: nxos_ssh
     network: cisco_nxos
