@@ -95,3 +95,34 @@ metrics:
   enabled: true
   prometheusRule:
     enabled: true
+
+extraObjects:
+  - apiVersion: batch/v1
+    kind: CronJob
+    metadata:
+      name: sync-nautobot-ansible
+      namespace: nautobot
+    spec:
+      schedule: "0 0 * * *"  # Every day at 00:00 UTC
+      jobTemplate:
+        spec:
+          template:
+            spec:
+              containers:
+                - name: ansible-runner
+                  image: ghcr.io/rackerlabs/understack/ansible:latest
+                  command: ["ansible-runner", "run", "/runner", "--playbook", "debug.yaml"]
+                  env:
+                    - name: NAUTOBOT_TOKEN
+                      valueFrom:
+                        secretKeyRef:
+                          name: nautobot-superuser
+                          key: apitoken
+                    - name: NAUTOBOT_URL
+                      value: http://nautobot-default.nautobot
+              restartPolicy: Never
+              volumes:
+                - name: runner-data
+                  emptyDir: {}
+      successfulJobsHistoryLimit: 3
+      failedJobsHistoryLimit: 1
