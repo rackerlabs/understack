@@ -17,7 +17,7 @@ GOARCH_LIST=386 amd64 arm64
 
 BUILD_DIR=build
 
-VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+VERSION := $(shell git describe --tags --abbrev=0 --match "understack/v[0-9]*.[0-9]*.[0-9]*" 2>/dev/null || echo "dev")
 COMMIT  := $(shell git rev-parse --short HEAD)
 LDFLAGS := -ldflags="-s -w -X 'main.version=$(VERSION)' -X 'main.commit=$(COMMIT)'"
 

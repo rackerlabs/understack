@@ -30,7 +30,7 @@ jobs:
           cache: true
 
       - name: Install dependencies
-        run: sudo apt-get install -y zip tar make sed grep
+        run: sudo apt-get install -y sed grep
 
       - name: Build and Package
         working-directory: go/understack
