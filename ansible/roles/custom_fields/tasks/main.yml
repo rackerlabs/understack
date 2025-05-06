@@ -44,7 +44,7 @@
         VLAN ID visible to the Tenant, used in the dot1q tag when this VNI
         appears on a trunk port.  Normally different to the actual VLAN created
         on the switch - we use VLAN translation to gives the tenant a consistent
-        VLAN ID accross the whole fabric.
+        VLAN ID across the whole fabric.
     label: Tenant VLAN ID
     type: integer
     key: tenant_vlan_id

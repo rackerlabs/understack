@@ -3,7 +3,7 @@
 In your variables you'll need to define something like:
 
 ```yaml
-nb_secrets_groups:
+secrets_nb_secrets_groups:
   gh_dev_type_pat:
     - access_type: "HTTP(S)"
       secret_type: token
