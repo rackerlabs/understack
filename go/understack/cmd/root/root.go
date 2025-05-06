@@ -5,6 +5,7 @@ import (
 
 	"github.com/rackerlabs/understack/go/understack/cmd/argocd"
 	"github.com/rackerlabs/understack/go/understack/cmd/certManager"
+	"github.com/rackerlabs/understack/go/understack/cmd/deploy"
 	"github.com/rackerlabs/understack/go/understack/cmd/dex"
 	"github.com/rackerlabs/understack/go/understack/cmd/helmConfig"
 	"github.com/rackerlabs/understack/go/understack/cmd/node"
@@ -25,6 +26,7 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.AddCommand(deploy.NewCmdDeploy())
 	rootCmd.AddCommand(argocd.NewCmdArgocdSecret())
 	rootCmd.AddCommand(certManager.NewCmdCertManagerSecret())
 	rootCmd.AddCommand(dex.NewCmdDexSecrets())

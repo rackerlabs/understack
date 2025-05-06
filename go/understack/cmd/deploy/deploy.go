@@ -1,13 +1,14 @@
-package cmd
+package deploy
 
 import (
 	"fmt"
-	"github.com/charmbracelet/log"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/charmbracelet/log"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -15,23 +16,21 @@ const (
 	deployRepoFlag   = "deploy-repo"
 )
 
-var DeployCmd = &cobra.Command{
-	Use:   "deploy [--deploy-repo UC_DEPLOY] command",
-	Short: "UnderStack deployment",
-	Long:  ``,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// If no subcommand, show help
-		return cmd.Help()
-	},
-	PersistentPreRunE: preRun,
-	PreRun: func(cmd *cobra.Command, args []string) {
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-	},
-	PostRun: func(cmd *cobra.Command, args []string) {
-	},
-	PersistentPostRun: func(cmd *cobra.Command, args []string) {
-	},
+func NewCmdDeploy() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "deploy [--deploy-repo UC_DEPLOY] command",
+		Short: "UnderStack deployment",
+		Long:  ``,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// If no subcommand, show help
+			return cmd.Help()
+		},
+		PersistentPreRunE: preRun,
+	}
+
+	setFlags(cmd)
+
+	return cmd
 }
 
 func expandPath(path string) (string, error) {
@@ -74,7 +73,7 @@ func preRun(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func init() {
+func setFlags(cmd *cobra.Command) {
 	// bind our flag
 	if err := viper.BindEnv(deployRepoFlag, deployRepoEnvVar); err != nil {
 		log.Fatal("failed to bind", "env", deployRepoFlag, "err", err)
@@ -88,10 +87,9 @@ func init() {
 		"Path to your deployment repo (env: %s) (current: %s)",
 		deployRepoEnvVar, deployRepo,
 	)
-	DeployCmd.PersistentFlags().String(deployRepoFlag, "", helpText)
-	if err := viper.BindPFlag(deployRepoFlag, DeployCmd.PersistentFlags().Lookup(deployRepoFlag)); err != nil {
+	cmd.PersistentFlags().String(deployRepoFlag, "", helpText)
+	if err := viper.BindPFlag(deployRepoFlag, cmd.PersistentFlags().Lookup(deployRepoFlag)); err != nil {
 		log.Fatal("failed to bind", "flag", deployRepoFlag, "err", err)
 		os.Exit(1)
 	}
-
 }
