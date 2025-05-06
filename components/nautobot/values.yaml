@@ -110,8 +110,9 @@ extraObjects:
             spec:
               containers:
                 - name: ansible-runner
-                  image: ghcr.io/rackerlabs/understack/ansible:907
-                  command: ["ansible-runner", "run", "/runner", "--playbook", "debug.yaml"]
+                  image: ghcr.io/rackerlabs/understack/ansible:pr-907
+                  imagePullPolicy: Always
+                  command: ["ansible-runner", "run", "/runner", "--playbook", "nautobot-initial-setup.yaml"]
                   env:
                     - name: NAUTOBOT_TOKEN
                       valueFrom:
@@ -119,7 +120,7 @@ extraObjects:
                           name: nautobot-superuser
                           key: apitoken
                     - name: NAUTOBOT_URL
-                      value: http://nautobot-default.nautobot
+                      value: http://nautobot-default.nautobot.svc.cluster.local
               restartPolicy: Never
               volumes:
                 - name: runner-data
