@@ -1,0 +1,14 @@
+---
+component: snmp-exporter
+componentNamespace: monitoring
+sources:
+  - repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-snmp-exporter
+    targetRevision: 5.6.0
+    helm:
+      releaseName: prometheus-snmp-exporter
+      valueFiles:
+        - $deploy/{{.name}}/helm-configs/prometheus-snmp-exporter.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+  - ref: deploy

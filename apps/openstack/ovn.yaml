@@ -1,0 +1,4 @@
+---
+component: ovn
+repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
+chartVersion: 2024.2.0

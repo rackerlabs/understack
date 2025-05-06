@@ -1,0 +1,4 @@
+---
+component: ironic
+repoURL: https://tarballs.opendev.org/openstack/openstack-helm
+chartVersion: 0.2.21

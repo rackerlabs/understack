@@ -1,0 +1,7 @@
+---
+component: undersync
+sources:
+  - ref: understack
+    path: 'components/undersync'
+  - ref: deploy
+    path: '{{.name}}/manifests/undersync'
