@@ -85,3 +85,26 @@ options, refer to the official OpenStack documentation:
 
 * [OpenStack CLI Command Reference - Image](https://docs.openstack.org/python-openstackclient/latest/cli/command-objects/image.html)
 * [OpenStack Image Service (Glance) Documentation](https://docs.openstack.org/glance/latest/)
+
+## Talos Linux
+
+You can use [Talos Linux][talos] in Understack.
+
+Using the [Talos image factory][talos-image-factory] to create the image:
+
+* Under `Hardware Type` choose `Cloud Server` and hit next
+* Choose the version and hit next
+* Choose `OpenStack` for the Cloud provider and hit next
+* Choose your machine architecture - in our case it's `amd64` - and hit next
+* Choose system extensions and drivers you may need. In our case we want the `amd-ucode` and `bnx2-bnx2x` extensions. Then hit next.
+* Choose any customizations you may need. Understack works with the defaults. Then hit next.
+* On this page you can download The disk image for example `openstack-amd64.raw.xz`
+
+We can now take the raw image and add it to glance to make it available for new server builds:
+
+``` bash
+openstack image create --public --disk-format raw --file openstack-amd64.raw 'Talos 1.10.0'
+```
+
+[talos]: <https://www.talos.dev/>
+[talos-image-factory]: <https://factory.talos.dev/>
