@@ -18,8 +18,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": [
-        "apps/appsets/openstack.yaml$"
+      "managerFilePatterns": [
+        "/apps/appsets/openstack.yaml$/"
       ],
       "matchStrings": [
         "\\s- component: (?<depName>.+)\\n\\s+repoURL: (?<packageName>.+)\\n\\s+chartVersion: (?<currentValue>.+)\\s"
@@ -28,7 +28,9 @@
     },
     {
       "customType": "regex",
-      "fileMatch": ["^.*\\.ya?ml$"],
+      "managerFilePatterns": [
+        "/^.*\\.ya?ml$/"
+      ],
       "matchStrings": [
         "(?<depName>[^/]+/[^/]+)/releases/download/v(?<currentValue>[^/]+)"
       ],

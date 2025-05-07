@@ -71,7 +71,7 @@ repos:
         files: '^python/understack-workflows/'
         args: ["-C", "python/understack-workflows", "--no-update"]
   - repo: https://github.com/renovatebot/pre-commit-hooks
-    rev: 39.174.0
+    rev: 40.8.1
     hooks:
       - id: renovate-config-validator
   - repo: https://github.com/RobertCraigie/pyright-python
