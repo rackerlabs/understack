@@ -68,7 +68,8 @@ func (r *ClientReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	deleteRequested, err := r.handleDeletion(ctx, clientSpec)
 	if err != nil {
 		return ctrl.Result{}, err
-	} else if deleteRequested {
+	}
+	if deleteRequested {
 		return ctrl.Result{}, nil
 	}
 
