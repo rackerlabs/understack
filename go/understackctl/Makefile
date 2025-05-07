@@ -1,23 +1,23 @@
-# Makefile will understack go binary for multiple GOOS and GOARCH
+# Makefile will understackctl go binary for multiple GOOS and GOARCH
 #
 # Output will be like this:
-# understack_darwin_amd64/
-#   └── understack
-# understack_windows_amd64/
-#   └── understack.exe
-# understack_darwin_amd64.tar.gz
-# understack_windows_amd64.zip
+# understackctl_darwin_amd64/
+#   └── understackctl
+# understackctl_windows_amd64/
+#   └── understackctl.exe
+# understackctl_darwin_amd64.tar.gz
+# understackctl_windows_amd64.zip
 #
 # package-all: will package folders into .tar.gz and for windows .zip
 
-BINARY_NAME=understack
+BINARY_NAME=understackctl
 
 GOOS_LIST=linux darwin windows
 GOARCH_LIST=386 amd64 arm64
 
 BUILD_DIR=build
 
-VERSION := $(shell git describe --tags --abbrev=0 --match "understack/v[0-9]*.[0-9]*.[0-9]*" 2>/dev/null || echo "dev")
+VERSION := $(shell git describe --tags --abbrev=0 --match "understackctl/v[0-9]*.[0-9]*.[0-9]*" 2>/dev/null || echo "dev")
 COMMIT  := $(shell git rev-parse --short HEAD)
 LDFLAGS := -ldflags="-s -w -X 'main.version=$(VERSION)' -X 'main.commit=$(COMMIT)'"
 

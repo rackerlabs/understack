@@ -2,7 +2,7 @@ name: Releases
 on:
   push:
     tags:
-      - "understack/v[0-9]+.[0-9]+.[0-9]+"
+      - "understackctl/v[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
   contents: write
@@ -33,7 +33,7 @@ jobs:
         run: sudo apt-get install -y sed grep
 
       - name: Build and Package
-        working-directory: go/understack
+        working-directory: go/understackctl
         run: |
           make build-all package-all checksums
 
@@ -41,8 +41,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            go/understack/build/*.zip
-            go/understack/build/*.tar.gz
-            go/understack/build/checksums.txt
+            go/understackctl/build/*.zip
+            go/understackctl/build/*.tar.gz
+            go/understackctl/build/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
