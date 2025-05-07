@@ -1,0 +1,11 @@
+apiVersion: dex.rax.io/v1alpha1
+kind: Client
+metadata:
+  labels:
+  name: fred-client
+spec:
+  name: fred
+  secretName: my-secret
+  redirectURIs:
+    - http://localhost:8080
+    - https://some.service.example.com/
