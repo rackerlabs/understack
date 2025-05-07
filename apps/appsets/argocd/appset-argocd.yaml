@@ -26,6 +26,8 @@ spec:
           kustomize:
             components:
               - components/sso
+              - '{{index .metadata.annotations "uc_deploy_git_url"}}/{{.name}}/manifests/argocd?ref={{index .metadata.annotations "uc_deploy_ref"}}'
+            ignoreMissingComponents: true
             patches:
               - target:
                   kind: ConfigMap

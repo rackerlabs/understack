@@ -77,6 +77,10 @@ spec:
           path: components/{{.component}}/
           targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
           ref: understack
+          kustomize:
+            components:
+              - '{{index .metadata.annotations "uc_deploy_git_url"}}/{{.name}}/manifests/{{.components}}?ref={{index .metadata.annotations "uc_deploy_ref"}}'
+            ignoreMissingComponents: true
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
           path: '{{.name}}/manifests/{{.component}}'
