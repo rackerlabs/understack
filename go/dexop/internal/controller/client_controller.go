@@ -211,7 +211,7 @@ func (r *ClientReconciler) generateSecret(ctx context.Context, secretmgr *Secret
 		return "", err
 	}
 
-	if secret.Data["secret"] == nil {
+	if secret.Data == nil || secret.Data["secret"] == nil {
 		reqLogger.Error(nil, "Secret data is missing", "SecretName", clientSpec.Spec.SecretName)
 		return "", nil
 	}

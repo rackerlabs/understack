@@ -21,6 +21,9 @@ type DexManager struct {
 
 // Creates new Oauth2 client in Dex
 func (d *DexManager) CreateOauth2Client(clientSpec *dexv1alpha1.Client) (*dexapi.CreateClientResp, error) {
+	if clientSpec == nil {
+		return nil, fmt.Errorf("clientSpec is missing")
+	}
 	request := &dexapi.CreateClientReq{
 		Client: &dexapi.Client{
 			Id:           clientSpec.Spec.Name,
