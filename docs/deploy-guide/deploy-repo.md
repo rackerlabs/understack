@@ -47,8 +47,11 @@ during testing.
 
 Inside of the `manifests` directory you'll create child directories that will
 be named after each application that we will deploy. These directories are
-expected to hold a `kustomization.yaml` as `kustomize` will be used to apply
-these manifests to your cluster.
+expected to hold a `kustomization.yaml`  that will be used as a component
+to the primary `kustomization.yaml` in the UnderStack repo.  `kustomize`
+will be used to apply these manifests to your cluster.
+
+See the documentation on `kustomize` [Components][components] for more info.
 
 ### helm-configs directory
 
@@ -66,3 +69,5 @@ to configure different services
 This directory contains an Ansible inventory file along with Ansible
 group_vars that are used as data by Ansible executions within the cluster
 to configure different services.
+
+[components]: <https://kubectl.docs.kubernetes.io/guides/config_management/components/>
