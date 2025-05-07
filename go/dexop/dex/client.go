@@ -104,7 +104,7 @@ func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexC
 	cPool := x509.NewCertPool()
 	caCert, err := os.ReadFile(caPath)
 	if err != nil {
-		return nil, fmt.Errorf("invalid CA crt file: %s", caPath)
+		return nil, fmt.Errorf("invalid CA crt file (%s): %w", caPath, err)
 	}
 	if !cPool.AppendCertsFromPEM(caCert) {
 		return nil, fmt.Errorf("failed to parse CA crt")
@@ -112,7 +112,7 @@ func newDexClient(hostAndPort, caPath, clientKey, clientCrt string) (dexapi.DexC
 
 	clientCert, err := tls.LoadX509KeyPair(clientCrt, clientKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid client crt file: %s", clientCrt)
+		return nil, fmt.Errorf("invalid client crt(%s) or key(%s) file: %w", clientCrt, clientKey, err)
 	}
 
 	clientTLSConfig := &tls.Config{
