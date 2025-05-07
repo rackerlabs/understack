@@ -19,7 +19,7 @@ configs:
   params:
     server.insecure: true
   cm:
-    kustomize.buildOptions: --enable-helm
+    kustomize.buildOptions: --enable-helm --load-restrictor LoadRestrictionsNone
     resource.exclusions: |
         - apiGroups:
           - cilium.io
