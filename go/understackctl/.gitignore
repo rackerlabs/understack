@@ -21,6 +21,7 @@ vendor/
 
 # goreleaser dist folder
 dist/
+build/
 
 # IntelliJ
 .idea

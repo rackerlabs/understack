@@ -1,6 +1,6 @@
-# understack
+# understackctl
 
-UnderStack CLI helps quickly generate a deployment repository.
+understackctl is a CLI that helps quickly generate a deployment repository.
 
 ## How to use
 
@@ -18,7 +18,7 @@ export UC_DEPLOY_EMAIL="<your_email>"
 export UC_AIO=yes
 ```
 
-* Run
+* Quick Run
 
 ```
 go run *.go quickstart
@@ -27,6 +27,33 @@ go run *.go help
 
 * Commit all changes to the undercloud-deploy repo in your branch
 
+## Build
+
+* Local build `make build` ( this will only build binary for you local os ).
+* Cross-Platform build `make build-all` ( build for linux-mac-windows )
+
+## Development
+
+* To add a new command, create a function like this.
+
+```go
+func NewCmdMyCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "mycommand",
+		Short: "This will run my command",
+		Long:  "This will run my command",
+		Run:   myCommandFunction,
+	}
+}
+```
+
+* After that register it to `cmd/root/root.go`
+
+```go
+func init() {
+	rootCmd.AddCommand(deploy.NewCmdMyCommand())
+}
+```
 
 ## Contributing
 
