@@ -58,7 +58,7 @@ repos:
           - jmespath
         files: '^ansible/.*$'
   - repo: https://github.com/python-poetry/poetry
-    rev: '1.7.1'
+    rev: '2.1.3'
     hooks:
       - id: poetry-check
         language_version: "3.11"
@@ -69,7 +69,7 @@ repos:
         language_version: "3.11"
         name: "poetry-lock (understack-workflows)"
         files: '^python/understack-workflows/'
-        args: ["-C", "python/understack-workflows", "--no-update"]
+        args: ["-C", "python/understack-workflows"]
   - repo: https://github.com/renovatebot/pre-commit-hooks
     rev: 40.8.1
     hooks:
