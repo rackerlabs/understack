@@ -54,7 +54,8 @@ these manifests to your cluster.
 
 The `helm-configs` directory holds YAML files which are Helm `values.yaml`
 files that are used as additional values files that will be merged together
-by Helm.
+by Helm. These yaml files will be named after each application with the `.yaml`
+file extension.
 
 ### inventory directory
 
