@@ -6,6 +6,9 @@ spec:
   syncPolicy:
     applicationsSync: create-update
     preserveResourcesOnDeletion: true
+  ignoreApplicationDifferences:
+    - jsonPointers:
+        - /spec/syncPolicy
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
