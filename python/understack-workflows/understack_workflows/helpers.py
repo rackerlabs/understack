@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import pathlib
 from functools import partial
 from urllib.parse import urlparse
@@ -56,6 +57,8 @@ comma_list_args = partial(str.split, sep=",")
 
 
 def credential(subpath, item):
-    ref = pathlib.Path("/etc").joinpath(subpath).joinpath(item)
+    ref = (
+        pathlib.Path(os.getenv("SECRETS_DIR", "/etc")).joinpath(subpath).joinpath(item)
+    )
     with ref.open() as f:
         return f.read().strip()
