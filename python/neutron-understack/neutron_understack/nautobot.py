@@ -91,7 +91,7 @@ class Nautobot:
 
     def ucvni_delete(self, network_id: str) -> bool:
         try:
-            return self.api.plugins.undercloud_vni.ucnvis.delete([network_id])
+            return self.api.plugins.undercloud_vni.ucvnis.delete([network_id])
         except pynautobot.RequestError as e:
             raise NautobotRequestError.from_nautobot_request_error(e) from e
 
