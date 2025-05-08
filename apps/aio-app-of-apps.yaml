@@ -6,6 +6,11 @@ metadata:
 spec:
   syncPolicy:
     preserveResourcesOnDeletion: true
+  ignoreApplicationDifferences:
+    - jsonPointers:
+      # Allow temporarily disabling auto-sync for troubleshooting
+      # https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Controlling-Resource-Modification/#allow-temporarily-toggling-auto-sync
+      - /spec/syncPolicy
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
