@@ -11,7 +11,7 @@
     "kustomize@3.10.0",
     "telepresence2@2.21.3",
     "jq@latest",
-    "poetry@1.8.3"
+    "poetry@2.1.2"
   ],
   "shell": {
     "init_hook": [
