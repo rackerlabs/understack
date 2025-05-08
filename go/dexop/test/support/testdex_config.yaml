@@ -1,15 +1,13 @@
-issuer: http://127.0.0.1:15556/dex # The URL clients will use to connect to Dex
+issuer: http://127.0.0.1:15556/dex  # The URL clients will use to connect to Dex
 storage:
   type: memory
 web:
   http: 127.0.0.1:15556
-
 grpc:
   addr: 127.0.0.1:15557
   # don't do that in production
   plainText: true
-
 connectors:
-- type: mockCallback
-  id: mock
-  name: Example
+  - type: mockCallback
+    id: mock
+    name: Example
