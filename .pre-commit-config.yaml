@@ -69,7 +69,7 @@ repos:
         language_version: "3.11"
         name: "poetry-lock (understack-workflows)"
         files: '^python/understack-workflows/'
-        args: ["-C", "python/understack-workflows", "--no-update"]
+        args: ["-C", "python/understack-workflows"]
   - repo: https://github.com/renovatebot/pre-commit-hooks
     rev: 40.8.1
     hooks:
