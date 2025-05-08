@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: patch-application-automated-sync
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: name
+        description: "Name of the Application resource to modify."
+      - name: duration
+        description: "Duration in minutes to keep automated sync disabled."
+        value: "30"
+
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: disable-automated-sync
+            template: patch-automated-sync
+            arguments:
+              parameters:
+                - name: resource-name
+                  value: "{{workflow.parameters.name}}"
+                - name: automated-value
+                  value: "false"
+
+          - name: wait-for-duration
+            template: wait
+            dependencies: [disable-automated-sync]
+            arguments:
+              parameters:
+                - name: duration-minutes
+                  value: "{{workflow.parameters.duration}}"
+
+          - name: enable-automated-sync
+            template: patch-automated-sync
+            dependencies: [wait-for-duration]
+            arguments:
+              parameters:
+                - name: resource-name
+                  value: "{{workflow.parameters.name}}"
+                - name: automated-value
+                  value: "true"
+
+    - name: patch-automated-sync
+      inputs:
+        parameters:
+          - name: resource-name
+          - name: automated-value
+      resource:
+        action: patch
+        group: argoproj.io
+        version: v1alpha1
+        kind: Application
+        name: "{{inputs.parameters.resource-name}}"
+        patch: |
+          [
+            {
+              "op": "replace",
+              "path": "/spec/syncPolicy/automated",
+              "value": {{inputs.parameters.automated-value}}
+            }
+          ]
+    - name: wait
+      inputs:
+        parameters:
+          - name: duration-minutes
+      suspend:
+        duration: "{{=sprig.int(inputs.parameters.duration-minutes) * 60}}" # Convert minutes to seconds string for duration
