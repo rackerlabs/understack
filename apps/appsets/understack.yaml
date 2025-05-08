@@ -110,6 +110,9 @@ spec:
     applicationsSync: create-update
     # for infrastructure resources we don't want to delete things automatically
     preserveResourcesOnDeletion: true
+  ignoreApplicationDifferences:
+    - jsonPointers:
+        - /spec/syncPolicy
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
