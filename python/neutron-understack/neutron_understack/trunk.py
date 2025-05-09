@@ -171,7 +171,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             subport_network_id = utils.fetch_subport_network_id(
                 subport_id=subport["port_id"]
             )
-            network_segment = utils.allocate_dynamic_segment(
+            current_segment = utils.network_segment_by_physnet(
+                network_id=subport_network_id,
+                physnet=vlan_group_name,
+            )
+            network_segment = current_segment or utils.allocate_dynamic_segment(
                 network_id=subport_network_id,
                 physnet=vlan_group_name,
             )
