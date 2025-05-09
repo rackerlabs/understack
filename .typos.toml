@@ -6,7 +6,8 @@ extend-exclude = [
     "schema/argo-workflows.json",
     "python/understack-workflows/tests/json_samples/",
     "containers/*/patches",
-    "go.mod"
+    "go.mod",
+    "ansible/roles/statuses/defaults/main.yaml",
 ]
 
 [default]
@@ -19,3 +20,4 @@ extend-ignore-identifiers-re = [
 HPE = "HPE"
 fo = "fo"
 sme = "sme"
+4caf50 = "4caf50"

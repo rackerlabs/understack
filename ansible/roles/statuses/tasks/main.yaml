@@ -1,0 +1,12 @@
+---
+
+- name: Create Understack specific Device Statuses
+  networktocode.nautobot.status:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    description: "{{ item.description }}"
+    state: present
+    color: "{{ item.color | default('01bea3') }}"
+    content_types: "{{ item.content_types | default([]) }}"
+  loop: "{{ statuses_defaults }}"

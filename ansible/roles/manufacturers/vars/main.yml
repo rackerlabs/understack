@@ -1,0 +1,15 @@
+---
+
+manufacturers_defaults:
+  - name: Arista
+    desc: Arista
+  - name: Cisco
+    desc: Cisco
+  - name: Dell
+    desc: Dell
+  - name: F5
+    desc: F5
+  - name: HPE
+    desc: HPE
+  - name: Palo Alto
+    desc: Palo Alto

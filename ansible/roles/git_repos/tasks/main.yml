@@ -1,0 +1,5 @@
+---
+
+- name: Define git repos
+  ansible.builtin.include_tasks: git_repo_def.yml
+  loop: "{{ git_repos_nb_git_repos | dict2items }}"

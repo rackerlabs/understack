@@ -1,0 +1,42 @@
+---
+# Device Types repo: https://github.com/RSS-Engineering/undercloud-nautobot-device-types
+
+- name: Device Types Git Data
+  block:
+
+    - name: Create a temporary directory for the repo
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: repo
+      register: temp_dir
+      check_mode: false
+
+    - name: Collect device types from undercloud-nautobot-device-types repo
+      ansible.builtin.set_fact:
+        device_types_data: "{{ device_types_data | d([]) + [lookup('file', item.src) | from_yaml] }}"
+      with_community.general.filetree: "{{ temp_dir.path }}/device-types/"
+      when: item.state == "file"
+      check_mode: false
+
+  always:
+    - name: Clean up the Device Types Git Clone
+      ansible.builtin.file:
+        path: "{{ temp_dir.path }}"
+        state: absent
+      when: temp_dir is defined and temp_dir.path is defined
+      check_mode: false
+
+- name: Sync manufacturers
+  networktocode.nautobot.manufacturer:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item }}"
+    description: "{{ item }}"
+    state: present
+  loop: "{{ device_types_data | community.general.json_query('[*].manufacturer') | unique }}"
+
+- name: Loop through device types
+  ansible.builtin.include_tasks: device_types.yml
+  loop: "{{ device_types_data }}"
+  loop_control:
+    loop_var: device_type_item

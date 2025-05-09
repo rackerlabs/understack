@@ -1,0 +1,53 @@
+---
+- name: Initial setup of a Nautobot Dev Instance
+  connection: local
+  hosts: nautobot
+  gather_facts: false
+
+  # The goal after this playbook runs is to have a set of devices that can
+  # be tested against. For a Device to be defined in Nautobot you must
+  # first have a Device Role, a Device Type, and a Rack. For a Device Type
+  # to be defined you must first have a Manufacturer. For a Rack to be
+  # defined you must first have a Site. The Rackspace plugin to read
+  # data from CORE and Location Manager can provide some of these but
+  # that involves enabling Jobs from our plugin first. To be able to
+  # run our Jobs we need to populate some Secrets as well.
+  #
+  # To visualized linearly we need to instanitate the following:
+  # - Jobs
+  # - Secrets
+  # - Locations
+  # - Racks
+  # - Tenants
+  # - Device Role
+  # - Manufacturer
+  # - Device Type
+  # - Devices
+
+  pre_tasks:
+    - name: Ensure nautobot is up and responding
+      ansible.builtin.uri:
+        url: "{{ nautobot_url }}/health/"
+        method: GET
+        validate_certs: false
+      register: nautobot_up_check
+      until: nautobot_up_check.status == 200
+      retries: 24  # Retries for 24 * 5 seconds = 120 seconds = 2 minutes
+      delay: 5  # Every 5 seconds
+      check_mode: false
+
+  roles:
+    - role: permissions
+      tags: permissions
+    - role: jobs
+    - role: secrets
+    - role: git_repos
+    - role: location_types
+    - role: locations
+    - role: roles
+    - role: statuses
+    - role: custom_fields
+    - role: computed_fields
+    - role: manufacturers
+    - role: platforms
+    - role: relationships

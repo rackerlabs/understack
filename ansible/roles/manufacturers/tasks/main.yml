@@ -1,0 +1,10 @@
+---
+
+- name: Create Default Manufacturers
+  networktocode.nautobot.manufacturer:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    description: "{{ item.desc }}"
+    state: present
+  loop: "{{ manufacturers_defaults }}"
