@@ -2,12 +2,12 @@
   "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.12.0/.schema/devbox.schema.json",
   "packages": [
     "python@3.11",
-    "poetry@1.8.3",
     "argo@latest",
     "difftastic@latest",
     "yq-go@3.4.1",
     "jq@latest",
-    "pyright@latest"
+    "pyright@latest",
+    "poetry@2.1.2"
   ],
   "shell": {
     "init_hook": [

@@ -4,11 +4,11 @@
     "jq@latest",
     "yq-go@3.4.1",
     "python3@3.12.8",
-    "poetry@latest",
     "kubectl@latest",
     "kubeseal@0.28.0",
     "kustomize@3.10.0",
-    "telepresence2@2.21.3"
+    "telepresence2@2.21.3",
+    "poetry@2.1.2"
   ],
   "shell": {
     "init_hook": [

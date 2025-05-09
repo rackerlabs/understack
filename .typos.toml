@@ -6,6 +6,7 @@ extend-exclude = [
     "schema/argo-workflows.json",
     "python/understack-workflows/tests/json_samples/",
     "containers/*/patches",
+    "go.mod"
 ]
 
 [default]
