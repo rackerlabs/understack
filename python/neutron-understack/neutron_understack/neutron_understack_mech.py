@@ -20,6 +20,7 @@ from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
 
 from .ml2_type_annotations import NetworkContext
+from .ml2_type_annotations import NetworkSegmentDict
 from .ml2_type_annotations import PortContext
 
 LOG = logging.getLogger(__name__)
@@ -369,7 +370,8 @@ class UnderstackDriver(MechanismDriver):
             vlan_group_name,
         )
 
-        dynamic_segment = context.allocate_dynamic_segment(
+        current_vlan_segment = self._vlan_segment_for_physnet(context, vlan_group_name)
+        dynamic_segment = current_vlan_segment or context.allocate_dynamic_segment(
             segment={
                 "network_type": p_const.TYPE_VLAN,
                 "physical_network": vlan_group_name,
@@ -398,6 +400,21 @@ class UnderstackDriver(MechanismDriver):
             vif_details={},
             status=p_const.PORT_STATUS_ACTIVE,
         )
+
+    def _vlan_segment_for_physnet(
+        self, context: PortContext, physnet: str
+    ) -> NetworkSegmentDict | None:
+        for segment in context.network.network_segments:
+            if (
+                segment[api.NETWORK_TYPE] == p_const.TYPE_VLAN
+                and segment[api.PHYSICAL_NETWORK] == physnet
+            ):
+                LOG.info(
+                    "vlan segment: %(segment)s already preset for physnet: "
+                    "%(physnet)s",
+                    {"segment": segment, "physnet": physnet},
+                )
+                return segment
 
     def invoke_undersync(self, vlan_group_name: str):
         self.undersync.sync_devices(
