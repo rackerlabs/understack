@@ -267,6 +267,9 @@ class Test_HandleSegmentDeallocation:
         mocker.patch(
             "neutron_understack.utils.ports_bound_to_segment", return_value=False
         )
+        mocker.patch(
+            "neutron_understack.utils.is_dynamic_network_segment", return_value=True
+        )
         mocker.patch.object(understack_trunk_driver.nb, "delete_vlan")
         mocker.patch("neutron_understack.utils.release_dynamic_segment")
 
