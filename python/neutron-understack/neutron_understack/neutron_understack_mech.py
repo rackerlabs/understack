@@ -268,7 +268,9 @@ class UnderstackDriver(MechanismDriver):
             original_binding, self.nb
         )
 
-        if not utils.ports_bound_to_segment(segment_id):
+        if not utils.ports_bound_to_segment(
+            segment_id
+        ) and utils.is_dynamic_network_segment(segment_id):
             context.release_dynamic_segment(segment_id)
             self.nb.delete_vlan(segment_id)
 

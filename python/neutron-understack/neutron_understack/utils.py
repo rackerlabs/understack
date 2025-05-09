@@ -105,6 +105,11 @@ def release_dynamic_segment(segment_id: str) -> None:
         core_plugin.type_manager.release_dynamic_segment(context, segment_id)
 
 
+def is_dynamic_network_segment(segment_id: str) -> bool:
+    segment = network_segment_by_id(segment_id)
+    return segment.is_dynamic
+
+
 def fetch_connected_interface_uuid(binding_profile: dict, nautobot: Nautobot) -> str:
     """Fetches the connected interface UUID from the port's binding profile.
 

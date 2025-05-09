@@ -250,7 +250,9 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
 
     def _delete_unused_segment(self, segment_id: str) -> NetworkSegment:
         network_segment = utils.network_segment_by_id(segment_id)
-        if not utils.ports_bound_to_segment(segment_id):
+        if not utils.ports_bound_to_segment(
+            segment_id
+        ) and utils.is_dynamic_network_segment(segment_id):
             utils.release_dynamic_segment(segment_id)
             self.nb.delete_vlan(vlan_id=segment_id)
         return network_segment
