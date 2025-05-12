@@ -5,12 +5,10 @@
       "customType": "regex",
       "fileMatch": ["(^|/)images-openstack\\.ya?ml$"],
       "matchStrings": [
-        "ghcr\\.io/rackerlabs/understack/(?<depName>[\\w-]+):(?<currentValue>[\\w.-]+)"
+        "ghcr\\.io/rackerlabs/(?<depName>understack/[\\w\\-]+):(?<currentValue>v[\\d\\.]+)"
       ],
       "datasourceTemplate": "docker",
-      "packageNameTemplate": "ghcr.io/rackerlabs/understack/{{depName}}",
-      "versioningTemplate": "semver",
-      "extractVersionTemplate": "{{currentValue}}"
+      "packageNameTemplate": "ghcr.io/rackerlabs/{{depName}}"
     }
   ]
 }
