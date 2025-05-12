@@ -288,7 +288,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         vlan_ids_to_remove = self._handle_segment_deallocation(subports, binding_host)
         self.nb.remove_port_network_associations(
             interface_uuid=connected_interface_id,
-            network_ids_to_remove=vlan_ids_to_remove,
+            vlan_ids_to_remove=vlan_ids_to_remove,
         )
 
         if invoke_undersync and vlan_group_name:
