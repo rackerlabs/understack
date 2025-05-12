@@ -10,5 +10,11 @@
       "datasourceTemplate": "docker",
       "packageNameTemplate": "ghcr.io/rackerlabs/{{depName}}"
     }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["ghcr.io/rackerlabs/understack/**"],
+      "groupName": "understack"
+    }
   ]
 }
