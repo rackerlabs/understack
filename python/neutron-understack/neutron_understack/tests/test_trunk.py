@@ -223,7 +223,7 @@ class Test_CleanParentPortSwitchportConfig:
         understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
 
         understack_trunk_driver.nb.remove_port_network_associations.assert_called_once_with(
-            interface_uuid=str(port_id), network_ids_to_remove={network_id}
+            interface_uuid=str(port_id), vlan_ids_to_remove={network_id}
         )
         understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
             vlan_group="physnet",
