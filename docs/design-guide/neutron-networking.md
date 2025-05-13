@@ -378,9 +378,40 @@ The names and the IDs all match, along with the VLAN ID of the segment where the
 
 Our ML2 mechanism is responsible for the following:
 
-- creating dynamic VLAN segments on VXLAN networks via port binding operations
-- deleting dynamic VLAN segments on VXLAN networks when ports are removed
-- triggering the actual operation to update the network devices
+- creating dynamic VLAN segments on VXLAN networks via port binding operations via `bind_port()`
+- deleting dynamic VLAN segments on VXLAN networks when ports are removed via `delete_port_postcommit()`
+- triggering the actual operation to update the leaf/spine devices to provide the connectivity via `update_port_postcommit()`
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant NeutronAPI
+    participant ML2Plugin
+    participant MechanismManager
+    participant MechanismDriver
+
+    %% CREATE PORT FLOW
+    Client->>NeutronAPI: POST /v2.0/ports
+    NeutronAPI->>ML2Plugin: create_port(context)
+    ML2Plugin->>ML2Plugin: _create_port_with_binding()
+    ML2Plugin->>MechanismManager: bind_port(port_context)
+    MechanismManager->>MechanismDriver: attempt to bind (e.g., OVS, SR-IOV)
+    MechanismDriver-->>MechanismManager: binding result
+    MechanismManager-->>ML2Plugin: port bound
+    ML2Plugin-->>NeutronAPI: port with binding details
+    NeutronAPI-->>Client: 201 Created + port info
+
+    %% UPDATE PORT FLOW
+    Client->>NeutronAPI: PUT /v2.0/ports/{id}
+    NeutronAPI->>ML2Plugin: update_port(context)
+    ML2Plugin->>ML2Plugin: _update_port_with_binding()
+    ML2Plugin->>MechanismManager: bind_port(port_context)
+    MechanismManager->>MechanismDriver: rebind or validate existing binding
+    MechanismDriver-->>MechanismManager: binding result
+    MechanismManager-->>ML2Plugin: updated port context
+    ML2Plugin-->>NeutronAPI: port updated
+    NeutronAPI-->>Client: 200 OK + updated port info
+```
 
 ### Bind Port
 
