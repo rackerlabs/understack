@@ -30,6 +30,9 @@ config.register_ml2_type_understack_opts(cfg.CONF)
 config.register_ml2_understack_opts(cfg.CONF)
 
 
+SUPPORTED_VNIC_TYPES = [portbindings.VNIC_BAREMETAL, portbindings.VNIC_NORMAL]
+
+
 class UnderstackDriver(MechanismDriver):
     # See MechanismDriver docs for resource_provider_uuid5_namespace
     resource_provider_uuid5_namespace = UUID("6eae3046-4072-11ef-9bcf-d6be6370a162")
@@ -405,7 +408,18 @@ class UnderstackDriver(MechanismDriver):
         which means that changes made here will get pushed to the switch at that
         time.
         """
-        if is_provisioning_network(context.current["network_id"]):
+        port = context.current
+        LOG.debug(
+            "Attempting to bind port %(port)s on network %(net)s",
+            {"port": port["id"], "net": port["network_id"]},
+        )
+
+        vnic_type = port.get(portbindings.VNIC_TYPE, portbindings.VNIC_NORMAL)
+        if vnic_type not in SUPPORTED_VNIC_TYPES:
+            LOG.debug("Refusing to bind due to unsupported vnic_type: %s", vnic_type)
+            return
+
+        if is_provisioning_network(port["network_id"]):
             self._set_nautobot_port_status(context, "Provisioning-Interface")
 
         for segment in context.network.network_segments:
