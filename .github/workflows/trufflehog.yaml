@@ -1,5 +1,6 @@
+---
 name: Secrets scanning
-on:
+on: # yamllint disable-line rule:truthy
   push:
     branches:
       - main
@@ -12,20 +13,30 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - shell: bash
-        run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "depth=$(($(jq length <<< '${{ toJson(github.event.commits) }}') + 2))" >> $GITHUB_ENV
-            echo "branch=${{ github.ref_name }}" >> $GITHUB_ENV
-          fi
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "depth=$((${{ github.event.pull_request.commits }}+2))" >> $GITHUB_ENV
-            echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
-          fi
+      - uses: actions/github-script@v7
+        id: git-intel
+        with:
+          script: |
+            let depth = 0;
+            let branch = "";
+            core.debug(context.payload)
+            if (context.eventName == "push")  {
+              depth = context.payload.commits.length
+              branch = context.ref
+            }
+
+            if (context.eventName == "pull_request") {
+              depth = context.payload.pull_request.commits
+              branch = context.payload.pull_request.head.ref
+            }
+
+            depth = depth + 2
+            core.info(`Will fetch ${depth} commits from ${branch}.`)
+            return { "depth": depth, "branch": branch }
       - uses: actions/checkout@v4
         with:
-          ref: ${{env.branch}}
-          fetch-depth: ${{env.depth}}
+          ref: ${{steps.git-intel.outputs.result.branch}}
+          fetch-depth: ${{steps.git-intel.outputs.result.depth}}
       - name: Secret Scanning
         uses: trufflesecurity/trufflehog@main
         with:
