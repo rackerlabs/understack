@@ -510,6 +510,19 @@ class UnderstackDriver(MechanismDriver):
             "Attempting to assign router port %(port)s to router provider",
             {"port": port["id"]},
         )
+        # something like....
+        # ovn_network_node = self._plugin.get_agents(
+        #   self.plugin_context, filters={"agent_type": ovn_const.OVN_CONTROLLER_TYPES})
+        # LOG.debug("Assigning to OVN node %(node)s", {"node": ovn_network_node})
+        # port_update = {
+        #   portbindings.HOST_ID: OVN_HOST_PREFIX + ovn_network_node["host_id"]
+        # }
+        # self._plugin.update_port(
+        #   self.plugin_context,
+        #   port["id"],
+        #   {"port": port_update}
+        # )
+        # at the top define OVN_HOST_PREFIX to something like "ovn:"
 
 
 def is_provisioning_network(network_id: str) -> bool:
