@@ -9,7 +9,7 @@ from neutron_understack import utils
 class TestFetchConnectedInterfaceUUID:
     def test_with_normal_uuid(self, port_context, port_id):
         result = utils.fetch_connected_interface_uuid(
-            binding_profile=port_context.current["binding:profile"], nautobot=Mock()
+            binding_profile=port_context.current[portbindings.PROFILE], nautobot=Mock()
         )
         assert result == str(port_id)
 
@@ -19,7 +19,7 @@ class TestFetchConnectedInterfaceUUID:
         fake_nautobot.get_interface_uuid.return_value = "FAKE ID"
 
         result = utils.fetch_connected_interface_uuid(
-            binding_profile=port_context.current["binding:profile"],
+            binding_profile=port_context.current[portbindings.PROFILE],
             nautobot=fake_nautobot,
         )
         assert result == "FAKE ID"

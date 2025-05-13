@@ -2,8 +2,8 @@ import logging
 from uuid import UUID
 from pprint import pprint
 
-import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
+from neutron_lib.api.definitions import portbindings
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
@@ -320,7 +320,7 @@ class UnderstackDriver(MechanismDriver):
         """
         trunk_details = context.current.get("trunk_details", {})
         segment_id = context.original_top_bound_segment["id"]
-        original_binding = context.original["binding:profile"]
+        original_binding = context.original[portbindings.PROFILE]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             original_binding, self.nb
         )
@@ -416,7 +416,7 @@ class UnderstackDriver(MechanismDriver):
     def _bind_port_segment(self, context: PortContext, segment):
         network_id = context.current["network_id"]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
-            context.current["binding:profile"], self.nb
+            context.current[portbindings.PROFILE], self.nb
         )
         mac_address = context.current["mac_address"]
 
@@ -563,7 +563,7 @@ class UnderstackDriver(MechanismDriver):
         )
 
     def _set_nautobot_port_status(self, context: PortContext, status: str):
-        profile = context.current["binding:profile"]
+        profile = context.current[portbindings.PROFILE]
         interface_uuid = utils.fetch_connected_interface_uuid(profile, self.nb)
         LOG.debug("Set interface %s to %s status", interface_uuid, status)
         self.nb.configure_port_status(interface_uuid, status=status)
