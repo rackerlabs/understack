@@ -226,8 +226,16 @@ class UnderstackDriver(MechanismDriver):
     def create_port_precommit(self, context):
         pass
 
-    def create_port_postcommit(self, context):
-        pass
+    def create_port_postcommit(self, context: PortContext):
+        port = context.current
+
+        LOG.debug(
+            "Created port %(port)s on network %(net)s",
+            {"port": port["id"], "net": port["network_id"]},
+        )
+
+        if utils.is_router_interface(context):
+            self._assign_router_port_to_host(context)
 
     def update_port_precommit(self, context):
         pass
@@ -495,6 +503,13 @@ class UnderstackDriver(MechanismDriver):
         interface_uuid = utils.fetch_connected_interface_uuid(profile, self.nb)
         LOG.debug("Set interface %s to %s status", interface_uuid, status)
         self.nb.configure_port_status(interface_uuid, status=status)
+
+    def _assign_router_port_to_host(self, context: PortContext) -> None:
+        port = context.current
+        LOG.debug(
+            "Attempting to assign router port %(port)s to router provider",
+            {"port": port["id"]},
+        )
 
 
 def is_provisioning_network(network_id: str) -> bool:
