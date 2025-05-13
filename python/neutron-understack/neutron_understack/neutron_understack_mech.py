@@ -236,6 +236,13 @@ class UnderstackDriver(MechanismDriver):
     def create_port_postcommit(self, context: PortContext) -> None:
         # Provide network node(s) with connectivity to the networks where this
         # router port is attached to.
+        #
+        port = context.current
+        LOG.debug(
+            "Created port %(port)s on network %(net)s",
+            {"port": port["id"], "net": port["network_id"]},
+        )
+
         if utils.is_router_interface(context):
             routers.create_port_postcommit(context)
 
