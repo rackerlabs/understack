@@ -224,8 +224,33 @@ class UnderstackDriver(MechanismDriver):
     def create_port_precommit(self, context):
         pass
 
-    def create_port_postcommit(self, context):
-        pass
+    def create_port_postcommit(self, context: PortContext) -> None:
+        # vlan_group_name and trunk_id will be replaced by some dynamic calls
+        if utils.is_router_interface(context):
+            vlan_group_name = "f20-1-network"
+            trunk_id = "ac495e21-33fb-4797-9c11-be07fb89a1c3"
+            segment = utils.allocate_dynamic_segment(
+                network_id=context.network.get("id"),
+                physnet=vlan_group_name,
+            )
+            LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
+            subports = [
+                {
+                    "sub_ports": {
+                        "port_id": context.get("id"),
+                        "segmentation_id": segment.get("segmentation_id"),
+                        "segmentation_type": p_const.TYPE_VLAN,
+                    },
+                },
+            ]
+            LOG.debug("router subports to be added %(subports)s", {"subports": subports})
+            trunk_plugin = utils.fetch_trunk_plugin()
+            LOG.debug("trunk plugin: %(plugin)s", {"plugin": trunk_plugin})
+            trunk_plugin.add_subports(
+                context=context.plugin_context,
+                trunk_id=trunk_id,
+                subports=subports,
+            )
 
     def update_port_precommit(self, context):
         pass
