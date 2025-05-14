@@ -108,6 +108,9 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
             "neutron_understack.utils.allocate_dynamic_segment",
             return_value=vlan_network_segment,
         )
+        mocker.patch(
+            "neutron_understack.utils.network_segment_by_physnet", return_value=None
+        )
         mocker.patch("neutron_understack.utils.create_binding_profile_level")
         mocker.patch.object(understack_trunk_driver.nb, "add_port_vlan_associations")
         understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
@@ -220,7 +223,7 @@ class Test_CleanParentPortSwitchportConfig:
         understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
 
         understack_trunk_driver.nb.remove_port_network_associations.assert_called_once_with(
-            interface_uuid=str(port_id), network_ids_to_remove={network_id}
+            interface_uuid=str(port_id), vlan_ids_to_remove={network_id}
         )
         understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
             vlan_group="physnet",
@@ -263,6 +266,9 @@ class Test_HandleSegmentDeallocation:
         )
         mocker.patch(
             "neutron_understack.utils.ports_bound_to_segment", return_value=False
+        )
+        mocker.patch(
+            "neutron_understack.utils.is_dynamic_network_segment", return_value=True
         )
         mocker.patch.object(understack_trunk_driver.nb, "delete_vlan")
         mocker.patch("neutron_understack.utils.release_dynamic_segment")

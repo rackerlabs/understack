@@ -171,7 +171,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             subport_network_id = utils.fetch_subport_network_id(
                 subport_id=subport["port_id"]
             )
-            network_segment = utils.allocate_dynamic_segment(
+            current_segment = utils.network_segment_by_physnet(
+                network_id=subport_network_id,
+                physnet=vlan_group_name,
+            )
+            network_segment = current_segment or utils.allocate_dynamic_segment(
                 network_id=subport_network_id,
                 physnet=vlan_group_name,
             )
@@ -246,7 +250,9 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
 
     def _delete_unused_segment(self, segment_id: str) -> NetworkSegment:
         network_segment = utils.network_segment_by_id(segment_id)
-        if not utils.ports_bound_to_segment(segment_id):
+        if not utils.ports_bound_to_segment(
+            segment_id
+        ) and utils.is_dynamic_network_segment(segment_id):
             utils.release_dynamic_segment(segment_id)
             self.nb.delete_vlan(vlan_id=segment_id)
         return network_segment
@@ -282,7 +288,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         vlan_ids_to_remove = self._handle_segment_deallocation(subports, binding_host)
         self.nb.remove_port_network_associations(
             interface_uuid=connected_interface_id,
-            network_ids_to_remove=vlan_ids_to_remove,
+            vlan_ids_to_remove=vlan_ids_to_remove,
         )
 
         if invoke_undersync and vlan_group_name:

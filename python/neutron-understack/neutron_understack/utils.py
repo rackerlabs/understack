@@ -77,12 +77,37 @@ def network_segment_by_id(id: str) -> NetworkSegment:
     return NetworkSegment.get_object(context, id=id)
 
 
+def network_segment_by_physnet(network_id: str, physnet: str) -> NetworkSegment | None:
+    """Fetches vlan network segments for network in particular physnet.
+
+    We return first segment on purpose, there shouldn't be more, but if
+    that is the case, it may be intended for some reason and we don't want
+    to halt the code.
+    """
+    context = n_context.get_admin_context()
+
+    segments = NetworkSegment.get_objects(
+        context,
+        network_id=network_id,
+        physical_network=physnet,
+        network_type=constants.TYPE_VLAN,
+    )
+    if not segments:
+        return
+    return segments[0]
+
+
 def release_dynamic_segment(segment_id: str) -> None:
     context = n_context.get_admin_context()
     core_plugin = directory.get_plugin()  # Get the core plugin
 
     if hasattr(core_plugin.type_manager, "release_dynamic_segment"):
         core_plugin.type_manager.release_dynamic_segment(context, segment_id)
+
+
+def is_dynamic_network_segment(segment_id: str) -> bool:
+    segment = network_segment_by_id(segment_id)
+    return segment.is_dynamic
 
 
 def fetch_connected_interface_uuid(binding_profile: dict, nautobot: Nautobot) -> str:
