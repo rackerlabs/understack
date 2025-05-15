@@ -1,0 +1,8 @@
+---
+- name: Device types sync
+  connection: local
+  hosts: nautobot
+  gather_facts: false
+
+  roles:
+    - role: device_types
