@@ -229,15 +229,20 @@ class UnderstackDriver(MechanismDriver):
         if utils.is_router_interface(context):
             vlan_group_name = "f20-1-network"
             trunk_id = "ac495e21-33fb-4797-9c11-be07fb89a1c3"
+            port_id = context.current["id"]
+            device_id = context.current["device_id"]
+            device_owner = context.current["device_owner"]
+
             segment = utils.allocate_dynamic_segment(
                 network_id=context.current["network_id"],
                 physnet=vlan_group_name,
             )
             LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
+            utils.clear_device_id_for_port(port_id)
             subports = {
                 "sub_ports": [
                     {
-                        "port_id": context.current["id"],
+                        "port_id": port_id,
                         "segmentation_id": segment["segmentation_id"],
                         "segmentation_type": p_const.TYPE_VLAN,
                     },
@@ -250,6 +255,11 @@ class UnderstackDriver(MechanismDriver):
                 context=context.plugin_context,
                 trunk_id=trunk_id,
                 subports=subports,
+            )
+            utils.set_device_id_and_owner_for_port(
+                port_id=port_id,
+                device_id=device_id,
+                device_owner=device_owner,
             )
 
     def update_port_precommit(self, context):

@@ -21,6 +21,21 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
     return port
 
 
+def clear_device_id_for_port(port_id: str) -> None:
+    port = fetch_port_object(port_id)
+    port.device_id = ""
+    port.update()
+
+
+def set_device_id_and_owner_for_port(
+    port_id: str, device_id: str, device_owner: str
+    ) -> None:
+    port = fetch_port_object(port_id)
+    port.device_id = device_id
+    port.device_owner = device_owner
+    port.update()
+
+
 def fetch_trunk_plugin() -> TrunkPlugin:
     return directory.get_plugin("trunk")
 
