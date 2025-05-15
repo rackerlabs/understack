@@ -1,0 +1,31 @@
+---
+component: dex
+sources:
+  - repoURL: https://charts.dexidp.io
+    chart: dex
+    targetRevision: 0.16.0
+    helm:
+      releaseName: dex
+      valuesObject:
+        config:
+          issuer: 'https://dex.{{index .metadata.annotations "dns_zone" }}'
+        env:
+          DNS_ZONE: '{{index .metadata.annotations "dns_zone" }}'
+        ingress:
+          hosts:
+            - host: dex.{{index .metadata.annotations "dns_zone" }}
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: dex-ingress-tls
+              hosts:
+                - dex.{{index .metadata.annotations "dns_zone" }}
+      valueFiles:
+        - $understack/components/dex/values.yaml
+        - $deploy/{{.name}}/helm-configs/dex.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+    path: 'components/dex'
+  - ref: deploy
+    path: '{{.name}}/manifests/dex'
