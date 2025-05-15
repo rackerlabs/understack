@@ -230,14 +230,14 @@ class UnderstackDriver(MechanismDriver):
             vlan_group_name = "f20-1-network"
             trunk_id = "ac495e21-33fb-4797-9c11-be07fb89a1c3"
             segment = utils.allocate_dynamic_segment(
-                network_id=context.network.get("id"),
+                network_id=context.current["network_id"],
                 physnet=vlan_group_name,
             )
             LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
             subports = [
                 {
                     "sub_ports": {
-                        "port_id": context.get("id"),
+                        "port_id": context.current["id"],
                         "segmentation_id": segment.get("segmentation_id"),
                         "segmentation_type": p_const.TYPE_VLAN,
                     },
