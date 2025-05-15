@@ -234,15 +234,15 @@ class UnderstackDriver(MechanismDriver):
                 physnet=vlan_group_name,
             )
             LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
-            subports = [
-                {
-                    "sub_ports": {
+            subports = {
+                "sub_ports": [
+                    {
                         "port_id": context.current["id"],
-                        "segmentation_id": segment.get("segmentation_id"),
+                        "segmentation_id": segment["segmentation_id"],
                         "segmentation_type": p_const.TYPE_VLAN,
                     },
-                },
-            ]
+                ]
+            }
             LOG.debug("router subports to be added %(subports)s", {"subports": subports})
             trunk_plugin = utils.fetch_trunk_plugin()
             LOG.debug("trunk plugin: %(plugin)s", {"plugin": trunk_plugin})
