@@ -3,6 +3,7 @@ from uuid import UUID
 from neutron.objects import ports as port_obj
 from neutron.objects.network import NetworkSegment
 from neutron.plugins.ml2.driver_context import portbindings
+from neutron.services.trunk.plugin import TrunkPlugin
 from neutron_lib import constants
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
@@ -18,6 +19,42 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
     if port is None:
         raise ValueError(f"Failed to fetch Port with ID {port_id}")
     return port
+
+
+def remove_subport_from_trunk(trunk_id: str, subport_id: str) -> None:
+    context = n_context.get_admin_context()
+    plugin = fetch_trunk_plugin()
+    subports = {
+        "sub_ports": [
+            {
+                "port_id": subport_id,
+            },
+        ]
+    }
+    plugin.remove_subports(
+        context=context,
+        trunk_id=trunk_id,
+        subports=subports,
+    )
+
+
+def clear_device_id_for_port(port_id: str) -> None:
+    port = fetch_port_object(port_id)
+    port.device_id = ""
+    port.update()
+
+
+def set_device_id_and_owner_for_port(
+    port_id: str, device_id: str, device_owner: str
+    ) -> None:
+    port = fetch_port_object(port_id)
+    port.device_id = device_id
+    port.device_owner = device_owner
+    port.update()
+
+
+def fetch_trunk_plugin() -> TrunkPlugin:
+    return directory.get_plugin("trunk")
 
 
 def allocate_dynamic_segment(
@@ -157,3 +194,8 @@ def is_valid_vlan_network_segment(network_segment: dict):
 
 def is_baremetal_port(context: PortContext) -> bool:
     return context.current[portbindings.VNIC_TYPE] == portbindings.VNIC_BAREMETAL
+
+
+def is_router_interface(context: PortContext) -> bool:
+    """Returns True if this port is the internal side of a router."""
+    return context.current["device_owner"] in [constants.DEVICE_OWNER_ROUTER_INTF]
