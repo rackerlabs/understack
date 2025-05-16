@@ -1,0 +1,17 @@
+---
+
+network_segment_ranges:
+  - name: n11-21-network
+    range_min: 1800
+    range_max: 3799
+    network-type: vlan
+    physical-network: n11-21-network
+  - name: n11-22-network
+    range_min: 1800
+    range_max: 3799
+    network-type: vlan
+    physical-network: n11-22-network
+  - name: fabric-network
+    range_min: 1800
+    range_max: 3799
+    network-type: vxlan
