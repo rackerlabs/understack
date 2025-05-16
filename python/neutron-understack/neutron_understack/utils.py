@@ -21,6 +21,23 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
     return port
 
 
+def remove_subport_from_trunk(trunk_id: str, subport_id: str) -> None:
+    context = n_context.get_admin_context()
+    plugin = fetch_trunk_plugin()
+    subports = {
+        "sub_ports": [
+            {
+                "port_id": subport_id,
+            },
+        ]
+    }
+    plugin.remove_subports(
+        context=context,
+        trunk_id=trunk_id,
+        subports=subports,
+    )
+
+
 def clear_device_id_for_port(port_id: str) -> None:
     port = fetch_port_object(port_id)
     port.device_id = ""
