@@ -48,6 +48,5 @@
     - role: statuses
     - role: custom_fields
     - role: computed_fields
-    - role: manufacturers
     - role: platforms
     - role: relationships

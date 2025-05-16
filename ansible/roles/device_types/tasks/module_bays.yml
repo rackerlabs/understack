@@ -1,9 +1,0 @@
----
-
-- name: Create device type module bay templates
-  networktocode.nautobot.device_bay_template:
-    url: "{{ nautobot_url }}"
-    token: "{{ nautobot_token }}"
-    device_type: "{{ device_type_item.model }}"
-    name: "{{ module_bay_item.name }}"
-    state: present
