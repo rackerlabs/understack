@@ -1,0 +1,23 @@
+---
+
+- name: "Lookup Rackspace Jobs"
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/jobs/"
+    method: GET
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+  register: rackspace_jobs
+  check_mode: false
+
+- name: "Enable Rackspace Jobs"
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/extras/jobs/{{ item.id }}/"
+    method: PATCH
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+    body_format: json
+    body:
+      enabled: true
+  loop: "{{ rackspace_jobs.json | community.general.json_query(rackspace_grouping_query) }}"
+  vars:
+    rackspace_grouping_query: "results[?grouping=='Rackspace' || grouping=='ServiceNow Sync Jobs']"
