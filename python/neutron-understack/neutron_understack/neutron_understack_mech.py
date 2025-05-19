@@ -12,6 +12,7 @@ from neutron_lib.plugins.ml2.api import MechanismDriver
 from oslo_config import cfg
 
 from neutron_understack import config
+from neutron_understack import routers
 from neutron_understack import utils
 from neutron_understack.ironic import IronicClient
 from neutron_understack.nautobot import Nautobot
@@ -62,7 +63,7 @@ class UnderstackDriver(MechanismDriver):
             cancellable=True,
         )
         registry.subscribe(
-            self._handle_router_interface_removal,
+            routers.handle_router_interface_removal,
             resources.PORT,
             events.BEFORE_DELETE,
             cancellable=True,
@@ -234,59 +235,10 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def create_port_postcommit(self, context: PortContext) -> None:
-        # vlan_group_name and trunk_id will be replaced by some dynamic calls
+        # Provide network node(s) with connectivity to the networks where this
+        # router port is attached to.
         if utils.is_router_interface(context):
-            vlan_group_name = "f20-1-network"
-            trunk_id = "ac495e21-33fb-4797-9c11-be07fb89a1c3"
-            port_id = context.current["id"]
-            device_id = context.current["device_id"]
-            device_owner = context.current["device_owner"]
-
-            segment = utils.allocate_dynamic_segment(
-                network_id=context.current["network_id"],
-                physnet=vlan_group_name,
-            )
-
-            segment_obj = utils.network_segment_by_id(segment["id"])
-
-            # we need to publish the below event as allocate_dynamic_segment
-            # does not do that in neutron source code and we need it for
-            # ovn as it creates logical switchports based on the event.
-            registry.publish(
-                resources.SEGMENT,
-                events.AFTER_CREATE,
-                self.create_port_postcommit,
-                payload=events.DBEventPayload(
-                    context, resource_id=segment_obj.id, states=(segment_obj,)
-                ),
-            )
-
-            LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
-            utils.clear_device_id_for_port(port_id)
-            subports = {
-                "sub_ports": [
-                    {
-                        "port_id": port_id,
-                        "segmentation_id": segment["segmentation_id"],
-                        "segmentation_type": p_const.TYPE_VLAN,
-                    },
-                ]
-            }
-            LOG.debug(
-                "router subports to be added %(subports)s", {"subports": subports}
-            )
-            trunk_plugin = utils.fetch_trunk_plugin()
-            LOG.debug("trunk plugin: %(plugin)s", {"plugin": trunk_plugin})
-            trunk_plugin.add_subports(
-                context=context.plugin_context,
-                trunk_id=trunk_id,
-                subports=subports,
-            )
-            utils.set_device_id_and_owner_for_port(
-                port_id=port_id,
-                device_id=device_id,
-                device_owner=device_owner,
-            )
+            routers.create_port_postcommit(context, self)
 
     def update_port_precommit(self, context):
         pass
@@ -356,18 +308,6 @@ class UnderstackDriver(MechanismDriver):
 
     def delete_port_precommit(self, context):
         pass
-
-    def _handle_router_interface_removal(
-        self, resource, event, trigger, payload
-    ) -> None:
-        # trunk_id will be discovered dynamically at some point
-        trunk_id = "ac495e21-33fb-4797-9c11-be07fb89a1c3"
-        port = payload.metadata["port"]
-        port_id = port["id"]
-        router_device_owner = port["device_owner"] in [p_const.DEVICE_OWNER_ROUTER_INTF]
-        if router_device_owner:
-            LOG.debug("Router, Removing subport: %s(port)s", {"port": port})
-            utils.remove_subport_from_trunk(trunk_id, port_id)
 
     def delete_port_postcommit(self, context: PortContext) -> None:
         if utils.is_baremetal_port(context):
