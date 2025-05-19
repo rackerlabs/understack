@@ -1,5 +1,7 @@
+from contextlib import contextmanager
 from uuid import UUID
 
+from neutron.db import models_v2
 from neutron.objects import ports as port_obj
 from neutron.objects.network import NetworkSegment
 from neutron.plugins.ml2.driver_context import portbindings
@@ -38,19 +40,32 @@ def remove_subport_from_trunk(trunk_id: str, subport_id: str) -> None:
     )
 
 
+@contextmanager
+def get_admin_session():
+    session = n_context.get_admin_context().session
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def update_port_fields(port_id: str, fields: dict) -> None:
+    with get_admin_session() as session:
+        session.query(models_v2.Port).filter_by(id=port_id).update(fields)
+
+
 def clear_device_id_for_port(port_id: str) -> None:
-    port = fetch_port_object(port_id)
-    port.device_id = ""
-    port.update()
+    update_port_fields(port_id, {"device_id": ""})
 
 
 def set_device_id_and_owner_for_port(
     port_id: str, device_id: str, device_owner: str
-    ) -> None:
-    port = fetch_port_object(port_id)
-    port.device_id = device_id
-    port.device_owner = device_owner
-    port.update()
+) -> None:
+    update_port_fields(port_id, {"device_id": device_id, "device_owner": device_owner})
 
 
 def fetch_trunk_plugin() -> TrunkPlugin:
