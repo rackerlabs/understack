@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: undersync
-        image: ghcr.io/rss-engineering/undersync/undersync:latest
+        image: ghcr.io/rss-engineering/undersync/undersync:pr-41
         ports:
         - containerPort: 8080
         env:
