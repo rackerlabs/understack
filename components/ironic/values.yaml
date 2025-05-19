@@ -27,7 +27,10 @@ conf:
   # Update policies for better integration with OpenStack services
   # https://docs.openstack.org/ironic/latest/configuration/sample-policy.html
   policy:
+    # allow operators and node owners to get errors
     "baremetal:node:get:last_error": "role:service or role:admin or (project_id:%(node.owner)s or project_id:%(node.lessee)s)"
+    # allow operators and node owners to disable system cleaning
+    "baremetal:node:disable_cleaning": "role:service or role:admin or (project_id:%(node.owner)s or project_id:%(node.lessee)s)"
   ironic:
     DEFAULT:
       # We only want to default to direct, otherwise defaults interfere with hardware
