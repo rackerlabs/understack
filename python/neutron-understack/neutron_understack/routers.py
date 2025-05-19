@@ -64,6 +64,10 @@ def create_router_segment(driver, context: PortContext):
     """Creates a dynamic segment for connection between the router and network node."""
     network_id = UUID(context.current["network_id"])
     physnet = cfg.CONF.ml2_understack.network_node_switchport_physnet
+    if not physnet:
+        raise ValueError(
+            "please configure ml2_understack.network_node_switchport_physnet"
+        )
     segment = utils.allocate_dynamic_segment(
         network_id=str(network_id),
         physnet=physnet,
@@ -98,4 +102,7 @@ def handle_router_interface_removal(_resource, _event, _trigger, payload) -> Non
     if port["device_owner"] in [p_const.DEVICE_OWNER_ROUTER_INTF]:
         LOG.debug("Router, Removing subport: %s(port)s", {"port": port})
         port_id = port["id"]
-        utils.remove_subport_from_trunk(trunk_id, port_id)
+        try:
+            utils.remove_subport_from_trunk(trunk_id, port_id)
+        except Exception as err:
+            LOG.error("failed removing_subport: %(error)s", {"error": err})
