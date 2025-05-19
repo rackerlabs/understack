@@ -1,0 +1,22 @@
+---
+
+- name: Check if segment range exists
+  ansible.builtin.command: openstack network segment range show {{ item.name }}
+  register: segment_range_check
+  failed_when: false
+  changed_when: false
+
+- name: Create network segment range if missing
+  ansible.builtin.shell: >
+    openstack network segment range create
+    --shared
+    --network-type {{ item['network-type'] }}
+    --minimum {{ item.range_min }}
+    --maximum {{ item.range_max }}
+    {% if item.get('physical-network', '') | length > 0 %}
+    --physical-network {{ item['physical-network'] }}
+    {% endif %}
+    {{ item.name }}
+  when: segment_range_check.rc != 0
+  register: segment_range_created
+  changed_when: true

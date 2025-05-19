@@ -17,3 +17,28 @@
   loop: "{{ existing_networks.results }}"
   loop_control:
     label: "{{ item.item.network_name }}"
+
+- name: Create segment range
+  ansible.builtin.include_tasks: segment_range.yml
+  loop: "{{ network_segment_ranges }}"
+  loop_control:
+    loop_var: segment
+  vars:
+    item: "{{ segment }}"
+
+- name: Create subnet pool
+  ansible.builtin.include_tasks: subnet_pool.yml
+  loop: "{{ subnet_pools }}"
+  loop_control:
+    loop_var: subnet_pool
+  vars:
+    item: "{{ subnet_pool }}"
+
+- name: Create baremetal ports
+  ansible.builtin.include_tasks: port.yml
+  loop: "{{ baremetal_ports }}"
+  loop_control:
+    loop_var: network_ports
+  vars:
+    ports: "{{ network_ports.ports }}"
+    network: "{{ network_ports.network }}"

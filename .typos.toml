@@ -7,7 +7,6 @@ extend-exclude = [
     "python/understack-workflows/tests/json_samples/",
     "containers/*/patches",
     "go.mod",
-    "ansible/roles/statuses/defaults/main.yaml",
 ]
 
 [default]
@@ -20,4 +19,4 @@ extend-ignore-identifiers-re = [
 HPE = "HPE"
 fo = "fo"
 sme = "sme"
-4caf50 = "4caf50"
+caf = "caf"

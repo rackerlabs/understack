@@ -1,0 +1,7 @@
+---
+
+- name: Create baremetal port
+  openstack.cloud.baremetal_port:
+    address: "{{ port_info.mac }}"
+    node: "{{ port_node_name }}"
+    state: present
