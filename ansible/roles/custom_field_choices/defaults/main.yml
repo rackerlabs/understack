@@ -1,0 +1,107 @@
+---
+
+custom_field_choices_data:
+  - value: active
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: adopting
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: available
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: cleaning
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: clean wait
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: deleting
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: deploy failed
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: deploying
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: enroll
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: error
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: inspect failed
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: inspecting
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: inspect wait
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: manageable
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: rescue
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: rescue failed
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: rescue wait
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: rescuing
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: rescuingrescue wait
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: service failed
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: service wait
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: servicing
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: unrescue failed
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: unrescuing
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: verifying
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present
+  - value: wait call-back
+    weight: 100
+    custom_field: ironic_provision_state
+    state: present

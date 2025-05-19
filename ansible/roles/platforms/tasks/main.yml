@@ -1,0 +1,23 @@
+---
+
+- name: Create Default Platforms
+  networktocode.nautobot.platform:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    manufacturer: "{{ item.man }}"
+    napalm_driver: "{{ item.driver }}"
+    state: present
+  loop: "{{ platforms_defaults }}"
+
+- name: Create Default Platforms with Network Drivers
+  # Will need to include the nxos network driver for n9ks when ansible supports it
+  networktocode.nautobot.platform:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.name }}"
+    manufacturer: "{{ item.man }}"
+    napalm_driver: "{{ item.driver }}"
+    # network_driver: "{{ item.network }}"
+    state: present
+  loop: "{{ platforms_with_drivers }}"

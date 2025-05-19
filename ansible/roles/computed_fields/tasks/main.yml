@@ -1,0 +1,5 @@
+---
+
+- name: Define computed fields
+  ansible.builtin.include_tasks: computed_fields.yml
+  loop: "{{ computed_fields_data }}"

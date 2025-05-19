@@ -1,0 +1,27 @@
+---
+
+location_types_defaults:
+  - name: Company
+    description: Company
+    content_types:
+      - "ipam.namespace"
+    nestable: false
+    parent: Global
+  - name: Region
+    description: Region
+    content_types: []
+    nestable: false
+    parent: Company
+  - name: Site
+    description: Site
+    content_types:
+      - "dcim.device"
+      - "dcim.rack"
+      - "ipam.prefix"
+      - "ipam.vlan"
+      - "dcim.rackgroup"
+      - "ipam.vlangroup"
+      - "ipam.namespace"
+      - "vni_custom_model.ucvnigroup"
+    nestable: false
+    parent: Region

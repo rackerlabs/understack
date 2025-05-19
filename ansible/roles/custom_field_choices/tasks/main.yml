@@ -1,0 +1,12 @@
+---
+
+- name: Create Custom Field Choices
+  networktocode.nautobot.custom_field_choice:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    value: "{{ item.value }}"
+    weight: "{{ item.weight }}"
+    custom_field: "{{ item.custom_field }}"
+    state: present
+
+  loop: "{{ custom_field_choices_data }}"
