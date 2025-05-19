@@ -1,0 +1,19 @@
+---
+
+- name: Get network info
+  openstack.cloud.networks_info:
+    name: "{{ item.network_name }}"
+  loop: "{{ fabric_wide_layer_3_infrastructure_networks }}"
+  loop_control:
+    label: "{{ item.network_name }}"
+  register: existing_networks
+
+- name: Create network if not exists
+  openstack.cloud.network:
+    name: "{{ item.item.network_name }}"
+    provider_network_type: "{{ item.item.network_type }}"
+    state: present
+  when: item.networks | length == 0
+  loop: "{{ existing_networks.results }}"
+  loop_control:
+    label: "{{ item.item.network_name }}"
