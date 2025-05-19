@@ -1,0 +1,17 @@
+---
+
+- name: Check if baremetal port group exists
+  ansible.builtin.command: openstack baremetal port group show {{ port_group.name }}
+  register: port_group_check
+  failed_when: false
+  changed_when: false
+
+- name: Create baremetal port group
+  ansible.builtin.shell: >
+    openstack baremetal port group create
+    --node {{ node_id }}
+    --name {{ port_group.name }}
+    --mode {{ port_group.mode }}
+  when: port_group_check.rc != 0
+  register: port_group_created
+  changed_when: true

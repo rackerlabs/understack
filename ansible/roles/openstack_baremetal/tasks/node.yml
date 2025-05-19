@@ -1,0 +1,26 @@
+---
+
+- name: Enroll infra node {{ item.name }}
+  openstack.cloud.baremetal_node:
+    name: "{{ item.name }}"
+    driver: "{{ item.driver }}"
+    driver_info: "{{ item.driver_info }}"
+    nics: "{{ item.nics }}"
+    state: present
+  register: enrolled_node
+
+- name: Create baremetal ports for node {{ item.name }}
+  ansible.builtin.include_tasks: port.yml
+  loop: "{{ item.nics }}"
+  loop_control:
+    loop_var: port_info
+  vars:
+    port_node_name: "{{ item.name }}"
+
+- name: Create baremetal ports group for node {{ item.name }}
+  ansible.builtin.include_tasks: port_group.yml
+  loop: "{{ item.port_groups }}"
+  loop_control:
+    loop_var: port_group
+  vars:
+    node_id: "{{ enrolled_node.node.id }}"
