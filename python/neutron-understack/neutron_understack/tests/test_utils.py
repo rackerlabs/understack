@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import pytest
 from neutron.plugins.ml2.driver_context import portbindings
+from neutron_lib import constants
 from sqlalchemy import Column
 from sqlalchemy import String
 from sqlalchemy import create_engine
@@ -127,3 +128,29 @@ class TestPortFieldManipulation:
         port = db_session.query(Port).filter_by(id=id).one()
         assert port.device_id == "dev-2"
         assert port.device_owner == "own-2"
+
+
+class PortContext:
+    def __init__(self, current):
+        self.current = current
+
+
+class TestIsRouterInterface:
+    def test_router_interface_true(self):
+        context = PortContext(
+            current={"device_owner": constants.DEVICE_OWNER_ROUTER_INTF}
+        )
+        assert utils.is_router_interface(context)
+
+    def test_router_interface_false_different_device_owner(self):
+        context = PortContext(current={"device_owner": "compute:nova"})
+        assert not utils.is_router_interface(context)
+
+    def test_router_interface_false_device_owner_missing(self):
+        context = PortContext(current={})
+        with pytest.raises(KeyError):
+            utils.is_router_interface(context)
+
+    def test_router_interface_false_device_owner_none(self):
+        context = PortContext(current={"device_owner": None})
+        assert not utils.is_router_interface(context)
