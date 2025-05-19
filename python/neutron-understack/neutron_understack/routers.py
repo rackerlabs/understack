@@ -5,6 +5,7 @@ from neutron_lib import constants as p_const
 from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
+from oslo_config import cfg
 
 from neutron_understack import utils
 
@@ -39,7 +40,7 @@ def add_subport_to_trunk(context, segment):
     The trunk and parent port must already exist.
     """
     port_id = context.current["id"]
-    trunk_id = "ac495e21-33fb-4797-9c11-be07fb89a1c3"
+    trunk_id = cfg.CONF.ml2_understack.network_node_trunk_uuid
     subports = {
         "sub_ports": [
             {
@@ -62,7 +63,7 @@ def add_subport_to_trunk(context, segment):
 def create_router_segment(driver, context: PortContext):
     """Creates a dynamic segment for connection between the router and network node."""
     network_id = UUID(context.current["network_id"])
-    physnet = "f20-1-network"
+    physnet = cfg.CONF.ml2_understack.network_node_switchport_physnet
     segment = utils.allocate_dynamic_segment(
         network_id=str(network_id),
         physnet=physnet,
@@ -92,7 +93,7 @@ def handle_router_interface_removal(_resource, _event, _trigger, payload) -> Non
     from the trunk.
     """
     # trunk_id will be discovered dynamically at some point
-    trunk_id = "ac495e21-33fb-4797-9c11-be07fb89a1c3"
+    trunk_id = cfg.CONF.ml2_understack.network_node_trunk_uuid
     port = payload.metadata["port"]
     if port["device_owner"] in [p_const.DEVICE_OWNER_ROUTER_INTF]:
         LOG.debug("Router, Removing subport: %s(port)s", {"port": port})
