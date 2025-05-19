@@ -22,8 +22,18 @@ spec:
         env:
           - name: RACK_ENV
             value: "production"
+          - name: SETTINGS_FILE
+            value: "/run/secrets/settings-file.yaml"
         envFrom:
           - secretRef:
               name: settings
+        volumeMounts:
+          - mountPath: /run/secrets
+            name: settings-file
+            readOnly: true
+      volumes:
+        - name: settings-file
+          secret:
+            secretName: settings-file
       imagePullSecrets:
       - name: dockerconfigjson-github-com
