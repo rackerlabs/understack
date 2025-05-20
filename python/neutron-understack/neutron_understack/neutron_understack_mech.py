@@ -1,8 +1,8 @@
 import logging
 from uuid import UUID
 
-import neutron_lib.api.definitions.portbindings as portbindings
 from neutron_lib import constants as p_const
+from neutron_lib.api.definitions import portbindings
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
@@ -27,6 +27,9 @@ LOG = logging.getLogger(__name__)
 
 config.register_ml2_type_understack_opts(cfg.CONF)
 config.register_ml2_understack_opts(cfg.CONF)
+
+
+SUPPORTED_VNIC_TYPES = [portbindings.VNIC_BAREMETAL, portbindings.VNIC_NORMAL]
 
 
 class UnderstackDriver(MechanismDriver):
@@ -224,8 +227,16 @@ class UnderstackDriver(MechanismDriver):
     def create_port_precommit(self, context):
         pass
 
-    def create_port_postcommit(self, context):
-        pass
+    def create_port_postcommit(self, context: PortContext):
+        port = context.current
+
+        LOG.debug(
+            "Created port %(port)s on network %(net)s",
+            {"port": port["id"], "net": port["network_id"]},
+        )
+
+        if utils.is_router_interface(context):
+            self._assign_router_port_to_host(context)
 
     def update_port_precommit(self, context):
         pass
@@ -263,7 +274,7 @@ class UnderstackDriver(MechanismDriver):
         """
         trunk_details = context.current.get("trunk_details", {})
         segment_id = context.original_top_bound_segment["id"]
-        original_binding = context.original["binding:profile"]
+        original_binding = context.original[portbindings.PROFILE]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
             original_binding, self.nb
         )
@@ -338,7 +349,18 @@ class UnderstackDriver(MechanismDriver):
         which means that changes made here will get pushed to the switch at that
         time.
         """
-        if is_provisioning_network(context.current["network_id"]):
+        port = context.current
+        LOG.debug(
+            "Attempting to bind port %(port)s on network %(net)s",
+            {"port": port["id"], "net": port["network_id"]},
+        )
+
+        vnic_type = port.get(portbindings.VNIC_TYPE, portbindings.VNIC_NORMAL)
+        if vnic_type not in SUPPORTED_VNIC_TYPES:
+            LOG.debug("Refusing to bind due to unsupported vnic_type: %s", vnic_type)
+            return
+
+        if is_provisioning_network(port["network_id"]):
             self._set_nautobot_port_status(context, "Provisioning-Interface")
 
         for segment in context.network.network_segments:
@@ -349,7 +371,7 @@ class UnderstackDriver(MechanismDriver):
     def _bind_port_segment(self, context: PortContext, segment):
         network_id = context.current["network_id"]
         connected_interface_uuid = utils.fetch_connected_interface_uuid(
-            context.current["binding:profile"], self.nb
+            context.current[portbindings.PROFILE], self.nb
         )
         mac_address = context.current["mac_address"]
 
@@ -496,10 +518,30 @@ class UnderstackDriver(MechanismDriver):
         )
 
     def _set_nautobot_port_status(self, context: PortContext, status: str):
-        profile = context.current["binding:profile"]
+        profile = context.current[portbindings.PROFILE]
         interface_uuid = utils.fetch_connected_interface_uuid(profile, self.nb)
         LOG.debug("Set interface %s to %s status", interface_uuid, status)
         self.nb.configure_port_status(interface_uuid, status=status)
+
+    def _assign_router_port_to_host(self, context: PortContext) -> None:
+        port = context.current
+        LOG.debug(
+            "Attempting to assign router port %(port)s to router provider",
+            {"port": port["id"]},
+        )
+        # something like....
+        # ovn_network_node = self._plugin.get_agents(
+        #   self.plugin_context, filters={"agent_type": ovn_const.OVN_CONTROLLER_TYPES})
+        # LOG.debug("Assigning to OVN node %(node)s", {"node": ovn_network_node})
+        # port_update = {
+        #   portbindings.HOST_ID: OVN_HOST_PREFIX + ovn_network_node["host_id"]
+        # }
+        # self._plugin.update_port(
+        #   self.plugin_context,
+        #   port["id"],
+        #   {"port": port_update}
+        # )
+        # at the top define OVN_HOST_PREFIX to something like "ovn:"
 
 
 def is_provisioning_network(network_id: str) -> bool:
