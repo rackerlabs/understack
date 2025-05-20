@@ -7,10 +7,13 @@ from neutron.objects.network import NetworkSegment
 from neutron.plugins.ml2.driver_context import portbindings
 from neutron.services.trunk.plugin import TrunkPlugin
 from neutron_lib import constants
+from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
+from neutron_lib.plugins.ml2 import api
 
+from neutron_understack.ml2_type_annotations import NetworkSegmentDict
 from neutron_understack.ml2_type_annotations import PortContext
 from neutron_understack.nautobot import Nautobot
 
@@ -214,3 +217,14 @@ def is_baremetal_port(context: PortContext) -> bool:
 def is_router_interface(context: PortContext) -> bool:
     """Returns True if this port is the internal side of a router."""
     return context.current["device_owner"] in [constants.DEVICE_OWNER_ROUTER_INTF]
+
+
+def vlan_segment_for_physnet(
+    context: PortContext, physnet: str
+) -> NetworkSegmentDict | None:
+    for segment in context.network.network_segments:
+        if (
+            segment[api.NETWORK_TYPE] == p_const.TYPE_VLAN
+            and segment[api.PHYSICAL_NETWORK] == physnet
+        ):
+            return segment
