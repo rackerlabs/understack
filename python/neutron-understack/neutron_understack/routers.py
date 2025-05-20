@@ -1,7 +1,10 @@
 import logging
 from uuid import UUID
 
+from neutron.objects import base as base_obj
+from neutron.objects.network import NetworkSegment
 from neutron_lib import constants as p_const
+from neutron_lib import context as n_context
 from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
@@ -20,7 +23,28 @@ def create_port_postcommit(context: PortContext, driver):
     device_id = context.current["device_id"]
     device_owner = context.current["device_owner"]
 
-    segment = create_router_segment(driver, context)
+    filter = {
+        "network_id": context.current["network_id"],
+        "network_type": p_const.TYPE_VLAN,
+        "physical_network": cfg.CONF.ml2_understack.network_node_switchport_physnet,
+    }
+    admin_context = n_context.get_admin_context()
+    matching_segments = NetworkSegment.get_objects(
+        admin_context, _pager=base_obj.Pager(limit=1), **filter
+    )
+    if matching_segments:
+        existing_segment = matching_segments[0]
+    else:
+        existing_segment = None
+
+    LOG.debug(
+        "existing_segment: %(ex)s",
+        {"ex": existing_segment},
+    )
+    utils.vlan_segment_for_physnet(
+        context, cfg.CONF.ml2_understack.network_node_switchport_physnet
+    )
+    segment = existing_segment or create_router_segment(driver, context)
 
     # Trunk plugin does not allow the subport have a device_id set when it is
     # added to a trunk, so we temporarily clear the device_id and restore it
