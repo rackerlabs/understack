@@ -145,6 +145,9 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             subport_network_id = utils.fetch_subport_network_id(
                 subport_id=subport.port_id
             )
+            # we don't want to check mappings on network nodes
+            if trunk.id == cfg.CONF.ml2_understack.network_node_trunk_uuid:
+                continue
             self._handle_tenant_vlan_id_config(subport_network_id, subport)
 
         parent_port_obj = utils.fetch_port_object(trunk.port_id)
