@@ -167,9 +167,6 @@ def test_create_port_postcommit_existing_segment(mocker, context, driver):
 
 
 def test_segment_creation(mocker, context, driver):
-    mock_vlan_segment = mocker.patch(
-        "neutron_understack.utils.vlan_segment_for_physnet", return_value=None
-    )
     mock_clear_device_id = mocker.patch(
         "neutron_understack.utils.clear_device_id_for_port"
     )
@@ -189,7 +186,6 @@ def test_segment_creation(mocker, context, driver):
 
     create_port_postcommit(context, driver)
 
-    mock_vlan_segment.assert_called_once_with(context, "x23-1-network")
     mock_create_router_segment.assert_called_once_with(driver, context)
     mock_clear_device_id.assert_called_once_with("port123")
     mock_add_subport.assert_called_once_with(context, "new-seg")
