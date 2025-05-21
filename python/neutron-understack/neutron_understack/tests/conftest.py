@@ -219,7 +219,7 @@ def port_model(mac_address) -> PortModel:
 
 @pytest.fixture
 def trunk(subport, port_id) -> Trunk:
-    return Trunk(sub_ports=[subport], port_id=port_id)
+    return Trunk(sub_ports=[subport], port_id=port_id, id=str(uuid.uuid4()))
 
 
 @pytest.fixture
