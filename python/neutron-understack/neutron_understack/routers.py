@@ -3,6 +3,7 @@ from uuid import UUID
 
 from neutron.objects import base as base_obj
 from neutron.objects.network import NetworkSegment
+from neutron.plugins.ml2 import db as ml2_db
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
 from neutron_lib.plugins import directory
@@ -128,19 +129,45 @@ def ovn_client():
     return _cached_ovn_client
 
 
-def handle_router_interface_removal(_resource, _event, _trigger, payload) -> None:
+def handle_router_interface_removal(_resource, _event, trigger, payload) -> None:
     """Handles the removal of a router interface.
 
-    When router interface port is delete , we remove the corresponding subport
-    from the trunk.
+    When router interface port is deleted, we remove the corresponding subport
+    from the trunk and delete OVN localnet port.
     """
-    # trunk_id will be discovered dynamically at some point
-    trunk_id = cfg.CONF.ml2_understack.network_node_trunk_uuid
     port = payload.metadata["port"]
     if port["device_owner"] in [p_const.DEVICE_OWNER_ROUTER_INTF]:
-        LOG.debug("Router, Removing subport: %s(port)s", {"port": port})
-        port_id = port["id"]
-        try:
-            utils.remove_subport_from_trunk(trunk_id, port_id)
-        except Exception as err:
-            LOG.error("failed removing_subport: %(error)s", {"error": err})
+        _handle_localnet_port_removal(port)
+        _handle_subport_removal(port)
+
+
+def _handle_localnet_port_removal(port):
+    """Removes OVN localnet port that is used for this trunked VLAN."""
+    admin_context = n_context.get_admin_context()
+    parent_port_id = port["binding:profile"]["parent_name"]
+    parent_port = utils.fetch_port_object(parent_port_id)
+    binding_host = parent_port.bindings[0].host
+
+    binding_levels = ml2_db.get_binding_level_objs(
+        admin_context, port["id"], binding_host
+    )
+
+    LOG.debug("binding_levels: %(lvls)s", {"lvls": binding_levels})
+
+    if binding_levels:
+        segment_id = binding_levels[-1].segment_id
+        LOG.debug("looking up segment_id: %s", segment_id)
+        segment_obj = utils.network_segment_by_id(segment_id)
+        ovn_client().delete_provnet_port(port["network_id"], segment_obj)
+
+
+def _handle_subport_removal(port):
+    """Removes router's subport from a network node trunk."""
+    # trunk_id will be discovered dynamically at some point
+    trunk_id = cfg.CONF.ml2_understack.network_node_trunk_uuid
+    LOG.debug("Router, Removing subport: %s(port)s", {"port": port})
+    port_id = port["id"]
+    try:
+        utils.remove_subport_from_trunk(trunk_id, port_id)
+    except Exception as err:
+        LOG.error("failed removing_subport: %(error)s", {"error": err})
