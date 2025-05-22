@@ -5,9 +5,7 @@ from neutron.objects import base as base_obj
 from neutron.objects.network import NetworkSegment
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
-from neutron_lib.callbacks import events
-from neutron_lib.callbacks import registry
-from neutron_lib.callbacks import resources
+from neutron_lib.plugins import directory
 from oslo_config import cfg
 
 from neutron_understack import utils
@@ -91,22 +89,43 @@ def create_router_segment(driver, context: PortContext):
         network_id=str(network_id),
         physnet=physnet,
     )
-
     segment_obj = utils.network_segment_by_id(segment["id"])
+    ovn_client().create_provnet_port(str(network_id), segment_obj)
 
-    # We need to publish the event below because allocate_dynamic_segment
-    # in the Neutron source code does not handle this. OVN requires the event
-    # since it creates logical switch ports based on it.
-    registry.publish(
-        resources.SEGMENT,
-        events.AFTER_CREATE,
-        driver.create_port_postcommit,
-        payload=events.DBEventPayload(
-            context, resource_id=segment_obj.id, states=(segment_obj,)
-        ),
-    )
     LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
     return segment
+
+
+_cached_ovn_client = None
+
+
+def ovn_client():
+    """Retrieve the OVN client from the OVN ML2 plugin."""
+    global _cached_ovn_client
+    if _cached_ovn_client:
+        return _cached_ovn_client
+
+    ml2_plugin = directory.get_plugin()
+    if not ml2_plugin:
+        return None
+
+    plugin = None
+    for driver in ml2_plugin.mechanism_manager.ordered_mech_drivers:
+        if driver.name == "ovn":
+            plugin = driver.obj
+    ovn_plugin = next(
+        (
+            driver.obj
+            for driver in ml2_plugin.mechanism_manager.ordered_mech_drivers
+            if driver.name == "ovn"
+        ),
+        None,
+    )
+    if ovn_plugin is None:
+        raise Exception("No OVN Plugin available")
+
+    _cached_ovn_client = plugin._ovn_client
+    return _cached_ovn_client
 
 
 def handle_router_interface_removal(_resource, _event, _trigger, payload) -> None:
