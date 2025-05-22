@@ -3,11 +3,11 @@ from uuid import uuid4
 import pytest
 from neutron_lib import constants as p_const
 
+from neutron_understack.routers import _handle_subport_removal
 from neutron_understack.routers import add_subport_to_trunk
 from neutron_understack.routers import create_port_postcommit
 from neutron_understack.routers import create_router_segment
-from neutron_understack.routers import events
-from neutron_understack.routers import resources
+from neutron_understack.routers import handle_router_interface_removal
 
 
 @pytest.fixture
@@ -30,15 +30,12 @@ def test_create_router_segment_calls(mocker, port_context):
     mock_byid = mocker.patch(
         "neutron_understack.utils.network_segment_by_id", return_value=fake_segment_obj
     )
-    mock_publish = mocker.patch("neutron_lib.callbacks.registry.publish")
-    mock_payload = mocker.patch(
-        "neutron_lib.callbacks.events.DBEventPayload",
-        side_effect=lambda *a, **k: "somepayload",
-    )
     mocker.patch(
         "oslo_config.cfg.CONF.ml2_understack.network_node_switchport_physnet",
         fake_physnet,
     )
+    fake_client = mocker.Mock()
+    mocker.patch("neutron_understack.routers.ovn_client", return_value=fake_client)
 
     driver = mocker.Mock(create_port_postcommit="postcommit_func")
 
@@ -49,13 +46,8 @@ def test_create_router_segment_calls(mocker, port_context):
         physnet=fake_physnet,
     )
     mock_byid.assert_called_once_with("seg-123")
-    args, kwargs = mock_publish.call_args
-    assert args[0] == resources.SEGMENT
-    assert args[1] == events.AFTER_CREATE
-    assert args[2] == "postcommit_func"
-    assert kwargs["payload"] == "somepayload"
-    mock_payload.assert_called_once_with(
-        ctx, resource_id="seg-123", states=(fake_segment_obj,)
+    fake_client.create_provnet_port.assert_called_once_with(
+        port_context[1], fake_segment_obj
     )
     assert result is fake_segment
 
@@ -100,7 +92,7 @@ def test_add_subport_to_trunk(mocker, subport_mock_context):
     )
 
 
-def test_handle_router_interface_removal(mocker):
+def test_handle_subport_removal_router(mocker):
     trunk_id = "trunk-uuid"
     port_id = "port-456"
     mocker.patch(
@@ -111,13 +103,21 @@ def test_handle_router_interface_removal(mocker):
         "id": port_id,
         "device_owner": p_const.DEVICE_OWNER_ROUTER_INTF,
     }
-    payload = mocker.Mock(metadata={"port": port})
+    _handle_subport_removal(port)
+    mock_remove.assert_called_once_with(trunk_id, port_id)
 
-    from neutron_understack.routers import handle_router_interface_removal
 
+def test_handle_router_interface_removal_for_non_router(mocker):
+    mock_sb_removal = mocker.patch("neutron_understack.routers._handle_subport_removal")
+    mock_localnet_removal = mocker.patch(
+        "neutron_understack.routers._handle_localnet_port_removal"
+    )
+
+    payload = mocker.Mock(metadata={"port": {"device_owner": "not_a_router"}})
     handle_router_interface_removal(None, None, None, payload)
 
-    mock_remove.assert_called_once_with(trunk_id, port_id)
+    mock_sb_removal.assert_not_called()
+    mock_localnet_removal.assert_not_called()
 
 
 @pytest.fixture
