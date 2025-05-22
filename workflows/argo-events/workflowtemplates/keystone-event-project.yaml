@@ -33,8 +33,6 @@ spec:
         command:
           - sync-keystone
         args:
-          - "--only-domain"
-          - "default"
           - "{{inputs.parameters.event_type}}"
           - "{{inputs.parameters.project_uuid}}"
         volumeMounts:
