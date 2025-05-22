@@ -10,11 +10,11 @@
   ansible.builtin.shell: >
     openstack network segment range create
     --shared
-    --network-type {{ item['network-type'] }}
+    --network-type {{ item.network_type }}
     --minimum {{ item.range_min }}
     --maximum {{ item.range_max }}
-    {% if item.get('physical-network', '') | length > 0 %}
-    --physical-network {{ item['physical-network'] }}
+    {% if item.physical_network is defined %}
+    --physical-network {{ item.physical_network }}
     {% endif %}
     {{ item.name }}
   when: segment_range_check.rc != 0
