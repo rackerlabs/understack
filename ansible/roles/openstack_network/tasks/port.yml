@@ -1,9 +1,0 @@
----
-
-- name: Create neutron port for network {{ network }}
-  openstack.cloud.port:
-    state: present
-    name: "{{ item.name }}"
-    mac_address: "{{ item.mac_address }}"
-    network: "{{ network }}"
-  loop: "{{ ports }}"
