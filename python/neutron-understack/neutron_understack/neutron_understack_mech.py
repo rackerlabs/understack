@@ -1,6 +1,8 @@
 import logging
 from uuid import UUID
 
+from pprint import pprint
+from neutron.common.ovn import utils as ovn_utils
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.api.definitions import segment as segment_def
@@ -69,7 +71,15 @@ class UnderstackDriver(MechanismDriver):
         )
 
     def create_network_precommit(self, context):
-        pass
+        cmd = [
+            "OVN_Southbound",
+            {
+                "op": "select",
+                "table": "Interface",
+                "where": [["name", "==", "br-ex"]]
+            }
+        ]
+        pprint(ovn_utils.OvsdbClientTransactCommand.run(cmd))
 
     def create_network_postcommit(self, context: NetworkContext):
         network = context.current
