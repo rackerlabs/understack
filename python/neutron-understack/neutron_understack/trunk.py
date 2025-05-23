@@ -81,6 +81,12 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
+            self.subports_added_post,
+            resources.SUBPORTS,
+            events.AFTER_CREATE,
+            cancellable=True,
+        )
+        registry.subscribe(
             self.subports_deleted,
             resources.SUBPORTS,
             events.AFTER_DELETE,
@@ -145,6 +151,9 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             subport_network_id = utils.fetch_subport_network_id(
                 subport_id=subport.port_id
             )
+            # we don't want to check mappings on network nodes
+            if trunk.id == cfg.CONF.ml2_understack.network_node_trunk_uuid:
+                continue
             self._handle_tenant_vlan_id_config(subport_network_id, subport)
 
         parent_port_obj = utils.fetch_port_object(trunk.port_id)
@@ -158,9 +167,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         parent_port_obj = utils.fetch_port_object(port_id)
         subports = trunk_details.get("sub_ports", [])
         self._add_subports_networks_to_parent_port_switchport(
-            parent_port=parent_port_obj,
-            subports=subports,
-            invoke_undersync=False,
+            parent_port=parent_port_obj, subports=subports
         )
 
     def _handle_segment_allocation(
@@ -190,7 +197,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         return allowed_vlan_ids
 
     def _add_subports_networks_to_parent_port_switchport(
-        self, parent_port: Port, subports: list[SubPort], invoke_undersync: bool = True
+        self, parent_port: Port, subports: list[SubPort]
     ) -> None:
         binding_profile = parent_port.bindings[0].profile
         binding_host = parent_port.bindings[0].host
@@ -210,9 +217,6 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             vlan_group_name=vlan_group_name,
             allowed_vlans_ids=allowed_vlan_ids,
         )
-
-        if invoke_undersync:
-            self._trigger_undersync(vlan_group_name)
 
     def clean_trunk(
         self, trunk_details: dict, binding_profile: dict, host: str
@@ -298,6 +302,17 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         trunk = payload.states[0]
         subports = payload.metadata["subports"]
         self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
+
+    def subports_added_post(self, resource, event, trunk_plugin, payload):
+        trunk = payload.states[0]
+        parent_port = utils.fetch_port_object(trunk.port_id)
+
+        if utils.parent_port_is_bound(parent_port):
+            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+                parent_port.mac_address
+            )
+            LOG.debug("subports_added_post found vlan_group_name=%s", vlan_group_name)
+            self._trigger_undersync(vlan_group_name)
 
     def subports_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]

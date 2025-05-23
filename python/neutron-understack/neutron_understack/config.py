@@ -50,11 +50,26 @@ mech_understack_opts = [
             "prefixes that need to be routable outside of a tenant environment."
         ),
     ),
+    # TODO:: this can very likely be deprecated now
     cfg.StrOpt(
         "network_node_switchport_uuid",
         help=(
             "Nautobot UUID of the network node's switchport interface, that "
             "is used to trunk all vlans used by a neutron router."
+        ),
+    ),
+    cfg.StrOpt(
+        "network_node_trunk_uuid",
+        help=(
+            "UUID of the trunk that is used to trunk all vlans used by a Neutron"
+            " router."
+        ),
+    ),
+    cfg.StrOpt(
+        "network_node_switchport_physnet",
+        help=(
+            "Name of the physnet configured on a network node's"
+            "baremetal port that provides connectivity to OVN."
         ),
     ),
     cfg.BoolOpt(
