@@ -18,17 +18,27 @@ def port_context(mocker):
     return ctx, fake_id
 
 
-def test_create_router_segment_calls(mocker, port_context):
+@pytest.fixture
+def ovs_settings(mocker):
+    mocker.patch(
+        "neutron.conf.agent.ovs_conf.get_igmp_flood_reports", return_value="true"
+    )
+    mocker.patch("neutron.conf.agent.ovs_conf.get_igmp_flood", return_value="true")
+
+
+def test_create_router_segment_calls(mocker, port_context, ovs_settings):
     ctx, fake_id = port_context
     fake_segment = {"id": "seg-123", "foo": "bar"}
-    fake_segment_obj = mocker.Mock(id="seg-123")
     fake_physnet = "fake-physnet"
 
     mock_alloc = mocker.patch(
         "neutron_understack.utils.allocate_dynamic_segment", return_value=fake_segment
     )
     mock_byid = mocker.patch(
-        "neutron_understack.utils.network_segment_by_id", return_value=fake_segment_obj
+        "neutron_understack.utils.network_segment_by_id", return_value=fake_segment
+    )
+    mock_create_uplink_port = mocker.patch(
+        "neutron_understack.routers.create_uplink_port"
     )
     mocker.patch(
         "oslo_config.cfg.CONF.ml2_understack.network_node_switchport_physnet",
@@ -46,9 +56,7 @@ def test_create_router_segment_calls(mocker, port_context):
         physnet=fake_physnet,
     )
     mock_byid.assert_called_once_with("seg-123")
-    fake_client.create_provnet_port.assert_called_once_with(
-        port_context[1], fake_segment_obj
-    )
+    mock_create_uplink_port.assert_called_once_with(fake_segment, port_context[1])
     assert result is fake_segment
 
 

@@ -1,11 +1,15 @@
 import logging
 from uuid import UUID
 
+from neutron.common.ovn import constants as ovn_const
+from neutron.common.ovn import utils as ovn_utils
+from neutron.conf.agent import ovs_conf
 from neutron.objects import base as base_obj
 from neutron.objects.network import NetworkSegment
 from neutron.plugins.ml2 import db as ml2_db
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
+from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
 from oslo_config import cfg
 
@@ -91,7 +95,7 @@ def create_router_segment(driver, context: PortContext):
         physnet=physnet,
     )
     segment_obj = utils.network_segment_by_id(segment["id"])
-    ovn_client().create_provnet_port(str(network_id), segment_obj)
+    create_uplink_port(segment_obj, str(network_id))
 
     LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
     return segment
@@ -129,6 +133,28 @@ def ovn_client():
     return _cached_ovn_client
 
 
+def create_uplink_port(segment: NetworkSegment, network_id: str, txn=None):
+    tag = segment.get(segment_def.SEGMENTATION_ID, [])
+    physnet = segment.get(segment_def.PHYSICAL_NETWORK)
+    fdb_enabled = "true"
+    options = {
+        "network_name": physnet,
+        ovn_const.LSP_OPTIONS_MCAST_FLOOD_REPORTS: ovs_conf.get_igmp_flood_reports(),
+        ovn_const.LSP_OPTIONS_MCAST_FLOOD: ovs_conf.get_igmp_flood(),
+        ovn_const.LSP_OPTIONS_LOCALNET_LEARN_FDB: fdb_enabled,
+    }
+    cmd = ovn_client()._nb_idl.create_lswitch_port(
+        lport_name=f"uplink-{segment['id']}",
+        lswitch_name=ovn_utils.ovn_name(network_id),
+        addresses=[ovn_const.UNKNOWN_ADDR],
+        external_ids={},
+        type=ovn_const.LSP_TYPE_LOCALNET,
+        tag=tag,
+        options=options,
+    )
+    ovn_client()._transaction([cmd], txn=txn)
+
+
 def handle_router_interface_removal(_resource, _event, trigger, payload) -> None:
     """Handles the removal of a router interface.
 
@@ -144,7 +170,15 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
 def _handle_localnet_port_removal(port):
     """Removes OVN localnet port that is used for this trunked VLAN."""
     admin_context = n_context.get_admin_context()
-    parent_port_id = port["binding:profile"]["parent_name"]
+    try:
+        parent_port_id = port["binding:profile"]["parent_name"]
+    except KeyError as err:
+        LOG.error(
+            "Port %(port)s is not added to a trunk. %(err)",
+            {"port": port["id"], "err": err},
+        )
+        return
+
     parent_port = utils.fetch_port_object(parent_port_id)
     binding_host = parent_port.bindings[0].host
 
