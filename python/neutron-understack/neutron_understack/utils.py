@@ -216,7 +216,10 @@ def is_baremetal_port(context: PortContext) -> bool:
 
 def is_router_interface(context: PortContext) -> bool:
     """Returns True if this port is the internal side of a router."""
-    return context.current["device_owner"] in [constants.DEVICE_OWNER_ROUTER_INTF]
+    return context.current["device_owner"] in [
+        constants.DEVICE_OWNER_ROUTER_INTF,
+        constants.DEVICE_OWNER_ROUTER_GW,
+    ]
 
 
 def vlan_segment_for_physnet(
