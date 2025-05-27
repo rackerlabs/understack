@@ -134,6 +134,7 @@ def ovn_client():
 
 
 def create_uplink_port(segment: NetworkSegment, network_id: str, txn=None):
+    """Create a localnet port to connect given NetworkSegment to a network node."""
     tag = segment.get(segment_def.SEGMENTATION_ID, [])
     physnet = segment.get(segment_def.PHYSICAL_NETWORK)
     fdb_enabled = "true"
@@ -153,6 +154,15 @@ def create_uplink_port(segment: NetworkSegment, network_id: str, txn=None):
         options=options,
     )
     ovn_client()._transaction([cmd], txn=txn)
+
+
+def delete_uplink_port(segment: NetworkSegment, network_id: str):
+    """Remove a localnet uplink port from a network node."""
+    port_to_del = f"uplink-{segment['id']}"
+    cmd = ovn_client()._nb_idl.delete_lswitch_port(
+        lport_name=port_to_del, lswitch_name=ovn_utils.ovn_name(network_id)
+    )
+    return ovn_client()._transaction([cmd])
 
 
 def handle_router_interface_removal(_resource, _event, trigger, payload) -> None:
@@ -192,7 +202,8 @@ def _handle_localnet_port_removal(port):
         segment_id = binding_levels[-1].segment_id
         LOG.debug("looking up segment_id: %s", segment_id)
         segment_obj = utils.network_segment_by_id(segment_id)
-        ovn_client().delete_provnet_port(port["network_id"], segment_obj)
+        # ovn_client().delete_provnet_port(port["network_id"], segment_obj)
+        delete_uplink_port(segment_obj, port["network_id"])
 
 
 def _handle_subport_removal(port):
