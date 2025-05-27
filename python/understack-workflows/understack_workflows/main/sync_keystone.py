@@ -1,6 +1,5 @@
 import argparse
 import logging
-from typing import Any
 import uuid
 from enum import StrEnum
 
@@ -94,6 +93,7 @@ def _find_outside_network(conn: Connection, project_id: str):
         name_or_id=OUTSIDE_NETWORK_NAME,
     )
 
+
 def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str]:
     project = conn.identity.get_project(project_id.hex)  # type: ignore
     domain_id = project.domain_id
@@ -107,6 +107,7 @@ def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str]:
     tenant_name = f"{domain_name}:{project.name}"
     return tenant_name, str(project.description)
 
+
 def handle_project_create(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
@@ -116,9 +117,7 @@ def handle_project_create(
     nautobot_tenant_api = nautobot.session.tenancy.tenants
     try:
         tenant = nautobot_tenant_api.create(
-            id=str(project_id),
-            name=tenant_name,
-            description=tenant_description
+            id=str(project_id), name=tenant_name, description=tenant_description
         )
         _create_outside_network(conn, project_id)
     except Exception:
@@ -147,8 +146,8 @@ def handle_project_update(
             )
             logger.info("tenant %s created %s", project_id, new_tenant.created)  # type: ignore
         else:
-            existing_tenant.name = tenant_name # type: ignore
-            existing_tenant.description = tenant_description # type: ignore
+            existing_tenant.name = tenant_name  # type: ignore
+            existing_tenant.description = tenant_description  # type: ignore
             existing_tenant.save()  # type: ignore
             logger.info(
                 "tenant %s last updated %s",

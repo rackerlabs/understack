@@ -42,7 +42,6 @@ def test_parse_object_id(arg_list, context, expected_id):
         assert args.object == expected_id
 
 
-
 def test_create_project(
     os_conn,
     nautobot,
