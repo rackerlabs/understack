@@ -60,8 +60,15 @@ def os_conn(project_data: dict) -> openstack.connection.Connection:
                 "id": project_id,
                 "domain_id": project_data["domain_id"].hex,
             }
-            return openstack.identity.v3.project.Project(**data)
-        raise openstack.exceptions.NotFoundException
+        elif project_id == project_data["domain_id"].hex:
+            data = {
+                **project_data,
+                "id": project_data["domain_id"].hex,
+                "domain_id": "default",
+            }
+        else:
+            raise openstack.exceptions.NotFoundException
+        return openstack.identity.v3.project.Project(**data)
 
     conn = MagicMock(spec_set=openstack.connection.Connection)
     conn.identity.get_project.side_effect = _get_project
@@ -111,4 +118,6 @@ def nautobot(requests_mock, nautobot_url: str, tenant_data: dict) -> Nautobot:
     requests_mock.get(tenant_data["url"], json=tenant_data)
     requests_mock.delete(tenant_data["url"])
     requests_mock.post(f"{nautobot_url}/api/tenancy/tenants/", json=tenant_data)
+    requests_mock.patch(tenant_data["url"], json=tenant_data)
+
     return Nautobot(nautobot_url, "blah")

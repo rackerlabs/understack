@@ -144,7 +144,7 @@ def _redfish_request(
         )
         if response.status_code >= 400:
             raise Exception(
-                f"Redfish HTTP {response.status_code} " f"from {uri}: {response.text}"
+                f"Redfish HTTP {response.status_code} from {uri}: {response.text}"
             )
 
         else:
