@@ -1,10 +1,9 @@
 import argparse
 import logging
+from typing import Any
 import uuid
 from enum import StrEnum
 
-from understack_workflows.domain import DefaultDomain
-from understack_workflows.domain import domain_id
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
@@ -39,11 +38,6 @@ def argument_parser():
         help="Cloud to load. default: %(default)s",
     )
 
-    parser.add_argument(
-        "--only-domain",
-        type=domain_id,
-        help="Only operate on projects from specified domain",
-    )
     parser.add_argument("event", type=Event, choices=[item.value for item in Event])
     parser.add_argument(
         "object", type=uuid.UUID, help="Keystone ID of object the event happened on"
@@ -51,25 +45,6 @@ def argument_parser():
     parser = parser_nautobot_args(parser)
 
     return parser
-
-
-def is_valid_domain(
-    conn: Connection,
-    project_id: uuid.UUID,
-    only_domain: uuid.UUID | DefaultDomain | None,
-) -> bool:
-    if only_domain is None:
-        return True
-    project = conn.identity.get_project(project_id.hex)  # type: ignore
-    ret = project.domain_id == only_domain.hex
-    if not ret:
-        logger.info(
-            "keystone project %s part of domain %s and not %s",
-            project_id,
-            project.domain_id,
-            only_domain,
-        )
-    return ret
 
 
 def _create_outside_network(conn: Connection, project_id: uuid.UUID):
@@ -119,45 +94,61 @@ def _find_outside_network(conn: Connection, project_id: str):
         name_or_id=OUTSIDE_NETWORK_NAME,
     )
 
+def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str]:
+    project = conn.identity.get_project(project_id.hex)  # type: ignore
+    domain_id = project.domain_id
+
+    if domain_id == "default":
+        domain_name = "default"
+    else:
+        domain = conn.identity.get_project(domain_id)  # type: ignore
+        domain_name = domain.name
+
+    tenant_name = f"{domain_name}:{project.name}"
+    return tenant_name, str(project.description)
 
 def handle_project_create(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
-    logger.info("got request to create tenant %s", project_id)
-    project = conn.identity.get_project(project_id.hex)  # type: ignore
-    ten_api = nautobot.session.tenancy.tenants
+    logger.info("got request to create tenant %s", project_id.hex)
+    tenant_name, tenant_description = _tenant_attrs(conn, project_id)
+
+    nautobot_tenant_api = nautobot.session.tenancy.tenants
     try:
-        ten = ten_api.create(
-            id=str(project_id), name=project.name, description=project.description
+        tenant = nautobot_tenant_api.create(
+            id=str(project_id),
+            name=tenant_name,
+            description=tenant_description
         )
         _create_outside_network(conn, project_id)
     except Exception:
         logger.exception(
-            "Unable to create project %s / %s", str(project_id), project.name
+            "Unable to create project %s / %s", str(project_id), tenant_name
         )
         return _EXIT_API_ERROR
 
-    logger.info("tenant %s created %s", project_id, ten.created)  # type: ignore
+    logger.info("tenant %s created %s", project_id, tenant.created)  # type: ignore
     return _EXIT_SUCCESS
 
 
 def handle_project_update(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
-    logger.info("got request to update tenant %s", project_id)
-    project = conn.identity.get_project(project_id.hex)  # type: ignore
-    tenant_api = nautobot.session.tenancy.tenants
+    logger.info("got request to update tenant %s", project_id.hex)
+    tenant_name, tenant_description = _tenant_attrs(conn, project_id)
 
+    tenant_api = nautobot.session.tenancy.tenants
     existing_tenant = tenant_api.get(project_id)
     logger.info("existing_tenant: %s", existing_tenant)
     try:
         if existing_tenant is None:
             new_tenant = tenant_api.create(
-                id=str(project_id), name=project.name, description=project.description
+                id=str(project_id), name=tenant_name, description=tenant_description
             )
             logger.info("tenant %s created %s", project_id, new_tenant.created)  # type: ignore
         else:
-            existing_tenant.description = project.description  # type: ignore
+            existing_tenant.name = tenant_name # type: ignore
+            existing_tenant.description = tenant_description # type: ignore
             existing_tenant.save()  # type: ignore
             logger.info(
                 "tenant %s last updated %s",
@@ -168,7 +159,7 @@ def handle_project_update(
         _create_outside_network(conn, project_id)
     except Exception:
         logger.exception(
-            "Unable to update project %s / %s", str(project_id), project.name
+            "Unable to update project %s / %s", str(project_id), tenant_name
         )
         return _EXIT_API_ERROR
     return _EXIT_SUCCESS
@@ -194,16 +185,7 @@ def do_action(
     nautobot: Nautobot,
     event: Event,
     project_id: uuid.UUID,
-    only_domain: uuid.UUID | DefaultDomain | None,
 ) -> int:
-    if event in [Event.ProjectCreate, Event.ProjectUpdate] and not is_valid_domain(
-        conn, project_id, only_domain
-    ):
-        logger.info(
-            "keystone project %s not part of %s, skipping", project_id, only_domain
-        )
-        return _EXIT_SUCCESS
-
     match event:
         case Event.ProjectCreate:
             return handle_project_create(conn, nautobot, project_id)
@@ -224,4 +206,4 @@ def main() -> int:
     nb_token = args.nautobot_token or credential("nb-token", "token")
     nautobot = Nautobot(args.nautobot_url, nb_token, logger=logger)
 
-    return do_action(conn, nautobot, args.event, args.object, args.only_domain)
+    return do_action(conn, nautobot, args.event, args.object)
