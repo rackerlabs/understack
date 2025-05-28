@@ -26,6 +26,26 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
     return port
 
 
+def create_neutron_port_for_segment(
+    segment: NetworkSegment, network_id: str
+) -> port_obj.Port:
+    context = n_context.get_admin_context()
+    core_plugin = directory.get_plugin()
+    port = {
+        "port": {
+            "name": f"uplink-{segment['id']}",
+            "network_id": network_id,
+            "mac_address": "",
+            "device_owner": "",
+            "device_id": "",
+            "fixed_ips": [],
+            "admin_state_up": True,
+            "tenant_id": "",
+        }
+    }
+    return core_plugin.create_port(context, port)
+
+
 def remove_subport_from_trunk(trunk_id: str, subport_id: str) -> None:
     context = n_context.get_admin_context()
     plugin = fetch_trunk_plugin()
