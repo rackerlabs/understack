@@ -23,6 +23,10 @@ from .ml2_type_annotations import PortDict
 
 LOG = logging.getLogger(__name__)
 
+ROUTER_INTERFACE_AND_GW = [
+    p_const.DEVICE_OWNER_ROUTER_INTF, p_const.DEVICE_OWNER_ROUTER_GW
+]
+
 
 def create_port_postcommit(context: PortContext):
     # When router port is created, we can end up in one of two situations:
@@ -55,7 +59,7 @@ def create_port_postcommit(context: PortContext):
     create_uplink_port(segment_obj, str(network_id))
 
 
-def is_first_port_on_network(context: PortContext):
+def is_first_port_on_network(context: PortContext) -> bool:
     network_id = context.current["network_id"]
 
     other_router_ports = Port.get_objects(
@@ -225,41 +229,97 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
     # deleted by Neutron and segment-shared port stays around.
 
     port = payload.metadata["port"]
-    if port["device_owner"] in [p_const.DEVICE_OWNER_ROUTER_INTF]:
-        _handle_localnet_port_removal(port)
-        _handle_subport_removal(port)
 
+    if port["device_owner"] not in ROUTER_INTERFACE_AND_GW:
+        return
 
-def _handle_localnet_port_removal(port):
-    """Removes OVN localnet port that is used for this trunked VLAN."""
-    admin_context = n_context.get_admin_context()
-    try:
-        parent_port_id = port["binding:profile"]["parent_name"]
-    except KeyError as err:
-        LOG.error(
-            "Port %(port)s is not added to a trunk. %(err)",
-            {"port": port["id"], "err": err},
+    if not is_last_port_on_network(port):
+        LOG.debug(
+            "Deleting only Router port %(port)s as there are other"
+            " router ports using the same network", {"port": port}
         )
         return
 
-    parent_port = utils.fetch_port_object(parent_port_id)
-    binding_host = parent_port.bindings[0].host
+    network_id = port["network_id"]
 
-    binding_levels = ml2_db.get_binding_level_objs(
-        admin_context, port["id"], binding_host
+    segment = utils.network_segment_by_physnet(
+        network_id,
+        cfg.CONF.ml2_understack.network_node_switchport_physnet
+    )
+    if not segment:
+        LOG.error(
+            "Router network segment not found for network %(network_id)s",
+            {"network_id": network_id}
+        )
+        return
+
+    LOG.debug("Router network segment found %(segment)s", {"segment": segment})
+    shared_ports = Port.get_objects(
+        n_context.get_admin_context(),
+        name=f"uplink-{segment['id']}"
     )
 
-    LOG.debug("binding_levels: %(lvls)s", {"lvls": binding_levels})
+    if not shared_ports:
+        LOG.error(
+            "No router shared ports found for segment %(segment)s",
+            {"segment", segment}
+        )
+        return
+    LOG.debug("Router shared ports found %(ports)s", {"ports": shared_ports})
 
-    if binding_levels:
-        segment_id = binding_levels[-1].segment_id
-        LOG.debug("looking up segment_id: %s", segment_id)
-        segment_obj = utils.network_segment_by_id(segment_id)
-        # ovn_client().delete_provnet_port(port["network_id"], segment_obj)
-        delete_uplink_port(segment_obj, port["network_id"])
+    shared_port = shared_ports[0]
+
+    _handle_subport_removal(shared_port)
+    delete_uplink_port(segment, network_id)
+    shared_port.delete()
 
 
-def _handle_subport_removal(port):
+def is_last_port_on_network(port: PortDict) -> bool:
+    network_id = port["network_id"]
+
+    other_router_ports = Port.get_objects(
+        n_context.get_admin_context(),
+        network_id=network_id,
+        device_owner=ROUTER_INTERFACE_AND_GW,
+    )
+
+    LOG.debug("Router ports found: %(ports)s", {"ports": other_router_ports})
+    if len(other_router_ports) > 1:
+        return False
+    else:
+        return True
+
+
+# def _handle_localnet_port_removal(port):
+#     """Removes OVN localnet port that is used for this trunked VLAN."""
+#     admin_context = n_context.get_admin_context()
+#     try:
+#         parent_port_id = port["binding:profile"]["parent_name"]
+#     except KeyError as err:
+#         LOG.error(
+#             "Port %(port)s is not added to a trunk. %(err)",
+#             {"port": port["id"], "err": err},
+#         )
+#         return
+
+#     parent_port = utils.fetch_port_object(parent_port_id)
+#     binding_host = parent_port.bindings[0].host
+
+#     binding_levels = ml2_db.get_binding_level_objs(
+#         admin_context, port["id"], binding_host
+#     )
+
+#     LOG.debug("binding_levels: %(lvls)s", {"lvls": binding_levels})
+
+#     if binding_levels:
+#         segment_id = binding_levels[-1].segment_id
+#         LOG.debug("looking up segment_id: %s", segment_id)
+#         segment_obj = utils.network_segment_by_id(segment_id)
+#         # ovn_client().delete_provnet_port(port["network_id"], segment_obj)
+#         delete_uplink_port(segment_obj, port["network_id"])
+
+
+def _handle_subport_removal(port: Port):
     """Removes router's subport from a network node trunk."""
     # trunk_id will be discovered dynamically at some point
     trunk_id = cfg.CONF.ml2_understack.network_node_trunk_uuid
