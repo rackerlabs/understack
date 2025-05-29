@@ -6,7 +6,6 @@ from neutron.common.ovn import utils as ovn_utils
 from neutron.conf.agent import ovs_conf
 from neutron.objects import base as base_obj
 from neutron.objects.network import NetworkSegment
-from neutron.objects.ports import Port
 from neutron.plugins.ml2 import db as ml2_db
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
@@ -27,6 +26,19 @@ def create_port_postcommit(context: PortContext, driver):
     device_id = context.current["device_id"]
     device_owner = context.current["device_owner"]
     network_id = context.current["network_id"]
+
+    # When router port is created, we can end up in one of two situations:
+    # 1. It's a first router port using the network
+    # 2. There are already other routers that use this network
+    #
+    # In situation 1, we have to:
+    # - create or find the dynamic network segment for network node
+    # - create a segment-shared Neutron port that has network_id same as
+    #   router-specific port. Set the name to help identification.
+    # - add the segment-shared port to a network node trunk
+    # - create localnet port in OVN
+    #
+    # In situation 2, we don't have to do anything.
 
     segment = _existing_segment(context) or create_router_segment(driver, context)
 
@@ -74,7 +86,7 @@ def add_subport_to_trunk(context, segment):
         if subport["segmentation_id"] == segmentation_id:
             LOG.debug(
                 "Subport segmentation_id %(seg_id)s already in trunk %(trunk_id)s",
-                {"seg_id": segmentation_id, "trunk_id": trunk_id}
+                {"seg_id": segmentation_id, "trunk_id": trunk_id},
             )
             return
 
@@ -187,6 +199,25 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
     When router interface port is deleted, we remove the corresponding subport
     from the trunk and delete OVN localnet port.
     """
+    # We have router-specific port that is being deleted.
+    # We have segment-shared port for shared networks.
+    #
+    # When the delete router port event is received, we can be in two situations:
+    # 1. The port is the last one that uses shared network.
+    # 2. The port is being detached from a network, but there are other routers
+    #    still using that network.
+    #
+    # In situation 1, we have to:
+    # - identify segment-shared Neutron port. This can be done by looking up
+    #   ports that are subports of the preconfigured "network node" trunk with
+    #   matching segmentation_id and network_id.
+    # - remove the segment-shared Neutron port from a trunk
+    # - remove the localnet port in OVN for same segmentation_id/VLAN
+    # - delete the segment-shared Neutron port
+    #
+    # In situation 2, we don't have to do nothing. Router-specific port gets
+    # deleted by Neutron and segment-shared port stays around.
+
     port = payload.metadata["port"]
     if port["device_owner"] in [p_const.DEVICE_OWNER_ROUTER_INTF]:
         _handle_localnet_port_removal(port)
