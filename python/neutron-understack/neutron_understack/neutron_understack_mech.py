@@ -231,13 +231,13 @@ class UnderstackDriver(MechanismDriver):
         )
 
     def create_port_precommit(self, context: PortContext):
+        pass
+
+    def create_port_postcommit(self, context: PortContext) -> None:
         # Provide network node(s) with connectivity to the networks where this
         # router port is attached to.
         if utils.is_router_interface(context):
-            routers.create_port_precommit(context)
-
-    def create_port_postcommit(self, context: PortContext) -> None:
-        pass
+            routers.create_port_postcommit(context)
 
     def update_port_precommit(self, context):
         pass

@@ -24,7 +24,7 @@ from .ml2_type_annotations import PortDict
 LOG = logging.getLogger(__name__)
 
 
-def create_port_precommit(context: PortContext):
+def create_port_postcommit(context: PortContext):
     # When router port is created, we can end up in one of two situations:
     # 1. It's a first router port using the network
     # 2. There are already other routers that use this network
@@ -47,7 +47,7 @@ def create_port_precommit(context: PortContext):
     network_id = context.current["network_id"]
 
     # Trunk
-    shared_port = utils.create_neutron_port_for_segment(segment, network_id)
+    shared_port = utils.create_neutron_port_for_segment(segment, context)
     add_subport_to_trunk(shared_port, segment, context)
 
     # OVN
@@ -59,7 +59,7 @@ def is_first_port_on_network(context: PortContext):
     network_id = context.current["network_id"]
 
     other_router_ports = Port.get_objects(
-        n_context.get_admin_context(),
+        context.plugin_context,
         network_id=network_id,
         device_owner=[
             p_const.DEVICE_OWNER_ROUTER_INTF,
@@ -67,7 +67,8 @@ def is_first_port_on_network(context: PortContext):
         ],
     )
 
-    if other_router_ports:
+    LOG.debug("Router ports found: %(ports)s", {"ports": other_router_ports})
+    if len(other_router_ports) > 1:
         return False
     else:
         return True

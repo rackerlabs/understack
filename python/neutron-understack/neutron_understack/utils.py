@@ -28,14 +28,13 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
 
 
 def create_neutron_port_for_segment(
-    segment: NetworkSegmentDict, network_id: str
+    segment: NetworkSegmentDict, context: PortContext
 ) -> PortDict:
-    context = n_context.get_admin_context()
     core_plugin = directory.get_plugin()
     port = {
         "port": {
             "name": f"uplink-{segment['id']}",
-            "network_id": network_id,
+            "network_id": context.current["network_id"],
             "mac_address": "",
             "device_owner": "",
             "device_id": "",
@@ -47,7 +46,7 @@ def create_neutron_port_for_segment(
     if not core_plugin:
         raise Exception("Unable to retrieve core_plugin.")
 
-    return core_plugin.create_port(context, port)
+    return core_plugin.create_port(context.plugin_context, port)
 
 
 def remove_subport_from_trunk(trunk_id: str, subport_id: str) -> None:
