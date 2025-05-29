@@ -5,7 +5,7 @@ from neutron_lib import constants as p_const
 
 from neutron_understack.routers import _handle_subport_removal
 from neutron_understack.routers import add_subport_to_trunk
-from neutron_understack.routers import create_port_postcommit
+from neutron_understack.routers import create_port_precommit
 from neutron_understack.routers import create_router_segment
 from neutron_understack.routers import handle_router_interface_removal
 
@@ -143,7 +143,7 @@ def driver(mocker):
     return mocker.MagicMock()
 
 
-def test_create_port_postcommit_existing_segment(mocker, context, driver):
+def test_create_port_precommit_existing_segment(mocker, context, driver):
     segment = {"id": "segmentA"}
     mocker.patch("neutron_lib.context.get_admin_context", return_value=mocker.Mock())
     mocker.patch(
@@ -162,7 +162,7 @@ def test_create_port_postcommit_existing_segment(mocker, context, driver):
         "oslo_config.cfg.CONF.ml2_understack.network_node_switchport_physnet",
         "x23-1-network",
     )
-    create_port_postcommit(context, driver)
+    create_port_precommit(context)
 
     mock_clear.assert_called_once_with("port123")
     add_trunk.assert_called_once_with(context, segment)
@@ -190,7 +190,7 @@ def test_segment_creation(mocker, context, driver):
     mocker.patch("neutron_lib.context.get_admin_context", return_value=mocker.Mock())
     mocker.patch("neutron.objects.network.NetworkSegment.get_objects", return_value=[])
 
-    create_port_postcommit(context, driver)
+    create_port_precommit(context)
 
     mock_create_router_segment.assert_called_once_with(driver, context)
     mock_clear_device_id.assert_called_once_with("port123")

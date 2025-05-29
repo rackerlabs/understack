@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 from uuid import UUID
 
 from neutron.common.ovn import constants as ovn_const
@@ -16,7 +17,9 @@ from oslo_config import cfg
 
 from neutron_understack import utils
 
+from .ml2_type_annotations import NetworkSegmentDict
 from .ml2_type_annotations import PortContext
+from .ml2_type_annotations import PortDict
 
 LOG = logging.getLogger(__name__)
 
@@ -70,7 +73,7 @@ def is_first_port_on_network(context: PortContext):
         return True
 
 
-def _existing_segment(context):
+def _existing_segment(context) -> NetworkSegmentDict | None:
     filter = {
         "network_id": context.current["network_id"],
         "network_type": p_const.TYPE_VLAN,
@@ -81,13 +84,13 @@ def _existing_segment(context):
         admin_context, _pager=base_obj.Pager(limit=1), **filter
     )
     if matching_segments:
-        return matching_segments[0]
+        return cast(NetworkSegmentDict, matching_segments[0].to_dict())
     else:
         return None
 
 
 def add_subport_to_trunk(
-    shared_port: Port, segment: NetworkSegment, context: PortContext
+    shared_port: PortDict, segment: NetworkSegmentDict, context: PortContext
 ):
     """Adds requested port as a subport of a trunk connection for network nodes.
 
@@ -96,7 +99,7 @@ def add_subport_to_trunk(
     subports = {
         "sub_ports": [
             {
-                "port_id": shared_port.id,
+                "port_id": shared_port["id"],
                 "segmentation_id": segment["segmentation_id"],
                 "segmentation_type": p_const.TYPE_VLAN,
             },
@@ -109,7 +112,7 @@ def add_subport_to_trunk(
     )
 
 
-def create_router_segment(context: PortContext):
+def create_router_segment(context: PortContext) -> NetworkSegmentDict:
     """Creates a dynamic segment for connection between the router and network node."""
     network_id = UUID(context.current["network_id"])
     physnet = cfg.CONF.ml2_understack.network_node_switchport_physnet
@@ -121,6 +124,12 @@ def create_router_segment(context: PortContext):
         network_id=str(network_id),
         physnet=physnet,
     )
+    if not segment:
+        raise Exception(
+            "failed allocating dynamic segment for"
+            "network_id=%(network_id)s physnet=%(physnet)s",
+            {"network_id": str(network_id), "physnet": physnet},
+        )
     LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
     return segment
 

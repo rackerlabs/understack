@@ -15,6 +15,7 @@ from neutron_lib.plugins.ml2 import api
 
 from neutron_understack.ml2_type_annotations import NetworkSegmentDict
 from neutron_understack.ml2_type_annotations import PortContext
+from neutron_understack.ml2_type_annotations import PortDict
 from neutron_understack.nautobot import Nautobot
 
 
@@ -27,8 +28,8 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
 
 
 def create_neutron_port_for_segment(
-    segment: NetworkSegment, network_id: str
-) -> port_obj.Port:
+    segment: NetworkSegmentDict, network_id: str
+) -> PortDict:
     context = n_context.get_admin_context()
     core_plugin = directory.get_plugin()
     port = {
@@ -43,6 +44,9 @@ def create_neutron_port_for_segment(
             "tenant_id": "",
         }
     }
+    if not core_plugin:
+        raise Exception("Unable to retrieve core_plugin.")
+
     return core_plugin.create_port(context, port)
 
 
@@ -92,16 +96,22 @@ def set_device_id_and_owner_for_port(
 
 
 def fetch_trunk_plugin() -> TrunkPlugin:
-    return directory.get_plugin("trunk")
+    trunk_plugin = directory.get_plugin("trunk")
+    if not trunk_plugin:
+        raise Exception("unable to obtain trunk plugin")
+    return trunk_plugin
 
 
 def allocate_dynamic_segment(
     network_id: str,
     network_type: str = "vlan",
     physnet: str | None = None,
-) -> dict:
+) -> NetworkSegmentDict:
     context = n_context.get_admin_context()
     core_plugin = directory.get_plugin()
+
+    if not core_plugin:
+        raise Exception("unable to obtain core_plugin")
 
     if hasattr(core_plugin.type_manager, "allocate_dynamic_segment"):
         segment_dict = {
@@ -113,7 +123,8 @@ def allocate_dynamic_segment(
             context, network_id, segment_dict
         )
         return segment
-    return {}
+    # TODO: ask Milan when would this be useful
+    raise Exception("core type_manager does not support dynamic segment allocation.")
 
 
 def create_binding_profile_level(
