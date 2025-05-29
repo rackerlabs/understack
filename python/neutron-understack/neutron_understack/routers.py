@@ -6,6 +6,7 @@ from neutron.common.ovn import utils as ovn_utils
 from neutron.conf.agent import ovs_conf
 from neutron.objects import base as base_obj
 from neutron.objects.network import NetworkSegment
+from neutron.objects.ports import Port
 from neutron.plugins.ml2 import db as ml2_db
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
@@ -20,13 +21,7 @@ from .ml2_type_annotations import PortContext
 LOG = logging.getLogger(__name__)
 
 
-def create_port_postcommit(context: PortContext, driver):
-    """Handles `create_port_postcommit` event for Router ports."""
-    port_id = context.current["id"]
-    device_id = context.current["device_id"]
-    device_owner = context.current["device_owner"]
-    network_id = context.current["network_id"]
-
+def create_port_precommit(context: PortContext):
     # When router port is created, we can end up in one of two situations:
     # 1. It's a first router port using the network
     # 2. There are already other routers that use this network
@@ -39,20 +34,40 @@ def create_port_postcommit(context: PortContext, driver):
     # - create localnet port in OVN
     #
     # In situation 2, we don't have to do anything.
+    if not is_first_port_on_network(context):
+        LOG.debug(
+            "Creating a router port for a network that already has other routers."
+        )
+        return
 
-    segment = _existing_segment(context) or create_router_segment(driver, context)
+    segment = _existing_segment(context) or create_router_segment(context)
+    network_id = context.current["network_id"]
 
-    # Trunk plugin does not allow the subport have a device_id set when it is
-    # added to a trunk, so we temporarily clear the device_id and restore it
-    # after it's added.
-    segment_port = utils.create_neutron_port_for_segment(segment, network_id)
-    utils.clear_device_id_for_port(port_id)
-    add_subport_to_trunk(context, segment)
-    utils.set_device_id_and_owner_for_port(
-        port_id=port_id,
-        device_id=device_id,
-        device_owner=device_owner,
+    # Trunk
+    shared_port = utils.create_neutron_port_for_segment(segment, network_id)
+    add_subport_to_trunk(shared_port, segment, context)
+
+    # OVN
+    segment_obj = utils.network_segment_by_id(segment["id"])
+    create_uplink_port(segment_obj, str(network_id))
+
+
+def is_first_port_on_network(context: PortContext):
+    network_id = context.current["network_id"]
+
+    other_router_ports = Port.get_objects(
+        n_context.get_admin_context(),
+        network_id=network_id,
+        device_owner=[
+            p_const.DEVICE_OWNER_ROUTER_INTF,
+            p_const.DEVICE_OWNER_ROUTER_GW,
+        ],
     )
+
+    if other_router_ports:
+        return False
+    else:
+        return True
 
 
 def _existing_segment(context):
@@ -71,44 +86,30 @@ def _existing_segment(context):
         return None
 
 
-def add_subport_to_trunk(context, segment):
+def add_subport_to_trunk(
+    shared_port: Port, segment: NetworkSegment, context: PortContext
+):
     """Adds requested port as a subport of a trunk connection for network nodes.
 
     The trunk and parent port must already exist.
     """
-    port_id = context.current["id"]
-    trunk_id = cfg.CONF.ml2_understack.network_node_trunk_uuid
-    segmentation_id = segment["segmentation_id"]
-    trunk_plugin = utils.fetch_trunk_plugin()
-    current_subports = trunk_plugin.get_subports(context.plugin_context, trunk_id)
-
-    for subport in current_subports["sub_ports"]:
-        if subport["segmentation_id"] == segmentation_id:
-            LOG.debug(
-                "Subport segmentation_id %(seg_id)s already in trunk %(trunk_id)s",
-                {"seg_id": segmentation_id, "trunk_id": trunk_id},
-            )
-            return
-
     subports = {
         "sub_ports": [
             {
-                "port_id": port_id,
-                "segmentation_id": segmentation_id,
+                "port_id": shared_port.id,
+                "segmentation_id": segment["segmentation_id"],
                 "segmentation_type": p_const.TYPE_VLAN,
             },
         ]
     }
-    LOG.debug("router subports to be added %(subports)s", {"subports": subports})
-    LOG.debug("trunk plugin: %(plugin)s", {"plugin": trunk_plugin})
-    trunk_plugin.add_subports(
+    return utils.fetch_trunk_plugin().add_subports(
         context=context.plugin_context,
-        trunk_id=trunk_id,
+        trunk_id=cfg.CONF.ml2_understack.network_node_trunk_uuid,
         subports=subports,
     )
 
 
-def create_router_segment(driver, context: PortContext):
+def create_router_segment(context: PortContext):
     """Creates a dynamic segment for connection between the router and network node."""
     network_id = UUID(context.current["network_id"])
     physnet = cfg.CONF.ml2_understack.network_node_switchport_physnet
@@ -120,11 +121,6 @@ def create_router_segment(driver, context: PortContext):
         network_id=str(network_id),
         physnet=physnet,
     )
-    segment_obj = utils.network_segment_by_id(segment["id"])
-    create_uplink_port(segment_obj, str(network_id))
-    # segment_port = create_neutron_port(segment, str(network_id))
-    # add_subport_to_trunk(segment_port, segment)
-
     LOG.debug("router dynamic segment: %(segment)s", {"segment": segment})
     return segment
 

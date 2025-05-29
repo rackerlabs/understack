@@ -47,9 +47,7 @@ def test_create_router_segment_calls(mocker, port_context, ovs_settings):
     fake_client = mocker.Mock()
     mocker.patch("neutron_understack.routers.ovn_client", return_value=fake_client)
 
-    driver = mocker.Mock(create_port_postcommit="postcommit_func")
-
-    result = create_router_segment(driver, ctx)
+    result = create_router_segment(ctx)
 
     mock_alloc.assert_called_once_with(
         network_id=str(fake_id),

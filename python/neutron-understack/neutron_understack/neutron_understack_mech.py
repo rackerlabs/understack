@@ -230,14 +230,14 @@ class UnderstackDriver(MechanismDriver):
             {"prefix": prefix, "uuid": subnet_uuid},
         )
 
-    def create_port_precommit(self, context):
-        pass
-
-    def create_port_postcommit(self, context: PortContext) -> None:
+    def create_port_precommit(self, context: PortContext):
         # Provide network node(s) with connectivity to the networks where this
         # router port is attached to.
         if utils.is_router_interface(context):
-            routers.create_port_postcommit(context, self)
+            routers.create_port_precommit(context)
+
+    def create_port_postcommit(self, context: PortContext) -> None:
+        pass
 
     def update_port_precommit(self, context):
         pass
