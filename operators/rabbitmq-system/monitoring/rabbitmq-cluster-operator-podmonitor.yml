@@ -1,0 +1,16 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: rabbitmq-cluster-operator
+  namespace: rabbitmq-system
+  # If labels are defined in spec.podMonitorSelector.matchLabels of your deployed Prometheus object, make sure to include them here.
+spec:
+  podMetricsEndpoints:
+  - port: metrics
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: rabbitmq-operator
+  namespaceSelector:
+    matchNames:
+    - rabbitmq-system
