@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: rabbitmq-system
+
+resources:
+  - rabbitmq-servicemonitor.yml
+  - rabbitmq-cluster-operator-podmonitor.yml
+  - ./rules/rabbitmq-per-object/queue-is-growing.yml
+  - ./rules/rabbitmq-per-object/queue-has-no-consumers.yml
+  - ./rules/rabbitmq/container-restarts.yml
+  - ./rules/rabbitmq/high-connection-churn.yml
+  - ./rules/rabbitmq/file-descriptors-near-limit.yml
+  - ./rules/rabbitmq/low-disk-watermark-predicted.yml
+  - ./rules/rabbitmq/unroutable-messages.yml
+  - ./rules/rabbitmq/recording-rules.yml
+  - ./rules/rabbitmq/no-majority-of-nodes-ready.yml
+  - ./rules/rabbitmq/cluster-alarms.yml
+  - ./rules/rabbitmq/insufficient-established-erlang-distribution-links.yml
+  - ./rules/rabbitmq/persistent-volume-missing.yml
+  - ./rules/rabbitmq/tcp-sockets-near-limit.yml
+  - ./rules/rabbitmq-cluster-operator/unavailable-replicas.yml
