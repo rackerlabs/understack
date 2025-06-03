@@ -4,7 +4,8 @@
   "extends": [
     "github>rackerlabs/understack//.github/renovate/default",
     "github>rackerlabs/understack//.github/renovate/nautobot",
-    "github>rackerlabs/understack//.github/renovate/understackContainerMatch"
+    "github>rackerlabs/understack//.github/renovate/understackContainerMatch",
+    "github>rackerlabs/understack//.github/renovate/matchOpenStackHelm"
   ],
   "packageRules": [
     {
@@ -16,16 +17,6 @@
     }
   ],
   "customManagers": [
-    {
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/apps/appsets/openstack.yaml$/"
-      ],
-      "matchStrings": [
-        "\\s- component: (?<depName>.+)\\n\\s+repoURL: (?<packageName>.+)\\n\\s+chartVersion: (?<currentValue>.+)\\s"
-      ],
-      "datasourceTemplate": "helm"
-    },
     {
       "customType": "regex",
       "managerFilePatterns": [
