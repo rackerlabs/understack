@@ -1,129 +1,140 @@
-from uuid import uuid4
-
 import pytest
 from neutron_lib import constants as p_const
 
-from neutron_understack.routers import _handle_subport_removal
 from neutron_understack.routers import add_subport_to_trunk
-from neutron_understack.routers import create_port_precommit
-from neutron_understack.routers import create_router_segment
+from neutron_understack.routers import create_port_postcommit
+from neutron_understack.routers import fetch_or_create_router_segment
 from neutron_understack.routers import handle_router_interface_removal
+from neutron_understack.routers import handle_subport_removal
 
 
-@pytest.fixture
-def port_context(mocker):
-    fake_id = str(uuid4())
-    ctx = mocker.Mock()
-    ctx.current = {"network_id": fake_id}
-    return ctx, fake_id
+class TestFetchOrCreateRouterSegment:
+    def test_when_successful(self, mocker, port_context, network_id):
+        fake_segment = {"id": "seg-123", "foo": "bar"}
+        fake_physnet = "fake-physnet"
+        port_context.current["network_id"] = str(network_id)
+
+        mock_alloc = mocker.patch(
+            "neutron_understack.utils.allocate_dynamic_segment",
+            return_value=fake_segment,
+        )
+        mocker.patch(
+            "oslo_config.cfg.CONF.ml2_understack.network_node_switchport_physnet",
+            fake_physnet,
+        )
+        result = fetch_or_create_router_segment(port_context)
+
+        mock_alloc.assert_called_once_with(
+            network_id=str(network_id),
+            physnet=fake_physnet,
+        )
+        assert result is fake_segment
 
 
-@pytest.fixture
-def ovs_settings(mocker):
-    mocker.patch(
-        "neutron.conf.agent.ovs_conf.get_igmp_flood_reports", return_value="true"
-    )
-    mocker.patch("neutron.conf.agent.ovs_conf.get_igmp_flood", return_value="true")
+class TestAddSubportToTrunk:
+    def test_when_successful(self, mocker, port_context):
+        trunk_id = "trunk-uuid"
+        port = {"id": "port-123"}
+        segment = {"segmentation_id": 42}
+        mocker.patch(
+            "oslo_config.cfg.CONF.ml2_understack.network_node_trunk_uuid",
+            trunk_id,
+        )
+
+        mock_trunk_plugin = mocker.Mock()
+        mocker.patch(
+            "neutron_understack.utils.fetch_trunk_plugin",
+            return_value=mock_trunk_plugin,
+        )
+
+        add_subport_to_trunk(port, segment, port_context)
+
+        mock_trunk_plugin.add_subports.assert_called_once_with(
+            context=port_context.plugin_context,
+            trunk_id=trunk_id,
+            subports={
+                "sub_ports": [
+                    {
+                        "port_id": port["id"],
+                        "segmentation_id": 42,
+                        "segmentation_type": p_const.TYPE_VLAN,
+                    }
+                ]
+            },
+        )
 
 
-def test_create_router_segment_calls(mocker, port_context, ovs_settings):
-    ctx, fake_id = port_context
-    fake_segment = {"id": "seg-123", "foo": "bar"}
-    fake_physnet = "fake-physnet"
-
-    mock_alloc = mocker.patch(
-        "neutron_understack.utils.allocate_dynamic_segment", return_value=fake_segment
-    )
-    mock_byid = mocker.patch(
-        "neutron_understack.utils.network_segment_by_id", return_value=fake_segment
-    )
-    mock_create_uplink_port = mocker.patch(
-        "neutron_understack.routers.create_uplink_port"
-    )
-    mocker.patch(
-        "oslo_config.cfg.CONF.ml2_understack.network_node_switchport_physnet",
-        fake_physnet,
-    )
-    fake_client = mocker.Mock()
-    mocker.patch("neutron_understack.routers.ovn_client", return_value=fake_client)
-
-    result = create_router_segment(ctx)
-
-    mock_alloc.assert_called_once_with(
-        network_id=str(fake_id),
-        physnet=fake_physnet,
-    )
-    mock_byid.assert_called_once_with("seg-123")
-    mock_create_uplink_port.assert_called_once_with(fake_segment, port_context[1])
-    assert result is fake_segment
+class TestHandleSubportRemoval:
+    def test_when_successful(self, mocker, port_id, trunk_id):
+        mocker.patch(
+            "oslo_config.cfg.CONF.ml2_understack.network_node_trunk_uuid", str(trunk_id)
+        )
+        mock_remove = mocker.patch("neutron_understack.utils.remove_subport_from_trunk")
+        port = {"id": str(port_id)}
+        handle_subport_removal(port)
+        mock_remove.assert_called_once_with(str(trunk_id), str(port_id))
 
 
-@pytest.fixture
-def subport_mock_context(mocker):
-    class FakePluginContext:
-        pass
+class TestHandleRouterInterfaceRemoval:
+    def test_case_for_non_router(self, mocker, port_payload):
+        mock_sb_removal = mocker.patch(
+            "neutron_understack.routers.handle_subport_removal"
+        )
+        mock_localnet_removal = mocker.patch(
+            "neutron_understack.routers.delete_uplink_port"
+        )
 
-    return mocker.MagicMock(
-        current={"id": "port-123"}, plugin_context=FakePluginContext()
-    )
+        port_payload.metadata["port"]["device_owner"] = "not_a_router"
+        handle_router_interface_removal(None, None, None, port_payload)
 
+        mock_sb_removal.assert_not_called()
+        mock_localnet_removal.assert_not_called()
 
-def test_add_subport_to_trunk(mocker, subport_mock_context):
-    trunk_id = "trunk-uuid"
-    segment = {"segmentation_id": 42}
-    mocker.patch(
-        "oslo_config.cfg.CONF.ml2_understack.network_node_trunk_uuid",
-        trunk_id,
-    )
+    def test_when_network_in_use(self, mocker, port_payload):
+        mock_sb_removal = mocker.patch(
+            "neutron_understack.routers.handle_subport_removal"
+        )
+        mock_localnet_removal = mocker.patch(
+            "neutron_understack.routers.delete_uplink_port"
+        )
+        mocker.patch(
+            "neutron_understack.routers.is_only_router_port_on_network",
+            return_value=False,
+        )
 
-    mock_trunk_plugin = mocker.Mock()
-    mocker.patch(
-        "neutron_understack.utils.fetch_trunk_plugin", return_value=mock_trunk_plugin
-    )
+        handle_router_interface_removal(None, None, None, port_payload)
 
-    add_subport_to_trunk(subport_mock_context, segment)
+        mock_sb_removal.assert_not_called()
+        mock_localnet_removal.assert_not_called()
 
-    mock_trunk_plugin.add_subports.assert_called_once_with(
-        context=subport_mock_context.plugin_context,
-        trunk_id=trunk_id,
-        subports={
-            "sub_ports": [
-                {
-                    "port_id": "port-123",
-                    "segmentation_id": 42,
-                    "segmentation_type": p_const.TYPE_VLAN,
-                }
-            ]
-        },
-    )
+    def test_last_port_on_network(self, mocker, port_object, port_payload, network_id):
+        mock_sb_removal = mocker.patch(
+            "neutron_understack.routers.handle_subport_removal"
+        )
+        mock_localnet_removal = mocker.patch(
+            "neutron_understack.routers.delete_uplink_port"
+        )
+        mocker.patch(
+            "neutron_understack.routers.is_only_router_port_on_network",
+            return_value=True,
+        )
+        fake_segment = {"id": "seg-123", "foo": "bar"}
+        mocker.patch(
+            "neutron_understack.routers.fetch_router_network_segment",
+            return_value=fake_segment,
+        )
 
+        mocker.patch(
+            "neutron_understack.routers.fetch_shared_router_port",
+            return_value=port_object,
+        )
+        delete_shared_port = mocker.patch.object(port_object, "delete")
 
-def test_handle_subport_removal_router(mocker):
-    trunk_id = "trunk-uuid"
-    port_id = "port-456"
-    mocker.patch(
-        "oslo_config.cfg.CONF.ml2_understack.network_node_trunk_uuid", trunk_id
-    )
-    mock_remove = mocker.patch("neutron_understack.utils.remove_subport_from_trunk")
-    port = {
-        "id": port_id,
-        "device_owner": p_const.DEVICE_OWNER_ROUTER_INTF,
-    }
-    _handle_subport_removal(port)
-    mock_remove.assert_called_once_with(trunk_id, port_id)
+        handle_router_interface_removal(None, None, None, port_payload)
 
-
-def test_handle_router_interface_removal_for_non_router(mocker):
-    mock_sb_removal = mocker.patch("neutron_understack.routers._handle_subport_removal")
-    mock_localnet_removal = mocker.patch(
-        "neutron_understack.routers._handle_localnet_port_removal"
-    )
-
-    payload = mocker.Mock(metadata={"port": {"device_owner": "not_a_router"}})
-    handle_router_interface_removal(None, None, None, payload)
-
-    mock_sb_removal.assert_not_called()
-    mock_localnet_removal.assert_not_called()
+        mock_sb_removal.assert_called_once_with(port_object)
+        mock_localnet_removal.assert_called_once_with(fake_segment, str(network_id))
+        delete_shared_port.assert_called_once()
 
 
 @pytest.fixture
@@ -134,67 +145,53 @@ def context(mocker):
             "device_id": "dev456",
             "device_owner": "owner789",
             "network_id": "8ddd659b-b6da-4fa3-bd45-f9c3d25bf209",
-        }
+        },
+        plugin_context="123",
     )
 
 
-@pytest.fixture
-def driver(mocker):
-    return mocker.MagicMock()
+class TestCreatePortPostcommit:
+    def test_existing_router_on_network(self, mocker, port_context):
+        mocker.patch("neutron.objects.ports.Port.get_objects", return_value=[1, 2])
+        add_trunk = mocker.patch("neutron_understack.routers.add_subport_to_trunk")
+        create_neutron_port = mocker.patch(
+            "neutron_understack.utils.create_neutron_port_for_segment"
+        )
+        create_uplink_port = mocker.patch(
+            "neutron_understack.routers.create_uplink_port"
+        )
 
+        create_port_postcommit(port_context)
+        create_neutron_port.assert_not_called()
+        add_trunk.assert_not_called()
+        create_uplink_port.assert_not_called()
 
-def test_create_port_precommit_existing_segment(mocker, context, driver):
-    segment = {"id": "segmentA"}
-    mocker.patch("neutron_lib.context.get_admin_context", return_value=mocker.Mock())
-    mocker.patch(
-        "neutron.objects.network.NetworkSegment.get_objects", return_value=[segment]
-    )
-    mock_clear = mocker.patch("neutron_understack.utils.clear_device_id_for_port")
-    mock_set_device = mocker.patch(
-        "neutron_understack.utils.set_device_id_and_owner_for_port"
-    )
-    add_trunk = mocker.patch("neutron_understack.routers.add_subport_to_trunk")
-    create_router_segment = mocker.patch(
-        "neutron_understack.routers.create_router_segment"
-    )
-    mocker.patch("oslo_config.cfg.ConfigOpts.find_file", return_value=None)
-    mocker.patch(
-        "oslo_config.cfg.CONF.ml2_understack.network_node_switchport_physnet",
-        "x23-1-network",
-    )
-    create_port_precommit(context)
+    def test_no_router_on_network(self, mocker, port_context):
+        mocker.patch("neutron.objects.ports.Port.get_objects", return_value=[])
+        fake_segment = {"id": "seg-123", "foo": "bar"}
+        create_segment = mocker.patch(
+            "neutron_understack.routers.fetch_or_create_router_segment",
+            return_value=fake_segment,
+        )
+        port = {"id": "port-123"}
+        create_neutron_port = mocker.patch(
+            "neutron_understack.utils.create_neutron_port_for_segment",
+            return_value=port,
+        )
+        add_trunk = mocker.patch("neutron_understack.routers.add_subport_to_trunk")
+        fetch_segment_obj = mocker.patch(
+            "neutron_understack.utils.network_segment_by_id", return_value=fake_segment
+        )
+        create_uplink_port = mocker.patch(
+            "neutron_understack.routers.create_uplink_port"
+        )
 
-    mock_clear.assert_called_once_with("port123")
-    add_trunk.assert_called_once_with(context, segment)
-    mock_set_device.assert_called_once_with(
-        port_id="port123", device_id="dev456", device_owner="owner789"
-    )
-    create_router_segment.assert_not_called()
+        create_port_postcommit(port_context)
 
-
-def test_segment_creation(mocker, context, driver):
-    mock_clear_device_id = mocker.patch(
-        "neutron_understack.utils.clear_device_id_for_port"
-    )
-    mock_set_device_id_and_owner = mocker.patch(
-        "neutron_understack.utils.set_device_id_and_owner_for_port"
-    )
-    mock_add_subport = mocker.patch("neutron_understack.routers.add_subport_to_trunk")
-    mock_create_router_segment = mocker.patch(
-        "neutron_understack.routers.create_router_segment", return_value="new-seg"
-    )
-    mocker.patch(
-        "oslo_config.cfg.CONF.ml2_understack.network_node_switchport_physnet",
-        "x23-1-network",
-    )
-    mocker.patch("neutron_lib.context.get_admin_context", return_value=mocker.Mock())
-    mocker.patch("neutron.objects.network.NetworkSegment.get_objects", return_value=[])
-
-    create_port_precommit(context)
-
-    mock_create_router_segment.assert_called_once_with(driver, context)
-    mock_clear_device_id.assert_called_once_with("port123")
-    mock_add_subport.assert_called_once_with(context, "new-seg")
-    mock_set_device_id_and_owner.assert_called_once_with(
-        port_id="port123", device_id="dev456", device_owner="owner789"
-    )
+        create_segment.assert_called_once_with(port_context)
+        create_neutron_port.assert_called_once_with(fake_segment, port_context)
+        add_trunk.assert_called_once_with(port, fake_segment, port_context)
+        fetch_segment_obj.assert_called_once_with(fake_segment["id"])
+        create_uplink_port.assert_called_once_with(
+            fake_segment, port_context.current["network_id"]
+        )
