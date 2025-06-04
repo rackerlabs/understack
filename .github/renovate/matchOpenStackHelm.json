@@ -1,0 +1,24 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/apps/.*\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "['\"]?component:\\s['\"]?(?<depName>)['\"]?\\s*(?:repoUrl:\\s['\"]?(?<repoUrl>.*?)?['\"]\\s*chartVersion:\\s['\"]?(?<currentValue>.*?)['\"]?"
+      ],
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "{{#if repoUrl }}{{repoUrl}}{{else}}https://tarballs.opendev.org/openstack/openstack-helm{{/if}}",
+      "packageNameTemplate": "openstack-helm/{{depName}}",
+      "versioningTemplate": "helm"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["openstack-helm/**"],
+      "groupName": "openstack-helm"
+    }
+  ]
+}
