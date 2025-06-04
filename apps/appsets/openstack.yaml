@@ -4,6 +4,7 @@ metadata:
   name: openstack
 spec:
   syncPolicy:
+    preserveResourcesOnDeletion: true
     applicationsSync: create-update
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
