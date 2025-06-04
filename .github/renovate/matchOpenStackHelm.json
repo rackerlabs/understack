@@ -3,11 +3,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/apps/.*\\.ya?ml$"
-      ],
+      "fileMatch": ["apps.*\\.ya?ml$"],
       "matchStrings": [
-        "['\"]?component:\\s['\"]?(?<depName>)['\"]?\\s*(?:repoUrl:\\s['\"]?(?<repoUrl>.*?)?['\"]\\s*chartVersion:\\s['\"]?(?<currentValue>.*?)['\"]?"
+        "component:\\s['\"]?(?<depName>.*?)['\"]?\\s*(repoUrl:\\s['\"]?(?<repoUrl>.*?)['\"]\\s*)?chartVersion:\\s['\"]?(?<currentValue>.*?)['\"]?"
       ],
       "datasourceTemplate": "helm",
       "registryUrlTemplate": "{{#if repoUrl }}{{repoUrl}}{{else}}https://tarballs.opendev.org/openstack/openstack-helm{{/if}}",
