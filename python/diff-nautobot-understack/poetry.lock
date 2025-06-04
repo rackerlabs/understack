@@ -412,19 +412,20 @@ files = [
 
 [[package]]
 name = "keystoneauth-websso"
-version = "0.2.2"
+version = "0.2.3"
 description = "WebSSO CLI support for OpenStack keystoneauth library"
 optional = false
 python-versions = "<4.0,>=3.8"
 groups = ["main"]
 files = [
-    {file = "keystoneauth_websso-0.2.2-py3-none-any.whl", hash = "sha256:beaa2023a02f4d451cc0c29822fb650a349649bacab0854ef64a1e7338b7b849"},
-    {file = "keystoneauth_websso-0.2.2.tar.gz", hash = "sha256:de521a141319331a619ab2133dbb69f44dddceb92649d50a755a2257ac7127d6"},
+    {file = "keystoneauth_websso-0.2.3-py3-none-any.whl", hash = "sha256:37d09a64c7febbfaaa4417deabf0cafcc208e218a34ff4abdf9fe1c7c44b4e71"},
+    {file = "keystoneauth_websso-0.2.3.tar.gz", hash = "sha256:2f404e4102f4df05f58c2976553771a0cc07deff29e475fa51ca31b7f566d647"},
 ]
 
 [package.dependencies]
 keystoneauth1 = ">=5.0.0"
 multipart = ">=1.0.0"
+platformdirs = ">=2.5.2"
 
 [[package]]
 name = "keystoneauth1"
