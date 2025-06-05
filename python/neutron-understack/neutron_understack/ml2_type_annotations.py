@@ -145,6 +145,7 @@ class PortContext:
     network: NetworkContext
     status: str
     original_status: str
+    plugin_context: Any
     _plugin_context: Any
     _plugin: Any
     vif_type: str

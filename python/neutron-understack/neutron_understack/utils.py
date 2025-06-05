@@ -1,14 +1,21 @@
+from contextlib import contextmanager
 from uuid import UUID
 
+from neutron.db import models_v2
 from neutron.objects import ports as port_obj
 from neutron.objects.network import NetworkSegment
 from neutron.plugins.ml2.driver_context import portbindings
+from neutron.services.trunk.plugin import TrunkPlugin
 from neutron_lib import constants
+from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
+from neutron_lib.plugins.ml2 import api
 
+from neutron_understack.ml2_type_annotations import NetworkSegmentDict
 from neutron_understack.ml2_type_annotations import PortContext
+from neutron_understack.ml2_type_annotations import PortDict
 from neutron_understack.nautobot import Nautobot
 
 
@@ -20,13 +27,90 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
     return port
 
 
+def create_neutron_port_for_segment(
+    segment: NetworkSegmentDict, context: PortContext
+) -> PortDict:
+    core_plugin = directory.get_plugin()
+    port = {
+        "port": {
+            "name": f"uplink-{segment['id']}",
+            "network_id": context.current["network_id"],
+            "mac_address": "",
+            "device_owner": "",
+            "device_id": "",
+            "fixed_ips": [],
+            "admin_state_up": True,
+            "tenant_id": "",
+        }
+    }
+    if not core_plugin:
+        raise Exception("Unable to retrieve core_plugin.")
+
+    return core_plugin.create_port(context.plugin_context, port)
+
+
+def remove_subport_from_trunk(trunk_id: str, subport_id: str) -> None:
+    context = n_context.get_admin_context()
+    plugin = fetch_trunk_plugin()
+    subports = {
+        "sub_ports": [
+            {
+                "port_id": subport_id,
+            },
+        ]
+    }
+    plugin.remove_subports(
+        context=context,
+        trunk_id=trunk_id,
+        subports=subports,
+    )
+
+
+@contextmanager
+def get_admin_session():
+    session = n_context.get_admin_context().session
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def update_port_fields(port_id: str, fields: dict) -> None:
+    with get_admin_session() as session:
+        session.query(models_v2.Port).filter_by(id=port_id).update(fields)
+
+
+def clear_device_id_for_port(port_id: str) -> None:
+    update_port_fields(port_id, {"device_id": ""})
+
+
+def set_device_id_and_owner_for_port(
+    port_id: str, device_id: str, device_owner: str
+) -> None:
+    update_port_fields(port_id, {"device_id": device_id, "device_owner": device_owner})
+
+
+def fetch_trunk_plugin() -> TrunkPlugin:
+    trunk_plugin = directory.get_plugin("trunk")
+    if not trunk_plugin:
+        raise Exception("unable to obtain trunk plugin")
+    return trunk_plugin
+
+
 def allocate_dynamic_segment(
     network_id: str,
     network_type: str = "vlan",
     physnet: str | None = None,
-) -> dict:
+) -> NetworkSegmentDict:
     context = n_context.get_admin_context()
     core_plugin = directory.get_plugin()
+
+    if not core_plugin:
+        raise Exception("unable to obtain core_plugin")
 
     if hasattr(core_plugin.type_manager, "allocate_dynamic_segment"):
         segment_dict = {
@@ -38,7 +122,8 @@ def allocate_dynamic_segment(
             context, network_id, segment_dict
         )
         return segment
-    return {}
+    # TODO: ask Milan when would this be useful
+    raise Exception("core type_manager does not support dynamic segment allocation.")
 
 
 def create_binding_profile_level(
@@ -157,3 +242,22 @@ def is_valid_vlan_network_segment(network_segment: dict):
 
 def is_baremetal_port(context: PortContext) -> bool:
     return context.current[portbindings.VNIC_TYPE] == portbindings.VNIC_BAREMETAL
+
+
+def is_router_interface(context: PortContext) -> bool:
+    """Returns True if this port is the internal side of a router."""
+    return context.current["device_owner"] in [
+        constants.DEVICE_OWNER_ROUTER_INTF,
+        constants.DEVICE_OWNER_ROUTER_GW,
+    ]
+
+
+def vlan_segment_for_physnet(
+    context: PortContext, physnet: str
+) -> NetworkSegmentDict | None:
+    for segment in context.network.network_segments:
+        if (
+            segment[api.NETWORK_TYPE] == p_const.TYPE_VLAN
+            and segment[api.PHYSICAL_NETWORK] == physnet
+        ):
+            return segment

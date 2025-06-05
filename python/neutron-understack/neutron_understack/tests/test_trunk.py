@@ -122,6 +122,22 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
             vlan_group_name="physnet",
             allowed_vlans_ids={1800},
         )
+
+    def test_subports_add_post(
+        self,
+        mocker,
+        trunk,
+        port_object,
+        understack_trunk_driver,
+    ):
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch("neutron_understack.utils.parent_port_is_bound", return_value=True)
+        understack_trunk_driver.subports_added_post(
+            None, None, None, mocker.Mock(states=[trunk])
+        )
+
         understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
             vlan_group="physnet",
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
@@ -338,7 +354,6 @@ class TestConfigureTrunk:
         understack_trunk_driver._add_subports_networks_to_parent_port_switchport.assert_called_once_with(
             parent_port=port_object,
             subports=[],
-            invoke_undersync=False,
         )
 
 

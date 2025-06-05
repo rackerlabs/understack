@@ -19,6 +19,7 @@ from neutron.plugins.ml2.driver_context import SubnetContext
 from neutron.plugins.ml2.models import PortBinding
 from neutron.services.trunk.models import SubPort as SubPortModel
 from neutron.services.trunk.models import Trunk as TrunkModel
+from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks.events import DBEventPayload
 
@@ -49,6 +50,11 @@ def subnet_id() -> uuid.UUID:
 
 @pytest.fixture
 def port_id() -> uuid.UUID:
+    return uuid.uuid4()
+
+
+@pytest.fixture
+def trunk_id() -> uuid.UUID:
     return uuid.uuid4()
 
 
@@ -219,7 +225,7 @@ def port_model(mac_address) -> PortModel:
 
 @pytest.fixture
 def trunk(subport, port_id) -> Trunk:
-    return Trunk(sub_ports=[subport], port_id=port_id)
+    return Trunk(sub_ports=[subport], port_id=port_id, id=str(uuid.uuid4()))
 
 
 @pytest.fixture
@@ -319,6 +325,17 @@ def trunk_payload_metadata(subport) -> dict:
 @pytest.fixture
 def trunk_payload(trunk_payload_metadata, trunk) -> DBEventPayload:
     return DBEventPayload("context", metadata=trunk_payload_metadata, states=[trunk])
+
+
+@pytest.fixture
+def port_payload(network_id) -> DBEventPayload:
+    metadata = {
+        "port": {
+            "device_owner": p_const.DEVICE_OWNER_ROUTER_GW,
+            "network_id": str(network_id),
+        }
+    }
+    return DBEventPayload("context", metadata=metadata)
 
 
 @pytest.fixture
