@@ -27,3 +27,4 @@
 
   roles:
     - role: openstack_network
+    - role: openstack_baremetal
