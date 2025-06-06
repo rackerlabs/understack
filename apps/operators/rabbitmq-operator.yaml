@@ -1,0 +1,5 @@
+---
+component: rabbitmq-system
+sources:
+  - ref: understack
+    path: 'operators/rabbitmq-system'

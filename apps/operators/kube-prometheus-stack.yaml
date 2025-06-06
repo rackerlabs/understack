@@ -1,0 +1,15 @@
+---
+component: monitoring
+sources:
+  - repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 62.6.0
+    helm:
+      releaseName: kube-prometheus-stack
+      valueFiles:
+        - $understack/operators/monitoring/values.yaml
+        - $deploy/{{.name}}/helm-configs/monitoring.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+    path: 'operators/monitoring'
+  - ref: deploy

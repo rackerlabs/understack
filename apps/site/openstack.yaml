@@ -1,0 +1,7 @@
+---
+component: openstack
+sources:
+  - ref: understack
+    path: 'components/openstack'
+  - ref: deploy
+    path: '{{.name}}/manifests/openstack'

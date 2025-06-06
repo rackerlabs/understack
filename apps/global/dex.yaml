@@ -1,0 +1,16 @@
+---
+component: dex
+sources:
+  - repoURL: https://charts.dexidp.io
+    chart: dex
+    targetRevision: 0.16.0
+    helm:
+      releaseName: dex
+      valueFiles:
+        - $understack/components/dex/values.yaml
+        - $deploy/{{.name}}/helm-configs/dex.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+    path: 'components/dex'
+  - ref: deploy
+    path: '{{.name}}/manifests/dex'

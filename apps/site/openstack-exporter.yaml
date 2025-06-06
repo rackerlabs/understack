@@ -1,0 +1,15 @@
+---
+component: openstack-exporter
+componentNamespace: monitoring
+sources:
+  - repoURL: registry.scs.community/openstack-exporter
+    chart: prometheus-openstack-exporter
+    targetRevision: 0.4.5
+    helm:
+      releaseName: prometheus-openstack-exporter
+      valueFiles:
+        - $understack/components/openstack-exporter/values.yaml
+        - $deploy/{{.name}}/helm-configs/openstack-exporter.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+  - ref: deploy

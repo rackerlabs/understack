@@ -1,0 +1,11 @@
+---
+component: cert-manager
+sources:
+  - repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: '1.15.2'
+    helm:
+      releaseName: cert-manager
+      valuesObject:
+        crds:
+          enabled: true

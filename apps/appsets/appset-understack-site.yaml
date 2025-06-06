@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: understack-infra
+  name: understack-site
 spec:
   syncPolicy:
     applicationsSync: create-update
@@ -19,14 +19,13 @@ spec:
                 # merge cluster configs based on cluster name
                 - name
               generators:
-                # load all clusters
+                # load all clusters for site or aio
                 - clusters:
                     selector:
                       matchExpressions:
                         - key: understack.rackspace.com/role
                           operator: In
                           values:
-                            - "global"
                             - "site"
                             - "aio"
                 # dev clusters allow some overrides
@@ -49,7 +48,7 @@ spec:
                     repoURL: '{{ .values.understack_url }}'
                     revision: '{{ .values.understack_ref }}'
                     files:
-                      - path: "apps/infra/*.yaml"
+                      - path: "apps/site/*.yaml"
                 - git:
                     repoURL: '{{ .values.deploy_url }}'
                     revision: '{{ .values.deploy_ref }}'
@@ -70,7 +69,7 @@ spec:
       annotations:
         argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
     spec:
-      project: understack-infra
+      project: understack
       destination:
         server: '{{.server}}'
         namespace: '{{coalesce (get . "componentNamespace") .component}}'
@@ -100,7 +99,7 @@ spec:
           repoURL: {{ $root.values.deploy_url }}
           targetRevision: {{ $root.values.deploy_ref }}
           {{- end }}
-        {{- else }}
+        {{- else}}
         - repoURL: {{ $source.repoURL }}
           targetRevision: {{ $source.targetRevision }}
         {{- end }}
