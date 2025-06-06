@@ -6,8 +6,6 @@ resources:
 - appsets/project-understack.yaml
 - appsets/appset-understack-infra.yaml
 - appsets/appset-understack-operators.yaml
-- appsets/components.yaml
-- appsets/openstack.yaml
 - appsets/appset-understack-global.yaml
 - appsets/appset-understack-site.yaml
 - appsets/appset-understack-openstack.yaml
