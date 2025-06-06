@@ -4,18 +4,44 @@ keystone_bootstrap_dex_url: "{{ dex_url | default('https://dex.' + lookup('ansib
 keystone_bootstrap_groups:
   - name: ucadmin
     desc: 'Users Federated with Admin'
-    roles:
-      - member
-      - admin
+    domain_roles:
+      # grants admin role to the infra domain and child projects like baremetal
+      # this is for full access in ironic
+      - domain: infra
+        role: admin
+        inherited: true
+      # grants member role to the infra domain and child projects like baremetal
+      # this allows manipulating resources like images and networks for ironic usage
+      - domain: infra
+        role: member
+        inherited: true
+      # grants manager role to the default domain so that projects can be created
+      - domain: default
+        role: manager
+      # grants member role to the default domain and child projects where normal tenants live
+      # TODO: remove this because admins might not be the same people touching tenants
+      - domain: default
+        role: member
+        inherited: true
   - name: ucuser
     desc: 'Regular Federated Users'
-    roles:
-      - member
+    domain_roles:
+      # grants member role to the default domain and child projects where normal tenants live
+      - domain: default
+        role: member
+        inherited: true
   - name: ucneteng
     desc: 'Federated Network Engineers'
-    roles:
-      - member
+    domain_roles:
+      # grants member role to the default domain and child projects where normal tenants live
+      - domain: default
+        role: member
+        inherited: true
   - name: ucdctech
     desc: 'Federated DC Technicians'
-    roles:
-      - member
+    domain_roles:
+      # grants member role to the infra domain and child projects like baremetal
+      # this allows manipulating resources like images and networks for ironic usage
+      - domain: infra
+        role: member
+        inherited: true
