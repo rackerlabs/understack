@@ -12,20 +12,21 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
-#
-- name: Find group
-  openstack.cloud.identity_group_info:
-    name: "{{ item }}"
-    domain: "{{ _domain_sso.domain.id }}"
+
+- name: Create group
+  openstack.cloud.identity_group:
+    name: "{{ group_item.name }}"
+    domain_id: "{{ _domain_sso.domain.id }}"
+    description: "{{ group_item.desc }}"
+    state: present
+  register: _group
 
 # role assignment module is lacking inherited and cross domain assignments
-- name: Assign member access
-  ansible.builtin.command: openstack role add --group "{{ _group.group.id }}" --domain default --inherited admin
-  when: dont_set_roles is not defined
-  changed_when: false
-
-# role assignment module is lacking inherited and cross domain assignments
-- name: Assign member access
-  ansible.builtin.command: openstack role add --group "{{ _group.group.id }}" --domain infra --inherited admin
-  when: dont_set_roles is not defined
-  changed_when: false
+# so need to do this manually done
+- name: Assign role to group for domain
+  ansible.builtin.include_tasks: sso_domain_role.yml
+  loop: "{{ group_item.domain_roles }}"
+  loop_control:
+    loop_var: role_item
+  vars:
+    group_id: "{{ _group.group.id }}"

@@ -57,10 +57,7 @@
     mapping: sso_mapping
 
 - name: Create federated group mappings
-  ansible.builtin.include_tasks: sso_member_groups.yml
+  ansible.builtin.include_tasks: sso_groups.yml
   loop: "{{ keystone_bootstrap_groups }}"
-
-- name: Grant admin for groups
-  ansible.builtin.include_tasks: sso_role_admin.yml
-  loop:
-    - ucadmin
+  loop_control:
+    loop_var: group_item
