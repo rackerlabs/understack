@@ -4,4 +4,4 @@ collections:
   - name: openstack.cloud
     version: "==2.4.1"
   - name: networktocode.nautobot
-    version: "==5.11.0"
+    version: "==5.12.0"
