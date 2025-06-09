@@ -2,7 +2,7 @@ module github.com/rackerlabs/understack/go/dexop
 
 go 1.23
 
-toolchain go1.23.6
+toolchain go1.24.4
 
 require (
 	github.com/dexidp/dex/api/v2 v2.3.0
