@@ -1,0 +1,8 @@
+---
+
+- name: Create subnet pool for OUTSIDE network
+  openstack.cloud.subnet_pool:
+    state: present
+    name: "{{ item.name }}"
+    is_shared: true
+    prefixes: "{{ item.prefixes }}"
