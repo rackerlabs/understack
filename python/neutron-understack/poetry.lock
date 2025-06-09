@@ -1458,14 +1458,14 @@ WebOb = ">=1.8.2"
 
 [[package]]
 name = "neutron-lib"
-version = "3.18.2"
+version = "3.19.0"
 description = "Neutron shared routines and utilities"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "neutron_lib-3.18.2-py3-none-any.whl", hash = "sha256:5f5a6ef61f2bedf735d5a6d22f3987e3415a3f5a06acdc52830c4f7037c75476"},
-    {file = "neutron_lib-3.18.2.tar.gz", hash = "sha256:faa9d54c164b32d8ac773f3031abb050836cda9a6483479762726a8490bd2fb0"},
+    {file = "neutron_lib-3.19.0-py3-none-any.whl", hash = "sha256:588cc7ffd9861c3de8d23de1c904c35e4303b3b5f34a5fa61386075b45c879ac"},
+    {file = "neutron_lib-3.19.0.tar.gz", hash = "sha256:21b732d47bff04f517ee1257b726d8b1cce6cb11748f9715a8ae818aa7ff00c5"},
 ]
 
 [package.dependencies]
