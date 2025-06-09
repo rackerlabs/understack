@@ -13,7 +13,7 @@ resources:
 # you can do something like below to allow your deployment repo
 # to define the exact versions that you want to use
 # you will need to replace your $DEPLOY_URL and $DEPLOY_REF
-#patches:
+# patches:
 #  - target:
 #      group: argoproj.io
 #      version: v1alpha1
