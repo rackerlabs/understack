@@ -22,12 +22,12 @@ images:
     keystone_fernet_setup: "ghcr.io/rackerlabs/understack/keystone:2024.2-ubuntu_jammy"
 
     # ironic
-    ironic_api: "ghcr.io/rackerlabs/understack/ironic:2024.2-ubuntu_jammy"
-    ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:2024.2-ubuntu_jammy"
-    ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:2024.2-ubuntu_jammy"
-    ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:2024.2-ubuntu_jammy"
+    ironic_api: "ghcr.io/rackerlabs/understack/ironic:pr-973"
+    ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:pr-973"
+    ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:pr-973"
+    ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:pr-973"
     ironic_pxe_http: "docker.io/nginx:1.13.3"
-    ironic_db_sync: "ghcr.io/rackerlabs/understack/ironic:2024.2-ubuntu_jammy"
+    ironic_db_sync: "ghcr.io/rackerlabs/understack/ironic:pr-973"
     # these want curl which apparently is in the heat image
     ironic_manage_cleaning_network: "docker.io/openstackhelm/heat:2024.2-ubuntu_jammy"
     ironic_retrive_cleaning_network: "docker.io/openstackhelm/heat:2024.2-ubuntu_jammy"
