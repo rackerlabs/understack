@@ -3,7 +3,8 @@ from understack_workflows.topology import switch_connections
 
 
 def test_pxe_interface_name(dell_nautobot_device):
-    assert pxe_interface_name(dell_nautobot_device) == "NIC.Slot.1-2"
+    # Since "NIC.Integrated.1-1" matches preferred criteria, it should be returned
+    assert pxe_interface_name(dell_nautobot_device) == "NIC.Integrated.1-1"
 
 
 def test_switch_connections(dell_nautobot_device):
