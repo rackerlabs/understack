@@ -2,11 +2,12 @@ from understack_workflows.nautobot_device import NautobotDevice
 
 
 def pxe_interface_name(nautobot_device: NautobotDevice) -> str:
-    """Answer the last interface that connects to a -1 switch.
+    """Answer the interface that connects to a -1 switch with following rules.
 
-    We choose the last interface sorted alphabetically because we want this to
-    favour "NIC.Slot" over "NIC.Integrated", because that follows an arbitrary
-    local convention.
+    Of the interfaces connected to the "-1" switch,
+    select the interface with "Integrated" in the name.
+    If non such exists, select the interface with "Slot" in the name.
+    If neither exist then cause an error.
 
     A more correct algorithm would probably be:
 
@@ -18,11 +19,24 @@ def pxe_interface_name(nautobot_device: NautobotDevice) -> str:
     """
     switches = switch_connections(nautobot_device)
 
-    for interface_name, switch_name in reversed(switches.items()):
-        if switch_name.split(".")[0].endswith("-1"):
+    for interface_name, switch_name in switches.items():
+        if get_preferred_interface(interface_name, switch_name, "Integrated"):
+            return interface_name
+
+    for interface_name, switch_name in switches.items():
+        if get_preferred_interface(interface_name, switch_name, "Slot"):
             return interface_name
 
     raise Exception(f"No connection to a -1 switch for PXE, only {switches}")
+
+
+def get_preferred_interface(interface_name, switch_name, keyword):
+    """Check if the interface matches the given keyword and hostname ends with '-1'.
+
+    more on this related to convention.
+    https://docs.undercloud.rackspace.net/architecture-decisions/adr014-vlan-group-names/#decision.
+    """
+    return keyword in interface_name and switch_name.split(".")[0].endswith("-1")
 
 
 def switch_connections(nautobot_device: NautobotDevice) -> dict:

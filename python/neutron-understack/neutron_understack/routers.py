@@ -58,7 +58,7 @@ def create_port_postcommit(context: PortContext) -> None:
 
     # Trunk
     shared_port = utils.create_neutron_port_for_segment(segment, context)
-    add_subport_to_trunk(shared_port, segment, context)
+    add_subport_to_trunk(shared_port, segment)
 
     # OVN
     segment_obj = utils.network_segment_by_id(segment["id"])
@@ -84,9 +84,7 @@ def is_only_router_port_on_network(
         return True
 
 
-def add_subport_to_trunk(
-    shared_port: PortDict, segment: NetworkSegmentDict, context: PortContext
-) -> None:
+def add_subport_to_trunk(shared_port: PortDict, segment: NetworkSegmentDict) -> None:
     """Adds requested port as a subport of a trunk connection for network nodes.
 
     The trunk and parent port must already exist.
@@ -101,7 +99,7 @@ def add_subport_to_trunk(
         ]
     }
     utils.fetch_trunk_plugin().add_subports(
-        context=context.plugin_context,
+        context=n_context.get_admin_context(),
         trunk_id=cfg.CONF.ml2_understack.network_node_trunk_uuid,
         subports=subports,
     )

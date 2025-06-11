@@ -32,13 +32,16 @@ class TestFetchOrCreateRouterSegment:
 
 
 class TestAddSubportToTrunk:
-    def test_when_successful(self, mocker, port_context):
+    def test_when_successful(self, mocker):
         trunk_id = "trunk-uuid"
         port = {"id": "port-123"}
         segment = {"segmentation_id": 42}
         mocker.patch(
             "oslo_config.cfg.CONF.ml2_understack.network_node_trunk_uuid",
             trunk_id,
+        )
+        mocker.patch(
+            "neutron_lib.context.get_admin_context", return_value="admin_context"
         )
 
         mock_trunk_plugin = mocker.Mock()
@@ -47,10 +50,10 @@ class TestAddSubportToTrunk:
             return_value=mock_trunk_plugin,
         )
 
-        add_subport_to_trunk(port, segment, port_context)
+        add_subport_to_trunk(port, segment)
 
         mock_trunk_plugin.add_subports.assert_called_once_with(
-            context=port_context.plugin_context,
+            context="admin_context",
             trunk_id=trunk_id,
             subports={
                 "sub_ports": [
@@ -190,7 +193,7 @@ class TestCreatePortPostcommit:
 
         create_segment.assert_called_once_with(port_context)
         create_neutron_port.assert_called_once_with(fake_segment, port_context)
-        add_trunk.assert_called_once_with(port, fake_segment, port_context)
+        add_trunk.assert_called_once_with(port, fake_segment)
         fetch_segment_obj.assert_called_once_with(fake_segment["id"])
         create_uplink_port.assert_called_once_with(
             fake_segment, port_context.current["network_id"]

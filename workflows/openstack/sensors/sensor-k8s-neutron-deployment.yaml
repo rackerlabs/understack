@@ -29,7 +29,7 @@ spec:
                   spec:
                     containers:
                       - name: create-provisioning-network
-                        image: ghcr.io/rackerlabs/understack/ansible:pr-857
+                        image: ghcr.io/rackerlabs/understack/ansible:latest
                         imagePullPolicy: Always
                         command: ["ansible-runner", "run", "/runner", "--playbook", "openstack_network.yaml"]
                         env:
