@@ -30,6 +30,8 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
+
 	syncv1alpha1 "github.com/rackerlabs/understack/go/sync/api/v1alpha1"
 )
 
@@ -63,11 +65,14 @@ func (r *GitRepoWatcherReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	repoPath := fmt.Sprintf("gitcache/%s", watcher.Name)
 
+	gitUsername := ""
+	gitPassword := ""
+
 	repo, err := git.PlainOpen(repoPath)
 	switch err {
 	case git.ErrRepositoryNotExists: // If repo Not Exist, Clone It
 		log.Info("Cloning new repository", "url", watcher.Spec.RepoURL)
-		err := GitClone(repoPath, watcher.Spec.RepoURL, watcher.Spec.Ref)
+		err := GitClone(repoPath, watcher.Spec.RepoURL, watcher.Spec.Ref, gitUsername, gitPassword)
 		if err != nil {
 			log.Error(err, "Failed to clone Git repository")
 
@@ -76,10 +81,9 @@ func (r *GitRepoWatcherReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		repo, _ = git.PlainOpen(repoPath) // Try again after clone
 	case nil: // If repo already exists, pull it.
 		log.Info("Pulling latest changes", "path", repoPath)
-		err := GitPull(repo, watcher.Spec.Ref)
+		err := GitPull(repo, watcher.Spec.Ref, gitUsername, gitPassword)
 		if err != nil && err != git.NoErrAlreadyUpToDate {
 			log.Error(err, "Git pull failed")
-
 			return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, nil
 		}
 	default:
@@ -117,17 +121,21 @@ func (r *GitRepoWatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func GitClone(repoPath, url, ref string) error {
+func GitClone(repoPath, url, ref, username, password string) error {
 	_, err := git.PlainClone(repoPath, false, &git.CloneOptions{
 		URL:           url,
 		ReferenceName: plumbing.NewBranchReferenceName(ref),
 		SingleBranch:  true,
 		Depth:         1,
+		Auth: &githttp.BasicAuth{
+			Username: username,
+			Password: password,
+		},
 	})
 	return err
 }
 
-func GitPull(repo *git.Repository, ref string) error {
+func GitPull(repo *git.Repository, ref, username, password string) error {
 	w, err := repo.Worktree()
 	if err != nil {
 		return err
@@ -137,5 +145,9 @@ func GitPull(repo *git.Repository, ref string) error {
 		Depth:         1,
 		ReferenceName: plumbing.NewBranchReferenceName(ref),
 		Force:         true,
+		Auth: &githttp.BasicAuth{
+			Username: username,
+			Password: password,
+		},
 	})
 }

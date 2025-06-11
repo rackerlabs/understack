@@ -28,7 +28,7 @@ import (
 type NautobotSpec struct {
 	RepoWatcher string `json:"repoWatcher"`
 	ConfigPath  string `json:"configPath"`
-	// +kubebuilder:default=2
+	// +kubebuilder:default=10
 	SyncIntervalSeconds int             `json:"syncIntervalSeconds,omitempty"`
 	Env                 []corev1.EnvVar `json:"env,omitempty"`
 }

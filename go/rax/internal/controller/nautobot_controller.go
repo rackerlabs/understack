@@ -61,30 +61,36 @@ type NautobotReconciler struct {
 func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
+	// Fetch the Nautobot custom resource instance
 	var nautobotCR syncv1alpha1.Nautobot
 	if err := r.Get(ctx, types.NamespacedName{Name: req.Name}, &nautobotCR); err != nil {
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, client.IgnoreNotFound(err)
 	}
 
+	// Fetch the GitRepoWatcher referenced in the Nautobot CR
 	var gitRepoWatcher syncv1alpha1.GitRepoWatcher
 	if err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.RepoWatcher}, &gitRepoWatcher); err != nil {
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, client.IgnoreNotFound(err)
 	}
 
-	var service corev1.Service
-	if err := r.Get(ctx, types.NamespacedName{Namespace: "default", Name: "nautobot-default"}, &service); err != nil {
+	// Fetch the Nautobot nautobotService to get its ClusterIP
+	var nautobotService corev1.Service
+	if err := r.Get(ctx, types.NamespacedName{Namespace: "default", Name: "nautobot-default"}, &nautobotService); err != nil {
 		log.Error(err, "failed to fetch Service nautobot-default")
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
 
+	// Wait for the GitRepoWatcher to report readiness before proceeding
 	if !gitRepoWatcher.Status.Ready {
 		log.Info("git sync is not ready will retry")
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
 	}
 
+	// Get the latest commit SHA of the config file and store in status
 	sha, _ := GetLastFileCommitSHA(gitRepoWatcher.Status.RepoPath, nautobotCR.Spec.ConfigPath)
 	nautobotCR.Status.LatestCommitSHA = sha
 
+	// Read and parse the config YAML file from the Git repo
 	file, _ := os.ReadFile(fmt.Sprintf("%s/%s", gitRepoWatcher.Status.RepoPath, nautobotCR.Spec.ConfigPath))
 	root, err := parseYAML(file)
 	if err != nil {
@@ -94,7 +100,44 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	for i := range root.InstanceLocations {
 		setDisplayPath(&root.InstanceLocations[i], "")
 	}
-	var nautoBotAuthToken string
+
+	// Retrieve the Nautobot authentication token from a secret or external source
+	nautobotAuthToken, err := r.fetchNautobotAuthToken(ctx, nautobotCR)
+	if err != nil {
+		log.Error(err, "failed parse find nautoBotAuthToken")
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+	nb := nautobot.NewNautobotClient(fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP), nautobotAuthToken)
+
+	// Sync all instance locations with Nautobot
+	err = nb.SyncAllLocationTypes(ctx, root.LocationTypes)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+
+	// Sync all rack groups with Nautobot
+	err = nb.SyncAllLocations(ctx, root.InstanceLocations)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+
+	// Sync all rack groups with Nautobot
+	err = nb.SyncRackGroup(ctx, root.RackGroup)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+
+	// Sync all racks with Nautobot
+	err = nb.SyncRack(ctx, root.Rack)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+	// Successfully completed reconciliation; requeue after configured sync interval
+	return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
+}
+
+// fetchNautobotAuthToken: this will fetch Nautobot auth token from the given refer.
+func (r *NautobotReconciler) fetchNautobotAuthToken(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (string, error) {
 	for _, v := range nautobotCR.Spec.Env {
 		if v.Name == "NAUTOBOT_TOKEN" {
 			key := v.ValueFrom.SecretKeyRef.Key
@@ -103,44 +146,19 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: "default"}, secret)
 			if err != nil {
 				if errors.IsNotFound(err) {
-					log.Error(err, fmt.Sprintf("Secret %s not found in namespace %s for environment variable %s. Cannot retrieve secret value.", secretName, "", secretName))
-					return ctrl.Result{}, fmt.Errorf("secret %s/%s not found: %w", "", secretName, err)
+					return "", fmt.Errorf("secret %s/%s not found: %w", "", secretName, err)
 				}
-				log.Error(err, fmt.Sprintf("Failed to get Secret %s/%s for environment variable %s", "", secretName, secretName))
-				return ctrl.Result{}, err
+				return "", err
 			}
 
 			// Read the secret value
 			if valBytes, ok := secret.Data[key]; ok {
-				nautoBotAuthToken = string(valBytes)
-			} else {
-				return ctrl.Result{}, fmt.Errorf("secret key %s not found in secret", key)
+				return string(valBytes), nil
 			}
+			return "", fmt.Errorf("secret key %s not found in secret", key)
 		}
 	}
-	nb := nautobot.NewNautobotClient(fmt.Sprintf("http://%s/api", service.Spec.ClusterIP), nautoBotAuthToken)
-
-	err = nb.SyncAllLocationTypes(ctx, root.LocationTypes)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	err = nb.SyncAllLocations(ctx, root.InstanceLocations)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	err = nb.SyncRackGroup(ctx, root.RackGroup)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	err = nb.SyncRack(ctx, root.Rack)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
+	return "", fmt.Errorf("failed to find NAUTOBOT_TOKEN")
 }
 
 // SetupWithManager sets up the controller with the Manager.

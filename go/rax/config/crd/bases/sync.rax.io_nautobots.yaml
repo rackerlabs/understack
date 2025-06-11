@@ -161,7 +161,7 @@ spec:
               repoWatcher:
                 type: string
               syncIntervalSeconds:
-                default: 2
+                default: 10
                 type: integer
             required:
             - configPath
