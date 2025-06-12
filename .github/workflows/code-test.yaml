@@ -20,15 +20,25 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.set-projects.outputs.projects }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Find all Python projects with pyproject.toml
+        id: set-projects
+        run: |
+          # grabs all paths with pyproject.toml, snips the 2nd dir, grabs only unique ones, makes a JSON list
+          projects=$(find python -mindepth 2 -name pyproject.toml | awk -F/ '{print $2}' | sort -u | jq -R -s -c 'split("\n")[:-1]')
+          echo "projects=$projects" >> "$GITHUB_OUTPUT"
   python:
+    needs: [discover]
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        project:
-          - understack-workflows
-          - understack-flavor-matcher
-          - neutron-understack
+        project: ${{ fromJson(needs.discover.outputs.projects) }}
 
     defaults:
       run:

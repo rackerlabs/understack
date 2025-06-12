@@ -14,6 +14,14 @@ diffsync = "^2.0.1"
 typer = "^0.16.0"
 pydantic-settings = "^2.7.1"
 
+[tool.peotry.group.test]
+optional = true
+
+[tool.poetry.group.test.dependencies]
+pytest = "^8.0.0"
+pytest-github-actions-annotate-failures = "*"
+pytest-cov = "^6.0.0"
+
 [tool.ruff]
 target-version = "py311"
 fix = true
