@@ -1,7 +1,7 @@
 ---
 component: keystone
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2024.2.6+06d763432
+chartVersion: 2024.2.386+13651f45-628a320c
 ignoreDifferences:
   - kind: Secret
     name: keystone-fernet-keys
