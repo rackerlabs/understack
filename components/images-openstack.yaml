@@ -76,4 +76,18 @@ images:
     ovn_ovsdb_sb: "docker.io/openstackhelm/ovn:ubuntu_jammy-20250111"
     ovn_northd: "docker.io/openstackhelm/ovn:ubuntu_jammy-20250111"
     ovn_controller: "docker.io/openstackhelm/ovn:ubuntu_jammy-20250111"
+
+    # horizon
+    horizon: "quay.io/airshipit/horizon:2024.2-ubuntu_jammy"
+    horizon_db_sync: "quay.io/airshipit/horizon:2024.2-ubuntu_jammy"
+
+    # glance
+    glance_api: "quay.io/airshipit/glance:2024.2-ubuntu_jammy"
+    glance_db_sync: "quay.io/airshipit/glance:2024.2-ubuntu_jammy"
+    glance_metadefs_load: "quay.io/airshipit/glance:2024.2-ubuntu_jammy"
+    glance_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
+
+    # skyline
+    skyline: "quay.io/airshipit/skyline:latest"
+    skyline_db_sync: "quay.io/airshipit/skyline:latest"
 ...
