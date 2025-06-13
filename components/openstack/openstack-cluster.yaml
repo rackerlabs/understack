@@ -5,3 +5,45 @@ metadata:
   annotations:
     # do not allow ArgoCD to delete our cluster
     argocd.argoproj.io/sync-options: Delete=false
+spec:
+  # (nicholas.kuechler) Sets message TTL policies for the OpenStack queues to
+  # prevent the queues from growing indefinitely if there are no consumers.
+  override:
+    definitions:
+      vhosts:
+        - name: glance
+        - name: ironic
+        - name: keystone
+        - name: neutron
+        - name: nova
+      policies:
+        - name: TTL
+          pattern: ".*"
+          apply-to: queues
+          definition:
+            message-ttl: 86400000
+          vhost: glance
+        - name: TTL
+          pattern: ".*"
+          apply-to: queues
+          definition:
+            message-ttl: 86400000
+          vhost: ironic
+        - name: TTL
+          pattern: ".*"
+          apply-to: queues
+          definition:
+            message-ttl: 86400000
+          vhost: keystone
+        - name: TTL
+          pattern: ".*"
+          apply-to: queues
+          definition:
+            message-ttl: 86400000
+          vhost: neutron
+        - name: TTL
+          pattern: ".*"
+          apply-to: queues
+          definition:
+            message-ttl: 86400000
+          vhost: nova
