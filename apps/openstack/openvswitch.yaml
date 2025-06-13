@@ -1,4 +1,4 @@
 ---
 component: openvswitch
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
-chartVersion: 2024.2.0
+chartVersion: 2024.2.88+628a320c
