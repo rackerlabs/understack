@@ -8,7 +8,7 @@ require (
 	github.com/dexidp/dex/api/v2 v2.3.0
 	github.com/go-logr/logr v1.4.3
 	github.com/onsi/ginkgo/v2 v2.23.4
-	github.com/onsi/gomega v1.36.3
+	github.com/onsi/gomega v1.37.0
 	github.com/sethvargo/go-password v0.3.1
 	google.golang.org/grpc v1.70.0
 	k8s.io/api v0.31.0
