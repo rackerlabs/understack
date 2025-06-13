@@ -68,8 +68,8 @@ images:
     placement_db_sync: "docker.io/openstackhelm/placement:2024.2-ubuntu_jammy"
 
     # openvswitch
-    openvswitch_db_server: "docker.io/openstackhelm/openvswitch:ubuntu_jammy-20250111"
-    openvswitch_vswitchd: "docker.io/openstackhelm/openvswitch:ubuntu_jammy-20250111"
+    openvswitch_db_server: "docker.io/openstackhelm/openvswitch:ubuntu_jammy-dpdk-20250111"
+    openvswitch_vswitchd: "docker.io/openstackhelm/openvswitch:ubuntu_jammy-dpdk-20250111"
 
     # ovn
     ovn_ovsdb_nb: "docker.io/openstackhelm/ovn:ubuntu_jammy-20250111"
