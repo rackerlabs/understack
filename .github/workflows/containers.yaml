@@ -126,6 +126,7 @@ jobs:
           - name: ironic-nautobot-client
           - name: nova-flavors
           - name: ansible
+          - name: understack-tests
 
     steps:
       - name: setup docker buildx
@@ -186,6 +187,7 @@ jobs:
           - ironic-nautobot-client
           - nova-flavors
           - ansible
+          - understack-tests
 
     steps:
       - name: clean up PR container
