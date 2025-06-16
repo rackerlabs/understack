@@ -1,0 +1,19 @@
+version: 2
+title: Provision gp2.small Ubuntu, test floating IPs
+subtasks:
+  - title: "Boot"
+    workloads:
+      - scenario:
+          NovaServers.boot_server_associate_and_dissociate_floating_ip:
+            flavor:
+              name: gp2.small
+            image:
+              name: ^Ubuntu 24.*$
+            floating_network: NET_DEV_69.20.94.128/28
+            config_drive: true
+        contexts:
+          network:
+            start_cidr: 192.168.91.0/24
+            dns_nameservers: [8.8.8.8]
+            router:
+              external: true
