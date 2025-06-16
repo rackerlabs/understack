@@ -57,3 +57,20 @@ spec:
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: keystone-notifications-ttl
+  namespace: openstack
+spec:
+  name: keystone-notifications-ttl  # name of the policy
+  vhost: "keystone"  # default to '/' if not provided
+  pattern: "^notifications.*"  # regex used to match queues and exchanges
+  applyTo: "queues"  # set to 'queues', 'exchanges', or 'all'
+  priority: 1  # defaults to 0
+  definition:  # policy definition
+    message-ttl: 86400000
+  rabbitmqClusterReference:
+    name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
+    namespace: openstack
