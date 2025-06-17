@@ -39,7 +39,7 @@ spec:
           spec:
             description: NautobotSpec defines the desired state of Nautobot.
             properties:
-              configPath:
+              configFilePath:
                 type: string
               env:
                 items:
@@ -164,13 +164,15 @@ spec:
                 default: 10
                 type: integer
             required:
-            - configPath
+            - configFilePath
             - repoWatcher
             type: object
           status:
             description: NautobotStatus defines the observed state of Nautobot.
             properties:
-              latestCommitSHA:
+              configFileSHA:
+                type: string
+              gitCommitHash:
                 type: string
               message:
                 type: string
