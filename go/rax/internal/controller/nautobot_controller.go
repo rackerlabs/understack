@@ -18,14 +18,14 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 	"time"
 
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -33,8 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	syncv1alpha1 "github.com/rackerlabs/understack/go/sync/api/v1alpha1"
 	"github.com/rackerlabs/understack/go/sync/internal/nautobot"
 )
@@ -85,18 +83,37 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		log.Info("git sync is not ready will retry")
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
 	}
+	configFilePath := fmt.Sprintf("%s/%s", gitRepoWatcher.Status.RepoPath, nautobotCR.Spec.ConfigFilePath)
 
-	// Get the latest commit SHA of the config file and store in status
-	sha, _ := GetLastFileCommitSHA(gitRepoWatcher.Status.RepoPath, nautobotCR.Spec.ConfigPath)
-	nautobotCR.Status.LatestCommitSHA = sha
+	fileSha, err := sha(configFilePath)
+	if err != nil {
+		log.Error(err, "failed get sha value of file")
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+
+	// If last sync file sha value is same as that of current.
+	// That means no changes to file we will skip and retry.
+	if nautobotCR.Status.ConfigFileSHA == fileSha {
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+
+	nautobotCR.Status.ConfigFileSHA = fileSha
+	nautobotCR.Status.GitCommitHash = gitRepoWatcher.Status.GitCommitHash
 
 	// Read and parse the config YAML file from the Git repo
-	file, _ := os.ReadFile(fmt.Sprintf("%s/%s", gitRepoWatcher.Status.RepoPath, nautobotCR.Spec.ConfigPath))
+	file, err := os.ReadFile(configFilePath)
+	if err != nil {
+		log.Error(err, "failed to read file content of config file")
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+
+	// Parse yaml file
 	root, err := parseYAML(file)
 	if err != nil {
 		log.Error(err, "failed parse YAML")
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
+
 	for i := range root.InstanceLocations {
 		setDisplayPath(&root.InstanceLocations[i], "")
 	}
@@ -145,9 +162,6 @@ func (r *NautobotReconciler) fetchNautobotAuthToken(ctx context.Context, nautobo
 			secret := &corev1.Secret{}
 			err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: "default"}, secret)
 			if err != nil {
-				if errors.IsNotFound(err) {
-					return "", fmt.Errorf("secret %s/%s not found: %w", "", secretName, err)
-				}
 				return "", err
 			}
 
@@ -197,50 +211,16 @@ func IsGitRepoReady(watcher *syncv1alpha1.GitRepoWatcher) bool {
 	return watcher.Status.Ready
 }
 
-// GetLastFileCommitSHA returns the last commit SHA that modified the given file.
-func GetLastFileCommitSHA(repoPath, filePath string) (string, error) {
-	repo, err := git.PlainOpen(repoPath)
+func sha(filepath string) (string, error) {
+	f, err := os.Open(filepath)
 	if err != nil {
 		return "", err
 	}
+	defer f.Close()
 
-	ref, err := repo.Head()
-	if err != nil {
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
-
-	logIter, err := repo.Log(&git.LogOptions{From: ref.Hash()})
-	if err != nil {
-		return "", err
-	}
-
-	relativePath := filepath.ToSlash(filePath) // Normalize path
-	defer logIter.Close()
-
-	for {
-		commit, err := logIter.Next()
-		if err != nil {
-			break
-		}
-
-		files, err := commit.Files()
-		if err != nil {
-			return "", err
-		}
-
-		found := false
-		_ = files.ForEach(func(f *object.File) error {
-			if f.Name == relativePath {
-				found = true
-				return nil
-			}
-			return nil
-		})
-
-		if found {
-			return commit.Hash.String(), nil
-		}
-	}
-
-	return "", fmt.Errorf("no commit found for file: %s", filePath)
+	return string(h.Sum(nil)), nil
 }

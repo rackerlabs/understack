@@ -35,11 +35,11 @@ type GitRepoWatcherSpec struct {
 
 // GitRepoWatcherStatus defines the observed state of GitRepoWatcher.
 type GitRepoWatcherStatus struct {
-	LatestCommitSHA string      `json:"latestCommitSHA,omitempty"`
-	RepoPath        string      `json:"repoPath,omitempty"`
-	SyncedAt        metav1.Time `json:"syncedAt,omitempty"`
-	Ready           bool        `json:"ready,omitempty"`
-	Message         string      `json:"message,omitempty"`
+	GitCommitHash string      `json:"gitCommitHash,omitempty"`
+	RepoPath      string      `json:"repoPath,omitempty"`
+	SyncedAt      metav1.Time `json:"syncedAt,omitempty"`
+	Ready         bool        `json:"ready,omitempty"`
+	Message       string      `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true

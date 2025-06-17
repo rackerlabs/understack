@@ -26,8 +26,8 @@ import (
 
 // NautobotSpec defines the desired state of Nautobot.
 type NautobotSpec struct {
-	RepoWatcher string `json:"repoWatcher"`
-	ConfigPath  string `json:"configPath"`
+	RepoWatcher    string `json:"repoWatcher"`
+	ConfigFilePath string `json:"configFilePath"`
 	// +kubebuilder:default=10
 	SyncIntervalSeconds int             `json:"syncIntervalSeconds,omitempty"`
 	Env                 []corev1.EnvVar `json:"env,omitempty"`
@@ -35,10 +35,11 @@ type NautobotSpec struct {
 
 // NautobotStatus defines the observed state of Nautobot.
 type NautobotStatus struct {
-	LatestCommitSHA string      `json:"latestCommitSHA,omitempty"`
-	SyncedAt        metav1.Time `json:"syncedAt,omitempty"`
-	Ready           bool        `json:"ready,omitempty"`
-	Message         string      `json:"message,omitempty"`
+	ConfigFileSHA string      `json:"configFileSHA,omitempty"`
+	GitCommitHash string      `json:"gitCommitHash,omitempty"`
+	SyncedAt      metav1.Time `json:"syncedAt,omitempty"`
+	Ready         bool        `json:"ready,omitempty"`
+	Message       string      `json:"message,omitempty"`
 }
 
 // +kubebuilder:object:root=true
