@@ -70,8 +70,6 @@ conf:
     oslo_messaging_rabbit:
       rabbit_ha_queues: true
     pxe:
-      images_path: /var/lib/understack/master_iso_images
-      instance_master_path: /var/lib/understack/master_iso_images
       loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
