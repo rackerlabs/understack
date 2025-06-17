@@ -160,7 +160,7 @@ func (r *NautobotReconciler) fetchNautobotAuthToken(ctx context.Context, nautobo
 			key := v.ValueFrom.SecretKeyRef.Key
 			secretName := v.ValueFrom.SecretKeyRef.Name
 			secret := &corev1.Secret{}
-			err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: "default"}, secret)
+			err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: "openstack"}, secret)
 			if err != nil {
 				return "", err
 			}
