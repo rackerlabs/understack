@@ -21,12 +21,14 @@ class IronicClient:
             session=session, oslo_conf=cfg.CONF, connect_retries=cfg.CONF.http_retries
         ).baremetal
 
-    def baremetal_port_by_mac(self, mac_addr: str) -> BaremetalPort | None:
+    def baremetal_port_physical_network(self, local_link_info: dict) -> str | None:
+        port = self._port_by_local_link(local_link_info)
+        return port.physical_network if port else None
+
+    def _port_by_local_link(self, local_link_info: dict) -> BaremetalPort | None:
         try:
-            return next(self.irclient.ports(details=True, address=mac_addr))
+            return next(
+                self.irclient.ports(details=True, local_link_connection=local_link_info)
+            )
         except StopIteration:
             return None
-
-    def baremetal_port_physical_network(self, mac_addr: str) -> str | None:
-        port = self.baremetal_port_by_mac(mac_addr)
-        return port.physical_network if port else None

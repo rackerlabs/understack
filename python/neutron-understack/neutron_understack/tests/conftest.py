@@ -219,8 +219,8 @@ def subport_model(vlan_num) -> SubPortModel:
 
 
 @pytest.fixture
-def port_model(mac_address) -> PortModel:
-    return PortModel(mac_address=mac_address)
+def port_model(mac_address, port_id) -> PortModel:
+    return PortModel(mac_address=mac_address, id=str(port_id))
 
 
 @pytest.fixture

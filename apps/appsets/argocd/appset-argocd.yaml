@@ -17,6 +17,9 @@ spec:
   template:
     metadata:
       name: '{{.name}}-argocd'
+      annotations:
+        # we want ArgoCD itself to sync as early as possible
+        argocd.argoproj.io/sync-wave: "-1000"
     spec:
       project: default
       sources:

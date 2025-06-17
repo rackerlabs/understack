@@ -1,0 +1,25 @@
+version: 2
+title: "Provision Ubuntu server, log in, check uptime then destroy."
+subtasks:
+  - title: "Boot and delete"
+    workloads:
+    - scenario:
+        VMTasks.boot_runcommand_delete:
+          flavor:
+            name: gp2.small
+          image:
+            name: ^Ubuntu 24.*$
+          config_drive: true
+          force_delete: false
+          username: ubuntu
+          key_name: my-rally-key
+          command:
+            script_inline: |
+              echo "Hello hello!"
+              hostname
+              uptime
+            interpreter: "/bin/sh"
+      contexts:
+        network:
+          start_cidr: 192.168.91.0/24
+          dns_nameservers: [8.8.8.8]

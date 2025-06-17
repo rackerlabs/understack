@@ -205,8 +205,9 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             binding_profile, self.nb
         )
 
+        local_link_info = utils.local_link_from_binding_profile(binding_profile)
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            parent_port.mac_address
+            local_link_info
         )
         allowed_vlan_ids = self._handle_segment_allocation(
             subports, vlan_group_name, binding_host
@@ -237,8 +238,9 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             return
         binding_profile = parent_port_obj.bindings[0].profile
         binding_host = parent_port_obj.bindings[0].host
+        local_link_info = utils.local_link_from_binding_profile(binding_profile)
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            parent_port_obj.mac_address
+            local_link_info
         )
         self._handle_subports_removal(
             binding_profile=binding_profile,
@@ -308,8 +310,10 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         parent_port = utils.fetch_port_object(trunk.port_id)
 
         if utils.parent_port_is_bound(parent_port):
+            binding_profile = parent_port.bindings[0].profile
+            local_link_info = utils.local_link_from_binding_profile(binding_profile)
             vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                parent_port.mac_address
+                local_link_info
             )
             LOG.debug("subports_added_post found vlan_group_name=%s", vlan_group_name)
             self._trigger_undersync(vlan_group_name)

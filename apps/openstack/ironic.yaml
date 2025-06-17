@@ -1,4 +1,4 @@
 ---
 component: ironic
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 0.2.21
+chartVersion: 2025.1.1+062261562

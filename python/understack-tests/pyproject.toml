@@ -1,0 +1,8 @@
+[project]
+name = "understack-tests"
+version = "0.1.0"
+description = "Integration tests for Undercloud"
+requires-python = ">=3.12"
+dependencies = [
+    "rally-openstack>=3.0.0",
+]

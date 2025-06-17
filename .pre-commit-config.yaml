@@ -53,10 +53,12 @@ repos:
     hooks:
       - id: ansible-lint
         entry: "sh -c 'cd ansible && python3 -m ansiblelint -v --force-color'"
+        verbose: true
+        always_run: false
         additional_dependencies:
           - ansible
           - jmespath
-        files: '^ansible/.*$'
+        files: '^ansible/.*'
   - repo: https://github.com/python-poetry/poetry
     rev: '2.1.3'
     hooks:
