@@ -17,6 +17,20 @@ conductor:
   pxe:
     # at this time we are running our own dnsmasq container and statefulset
     enabled: false
+  initContainers:
+    # this can go away once we disable the ilo-ipxe and ipxe boot interfaces
+    # it is only necessary because the above pxe is disabled, its init
+    # creates this path
+    - name: create-tftpboot
+      image: docker.io/openstackhelm/heat:2024.2-ubuntu_jammy
+      imagePullPolicy: IfNotPresent
+      command: [bash]
+      args:
+        - "-c"
+        - "mkdir -p /var/lib/openstack-helm/tftpboot"
+      volumeMounts:
+        - name: pod-data
+          mountPath: /var/lib/openstack-helm
 
 labels:
   conductor:
