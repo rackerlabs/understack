@@ -68,9 +68,30 @@ cephBlockPools:
         csi.storage.k8s.io/node-stage-secret-namespace: "{{ .Release.Namespace }}"
         dataPool: ceph-blockpool-ecoded
         pool: replicated-metadata-pool
-        # needed because we are running kernel 4.x which does not support fast-diff
-        # see  https://docs.ceph.com/en/latest/rbd/rbd-config-ref/ for things supported
-        # in particular kernel version
+  - name: ceph-block-single
+    # see https://github.com/rook/rook/blob/master/Documentation/CRDs/Block-Storage/ceph-block-pool-crd.md#spec for available configuration
+    spec:
+      failureDomain: host
+      replicated:
+        size: 1
+        requireSafeReplicaSize: false
+    storageClass:
+      enabled: true
+      name: ceph-block-single
+      isDefault: false
+      reclaimPolicy: Retain
+      allowVolumeExpansion: true
+      volumeBindingMode: "Immediate"
+      mountOptions: []
+      # see https://kubernetes.io/docs/concepts/storage/storage-classes/#allowed-topologies
+      allowedTopologies: []
+      parameters:
+        csi.storage.k8s.io/provisioner-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/provisioner-secret-namespace: "{{ .Release.Namespace }}"
+        csi.storage.k8s.io/controller-expand-secret-name: rook-csi-rbd-provisioner
+        csi.storage.k8s.io/controller-expand-secret-namespace: "{{ .Release.Namespace }}"
+        csi.storage.k8s.io/node-stage-secret-name: rook-csi-rbd-node
+        csi.storage.k8s.io/node-stage-secret-namespace: "{{ .Release.Namespace }}"
         imageFeatures: layering
 
 # -- A list of CephFileSystem configurations to deploy
