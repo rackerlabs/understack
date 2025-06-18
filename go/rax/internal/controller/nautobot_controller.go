@@ -83,7 +83,15 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		log.Info("git sync is not ready will retry")
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
 	}
-	configFilePath := fmt.Sprintf("%s/%s", gitRepoWatcher.Status.RepoPath, nautobotCR.Spec.ConfigFilePath)
+
+	// Retrieve the Nautobot authentication token from a secret or external source
+	nautobotAuthToken, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR, "NAUTOBOT_TOKEN")
+	if err != nil {
+		log.Error(err, "failed parse find nautoBotAuthToken")
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+
+	configFilePath := fmt.Sprintf("%s/%s", gitRepoWatcher.Status.RepoClonePath, nautobotCR.Spec.ConfigFilePath)
 
 	fileSha, err := sha(configFilePath)
 	if err != nil {
@@ -118,12 +126,6 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		setDisplayPath(&root.InstanceLocations[i], "")
 	}
 
-	// Retrieve the Nautobot authentication token from a secret or external source
-	nautobotAuthToken, err := r.fetchNautobotAuthToken(ctx, nautobotCR)
-	if err != nil {
-		log.Error(err, "failed parse find nautoBotAuthToken")
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
 	nb := nautobot.NewNautobotClient(fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP), nautobotAuthToken)
 
 	// Sync all instance locations with Nautobot
@@ -153,26 +155,23 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
 }
 
-// fetchNautobotAuthToken: this will fetch Nautobot auth token from the given refer.
-func (r *NautobotReconciler) fetchNautobotAuthToken(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (string, error) {
-	for _, v := range nautobotCR.Spec.Env {
-		if v.Name == "NAUTOBOT_TOKEN" {
-			key := v.ValueFrom.SecretKeyRef.Key
-			secretName := v.ValueFrom.SecretKeyRef.Name
+// getAuthTokenFromSecretRef: this will fetch Nautobot auth token from the given refer.
+func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot, name string) (string, error) {
+	for _, v := range nautobotCR.Spec.Secrets {
+		if v.Name == name {
 			secret := &corev1.Secret{}
-			err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: "openstack"}, secret)
+			err := r.Get(ctx, types.NamespacedName{Name: v.SecretRef.Name, Namespace: *v.SecretRef.Namespace}, secret)
 			if err != nil {
 				return "", err
 			}
-
 			// Read the secret value
-			if valBytes, ok := secret.Data[key]; ok {
+			if valBytes, ok := secret.Data[v.SecretRef.Key]; ok {
 				return string(valBytes), nil
 			}
-			return "", fmt.Errorf("secret key %s not found in secret", key)
+			return "", fmt.Errorf("secret key %s not found in secret", v.SecretRef.Key)
 		}
 	}
-	return "", fmt.Errorf("failed to find NAUTOBOT_TOKEN")
+	return "", fmt.Errorf("failed to find %s", name)
 }
 
 // SetupWithManager sets up the controller with the Manager.

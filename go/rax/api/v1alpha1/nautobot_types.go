@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,8 +28,8 @@ type NautobotSpec struct {
 	RepoWatcher    string `json:"repoWatcher"`
 	ConfigFilePath string `json:"configFilePath"`
 	// +kubebuilder:default=10
-	SyncIntervalSeconds int             `json:"syncIntervalSeconds,omitempty"`
-	Env                 []corev1.EnvVar `json:"env,omitempty"`
+	SyncIntervalSeconds int      `json:"syncIntervalSeconds,omitempty"`
+	Secrets             []Secret `json:"secrets,omitempty"`
 }
 
 // NautobotStatus defines the observed state of Nautobot.

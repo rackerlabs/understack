@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,21 +62,29 @@ func (r *GitRepoWatcherReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, client.IgnoreNotFound(err)
 	}
 
-	repoPath := fmt.Sprintf("gitcache/%s", watcher.Name)
+	repoClonePath := fmt.Sprintf("gitcache/%s", watcher.Name)
 
-	githubToken, err := git.NewGithub("", "", "").GetToken(ctx)
+	appId, err := r.getAuthTokenFromSecretRef(ctx, watcher, "username")
 	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, nil
+		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
-	git := git.NewGit(repoPath, watcher.Spec.RepoURL, watcher.Spec.Ref, "usernmae", githubToken)
+	privateKeyPEM, err := r.getAuthTokenFromSecretRef(ctx, watcher, "password")
+	if err != nil {
+		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+	githubToken, err := git.NewGithub(appId, watcher.Spec.GitOrgName, privateKeyPEM).GetToken(ctx)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+	git := git.NewGit(repoClonePath, watcher.Spec.RepoURL, watcher.Spec.Ref, appId, githubToken)
 	repo, err := git.Sync()
 	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, nil
+		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
 	// Get latest commit SHA
 	head, err := repo.Head()
 	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, nil
+		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
 
 	sha := head.Hash().String()
@@ -85,10 +94,10 @@ func (r *GitRepoWatcherReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	watcher.Status.GitCommitHash = sha
 	watcher.Status.SyncedAt = metav1.Now()
 	watcher.Status.Ready = true
-	watcher.Status.RepoPath = repoPath
+	watcher.Status.RepoClonePath = repoClonePath
 	watcher.Status.Message = "Sync successful"
 	if err := r.Status().Update(ctx, &watcher); err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, nil
+		return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
 
 	return ctrl.Result{RequeueAfter: time.Duration(watcher.Spec.SyncIntervalSeconds) * time.Second}, nil
@@ -100,4 +109,22 @@ func (r *GitRepoWatcherReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&syncv1alpha1.GitRepoWatcher{}).
 		Named("gitrepowatcher").
 		Complete(r)
+}
+
+func (r *GitRepoWatcherReconciler) getAuthTokenFromSecretRef(ctx context.Context, gitRepoWatcher syncv1alpha1.GitRepoWatcher, name string) (string, error) {
+	for _, v := range gitRepoWatcher.Spec.Secrets {
+		if v.Name == name {
+			secret := &corev1.Secret{}
+			err := r.Get(ctx, types.NamespacedName{Name: v.SecretRef.Name, Namespace: *v.SecretRef.Namespace}, secret)
+			if err != nil {
+				return "", err
+			}
+			// Read the secret value
+			if valBytes, ok := secret.Data[v.SecretRef.Key]; ok {
+				return string(valBytes), nil
+			}
+			return "", fmt.Errorf("secret key %s not found in secret", v.SecretRef.Key)
+		}
+	}
+	return "", fmt.Errorf("failed to find %s", name)
 }

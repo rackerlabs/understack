@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -26,17 +25,18 @@ import (
 
 // GitRepoWatcherSpec defines the desired state of GitRepoWatcher.
 type GitRepoWatcherSpec struct {
-	RepoURL string `json:"repoURL"`
-	Ref     string `json:"ref"` // branch or tag
+	RepoURL    string `json:"repoURL"`
+	GitOrgName string `json:"gitOrgName"`
+	Ref        string `json:"ref"` // branch or tag
 	// +kubebuilder:default=60
-	SyncIntervalSeconds int           `json:"syncIntervalSeconds,omitempty"`
-	Env                 corev1.EnvVar `json:"env,omitempty"`
+	SyncIntervalSeconds int      `json:"syncIntervalSeconds,omitempty"`
+	Secrets             []Secret `json:"secrets,omitempty"`
 }
 
 // GitRepoWatcherStatus defines the observed state of GitRepoWatcher.
 type GitRepoWatcherStatus struct {
 	GitCommitHash string      `json:"gitCommitHash,omitempty"`
-	RepoPath      string      `json:"repoPath,omitempty"`
+	RepoClonePath string      `json:"repoClonePath,omitempty"`
 	SyncedAt      metav1.Time `json:"syncedAt,omitempty"`
 	Ready         bool        `json:"ready,omitempty"`
 	Message       string      `json:"message,omitempty"`
