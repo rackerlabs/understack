@@ -92,7 +92,7 @@ func (r *GitRepoWatcherReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	// Update status
 	watcher.Status.GitCommitHash = sha
-	watcher.Status.SyncedAt = metav1.Now()
+	watcher.Status.LastSyncedAt = metav1.Now()
 	watcher.Status.Ready = true
 	watcher.Status.RepoClonePath = repoClonePath
 	watcher.Status.Message = "Sync successful"

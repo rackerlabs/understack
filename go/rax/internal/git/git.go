@@ -2,9 +2,10 @@ package git
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
-	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -28,27 +29,43 @@ func NewGit(clonePath, remoteURL, ref, username, password string) *Git {
 	}
 }
 
+// Sync clones if missing or dirty, then pulls latest changes.
 func (g *Git) Sync() (*git.Repository, error) {
 	repo, err := git.PlainOpen(g.clonePath)
-	switch err {
-	case git.ErrRepositoryNotExists: // If repo Not Exist, Clone It
-		err := g.GitClone()
-		if err != nil {
-			return nil, fmt.Errorf("failed to clone Git repository %s", err.Error())
+	if err == git.ErrRepositoryNotExists {
+		if err := g.Clone(); err != nil {
+			return nil, fmt.Errorf("failed to clone repo: %w", err)
 		}
-		repo, _ = git.PlainOpen(g.clonePath) // Try again after clone
-	case nil: // If repo already exists, pull it.
-		err := g.GitPull()
-		if err != nil && err != git.NoErrAlreadyUpToDate {
-			return nil, fmt.Errorf("failed to pull Git repository %s", err.Error())
-		}
-	default:
-		return nil, err
+		return git.PlainOpen(g.clonePath)
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to open repo: %w", err)
 	}
-	return repo, err
+
+	dirty, err := g.IsDirty()
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if repo is dirty: %w", err)
+	}
+	if dirty {
+		// Remove the existing clone
+		if err := os.RemoveAll(g.clonePath); err != nil {
+			return nil, fmt.Errorf("failed to delete dirty repo: %w", err)
+		}
+		// Reclone fresh
+		if err := g.Clone(); err != nil {
+			return nil, fmt.Errorf("failed to re-clone dirty repo: %w", err)
+		}
+		return git.PlainOpen(g.clonePath)
+	}
+
+	if err := g.Pull(); err != nil && err != git.NoErrAlreadyUpToDate {
+		return nil, fmt.Errorf("failed to pull repo: %w", err)
+	}
+
+	return repo, nil
 }
 
-func (g *Git) GitClone() error {
+// Clone performs a shallow clone of the specified branch.
+func (g *Git) Clone() error {
 	_, err := git.PlainClone(g.clonePath, false, &git.CloneOptions{
 		URL:           g.remoteURL,
 		ReferenceName: plumbing.NewBranchReferenceName(g.ref),
@@ -62,19 +79,23 @@ func (g *Git) GitClone() error {
 	return err
 }
 
-func (g *Git) GitPull() error {
+// Pull updates the local repo by pulling changes from remote.
+func (g *Git) Pull() error {
 	repo, err := git.PlainOpen(g.clonePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("open repo for pull: %w", err)
 	}
-	w, err := repo.Worktree()
+
+	worktree, err := repo.Worktree()
 	if err != nil {
-		return err
+		return fmt.Errorf("get worktree: %w", err)
 	}
-	return w.Pull(&git.PullOptions{
+
+	return worktree.Pull(&git.PullOptions{
 		RemoteName:    "origin",
-		Depth:         1,
 		ReferenceName: plumbing.NewBranchReferenceName(g.ref),
+		SingleBranch:  true,
+		Depth:         1,
 		Force:         true,
 		Auth: &githttp.BasicAuth{
 			Username: g.username,
@@ -83,24 +104,25 @@ func (g *Git) GitPull() error {
 	})
 }
 
+// GetLastFileCommitSHA returns the last commit SHA that modified a file.
 func (g *Git) GetLastFileCommitSHA(filePath string) (string, error) {
 	repo, err := git.PlainOpen(g.clonePath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("open repo: %w", err)
 	}
 
 	ref, err := repo.Head()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("get HEAD: %w", err)
 	}
 
 	logIter, err := repo.Log(&git.LogOptions{From: ref.Hash()})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("get commit log: %w", err)
 	}
-
-	relativePath := filepath.ToSlash(filePath) // Normalize path
 	defer logIter.Close()
+
+	normalizedPath := filepath.ToSlash(filePath)
 
 	for {
 		commit, err := logIter.Next()
@@ -110,12 +132,12 @@ func (g *Git) GetLastFileCommitSHA(filePath string) (string, error) {
 
 		files, err := commit.Files()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("get commit files: %w", err)
 		}
 
-		found := false
+		var found bool
 		_ = files.ForEach(func(f *object.File) error {
-			if f.Name == relativePath {
+			if f.Name == normalizedPath {
 				found = true
 				return nil
 			}
@@ -128,4 +150,24 @@ func (g *Git) GetLastFileCommitSHA(filePath string) (string, error) {
 	}
 
 	return "", fmt.Errorf("no commit found for file: %s", filePath)
+}
+
+// IsDirty returns true if the working directory has uncommitted changes.
+func (g *Git) IsDirty() (bool, error) {
+	repo, err := git.PlainOpen(g.clonePath)
+	if err != nil {
+		return false, fmt.Errorf("open repo: %w", err)
+	}
+
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return false, fmt.Errorf("get worktree: %w", err)
+	}
+
+	status, err := worktree.Status()
+	if err != nil {
+		return false, fmt.Errorf("get status: %w", err)
+	}
+
+	return !status.IsClean(), nil
 }

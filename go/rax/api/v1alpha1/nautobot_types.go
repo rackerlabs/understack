@@ -36,7 +36,7 @@ type NautobotSpec struct {
 type NautobotStatus struct {
 	ConfigFileSHA string      `json:"configFileSHA,omitempty"`
 	GitCommitHash string      `json:"gitCommitHash,omitempty"`
-	SyncedAt      metav1.Time `json:"syncedAt,omitempty"`
+	LastSyncedAt  metav1.Time `json:"lastSyncedAt,omitempty"`
 	Ready         bool        `json:"ready,omitempty"`
 	Message       string      `json:"message,omitempty"`
 }

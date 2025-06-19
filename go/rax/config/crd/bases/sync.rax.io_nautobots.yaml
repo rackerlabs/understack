@@ -95,13 +95,13 @@ spec:
                 type: string
               gitCommitHash:
                 type: string
+              lastSyncedAt:
+                format: date-time
+                type: string
               message:
                 type: string
               ready:
                 type: boolean
-              syncedAt:
-                format: date-time
-                type: string
             type: object
         type: object
     served: true

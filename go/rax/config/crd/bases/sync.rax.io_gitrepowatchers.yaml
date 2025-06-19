@@ -96,14 +96,14 @@ spec:
             properties:
               gitCommitHash:
                 type: string
+              lastSyncedAt:
+                format: date-time
+                type: string
               message:
                 type: string
               ready:
                 type: boolean
               repoClonePath:
-                type: string
-              syncedAt:
-                format: date-time
                 type: string
             type: object
         type: object

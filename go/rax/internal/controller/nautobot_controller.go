@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -26,6 +27,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -102,11 +104,8 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// If last sync file sha value is same as that of current.
 	// That means no changes to file we will skip and retry.
 	if nautobotCR.Status.ConfigFileSHA == fileSha {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
 	}
-
-	nautobotCR.Status.ConfigFileSHA = fileSha
-	nautobotCR.Status.GitCommitHash = gitRepoWatcher.Status.GitCommitHash
 
 	// Read and parse the config YAML file from the Git repo
 	file, err := os.ReadFile(configFilePath)
@@ -149,6 +148,16 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Sync all racks with Nautobot
 	err = nb.SyncRack(ctx, root.Rack)
 	if err != nil {
+		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	}
+
+	// Update status
+	nautobotCR.Status.ConfigFileSHA = fileSha
+	nautobotCR.Status.GitCommitHash = gitRepoWatcher.Status.GitCommitHash
+	nautobotCR.Status.LastSyncedAt = metav1.Now()
+	nautobotCR.Status.Ready = true
+	nautobotCR.Status.Message = "Sync successful"
+	if err := r.Status().Update(ctx, &nautobotCR); err != nil {
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
 	// Successfully completed reconciliation; requeue after configured sync interval
@@ -211,15 +220,17 @@ func IsGitRepoReady(watcher *syncv1alpha1.GitRepoWatcher) bool {
 }
 
 func sha(filepath string) (string, error) {
-	f, err := os.Open(filepath)
+	file, err := os.Open(filepath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to open file: %w", err)
 	}
-	defer f.Close()
+	defer file.Close()
 
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
 	}
-	return string(h.Sum(nil)), nil
+
+	sum := hash.Sum(nil)
+	return hex.EncodeToString(sum), nil
 }

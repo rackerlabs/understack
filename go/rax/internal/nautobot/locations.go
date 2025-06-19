@@ -26,7 +26,8 @@ func (n *NautobotClient) SyncAllLocations(ctx context.Context, rootLocations []L
 			return fmt.Errorf("failed to sync root location %s: %w", location.Name, err)
 		}
 	}
-	return nil
+
+	return n.DeleteOrphanedLocations(ctx, rootLocations)
 }
 
 func (n *NautobotClient) CreateNewLocation(ctx context.Context, req nb.LocationRequest) (*nb.Location, error) {

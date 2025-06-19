@@ -37,7 +37,7 @@ type GitRepoWatcherSpec struct {
 type GitRepoWatcherStatus struct {
 	GitCommitHash string      `json:"gitCommitHash,omitempty"`
 	RepoClonePath string      `json:"repoClonePath,omitempty"`
-	SyncedAt      metav1.Time `json:"syncedAt,omitempty"`
+	LastSyncedAt  metav1.Time `json:"lastSyncedAt,omitempty"`
 	Ready         bool        `json:"ready,omitempty"`
 	Message       string      `json:"message,omitempty"`
 }
