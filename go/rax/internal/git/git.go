@@ -120,7 +120,7 @@ func (g *Git) GetLastFileCommitSHA(filePath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("get commit log: %w", err)
 	}
-	defer logIter.Close()
+	defer logIter.Close() //nolint:errcheck
 
 	normalizedPath := filepath.ToSlash(filePath)
 

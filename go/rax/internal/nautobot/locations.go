@@ -192,6 +192,6 @@ func logResponseBody(resp *http.Response) {
 		log.Printf("failed to read response body")
 		return
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 	log.Printf("Create error: %s", string(body))
 }
