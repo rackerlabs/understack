@@ -23,7 +23,7 @@ type LocationType struct {
 func (n *NautobotClient) SyncAllLocationTypes(ctx context.Context, rootLocations []LocationType) error {
 	for _, locationType := range rootLocations {
 		if err := n.syncChildLocationTypesRecursive(ctx, &locationType, nil); err != nil {
-			return fmt.Errorf("failed to sync root location %s: %w", locationType.Name, err)
+			return fmt.Errorf("failed to sync root location types %s: %w", locationType.Name, err)
 		}
 	}
 	return nil

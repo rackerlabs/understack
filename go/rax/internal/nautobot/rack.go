@@ -23,7 +23,7 @@ func (n *NautobotClient) SyncRack(ctx context.Context, racks []Rack) error {
 	for _, rack := range racks {
 		_, err := n.syncOrUpdateRack(ctx, &rack)
 		if err != nil {
-			log.Printf("Failed to sync rack %s: %v", rack.Name, err)
+			log.Printf("failed to sync rack %s: %v", rack.Name, err)
 		}
 	}
 	return nil
@@ -48,9 +48,9 @@ func (n *NautobotClient) CreateRack(ctx context.Context, req nb.WritableRackRequ
 	rack, resp, err := n.Client.DcimAPI.DcimRacksCreate(ctx).WritableRackRequest(req).Execute()
 	if err != nil {
 		logResponseBody(resp)
-		return nil, fmt.Errorf("API error creating rack %s: %w", req.Name, err)
+		return nil, fmt.Errorf("api error creating rack %s: %w", req.Name, err)
 	}
-	log.Printf("Created rack: %s (ID: %s)", rack.Name, rack.Id)
+	log.Printf("created rack: %s (ID: %s)", rack.Name, rack.Id)
 	return rack, nil
 }
 
@@ -60,7 +60,7 @@ func (n *NautobotClient) UpdateRack(ctx context.Context, id string, req nb.Patch
 		logResponseBody(resp)
 		return nil, err
 	}
-	log.Printf("Updated rack: id %s: Name:%s (%s)", id, rack.Name, rack.Display)
+	log.Printf("updated rack: id %s: Name:%s (%s)", id, rack.Name, rack.Display)
 	return rack, nil
 }
 
