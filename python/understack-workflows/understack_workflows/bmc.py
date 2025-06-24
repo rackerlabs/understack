@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass
 
 import requests
+from requests.utils import CaseInsensitiveDict
 import urllib3
 from sushy import Sushy
 
@@ -41,7 +42,21 @@ class Bmc:
         verify: bool = False,
         timeout: int = 30,
     ) -> dict:
+        (response, _) = self.redfish_request_with_headers(
+            path, method, payload, verify, timeout
+        )
+        return response
+
+    def redfish_request_with_headers(
+        self,
+        path: str,
+        method: str = "GET",
+        payload: dict | None = None,
+        verify: bool = False,
+        timeout: int = 30,
+    ) -> tuple[dict, CaseInsensitiveDict]:
         url = f"{self.url()}{path}"
+
         r = requests.request(
             method,
             url,
@@ -56,10 +71,9 @@ class Bmc:
                 f"BMC communications failure HTTP {r.status_code} "
                 f"{r.reason} from {url} - {r.text}"
             )
-        if r.text:
-            return r.json()
-        else:
-            return {}
+
+        response = r.json() if r.text else {}
+        return response, r.headers
 
     def sushy(self):
         return Sushy(
