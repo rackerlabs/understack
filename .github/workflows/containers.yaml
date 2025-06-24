@@ -74,48 +74,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
 
-  dnsmasq:
-    if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: setup docker buildx
-        uses: docker/setup-buildx-action@18ce135bb5112fa8ce4ed6c17ab05699d7f3a5e0 # v3
-      - name: login to ghcr.io
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: image metadata
-        id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
-        with:
-          images: ghcr.io/${{ github.repository }}/dnsmasq
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=ref,event=tag
-            type=ref,event=pr
-        env:
-          # Create the annotations at the index as well since this
-          # defaults to manifest only and we have to manually merge
-          # the container is multi-arch because of provenance creating
-          # an 'unknown/unknown' arch with data. We've got no annotations
-          # that are arch specific so populate them at the index as well.
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
-
-      - name: build and deploy dnsmasq container to registry
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
-        with:
-          context: "{{defaultContext}}:containers/dnsmasq"
-          file: Dockerfile.dnsmasq
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  workflows:
+  containers:
     if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
 
@@ -127,6 +86,7 @@ jobs:
           - name: nova-flavors
           - name: ansible
           - name: understack-tests
+          - name: dnsmasq
 
     steps:
       - name: setup docker buildx
