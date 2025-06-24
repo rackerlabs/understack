@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
-      - uses: azure/setup-kubectl@3e0aec4d80787158d308d7b364cb1b702e7feb7f # v4
+      - uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4
       - uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
       - uses: bmuschko/setup-kubeconform@5ccaecbbf012bcb1eeeab66e649db64a477ade8f # v1
       - name: validate kustomize with kubeconform
