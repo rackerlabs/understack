@@ -43,7 +43,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: containers/python311_alpine/
-          file: containers/python311_alpine/Dockerfile.python311_alpine
+          file: containers/python311_alpine/Dockerfile
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/${{ github.repository }}/argo-python3.11.8-alpine3.19:latest,ghcr.io/${{ github.repository }}/argo-python3.11.8-alpine3.19:${{ env.VERSION_PYTHON311 }}
@@ -54,7 +54,7 @@ jobs:
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           context: containers/python312_alpine/
-          file: containers/python312_alpine/Dockerfile.python312_alpine
+          file: containers/python312_alpine/Dockerfile
           # push for all main branch commits
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/${{ github.repository }}/argo-python3.12.2-alpine3.19:latest,ghcr.io/${{ github.repository }}/argo-python3.12.2-alpine3.19:${{ env.VERSION_PYTHON312 }}
