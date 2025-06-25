@@ -3,27 +3,24 @@ FROM ${BASE} AS builder
 
 RUN --mount=type=cache,target=/var/cache/apk apk add --virtual build-deps gcc python3-dev musl-dev linux-headers
 RUN --mount=type=cache,target=/root/.cache/pip pip install 'wheel==0.43.0'
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m venv /opt/poetry && \
-    /opt/poetry/bin/pip install 'poetry==1.7.1' && \
-    /opt/poetry/bin/poetry self add 'poetry-dynamic-versioning[plugin]==1.3.0'
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # copy in the code
-COPY --chown=appuser:appgroup python/understack-workflows /app
-COPY --chown=appuser:appgroup python/understack-flavor-matcher /understack-flavor-matcher
-# need netifaces built as a wheel
-RUN --mount=type=cache,target=/root/.cache/pip pip wheel --wheel-dir /app/dist netifaces psutil==6.1.1
-# build wheels and requirements.txt, skip hashes due to building of netifaces above which won't match
-RUN cd /app && /opt/poetry/bin/poetry build -f wheel && /opt/poetry/bin/poetry export --without-hashes -f requirements.txt -o dist/requirements.txt
+COPY --chown=appuser:appgroup python/understack-workflows /tmp/understack/python/understack-workflows
+COPY --chown=appuser:appgroup python/understack-flavor-matcher /tmp/understack/python/understack-flavor-matcher
+
+# install our requirements and our packages
+RUN --mount=type=cache,target=/root/.cache/uv \
+  uv venv /opt/venv && \
+  uv pip install \
+    netifaces \
+    psutil==6.1.1 \
+    /tmp/understack/python/understack-workflows \
+    /tmp/understack/python/understack-flavor-matcher
 
 FROM ${BASE} AS prod
 LABEL org.opencontainers.image.description="UnderStack Workflows"
-WORKDIR /app
 
-RUN mkdir -p /opt/venv/wheels/
-COPY --from=builder /app/dist/*.whl /app/dist/requirements.txt /opt/venv/wheels/
-COPY --chown=appuser:appgroup python/understack-flavor-matcher /understack-flavor-matcher
-
-RUN --mount=type=cache,target=/root/.cache/pip /opt/venv/bin/pip install --find-links /opt/venv/wheels/ --only-binary netifaces psutil -r /opt/venv/wheels/requirements.txt understack-workflows
+COPY --from=builder --link /opt/venv /opt/venv
 
 USER appuser
