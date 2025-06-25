@@ -151,6 +151,7 @@ nav:
       - operator-guide/rook-ceph.md
       - operator-guide/nautobot.md
       - operator-guide/troubleshooting-osh.md
+      - operator-guide/logging.md
     - 'Scripts and Tools':
       - operator-guide/scripts.md
   - 'User Guide':
