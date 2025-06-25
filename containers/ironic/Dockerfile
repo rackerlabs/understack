@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM docker.io/openstackhelm/ironic:${OPENSTACK_VERSION}-ubuntu_jammy AS builder
+FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_jammy AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
       cd $(dirname ${proj}) && uv build --wheel --out-dir /tmp/wheels/; \
     done
 
-FROM docker.io/openstackhelm/ironic:${OPENSTACK_VERSION}-ubuntu_jammy AS final
+FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_jammy AS final
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
