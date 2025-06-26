@@ -64,6 +64,9 @@ repos:
     rev: 0.7.13
     hooks:
       - id: uv-lock
+        name: cinder-understack
+        args: ["-D", "python/cinder-understack"]
+      - id: uv-lock
         name: diff-nautobot-understack
         args: ["-D", "python/diff-nautobot-understack"]
       - id: uv-lock
