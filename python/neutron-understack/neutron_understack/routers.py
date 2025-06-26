@@ -219,10 +219,13 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
     In situation 2, we don't have to do anything. Router-specific port gets
     deleted by Neutron and segment-shared port stays around.
     """
-    port = payload.metadata["port"]
-    network_id = port["network_id"]
+    LOG.debug(
+        "handle_router_interface_removal received %(payload)s", {"payload": payload}
+    )
+    port = payload.metadata["port_db"]
+    network_id = payload.metadata["network"]["id"]
 
-    if port["device_owner"] not in ROUTER_INTERFACE_AND_GW:
+    if port.device_owner not in ROUTER_INTERFACE_AND_GW:
         return
 
     if not is_only_router_port_on_network(network_id):
