@@ -236,6 +236,13 @@ class UnderstackDriver(MechanismDriver):
     def create_port_postcommit(self, context: PortContext) -> None:
         # Provide network node(s) with connectivity to the networks where this
         # router port is attached to.
+        #
+        port = context.current
+        LOG.debug(
+            "Created port %(port)s on network %(net)s",
+            {"port": port["id"], "net": port["network_id"]},
+        )
+
         if utils.is_router_interface(context):
             routers.create_port_postcommit(context)
 
@@ -251,8 +258,16 @@ class UnderstackDriver(MechanismDriver):
         original_vif_other = context.original_vif_type == portbindings.VIF_TYPE_OTHER
         current_vif_other = context.vif_type == portbindings.VIF_TYPE_OTHER
 
+        if current_vif_unbound and original_vif_other:
+            local_link_info = utils.local_link_from_binding_profile(
+                context.original[portbindings.PROFILE]
+            )
+        else:
+            local_link_info = utils.local_link_from_binding_profile(
+                context.current[portbindings.PROFILE]
+            )
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            context.current["mac_address"]
+            local_link_info
         )
 
         if current_vif_unbound and original_vif_other:
@@ -316,8 +331,11 @@ class UnderstackDriver(MechanismDriver):
         # Only clean up provisioning ports. Ports with tenant networks are cleaned
         # up in _tenant_network_port_cleanup
 
+        local_link_info = utils.local_link_from_binding_profile(
+            context.current[portbindings.PROFILE]
+        )
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            context.current["mac_address"]
+            local_link_info
         )
 
         if vlan_group_name and is_provisioning_network(context.current["network_id"]):
@@ -376,8 +394,11 @@ class UnderstackDriver(MechanismDriver):
         )
         mac_address = context.current["mac_address"]
 
+        local_link_info = utils.local_link_from_binding_profile(
+            context.current[portbindings.PROFILE]
+        )
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            mac_address
+            local_link_info
         )
 
         if not vlan_group_name:

@@ -54,19 +54,15 @@ annotations:
     placement_db_sync:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     placement_ks_service:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     placement_ks_user:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     placement_ks_endpoints:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
 
 endpoints:
   placement:

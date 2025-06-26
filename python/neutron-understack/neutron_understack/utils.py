@@ -195,6 +195,10 @@ def is_dynamic_network_segment(segment_id: str) -> bool:
     return segment.is_dynamic
 
 
+def local_link_from_binding_profile(binding_profile: dict) -> dict | None:
+    return binding_profile.get("local_link_information", [None])[0]
+
+
 def fetch_connected_interface_uuid(binding_profile: dict, nautobot: Nautobot) -> str:
     """Fetches the connected interface UUID from the port's binding profile.
 

@@ -1,0 +1,19 @@
+---
+
+- interface: bios
+  step: apply_configuration
+  args:
+    settings:
+      - name: PxeDev1EnDis
+        value: Enabled
+      - name: PxeDev1Interface
+        value: NIC.Slot.1-1
+      - name: HttpDev1EnDis
+        value: Enabled
+      - name: HttpDev1Interface
+        value: NIC.Slot.1-1
+      - name: HttpDev1TlsMode
+        value: None
+      - name: TimeZone
+        value: UTC
+  order: 1

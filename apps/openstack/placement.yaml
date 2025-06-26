@@ -1,4 +1,4 @@
 ---
 component: placement
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2024.2.1+34d1672a-93ed069c
+chartVersion: 2025.1.1+062261562

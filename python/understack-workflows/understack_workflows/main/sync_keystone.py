@@ -94,32 +94,34 @@ def _find_outside_network(conn: Connection, project_id: str):
     )
 
 
-def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str]:
+def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str, bool]:
     project = conn.identity.get_project(project_id.hex)  # type: ignore
     domain_id = project.domain_id
+    is_default_domain = domain_id == "default"
 
-    if domain_id == "default":
+    if is_default_domain:
         domain_name = "default"
     else:
         domain = conn.identity.get_project(domain_id)  # type: ignore
         domain_name = domain.name
 
     tenant_name = f"{domain_name}:{project.name}"
-    return tenant_name, str(project.description)
+    return tenant_name, str(project.description), is_default_domain
 
 
 def handle_project_create(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to create tenant %s", project_id.hex)
-    tenant_name, tenant_description = _tenant_attrs(conn, project_id)
+    tenant_name, tenant_description, is_default_domain = _tenant_attrs(conn, project_id)
 
     nautobot_tenant_api = nautobot.session.tenancy.tenants
     try:
         tenant = nautobot_tenant_api.create(
             id=str(project_id), name=tenant_name, description=tenant_description
         )
-        _create_outside_network(conn, project_id)
+        if is_default_domain:
+            _create_outside_network(conn, project_id)
     except Exception:
         logger.exception(
             "Unable to create project %s / %s", str(project_id), tenant_name
@@ -134,7 +136,7 @@ def handle_project_update(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to update tenant %s", project_id.hex)
-    tenant_name, tenant_description = _tenant_attrs(conn, project_id)
+    tenant_name, tenant_description, is_default_domain = _tenant_attrs(conn, project_id)
 
     tenant_api = nautobot.session.tenancy.tenants
     existing_tenant = tenant_api.get(project_id)
@@ -155,7 +157,8 @@ def handle_project_update(
                 existing_tenant.last_updated,  # type: ignore
             )
 
-        _create_outside_network(conn, project_id)
+        if is_default_domain:
+            _create_outside_network(conn, project_id)
     except Exception:
         logger.exception(
             "Unable to update project %s / %s", str(project_id), tenant_name

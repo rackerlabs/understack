@@ -130,28 +130,21 @@ annotations:
     glance_db_sync:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     glance_ks_service:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     glance_ks_user:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     glance_ks_endpoints:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     glance_metadefs_load:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     glance_storage_init:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     glance_bootstrap:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true

@@ -17,6 +17,20 @@ conductor:
   pxe:
     # at this time we are running our own dnsmasq container and statefulset
     enabled: false
+  initContainers:
+    # this can go away once we disable the ilo-ipxe and ipxe boot interfaces
+    # it is only necessary because the above pxe is disabled, its init
+    # creates this path
+    - name: create-tftpboot
+      image: docker.io/openstackhelm/heat:2024.2-ubuntu_jammy
+      imagePullPolicy: IfNotPresent
+      command: [bash]
+      args:
+        - "-c"
+        - "mkdir -p /var/lib/openstack-helm/tftpboot"
+      volumeMounts:
+        - name: pod-data
+          mountPath: /var/lib/openstack-helm
 
 labels:
   conductor:
@@ -70,8 +84,6 @@ conf:
     oslo_messaging_rabbit:
       rabbit_ha_queues: true
     pxe:
-      images_path: /var/lib/understack/master_iso_images
-      instance_master_path: /var/lib/understack/master_iso_images
       loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
@@ -218,16 +230,12 @@ annotations:
     ironic_db_sync:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     ironic_ks_service:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     ironic_ks_user:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true
     ironic_ks_endpoints:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Replace=true

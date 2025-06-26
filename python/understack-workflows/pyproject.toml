@@ -1,15 +1,14 @@
 [build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
-build-backend = "poetry_dynamic_versioning.backend"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry]
+[project]
 name = "understack-workflows"
 version = "0.0.0"
-authors = ["Understack Developers"]
 description = "The glue between different systems and services that are run in our Workflows"
+authors = [{ name = "Understack Developers" }]
+requires-python = "~=3.11.0"
 readme = "README.md"
-packages = [{include = "understack_workflows"}]
-
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -18,32 +17,18 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3.11",
     "Topic :: System :: Hardware",
-    "Topic :: System :: Systems Administration"
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "pydantic>=2,<3",
+    "pynautobot>=2.2.1,<3",
+    "python-ironicclient>=5,<6",
+    "sushy>=5.3.0,<6",
+    "kubernetes==33.1.0",
+    "understack-flavor-matcher",
 ]
 
-[tool.poetry.dependencies]
-# keep this python field in sync with the tool.ruff.target-version
-python = "~3.11.0"
-
-pydantic = "^2"
-pynautobot = "^2.2.1"
-python-ironicclient = "^5"
-sushy = "^5.3.0"
-kubernetes = "29.0.0"
-understack-flavor-matcher = {path = "../understack-flavor-matcher"}
-
-[tool.peotry.group.test]
-optional = true
-
-[tool.poetry.group.test.dependencies]
-pytest = "^8.0.0"
-pytest-github-actions-annotate-failures = "*"
-pytest-cov = "^6.0.0"
-pytest-mock = "^3.14.0"
-pytest-lazy-fixtures = "^1.1.1"
-requests-mock = "^1.12.1"
-
-[tool.poetry.scripts]
+[project.scripts]
 sync-keystone = "understack_workflows.main.sync_keystone:main"
 sync-provision-state = "understack_workflows.main.sync_provision_state:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
@@ -52,6 +37,31 @@ enroll-server = "understack_workflows.main.enroll_server:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 sync-network-segment-range = "understack_workflows.main.sync_ucvni_group_range:main"
+
+[dependency-groups]
+test = [
+    "pytest>=8,<9",
+    "pytest-github-actions-annotate-failures",
+    "pytest-cov>=6.0.0,<7",
+    "pytest-mock>=3.14.0,<4",
+    "pytest-lazy-fixtures>=1.1.1,<2",
+    "requests-mock>=1.12.1,<2",
+]
+
+[tool.uv]
+default-groups = ["test"]
+
+[tool.uv.sources]
+understack-flavor-matcher = { path = "../understack-flavor-matcher" }
+
+[tool.hatch.build.targets.sdist]
+include = ["understack_workflows"]
+
+[tool.hatch.build.targets.wheel]
+include = ["understack_workflows"]
+
+[tool.peotry.group.test]
+optional = true
 
 [tool.pytest.ini_options]
 minversion = "6.0"
