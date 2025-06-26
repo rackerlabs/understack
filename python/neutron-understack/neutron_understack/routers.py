@@ -223,7 +223,7 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
         "handle_router_interface_removal received %(payload)s", {"payload": payload}
     )
     port = payload.metadata["port_db"]
-    network_id = payload["network"]["id"]
+    network_id = payload.metadata["network"]["id"]
 
     if port.device_owner not in ROUTER_INTERFACE_AND_GW:
         return
