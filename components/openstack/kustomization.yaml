@@ -15,7 +15,7 @@ resources:
 helmCharts:
   - name: memcached
     repo: https://charts.bitnami.com/bitnami
-    version: 6.14.0
+    version: 7.8.6
     namespace: openstack
     releaseName: memcached
     valuesFile: memcached-values.yaml
