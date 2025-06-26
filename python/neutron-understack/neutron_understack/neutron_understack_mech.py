@@ -66,6 +66,7 @@ class UnderstackDriver(MechanismDriver):
             resources.PORT,
             events.BEFORE_DELETE,
             cancellable=True,
+            priority=10
         )
 
     def create_network_precommit(self, context):
