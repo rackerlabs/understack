@@ -33,7 +33,7 @@ jobs:
     strategy:
       matrix:
         # if you add a container here, add it to the 'clean_containers' job below
-        project: [ironic, neutron, keystone, nova, openstack-client]
+        project: [ironic, neutron, keystone, nova, octavia, openstack-client]
 
     steps:
       - name: setup docker buildx
@@ -127,6 +127,7 @@ jobs:
           - name: nova-flavors
           - name: ansible
           - name: understack-tests
+          - name: openvswitch
 
     steps:
       - name: setup docker buildx
@@ -182,12 +183,14 @@ jobs:
           - neutron
           - keystone
           - nova
+          - octavia
           - openstack-client
           - dnsmasq
           - ironic-nautobot-client
           - nova-flavors
           - ansible
           - understack-tests
+          - openvswitch
 
     steps:
       - name: clean up PR container
