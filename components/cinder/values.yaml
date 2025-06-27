@@ -1,0 +1,163 @@
+---
+release_group: null
+
+conf:
+  backends:
+    # disable the hardcoded one in the OpenStack Helm values.yaml
+    rbd1: null
+
+# typically overridden by environmental
+# values, but should include all endpoints
+# required by this chart
+endpoints:
+  oslo_messaging:
+    statefulset:
+      replicas: 3
+      name: rabbitmq-server
+    hosts:
+      default: rabbitmq-nodes
+  volumev3:
+    port:
+      api:
+        public: 443
+    scheme:
+      public: https
+    path:
+      # since the Yoga release it is not necessary to include the tenant_id
+      # in the URL
+      default: '/v3'
+    host_fqdn_override:
+      public:
+        tls:
+          secretName: cinder-tls-public
+          issuerRef:
+            name: understack-cluster-issuer
+            kind: ClusterIssuer
+
+
+network:
+  # configure OpenStack Helm to use Undercloud's ingress
+  # instead of expecting the ingress controller provided
+  # by OpenStack Helm
+  use_external_ingress_controller: true
+  api:
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /
+        # set our default issuer
+        cert-manager.io/cluster-issuer: understack-cluster-issuer
+
+pod:
+  mounts:
+    cinder_volume:
+      cinder_volume:
+        # necessary because the netapp driver requires this for scratch space
+        # and even makes sure its writeable a better approach should go upstream
+        volumeMounts:
+          - mountPath: /var/lib/cinder
+            name: var-lib-cinder
+        volumes:
+          - name: var-lib-cinder
+            emptyDir: {}
+  lifecycle:
+    disruption_budget:
+      deployments:
+        # this should be set to no more than (pod.replicas.server - 1)
+        # usually set on per-deployment basis.
+        min_available: 0
+dependencies:
+  dynamic:
+    common:
+      local_image_registry:
+        jobs: null
+  static:
+    api:
+      jobs:
+        - cinder-db-sync
+        - cinder-ks-user
+        - cinder-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: identity
+    db_sync:
+      jobs:
+    backup:
+      jobs:
+        - cinder-db-sync
+        - cinder-ks-user
+        - cinder-ks-endpoints
+    db_purge:
+      jobs:
+        - cinder-db-sync
+        - cinder-ks-user
+        - cinder-ks-endpoints
+    scheduler:
+      jobs:
+        - cinder-db-sync
+        - cinder-ks-user
+        - cinder-ks-endpoints
+    volume:
+      jobs:
+        - cinder-db-sync
+        - cinder-ks-user
+        - cinder-ks-endpoints
+    volume_usage_audit:
+      jobs:
+        - cinder-db-sync
+        - cinder-ks-user
+        - cinder-ks-endpoints
+
+manifests:
+  secret_keystone: true
+  job_backup_storage_init: false
+  job_bootstrap: false
+  job_db_init: false
+  job_db_drop: false
+  job_rabbit_init: false
+  job_storage_init: false
+  pod_rally_test: false
+  secret_db: false
+  secret_ingress_tls: false
+  secret_rabbitmq: false
+  secret_registry: false
+  service_ingress_api: false
+  deployment_backup: false
+
+# We don't want to enable OpenStack Helm's
+# helm.sh/hooks because they set them as
+# post-install,post-upgrade which in ArgoCD
+# maps to PostSync. However the deployments
+# and statefulsets in OpenStack Helm
+# depend on the jobs to complete to become
+# healthy. Which they cannot because they are in
+# the post step and not in the main step.
+# Turning this on results in the keys jobs
+# editing the annotation which deletes the item
+# and wipes our keys.
+helm3_hook: false
+
+annotations:
+  job:
+    cinder_db_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    cinder_ks_service:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    cinder_ks_user:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    cinder_ks_endpoints:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    cinder_image_repo_sync:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    cinder_clean:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    cinder_create_internal_tenant:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
