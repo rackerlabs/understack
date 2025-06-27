@@ -19,8 +19,6 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         genisoimage \
         isolinux \
-        patch \
-        quilt \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -29,6 +27,3 @@ RUN --mount=type=cache,target=/root/.cache/pip \
       ironic-understack \
       understack-flavor-matcher \
       sushy-oem-idrac==6.0.0
-COPY containers/ironic/patches /tmp/patches/
-RUN cd /var/lib/openstack/lib/python3.10/site-packages && \
-    QUILT_PATCHES=/tmp/patches quilt push -a
