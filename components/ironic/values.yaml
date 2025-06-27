@@ -117,6 +117,14 @@ endpoints:
             name: understack-cluster-issuer
             kind: ClusterIssuer
 
+secrets:
+  tls:
+    baremetal:
+      api:
+        # needs to be kept in sync with secretName in the host_fqdn_override
+        # because helm-toolkit checks one field but then uses the other
+        public: ironic-tls-public
+
 network:
   api:
     ingress:
