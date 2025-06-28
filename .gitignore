@@ -30,3 +30,10 @@ docs/workflows/
 
 # mkdocs site output
 site/
+
+# Editor Specific
+.DS_Store
+.zed
+.idea
+.vscode
+.kiro
