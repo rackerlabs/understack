@@ -1,0 +1,100 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: patch-application-automated-sync-external
+  annotations:
+    workflows.argoproj.io/title: Temporarily disable autosync on an Application in production environment
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/disable-autosync.yaml`
+spec:
+  entrypoint: main
+  arguments:
+    parameters:
+      - name: name
+        description: "Name of the Application resource to modify in the external cluster."
+      - name: duration
+        description: "Duration in minutes to keep automated sync disabled."
+        value: "30"
+      - name: kubeconfig-secret-name
+        description: "Name of the K8s Secret containing the kubeconfig for the external cluster."
+      - name: kubeconfig-secret-key
+        description: "Key within the K8s Secret that holds the kubeconfig data."
+
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: disable-automated-sync
+            template: patch-automated-sync
+            arguments:
+              parameters:
+                - name: resource-name
+                  value: "{{workflow.parameters.name}}"
+                - name: automated-value
+                  value: "false"
+                - name: kubeconfig-secret-name
+                  value: "{{workflow.parameters.kubeconfig-secret-name}}"
+                - name: kubeconfig-secret-key
+                  value: "{{workflow.parameters.kubeconfig-secret-key}}"
+
+          - name: wait-for-duration
+            template: wait
+            dependencies: [disable-automated-sync]
+            arguments:
+              parameters:
+                - name: duration-minutes
+                  value: "{{workflow.parameters.duration}}"
+
+          - name: enable-automated-sync
+            template: patch-automated-sync
+            dependencies: [wait-for-duration]
+            arguments:
+              parameters:
+                - name: resource-name
+                  value: "{{workflow.parameters.name}}"
+                - name: automated-value
+                  value: "true"
+                - name: kubeconfig-secret-name
+                  value: "{{workflow.parameters.kubeconfig-secret-name}}"
+                - name: kubeconfig-secret-key
+                  value: "{{workflow.parameters.kubeconfig-secret-key}}"
+
+    - name: patch-automated-sync
+      inputs:
+        parameters:
+          - name: resource-name
+          - name: automated-value
+          - name: kubeconfig-secret-name
+          - name: kubeconfig-secret-key
+      resource:
+        action: patch
+        # The kubeconfig from the secret will dictate the target cluster.
+        # The group, version, kind, and name refer to the resource on that external cluster.
+        group: argoproj.io
+        version: v1alpha1
+        kind: Application
+        name: "{{inputs.parameters.resource-name}}"
+        # Namespace of the Application on the external cluster.
+        # If not specified, it will use the default namespace from the kubeconfig,
+        # or you can explicitly set it here if needed.
+        # namespace: "your-app-namespace-on-external-cluster"
+        patch: |
+          [
+            {
+              "op": "replace",
+              "path": "/spec/syncPolicy/automated",
+              "value": {{inputs.parameters.automated-value}}
+            }
+          ]
+        # Instruct Argo to use the kubeconfig from the specified secret
+        kubeconfig:
+          secretKeyRef:
+            name: "{{inputs.parameters.kubeconfig-secret-name}}"
+            key: "{{inputs.parameters.kubeconfig-secret-key}}"
+    - name: wait
+      inputs:
+        parameters:
+          - name: duration-minutes
+      suspend:
+        # Here we convert minutes to seconds and ensure it's a string.
+        duration: "{{=sprig.int(inputs.parameters.duration-minutes) * 60}}"
