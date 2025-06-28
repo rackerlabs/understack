@@ -28,6 +28,7 @@ dependencies = [
     "neutron-lib>=3,<4",
     "neutron>=25,<26",
     "pynautobot>=2.6.1,<3",
+    "remote-pdb (>=2.1.0,<3.0.0)",
 ]
 
 [project.entry-points."neutron.ml2.mechanism_drivers"]
