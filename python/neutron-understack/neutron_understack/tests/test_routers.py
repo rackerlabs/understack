@@ -79,7 +79,7 @@ class TestHandleSubportRemoval:
 
 
 class TestHandleRouterInterfaceRemoval:
-    def test_case_for_non_router(self, mocker, port_payload):
+    def test_case_for_non_router(self, mocker, port_db_payload):
         mock_sb_removal = mocker.patch(
             "neutron_understack.routers.handle_subport_removal"
         )
@@ -87,13 +87,14 @@ class TestHandleRouterInterfaceRemoval:
             "neutron_understack.routers.delete_uplink_port"
         )
 
-        port_payload.metadata["port"]["device_owner"] = "not_a_router"
-        handle_router_interface_removal(None, None, None, port_payload)
+        port_db_payload.metadata["port_db"].device_owner = "not_a_router"
+
+        handle_router_interface_removal(None, None, None, port_db_payload)
 
         mock_sb_removal.assert_not_called()
         mock_localnet_removal.assert_not_called()
 
-    def test_when_network_in_use(self, mocker, port_payload):
+    def test_when_network_in_use(self, mocker, port_db_payload):
         mock_sb_removal = mocker.patch(
             "neutron_understack.routers.handle_subport_removal"
         )
@@ -105,12 +106,14 @@ class TestHandleRouterInterfaceRemoval:
             return_value=False,
         )
 
-        handle_router_interface_removal(None, None, None, port_payload)
+        handle_router_interface_removal(None, None, None, port_db_payload)
 
         mock_sb_removal.assert_not_called()
         mock_localnet_removal.assert_not_called()
 
-    def test_last_port_on_network(self, mocker, port_object, port_payload, network_id):
+    def test_last_port_on_network(
+        self, mocker, port_object, port_db_payload, network_id
+    ):
         mock_sb_removal = mocker.patch(
             "neutron_understack.routers.handle_subport_removal"
         )
@@ -133,7 +136,7 @@ class TestHandleRouterInterfaceRemoval:
         )
         delete_shared_port = mocker.patch.object(port_object, "delete")
 
-        handle_router_interface_removal(None, None, None, port_payload)
+        handle_router_interface_removal(None, None, None, port_db_payload)
 
         mock_sb_removal.assert_called_once_with(port_object)
         mock_localnet_removal.assert_called_once_with(fake_segment, str(network_id))
