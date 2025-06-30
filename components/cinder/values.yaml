@@ -11,7 +11,7 @@ endpoints:
       name: rabbitmq-server
     hosts:
       default: rabbitmq-nodes
-  network:
+  volume:
     port:
       api:
         public: 443
@@ -38,7 +38,13 @@ network:
         # set our default issuer
         cert-manager.io/cluster-issuer: understack-cluster-issuer
 
-conf: {}
+conf:
+  ceph:
+    enabled: false
+  cinder:
+    DEFAULT:
+  backend_defaults:
+    volume_group: cinder-volumes
 
 pod:
   lifecycle:
@@ -82,6 +88,7 @@ dependencies:
         - cinder-ks-endpoints
 
 manifests:
+  secret_keystone: true
   job_backup_storage_init: false
   job_bootstrap: false
   job_db_init: false
