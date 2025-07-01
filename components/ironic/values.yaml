@@ -27,7 +27,7 @@ conductor:
       command: [bash]
       args:
         - "-c"
-        - "mkdir -p /var/lib/openstack-helm/tftpboot"
+        - "mkdir -p /var/lib/openstack-helm/tftpboot /var/lib/openstack-helm/tmp"
       volumeMounts:
         - name: pod-data
           mountPath: /var/lib/openstack-helm
