@@ -38,14 +38,6 @@ network:
         # set our default issuer
         cert-manager.io/cluster-issuer: understack-cluster-issuer
 
-conf:
-  ceph:
-    enabled: false
-  cinder:
-    DEFAULT:
-  backend_defaults:
-    volume_group: cinder-volumes
-
 pod:
   lifecycle:
     disruption_budget:
@@ -59,6 +51,16 @@ dependencies:
       local_image_registry:
         jobs: null
   static:
+    api:
+      jobs:
+        - cinder-db-sync
+        - cinder-ks-user
+        - cinder-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: identity
     db_sync:
       jobs:
     backup:
@@ -101,6 +103,7 @@ manifests:
   secret_rabbitmq: false
   secret_registry: false
   service_ingress_api: false
+  deployment_backup: false
 
 # We don't want to enable OpenStack Helm's
 # helm.sh/hooks because they set them as
