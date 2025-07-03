@@ -53,10 +53,8 @@ spec:
                     repoURL: '{{ .values.deploy_url }}'
                     revision: '{{ .values.deploy_ref }}'
                     files:
-                      # due to https://github.com/argoproj/argo-cd/issues/22051
-                      # we need to do this workaround. this reads the apps.yaml
-                      # for per cluster
-                      - path: '{{ "{{.name}}" }}/apps.yaml'
+                        # this reads the overrides per cluster
+                      - path: '{{ .name }}/apps.yaml'
       selector:
         matchExpressions:
           # if you set skip to any value for the component in apps.yaml, this will disable it
