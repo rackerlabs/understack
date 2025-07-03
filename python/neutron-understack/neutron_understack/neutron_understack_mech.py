@@ -64,7 +64,7 @@ class UnderstackDriver(MechanismDriver):
         registry.subscribe(
             routers.handle_router_interface_removal,
             resources.PORT,
-            events.PRECOMMIT_DELETE,
+            events.BEFORE_DELETE,
             cancellable=True,
         )
 

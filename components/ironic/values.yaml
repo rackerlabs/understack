@@ -22,12 +22,12 @@ conductor:
     # it is only necessary because the above pxe is disabled, its init
     # creates this path
     - name: create-tftpboot
-      image: quay.io/airshipit/heat:2024.2-ubuntu_jammy
+      image: docker.io/openstackhelm/heat:2024.2-ubuntu_jammy
       imagePullPolicy: IfNotPresent
       command: [bash]
       args:
         - "-c"
-        - "mkdir -p /var/lib/openstack-helm/tftpboot /var/lib/openstack-helm/tmp"
+        - "mkdir -p /var/lib/openstack-helm/tftpboot"
       volumeMounts:
         - name: pod-data
           mountPath: /var/lib/openstack-helm
@@ -116,14 +116,6 @@ endpoints:
           issuerRef:
             name: understack-cluster-issuer
             kind: ClusterIssuer
-
-secrets:
-  tls:
-    baremetal:
-      api:
-        # needs to be kept in sync with secretName in the host_fqdn_override
-        # because helm-toolkit checks one field but then uses the other
-        public: ironic-tls-public
 
 network:
   api:

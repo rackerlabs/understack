@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1
+
+ARG OPENSTACK_VERSION="required_argument"
+FROM docker.io/openstackhelm/ironic:${OPENSTACK_VERSION}-ubuntu_jammy
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        genisoimage \
+        isolinux \
+        patch \
+        quilt \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY containers/ironic/patches /tmp/patches/
+COPY python/ironic-understack /tmp/ironic-understack
+COPY python/understack-flavor-matcher /tmp/understack-flavor-matcher
+RUN /var/lib/openstack/bin/python -m pip install --no-cache --no-cache-dir /tmp/ironic-understack /tmp/understack-flavor-matcher sushy-oem-idrac==6.0.0
+RUN cd /var/lib/openstack/lib/python3.10/site-packages && \
+    QUILT_PATCHES=/tmp/patches quilt push -a

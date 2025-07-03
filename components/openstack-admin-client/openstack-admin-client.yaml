@@ -7,7 +7,7 @@ spec:
   restartPolicy: Always
   containers:
     - name: "image-ks-service-registration"
-      image: quay.io/airshipit/heat:2024.1-ubuntu_jammy
+      image: docker.io/openstackhelm/heat:2024.1-ubuntu_jammy
       imagePullPolicy: IfNotPresent
       command:
         - sleep

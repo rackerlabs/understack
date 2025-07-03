@@ -339,15 +339,6 @@ def port_payload(network_id) -> DBEventPayload:
 
 
 @pytest.fixture
-def port_db_payload(network) -> DBEventPayload:
-    metadata = {
-        "port_db": PortModel(device_owner=p_const.DEVICE_OWNER_ROUTER_GW),
-        "network": network,
-    }
-    return DBEventPayload("context", metadata=metadata)
-
-
-@pytest.fixture
 def ml2_understack_conf(mocker, ucvni_group_id) -> None:
     mocker.patch(
         "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.ucvni_group",

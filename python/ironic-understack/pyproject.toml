@@ -1,46 +1,36 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
-[project]
+[tool.poetry]
 name = "ironic-understack"
 version = "0.0.0"
 description = "Ironic hooks for Understack"
-authors = [{ name = "Marek Skrobacki", email = "marek.skrobacki@rackspace.co.uk" }]
-requires-python = "~=3.10"
-readme = "README.md"
+authors = ["Marek Skrobacki <marek.skrobacki@rackspace.co.uk>"]
 license = "MIT"
-dependencies = [
-    "ironic>=24.1",
-    "pyyaml~=6.0",
-    "understack-flavor-matcher",
+readme = "README.md"
+packages = [
+    { include = "ironic_understack" }
 ]
 
-[project.entry-points."ironic.inspection.hooks"]
-resource-class = "ironic_understack.resource_class:UndercloudResourceClassHook"
+[tool.poetry.dependencies]
+# keep this python field in sync with the tool.ruff.target-version
+python = "^3.10"
+ironic = ">=24.1"
+pyyaml = "^6.0"
+understack-flavor-matcher = {path = "../understack-flavor-matcher"}
 
-[project.entry-points."ironic.hardware.interfaces.inspect"]
-redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
-idrac-redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackDracRedfishInspect"
+[tool.poetry.group.test.dependencies]
+pytest = "^8.3.2"
+pytest-github-actions-annotate-failures = "*"
+pytest-cov = "^6.0.0"
 
-[dependency-groups]
-test = [
-    "pytest>=8.3.2,<9",
-    "pytest-github-actions-annotate-failures",
-    "pytest-cov>=5.0.0,<6",
-]
+[tool.poetry.plugins."ironic.inspection.hooks"]
+"resource-class" = "ironic_understack.resource_class:UndercloudResourceClassHook"
 
-[tool.uv]
-default-groups = ["test"]
-
-[tool.uv.sources]
-understack-flavor-matcher = { path = "../understack-flavor-matcher" }
-
-[tool.hatch.build.targets.sdist]
-include = ["ironic_understack"]
-
-[tool.hatch.build.targets.wheel]
-include = ["ironic_understack"]
+[tool.poetry.plugins."ironic.hardware.interfaces.inspect"]
+"redfish-understack" = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
+"idrac-redfish-understack" = "ironic_understack.redfish_inspect_understack:UnderstackDracRedfishInspect"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
