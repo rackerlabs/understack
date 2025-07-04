@@ -196,3 +196,17 @@ Now everything is back to normal and the prometheus alert should clear:
 | a2172b59-5558-4018-858d-88947e2d9adf | OVN Controller Gateway agent | 1327172-hp1                          |                   | :-)   | UP    | ovn-controller       |
 +--------------------------------------+------------------------------+--------------------------------------+-------------------+-------+-------+----------------------+
 ```
+
+## Resync Neutron with OVN
+
+Resync neutron data with OVN and repair the ovn database by running the
+`neutron-ovn-db-sync-util` command in a neutron-server pod:
+
+``` text
+kubectl -n openstack exec -it neutron-server-7f798ff5cd-bhj5q -- neutron-ovn-db-sync-util \
+    --ovn-neutron_sync_mode \
+    repair \
+    --config-file /etc/neutron/neutron.conf \
+    --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+    --debug
+```
