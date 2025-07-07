@@ -6,3 +6,15 @@ commonAnnotations:
 
 metrics:
   enabled: true
+
+# (nicholas.kuechler) The default memcached presents are 'nano' size which
+# are a bit too small for OpenStack usage and generates 'CPUThrottlingHigh'
+# alerts for memcached.
+# https://github.com/bitnami/charts/blob/main/bitnami/memcached/values.yaml#L218-L234
+resources:
+  requests:
+    cpu: 500m
+    memory: 1024Mi
+  limits:
+    cpu: 750m
+    memory: 1536Mi
