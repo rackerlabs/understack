@@ -104,16 +104,18 @@ spec:
         automated:
           selfHeal: true
         syncOptions:
-          - CreateNamespace=true
+          # Use the server side apply behavior of kubernetes for resources, we've got the
+          # compare option set above to support this.
           - ServerSideApply=true
+          # Resources might have mutated fields and we want to allow those to be set without
+          # ArgoCD coming back and smacking them back. The ignoreDifferences templatePatch
+          # uses this feature.
           - RespectIgnoreDifferences=true
-        managedNamespaceMetadata:
-          annotations:
-            # ArgoCD can create our namespace but let's not delete it
-            argocd.argoproj.io/sync-options: Delete=false
-          labels:
-            kubernetes.io/metadata.name: openstack
-            name: openstack
+          # Enable selective sync so that resources that have a difference are applied
+          # instead of always applying all resources. This prevents us from always
+          # running DB migrations and messing with keystone users and endpoints.
+          # https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/#selective-sync
+          - ApplyOutOfSyncOnly=true
   templatePatch: |
     spec:
       ignoreDifferences: {{ dig "ignoreDifferences" list . | toJson }}
