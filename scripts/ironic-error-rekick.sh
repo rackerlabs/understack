@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 function usage() {
+    # shellcheck disable=SC2005
     echo "$(basename "$0")" >&2
     echo "" >&2
     echo "Rekicks ironic baremetal nodes in 'error' status" >&2
@@ -25,7 +26,6 @@ IFS=$'\n'
 for item in $(openstack baremetal node list -f json | jq -c -r '.[]') ; do
     NODE_UUID=$(jq -r '.UUID' <<< "$item");
     NODE_STATE=$(jq -r '."Provisioning State"' <<< "$item");
-    NODE_MAINTENANCE=$(jq -r '.Maintenance' <<< "$item");
     NODE_INSTANCE=$(jq -r '."Instance UUID"' <<< "$item");
     if [[ "$NODE_STATE" == "error" && "$NODE_INSTANCE" == "null" ]]; then
         NODE_IP=$(openstack baremetal node show "$NODE_UUID" -f json | jq -c -r '.driver_info.redfish_address' | sed 's|https://||g');
