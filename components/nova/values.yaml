@@ -67,7 +67,7 @@ conf:
     quota:
       # adjust default quotas to make it possible to use baremetal
       cores: 512
-      ram: 512000
+      ram: 1024000
 
     # (TODO) This is to help with an upstream Nova bug:
     # https://review.opendev.org/c/openstack/nova/+/883411
