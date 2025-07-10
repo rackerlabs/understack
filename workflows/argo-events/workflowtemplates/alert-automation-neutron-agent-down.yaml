@@ -1,0 +1,56 @@
+---
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: alert-automation-neutron-agent-down
+  annotations:
+    workflows.argoproj.io/title: Alert automation for NeutronAgentDown alerts
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/alert-automation-neutron-agent-down.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: process-alert
+  serviceAccountName: workflow
+  arguments:
+    parameters:
+      - name: inputs
+      - name: id
+      - name: hostname
+  templates:
+    - name: process-alert
+      inputs:
+        parameters:
+          - name: inputs
+          - name: id
+          - name: hostname
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        command: ["sh", "-c"]
+        args:
+          - |
+            echo "=== Alert Automation Started ==="
+            echo "ID: {{inputs.parameters.id}}"
+            echo "Hostname: {{inputs.parameters.hostname}}"
+            echo "Full Alert Data: {{inputs.parameters.inputs}}"
+            echo "=== Starting Remediation ==="
+            baremetal_output=$(openstack baremetal node show "{{inputs.parameters.hostname}}" 2>&1)
+            echo "baremetal_output: $baremetal_output"
+            if echo "$baremetal_output" | grep -q "could not be found. (HTTP 404)"; then
+              echo "Baremetal Node with UUID '{{inputs.parameters.hostname}}' no longer exists. Deleting its old network agent: '{{inputs.parameters.id}}'"
+              openstack network agent delete {{inputs.parameters.id}}
+              exit 0
+            else
+              echo "Node with UUID '{{inputs.parameters.hostname}}' exists. Not deleting network agent."
+              exit 0
+            fi
+            echo "=== Remediation Complete ==="
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      volumes:
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct

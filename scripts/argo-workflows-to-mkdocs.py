@@ -445,9 +445,9 @@ def generate_mermaid(workflows, nodes, output_name, output_file, workflow_readme
                 # render the node itself
                 name = f'<span style="font-size:20px">{n.name}</span>'
                 if n.image:
-                    name += f'\\n<span style="color:green">image: {n.image}</span>'
+                    name += f'\n<span style="color:green">image: {n.image}</span>'
                 if n.script:
-                    name += f'\\n<span style="color:green">script: {n.script}</span>'
+                    name += f'\n<span style="color:green">script: {n.script}</span>'
                 if n.input_params:
                     name += '<pre style="color:blue;margin-top:8px">'
                     for p in n.input_params:
