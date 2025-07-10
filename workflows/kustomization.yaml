@@ -4,3 +4,6 @@ kind: Kustomization
 resources:
   - openstack
   - argo-events
+
+  # Alert automation workflows
+  - alert-automation.yaml
