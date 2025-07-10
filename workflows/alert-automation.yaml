@@ -1,0 +1,115 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: alertmanager-webhook-eventsource
+  namespace: argo-events
+spec:
+  service:
+    ports:
+      - port: 12345
+        targetPort: 12345
+  webhook:
+    alerts:
+      port: "12345"
+      endpoint: /alerts
+      method: POST
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: alertmanager-webhook-sensor
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: operate-workflow-sa
+  dependencies:
+  - name: alertmanager-dep
+    eventSourceName: alertmanager-webhook-eventsource
+    eventName: alerts
+    filters:
+      dataLogicalOperator: "and"
+      data:
+        - path: "body.alerts.0.labels.alertname"
+          type: string
+          value:
+            - "NeutronAgentDown"
+        - path: "body.alerts.0.status"
+          type: string
+          value:
+            - "firing"
+  triggers:
+  - template:
+      name: alertmanager-workflow-trigger
+      k8s:
+        operation: create
+        source:
+          resource:
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            metadata:
+              generateName: alertmanager-processor-
+              namespace: argo-events
+            spec:
+              entrypoint: process-alert
+              serviceAccountName: workflow
+              arguments:
+                parameters:
+                  - name: inputs
+                    value: "{{workflow.parameters.inputs}}"
+                  - name: id
+                    value: "{{inputs.parameters.id}}"
+                  - name: hostname
+                    value: "{{inputs.parameters.hostname}}"
+              templates:
+              - name: process-alert
+                inputs:
+                  parameters:
+                    - name: inputs
+                    - name: id
+                    - name: hostname
+                container:
+                  image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+                  command: ["sh", "-c"]
+                  args:
+                    - |
+                      echo "=== Alert Automation Started ==="
+                      echo "ID: {{inputs.parameters.id}}"
+                      echo "Hostname: {{inputs.parameters.hostname}}"
+                      echo "Full Alert Data: {{inputs.parameters.inputs}}"
+                      echo "=== Starting Remediation ==="
+                      baremetal_output=$(openstack baremetal node show "{{inputs.parameters.hostname}}" 2>&1)
+                      echo "baremetal_output: $baremetal_output"
+                      if echo "$baremetal_output" | grep -q "could not be found. (HTTP 404)"; then
+                        echo "Baremetal Node with UUID '{{inputs.parameters.hostname}}' no longer exists. Deleting its old network agent: '{{inputs.parameters.id}}'"
+                        openstack network agent delete {{inputs.parameters.id}}
+                        exit 0
+                      else
+                        echo "Node with UUID '{{inputs.parameters.hostname}}' exists. Not deleting network agent."
+                        exit 0
+                      fi
+                      echo "=== Remediation Complete ==="
+                  env:
+                    - name: OS_CLOUD
+                      value: understack
+                  volumeMounts:
+                    - mountPath: /etc/openstack
+                      name: openstack-svc-acct
+                      readOnly: true
+                volumes:
+                  - name: openstack-svc-acct
+                    secret:
+                      secretName: openstack-svc-acct
+        parameters:
+        - src:
+            dependencyName: alertmanager-dep
+            dataKey: body
+          dest: spec.arguments.parameters.0.value
+        - src:
+            dependencyName: alertmanager-dep
+            dataKey: body.alerts.0.labels.id
+          dest: spec.arguments.parameters.1.value
+        - src:
+            dependencyName: alertmanager-dep
+            dataKey: body.alerts.0.labels.hostname
+          dest: spec.arguments.parameters.2.value
