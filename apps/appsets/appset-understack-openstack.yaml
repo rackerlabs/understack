@@ -107,6 +107,11 @@ spec:
         namespace: openstack
       syncPolicy:
         automated:
+          # auto-sync is enabled
+          enabled: true
+          # prune resources no longer present in the application during sync
+          prune: true
+          # sync should be run if a change is detected in the resource objects
           selfHeal: true
         syncOptions:
           # Use the server side apply behavior of kubernetes for resources, we've got the

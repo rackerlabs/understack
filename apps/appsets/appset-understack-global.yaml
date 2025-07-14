@@ -78,6 +78,11 @@ spec:
         namespace: '{{coalesce (get . "componentNamespace") .component}}'
       syncPolicy:
         automated:
+          # auto-sync is enabled
+          enabled: true
+          # prune resources no longer present in the application during sync
+          prune: true
+          # sync should be run if a change is detected in the resource objects
           selfHeal: true
         syncOptions:
           # Create the namespace we are using if it doesn't already exist.
