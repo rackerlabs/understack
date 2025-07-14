@@ -24,19 +24,36 @@ that are referred to in the documentation as:
 ```mermaid
 flowchart TD
 
-  A[Management] --> B[Global];
-  B[Global] --> C[Site A];
-  B[Global] --> D[Site B...];
-  B[Global] --> E[Site N];
+  A[Management] mb@--> B[Global];
+  A mc@--> C[Site A];
+  A md@--> D[Site B...];
+  A me@--> E[Site N];
+
+  subgraph P[Partition]
+    B <==> C;
+    B <==> D;
+    B <==> E;
+  end
+
+  %% Style the subgraph with dashed border
+  style P stroke-dasharray: 5 5
+
+  classDef animate stroke-dasharray: 9,5,stroke-dashoffset: 900,animation: dash 25s linear infinite;
+  class mb animate
+  class mc animate
+  class md animate
+  class me animate
 ```
 
 A fully functioning system only needs one _Management_ cluster, one _Global_
 cluster and one or more _Site_ cluster(s). In this configuration,
 the _Management_ cluster is responsible for utilizing our [GitOps][gitops]
-tool, [ArgoCD][argocd] to deploy the expected state to all other clusters.
+tool, [ArgoCD][argocd] to deploy the expected state to all other clusters
+and provide other observation and monitoring services like logging and alerting.
+
 While the _Global_ cluster is
 responsible for hosting any services that are expected to exist only once
-for a whole system deployment such as the DCIM/IPAM tool. While the _Site_
+for a partition such as the DCIM/IPAM tool. While the _Site_
 clusters will run the tools and services that need to live close to the
 actual hardware.
 
@@ -48,14 +65,40 @@ would be a staging partition and a production partition.
 ```mermaid
 flowchart TD
 
-  A[Management] --> |staging| B[Global];
-  B[Global] --> C[Site A];
-  B[Global] --> D[Site B...];
-  B[Global] --> E[Site N];
-  A[Management] --> |production| F[Global];
-  F[Global] --> G[Site D];
-  F[Global] --> H[Site E...];
-  F[Global] --> I[Site Z];
+  A[Management] mb@--> B[Global];
+  A mc@--> C[Site A];
+  A md@--> D[Site B...];
+  A me@--> E[Site N];
+  A mf@--> F[Global];
+  A mg@--> G[Site D];
+  A mh@--> H[Site E...];
+  A mi@--> I[Site Z];
+
+  subgraph S[Partition staging]
+    B <==> C;
+    B <==> D;
+    B <==> E;
+  end
+
+  subgraph P[Partition production]
+    F <==> G;
+    F <==> H;
+    F <==> I;
+  end
+
+  %% Style both subgraphs with dashed borders
+  style S stroke-dasharray: 5 5
+  style P stroke-dasharray: 5 5
+
+  classDef animate stroke-dasharray: 9,5,stroke-dashoffset: 900,animation: dash 25s linear infinite;
+  class mb animate
+  class mc animate
+  class md animate
+  class me animate
+  class mf animate
+  class mg animate
+  class mh animate
+  class mi animate
 ```
 
 [argocd]: <https://argo-cd.readthedocs.io/en/stable/>
