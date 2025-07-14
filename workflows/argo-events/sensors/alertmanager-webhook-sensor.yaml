@@ -1,0 +1,70 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: alertmanager-webhook-sensor
+  namespace: argo-events
+  annotations:
+    workflows.argoproj.io/title: Sensor for receiving AlertManager alerts and sending to Alert Automation workflow template
+    workflows.argoproj.io/description: |+
+      Triggers when an AlertManager alert gets sent to the alertmanager-webhook-eventsource
+
+      Defined in `workflows/argo-events/sensors/alertmanager-webhook-sensor.yaml`
+spec:
+  template:
+    serviceAccountName: operate-workflow-sa
+  dependencies:
+  - name: alertmanager-dep
+    eventSourceName: alertmanager-webhook-eventsource
+    eventName: alerts
+    filters:
+      dataLogicalOperator: "and"
+      data:
+        - path: "body.alerts.0.labels.alertname"
+          type: string
+          value:
+            - "NeutronAgentDown"
+        - path: "body.alerts.0.status"
+          type: string
+          value:
+            - "firing"
+  triggers:
+    - template:
+        name: alertmanager-workflow-trigger
+        # uses 'argo' CLI instead of 'kubectl'
+        argoWorkflow:
+          # sets the operation to 'argo submit'
+          operation: submit
+
+          parameters:
+          - src:
+              dependencyName: alertmanager-dep
+              dataKey: body
+            dest: spec.arguments.parameters.0.value
+          - src:
+              dependencyName: alertmanager-dep
+              dataKey: body.alerts.0.labels.id
+            dest: spec.arguments.parameters.1.value
+          - src:
+              dependencyName: alertmanager-dep
+              dataKey: body.alerts.0.labels.hostname
+            dest: spec.arguments.parameters.2.value
+
+          source:
+            # create a workflow in argo-events prefixed with ironic-reclean-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: alert-automation-neutron-agent-down-
+                namespace: argo-events
+              spec:
+                # defines the parameters being replaced above
+                arguments:
+                  parameters:
+                    - name: inputs
+                    - name: id
+                    - name: hostname
+                # references the workflow
+                workflowTemplateRef:
+                  name: alert-automation-neutron-agent-down
