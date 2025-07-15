@@ -8,6 +8,11 @@ extend-exclude = [
     "containers/*/patches",
     "go.mod",
     "ansible/roles/statuses/defaults/main.yaml",
+    "apps/infra/*.yaml",
+    "apps/operators/*.yaml",
+    "apps/global/*.yaml",
+    "apps/site/*.yaml",
+    "apps/openstack/*.yaml",
 ]
 
 [default]
