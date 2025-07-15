@@ -1,0 +1,9 @@
+---
+
+- name: Enroll infra nodes
+  ansible.builtin.include_tasks: node.yml
+  loop: "{{ infra_nodes }}"
+  loop_control:
+    loop_var: node
+  vars:
+    item: "{{ node }}"

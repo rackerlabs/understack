@@ -5,3 +5,4 @@ pynautobot==2.6.5
 jmespath==1.0.1
 # remove me after the inherited roles workaround can be dropped
 python-openstackclient
+python-ironicclient==5.11.0

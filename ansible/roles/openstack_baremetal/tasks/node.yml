@@ -1,0 +1,51 @@
+---
+
+- name: Extract MAC addresses
+  ansible.builtin.set_fact:
+    node_mac_addresses: >-
+      {{
+        item.port_info
+        | map(attribute='port')
+        | map(attribute='mac')
+        | map('community.general.dict_kv', 'mac')
+        | list
+      }}
+
+- name: Enroll infra node {{ item.name }}
+  openstack.cloud.baremetal_node:
+    name: "{{ item.name }}"
+    driver: "{{ item.driver }}"
+    driver_info: "{{ item.driver_info }}"
+    nics: "{{ node_mac_addresses }}"
+    state: present
+  register: enrolled_node
+
+
+- name: Create baremetal port group for node {{ item.name }}
+  ansible.builtin.include_tasks: port_group.yml
+  loop: "{{ port_groups }}"
+  loop_control:
+    loop_var: port_group
+  vars:
+    node_id: "{{ enrolled_node.node.id }}"
+    port_groups: >-
+      {{
+        item.port_info
+        | map(attribute='port_group')
+        | select('defined')
+        | list
+      }}
+
+- name: Create baremetal ports for node {{ item.name }}
+  ansible.builtin.include_tasks: baremetal_port.yml
+  loop: "{{ node_mac_addresses }}"
+  loop_control:
+    loop_var: port_info
+  vars:
+    port_node_name: "{{ item.name }}"
+
+- name: Create neutron ports
+  ansible.builtin.include_tasks: neutron_port.yml
+  loop: "{{ item.port_info }}"
+  loop_control:
+    loop_var: port_info

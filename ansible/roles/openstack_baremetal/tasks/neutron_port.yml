@@ -1,0 +1,9 @@
+---
+
+- name: Create neutron port for network {{ port_info.neutron_network }}
+  openstack.cloud.port:
+    state: present
+    name: "{{ port_info.neutron_name }}"
+    mac_address: "{{ port_info.mac }}"
+    network: "{{ port_info.neutron_network }}"
+  when: port_info.neutron_name is defined

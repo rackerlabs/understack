@@ -17,3 +17,29 @@
   loop: "{{ existing_networks.results }}"
   loop_control:
     label: "{{ item.item.network_name }}"
+
+- name: Create subnet pool
+  ansible.builtin.include_tasks: subnet_pool.yml
+  loop: "{{ subnet_pools }}"
+  loop_control:
+    loop_var: subnet_pool
+  vars:
+    item: "{{ subnet_pool }}"
+
+- name: Create fabric segment range
+  ansible.builtin.include_tasks: segment_range.yml
+  vars:
+    item: "{{ fabric_network_segment_range }}"
+
+- name: Create segment range
+  ansible.builtin.include_tasks: segment_range.yml
+  loop: "{{ network_segment_ranges.physical_networks }}"
+  loop_control:
+    loop_var: physical_network
+  vars:
+    item:
+      name: "{{ physical_network }}"
+      range_min: "{{ network_segment_ranges.range_min }}"
+      range_max: "{{ network_segment_ranges.range_max }}"
+      network_type: "{{ network_segment_ranges.network_type }}"
+      physical_network: "{{ physical_network }}"
