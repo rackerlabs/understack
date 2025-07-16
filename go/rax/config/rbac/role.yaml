@@ -1,0 +1,35 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - sync.rax.io
+  resources:
+  - gitrepowatchers
+  - nautobots
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - sync.rax.io
+  resources:
+  - gitrepowatchers/finalizers
+  - nautobots/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - sync.rax.io
+  resources:
+  - gitrepowatchers/status
+  - nautobots/status
+  verbs:
+  - get
+  - patch
+  - update
