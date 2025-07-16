@@ -16,7 +16,7 @@ dependencies = ["pyyaml~=6.0"]
 test = [
     "pytest>=8.3.2,<9",
     "pytest-github-actions-annotate-failures",
-    "pytest-cov>=5.0.0,<6",
+    "pytest-cov>=6.2.1,<7",
 ]
 
 [tool.uv]
