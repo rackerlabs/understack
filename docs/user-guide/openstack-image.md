@@ -106,5 +106,11 @@ We can now take the raw image and add it to glance to make it available for new 
 openstack image create --public --disk-format raw --file openstack-amd64.raw 'Talos 1.10.0'
 ```
 
+Ensure the image has config drive as mandatory:
+
+``` bash
+openstack image set --property img_config_drive='mandatory' $NEW_IMAGE_UUID
+```
+
 [talos]: <https://www.talos.dev/>
 [talos-image-factory]: <https://factory.talos.dev/>
