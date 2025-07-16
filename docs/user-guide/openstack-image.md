@@ -114,3 +114,55 @@ openstack image set --property img_config_drive='mandatory' $NEW_IMAGE_UUID
 
 [talos]: <https://www.talos.dev/>
 [talos-image-factory]: <https://factory.talos.dev/>
+
+## VMware ESXi
+
+The VMware ESXi installer can be made into an image that can be booted on a machine.
+It will not work directly but instead must be converted using the [esxi-img][esxi-img]
+utility. To start you will need the VMware ESXi ISO from VMware.
+
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD046 -->
+!!! tip
+
+    You can store the ISO in glance so that you don't have to find it on VMware's
+    website again.
+
+    ```bash
+    openstack image create \
+      --container-format bare \
+      --disk-format raw \
+      --private \
+      --file ~/Downloads/VMware-VMvisor-Installer-8.0U3-24022510.x86_64.iso \
+      'ESXi 8.0u3 ISO'
+    ```
+
+    Then you can fetch it later.
+
+    ```bash
+    openstack image save --file esxi-80u3.iso 'ESXi 8.0u3 ISO'
+    ```
+<!-- markdownlint-restore -->
+
+If you have [uv][uv] installed then you can use `uvx` to
+run it. The following will produce a converted image that can be uploaded to
+glance and booted.
+
+```bash
+uvx esxi-img gen-img esxi-80u3.iso esxi-80u3.raw
+```
+
+To upload it to glance run the following:
+
+```bash
+openstack image create \
+  --container-format bare \
+  --disk-format raw \
+  --public \
+  --file esxi-80u3.raw \
+  --property img_config_drive=mandatory \
+  'ESXi 8.0u3'
+```
+
+[esxi-img]: <https://github.com/rackerlabs/esxi-img>
+[uv]: <https://docs.astral.sh/uv>
