@@ -37,6 +37,7 @@ enroll-server = "understack_workflows.main.enroll_server:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 sync-network-segment-range = "understack_workflows.main.sync_ucvni_group_range:main"
+openstack-oslo-event = "understack_workflows.main.openstack_oslo_event:main"
 
 [dependency-groups]
 test = [
