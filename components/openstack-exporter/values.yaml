@@ -1,0 +1,7 @@
+# https://github.com/SovereignCloudStack/openstack-exporter-helm-charts/blob/master/charts/prometheus-openstack-exporter/values.yaml
+serviceMonitor:
+  interval: 4m
+  scrapeTimeout: 3m
+
+nodeSelector:
+  openstack-control-plane: enabled
