@@ -1,0 +1,6 @@
+serviceMonitor:
+  interval: 4m
+  scrapeTimeout: 3m
+
+nodeSelector:
+  openstack-control-plane: enabled
