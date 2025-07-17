@@ -26,4 +26,4 @@ kubectl apply -f bootstrap/cert-manager/issuer-kube-system-self-signed.yaml
 export DEPLOY_NAME=selfsigned
 export DNS_ZONE=local
 cat bootstrap/argocd/ingress.yaml | envsubst | kubectl apply -f -
-kubectl apply -f bootstrap/external-secretes/pwsafe.yaml
+cat bootstrap/external-secrets/pwsafe.yaml | kubectl apply -f -
