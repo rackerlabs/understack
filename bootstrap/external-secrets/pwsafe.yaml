@@ -1,0 +1,40 @@
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  labels:
+    external-secrets.io/type: webhook
+  name: pwsafe
+spec:
+  provider:
+    webhook:
+      headers:
+        Accept: application/json
+        Content-Type: application/json
+        X-Auth-Token: '{{ .auth.token }}'
+      result:
+        jsonPath: $.credential.password
+      secrets:
+      - name: auth
+        secretRef:
+          name: pwsafe-rackspace-identity-token
+          namespace: external-secrets
+      url: https://passwordsafe.corp.rackspace.com/credentials/{{ .remoteRef.key }}/search
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: pwsafe-rackspace-identity-token
+  namespace: external-secrets
+  labels:
+    external-secrets.io/type: webhook
+spec:
+  refreshInterval: "4h"
+  secretStoreRef:
+    name: rax-identity-auth
+    kind: ClusterSecretStore
+  target:
+    name: pwsafe-rackspace-identity-token
+  data:
+  - secretKey: token
+    remoteRef:
+      key: id
