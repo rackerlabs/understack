@@ -1,24 +1,24 @@
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
 metadata:
+  name: rax-identity-auth
   labels:
     external-secrets.io/type: webhook
-  name: pwsafe
 spec:
   provider:
     webhook:
+      url: "https://identity-internal.api.rackspacecloud.com/v2.0/tokens"
+      method: POST
       headers:
-        Accept: application/json
         Content-Type: application/json
-        X-Auth-Token: '{{ .auth.token }}'
+      body: '{"auth": {"RAX-AUTH:domain": {"name": "Rackspace"}, "passwordCredentials":{"username":"{{ .auth.username }}", "password":"{{ .auth.password }}"}}}'
       result:
-        jsonPath: $.credential.password
+        jsonPath: "$.access.token.id"
       secrets:
       - name: auth
         secretRef:
-          name: pwsafe-rackspace-identity-token
+          name: pwsafe-svc
           namespace: external-secrets
-      url: https://passwordsafe.corp.rackspace.com/credentials/{{ .remoteRef.key }}/search
 ---
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -38,3 +38,25 @@ spec:
   - secretKey: token
     remoteRef:
       key: id
+---
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: pwsafe
+  labels:
+    external-secrets.io/type: webhook
+spec:
+  provider:
+    webhook:
+      url: "https://passwordsafe.corp.rackspace.com/credentials/{{ .remoteRef.key }}/search"
+      result:
+        jsonPath: "$.credential" # retrieves all fields
+      headers:
+        Content-Type: application/json
+        Accept: application/json
+        X-Auth-Token: "{{ .auth.token }}"
+      secrets:
+      - name: auth
+        secretRef:
+          name: pwsafe-rackspace-identity-token
+          namespace: external-secrets
