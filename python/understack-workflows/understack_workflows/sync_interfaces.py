@@ -65,21 +65,19 @@ def get_nautobot_interfaces(
     Excludes interfaces with no MAC address
 
     """
-    device_id = nautobot_device.id
-
     return [
-        port_configuration(interface, pxe_interface, device_id)
+        port_configuration(interface, pxe_interface, nautobot_device)
         for interface in nautobot_device.interfaces
         if interface_is_relevant(interface)
     ]
 
 
 def port_configuration(
-    interface: NautobotInterface, pxe_interface: str, device_id: str
+    interface: NautobotInterface, pxe_interface: str, device: NautobotDevice
 ) -> PortConfiguration:
     # Interface names have their UUID prepended because Ironic wants them
     # globally unique across all devices.
-    name = f"{interface.id} {interface.name}"
+    name = f"{device.name}:{interface.name}"
     pxe_enabled = interface.name == pxe_interface
 
     if interface.neighbor_chassis_mac:
@@ -92,7 +90,7 @@ def port_configuration(
         local_link_connection = {}
 
     return PortConfiguration(
-        node_uuid=device_id,
+        node_uuid=device.id,
         address=interface.mac_address.lower(),
         uuid=interface.id,
         name=name,
