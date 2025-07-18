@@ -1,0 +1,74 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ironic-node-port
+  annotations:
+    workflows.argoproj.io/title: Update Nautobot from Ironic Node Port Events
+    workflows.argoproj.io/description: |+
+      Triggers on the following Ironic Events:
+
+      - baremetal.port.create.end which happens when a baremetal port is created
+      - baremetal.port.update.end which happens after a port is updated
+      - baremetal.port.delete.end which happens when a port is deleted
+
+      Resulting code should be very similar to:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
+      -p event-json "JSON-payload"
+      ```
+
+      Defined in `workflows/argo-events/sensors/ironic-node-port.yaml`
+spec:
+  dependencies:
+  - eventName: openstack
+    eventSourceName: openstack-ironic
+    name: ironic-dep
+    transform:
+      # the event is a string-ified JSON so we need to decode it
+      # replace the whole event body
+      jq: |
+        .body = (.body["oslo.message"] | fromjson)
+    filters:
+      # applies each of the items in data with 'and' but there's only one
+      dataLogicalOperator: "and"
+      data:
+        - path: "body.event_type"
+          type: "string"
+          value:
+            - "baremetal.port.create.end"
+            - "baremetal.port.update.end"
+            - "baremetal.port.delete.end"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: ironic-node-port
+        # uses 'argo' CLI instead of 'kubectl'
+        argoWorkflow:
+          # sets the operation to 'argo submit'
+          operation: submit
+          # edits source section
+          parameters:
+            # first parameter is the parsed oslo.message
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: body
+                dependencyName: ironic-dep
+          source:
+            # create a workflow in argo-events prefixed with ironic-node-update-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: ironic-node-port-
+                namespace: argo-events
+              spec:
+                # defines the parameters being replaced above
+                arguments:
+                  parameters:
+                    - name: event-json
+                # references the workflow
+                workflowTemplateRef:
+                  name: openstack-oslo-event
