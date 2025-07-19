@@ -2,7 +2,7 @@
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
-  name: cinder-netapp-service-account
+  name: cinder-netapp-config
   namespace: openstack
 spec:
   refreshInterval: 1h
@@ -10,16 +10,25 @@ spec:
     kind: ClusterSecretStore
     name: openstack
   target:
-    name: cinder-netapp-service-account
+    name: cinder-netapp-config
     creationPolicy: Owner
     deletionPolicy: Delete
     template:
       engineVersion: v2
       data:
-        netapp_nvme.conf: |
+        backends.conf: |
           [netapp_nvme]
           netapp_login = {{ .netapp_username }}
           netapp_password = {{ .netapp_password }}
+          netapp_server_hostname = {{ .netapp_host }}
+          netapp_server_port = 443
+          netapp_storage_family = ontap_cluster
+          netapp_storage_protocol = nvme
+          netapp_transport_type = https
+          netapp_use_legacy_client = false
+          netapp_vserver = data-svm1
+          volume_backend_name = netapp_nvme
+          volume_driver = cinder.volume.drivers.netapp.common.NetAppDriver
   data:
   - secretKey: netapp_username
     remoteRef:
@@ -29,3 +38,7 @@ spec:
     remoteRef:
       key: svc-acct-netapp
       property: password
+  - secretKey: netapp_host
+    remoteRef:
+      key: svc-acct-netapp
+      property: host
