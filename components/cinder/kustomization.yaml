@@ -5,3 +5,4 @@ kind: Kustomization
 resources:
   - cinder-mariadb-db.yaml
   - cinder-rabbitmq-queue.yaml
+  - cinder-volume-netapp.yaml
