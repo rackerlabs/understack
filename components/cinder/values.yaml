@@ -60,10 +60,10 @@ pod:
         volumeMounts:
           - mountPath: /var/lib/cinder
             name: var-lib-cinder
-          - mountPath: /etc/cinder/conf/backends.conf
-            subPath: backends.conf
-            name: volume-backend
-            readOnly: true
+#          - mountPath: /etc/cinder/conf/backends.conf
+#            subPath: backends.conf
+#            name: volume-backend
+#            readOnly: true
         volumes:
           - name: var-lib-cinder
             emptyDir: {}
