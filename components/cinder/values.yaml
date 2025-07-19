@@ -5,6 +5,10 @@ conf:
   backends:
     # disable the hardcoded one in the OpenStack Helm values.yaml
     rbd1: null
+  cinder:
+    DEFAULT:
+      enabled_backends: netapp_nvme
+      default_volume_type: netapp_nvme
 
 # typically overridden by environmental
 # values, but should include all endpoints
@@ -56,9 +60,16 @@ pod:
         volumeMounts:
           - mountPath: /var/lib/cinder
             name: var-lib-cinder
+          - mountPath: /etc/cinder/cinder.conf.d/netapp_nvme.conf
+            subPath: netapp_nvme.conf
+            name: volume-backend
+            readOnly: true
         volumes:
           - name: var-lib-cinder
             emptyDir: {}
+          - name: volume-backend
+            secret:
+              secretName: cinder-netapp-config
   lifecycle:
     disruption_budget:
       deployments:
