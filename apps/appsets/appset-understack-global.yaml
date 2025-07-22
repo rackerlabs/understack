@@ -33,6 +33,13 @@ spec:
                           values:
                             - "global"
                             - "aio"
+                    values:
+                      # these should always be replaced by further rules below but provide
+                      # a default for the merge operations below
+                      understack_url: 'https://github.com/rackerlabs/understack.git'
+                      understack_ref: 'main'
+                      deploy_url: 'https://github.com/rackerlabs/understack.git'
+                      deploy_ref: 'main'
                 # dev clusters allow some overrides
                 - clusters:
                     selector:
