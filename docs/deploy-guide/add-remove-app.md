@@ -23,14 +23,16 @@ in your deployment repo.
 
 ## Removing an application for a specific deploy
 
-To remove an application from being deployed, add or modify the `uc_skip_components`
-annotation on the Kubernetes Secret which defines the cluster in the `argocd` namespace.
-The `uc_skip_components` annotation is a string-ified JSON list of applications to
-skip like:
+To remove an application from being deployed, create an `apps.yaml` file in your deployment
+repo at `$DEPLOY_NAME/apps.yaml`). The `apps.yaml` file
+contains a list of objects, where each object has a `component` field that is the name
+of the component (app) and an optional `skip` field that can be set to `true`:
 
 ```yaml
-uc_skip_components: |
-  ["metallb"]
+- component: metallb
+  skip: true
+- component: dex
+  skip: false  # optional, defaults to false
 ```
 
 ## Adding an application to UnderStack
