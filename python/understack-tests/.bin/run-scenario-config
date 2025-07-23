@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+rally db ensure
+rally deployment create --file config.json --name=main
+rally deployment check
+rally task start "$@"
