@@ -89,6 +89,7 @@ conf:
           - "L3_ROUTER_NAT:cisco-asa:neutron_understack.l3_router.cisco_asa.CiscoAsa"
           - "L3_ROUTER_NAT:palo-alto:neutron_understack.l3_router.palo_alto.PaloAlto"
           - "L3_ROUTER_NAT:vrf:neutron_understack.l3_router.vrf.Vrf"
+          - "L3_ROUTER_NAT:svi:neutron_understack.l3_router.svi.Svi"
     ovn:
       # the ovn-metadata-agent utilizes 'localport' on each hypervisor in OVS to work, since
       # we don't have an OVS that the baremetal nodes are plugged into we can't have this
