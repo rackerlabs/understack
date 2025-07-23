@@ -43,7 +43,7 @@ conf:
   octavia:
     api_settings:
       enabled_provider_drivers: >-
-        ovn: "The Octavia OVN driver",
+        ovn: "The Octavia OVN driver"
       default_provider_driver: ovn
     driver_agent:
       enabled_provider_agents: ovn
