@@ -74,3 +74,8 @@ annotations:
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
       argocd.argoproj.io/sync-wave: "0"
+    skyline_ks_user:
+      argocd.argoproj.io/hook: Sync
+      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Force=true
+      argocd.argoproj.io/sync-wave: "0"
