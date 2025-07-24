@@ -76,6 +76,9 @@ pod:
         # this should be set to no more than (pod.replicas.server - 1)
         # usually set on per-deployment basis.
         min_available: 0
+  resources:
+    enabled: true
+
 dependencies:
   dynamic:
     common:

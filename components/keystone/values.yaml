@@ -33,7 +33,7 @@ dependencies:
 
 pod:
   resources:
-    enabled: false
+    enabled: true
     api:
       requests:
         memory: "64Mi"
