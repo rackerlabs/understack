@@ -50,6 +50,8 @@ conf:
     ovn:
       ovn_nb_connection: tcp:ovn-ovsdb-nb.openstack.svc.cluster.local:6641
       ovn_sb_connection: tcp:ovn-ovsdb-sb.openstack.svc.cluster.local:6642
+    task_flow:
+      jobboard_enabled: false
 
 dependencies:
   dynamic:
