@@ -54,6 +54,12 @@ nautobot:
     timeoutSeconds: 60
 
 celery:
+  # Concurrency defaults to the number of CPUs detected on the system.
+  # If your concurrency is set too high for the resource requests and limits then
+  # you'll have a large amount of memory taken by all the worker processes.
+  # https://github.com/nautobot/helm-charts/issues/433
+  # https://docs.nautobot.com/projects/core/en/stable/user-guide/administration/guides/celery-queues/#concurrency-setting
+  concurrency: 2
   replicaCount: 1
   extraEnvVarsSecret:
     - nautobot-django
@@ -66,7 +72,6 @@ celery:
     initialDelaySeconds: 60
     periodSeconds: 120
     timeoutSeconds: 60
-
 
 postgresql:
   enabled: false
