@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: openstack-oslo-event
+  annotations:
+    workflows.argoproj.io/title: OpenStack OSLO event dispatcher
+    workflows.argoproj.io/description: |
+      Updates Nautobot with data from an OpenStack OSLO event.
+
+      This script takes the JSON parsed body of 'oslo.message' from
+      an OSLO event. This can be decoded with `jq -r '."oslo.message" | fromjson'`
+
+      To test this workflow you can run it with the following:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
+      -p event-json "$(jq -r '."oslo.message" | fromjson')"
+      ```
+
+      Defined in `workflows/argo-events/workflowtemplates/openstack-oslo-event.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  serviceAccountName: workflow
+  arguments:
+    parameters:
+      - name: event-json
+        value: "{}"  # default to empty dict
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: event-json
+        artifacts:
+          - name: event-data
+            path: /tmp/event.json
+            raw:
+              data: "{{inputs.parameters.event-json}}"
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - openstack-oslo-event
+        args:
+          - "--file"
+          - "/tmp/event.json"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: openstack-svc-acct
+            readOnly: true
+      volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
+        - name: openstack-svc-acct
+          secret:
+            secretName: openstack-svc-acct
