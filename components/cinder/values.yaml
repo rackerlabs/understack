@@ -136,39 +136,60 @@ manifests:
   service_ingress_api: false
   deployment_backup: false
 
-# We don't want to enable OpenStack Helm's
-# helm.sh/hooks because they set them as
-# post-install,post-upgrade which in ArgoCD
-# maps to PostSync. However the deployments
-# and statefulsets in OpenStack Helm
-# depend on the jobs to complete to become
-# healthy. Which they cannot because they are in
-# the post step and not in the main step.
-# Turning this on results in the keys jobs
-# editing the annotation which deletes the item
-# and wipes our keys.
-helm3_hook: false
-
 annotations:
+  # we need to modify the annotations on OpenStack Helm
+  # jobs because they use helm.sh/hooks: post-install,post-upgrade
+  # which means they will get applied in the post phase which
+  # is after the API deployment. With standard helm this works
+  # out because it just orders how things are applied but with
+  # ArgoCD it will wait until the sync phase is successful.
+  # Unfortunately the API deployments need several jobs to occur
+  # before it will go successful like creating the keystone user,
+  # service, endpoints and syncing the DB. These jobs also have
+  # a helm.sh/hook-weight to order them which is good but by moving
+  # them to the sync phase the weight is now wrong with resources
+  # they depend on like secrets and configmaps so we need to
+  # override them to 0 because there is no way in OpenStack Helm
+  # to set annotations on deployments and daemonssets nicely.
+  # Other jobs might need to be moved as well. We do this by
+  # moving them to the sync phase. Additionally since the jobs
+  # are using fixed names and not generated names for each run
+  # ArgoCD attempts to edit them but they have immutable fields
+  # so we must force the replacement instead of attempting to diff them.
+  # Lastly the hook-delete-policy controls the finalizer which
+  # prevents the deletion of the job. In this case we're saying
+  # the old job needs to be removed before applying the new one
+  # which gets around the immutable case above.
   job:
     cinder_db_sync:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Force=true
+      argocd.argoproj.io/sync-wave: "0"
     cinder_ks_service:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Force=true
+      argocd.argoproj.io/sync-wave: "0"
     cinder_ks_user:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Force=true
+      argocd.argoproj.io/sync-wave: "0"
     cinder_ks_endpoints:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Force=true
+      argocd.argoproj.io/sync-wave: "0"
     cinder_image_repo_sync:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Force=true
     cinder_clean:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Force=true
     cinder_create_internal_tenant:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+      argocd.argoproj.io/sync-options: Force=true
