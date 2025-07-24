@@ -124,6 +124,7 @@ manifests:
   secret_keystone: true
   job_backup_storage_init: false
   job_bootstrap: false
+  job_clean: false
   job_db_init: false
   job_db_drop: false
   job_rabbit_init: false
@@ -181,14 +182,6 @@ annotations:
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
       argocd.argoproj.io/sync-wave: "0"
-    cinder_image_repo_sync:
-      argocd.argoproj.io/hook: Sync
-      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Force=true
-    cinder_clean:
-      argocd.argoproj.io/hook: Sync
-      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Force=true
     cinder_create_internal_tenant:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
