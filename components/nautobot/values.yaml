@@ -46,14 +46,15 @@ nautobot:
       cpu: "1000m"
       memory: "1536M"
     limits:
-      cpu: "2000m"
-      memory: "8704M"
+      cpu: "8000m"
+      memory: "34816M"
 
   livenessProbe:
     periodSeconds: 120
     timeoutSeconds: 60
 
 celery:
+  concurrency: 4
   replicaCount: 1
   extraEnvVarsSecret:
     - nautobot-django
@@ -66,7 +67,13 @@ celery:
     initialDelaySeconds: 60
     periodSeconds: 120
     timeoutSeconds: 60
-
+  resources:
+    requests:
+      cpu: "400m"
+      memory: "1G"
+    limits:
+      cpu: "6000m"
+      memory: "16384M"
 
 postgresql:
   enabled: false
