@@ -154,6 +154,8 @@ pod:
         # this should be set to no more than (pod.replicas.osapi - 1)
         # usually set on per-deployment basis.
         min_available: 0
+  resources:
+    enabled: true
 
 manifests:
   job_db_init: false
