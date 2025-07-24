@@ -138,6 +138,9 @@ pod:
           - name: undersync-token
             secret:
               secretName: undersync-token
+  resources:
+    enabled: true
+
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:
   dynamic:

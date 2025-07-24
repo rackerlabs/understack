@@ -82,6 +82,10 @@ dependencies:
     db_sync:
       jobs:
 
+pod:
+  resources:
+    enabled: true
+
 manifests:
   job_db_init: false
   job_rabbit_init: false
