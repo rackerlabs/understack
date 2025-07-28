@@ -48,7 +48,7 @@ volume:
 # disable the default image additions
 bootstrap:
   structured:
-    images: {}
+    images: null
 
 dependencies:
   dynamic:
