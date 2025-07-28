@@ -12,7 +12,7 @@ spec:
     - jsonPointers:
       # Allow temporarily disabling auto-sync for troubleshooting
       # https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/Controlling-Resource-Modification/#allow-temporarily-toggling-auto-sync
-      - /spec/syncPolicy
+      - /spec/syncPolicy/automated
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]
   generators:
@@ -33,6 +33,13 @@ spec:
                           values:
                             - "global"
                             - "aio"
+                    values:
+                      # these should always be replaced by further rules below but provide
+                      # a default for the merge operations below
+                      understack_url: 'https://github.com/rackerlabs/understack.git'
+                      understack_ref: 'main'
+                      deploy_url: 'https://github.com/rackerlabs/understack.git'
+                      deploy_ref: 'main'
                 # dev clusters allow some overrides
                 - clusters:
                     selector:

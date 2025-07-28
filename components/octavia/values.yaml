@@ -1,5 +1,4 @@
 ---
-release_group: null
 
 # typically overridden by environmental
 # values, but should include all endpoints
@@ -11,7 +10,7 @@ endpoints:
       name: rabbitmq-server
     hosts:
       default: rabbitmq-nodes
-  image:
+  load_balancer:
     port:
       api:
         public: 443
@@ -20,7 +19,7 @@ endpoints:
     host_fqdn_override:
       public:
         tls:
-          secretName: glance-tls-public
+          secretName: octavia-tls-public
           issuerRef:
             name: understack-cluster-issuer
             kind: ClusterIssuer
@@ -36,19 +35,23 @@ network:
         nginx.ingress.kubernetes.io/rewrite-target: /
         # set our default issuer
         cert-manager.io/cluster-issuer: understack-cluster-issuer
+    external_policy_local: false
+    node_port:
+      enabled: false
 
-# Glance storage backend
-# we'll switch to radosgw in the future
-storage: pvc
-
-# leave it empty to use the default
-volume:
-  class_name: ''
-
-# disable the default image additions
-bootstrap:
-  structured:
-    images: {}
+conf:
+  octavia:
+    api_settings:
+      enabled_provider_drivers: >-
+        ovn: "The Octavia OVN driver"
+      default_provider_driver: ovn
+    driver_agent:
+      enabled_provider_agents: ovn
+    ovn:
+      ovn_nb_connection: tcp:ovn-ovsdb-nb.openstack.svc.cluster.local:6641
+      ovn_sb_connection: tcp:ovn-ovsdb-sb.openstack.svc.cluster.local:6642
+    task_flow:
+      jobboard_enabled: false
 
 dependencies:
   dynamic:
@@ -56,59 +59,34 @@ dependencies:
       local_image_registry:
         jobs: null
   static:
+    api:
+      jobs:
+        - octavia-db-sync
+        - octavia-ks-user
+        - octavia-ks-endpoints
+    worker:
+      jobs:
+        - octavia-db-sync
+        - octavia-ks-user
+        - octavia-ks-endpoints
+    housekeeping:
+      jobs:
+        - octavia-db-sync
+        - octavia-ks-user
+        - octavia-ks-endpoints
+    health_manager:
+      jobs:
+        - octavia-db-sync
+        - octavia-ks-user
+        - octavia-ks-endpoints
     db_sync:
       jobs:
-    api:
-      jobs:
-        - glance-db-sync
-        - glance-ks-user
-        - glance-ks-endpoints
-
-pod:
-  lifecycle:
-    disruption_budget:
-      api:
-        # this should be set to no more than (pod.replicas.api - 1)
-        # usually set on per-deployment basis.
-        min_available: 0
-  resources:
-    enabled: true
-    api:
-      limits:
-        memory: 6144Mi
-  probes:
-    api:
-      glance-api:
-        readiness:
-          enabled: true
-          params:
-            periodSeconds: 10
-            timeoutSeconds: 5
-            failureThreshold: 6
-        liveness:
-          enabled: true
-          params:
-            initialDelaySeconds: 5
-            periodSeconds: 10
-            timeoutSeconds: 8
-            failureThreshold: 6
-
-conf:
-  glance_api_uwsgi:
-    uwsgi:
-      # This should be set to anything larger than 1.
-      # Otherwise uWSGI is not able to serve multiple requests at the same time
-      # under heavy load, which results in liveness probe failures in
-      # Kubernetes environment.
-      processes: 2
 
 manifests:
   job_db_init: false
   job_rabbit_init: false
-  # disabled for now but we might want this
-  job_image_repo_sync: false
   pod_rally_test: false
-  secret_db: false
+  secret_db: true
   secret_keystone: true
   service_ingress_api: false
 
@@ -137,35 +115,27 @@ annotations:
   # the old job needs to be removed before applying the new one
   # which gets around the immutable case above.
   job:
-    glance_db_sync:
+    octavia_db_sync:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
       argocd.argoproj.io/sync-wave: "0"
-    glance_ks_service:
+    octavia_ks_service:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
       argocd.argoproj.io/sync-wave: "0"
-    glance_ks_user:
+    octavia_ks_user:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
       argocd.argoproj.io/sync-wave: "0"
-    glance_ks_endpoints:
+    octavia_ks_endpoints:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
       argocd.argoproj.io/sync-wave: "0"
-    glance_metadefs_load:
-      argocd.argoproj.io/hook: Sync
-      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Force=true
-    glance_storage_init:
-      argocd.argoproj.io/hook: Sync
-      argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
-      argocd.argoproj.io/sync-options: Force=true
-    glance_bootstrap:
-      # relies on the services to be up so it can be post
+    octavia_bootstrap:
+      # relies on the service to be up so can remain post
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true

@@ -101,4 +101,12 @@ images:
     cinder_backup: "ghcr.io/rackerlabs/understack/cinder:2024.2-ubuntu_jammy"
     cinder_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
     cinder_backup_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
+
+    # octavia
+    octavia_api: "ghcr.io/rackerlabs/understack/octavia:2024.2-ubuntu_jammy"
+    octavia_db_sync: "ghcr.io/rackerlabs/understack/octavia:2024.2-ubuntu_jammy"
+    octavia_worker: "ghcr.io/rackerlabs/understack/octavia:2024.2-ubuntu_jammy"
+    octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:2024.2-ubuntu_jammy"
+    octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:2024.2-ubuntu_jammy"
+    octavia_health_manager_init: "docker.io/openstackhelm/heat:2024.2-ubuntu_jammy"
 ...

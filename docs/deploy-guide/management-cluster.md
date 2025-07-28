@@ -94,10 +94,6 @@ different configurations.
 : Git reference to use of the deploy repo. Can only be set for `dev` env
   clusters.
 
-`uc_skip_components`
-: string-ified JSON list of components or services from UnderStack to not
-  install in this cluster.
-
 ### Deploying your Cluster Config
 
 Once you have the Kubernetes secret which defines your cluster config ready
