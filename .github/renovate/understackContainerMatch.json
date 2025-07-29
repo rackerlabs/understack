@@ -5,11 +5,11 @@
       "customType": "regex",
       "fileMatch": ["(^|/)images-openstack\\.ya?ml$"],
       "matchStrings": [
-        "ghcr\\.io/rackerlabs/(?<depName>understack/[\\w\\-]+)(?::(?<currentValue>[-a-zA-Z0-9.]+))?(?:@(?<currentDigest>sha256:[a-zA-Z0-9]+))?"
+        "(?<registryUrl>[a-zA-Z0-9.-]+(?:\\:[0-9]+)?)/(?<depName>[^\\s:@]+)(?::(?<currentValue>[-a-zA-Z0-9.]+))?(?:@(?<currentDigest>sha256:[a-zA-Z0-9]+))?"
       ],
       "datasourceTemplate": "docker",
-      "packageNameTemplate": "ghcr.io/rackerlabs/{{depName}}",
-      "autoReplaceStringTemplate": "ghcr.io/rackerlabs/{{{depName}}}:{{{newValue}}}{{#if newDigest}}@{{{newDigest}}}{{/if}}"
+      "packageNameTemplate": "{{registryUrl}}/{{depName}}",
+      "autoReplaceStringTemplate": "{{registryUrl}}/{{{depName}}}:{{{newValue}}}{{#if newDigest}}@{{{newDigest}}}{{/if}}"
     }
   ],
   "packageRules": [
