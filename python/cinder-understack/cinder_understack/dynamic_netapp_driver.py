@@ -423,29 +423,57 @@ class NetappCinderDynamicDriver(NetAppBlockStorageCmodeLibrary):
         LOG.debug("No-op clean_volume_file_locks in dynamic driver")
 
     def create_volume(self, volume):
-        # Called directly by Cinder during volume create workflow (create_volume.py)
-        # This is where we extract runtime metadata (hostname, creds, protocol, etc.)
-        # from volume type extra_specs and establish REST client connection.
+        """Create a volume with dynamic SVM selection.
+
+        Only SVM name comes from volume type, credentials from cinder.conf.
+        This improves security and centralizes credential management.
+        """
+        if not volume or not volume.volume_type:
+            raise exception.InvalidInput(reason="Volume and volume type are required")
+
         specs = volume.volume_type.extra_specs
-        hostname = specs.get("netapp:svm_hostname")
-        username = specs.get("netapp:svm_username")
-        password = specs.get("netapp:svm_password")
+
+        # Only SVM name from volume type (security improvement)
         vserver = specs.get("netapp:svm_vserver")
         protocol = specs.get("netapp:svm_protocol", "NVMe")
 
-        if not all([hostname, username, password, vserver]):
-            raise exception.VolumeBackendAPIException(data="Missing NetApp metadata")
+        # Everything else from cinder.conf (centralized credentials)
+        hostname = self.configuration.netapp_server_hostname
+        username = self.configuration.netapp_login
+        password = self.configuration.netapp_password
 
-        client = self._init_rest_client(hostname, username, password, vserver)  # noqa: F841
+        # Enhanced validation
+        if not vserver:
+            raise exception.VolumeBackendAPIException(
+                data="Missing required volume type extra_spec: netapp:svm_vserver"
+            )
+
+        if not all([hostname, username, password]):
+            missing_params = []
+            if not hostname:
+                missing_params.append("netapp_server_hostname")
+            if not username:
+                missing_params.append("netapp_login")
+            if not password:
+                missing_params.append("netapp_password")
+            raise exception.VolumeBackendAPIException(
+                data=f"Missing required cinder.conf parameters: {missing_params}"
+            )
+
+        LOG.info(
+            "Creating volume %s on SVM %s (JIRA 2: credentials from cinder.conf)",
+            volume.name,
+            vserver,
+        )
+
+        # Store client for pool discovery (temporary)
+        client = self._init_rest_client(hostname, username, password, vserver)
+        self._test_client = client
 
         if protocol == "iscsi":
             LOG.info("Provisioning via iSCSI")
         elif protocol == "NVMe":
             LOG.info("Provisioning via NVMe")
-            # TODO: Inherit these from client_cmode
-            # Call create or get NVMe subsystem
-            # Add host initiator to subsystem
-            # Create namespace backed by FlexVol
-            # Map namespace to subsystem
+            # TODO: Will be implemented
         else:
-            LOG.info(" .WIP. ")
+            LOG.info("Unsupported protocol: %s", protocol)
