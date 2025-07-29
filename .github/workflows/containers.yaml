@@ -11,6 +11,7 @@ on:
       - "containers/**"
       - ".github/workflows/containers.yaml"
       - "python/**"
+      - "docker-bake.hcl"
   pull_request:
     types: [opened, synchronize, reopened, closed]
     paths:
@@ -18,177 +19,158 @@ on:
       - "containers/**"
       - ".github/workflows/containers.yaml"
       - "python/**"
+      - "docker-bake.hcl"
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
 
 env:
   OPENSTACK_VERSION: 2024.2
+  REGISTRY: ghcr.io/rackerlabs/understack
 
 jobs:
-  openstack:
+  build:
     if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup docker buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: login to ghcr.io
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: set tag based on event
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "tag=${{ env.OPENSTACK_VERSION }}-ubuntu_jammy" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: build and push with docker bake
+        uses: docker/bake-action@2e3d19baedb14545e5d41222653874f25d43b545 # v5
+        with:
+          push: ${{ github.event_name != 'pull_request' || github.event.action != 'closed' }}
+          set: |
+            *.platform=linux/amd64,linux/arm64
+        env:
+          REGISTRY: ${{ env.REGISTRY }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          OPENSTACK_VERSION: ${{ env.OPENSTACK_VERSION }}
+
+  get_targets:
+    if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: extract targets from docker-bake.hcl
+        id: targets
+        run: |
+          # Extract target names from the default group in docker-bake.hcl
+          targets=$(grep -A 20 'group "default"' docker-bake.hcl | \
+                   sed -n '/targets = \[/,/\]/p' | \
+                   grep -o '"[^"]*"' | \
+                   tr -d '"' | \
+                   jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "targets=$targets" >> $GITHUB_OUTPUT
+          echo "Found targets: $targets"
+
+  security_scan:
+    if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    needs: get_targets
+
+    permissions:
+      security-events: write
+      contents: read
 
     strategy:
       matrix:
-        # if you add a container here, add it to the 'clean_containers' job below
-        project: [ironic, neutron, keystone, nova, openstack-client, cinder, octavia]
+        container: ${{ fromJson(needs.get_targets.outputs.targets) }}
 
     steps:
-      - name: setup docker buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
-      - name: login to ghcr.io
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: checkout repository
+        uses: actions/checkout@v4
 
-      - name: image metadata
-        id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
-        with:
-          images: ghcr.io/${{ github.repository }}/${{ matrix.project }}
-          tags: |
-            type=raw,value=${{ env.OPENSTACK_VERSION }}-ubuntu_jammy,enable={{is_default_branch}}
-            type=raw,value=${{ env.OPENSTACK_VERSION }}-ubuntu_jammy,enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=ref,event=tag
-            type=ref,event=pr
-        env:
-          # Create the annotations at the index as well since this
-          # defaults to manifest only and we have to manually merge
-          # the container is multi-arch because of provenance creating
-          # an 'unknown/unknown' arch with data. We've got no annotations
-          # that are arch specific so populate them at the index as well.
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+      - name: set tag based on event
+        id: tag
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "tag=pr-${{ github.event.number }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref_name }}" == "main" ]]; then
+            echo "tag=${{ env.OPENSTACK_VERSION }}-ubuntu_jammy" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
 
-      - name: build and deploy openstack container image to registry
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+      - name: run trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@6e7b7d1fd3e4fef0c5fa8cce1229c54b9c9a2fa0 # v0.24.0
         with:
-          file: containers/${{ matrix.project }}/Dockerfile
-          build-args: OPENSTACK_VERSION=${{ env.OPENSTACK_VERSION }}
-          pull: true  # ensure we always have an up to date source
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          annotations: ${{ steps.meta.outputs.annotations }}
+          image-ref: '${{ env.REGISTRY }}/${{ matrix.container }}:${{ steps.tag.outputs.tag }}'
+          format: 'sarif'
+          output: 'trivy-results-${{ matrix.container }}.sarif'
 
-  dnsmasq:
-    if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+      - name: upload trivy results to github security tab
+        uses: github/codeql-action/upload-sarif@ea9e4e37992a54ee68a9622e985e60c8e8f12d9f # v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results-${{ matrix.container }}.sarif'
+          category: 'trivy-${{ matrix.container }}'
+
+  get_cleanup_targets:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
 
     steps:
-      - name: setup docker buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
-      - name: login to ghcr.io
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: checkout repository
+        uses: actions/checkout@v4
 
-      - name: image metadata
-        id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
-        with:
-          images: ghcr.io/${{ github.repository }}/dnsmasq
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=ref,event=tag
-            type=ref,event=pr
-        env:
-          # Create the annotations at the index as well since this
-          # defaults to manifest only and we have to manually merge
-          # the container is multi-arch because of provenance creating
-          # an 'unknown/unknown' arch with data. We've got no annotations
-          # that are arch specific so populate them at the index as well.
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
-
-      - name: build and deploy dnsmasq container to registry
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
-        with:
-          context: "{{defaultContext}}:containers/dnsmasq"
-          file: Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  workflows:
-    if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        # if you add a container here, add it to the 'clean_containers' job below
-        container:
-          - name: ironic-nautobot-client
-          - name: nova-flavors
-          - name: ansible
-          - name: understack-tests
-
-    steps:
-      - name: setup docker buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
-      - name: login to ghcr.io
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: image metadata
-        id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
-        with:
-          images: ghcr.io/${{ github.repository }}/${{ matrix.container.name }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=ref,event=tag
-            type=ref,event=pr
-        env:
-          # Create the annotations at the index as well since this
-          # defaults to manifest only and we have to manually merge
-          # the container is multi-arch because of provenance creating
-          # an 'unknown/unknown' arch with data. We've got no annotations
-          # that are arch specific so populate them at the index as well.
-          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
-
-      - name: build and deploy container image to registry
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
-        with:
-          file: containers/${{ matrix.container.name }}/Dockerfile
-          pull: true  # ensure we always have an up to date source
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          annotations: ${{ steps.meta.outputs.annotations }}
-          # prod is the target that has the code installed
-          target: prod
+      - name: extract targets from docker-bake.hcl
+        id: targets
+        run: |
+          # Extract target names from the default group in docker-bake.hcl
+          targets=$(grep -A 20 'group "default"' docker-bake.hcl | \
+                   sed -n '/targets = \[/,/\]/p' | \
+                   grep -o '"[^"]*"' | \
+                   tr -d '"' | \
+                   jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "targets=$targets" >> $GITHUB_OUTPUT
+          echo "Found cleanup targets: $targets"
 
   clean_containers:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
+    needs: get_cleanup_targets
 
     permissions:
       packages: write
 
     strategy:
       matrix:
-        container:
-          - ironic
-          - neutron
-          - keystone
-          - nova
-          - octavia
-          - openstack-client
-          - dnsmasq
-          - ironic-nautobot-client
-          - nova-flavors
-          - ansible
-          - understack-tests
+        container: ${{ fromJson(needs.get_cleanup_targets.outputs.targets) }}
 
     steps:
       - name: clean up PR container
