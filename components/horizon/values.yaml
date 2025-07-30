@@ -76,6 +76,8 @@ pod:
         # this should be set to no more than (pod.replicas.horizon - 1)
         # usually set on per-deployment basis.
         min_available: 0
+  resources:
+    enabled: true
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
