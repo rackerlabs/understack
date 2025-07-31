@@ -1,11 +1,17 @@
-# Getting Started
+# Requirements
 
 To get started, ensure you have the following prerequisites:
 
+* A name for the deployment. For example `my-k3s`. We will refer to this
+  as `DEPLOY_NAME`.
 * A clone of this repository.
 * Another [Git repository,](#deploy-repository) referred to as the
   [Deploy Repository](#deploy-repository).
 * Access to at least one Kubernetes cluster.
+* A DNS zone. For example `dev.yourdomain.com`. We will refer to this
+  as `DNS_ZONE`.
+* Bare metal machines to adopt in OpenStack Ironic
+* Switches compatible with OpenStack Neutron
 
 For simplicity, you can use an All-In-One deployment. However, for
 production or large-scale deployments, it is recommended to use multiple

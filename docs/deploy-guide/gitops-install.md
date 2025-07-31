@@ -29,7 +29,7 @@ git init uc-deploy
 git clone https://path/to/my/uc-deploy
 ```
 
-See [Deployment Repository](./getting-started.md#creation-and-access)
+See [Deployment Repository](./requirements.md#creation-and-access)
 
 ## Pre-deployment
 
