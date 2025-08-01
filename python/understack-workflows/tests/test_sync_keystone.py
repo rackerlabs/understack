@@ -74,14 +74,11 @@ def test_parse_object_id(arg_list, context, expected_id):
 
 def test_create_project(
     os_conn,
-    nautobot,
     mock_pynautobot_api,
     project_id: uuid.UUID,
     domain_id: uuid.UUID,
 ):
-    ret = do_action(
-        os_conn, nautobot, mock_pynautobot_api, Event.ProjectCreate, project_id
-    )
+    ret = do_action(os_conn, mock_pynautobot_api, Event.ProjectCreate, project_id)
     os_conn.identity.get_project.assert_any_call(domain_id.hex)
     os_conn.identity.get_project.assert_any_call(project_id.hex)
     assert ret == 0
@@ -89,14 +86,11 @@ def test_create_project(
 
 def test_update_project(
     os_conn,
-    nautobot,
     mock_pynautobot_api,
     project_id: uuid.UUID,
     domain_id: uuid.UUID,
 ):
-    ret = do_action(
-        os_conn, nautobot, mock_pynautobot_api, Event.ProjectUpdate, project_id
-    )
+    ret = do_action(os_conn, mock_pynautobot_api, Event.ProjectUpdate, project_id)
     os_conn.identity.get_project.assert_any_call(domain_id.hex)
     os_conn.identity.get_project.assert_any_call(project_id.hex)
     assert ret == 0
@@ -104,13 +98,10 @@ def test_update_project(
 
 def test_delete_project(
     os_conn,
-    nautobot,
     mock_pynautobot_api,
     project_id: uuid.UUID,
 ):
-    ret = do_action(
-        os_conn, nautobot, mock_pynautobot_api, Event.ProjectDelete, project_id
-    )
+    ret = do_action(os_conn, mock_pynautobot_api, Event.ProjectDelete, project_id)
     assert ret == 0
 
 
