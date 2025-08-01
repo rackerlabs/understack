@@ -13,11 +13,6 @@ from understack_workflows.main.sync_keystone import handle_project_delete
 
 
 @pytest.fixture
-def nautobot_client():
-    return MagicMock()
-
-
-@pytest.fixture
 def mock_pynautobot_api(mocker):
     mock_client = MagicMock(name="MockPynautobotApi")
 
@@ -117,8 +112,9 @@ def test_handle_project_delete(
 ):
     project_id = uuid.uuid4()
 
+    tenant_obj = MagicMock()
     mock_pynautobot_api.tenancy.tenants.get.return_value = (
-        MagicMock() if tenant_exists else None
+        tenant_obj if tenant_exists else None
     )
 
     mock_delete_network = mocker.patch(
@@ -136,12 +132,10 @@ def test_handle_project_delete(
     if tenant_exists:
         mock_delete_network.assert_called_once_with(conn_mock, project_id)
         mock_unmap_devices.assert_called_once_with(
-            tenant_id=project_id, nautobot_client=mock_pynautobot_api
+            tenant_id=project_id, nautobot=mock_pynautobot_api
         )
-        mock_pynautobot_api.tenancy.tenants.delete.assert_called_once_with(
-            ["project_id"]
-        )
+        tenant_obj.delete.assert_called_once()
     else:
         mock_delete_network.assert_not_called()
         mock_unmap_devices.assert_not_called()
-        mock_pynautobot_api.tenancy.tenants.delete.assert_not_called()
+        tenant_obj.delete.assert_not_called()
