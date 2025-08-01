@@ -20,5 +20,6 @@ resources:
   - sensors/sensor-k8s-neutron-deployment.yaml
   - sensors/sensor-neutron-event-network-segment-range.yaml
   - sensors/sensor-ironic-reclean.yaml
+  - sensors/sensor-ironic-node-port.yaml
   - secrets/nautobot-token.yaml
   - secrets/openstack-svc-acct.yaml

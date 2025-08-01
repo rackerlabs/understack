@@ -20,6 +20,7 @@ resources:
   - workflowtemplates/keystone-event-project.yaml
   - workflowtemplates/enroll-server.yaml
   - workflowtemplates/reclean-server.yaml
+  - workflowtemplates/openstack-oslo-event.yaml
   # Alert automation
   - sensors/alertmanager-webhook-sensor.yaml
   - eventsources/alertmanager-webhook-eventsource.yaml
