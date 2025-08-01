@@ -17,5 +17,4 @@ resources:
   - ./rules/rabbitmq/cluster-alarms.yml
   - ./rules/rabbitmq/insufficient-established-erlang-distribution-links.yml
   - ./rules/rabbitmq/persistent-volume-missing.yml
-  - ./rules/rabbitmq/tcp-sockets-near-limit.yml
   - ./rules/rabbitmq-cluster-operator/unavailable-replicas.yml
