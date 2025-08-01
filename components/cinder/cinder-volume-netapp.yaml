@@ -26,9 +26,8 @@ spec:
           netapp_storage_protocol = nvme
           netapp_transport_type = https
           netapp_use_legacy_client = false
-          netapp_vserver = data-svm1
           volume_backend_name = netapp_nvme
-          volume_driver = cinder.volume.drivers.netapp.common.NetAppDriver
+          volume_driver = cinder_understack.dynamic_netapp_driver.NetappCinderDynamicDriver
   data:
   - secretKey: netapp_username
     remoteRef:
