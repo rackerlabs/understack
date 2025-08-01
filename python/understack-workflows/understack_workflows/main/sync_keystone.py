@@ -1,7 +1,11 @@
 import argparse
 import logging
 import uuid
+from collections.abc import Sequence
 from enum import StrEnum
+
+import pynautobot
+from pynautobot.core.response import Record
 
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
@@ -109,6 +113,18 @@ def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str, bo
     return tenant_name, str(project.description), is_default_domain
 
 
+def _unmap_tenant_from_devices(
+    tenant_id: uuid.UUID,
+    nautobot_client: pynautobot.api,
+):
+    devices: Sequence[Record] = list(
+        nautobot_client.dcim.devices.filter(tenant=tenant_id)
+    )
+    for d in devices:
+        d.tenant = None  # type: ignore[attr-defined]
+        nautobot_client.dcim.devices.update(devices)
+
+
 def handle_project_create(
     conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
 ) -> int:
@@ -168,16 +184,17 @@ def handle_project_update(
 
 
 def handle_project_delete(
-    conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
+    conn: Connection, nautobot_client: pynautobot.api, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to delete tenant %s", project_id)
-    ten = nautobot.session.tenancy.tenants.get(project_id)
-    if not ten:
+    tenant = nautobot_client.tenancy.tenants.get(id=project_id)
+    if not tenant:
         logger.warning("tenant %s does not exist, nothing to delete", project_id)
         return _EXIT_SUCCESS
 
     _delete_outside_network(conn, project_id)
-    ten.delete()  # type: ignore
+    _unmap_tenant_from_devices(tenant_id=project_id, nautobot_client=nautobot_client)
+    nautobot_client.tenancy.tenants.delete(["project_id"])
     logger.info("deleted tenant %s", project_id)
     return _EXIT_SUCCESS
 
@@ -185,6 +202,7 @@ def handle_project_delete(
 def do_action(
     conn: Connection,
     nautobot: Nautobot,
+    nautobot_client: pynautobot.api,
     event: Event,
     project_id: uuid.UUID,
 ) -> int:
@@ -194,7 +212,7 @@ def do_action(
         case Event.ProjectUpdate:
             return handle_project_update(conn, nautobot, project_id)
         case Event.ProjectDelete:
-            return handle_project_delete(conn, nautobot, project_id)
+            return handle_project_delete(conn, nautobot_client, project_id)
         case _:
             logger.error("Cannot handle event: %s", event)
             return _EXIT_EVENT_UNKNOWN
@@ -207,5 +225,5 @@ def main() -> int:
     conn = get_openstack_client(cloud=args.os_cloud)
     nb_token = args.nautobot_token or credential("nb-token", "token")
     nautobot = Nautobot(args.nautobot_url, nb_token, logger=logger)
-
-    return do_action(conn, nautobot, args.event, args.object)
+    nautobot_client = pynautobot.api(args.nautobot_url, token=nb_token)
+    return do_action(conn, nautobot, nautobot_client, args.event, args.object)
