@@ -1,12 +1,16 @@
 import argparse
 import logging
 import uuid
+from collections.abc import Sequence
 from enum import StrEnum
+from typing import cast
+
+import pynautobot
+from pynautobot.core.response import Record
 
 from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
-from understack_workflows.nautobot import Nautobot
 from understack_workflows.openstack.client import Connection
 from understack_workflows.openstack.client import get_openstack_client
 
@@ -109,15 +113,24 @@ def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str, bo
     return tenant_name, str(project.description), is_default_domain
 
 
+def _unmap_tenant_from_devices(
+    tenant_id: uuid.UUID,
+    nautobot: pynautobot.api,
+):
+    devices: Sequence[Record] = list(nautobot.dcim.devices.filter(tenant=tenant_id))
+    for d in devices:
+        d.tenant = None  # type: ignore[attr-defined]
+        nautobot.dcim.devices.update(devices)
+
+
 def handle_project_create(
-    conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
+    conn: Connection, nautobot: pynautobot.api, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to create tenant %s", project_id.hex)
     tenant_name, tenant_description, is_default_domain = _tenant_attrs(conn, project_id)
 
-    nautobot_tenant_api = nautobot.session.tenancy.tenants
     try:
-        tenant = nautobot_tenant_api.create(
+        tenant = nautobot.tenancy.tenants.create(
             id=str(project_id), name=tenant_name, description=tenant_description
         )
         if is_default_domain:
@@ -133,24 +146,24 @@ def handle_project_create(
 
 
 def handle_project_update(
-    conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
+    conn: Connection, nautobot: pynautobot.api, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to update tenant %s", project_id.hex)
     tenant_name, tenant_description, is_default_domain = _tenant_attrs(conn, project_id)
 
-    tenant_api = nautobot.session.tenancy.tenants
-    existing_tenant = tenant_api.get(project_id)
+    existing_tenant = nautobot.tenancy.tenants.get(id=project_id)
     logger.info("existing_tenant: %s", existing_tenant)
     try:
         if existing_tenant is None:
-            new_tenant = tenant_api.create(
+            new_tenant = nautobot.tenancy.tenants.create(
                 id=str(project_id), name=tenant_name, description=tenant_description
             )
             logger.info("tenant %s created %s", project_id, new_tenant.created)  # type: ignore
         else:
-            existing_tenant.name = tenant_name  # type: ignore
-            existing_tenant.description = tenant_description  # type: ignore
-            existing_tenant.save()  # type: ignore
+            existing_tenant = cast(Record, existing_tenant)
+            existing_tenant.update(
+                {"name": tenant_name, "description": tenant_description}
+            )  # type: ignore
             logger.info(
                 "tenant %s last updated %s",
                 project_id,
@@ -168,23 +181,26 @@ def handle_project_update(
 
 
 def handle_project_delete(
-    conn: Connection, nautobot: Nautobot, project_id: uuid.UUID
+    conn: Connection, nautobot: pynautobot.api, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to delete tenant %s", project_id)
-    ten = nautobot.session.tenancy.tenants.get(project_id)
-    if not ten:
+    tenant = nautobot.tenancy.tenants.get(id=project_id)
+    if not tenant:
         logger.warning("tenant %s does not exist, nothing to delete", project_id)
         return _EXIT_SUCCESS
 
     _delete_outside_network(conn, project_id)
-    ten.delete()  # type: ignore
+    _unmap_tenant_from_devices(tenant_id=project_id, nautobot=nautobot)
+
+    tenant = cast(Record, tenant)
+    tenant.delete()
     logger.info("deleted tenant %s", project_id)
     return _EXIT_SUCCESS
 
 
 def do_action(
     conn: Connection,
-    nautobot: Nautobot,
+    nautobot: pynautobot.api,
     event: Event,
     project_id: uuid.UUID,
 ) -> int:
@@ -206,6 +222,5 @@ def main() -> int:
 
     conn = get_openstack_client(cloud=args.os_cloud)
     nb_token = args.nautobot_token or credential("nb-token", "token")
-    nautobot = Nautobot(args.nautobot_url, nb_token, logger=logger)
-
+    nautobot = pynautobot.api(args.nautobot_url, token=nb_token)
     return do_action(conn, nautobot, args.event, args.object)
