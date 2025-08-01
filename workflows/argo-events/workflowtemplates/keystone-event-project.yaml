@@ -29,7 +29,7 @@ spec:
           - name: event_type
           - name: project_uuid
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1118
         command:
           - sync-keystone
         args:
