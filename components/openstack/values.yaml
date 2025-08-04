@@ -1,1 +1,17 @@
 ---
+
+# -- Array of extra Kubernetes manifests to deploy
+extraObjects: []
+# - apiVersion: external-secrets.io/v1beta1
+#   kind: ExternalSecret
+#   metadata:
+#     name: my-secret
+#   spec:
+#     secretStoreREf:
+#       kind: ClusterSecretStore
+#       name: mystore
+#     target:
+#       name: my-secret
+#     dataFrom:
+#       - extract:
+#           key: my-secret-id
