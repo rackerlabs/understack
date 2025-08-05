@@ -1,5 +1,19 @@
 ---
 
+# -- OpenStack mariadb instance settings
+mariadb:
+  # -- root password settings
+  rootPasswordSecretKeyRef:
+    name: mariadb
+    key: root-password
+    generate: true
+
+  # -- storage settings
+  storage:
+    size: 10Gi
+    resizeInUseVolumes: true
+    waitForVolumeResize: true
+
 # -- Array of extra Kubernetes manifests to deploy
 extraObjects: []
 # - apiVersion: external-secrets.io/v1beta1
