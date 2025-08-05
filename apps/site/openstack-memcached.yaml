@@ -1,0 +1,15 @@
+---
+component: openstack-memcached
+componentNamespace: openstack
+sources:
+  - repoURL: https://charts.bitnami.com/bitnami
+    chart: memcached
+    targetRevision: 7.8.6
+    helm:
+      releaseName: memcached
+      valueFiles:
+        - $understack/components/openstack/memcached-values.yaml
+        - $deploy/{{.name}}/helm-configs/openstack-memcached.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+  - ref: deploy
