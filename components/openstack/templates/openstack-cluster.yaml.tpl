@@ -8,6 +8,7 @@ metadata:
     argocd.argoproj.io/sync-options: Delete=false
 spec:
   replicas: 3
+  persistence: {{ .Values.rabbitmq.persistence | toJson }}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
