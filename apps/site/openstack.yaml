@@ -3,5 +3,10 @@ component: openstack
 sources:
   - ref: understack
     path: 'components/openstack'
+    helm:
+      releaseName: openstack
+      valueFiles:
+        - $deploy/{{.name}}/helm-configs/openstack.yaml
+      ignoreMissingValueFiles: true
   - ref: deploy
     path: '{{.name}}/manifests/openstack'

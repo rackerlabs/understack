@@ -1,0 +1,36 @@
+---
+
+# -- OpenStack mariadb instance settings
+mariadb:
+  # -- root password settings
+  rootPasswordSecretKeyRef:
+    name: mariadb
+    key: root-password
+    generate: true
+
+  # -- storage settings
+  storage:
+    size: 10Gi
+    resizeInUseVolumes: true
+    waitForVolumeResize: true
+
+# -- OpenStack RabbitMQ instance settings
+rabbitmq:
+  # -- storage settings
+  persistence: {}
+
+# -- Array of extra Kubernetes manifests to deploy
+extraObjects: []
+# - apiVersion: external-secrets.io/v1beta1
+#   kind: ExternalSecret
+#   metadata:
+#     name: my-secret
+#   spec:
+#     secretStoreREf:
+#       kind: ClusterSecretStore
+#       name: mystore
+#     target:
+#       name: my-secret
+#     dataFrom:
+#       - extract:
+#           key: my-secret-id
