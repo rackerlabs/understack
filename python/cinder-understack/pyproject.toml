@@ -24,6 +24,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
+  "cinder>=25.0.0,<26",
+  "oslo.utils>=6.0.0,<8"
 ]
 
 [project.urls]
@@ -31,10 +33,10 @@ Source = "https://github.com/rackerlabs/understack"
 
 [dependency-groups]
 test = [
-    "pytest>=8.3.2,<9",
-    "pytest-cov>=6.2.1,<7",
-    "pytest-mock>=3.14.0,<4",
-]
+    "ddt>=1.4.4",
+    "fixtures>=3.0.0",
+    "stestr>=3.2.1",
+ ]
 
 [tool.uv]
 default-groups = ["test"]
