@@ -17,15 +17,18 @@ from oslo_log import log as logging
 LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
 
-# Register config options for netapp_nvme backend
-CONF.register_opts(options.netapp_proxy_opts, group="netapp_nvme")
-CONF.register_opts(options.netapp_connection_opts, group="netapp_nvme")
-CONF.register_opts(options.netapp_transport_opts, group="netapp_nvme")
-CONF.register_opts(options.netapp_basicauth_opts, group="netapp_nvme")
-CONF.register_opts(options.netapp_provisioning_opts, group="netapp_nvme")
-CONF.register_opts(options.netapp_cluster_opts, group="netapp_nvme")
-CONF.register_opts(options.netapp_san_opts, group="netapp_nvme")
-CONF.register_opts(volume_driver.volume_opts, group="netapp_nvme")
+# Configuration options for dynamic NetApp driver
+# Using cinder.volume.configuration approach for better abstraction
+NETAPP_DYNAMIC_OPTS = [
+    options.netapp_proxy_opts,
+    options.netapp_connection_opts,
+    options.netapp_transport_opts,
+    options.netapp_basicauth_opts,
+    options.netapp_provisioning_opts,
+    options.netapp_cluster_opts,
+    options.netapp_san_opts,
+    volume_driver.volume_opts,
+]
 
 
 class NetappCinderDynamicDriver(NetAppNVMeStorageLibrary):
@@ -48,10 +51,63 @@ class NetappCinderDynamicDriver(NetAppNVMeStorageLibrary):
         driver_protocol = kwargs.pop("driver_protocol", "nvme")
         self.app_version = kwargs.get("app_version", "1.0.0")
 
+        self._setup_configuration(**kwargs)
+
         super().__init__(driver_name, driver_protocol, **kwargs)
         self.ssc_library = None
         self.perf_library = None
         self.init_capabilities()
+
+    def _setup_configuration(self, **kwargs):
+        """Setup configuration using cinder.volume.configuration module."""
+        from cinder.volume import configuration
+
+        config_obj = kwargs.get("configuration", None)
+
+        if config_obj:
+            # here we can access any cinder-provided config .
+            self.configuration = config_obj
+            config_group = getattr(config_obj, "config_group", "netapp_nvme")
+
+            # Register NetApp-specific options using configuration.append()
+            # Following the exact pattern from upstream NetApp drivers
+
+            try:
+                for opt_group in NETAPP_DYNAMIC_OPTS:
+                    self.configuration.append_config_values(opt_group)
+
+                LOG.info(
+                    "Registered NetApp configuration options for group: %s",
+                    config_group,
+                )
+
+            except Exception as e:
+                LOG.warning("Failed to register configuration options: %s", e)
+                # Continue default configuration handling for backward compatibility
+        else:
+            # Testing/Fallback: Create configuration object with all options
+            config_group = "netapp_nvme"
+            self.configuration = configuration.Configuration(
+                volume_driver.volume_opts, config_group=config_group
+            )
+
+            # Register additional NetApp options for testing
+            try:
+                for opt_group in NETAPP_DYNAMIC_OPTS:
+                    if (
+                        opt_group != volume_driver.volume_opts
+                    ):  # Avoid duplicate registration
+                        self.configuration.append_config_values(opt_group)
+
+                LOG.info(
+                    "Registered NetApp configuration options for testing group: %s",
+                    config_group,
+                )
+
+            except Exception as e:
+                LOG.warning(
+                    "Failed to register configuration options for testing: %s", e
+                )
 
     @property
     def supported(self):
@@ -269,14 +325,14 @@ class NetappCinderDynamicDriver(NetAppNVMeStorageLibrary):
 
                 # Get real capacity from NetApp - use fallback values if API fails
                 try:
-                    cap = client.get_flexvol_capacity(vol_name)
+                    cap = self._get_flexvol_capacity_with_fallback(client, vol_name)
                     if isinstance(cap, dict):
                         if "size-total" in cap and "size-available" in cap:
-                            total_bytes = int(cap["size-total"])
-                            free_bytes = int(cap["size-available"])
+                            total_bytes = cap["size-total"]
+                            free_bytes = cap["size-available"]
                         elif "size_total" in cap and "size_available" in cap:
-                            total_bytes = int(cap["size_total"])
-                            free_bytes = int(cap["size_available"])
+                            total_bytes = cap["size_total"]
+                            free_bytes = cap["size_available"]
                         else:
                             LOG.warning(
                                 "Unexpected capacity format for %s: %s",
@@ -512,6 +568,131 @@ class NetappCinderDynamicDriver(NetAppNVMeStorageLibrary):
         """
         # Got AttributeError
         pass
+
+    def _get_flexvol_capacity_with_fallback(self, client, vol_name):
+        """Get FlexVol capacity with custom volume name to junction path mapping."""
+        # TODO : find a API endpoint to fetch the junction path with svm and pool
+        try:
+            # First try the standard method
+            return client.get_flexvol_capacity(vol_name)
+        except Exception as e:
+            LOG.debug("Standard capacity retrieval failed for %s: %s", vol_name, e)
+
+            try:
+                # Use the same query pattern as list_flexvols() but with capacity fields
+                query = {
+                    "type": "rw",
+                    "style": "flex*",  # Match both 'flexvol' and 'flexgroup'
+                    "is_svm_root": "false",
+                    "error_state.is_inconsistent": "false",
+                    "state": "online",
+                    "fields": "name,space.available,space.size,nas.path",
+                }
+
+                # Get all volumes like list_flexvols() does
+                volumes_response = client.send_request(
+                    "/storage/volumes/", "get", query=query
+                )
+                records = volumes_response.get("records", [])
+
+                # Filter for the specific volume we want with multiple matching patterns
+                target_volume = None
+                for volume in records:
+                    volume_name = volume.get("name", "")
+                    volume_path = volume.get("nas", {}).get("path", "")
+
+                    # Pattern 1: Exact name match [Ideal scenario]
+                    # but keeping other patterns just to be safe,
+                    # we can delete it in future
+                    # I might have to circle back here ,
+                    # once I find a API endpoint to fetch
+                    # the junction path with svm name and pool name
+                    if volume_name == vol_name:
+                        target_volume = volume
+                        LOG.debug("Found target volume by exact name: %s", vol_name)
+                        break
+
+                    # Pattern 2: Path normalization (handle leading slash differences)
+                    if volume_path:
+                        normalized_vol_path = volume_path.lstrip("/")
+                        normalized_target_path = vol_name.lstrip("/")
+                        if normalized_vol_path == normalized_target_path:
+                            target_volume = volume
+                            LOG.debug(
+                                "Found target volume by path normalization: %s -> %s",
+                                vol_name,
+                                volume_path,
+                            )
+                            break
+
+                    # Pattern 3: sto_lun1 -> lun1 matches /lun1
+                    if vol_name and volume_path and "_" in vol_name:
+                        name_suffix = vol_name.split("_")[-1]
+                        normalized_vol_path = volume_path.lstrip("/")
+                        if normalized_vol_path == name_suffix:
+                            target_volume = volume
+                            LOG.debug(
+                                "Found target volume by name suffix mapping: %s -> %s",
+                                vol_name,
+                                volume_path,
+                            )
+                            break
+
+                    # Pattern 4: sto_lun1 -> sto-lun1 matches /sto-lun1
+                    if vol_name and volume_path:
+                        hyphenated_name = vol_name.replace("_", "-")
+                        normalized_vol_path = volume_path.lstrip("/")
+                        if normalized_vol_path == hyphenated_name:
+                            target_volume = volume
+                            LOG.debug(
+                                "Found target volume by hyphen name mapping: %s -> %s",
+                                vol_name,
+                                volume_path,
+                            )
+                            break
+
+                    # Pattern 5: handle cases where path uses hyphens
+                    # but name uses underscores
+                    if vol_name and volume_path:
+                        normalized_vol_path = volume_path.lstrip("/")
+                        if normalized_vol_path.replace("-", "_") == vol_name:
+                            target_volume = volume
+                            LOG.debug(
+                                "Found target volume by separator conversion: %s -> %s",
+                                vol_name,
+                                volume_path,
+                            )
+                            break
+
+                if not target_volume:
+                    volume_names = [vol.get("name", "unknown") for vol in records]
+                    volume_paths = [
+                        vol.get("nas", {}).get("path", "no-path") for vol in records
+                    ]
+                    raise Exception(
+                        f"Could not find volume {vol_name}. "
+                        f"Available volumes: {volume_names}. "
+                        f"Available paths: {volume_paths}."
+                    )
+
+                # Extract capacity information
+                space_info = target_volume.get("space", {})
+                total_size = space_info.get("size", 0)
+                available_size = space_info.get("available", 0)
+
+                return {
+                    "size-total": float(total_size),
+                    "size-available": float(available_size),
+                }
+
+            except Exception as custom_e:
+                LOG.warning(
+                    "Custom capacity retrieval also failed for %s: %s",
+                    vol_name,
+                    custom_e,
+                )
+                # Return None to trigger fallback values in the calling code
+                raise custom_e
 
     def _init_rest_client(self, hostname, username, password, vserver):
         """Create a NetApp REST client for the specified SVM.
