@@ -219,7 +219,8 @@ conf:
         OIDCXForwardedHeaders X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
         OIDCResponseType "code"
         OIDCScope "openid email profile groups"
-        OIDCProviderMetadataURL http://dex.dex.svc:5556/.well-known/openid-configuration
+        OIDCProviderMetadataURL {{ tuple "dex" "internal" "dex" $ | include "helm-toolkit.endpoints.keystone_endpoint_uri_lookup" }}
+
         OIDCClientID keystone
         OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
         OIDCCryptoPassphrase "exec:/bin/cat /etc/oidc-secret/password"
@@ -279,6 +280,23 @@ endpoints:
           issuerRef:
             name: understack-cluster-issuer
             kind: ClusterIssuer
+  # default to dex in the same cluster for AIO
+  dex:
+    namespace: dex
+    hosts:
+      default: dex
+    host_fqdn_override:
+      # override this when using a full deployment
+      # to the actual hostname of dex
+      default: null
+    scheme:
+      # override this to https when full deployment
+      default: http
+    port:
+      dex:
+        # override this when full deployment
+        default: 5556
+    path: '/.well-known/openid-configuration'
 
 manifests:
   job_credential_cleanup: false
