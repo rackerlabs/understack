@@ -11,6 +11,9 @@ spec:
   instances: 3
   storage:
     size: 20Gi
+  affinity:
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
   monitoring:
     enablePodMonitor: true
 ---
