@@ -9,6 +9,21 @@ metadata:
 spec:
   replicas: 3
   persistence: {{ .Values.rabbitmq.persistence | toJson }}
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: openstack-control-plane
+                operator: In
+                values:
+                  - enabled
+    podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: rabbitmq
+          topologyKey: kubernetes.io/hostname
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
