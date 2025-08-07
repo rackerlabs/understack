@@ -2,6 +2,7 @@
 
 from cinder import context
 from cinder import exception
+from cinder import interface
 from cinder.objects import volume_type as vol_type_obj
 from cinder.volume import driver as volume_driver
 from cinder.volume.drivers.netapp import options
@@ -31,8 +32,8 @@ NETAPP_DYNAMIC_OPTS = [
 ]
 
 
-class NetappCinderDynamicDriver(NetAppNVMeStorageLibrary):
-    """NetApp NVMe driver with dynamic SVM selection from volume types.
+class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
+    """NetApp NVMe storage library with dynamic SVM selection from volume types.
 
     Key difference from standard NetApp drivers:
     - Standard: One SVM per backend, all config in cinder.conf
@@ -962,6 +963,87 @@ class NetappCinderDynamicDriver(NetAppNVMeStorageLibrary):
             raise exception.VolumeBackendAPIException(
                 data=f"Failed to create volume {volume.name}: {e}"
             ) from e
+
+
+@interface.volumedriver
+class NetappCinderDynamicDriver(volume_driver.BaseVD):
+    """NetApp NVMe driver with dynamic multi-SVM support.
+
+    This driver follows the standard Cinder pattern by inheriting from BaseVD
+    and delegating storage operations to the NetappDynamicLibrary.
+    """
+
+    VERSION = "1.0.0"
+    DRIVER_NAME = "NetApp_Dynamic_NVMe"
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the driver and create library instance."""
+        super().__init__(*args, **kwargs)
+        self.library = NetappDynamicLibrary(self.DRIVER_NAME, "NVMe", **kwargs)
+
+    def do_setup(self, context):
+        """Setup the driver."""
+        self.library.do_setup(context)
+
+    def check_for_setup_error(self):
+        """Check for setup errors."""
+        self.library.check_for_setup_error()
+
+    def create_volume(self, volume):
+        """Create a volume."""
+        return self.library.create_volume(volume)
+
+    def delete_volume(self, volume):
+        """Delete a volume."""
+        return self.library.delete_volume(volume)
+
+    def create_snapshot(self, snapshot):
+        """Create a snapshot."""
+        return self.library.create_snapshot(snapshot)
+
+    def delete_snapshot(self, snapshot):
+        """Delete a snapshot."""
+        return self.library.delete_snapshot(snapshot)
+
+    def create_volume_from_snapshot(self, volume, snapshot):
+        """Create a volume from a snapshot."""
+        return self.library.create_volume_from_snapshot(volume, snapshot)
+
+    def create_cloned_volume(self, volume, src_vref):
+        """Create a cloned volume."""
+        return self.library.create_cloned_volume(volume, src_vref)
+
+    def extend_volume(self, volume, new_size):
+        """Extend a volume."""
+        return self.library.extend_volume(volume, new_size)
+
+    def initialize_connection(self, volume, connector):
+        """Initialize connection to volume."""
+        return self.library.initialize_connection(volume, connector)
+
+    def terminate_connection(self, volume, connector, **kwargs):
+        """Terminate connection to volume."""
+        return self.library.terminate_connection(volume, connector, **kwargs)
+
+    def get_volume_stats(self, refresh=False):
+        """Get volume stats."""
+        return self.library.get_volume_stats(refresh)
+
+    def update_provider_info(self, volumes, snapshots):
+        """Update provider info."""
+        return self.library.update_provider_info(volumes, snapshots)
+
+    def create_export(self, context, volume, connector):
+        """Create export for volume."""
+        return self.library.create_export(context, volume, connector)
+
+    def ensure_export(self, context, volume):
+        """Ensure export for volume."""
+        return self.library.ensure_export(context, volume)
+
+    def remove_export(self, context, volume):
+        """Remove export for volume."""
+        return self.library.remove_export(context, volume)
 
 
 # NOTES
