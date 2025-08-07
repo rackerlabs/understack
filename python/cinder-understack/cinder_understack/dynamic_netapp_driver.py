@@ -40,84 +40,19 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
     - Ours: Multiple SVMs per backend, SVM name from volume type
     """
 
-    def __init__(self, *args, **kwargs):
+    REQUIRED_CMODE_FLAGS = []
+
+    def __init__(self, driver_name, driver_protocol, **kwargs):
         """Initialize driver without creating SVM connections.
 
         Parent driver creates static connections during init. We defer
         SVM connections until volume creation when we know which SVM to use.
         """
-        self.initialized = False
-        self.client = None
-        driver_name = kwargs.pop("driver_name", "NetAppDynamicNVMe")
-        driver_protocol = kwargs.pop("driver_protocol", "nvme")
-        self.app_version = kwargs.get("app_version", "1.0.0")
-
-        self._setup_configuration(**kwargs)
-
         super().__init__(driver_name, driver_protocol, **kwargs)
+        self.client = None
         self.ssc_library = None
         self.perf_library = None
         self.init_capabilities()
-
-    def _setup_configuration(self, **kwargs):
-        """Setup configuration using cinder.volume.configuration module."""
-        from cinder.volume import configuration
-
-        config_obj = kwargs.get("configuration", None)
-
-        if config_obj:
-            # here we can access any cinder-provided config .
-            self.configuration = config_obj
-            config_group = getattr(config_obj, "config_group", "netapp_nvme")
-
-            # Register NetApp-specific options using configuration.append()
-            # Following the exact pattern from upstream NetApp drivers
-
-            try:
-                for opt_group in NETAPP_DYNAMIC_OPTS:
-                    self.configuration.append_config_values(opt_group)
-
-                LOG.info(
-                    "Registered NetApp configuration options for group: %s",
-                    config_group,
-                )
-
-            except Exception as e:
-                LOG.warning("Failed to register configuration options: %s", e)
-                # Continue default configuration handling for backward compatibility
-        else:
-            # Testing/Fallback: Create configuration object with all options
-            config_group = "netapp_nvme"
-            self.configuration = configuration.Configuration(
-                volume_driver.volume_opts, config_group=config_group
-            )
-
-            # Register additional NetApp options for testing
-            try:
-                for opt_group in NETAPP_DYNAMIC_OPTS:
-                    if (
-                        opt_group != volume_driver.volume_opts
-                    ):  # Avoid duplicate registration
-                        self.configuration.append_config_values(opt_group)
-
-                LOG.info(
-                    "Registered NetApp configuration options for testing group: %s",
-                    config_group,
-                )
-
-            except Exception as e:
-                LOG.warning(
-                    "Failed to register configuration options for testing: %s", e
-                )
-
-    @property
-    def supported(self):
-        # Used by Cinder to determine whether this driver is active/enabled
-        return True
-
-    def get_version(self):
-        # Called at Cinder service startup to report backend driver version
-        return "NetappCinderDynamicDriver 1.0"
 
     def do_setup(self, context):
         """Skip static NetApp connections, defer to volume creation time."""
@@ -143,10 +78,6 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
             "max_over_subscription_ratio": max_over_subscription_ratio,
         }
         self.capabilities = self._capabilities
-
-    def set_initialized(self):
-        """Mark driver as ready for volume operations."""
-        self.initialized = True
 
     def _get_all_svm_clients_from_volume_types(self):
         """Connect to all SVMs found in volume type metadata."""
