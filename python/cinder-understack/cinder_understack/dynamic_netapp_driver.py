@@ -5,6 +5,7 @@ from cinder import exception
 from cinder import interface
 from cinder.objects import volume_type as vol_type_obj
 from cinder.volume import driver as volume_driver
+from cinder.volume import volume_types
 from cinder.volume.drivers.netapp import options
 from cinder.volume.drivers.netapp.dataontap.client.client_cmode_rest import (
     RestClient as RestNaServer,
@@ -697,6 +698,14 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
         our dynamic pool naming convention (svm_name#flexvol_name).
         """
         LOG.info("Creating volume %s on host %s", volume.name, volume.host)
+
+        if volume.volume_type:
+            volume_type = volume.volume_type
+        else:
+            volume_type = volume_types.get_volume_type(None, volume.volume_type_id)
+
+        LOG.info("Volume Type: %s", volume_type)
+
         # TODO: subsystem
         # Parse the pool name from volume host to handle our
         # svm_name#flexvol_name format
