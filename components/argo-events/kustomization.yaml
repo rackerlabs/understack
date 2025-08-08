@@ -7,10 +7,9 @@ resources:
   - https://github.com/argoproj/argo-events/releases/download/v1.9.7/install.yaml
   - https://github.com/argoproj/argo-events/releases/download/v1.9.7/install-validating-webhook.yaml
 
-  ## configure rbac to integrate with argo-workflow
-  # - default-role.yaml
-  - argo-server-role.yaml
-  - argo-role.yaml
+  # grant the argo-workflows the ability to run workflows in this namespace
+  - https://github.com/argoproj/argo-workflows/manifests/namespace-install/argo-server-rbac?ref=v3.5.10
+  - https://github.com/argoproj/argo-workflows/manifests/namespace-install/workflow-controller-rbac?ref=v3.5.10
 
   ## configure webhook Sensor and associated role
   - sensor-workflow-role.yaml
@@ -23,3 +22,14 @@ resources:
 
   ## copy openstack/cinder-netapp-config to argo-events/netapp-config
   - secret-netapp.yaml
+
+patches:
+- target:
+    kind: RoleBinding
+    name: argo-binding
+  path: controller-rb.yaml
+
+- target:
+    kind: RoleBinding
+    name: argo-server-binding
+  path: argo-server-rb.yaml
