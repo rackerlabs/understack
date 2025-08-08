@@ -29,6 +29,7 @@
     name: sso
     domain_id: "{{ _domain_sso.domain.id }}"
     description: 'Identity Provider to dex'
+    is_enabled: true
     remote_ids:
       - "{{ keystone_bootstrap_dex_url }}"
 
