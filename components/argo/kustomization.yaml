@@ -3,11 +3,14 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  # the same as using namespace-install.yaml but easier to follow what the
-  # actual pieces we are using are
+  # We are doing upstream's namespace-install.yaml but since we
+  # want the actual workflows to run in a different namespace
+  # the roles are created there
   - https://github.com/argoproj/argo-workflows/manifests/base?ref=v3.5.10
-  - https://github.com/argoproj/argo-workflows/manifests/namespace-install/argo-server-rbac?ref=v3.5.10
-  - https://github.com/argoproj/argo-workflows/manifests/namespace-install/workflow-controller-rbac?ref=v3.5.10
+  # give the workflow controller access it needs
+  - workflow-controller-runtime.yaml
+  # give the argo-server access it needs
+  - argo-server-runtime.yaml
 
   # ingress for workflows.${DNS_ZONE} to the argo server for the UI
   - ingress.yaml
@@ -40,15 +43,6 @@ patches:
     kind: Deployment
     name: workflow-controller
   path: ./workflow-controller-deployment.yaml
-
-# see the patch for details on the change
-- target:
-    group: rbac.authorization.k8s.io
-    version: v1
-    kind: Role
-    # this is the role that the workflow-controller runs with
-    name: argo-role
-  path: ./workflow-controller-role.yaml
 
 # apply our configuration changes to the configmap
 configMapGenerator:
