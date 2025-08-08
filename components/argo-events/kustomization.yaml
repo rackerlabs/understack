@@ -19,3 +19,19 @@ resources:
 
   ## allow neutron's service account to submit workflows
   - svc-neutron.yaml
+
+patches:
+- target:
+    kind: Deployment
+    name: controller-manager
+  path: controller-deployment.yaml
+
+- target:
+    kind: RoleBinding
+    name: argo-binding
+  path: controller-rb.yaml
+
+- target:
+    kind: RoleBinding
+    name: argo-server-binding
+  path: argo-server-rb.yaml
