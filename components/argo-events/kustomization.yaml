@@ -17,9 +17,6 @@ resources:
 
   - configmaps.yaml
 
-  ## allow neutron's service account to submit workflows
-  - svc-neutron.yaml
-
   ## copy openstack/cinder-netapp-config to argo-events/netapp-config
   - secret-netapp.yaml
 
