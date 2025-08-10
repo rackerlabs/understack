@@ -14,5 +14,5 @@ helmCharts:
   namespace: mariadb-operator
   valuesFile: values.yaml
   releaseName: mariadb-operator
-  version: 0.31.0
+  version: 0.38.1
   repo: https://mariadb-operator.github.io/mariadb-operator
