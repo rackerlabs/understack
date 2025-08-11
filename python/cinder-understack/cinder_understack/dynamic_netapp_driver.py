@@ -239,7 +239,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def get_volume_stats(self, refresh=False):
         """Get volume stats."""
         if refresh:
-            LOG.INFO("would refresh")
+            LOG.info("would refresh")
             data = {}
             data["volume_backend_name"] = (
                 self.configuration.safe_get("volume_backend_name") or self.DRIVER_NAME
