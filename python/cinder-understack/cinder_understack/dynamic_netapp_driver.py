@@ -40,24 +40,20 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
     - Ours: Multiple SVMs per backend, SVM name from volume type
     """
 
+    REQUIRED_CMODE_FLAGS = []
+
     def __init__(self, *args, **kwargs):
         """Initialize driver without creating SVM connections.
 
         Parent driver creates static connections during init. We defer
         SVM connections until volume creation when we know which SVM to use.
         """
-        self.initialized = False
-        self.client = None
-        driver_name = kwargs.pop("driver_name", "NetAppDynamicNVMe")
-        driver_protocol = kwargs.pop("driver_protocol", "nvme")
-        self.app_version = kwargs.get("app_version", "1.0.0")
-
         self._setup_configuration(**kwargs)
 
-        super().__init__(driver_name, driver_protocol, **kwargs)
+        super().__init__(*args, **kwargs)
+        self.client = None
         self.ssc_library = None
         self.perf_library = None
-        self.init_capabilities()
 
     def _setup_configuration(self, **kwargs):
         """Setup configuration using cinder.volume.configuration module."""
@@ -110,15 +106,6 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
                     "Failed to register configuration options for testing: %s", e
                 )
 
-    @property
-    def supported(self):
-        # Used by Cinder to determine whether this driver is active/enabled
-        return True
-
-    def get_version(self):
-        # Called at Cinder service startup to report backend driver version
-        return "NetappCinderDynamicDriver 1.0"
-
     def do_setup(self, context):
         """Skip static NetApp connections, defer to volume creation time."""
         LOG.info("Skipping static setup, will connect to SVMs dynamically")
@@ -131,22 +118,6 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
     def check_for_setup_error(self):
         """Skip static validation since we connect to SVMs dynamically."""
         pass
-
-    def init_capabilities(self):
-        """Set driver capabilities for Cinder scheduler."""
-        max_over_subscription_ratio = self.configuration.max_over_subscription_ratio
-        self._capabilities = {
-            "thin_provisioning_support": True,
-            "thick_provisioning_support": True,
-            "multiattach": True,
-            "snapshot_support": True,
-            "max_over_subscription_ratio": max_over_subscription_ratio,
-        }
-        self.capabilities = self._capabilities
-
-    def set_initialized(self):
-        """Mark driver as ready for volume operations."""
-        self.initialized = True
 
     def _get_all_svm_clients_from_volume_types(self):
         """Connect to all SVMs found in volume type metadata."""
@@ -1029,10 +1000,6 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """Get volume stats."""
         return self.library.get_volume_stats(refresh)
 
-    def update_provider_info(self, volumes, snapshots):
-        """Update provider info."""
-        return self.library.update_provider_info(volumes, snapshots)
-
     def create_export(self, context, volume, connector):
         """Create export for volume."""
         return self.library.create_export(context, volume, connector)
@@ -1044,12 +1011,3 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def remove_export(self, context, volume):
         """Remove export for volume."""
         return self.library.remove_export(context, volume)
-
-
-# NOTES
-# Namespace: Manually created because we skip standard do_setup()
-# Pool: Custom svm#flexvol format to support multi-SVM
-# Client: Runtime creation based on volume type metadata vs static config
-# Metadata: volume type extra_specs vs cinder.conf
-# Library Initialization: Lazy initialization during volume creation
-# Pool Discovery: Multi-SVM aggregation vs single SVM
