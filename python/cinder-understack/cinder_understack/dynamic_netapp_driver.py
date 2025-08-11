@@ -13,7 +13,6 @@ from cinder.volume.drivers.netapp.dataontap.client import client_cmode_rest
 from cinder.volume.drivers.netapp.dataontap.nvme_library import NetAppNVMeStorageLibrary
 from cinder.volume.drivers.netapp.dataontap.performance import perf_cmode
 from cinder.volume.drivers.netapp.dataontap.utils import capabilities
-from cinder.volume.drivers.netapp.dataontap.utils import utils as dot_utils
 from oslo_config import cfg
 from oslo_log import log as logging
 
@@ -75,7 +74,6 @@ def _validate_volume_type(volume_type):
 class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
     """Add multi-SVM support to the upstream NetApp library."""
 
-    # we are dynamically supplying the svm name so don't require the param
     REQUIRED_CMODE_FLAGS = []
 
     def do_setup(self, ctxt, svm_name):
@@ -92,9 +90,6 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
 
         na_utils.check_flags(self.REQUIRED_CMODE_FLAGS, self.configuration)
 
-        self.client = dot_utils.get_client_for_backend(
-            self.backend_name, vserver_name=svm_name, force_rest=True
-        )
         self.client = client_cmode_rest.RestClient(
             transport_type=self.configuration.netapp_transport_type,
             ssl_cert_path=self.configuration.netapp_ssl_cert_path,
@@ -170,7 +165,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             CONF.set_override("netapp_vserver", svm_name, group=new_cfg_grp)
             CONF.set_override("volume_backend_name", new_cfg_grp, group=new_cfg_grp)
             # create a new instance
-            lib = NetappDynamicLibrary(
+            lib = NetAppNVMeStorageLibrary(
                 self.DRIVER_NAME, "NVMe", configuration=cfg, **self._lib_init
             )
             lib.do_setup(ctxt, svm_name)
@@ -185,9 +180,9 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def do_setup(self, ctxt):
         """Setup the driver."""
-        for svm_name, lib in self._libraries.items():
+        for svm_name, _ in self._libraries.items():
             LOG.info("Calling do_setup for SVM %s", svm_name)
-            lib.do_setup(ctxt, svm_name)
+            # lib.do_setup(ctxt)
 
     def check_for_setup_error(self):
         """Check for setup errors."""
