@@ -133,6 +133,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             self.configuration.append_config_values(opts)
         # stats cache
         self._stats = {}
+        LOG.info("initialized dynamic nvme")
 
     def _volume_to_library(self, volume):
         LOG.info("got called for volume %s", volume)
@@ -181,12 +182,12 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def create_snapshot(self, snapshot):
         """Create a snapshot."""
         raise exception.DriverNotInitialized()
-        return self.library.create_snapshot(snapshot)
+        # return self.library.create_snapshot(snapshot)
 
     def delete_snapshot(self, snapshot):
         """Delete a snapshot."""
         raise exception.DriverNotInitialized()
-        return self.library.delete_snapshot(snapshot)
+        # return self.library.delete_snapshot(snapshot)
 
     def create_volume_from_snapshot(self, volume, snapshot):
         """Create a volume from a snapshot."""
@@ -217,6 +218,17 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """Get volume stats."""
         if refresh:
             LOG.INFO("would refresh")
+            data = {}
+            data["volume_backend_name"] = (
+                self.configuration.safe_get("volume_backend_name") or self.DRIVER_NAME
+            )
+            data["vendor_name"] = "NetApp"
+            data["driver_version"] = self.VERSION
+            data["storage_protocol"] = "NVMe"
+            data["sparse_copy_volume"] = True
+            data["replication_enabled"] = False
+            data["pools"] = []
+            self._stats = data
         return self._stats
 
     def create_export(self, ctxt, volume, connector):
