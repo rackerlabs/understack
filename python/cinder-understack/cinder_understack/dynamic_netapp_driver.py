@@ -236,11 +236,6 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         #    self._stats = data
         return self._stats
 
-    def update_provider_info(self, volumes, snapshots):
-        """Update provider info."""
-        raise exception.DriverNotInitialized()
-        return self.library.update_provider_info(volumes, snapshots)
-
     def create_export(self, ctxt, volume, connector):
         """Create export for volume."""
         lib = self._volume_to_library(volume)
