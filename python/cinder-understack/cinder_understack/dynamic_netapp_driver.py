@@ -168,6 +168,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             )
             cfg.shared_backend_conf = CONF._get(self.configuration.config_group)
             CONF.set_override("netapp_vserver", svm_name, group=new_cfg_grp)
+            CONF.set_override("volume_backend_name", new_cfg_grp, group=new_cfg_grp)
             # create a new instance
             lib = NetappDynamicLibrary(
                 self.DRIVER_NAME, "NVMe", configuration=cfg, **self._lib_init
