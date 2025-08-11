@@ -135,6 +135,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         self._stats = {}
 
     def _volume_to_library(self, volume):
+        LOG.info("got called for volume %s", volume)
         volume_type = _get_volume_type(volume)
         _validate_volume_type(volume_type)
         prefix = self.configuration.safe_get("netapp_vserver_prefix") or "os-"
@@ -216,24 +217,6 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """Get volume stats."""
         if refresh:
             LOG.INFO("would refresh")
-        #    data = {}
-        #    data["volume_backend_name"] = (
-        #        self.configuration.safe_get("volume_backend_name") or self.DRIVER_NAME
-        #    )
-        #    data["vendor_name"] = "NetApp"
-        #    data["driver_version"] = self.VERSION
-        #    data["storage_protocol"] = "NVMe"
-        #    data["sparse_copy_volume"] = True
-        #    data["replication_enabled"] = False
-        #    data["pools"] = []
-        #    for svm_name, lib in self._libraries.items():
-        #        stats = lib.get_volume_stats(
-        #            refresh, lib.get_filter_function(), lib.get_goodness_function()
-        #        )
-        #        for pool in stats["pools"]:
-        #            pool["pool_name"] = f"{svm_name}#{pool['pool_name']}"
-        #            data["pools"].append(pool)
-        #    self._stats = data
         return self._stats
 
     def create_export(self, ctxt, volume, connector):
