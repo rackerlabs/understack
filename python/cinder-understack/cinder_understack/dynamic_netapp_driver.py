@@ -3,10 +3,13 @@
 from cinder import context
 from cinder import exception
 from cinder import interface
+from cinder.volume import configuration
 from cinder.volume import driver as volume_driver
 from cinder.volume import volume_types
+from cinder.volume import volume_utils
 from cinder.volume.drivers.netapp import options
 from cinder.volume.drivers.netapp import utils as na_utils
+from cinder.volume.drivers.netapp.dataontap.client import client_cmode_rest
 from cinder.volume.drivers.netapp.dataontap.nvme_library import NetAppNVMeStorageLibrary
 from cinder.volume.drivers.netapp.dataontap.performance import perf_cmode
 from cinder.volume.drivers.netapp.dataontap.utils import capabilities
@@ -79,7 +82,7 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
         """Override the upstream implementation to dynamically set the svm.
 
         This is a copy and paste of the driver except the get_client_for_backend()
-        call passing the svm instead of reading it from the config.
+        call is replaced with one that uses our custom config
         """
         na_utils.check_flags(self.REQUIRED_FLAGS, self.configuration)
         self.namespace_ostype = (
@@ -89,10 +92,20 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
 
         na_utils.check_flags(self.REQUIRED_CMODE_FLAGS, self.configuration)
 
-        # NOTE(felipe_rodrigues): NVMe driver is only available with
-        # REST client.
         self.client = dot_utils.get_client_for_backend(
             self.backend_name, vserver_name=svm_name, force_rest=True
+        )
+        self.client = client_cmode_rest.RestClient(
+            transport_type=self.configuration.netapp_transport_type,
+            ssl_cert_path=self.configuration.netapp_ssl_cert_path,
+            username=self.configuration.netapp_login,
+            password=self.configuration.netapp_password,
+            hostname=self.configuration.netapp_server_hostname,
+            port=self.configuration.netapp_server_port,
+            vserver=self.configuration.netapp_vserver,
+            trace=volume_utils.TRACE_API,
+            api_trace_pattern=self.configuration.netapp_api_trace_pattern,
+            async_rest_timeout=self.configuration.netapp_async_rest_timeout,
         )
         self.vserver = self.client.vserver
 
@@ -131,6 +144,8 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         self.configuration = kwargs["configuration"]
         for opts in NETAPP_DYNAMIC_OPTS:
             self.configuration.append_config_values(opts)
+        # we want to provide a unique configuration to each lib init
+        del self._lib_init["configuration"]
         # stats cache
         self._stats = {}
         LOG.info("initialized dynamic nvme")
@@ -145,8 +160,18 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         lib = self._libraries.get(svm_name)
         if lib is None:
             ctxt = context.get_admin_context()
-            # create a new instance if needed
-            lib = NetappDynamicLibrary(self.DRIVER_NAME, "NVMe", **self._lib_init)
+            # dynamically generate a new config section
+            new_cfg_grp = f"{self.configuration.config_group}-{svm_name}"
+            cfg = configuration.BackendGroupConfiguration(
+                volume_driver.volume_opts,
+                config_group=new_cfg_grp,
+            )
+            cfg.shared_backend_conf = CONF._get(self.configuration.config_group)
+            CONF.set_override("netapp_vserver", svm_name, group=new_cfg_grp)
+            # create a new instance
+            lib = NetappDynamicLibrary(
+                self.DRIVER_NAME, "NVMe", configuration=cfg, **self._lib_init
+            )
             lib.do_setup(ctxt, svm_name)
             lib.check_for_setup_error()
             self._libraries[svm_name] = lib
