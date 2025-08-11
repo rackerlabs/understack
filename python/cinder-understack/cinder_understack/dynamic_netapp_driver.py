@@ -1,3 +1,4 @@
+
 """NetApp NVMe driver with dynamic multi-SVM support."""
 
 from cinder import context
@@ -57,6 +58,8 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
         super().__init__(driver_name, driver_protocol, **kwargs)
         self.ssc_library = None
         self.perf_library = None
+        # Cache for SVM-specific NetAppNVMeStorageLibrary instances
+        self.svm_libraries = {}
         self.init_capabilities()
 
     def _setup_configuration(self, **kwargs):
@@ -189,6 +192,138 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
 
         return svm_clients
 
+    def upstream_lib_instances(self, svm_name, client):
+        """
+        """
+        print(f"DEBUG: upstream_lib_instances called with svm_name={svm_name}")
+
+        if svm_name not in self.svm_libraries:
+            print(f"Creating new library for SVM: {svm_name}")  # temp debug
+
+            try:
+                # Create a configuration object for this SVM
+                from cinder.volume import configuration
+
+
+                svm_config = configuration.Configuration(
+                    volume_driver.volume_opts,
+                    config_group=f"netapp_nvme_{svm_name}"
+                )
+
+                # Copy all attributes
+                debug_copied_attrs = 0
+                failed_attrs = []
+                for attr_name in dir(self.configuration):
+                    if not attr_name.startswith('_') and hasattr(svm_config, attr_name):
+                        try:
+                            setattr(svm_config, attr_name, getattr(self.configuration, attr_name))
+                            debug_copied_attrs += 1
+                        except (AttributeError, TypeError) as e:
+
+                            failed_attrs.append(attr_name)
+                            pass
+
+                # print(f"DEBUG: copied {debug_copied_attrs} attrs, failed: {failed_attrs}")
+
+                svm_config.netapp_vserver = svm_name
+
+
+                for opt_group in NETAPP_DYNAMIC_OPTS:
+                    try:
+                        svm_config.append_config_values(opt_group)
+                    except Exception as reg_error:
+                        # Options might already be registered, ignore
+                        # print(f"Config registration failed: {reg_error}")
+                        pass
+
+                # Create the upstream library instance
+                # NOTE: upstream expects specific host format, don't change this
+                backend_host = f"cinder@netapp_nvme_{svm_name}"
+
+                # print(f"Creating library with backend_host: {backend_host}")
+
+                svm_library = NetAppNVMeStorageLibrary(
+                    driver_name=f"{self.driver_name}_{svm_name}",
+                    driver_protocol=self.driver_protocol,
+                    configuration=svm_config,
+                    host=backend_host,
+                    app_version=self.app_version
+                )
+
+                # Set client directly to skip do_setup()
+                svm_library.client = client
+                svm_library.rest_client = client
+                svm_library.vserver = svm_name
+                svm_library.namespace_ostype = self.namespace_ostype or self.DEFAULT_NAMESPACE_OS
+                svm_library.host_type = self.host_type or self.DEFAULT_HOST_TYPE
+
+                # Initialize SSC library - HACK: using zapi_client param for REST client
+                # because upstream code expects it, even though we're using REST
+                svm_library.ssc_library = capabilities.CapabilitiesLibrary(
+                    protocol=self.driver_protocol,
+                    vserver_name=svm_name,
+                    zapi_client=client,  # This is actually REST client but upstream doesn't care
+                    configuration=svm_config,
+                )
+
+                # This used to fail randomly, added try/catch
+                perm_check_failed = False
+                try:
+                    svm_library.ssc_library.check_api_permissions()
+                    svm_library.using_cluster_credentials = (
+                        svm_library.ssc_library.cluster_user_supported()
+                    )
+                except Exception as perm_error:
+                    print(f"Permission check failed: {perm_error}")
+                    # Continue anyway, might still work
+                    svm_library.using_cluster_credentials = True
+                    perm_check_failed = True
+
+                svm_library.perf_library = perf_cmode.PerformanceCmodeLibrary(client)
+
+                # Set other attributes - TODO: get these from config instead of hardcoding
+                svm_library.max_over_subscription_ratio = (
+                    self.max_over_subscription_ratio if hasattr(self, 'max_over_subscription_ratio')
+                    else 20.0  # Default from NetApp docs
+                )
+                svm_library.reserved_percentage = (
+                    self.reserved_percentage if hasattr(self, 'reserved_percentage')
+                    else 0
+                )
+
+                # Ensure namespace table exists - this was missing and caused AttributeError
+                if not hasattr(svm_library, 'namespace_table'):
+                    svm_library.namespace_table = {}
+                    # print("Created empty namespace_table")  # debug
+
+                # Backend name for Cinder scheduler
+                svm_library.backend_name = f"netapp_nvme_{svm_name}"
+
+                # Import looping calls - this was causing AttributeError before
+                from cinder.volume.drivers.netapp.dataontap.utils import loopingcalls
+                svm_library.loopingcalls = loopingcalls.LoopingCalls()
+
+                # Cache it
+                self.svm_libraries[svm_name] = svm_library
+
+                LOG.info("Created NetAppNVMeStorageLibrary instance for SVM %s", svm_name)
+                print(f"SUCCESS: Library created for {svm_name}" +
+                      f" (perm_check_failed={perm_check_failed})")  # temp debug
+
+            except Exception as e:
+                print(f"FAILED to create library for {svm_name}: {e}")  # debug
+                LOG.warning("Failed to create library instance for SVM %s: %s", svm_name, e)
+                # TODO: maybe we should retry once?
+                # import time
+                # time.sleep(0.5)
+                # return self.upstream_lib_instances(svm_name, client)
+                return None
+        else:
+            # print(f"Using cached library for SVM: {svm_name}")  # debug
+            pass
+
+        return self.svm_libraries.get(svm_name)
+
     def get_volume_stats(self, refresh=False):
         self._update_volume_stats()
         return self._stats
@@ -256,157 +391,47 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
         return all_pools
 
     def _get_svm_specific_pools(self, svm_name, client):
-        """Get pools for a specific SVM.
-
-        Creates SSC and performance libraries for the SVM, then builds
-        pool objects from FlexVols with SVM-prefixed names to avoid conflicts.
+        """
         """
         pools = []
 
         try:
-            # Create SSC library for this specific SVM  (not global)
-            ssc_library = capabilities.CapabilitiesLibrary(
-                protocol="nvme",
-                vserver_name=svm_name,  # SVM-specific
-                zapi_client=client,  # SVM-specific client
-                configuration=self.configuration,
-            )
-            # Get FlexVols for this SVM
-            flexvol_names = client.list_flexvols()  # SVM-specific call
-            LOG.info(
-                "Processing SVM %s: found %d FlexVols %s",
-                svm_name,
-                len(flexvol_names),
-                flexvol_names,
-            )
-
-            # Create flexvol mapping with SVM prefix to avoid conflicts
-            flexvol_map = {}
-            for flexvol_name in flexvol_names:
-                # Prefix pool name with SVM to avoid conflicts
-                pool_name = f"{svm_name}#{flexvol_name}"
-                flexvol_map[flexvol_name] = {"pool_name": pool_name}
-
-            # Update SSC for this SVM
-            ssc_library.update_ssc(flexvol_map)
-            ssc = ssc_library.get_ssc()
-
-            if not ssc:
-                LOG.warning("No SSC data for SVM %s", svm_name)
+            # Get or create the upstream library instance for this SVM
+            svm_library = self.upstream_lib_instances(svm_name, client)
+            if not svm_library:
+                LOG.warning("Could not create library instance for SVM %s", svm_name)
                 return pools
 
-            # Create performance library for this SVM
-            try:
-                perf_library = perf_cmode.PerformanceCmodeLibrary(
-                    client
-                )  # SVM-specific
-                perf_library.update_performance_cache(ssc)
-                aggregates = ssc_library.get_ssc_aggregates()
-                aggr_cap = client.get_aggregate_capacities(aggregates)
-            except Exception as e:
-                LOG.warning("Performance library failed for SVM %s: %s", svm_name, e)
-                perf_library = None
-                aggr_cap = {}
+            # Update the SSC (Storage Service Catalog) for this SVM
+            # This is equivalent to what the upstream library does in _update_ssc()
+            svm_library._update_ssc()
 
-            # Build pools for this SVM, using same logic as original code
+            # Use the upstream library's _get_pool_stats() method
+            # This gives us all the pool statistics with proper capacity,
+            # performance metrics, dedupe info, etc.
+            upstream_pools = svm_library._get_pool_stats()
+
+            # Prefix pool names with SVM name to avoid conflicts between SVMs
             pool_results = []
-            for vol_name, vol_info in ssc.items():
-                pool_name = f"{svm_name}#{vol_name}"  # SVM-prefixed pool name
-
-                pool = dict(vol_info)
-                pool["pool_name"] = pool_name
-                # same capabilities as original copied from netappnvme
-                pool["QoS_support"] = False
-                pool["multiattach"] = False
-                pool["online_extend_support"] = False
-                pool["consistencygroup_support"] = False
-                pool["consistent_group_snapshot_enabled"] = False
-                pool["reserved_percentage"] = 0
-                pool["max_over_subscription_ratio"] = 20.0
-
-                # Get real capacity from NetApp - use fallback values if API fails
-                try:
-                    cap = self._get_flexvol_capacity_with_fallback(client, vol_name)
-                    if isinstance(cap, dict):
-                        if "size-total" in cap and "size-available" in cap:
-                            total_bytes = cap["size-total"]
-                            free_bytes = cap["size-available"]
-                        elif "size_total" in cap and "size_available" in cap:
-                            total_bytes = cap["size_total"]
-                            free_bytes = cap["size_available"]
-                        else:
-                            LOG.warning(
-                                "Unexpected capacity format for %s: %s",
-                                vol_name,
-                                cap,
-                            )
-                            total_bytes = 1000 * (1024**3)  # 1TB fallback
-                            free_bytes = 900 * (1024**3)  # 900GB fallback
-                    else:
-                        # Fallback values
-                        LOG.warning(
-                            "Non-dict capacity response for %s: %s", vol_name, cap
-                        )
-                        total_bytes = 1000 * (1024**3)  # 1TB fallback
-                        free_bytes = 900 * (1024**3)  # 900GB fallback
-
-                    pool["total_capacity_gb"] = total_bytes // (1024**3)
-                    pool["free_capacity_gb"] = free_bytes // (1024**3)
-
-                    # Ensure non-zero capacity for scheduler
-                    if pool["total_capacity_gb"] == 0:
-                        pool["total_capacity_gb"] = 1000
-                        pool["free_capacity_gb"] = 900
-
-                    pool_results.append(f"{pool_name}({pool['total_capacity_gb']}GB)")
-
-                except Exception as e:
-                    LOG.warning(
-                        "Capacity error for %s: %s, using fallback values",
-                        pool_name,
-                        e,
-                    )
-                    # Use fallback values that will allow scheduling
-                    pool["total_capacity_gb"] = 1000
-                    pool["free_capacity_gb"] = 900
-                    pool_results.append(
-                        f"{pool_name}(fallback-{pool['total_capacity_gb']}GB)"
-                    )
-
-                # Add performance metrics
-                if perf_library:
-                    try:
-                        pool["utilization"] = (
-                            perf_library.get_node_utilization_for_pool(vol_name)
-                        )
-                    except Exception:
-                        pool["utilization"] = 50
-                else:
-                    pool["utilization"] = 50
-
-                # Add aggregate info
-                aggr_name = vol_info.get("netapp_aggregate")
-                pool["netapp_aggregate_used_percent"] = aggr_cap.get(aggr_name, {}).get(
-                    "percent-used", 0
-                )
-
-                # Add dedupe info
-                try:
-                    pool["netapp_dedupe_used_percent"] = (
-                        client.get_flexvol_dedupe_used_percent(vol_name)
-                    )
-                except Exception:
-                    pool["netapp_dedupe_used_percent"] = 0
-
+            for pool in upstream_pools:
+                original_pool_name = pool.get('pool_name', 'unknown')
+                prefixed_pool_name = f"{svm_name}#{original_pool_name}"
+                pool['pool_name'] = prefixed_pool_name
                 pools.append(pool)
+
+                capacity = pool.get('total_capacity_gb', 0)
+                pool_results.append(f"{prefixed_pool_name}({capacity}GB)")
 
             # Single consolidated log for all pools processed
             LOG.info(
-                "SVM %s contributed %d pools: %s", svm_name, len(pools), pool_results
+                "SVM %s contributed %d pools using upstream library: %s",
+                svm_name, len(pools), pool_results
             )
 
         except Exception as e:
-            LOG.exception("Failed to process SVM %s: %s", svm_name, e)
+            LOG.exception("Failed to process SVM %s using upstream library: %s", svm_name, e)
+            # Fallback to ensure we don't break the entire backend
+            return []
 
         return pools
 
@@ -760,39 +785,22 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
         LOG.debug("No-op clean_volume_file_locks in dynamic driver")
 
     def create_volume(self, volume):
-        """Create a volume with dynamic SVM selection based on volume type metadata.
-
-        This method completely overrides the parent's create_volume method to handle
-        our dynamic pool naming convention (svm_name#flexvol_name).
-        """
         LOG.info("Creating volume %s on host %s", volume.name, volume.host)
-        # TODO: subsystem
-        # Parse the pool name from volume host to handle our
-        # svm_name#flexvol_name format
-        # Our host format: cinder@netapp_nvme#data-svm1#ucloud1
-        # Standard extract_host expects only one #, but we use two
-        # So we need custom parsing for our svm_name#flexvol_name format
+
+        # Parse the pool name from volume host to handle our svm_name#flexvol_name format
         if "#" not in volume.host:
             msg = "No pool information found in volume host field."
             LOG.error(msg)
             raise exception.InvalidHost(reason=msg)
 
-        # Split on # and get everything after the backend name
-        # The original driver expects a simple pool name (FlexVol name).
-        # But our dynamic driver needs to support multiple SVMs,
-        # so we created a custom format svm_name#flexvol_name to encode
-        # both the SVM and FlexVol information in the pool name.
-        # This allows the scheduler to differentiate between FlexVols
-        # with the same name on different SVMs.
+        # Extract SVM and FlexVol names from the host field
         host_parts = volume.host.split("#")
         if len(host_parts) < 3:
             # Fallback to standard extraction for single # format
             from cinder.volume import volume_utils
-
             pool_name = volume_utils.extract_host(volume.host, level="pool")
         else:
             # Our custom format: backend#svm_name#flexvol_name
-            # Combine svm_name#flexvol_name as the pool name
             pool_name = "#".join(host_parts[1:])
 
         if pool_name is None:
@@ -810,29 +818,19 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
 
         # Extract SVM metadata from volume type extra_specs
         specs = volume.volume_type.extra_specs
-        LOG.info(
-            "Parsed pool %s -> SVM: %s, FlexVol: %s, extra_specs: %s",
-            pool_name,
-            svm_name,
-            flexvol_name,
-            specs,
-        )
-
-        # Extract SVM name from volume type metadata
         vserver = specs.get("netapp:svm_vserver")
-
-        # Everything else from cinder.conf
-        hostname = self.configuration.netapp_server_hostname
-        username = self.configuration.netapp_login
-        password = self.configuration.netapp_password
-        # For NVMe driver, protocol is always nvme
 
         # Validate required metadata
         if not vserver:
             msg = "Missing required NetApp SVM metadata: netapp:svm_vserver"
             LOG.error(msg)
             raise exception.VolumeBackendAPIException(data=msg)
+
         # Validate cinder.conf parameters
+        hostname = self.configuration.netapp_server_hostname
+        username = self.configuration.netapp_login
+        password = self.configuration.netapp_password
+
         if not all([hostname, username, password]):
             missing_conf = []
             if not hostname:
@@ -841,119 +839,105 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
                 missing_conf.append("netapp_login")
             if not password:
                 missing_conf.append("netapp_password")
-            msg = (
-                f"Missing required NetApp configuration in cinder.conf: "
-                f"{missing_conf}"
-            )
+            msg = f"Missing required NetApp configuration in cinder.conf: {missing_conf}"
             LOG.error(msg)
             raise exception.VolumeBackendAPIException(data=msg)
 
         LOG.info("Using SVM %s at %s (user: %s)", vserver, hostname, username)
 
         try:
-            # The original driver creates a single REST client during
-            # do_setup() using static configuration.
-            # Our dynamic driver needs to connect to different SVMs based on
-            # volume type metadata, so we create the client at volume creation
-            # time with parameters extracted from the volume type's extra_specs
-
-            # Initialize REST client for this specific SVM
-            self.client = self._init_rest_client(hostname, username, password, vserver)
-            # TODO WIP: sets self.client for current operation
-            # But pool stats methods expect different client patterns
-            # This could cause issues with concurrent operations
-            self.vserver = vserver  # Set vserver for compatibility
+            # Create REST client for this specific SVM
+            client = self._init_rest_client(hostname, username, password, vserver)
 
             # Test the connection
             try:
-                ontap_version = self.client.get_ontap_version(cached=False)
+                ontap_version = client.get_ontap_version(cached=False)
                 LOG.info("Connected to ONTAP %s on SVM %s", ontap_version, vserver)
             except Exception as e:
                 LOG.error("Failed to connect to ONTAP SVM %s: %s", vserver, e)
                 raise exception.VolumeBackendAPIException(
                     data=f"Cannot connect to NetApp SVM {vserver}: {e}"
                 ) from e
-            # The original driver initializes these libraries during do_setup().
-            # Since our dynamic driver skips static setup,
-            # we initialize them during the first volume creation.
-            # These libraries are needed for pool statistics and performance
-            # monitoring.
 
-            # Initialize SSC library for this SVM
-            if not self.ssc_library:
-                try:
-                    self.ssc_library = capabilities.CapabilitiesLibrary(
-                        protocol="nvme",
-                        vserver_name=vserver,
-                        zapi_client=self.client,
-                        configuration=self.configuration,
-                    )
-                    LOG.info("SSC library initialized for SVM %s", vserver)
-                except Exception as e:
-                    LOG.warning("Could not initialize SSC library: %s", e)
+            # Get or create the upstream library instance for this SVM
+            svm_library = self.upstream_lib_instances(vserver, client)
+            if not svm_library:
+                msg = f"Could not create library instance for SVM {vserver}"
+                LOG.error(msg)
+                raise exception.VolumeBackendAPIException(data=msg)
 
-            # Initialize performance library for this SVM
-            if not self.perf_library:
-                try:
-                    self.perf_library = perf_cmode.PerformanceCmodeLibrary(self.client)
-                    LOG.info("Performance library initialized for SVM %s", vserver)
-                except Exception as e:
-                    LOG.warning("Could not initialize performance library: %s", e)
+            # Create a modified volume object with the correct host format for upstream library
+            # The upstream library expects host format: backend@driver#pool_name
+            # We need to convert our svm_name#flexvol_name to just flexvol_name
 
-            # The core namespace creation logic is identical to the original -
-            # we reused the exact same pattern.
-            # The only difference is we use flexvol_name (extracted from our
-            # custom pool format) instead of pool_name directly.
+            backend_name = volume.host.split('@')[1].split('#')[0]
+            modified_host = f"{volume.host.split('@')[0]}@{backend_name}#{flexvol_name}"
 
-            # Replicate parent create_volume logic with our FlexVol name
-            from oslo_utils import units
+            # trying with temp a volume-like object that supports attribute access
+            class VolumeProxy:
+                def __init__(self, original_volume, modified_host):
+                    self._original = original_volume
+                    self._modified_host = modified_host
 
-            namespace = volume.name
-            size = int(volume["size"]) * units.Gi  # Convert GB to bytes
-            metadata = {
-                "OsType": self.namespace_ostype,
-                "Path": f"/vol/{flexvol_name}/{namespace}",
-            }
+                def __getattr__(self, name):
+                    if name == 'host':
+                        return self._modified_host
+                    return getattr(self._original, name)
 
-            try:
-                self.client.create_namespace(flexvol_name, namespace, size, metadata)
-                LOG.info("Created namespace %s in FlexVol %s", namespace, flexvol_name)
-            except Exception as e:
-                LOG.exception(
-                    "Exception creating namespace %(name)s in FlexVol "
-                    "%(pool)s: %(error)s",
-                    {"name": namespace, "pool": flexvol_name, "error": e},
-                )
-                msg = (
-                    f"Volume {namespace} could not be created in FlexVol "
-                    f"{flexvol_name}: {e}"
-                )
-                raise exception.VolumeBackendAPIException(data=msg) from e
+                def __getitem__(self, key):
+                    if key == 'host':
+                        return self._modified_host
+                    if hasattr(self._original, key):
+                        return getattr(self._original, key)
+                    # Fallback for dictionary-style access
+                    if hasattr(self._original, '__getitem__'):
+                        return self._original[key]
+                    raise KeyError(key)
 
-            # Update metadata and add to namespace table
-            metadata["Volume"] = flexvol_name
-            metadata["Qtree"] = None
-            handle = f'{self.vserver}:{metadata["Path"]}'
+                def get(self, key, default=None):
+                    try:
+                        return self[key]
+                    except (KeyError, AttributeError):
+                        return default
 
-            # Add to namespace table for tracking
-            # The original library maintains a namespace_table to
-            # cache namespace information for performance. Since our dynamic
-            # driver skips the standard do_setup() where this table would
-            # normally be initialized, we had to create it manually during
-            # volume creation.
-            # This table is important for operations like get_pool(),
-            # delete_volume(), and connection management.
-            from cinder.volume.drivers.netapp.dataontap.nvme_library import (
-                NetAppNamespace,
+            volume_copy = VolumeProxy(volume, modified_host)
+
+            LOG.info(
+                "Delegating volume creation to upstream library for SVM %s, "
+                "FlexVol %s, modified host: %s",
+                vserver, flexvol_name, volume_copy['host']
             )
 
-            namespace_obj = NetAppNamespace(handle, namespace, size, metadata)
-            if not hasattr(self, "namespace_table"):
-                self.namespace_table = {}
-            self.namespace_table[namespace] = namespace_obj
+            # Delegate to the upstream library's create_volume method
+            # This should handles all the namespace creation, metadata management, etc.
+            # import pdb
+            # pdb.set_trace()
+            LOG.info("About to call upstream create_volume with volume_copy: %s", volume_copy)
+            LOG.info("SVM library attributes: client=%s, vserver=%s, namespace_ostype=%s",
+                     hasattr(svm_library, 'client'),
+                     getattr(svm_library, 'vserver', 'None'),
+                     getattr(svm_library, 'namespace_ostype', 'None'))
 
-            LOG.info("Volume %s creation completed", volume.name)
-            return None  # Parent method returns None
+            try:
+                result = svm_library.create_volume(volume_copy)
+                LOG.info("Upstream create_volume returned: %s", result)
+            except Exception as upstream_error:
+                LOG.exception("Upstream create_volume failed for volume %s: %s", volume.name, upstream_error)
+                raise exception.VolumeBackendAPIException(
+                    data=f"Upstream create_volume failed for {volume.name}: {upstream_error}"
+                ) from upstream_error
+
+            # Update our namespace table with the created namespace
+            if hasattr(svm_library, 'namespace_table') and volume.name in svm_library.namespace_table:
+                if not hasattr(self, 'namespace_table'):
+                    self.namespace_table = {}
+                self.namespace_table[volume.name] = svm_library.namespace_table[volume.name]
+                LOG.info("Updated namespace table with volume %s", volume.name)
+            else:
+                LOG.warning("Volume %s not found in SVM library namespace table after creation", volume.name)
+
+            LOG.info("Volume %s creation completed using upstream library, returning: %s", volume.name, result)
+            return result
 
         except exception.VolumeBackendAPIException:
             # Re-raise Cinder exceptions as-is
@@ -963,7 +947,6 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
             raise exception.VolumeBackendAPIException(
                 data=f"Failed to create volume {volume.name}: {e}"
             ) from e
-
 
 @interface.volumedriver
 class NetappCinderDynamicDriver(volume_driver.BaseVD):
@@ -994,7 +977,8 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         return self.library.create_volume(volume)
 
     def delete_volume(self, volume):
-        """Delete a volume."""
+        """Delete a volume - enabled for cleanup."""
+        LOG.info("Driver delete_volume called for %s", volume.name)
         return self.library.delete_volume(volume)
 
     def create_snapshot(self, snapshot):
@@ -1053,3 +1037,4 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 # Metadata: volume type extra_specs vs cinder.conf
 # Library Initialization: Lazy initialization during volume creation
 # Pool Discovery: Multi-SVM aggregation vs single SVM
+
