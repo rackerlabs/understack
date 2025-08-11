@@ -138,8 +138,8 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         self._lib_init = kwargs
         # save the config
         self.configuration = kwargs["configuration"]
-        for opts in NETAPP_DYNAMIC_OPTS:
-            self.configuration.append_config_values(opts)
+        # for opts in NETAPP_DYNAMIC_OPTS:
+        #    self.configuration.append_config_values(opts)
         # we want to provide a unique configuration to each lib init
         del self._lib_init["configuration"]
         # stats cache
