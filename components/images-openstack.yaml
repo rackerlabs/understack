@@ -92,13 +92,13 @@ images:
     skyline_db_sync: "quay.io/airshipit/skyline:latest"
 
     # cinder
-    cinder_api: "ghcr.io/rackerlabs/understack/cinder:2024.2-ubuntu_jammy"
-    cinder_db_sync: "ghcr.io/rackerlabs/understack/cinder:2024.2-ubuntu_jammy"
-    cinder_scheduler: "ghcr.io/rackerlabs/understack/cinder:2024.2-ubuntu_jammy"
-    cinder_volume: "ghcr.io/rackerlabs/understack/cinder:2024.2-ubuntu_jammy"
-    cinder_volume_usage_audit: "ghcr.io/rackerlabs/understack/cinder:2024.2-ubuntu_jammy"
-    cinder_db_purge: "ghcr.io/rackerlabs/understack/cinder:2024.2-ubuntu_jammy"
-    cinder_backup: "ghcr.io/rackerlabs/understack/cinder:2024.2-ubuntu_jammy"
+    cinder_api: "ghcr.io/rackerlabs/understack/cinder:pr-1138"
+    cinder_db_sync: "ghcr.io/rackerlabs/understack/cinder:pr-1138"
+    cinder_scheduler: "ghcr.io/rackerlabs/understack/cinder:pr-1138"
+    cinder_volume: "ghcr.io/rackerlabs/understack/cinder:pr-1138"
+    cinder_volume_usage_audit: "ghcr.io/rackerlabs/understack/cinder:pr-1138"
+    cinder_db_purge: "ghcr.io/rackerlabs/understack/cinder:pr-1138"
+    cinder_backup: "ghcr.io/rackerlabs/understack/cinder:pr-1138"
     cinder_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
     cinder_backup_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
