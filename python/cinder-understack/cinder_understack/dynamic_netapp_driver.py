@@ -130,6 +130,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def __init__(self, *args, **kwargs):
         """Initialize the driver and create library instance."""
+        LOG.info("Initializing %s", self.DRIVER_NAME)
         super().__init__(*args, **kwargs)
         # this is where we'll keep each SVM scoped instance of the upstream NetApp lib
         self._libraries = {}
