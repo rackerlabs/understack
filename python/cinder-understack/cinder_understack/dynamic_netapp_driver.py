@@ -36,6 +36,7 @@ netapp_dynamic_opts = [
 
 # All configuration option groups used by the dynamic driver
 NETAPP_DYNAMIC_OPTS = [
+    volume_driver.volume_opts,
     options.netapp_proxy_opts,
     options.netapp_connection_opts,
     options.netapp_transport_opts,
