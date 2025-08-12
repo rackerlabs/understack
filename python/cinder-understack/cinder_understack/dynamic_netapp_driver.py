@@ -146,7 +146,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         CONF.set_override(
             "max_over_subscription_ratio",
             self.configuration.safe_get("max_over_subscription_ratio"),
-            group=self.configuration.group_name,
+            group=self.configuration.config_group,
         )
         # we want to provide a unique configuration to each lib init
         del self._lib_init["configuration"]
