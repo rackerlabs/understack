@@ -171,8 +171,13 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             volume_driver.volume_opts,
             config_group=new_cfg_grp,
         )
+        # add the netapp_vserver option
+        cfg.append_config_values(options.netapp_cluster_opts)
+        # the shared values come from our main driver config
         cfg.shared_backend_conf = CONF._get(self.configuration.config_group)
+        # set the vserver
         CONF.set_override("netapp_vserver", svm_name, group=new_cfg_grp)
+        # set an unique volume_backend_name for the SSC and capabilities libraries
         CONF.set_override("volume_backend_name", new_cfg_grp, group=new_cfg_grp)
         # create a new instance
         lib = NetAppNVMeStorageLibrary(
