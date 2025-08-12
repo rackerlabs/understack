@@ -190,7 +190,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         lib = NetAppNVMeStorageLibrary(
             self.DRIVER_NAME, "NVMe", configuration=cfg, **self._lib_init
         )
-        lib.do_setup(ctxt, svm_name)
+        lib.do_setup(ctxt)
         lib.check_for_setup_error()
         self._libraries[svm_name] = lib
 
