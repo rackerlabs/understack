@@ -141,6 +141,12 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         self.configuration = kwargs["configuration"]
         for opts in NETAPP_DYNAMIC_OPTS:
             self.configuration.append_config_values(opts)
+        # work around default used in drivers for the cfg override below
+        CONF.set_default(
+            "max_over_subscription_ratio",
+            self.configuration.safe_get("max_over_subscription_ratio"),
+            group=self.configuration.group_name,
+        )
         # we want to provide a unique configuration to each lib init
         del self._lib_init["configuration"]
         # stats cache
