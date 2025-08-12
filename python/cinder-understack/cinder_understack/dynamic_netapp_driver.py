@@ -43,6 +43,7 @@ NETAPP_DYNAMIC_OPTS = [
     options.netapp_provisioning_opts,
     options.netapp_cluster_opts,
     options.netapp_san_opts,
+    options.netapp_support_opts,
     volume_driver.volume_opts,
     netapp_dynamic_opts,
 ]
