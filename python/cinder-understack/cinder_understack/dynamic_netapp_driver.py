@@ -141,7 +141,8 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         for opts in NETAPP_DYNAMIC_OPTS:
             self.configuration.append_config_values(opts)
         # work around default used in drivers for the cfg override below
-        CONF.set_default(
+        # by dragging it from the SHARED_CONF_GROUP to our driver group
+        CONF.set_override(
             "max_over_subscription_ratio",
             self.configuration.safe_get("max_over_subscription_ratio"),
             group=self.configuration.group_name,
