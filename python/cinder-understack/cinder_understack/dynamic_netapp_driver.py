@@ -146,6 +146,41 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         self._stats = {}
         LOG.info("initialized dynamic nvme")
 
+    def _get_svms(self):
+        prefix = self.configuration.safe_get("netapp_vserver_prefix") or "os-"
+        svm_filter = {
+            "state": "running",
+            "nvme.enabled": "true",
+            "name": f"{prefix}*",
+            "fields": "name,uuid",
+        }
+        ret = self.cluster.get_records(
+            "svm/svms", query=svm_filter, enable_tunneling=False
+        )
+
+        return [rec["name"] for rec in ret["records"]]
+
+    def _add_svm_lib(self, svm_name, ctxt=None):
+        LOG.info("Setting up SVM %s", svm_name)
+        if ctxt is None:
+            ctxt = context.get_admin_context()
+        # dynamically generate a new config section
+        new_cfg_grp = f"{self.configuration.config_group}-{svm_name}"
+        cfg = configuration.BackendGroupConfiguration(
+            volume_driver.volume_opts,
+            config_group=new_cfg_grp,
+        )
+        cfg.shared_backend_conf = CONF._get(self.configuration.config_group)
+        CONF.set_override("netapp_vserver", svm_name, group=new_cfg_grp)
+        CONF.set_override("volume_backend_name", new_cfg_grp, group=new_cfg_grp)
+        # create a new instance
+        lib = NetAppNVMeStorageLibrary(
+            self.DRIVER_NAME, "NVMe", configuration=cfg, **self._lib_init
+        )
+        lib.do_setup(ctxt, svm_name)
+        lib.check_for_setup_error()
+        self._libraries[svm_name] = lib
+
     def _volume_to_library(self, volume):
         LOG.info("got called for volume %s", volume)
         volume_type = _get_volume_type(volume)
@@ -155,24 +190,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         # load an existing cached instance
         lib = self._libraries.get(svm_name)
         if lib is None:
-            ctxt = context.get_admin_context()
-            # dynamically generate a new config section
-            new_cfg_grp = f"{self.configuration.config_group}-{svm_name}"
-            cfg = configuration.BackendGroupConfiguration(
-                volume_driver.volume_opts,
-                config_group=new_cfg_grp,
-            )
-            cfg.shared_backend_conf = CONF._get(self.configuration.config_group)
-            CONF.set_override("netapp_vserver", svm_name, group=new_cfg_grp)
-            CONF.set_override("volume_backend_name", new_cfg_grp, group=new_cfg_grp)
-            # create a new instance
-            lib = NetAppNVMeStorageLibrary(
-                self.DRIVER_NAME, "NVMe", configuration=cfg, **self._lib_init
-            )
-            lib.do_setup(ctxt, svm_name)
-            lib.check_for_setup_error()
-            self._libraries[svm_name] = lib
-
+            raise exception.DriverNotInitialized()
         return lib
 
     @staticmethod
@@ -180,16 +198,30 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         return NETAPP_DYNAMIC_OPTS
 
     def do_setup(self, ctxt):
-        """Setup the driver."""
-        for svm_name, _ in self._libraries.items():
-            LOG.info("Calling do_setup for SVM %s", svm_name)
-            # lib.do_setup(ctxt)
+        """Setup the driver.
+
+        Connected to the NetApp with cluster credentials to find the SVMs.
+        """
+        self.cluster = client_cmode_rest.RestClient(
+            transport_type=self.configuration.netapp_transport_type,
+            ssl_cert_path=self.configuration.netapp_ssl_cert_path,
+            username=self.configuration.netapp_login,
+            password=self.configuration.netapp_password,
+            hostname=self.configuration.netapp_server_hostname,
+            port=self.configuration.netapp_server_port,
+            vserver=None,
+            trace=volume_utils.TRACE_API,
+            api_trace_pattern=self.configuration.netapp_api_trace_pattern,
+            async_rest_timeout=self.configuration.netapp_async_rest_timeout,
+        )
+        svms = self._get_svms()
+        for svm_name in svms:
+            self._add_svm_lib(svm_name, ctxt)
 
     def check_for_setup_error(self):
         """Check for setup errors."""
-        for svm_name, lib in self._libraries.items():
+        for svm_name, _ in self._libraries.items():
             LOG.info("Calling do_setup for SVM %s", svm_name)
-            lib.check_for_setup_error()
 
     def create_volume(self, volume):
         """Create a volume."""
