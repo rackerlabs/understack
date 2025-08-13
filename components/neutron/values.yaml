@@ -48,11 +48,7 @@ conf:
   plugins:
     ml2_conf:
       ml2:
-        # at this time due to physical switches not doing OpenFlow and enabling
-        # port security rules being different per model (or supported at all)
-        # disable it by default. this is necessary because openstack-helm enables
-        # it by default
-        extension_drivers: ''
+        extension_drivers: 'port_security'
         # set the default ml2 backend to our plugin, neutron_understack
         # we'll need to use the ovn ML2 plugin to hook the routers to our network
         mechanism_drivers: "understack,ovn"
