@@ -21,10 +21,6 @@ kind: WorkflowTemplate
 spec:
   entrypoint: sync-keystone-netapp
   serviceAccountName: workflow
-  arguments:
-    parameters:
-      - name: event_type
-      - name: project_uuid
   templates:
     - name: sync-keystone-netapp
       inputs:
