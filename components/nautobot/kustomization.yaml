@@ -6,7 +6,6 @@ resources:
   - cloudnative-postgres-nautobot.yaml
   - secretstore-nautobot.yaml
   - external-secret-nautobot-sso.yaml
-  - secretstore-nautobot-token.yaml
 
 configMapGenerator:
   - name: nautobot-sso

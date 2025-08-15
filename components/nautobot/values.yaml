@@ -113,6 +113,27 @@ extraObjects:
       template:
         spec:
           containers:
+            - name: create-nautobot-users
+                image: ghcr.io/rackerlabs/understack/ansible:latest
+                imagePullPolicy: Always
+                command: [ "ansible-runner", "run", "/runner", "--playbook", "nautobot-users.yaml" ]
+                env:
+                  - name: NAUTOBOT_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: ansible-nautobot-token
+                        key: apitoken
+                  - name: NAUTOBOT_URL
+                    value: http://nautobot-default.nautobot.svc.cluster.local
+                  - name: IDENTITY_TOKEN
+                    value: http://nautobot-default.nautobot.svc.cluster.local
+                  - name: PASSWORD_SAFE_URL
+                    value: https://passwordsafe.corp.rackspace.com
+                volumeMounts:
+                  - name: ansible-inventory
+                    mountPath: /runner/inventory/
+                  - name: ansible-group-vars
+                    mountPath: /runner/inventory/group_vars/
             - name: ansible-runner
               image: ghcr.io/rackerlabs/understack/ansible:latest
               imagePullPolicy: Always
