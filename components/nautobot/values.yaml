@@ -121,7 +121,7 @@ extraObjects:
                 - name: NAUTOBOT_TOKEN
                   valueFrom:
                     secretKeyRef:
-                      name: nautobot-superuser
+                      name: ansible-nautobot-token
                       key: apitoken
                 - name: NAUTOBOT_URL
                   value: http://nautobot-default.nautobot.svc.cluster.local
