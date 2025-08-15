@@ -8,7 +8,7 @@ spec:
   refreshInterval: 1h
   secretStoreRef:
     kind: ClusterSecretStore
-    name: nautobot
+    name: nautobot-token-store
   target:
     name: neutron-nautobot
     creationPolicy: Owner
@@ -23,5 +23,4 @@ spec:
   data:
   - secretKey: token
     remoteRef:
-      key: nautobot-superuser
-      property: apitoken
+      key: undercloud-neutron

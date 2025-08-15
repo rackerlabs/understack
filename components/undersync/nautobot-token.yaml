@@ -3,7 +3,7 @@ apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
 metadata:
   name: nautobot-token
-  namespace: openstack
+  namespace: undersync
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -13,16 +13,10 @@ spec:
     name: nautobot-token
     creationPolicy: Owner
     deletionPolicy: Delete
-    template:
-      engineVersion: v2
-      data:
-        token: "{{ .token }}"
-        bearer_token: "Token {{ .token }}"
   data:
-  - secretKey: token
+  - secretKey: nautobot_api_key
     remoteRef:
-      key: undercloud-openstack
-      property: apitoken
+      key: undercloud-undersync
       # necessary to avoid argoproj/argo-cd#13004
       conversionStrategy: Default
       decodingStrategy: None
