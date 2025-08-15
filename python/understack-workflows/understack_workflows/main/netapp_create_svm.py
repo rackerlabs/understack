@@ -5,13 +5,13 @@ import os
 
 import openstack
 import urllib3
-
 from netapp_ontap import config
 from netapp_ontap import utils
 from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
 from netapp_ontap.resources import Svm
 from netapp_ontap.resources import Volume
+
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
@@ -36,11 +36,9 @@ class NetAppManager:
         )
 
     def parse_ontap_config(self, config_path="/etc/netapp/config.ini"):
-        """
-        Reads ONTAP connection details from a specified INI configuration file.
-        """
+        """Reads ONTAP connection details from a specified INI configuration file."""
         if not os.path.exists(config_path):
-            logger.error(f"Configuration file not found at {config_path}")
+            logger.error("Configuration file not found at %s", config_path)
             exit(1)
 
         ontap_parser = configparser.ConfigParser()
@@ -48,14 +46,14 @@ class NetAppManager:
 
         try:
             logger.debug(
-                f"Reading configuration from section [netapp_nvme] in {config_path}"
+                "Reading configuration from section [netapp_nvme] in %s", config_path
             )
             hostname = ontap_parser.get("netapp_nvme", "netapp_server_hostname")
             login = ontap_parser.get("netapp_nvme", "netapp_login")
             password = ontap_parser.get("netapp_nvme", "netapp_password")
         except (configparser.NoSectionError, configparser.NoOptionError) as e:
             logger.error(
-                f"Missing required configuration in {config_path}. Details: {e}"
+                "Missing required configuration in %s . Details: %s", config_path, e
             )
             exit(1)
 
@@ -66,7 +64,7 @@ class NetAppManager:
         name = self._svm_name()
         root_name = f"{name}_root"
 
-        logger.info(f"Creating SVM: {name}...")
+        logger.info("Creating SVM: %s...", name)
         try:
             svm = Svm(
                 name=name,
@@ -80,10 +78,10 @@ class NetAppManager:
             # Wait for SVM to be fully created and online
             svm.get()
             logger.info(
-                f"SVM '{svm.name}' created successfully with NVMe protocol allowed"
+                "SVM '%s' created successfully with NVMe protocol allowed", svm.name
             )
         except NetAppRestError as e:
-            logger.error(f"Error creating SVM: {e}")
+            logger.error("Error creating SVM: %s", e)
             exit(1)
 
     def create_volume(self, args):
@@ -91,7 +89,8 @@ class NetAppManager:
         volume_name = self._volume_name()
         volume_size_str = args.volume_size
         logger.info(
-            f"Creating volume '{volume_name}' with size {volume_size_str} on aggregate '{args.aggregate_name}'..."
+            "Creating volume '%(vname)s' with size %(size)s on aggregate '%(agg)s'...",
+            {"vname": volume_name, "size": volume_size_str, "agg": args.aggregate_name},
         )
 
         try:
@@ -103,9 +102,9 @@ class NetAppManager:
             )
             volume.post()
             volume.get()
-            logger.info(f"Volume {volume_name} created.")
+            logger.info("Volume %s created.", volume_name)
         except NetAppRestError as e:
-            logger.error(f"Error creating Volume: {e}")
+            logger.error("Error creating Volume: %s", e)
             exit(1)
 
     def _svm_name(self):
@@ -158,10 +157,7 @@ def argument_parser():
 
 
 def main():
-    """
-    Main function to orchestrate the SVM and volume creation process.
-    """
-
+    """Main function to orchestrate the SVM and volume creation process."""
     args = argument_parser().parse_args()
     if args.debug:
         utils.DEBUG = 1
@@ -180,9 +176,9 @@ def main():
 
 def do_action(args, netapp_manager, kp):
     tags = kp.project_tags(args.project_id)
-    logger.debug(f"Project {args.project_id} has tags: {tags}")
-    if not SVM_PROJECT_TAG in tags:
-        logger.info(f"The {SVM_PROJECT_TAG} is missing, not creating SVM.")
+    logger.debug("Project %s has tags: %s", args.project_id, tags)
+    if SVM_PROJECT_TAG not in tags:
+        logger.info("The %s is missing, not creating SVM.", SVM_PROJECT_TAG)
         exit(0)
 
     netapp_manager.create_svm(args)
