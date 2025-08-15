@@ -26,8 +26,7 @@ SVM_PROJECT_TAG = "UNDERSTACK_SVM"
 class NetAppManager:
     """Manages NetApp ONTAP operations including SVM and volume creation."""
 
-    def __init__(self, args, logger):
-        self.logger = logger
+    def __init__(self, args):
         self.args = args
         netapp_ini = self.parse_ontap_config(args.config_file)
         config.CONNECTION = HostConnection(
@@ -41,21 +40,21 @@ class NetAppManager:
         Reads ONTAP connection details from a specified INI configuration file.
         """
         if not os.path.exists(config_path):
-            self.logger.error(f"Configuration file not found at {config_path}")
+            logger.error(f"Configuration file not found at {config_path}")
             exit(1)
 
         ontap_parser = configparser.ConfigParser()
         ontap_parser.read(config_path)
 
         try:
-            self.logger.debug(
+            logger.debug(
                 f"Reading configuration from section [netapp_nvme] in {config_path}"
             )
             hostname = ontap_parser.get("netapp_nvme", "netapp_server_hostname")
             login = ontap_parser.get("netapp_nvme", "netapp_login")
             password = ontap_parser.get("netapp_nvme", "netapp_password")
         except (configparser.NoSectionError, configparser.NoOptionError) as e:
-            self.logger.error(
+            logger.error(
                 f"Missing required configuration in {config_path}. Details: {e}"
             )
             exit(1)
@@ -67,7 +66,7 @@ class NetAppManager:
         name = self._svm_name()
         root_name = f"{name}_root"
 
-        self.logger.info(f"Creating SVM: {name}...")
+        logger.info(f"Creating SVM: {name}...")
         try:
             svm = Svm(
                 name=name,
@@ -80,18 +79,18 @@ class NetAppManager:
             svm.post()
             # Wait for SVM to be fully created and online
             svm.get()
-            self.logger.info(
+            logger.info(
                 f"SVM '{svm.name}' created successfully with NVMe protocol allowed"
             )
         except NetAppRestError as e:
-            self.logger.error(f"Error creating SVM: {e}")
+            logger.error(f"Error creating SVM: {e}")
             exit(1)
 
     def create_volume(self, args):
         """Creates a new volume within a specific SVM and aggregate."""
         volume_name = self._volume_name()
         volume_size_str = args.volume_size
-        self.logger.info(
+        logger.info(
             f"Creating volume '{volume_name}' with size {volume_size_str} on aggregate '{args.aggregate_name}'..."
         )
 
@@ -104,9 +103,9 @@ class NetAppManager:
             )
             volume.post()
             volume.get()
-            self.logger.info(f"Volume {volume_name} created.")
+            logger.info(f"Volume {volume_name} created.")
         except NetAppRestError as e:
-            self.logger.error(f"Error creating Volume: {e}")
+            logger.error(f"Error creating Volume: {e}")
             exit(1)
 
     def _svm_name(self):
@@ -117,8 +116,7 @@ class NetAppManager:
 
 
 class KeystoneProject:
-    def __init__(self, logger):
-        self.logger = logger
+    def __init__(self):
         self.conn = None
 
     def connect(self):
@@ -173,8 +171,8 @@ def main():
 
     logger.info("Starting ONTAP SVM and Volume creation workflow.")
 
-    netapp_manager = NetAppManager(args, logger)
-    kp = KeystoneProject(logger)
+    netapp_manager = NetAppManager(args)
+    kp = KeystoneProject()
 
     do_action(args, netapp_manager, kp)
     logger.info("All operations completed successfully!")
