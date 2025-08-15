@@ -37,16 +37,16 @@ spec:
         command:
           - netapp-create-svm
         args:
-          - --svm_name
+          - --project_id
           - "{{inputs.parameters.project_uuid}}"
           - --volume_size
           - "{{inputs.parameters.volume_size}}"
           - --aggregate_name
           - "{{inputs.parameters.aggregate_name}}"
           - --config
-          - /etc/netapp_credentials.ini
+          - /etc/netapp/netapp_nvme.conf
         volumeMounts:
-          - mountPath: /etc/netapp/netapp_nvme.conf
+          - mountPath: /etc/netapp
             name: netapp-ini
             readOnly: true
           - mountPath: /etc/openstack
