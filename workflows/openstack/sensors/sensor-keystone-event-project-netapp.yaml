@@ -2,16 +2,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: keystone-event-project
-  namespace: argo-events
+  name: keystone-event-project-netapp
+  namespace: openstack
   annotations:
     workflows.argoproj.io/title: CRUD Nautobot Tenants from Keystone Projects
     workflows.argoproj.io/description: |+
       Triggers on the following Keystone Events:
 
       - identity.project.created
-      - identity.project.updated
-      - identity.project.deleted
 
       Currently parses out the following fields:
 
@@ -20,11 +18,11 @@ metadata:
       Resulting code should be very similar to:
 
       ```
-      argo -n argo-events submit --from workflowtemplate/keystone-event-project \
+      argo -n argo-events submit --from workflowtemplate/sync-keystone-netapp \
       -p event_type identity.project.created -p project_uuid=00000000-0000-0000-0000-000000000000
       ```
 
-      Defined in `workflows/openstack/sensor-keystone-event-project.yaml`
+      Defined in `workflows/openstack/sensor-keystone-event-project-netapp.yaml`
 spec:
   dependencies:
   - eventName: notifications
@@ -42,13 +40,14 @@ spec:
           # any of the values will trigger
           value:
             - "identity.project.created"
-            - "identity.project.updated"
-            - "identity.project.deleted"
+            # Delete and update are not supported yet.
+            # - "identity.project.updated"
+            # - "identity.project.deleted"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
     - template:
-        name: keystone-event-project
+        name: keystone-event-project-netapp
         # uses 'argo' CLI instead of 'kubectl'
         argoWorkflow:
           # sets the operation to 'argo submit'
@@ -71,7 +70,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: keystone-event-project-
+                generateName: sync-keystone-netapp-
                 namespace: argo-events
               spec:
                 # defines the parameters being replaced above
@@ -81,4 +80,4 @@ spec:
                     - name: project_uuid
                 # references the workflow
                 workflowTemplateRef:
-                  name: keystone-event-project
+                  name: keystone-netapp-sync
