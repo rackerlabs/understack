@@ -1,14 +1,17 @@
 import argparse
 import configparser
+import logging
 import os
 
 import openstack
 import urllib3
-from netapp_ontamp import config
+
+from netapp_ontap import config
 from netapp_ontap import utils
 from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
-from netapp_ontap.resources import Svm, Volume
+from netapp_ontap.resources import Svm
+from netapp_ontap.resources import Volume
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
@@ -16,6 +19,8 @@ logger = setup_logger(__name__)
 
 # Suppress warnings for unverified HTTPS requests, common in lab environments
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+SVM_PROJECT_TAG = "UNDERSTACK_SVM"
 
 
 class NetAppManager:
@@ -26,7 +31,9 @@ class NetAppManager:
         self.args = args
         netapp_ini = self.parse_ontap_config(args.config_file)
         config.CONNECTION = HostConnection(
-            netapp_ini["hostname"], username=netapp_ini["username"], password=netapp_ini["password"]
+            netapp_ini["hostname"],
+            username=netapp_ini["username"],
+            password=netapp_ini["password"],
         )
 
     def parse_ontap_config(self, config_path="/etc/netapp/config.ini"):
@@ -112,11 +119,15 @@ class NetAppManager:
 class KeystoneProject:
     def __init__(self, logger):
         self.logger = logger
+        self.conn = None
 
     def connect(self):
         self.conn = openstack.connect()
 
     def project_tags(self, project_id):
+        if not self.conn:
+            self.connect()
+
         project = self.conn.identity.get_project(project_id)
         if hasattr(project, "tags"):
             return project.tags
@@ -154,17 +165,27 @@ def main():
     """
 
     args = argument_parser().parse_args()
+    if args.debug:
+        utils.DEBUG = 1
+        logger.setLevel(logging.DEBUG)
+    else:
+        logging.getLogger().setLevel(logging.INFO)
+
     logger.info("Starting ONTAP SVM and Volume creation workflow.")
 
     netapp_manager = NetAppManager(args, logger)
+    kp = KeystoneProject(logger)
 
-    do_action(args, netapp_manager)
+    do_action(args, netapp_manager, kp)
     logger.info("All operations completed successfully!")
 
 
-def do_action(args, netapp_manager):
-    if args.debug:
-        utils.DEBUG = 1
+def do_action(args, netapp_manager, kp):
+    tags = kp.project_tags(args.project_id)
+    logger.debug(f"Project {args.project_id} has tags: {tags}")
+    if not SVM_PROJECT_TAG in tags:
+        logger.info(f"The {SVM_PROJECT_TAG} is missing, not creating SVM.")
+        exit(0)
 
     netapp_manager.create_svm(args)
     netapp_manager.create_volume(args)
