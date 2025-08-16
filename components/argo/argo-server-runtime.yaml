@@ -1,0 +1,40 @@
+# This is a role and rolebinding to provide the argo-server with permissions
+# it needs to run in its own namespace.
+# - to read the configmap for its configuration
+# - read the SSO secret
+# - create and read other secrets for auth tokens
+# - events to provide prometheus metrics
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-server-runtime
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - watch
+    resourceNames:
+      - workflow-controller-configmap
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-server-runtime
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-server-runtime
+subjects:
+  - kind: ServiceAccount
+    name: argo-server
