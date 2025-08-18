@@ -5,7 +5,9 @@ from cinder import exception
 from cinder import interface
 from cinder.objects import volume_type as vol_type_obj
 from cinder.volume import driver as volume_driver
+from cinder.volume import volume_utils
 from cinder.volume.drivers.netapp import options as na_opts
+from cinder.volume.drivers.netapp import utils as na_utils
 from cinder.volume.drivers.netapp.dataontap.client.client_cmode_rest import (
     RestClient as RestNaServer,
 )
@@ -849,6 +851,73 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
             raise exception.VolumeBackendAPIException(
                 data=f"Failed to create volume {volume.name}: {e}"
             ) from e
+
+
+class NetAppMinimalLibrary(NetAppNVMeStorageLibrary):
+    """Minimal overriding library.
+
+    The purpose of this class is to take the existing upstream class
+    and patch it as necessary to allow for our multi-SVM approach.
+    This class is still intended to exist per SVM, its just fixes
+    for that approach.
+    """
+
+    def __init__(self, driver_name, driver_protocol, **kwargs):
+        super().__init__(driver_name, driver_protocol, **kwargs)
+        # the upstream library sets this field by parsing the host
+        # which is "pod@config_group" in syntax. The issue is that
+        # will point to our parent group. This backend_name is then
+        # used by the connection code which reloads the whole configuration
+        # but now it loaded the parent configuration and not the one targeting
+        # the SVM. By fixing this backend_name it should point to the
+        # right place.
+        self.backend_name = self.configuration.config_group
+
+    def do_setup(self, ctxt):
+        """Override the upstream call.
+
+        This is a copy and paste except for the self.client setup,
+        instead of calling the library function which makes a brand new
+        self.configuration object and then reads from that. This creates
+        the rest client from our existing self.configuration so that we
+        can supply our overridden one. If we had used the upstream one it
+        would check that the dynamic config group we made existed in the
+        parsed config, which it does not and it would then fail.
+        """
+        na_utils.check_flags(self.REQUIRED_FLAGS, self.configuration)
+        self.namespace_ostype = (
+            self.configuration.netapp_namespace_ostype or self.DEFAULT_NAMESPACE_OS
+        )
+        self.host_type = self.configuration.netapp_host_type or self.DEFAULT_HOST_TYPE
+
+        na_utils.check_flags(self.REQUIRED_CMODE_FLAGS, self.configuration)
+
+        # this is the change from upstream right here
+        self.client = RestNaServer(
+            transport_type=self.configuration.netapp_transport_type,
+            ssl_cert_path=self.configuration.netapp_ssl_cert_path,
+            username=self.configuration.netapp_login,
+            password=self.configuration.netapp_password,
+            hostname=self.configuration.netapp_server_hostname,
+            port=self.configuration.netapp_server_port,
+            vserver=self.configuration.netapp_vserver,
+            trace=volume_utils.TRACE_API,
+            api_trace_pattern=self.configuration.netapp_api_trace_pattern,
+            async_rest_timeout=self.configuration.netapp_async_rest_timeout,
+        )
+        self.vserver = self.client.vserver
+
+        # Storage service catalog.
+        self.ssc_library = capabilities.CapabilitiesLibrary(
+            self.driver_protocol, self.vserver, self.client, self.configuration
+        )
+
+        self.ssc_library.check_api_permissions()
+
+        self.using_cluster_credentials = self.ssc_library.cluster_user_supported()
+
+        # Performance monitoring library.
+        self.perf_library = perf_cmode.PerformanceCmodeLibrary(self.client)
 
 
 @interface.volumedriver

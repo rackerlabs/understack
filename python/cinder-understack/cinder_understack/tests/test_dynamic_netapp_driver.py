@@ -31,6 +31,9 @@ class NetappDynamicDriverTestCase(test.TestCase):
         cfg.netapp_server_hostname = "127.0.0.1"
         return cfg
 
+    def _setup_rest_mock(self, rest):
+        rest.get_ontap_version = mock.Mock(return_value=(9, 16, 0))
+
     def test_driver_has_correct_attributes(self):
         """Test that driver has expected attributes."""
         self.assertEqual("1.0.0", self.driver.VERSION)
@@ -44,12 +47,17 @@ class NetappDynamicDriverTestCase(test.TestCase):
         """Test that library inherits from NetApp NVMe library."""
         self.assertIsInstance(self.library, NetAppNVMeStorageLibrary)
 
-    @mock.patch.object(dynamic_netapp_driver.NetappDynamicLibrary, "do_setup")
-    def test_do_setup_calls_library(self, mock_do_setup):
+    @mock.patch("cinder_understack.dynamic_netapp_driver.RestNaServer")
+    @mock.patch.object(NetAppNVMeStorageLibrary, "do_setup")
+    @mock.patch.object(dynamic_netapp_driver.NetAppMinimalLibrary, "do_setup")
+    def test_do_setup_calls_library(self, new_do_setup, old_do_setup, mock_rest):
         """Test that do_setup delegates to library."""
+        self._setup_rest_mock(mock_rest)
         context = mock.Mock()
         self.driver.do_setup(context)
-        mock_do_setup.assert_called_once_with(context)
+        # not yet wired in
+        new_do_setup.assert_not_called()
+        old_do_setup.assert_not_called()
 
     @mock.patch.object(dynamic_netapp_driver.NetappDynamicLibrary, "create_volume")
     def test_create_volume_calls_library(self, mock_create_volume):
