@@ -89,6 +89,7 @@ target-version = "py310"
 "tests/**/*.py" = [
     "S101",     # allow 'assert' for pytest
     "S105",     # allow hardcoded passwords for testing
+    "S106",     # allow hardcoded passwords for testing
 ]
 "understack_workflows/main/bmc_display_password.py" = [
     "S607",     # allow the kubectl call
