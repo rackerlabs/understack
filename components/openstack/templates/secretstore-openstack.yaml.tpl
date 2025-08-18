@@ -27,6 +27,7 @@ rules:
   resourceNames:
   - svc-acct-argoworkflow
   - svc-acct-netapp
+  - cinder-netapp-config
 - apiGroups:
   - authorization.k8s.io
   resources:

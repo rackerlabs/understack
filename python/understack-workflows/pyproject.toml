@@ -26,6 +26,7 @@ dependencies = [
     "sushy>=5.3.0,<6",
     "kubernetes==33.1.0",
     "understack-flavor-matcher",
+    "netapp-ontap>=9.17.1.0",
 ]
 
 [project.scripts]
@@ -38,6 +39,7 @@ bmc-password = "understack_workflows.main.print_bmc_password:main"
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 sync-network-segment-range = "understack_workflows.main.sync_ucvni_group_range:main"
 openstack-oslo-event = "understack_workflows.main.openstack_oslo_event:main"
+netapp-create-svm = "understack_workflows.main.netapp_create_svm:main"
 
 [dependency-groups]
 test = [
@@ -87,6 +89,7 @@ target-version = "py310"
 "tests/**/*.py" = [
     "S101",     # allow 'assert' for pytest
     "S105",     # allow hardcoded passwords for testing
+    "S106",     # allow hardcoded passwords for testing
 ]
 "understack_workflows/main/bmc_display_password.py" = [
     "S607",     # allow the kubectl call

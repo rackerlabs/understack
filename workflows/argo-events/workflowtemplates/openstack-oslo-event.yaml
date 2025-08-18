@@ -49,6 +49,9 @@ spec:
           - mountPath: /etc/openstack
             name: openstack-svc-acct
             readOnly: true
+          - mountPath: /etc/netapp
+            name: netapp-ini
+            readOnly: true
       volumes:
         - name: nb-token
           secret:
@@ -56,3 +59,6 @@ spec:
         - name: openstack-svc-acct
           secret:
             secretName: openstack-svc-acct
+        - name: netapp-ini
+          secret:
+            secretName: netapp-config

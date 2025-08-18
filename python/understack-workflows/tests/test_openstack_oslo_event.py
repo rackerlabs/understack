@@ -355,8 +355,8 @@ class TestMainFunction:
         mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
 
 
-class TestIntegrationWithPortEventHandlers:
-    """Test integration with port event handlers."""
+class TestIntegrationWithEventHandlers:
+    """Test integration with various event handlers."""
 
     @patch("understack_workflows.main.openstack_oslo_event.initialize_clients")
     @patch("understack_workflows.main.openstack_oslo_event.argument_parser")
@@ -433,3 +433,169 @@ class TestIntegrationWithPortEventHandlers:
 
         assert result == _EXIT_SUCCESS
         mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
+
+    @patch("understack_workflows.main.openstack_oslo_event.initialize_clients")
+    @patch("understack_workflows.main.openstack_oslo_event.argument_parser")
+    def test_integration_keystone_project_created_event(
+        self, mock_argument_parser, mock_initialize_clients
+    ):
+        """Test integration with keystone project created event handler."""
+        # Mock argument parser
+        mock_parser = Mock()
+        mock_args = Mock()
+        mock_args.file = None
+        mock_parser.parse_args.return_value = mock_args
+        mock_argument_parser.return_value = mock_parser
+
+        # Mock client initialization
+        mock_conn = Mock()
+        mock_nautobot = Mock()
+        mock_initialize_clients.return_value = (mock_conn, mock_nautobot)
+
+        # Use real event data - extract the oslo.message content
+        with open("tests/json_samples/keystone-project-created.json") as f:
+            oslo_wrapper = json.load(f)
+            test_event = json.loads(oslo_wrapper["oslo.message"])
+
+        # Mock the keystone project event handler by patching the event handlers dict
+        mock_handler = Mock(return_value=0)
+        with patch(
+            "understack_workflows.main.openstack_oslo_event._event_handlers",
+            {"identity.project.created": mock_handler},
+        ):
+            with patch(
+                "understack_workflows.main.openstack_oslo_event.read_event",
+                return_value=test_event,
+            ):
+                result = main()
+
+        assert result == _EXIT_SUCCESS
+        mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
+
+    @patch("understack_workflows.main.openstack_oslo_event.initialize_clients")
+    @patch("understack_workflows.main.openstack_oslo_event.argument_parser")
+    def test_integration_keystone_project_created_handler_success(
+        self, mock_argument_parser, mock_initialize_clients
+    ):
+        """Test success path with keystone project created event handler."""
+        # Mock argument parser
+        mock_parser = Mock()
+        mock_args = Mock()
+        mock_args.file = None
+        mock_parser.parse_args.return_value = mock_args
+        mock_argument_parser.return_value = mock_parser
+
+        # Mock client initialization
+        mock_conn = Mock()
+        mock_nautobot = Mock()
+        mock_initialize_clients.return_value = (mock_conn, mock_nautobot)
+
+        # Use real event data - extract the oslo.message content
+        with open("tests/json_samples/keystone-project-created.json") as f:
+            oslo_wrapper = json.load(f)
+            test_event = json.loads(oslo_wrapper["oslo.message"])
+
+        # Mock the keystone project event handler by patching the event handlers dict
+        mock_handler = Mock(return_value=0)
+        with patch(
+            "understack_workflows.main.openstack_oslo_event._event_handlers",
+            {"identity.project.created": mock_handler},
+        ):
+            with patch(
+                "understack_workflows.main.openstack_oslo_event.read_event",
+                return_value=test_event,
+            ):
+                result = main()
+
+        assert result == _EXIT_SUCCESS
+        mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
+
+    @patch("understack_workflows.main.openstack_oslo_event.initialize_clients")
+    @patch("understack_workflows.main.openstack_oslo_event.argument_parser")
+    def test_integration_keystone_project_created_handler_failure(
+        self, mock_argument_parser, mock_initialize_clients
+    ):
+        """Test integration when keystone project created handler fails."""
+        # Mock argument parser
+        mock_parser = Mock()
+        mock_args = Mock()
+        mock_args.file = None
+        mock_parser.parse_args.return_value = mock_args
+        mock_argument_parser.return_value = mock_parser
+
+        # Mock client initialization
+        mock_conn = Mock()
+        mock_nautobot = Mock()
+        mock_initialize_clients.return_value = (mock_conn, mock_nautobot)
+
+        # Use real event data - extract the oslo.message content
+        with open("tests/json_samples/keystone-project-created.json") as f:
+            oslo_wrapper = json.load(f)
+            test_event = json.loads(oslo_wrapper["oslo.message"])
+
+        # Mock the keystone project event handler to raise an exception
+        mock_handler = Mock(side_effect=Exception("Handler failed"))
+        with patch(
+            "understack_workflows.main.openstack_oslo_event._event_handlers",
+            {"identity.project.created": mock_handler},
+        ):
+            with patch(
+                "understack_workflows.main.openstack_oslo_event.read_event",
+                return_value=test_event,
+            ):
+                with pytest.raises(SystemExit) as exc_info:
+                    main()
+                assert exc_info.value.code == _EXIT_HANDLER_ERROR
+
+        mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
+
+    @patch("understack_workflows.main.openstack_oslo_event.initialize_clients")
+    @patch("understack_workflows.main.openstack_oslo_event.argument_parser")
+    def test_integration_keystone_project_created_event_validation(
+        self, mock_argument_parser, mock_initialize_clients
+    ):
+        """Test that keystone project created event passes validation."""
+        # Mock argument parser
+        mock_parser = Mock()
+        mock_args = Mock()
+        mock_args.file = None
+        mock_parser.parse_args.return_value = mock_args
+        mock_argument_parser.return_value = mock_parser
+
+        # Mock client initialization
+        mock_conn = Mock()
+        mock_nautobot = Mock()
+        mock_initialize_clients.return_value = (mock_conn, mock_nautobot)
+
+        # Use real event data - extract the oslo.message content
+        with open("tests/json_samples/keystone-project-created.json") as f:
+            oslo_wrapper = json.load(f)
+            test_event = json.loads(oslo_wrapper["oslo.message"])
+
+        # Verify the event structure
+        assert test_event["event_type"] == "identity.project.created"
+        assert "payload" in test_event
+        assert "target" in test_event["payload"]
+        assert "id" in test_event["payload"]["target"]
+
+        # Mock the handler to verify it gets called with correct data
+        mock_handler = Mock(return_value=0)
+        with patch(
+            "understack_workflows.main.openstack_oslo_event._event_handlers",
+            {"identity.project.created": mock_handler},
+        ):
+            with patch(
+                "understack_workflows.main.openstack_oslo_event.read_event",
+                return_value=test_event,
+            ):
+                result = main()
+
+        assert result == _EXIT_SUCCESS
+        mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
+
+        # Verify the handler was called with the expected project ID
+        call_args = mock_handler.call_args[0]
+        event_data = call_args[2]  # Third argument is the event data
+        assert (
+            event_data["payload"]["target"]["id"] == "148f2f86b96440a1ba0934f837b2c77b"
+        )
