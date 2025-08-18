@@ -4,6 +4,7 @@ from unittest import mock
 
 from cinder.tests.unit import test
 from cinder.tests.unit.volume.drivers.netapp import fakes as na_fakes
+from cinder.volume.drivers.netapp.dataontap.nvme_library import NetAppNVMeStorageLibrary
 
 from cinder_understack import dynamic_netapp_driver
 
@@ -24,7 +25,11 @@ class NetappDynamicDriverTestCase(test.TestCase):
 
     def get_config_base(self):
         """Get base configuration for testing."""
-        return na_fakes.create_configuration()
+        cfg = na_fakes.create_configuration()
+        cfg.netapp_login = "fake_user"
+        cfg.netapp_password = "fake_pass"  # noqa: S105
+        cfg.netapp_server_hostname = "127.0.0.1"
+        return cfg
 
     def test_driver_has_correct_attributes(self):
         """Test that driver has expected attributes."""
@@ -37,10 +42,6 @@ class NetappDynamicDriverTestCase(test.TestCase):
 
     def test_library_inherits_from_netapp_library(self):
         """Test that library inherits from NetApp NVMe library."""
-        from cinder.volume.drivers.netapp.dataontap.nvme_library import (
-            NetAppNVMeStorageLibrary,
-        )
-
         self.assertIsInstance(self.library, NetAppNVMeStorageLibrary)
 
     @mock.patch.object(dynamic_netapp_driver.NetappDynamicLibrary, "do_setup")
