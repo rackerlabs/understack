@@ -1,11 +1,14 @@
 """NetApp NVMe driver with dynamic multi-SVM support."""
 
+from collections.abc import Generator
 from contextlib import contextmanager
+from functools import cached_property
 
 from cinder import context
 from cinder import exception
 from cinder import interface
 from cinder.objects import volume_type as vol_type_obj
+from cinder.volume import configuration
 from cinder.volume import driver as volume_driver
 from cinder.volume import volume_utils
 from cinder.volume.drivers.netapp import options as na_opts
@@ -22,6 +25,18 @@ from oslo_log import log as logging
 LOG = logging.getLogger(__name__)
 CONF = cfg.CONF
 
+# Dynamic SVM options - our custom configuration group
+netapp_dynamic_opts = [
+    cfg.StrOpt(
+        "netapp_vserver_prefix",
+        default="os-",
+        help="Prefix to use when constructing SVM/vserver names from tenant IDs. "
+        "The SVM name will be formed as <prefix><tenant_id>. This allows "
+        "the driver to dynamically select different SVMs based on the "
+        "volume's project/tenant ID instead of being confined to one SVM.",
+    ),
+]
+
 # Configuration options for dynamic NetApp driver
 # Using cinder.volume.configuration approach for better abstraction
 NETAPP_DYNAMIC_OPTS = [
@@ -32,6 +47,7 @@ NETAPP_DYNAMIC_OPTS = [
     na_opts.netapp_support_opts,
     na_opts.netapp_san_opts,
     na_opts.netapp_cluster_opts,
+    netapp_dynamic_opts,
 ]
 
 
@@ -732,8 +748,7 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
             if not password:
                 missing_conf.append("netapp_password")
             msg = (
-                f"Missing required NetApp configuration in cinder.conf: "
-                f"{missing_conf}"
+                f"Missing required NetApp configuration in cinder.conf: {missing_conf}"
             )
             LOG.error(msg)
             raise exception.VolumeBackendAPIException(data=msg)
@@ -823,7 +838,7 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
             # Update metadata and add to namespace table
             metadata["Volume"] = flexvol_name
             metadata["Qtree"] = None
-            handle = f'{self.vserver}:{metadata["Path"]}'
+            handle = f"{self.vserver}:{metadata['Path']}"
 
             # Add to namespace table for tracking
             # The original library maintains a namespace_table to
@@ -941,20 +956,98 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def __init__(self, *args, **kwargs):
         """Initialize the driver and create library instance."""
         super().__init__(*args, **kwargs)
-        self.library = NetappDynamicLibrary(self.DRIVER_NAME, "NVMe", **kwargs)
+        self.configuration.append_config_values(self.__class__.get_driver_options())
+        # save the arguments supplied
+        self._init_kwargs = kwargs
+        # but we don't need the configuration
+        del self._init_kwargs["configuration"]
+        # child libraries
+        self._libraries = {}
+        # aggregated stats
+        self._stats = self._empty_volume_stats()
+
+    def _create_svm_lib(self, svm_name: str) -> NetAppMinimalLibrary:
+        # we create a configuration object per SVM library to
+        # provide the SVM name to the SVM library
+        child_grp = f"{self.configuration.config_group}_{svm_name}"
+        child_cfg = configuration.Configuration(
+            volume_driver.volume_opts,
+            config_group=child_grp,
+        )
+        # register the options
+        child_cfg.append_config_values(self.__class__.get_driver_options())
+        # we need to copy the configs so get the base group
+        for opt in self.__class__.get_driver_options():
+            try:
+                val = getattr(self.configuration, opt.name)
+                CONF.set_override(opt.name, val, group=child_grp)
+            except cfg.NoSuchOptError:
+                # this exception occurs if the option isn't set at all
+                # which means we don't need to set an override
+                pass
+
+        # now set the SVM name
+        CONF.set_override("netapp_vserver", svm_name, group=child_grp)
+        # now set the backend configuration name
+        CONF.set_override("volume_backend_name", child_grp, group=child_grp)
+        # return an instance of the library scoped to one SVM
+        return NetAppMinimalLibrary(
+            self.DRIVER_NAME, "NVMe", configuration=child_cfg, **self._init_kwargs
+        )
 
     @staticmethod
     def get_driver_options():
         """All options this driver supports."""
         return [item for sublist in NETAPP_DYNAMIC_OPTS for item in sublist]
 
-    def do_setup(self, context):
-        """Setup the driver."""
-        self.library.do_setup(context)
+    @cached_property
+    def cluster(self) -> RestNaServer:
+        return RestNaServer(
+            transport_type=self.configuration.netapp_transport_type,
+            ssl_cert_path=self.configuration.netapp_ssl_cert_path,
+            username=self.configuration.netapp_login,
+            password=self.configuration.netapp_password,
+            hostname=self.configuration.netapp_server_hostname,
+            port=self.configuration.netapp_server_port,
+            vserver=None,
+            trace=volume_utils.TRACE_API,
+            api_trace_pattern=self.configuration.netapp_api_trace_pattern,
+            async_rest_timeout=self.configuration.netapp_async_rest_timeout,
+        )
+
+    def _get_svms(self):
+        prefix = self.configuration.safe_get("netapp_vserver_prefix")
+        svm_filter = {
+            "state": "running",
+            "nvme.enabled": "true",
+            "name": f"{prefix}*",
+            "fields": "name,uuid",
+        }
+        ret = self.cluster.get_records(
+            "svm/svms", query=svm_filter, enable_tunneling=False
+        )
+        return [rec["name"] for rec in ret["records"]]
+
+    def do_setup(self, ctxt):
+        """Setup the driver.
+
+        Connected to the NetApp with cluster credentials to find the SVMs.
+        """
+        for svm_name in self._get_svms():
+            if svm_name in self._libraries:
+                LOG.info("SVMe library already exists for SVM %s, skipping", svm_name)
+                continue
+
+            LOG.info("Creating NVMe library instance for SVM %s", svm_name)
+            svm_lib = self._create_svm_lib(svm_name)
+            svm_lib.do_setup(ctxt)
+            self._libraries[svm_name] = svm_lib
 
     def check_for_setup_error(self):
         """Check for setup errors."""
-        self.library.check_for_setup_error()
+        for svm_name, svm_lib in self._libraries.items():
+            LOG.info("Checking NVMe library for errors for SVM %s", svm_name)
+            svm_lib.check_for_setup_error()
 
     def _svmify_pool(self, pool: dict, svm_name: str, **kwargs) -> dict:
         """Applies SVM info to a pool so we can target it and track it."""
@@ -968,68 +1061,142 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         pool_name = pool["pool_name"]
         pool["pool_name"] = f"{svm_name}{_SVM_NAME_DELIM}{pool_name}"
         pool["netapp_vserver"] = svm_name
+        prefix = self.configuration.safe_get("netapp_vserver_prefix")
+        pool["netapp_project_id"] = svm_name.replace(prefix, "")
         pool.update(kwargs)
         return pool
 
     @contextmanager
-    def _fix_volume_pool_name(self, svm_name: str, volume):
-        """Strips out the SVM name from the volume host and restores."""
-        original_host = volume.get("host")
-        if not original_host:
-            yield original_host
-        else:
-            volume["host"] = original_host.replace(f"{svm_name}{_SVM_NAME_DELIM}", "")
-            yield volume
-            volume["host"] = original_host
+    def _volume_to_library(self, volume) -> Generator[NetAppMinimalLibrary]:
+        """From a volume find the specific NVMe library to use."""
+        # save this to restore it in the end
+        original_host = volume["host"]
+        # svm plus pool_name
+        svm_pool_name = volume_utils.extract_host(original_host, level="pool")
+        svm_name = svm_pool_name.split(_SVM_NAME_DELIM)[0]
+        try:
+            lib = self._libraries[svm_name]
+        except KeyError:
+            LOG.error("No such SVM %s instantiated", svm_name)
+            raise exception.DriverNotInitialized() from None
+
+        if lib.vserver != svm_name:
+            LOG.error(
+                "NVMe library vserver %s mismatch with volume.host SVM %s",
+                lib.vserver,
+                svm_name,
+            )
+            raise exception.InvalidInput(
+                reason="NVMe library vserver mismatch with volume.host"
+            )
+
+        volume["host"] = original_host.replace(f"{svm_name}{_SVM_NAME_DELIM}", "")
+        yield lib
+        volume["host"] = original_host
 
     def create_volume(self, volume):
         """Create a volume."""
-        return self.library.create_volume(volume)
+        with self._volume_to_library(volume) as lib:
+            return lib.create_volume(volume)
 
     def delete_volume(self, volume):
         """Delete a volume."""
-        return self.library.delete_volume(volume)
+        with self._volume_to_library(volume) as lib:
+            return lib.delete_volume(volume)
 
     def create_snapshot(self, snapshot):
         """Create a snapshot."""
-        return self.library.create_snapshot(snapshot)
+        with self._volume_to_library(snapshot.volume) as lib:
+            return lib.create_snapshot(snapshot)
 
     def delete_snapshot(self, snapshot):
         """Delete a snapshot."""
-        return self.library.delete_snapshot(snapshot)
+        with self._volume_to_library(snapshot.volume) as lib:
+            return lib.delete_snapshot(snapshot)
 
     def create_volume_from_snapshot(self, volume, snapshot):
         """Create a volume from a snapshot."""
-        return self.library.create_volume_from_snapshot(volume, snapshot)
+        with self._volume_to_library(volume) as lib:
+            return lib.create_volume_from_snapshot(volume, snapshot)
 
     def create_cloned_volume(self, volume, src_vref):
         """Create a cloned volume."""
-        return self.library.create_cloned_volume(volume, src_vref)
+        with self._volume_to_library(volume) as lib:
+            return lib.create_cloned_volume(volume, src_vref)
 
     def extend_volume(self, volume, new_size):
         """Extend a volume."""
-        return self.library.extend_volume(volume, new_size)
+        with self._volume_to_library(volume) as lib:
+            return lib.extend_volume(volume, new_size)
 
     def initialize_connection(self, volume, connector):
         """Initialize connection to volume."""
-        return self.library.initialize_connection(volume, connector)
+        with self._volume_to_library(volume) as lib:
+            return lib.initialize_connection(volume, connector)
 
     def terminate_connection(self, volume, connector, **kwargs):
         """Terminate connection to volume."""
-        return self.library.terminate_connection(volume, connector, **kwargs)
+        with self._volume_to_library(volume) as lib:
+            return lib.terminate_connection(volume, connector, **kwargs)
+
+    def get_filter_function(self):
+        """Prefixes any filter function with our SVM matching."""
+        base_filter = super().get_filter_function()
+        svm_filter = "(capabilities.netapp_project_id == volume.project_id)"
+        if base_filter:
+            return f"{svm_filter} and {base_filter}"
+        else:
+            return svm_filter
+
+    def _empty_volume_stats(self):
+        data = {}
+        data["volume_backend_name"] = (
+            self.configuration.safe_get("volume_backend_name") or self.DRIVER_NAME
+        )
+        data["vendor_name"] = "NetApp"
+        data["driver_version"] = self.VERSION
+        data["storage_protocol"] = "NVMe"
+        data["sparse_copy_volume"] = True
+        data["replication_enabled"] = False
+        # each SVM is going to have different limits
+        data["total_capacity_gb"] = "unknown"
+        data["free_capacity_gb"] = "unknown"
+        # ensure we filter our pools by SVM
+        data["filter_function"] = self.get_filter_function()
+        data["goodness_function"] = self.get_goodness_function()
+        data["pools"] = []
+        return data
 
     def get_volume_stats(self, refresh=False):
         """Get volume stats."""
-        return self.library.get_volume_stats(refresh)
+        if refresh:
+            data = self._empty_volume_stats()
+            for svm_name, svm_lib in self._libraries.items():
+                LOG.info("Get Volume Stats for SVM %s", svm_name)
+                ret = svm_lib.get_volume_stats(refresh)
+                LOG.info("Adding SVM data to pools for SVM %s", svm_name)
+                data["pools"].extend(
+                    [
+                        self._svmify_pool(
+                            pool, svm_name, filter_function=data["filter_function"]
+                        )
+                        for pool in ret["pools"]
+                    ]
+                )
+            self._stats = data
+        return self._stats
 
     def create_export(self, context, volume, connector):
         """Create export for volume."""
-        return self.library.create_export(context, volume, connector)
+        with self._volume_to_library(volume) as lib:
+            return lib.create_export(context, volume, connector)
 
     def ensure_export(self, context, volume):
         """Ensure export for volume."""
-        return self.library.ensure_export(context, volume)
+        with self._volume_to_library(volume) as lib:
+            return lib.ensure_export(context, volume)
 
     def remove_export(self, context, volume):
         """Remove export for volume."""
-        return self.library.remove_export(context, volume)
+        with self._volume_to_library(volume) as lib:
+            return lib.remove_export(context, volume)
