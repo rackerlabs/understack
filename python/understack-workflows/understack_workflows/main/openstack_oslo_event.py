@@ -13,8 +13,8 @@ from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.openstack.client import get_openstack_client
-from understack_workflows.oslo_event.ironic_port import handle_port_create_update
-from understack_workflows.oslo_event.ironic_port import handle_port_delete
+from understack_workflows.oslo_event import ironic_port
+from understack_workflows.oslo_event import keystone_project
 
 logger = setup_logger(__name__)
 
@@ -61,9 +61,10 @@ EventHandler = Callable[[Connection, NautobotApi, dict[str, Any]], int]
 
 # add the event_type here and the function that should be called
 _event_handlers: dict[str, EventHandler] = {
-    "baremetal.port.create.end": handle_port_create_update,
-    "baremetal.port.update.end": handle_port_create_update,
-    "baremetal.port.delete.end": handle_port_delete,
+    "baremetal.port.create.end": ironic_port.handle_port_create_update,
+    "baremetal.port.update.end": ironic_port.handle_port_create_update,
+    "baremetal.port.delete.end": ironic_port.handle_port_delete,
+    "identity.project.created": keystone_project.handle_project_created,
 }
 
 
