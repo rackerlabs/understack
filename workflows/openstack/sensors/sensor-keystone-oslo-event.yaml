@@ -1,0 +1,73 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: keystone-oslo-event
+  annotations:
+    workflows.argoproj.io/title: Process oslo_events for keystone project
+    workflows.argoproj.io/description: |+
+      Triggers on the following Keystone Events:
+
+      - identity.project.created
+      - identity.project.deleted
+      - other events are silently ignored now
+
+      Resulting code should be very similar to:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
+      -p event-json "JSON-payload"
+      ```
+
+      Defined in `workflows/argo-events/sensors/keystone-project.yaml`
+spec:
+  dependencies:
+  - eventName: notifications
+    eventSourceName: openstack-keystone
+    name: keystone-dep
+    transform:
+      # the event is a string-ified JSON so we need to decode it
+      # replace the whole event body
+      jq: |
+        .body = (.body["oslo.message"] | fromjson)
+    filters:
+      # applies each of the items in data with 'and' but there's only one
+      dataLogicalOperator: "and"
+      data:
+        - path: "body.event_type"
+          type: "string"
+          value:
+            - "identity.project.created"
+            - "identity.project.deleted"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: keystone-project
+        # uses 'argo' CLI instead of 'kubectl'
+        argoWorkflow:
+          # sets the operation to 'argo submit'
+          operation: submit
+          # edits source section
+          parameters:
+            # first parameter is the parsed oslo.message
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: body
+                dependencyName: keystone-dep
+          source:
+            # create a workflow in argo-events prefixed with keystone-project-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: keystone-project-
+                namespace: argo-events
+              spec:
+                # defines the parameters being replaced above
+                arguments:
+                  parameters:
+                    - name: event-json
+                # references the workflow
+                workflowTemplateRef:
+                  name: openstack-oslo-event
