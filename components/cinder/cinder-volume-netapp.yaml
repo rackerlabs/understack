@@ -28,6 +28,9 @@ spec:
           netapp_use_legacy_client = false
           volume_backend_name = netapp_nvme
           volume_driver = cinder_understack.dynamic_netapp_driver.NetappCinderDynamicDriver
+          [scheduler]
+          scheduler_default_filters = CapabilitiesFilter,DriverFilter
+
   data:
   - secretKey: netapp_username
     remoteRef:
