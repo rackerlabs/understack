@@ -52,7 +52,7 @@ def project_data(domain_id: uuid.UUID, project_id: uuid.UUID):
 
 
 @pytest.fixture
-def os_conn(project_data: dict) -> openstack.connection.Connection:
+def os_conn(project_data: dict) -> openstack.connection.Connection:  # pyright: ignore[reportAttributeAccessIssue]
     def _get_project(project_id):
         if project_id == project_data["id"].hex:
             data = {
@@ -67,10 +67,10 @@ def os_conn(project_data: dict) -> openstack.connection.Connection:
                 "domain_id": "default",
             }
         else:
-            raise openstack.exceptions.NotFoundException
-        return openstack.identity.v3.project.Project(**data)
+            raise openstack.exceptions.NotFoundException  # pyright: ignore[reportAttributeAccessIssue]
+        return openstack.identity.v3.project.Project(**data)  # pyright: ignore[reportAttributeAccessIssue]
 
-    conn = MagicMock(spec_set=openstack.connection.Connection)
+    conn = MagicMock(spec_set=openstack.connection.Connection)  # pyright: ignore[reportAttributeAccessIssue]
     conn.identity.get_project.side_effect = _get_project
     return conn
 
