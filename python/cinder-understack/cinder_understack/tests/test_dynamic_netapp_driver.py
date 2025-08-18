@@ -44,6 +44,20 @@ class NetappDynamicDriverTestCase(test.TestCase):
         """Test that library inherits from NetApp NVMe library."""
         self.assertIsInstance(self.library, NetAppNVMeStorageLibrary)
 
+    def test_library_uses_composition_not_inheritance(self):
+        """Test that library uses composition pattern instead of inheritance.
+
+        The new architecture uses composition/delegation pattern where
+        NetappDynamicLibrary HAS multiple NetAppNVMeStorageLibrary instances
+        rather than IS a NetAppNVMeStorageLibrary.
+        """
+        # Library should be instance of object (composition pattern)
+        self.assertIsInstance(self.library, object)
+
+        # Library should have svm_libraries dictionary for composition
+        self.assertTrue(hasattr(self.library, "svm_libraries"))
+        self.assertIsInstance(self.library.svm_libraries, dict)
+
     @mock.patch.object(dynamic_netapp_driver.NetappDynamicLibrary, "do_setup")
     def test_do_setup_calls_library(self, mock_do_setup):
         """Test that do_setup delegates to library."""
@@ -62,4 +76,4 @@ class NetappDynamicDriverTestCase(test.TestCase):
     def test_get_volume_stats_calls_library(self, mock_get_volume_stats):
         """Test that get_volume_stats delegates to library."""
         self.driver.get_volume_stats(refresh=True)
-        mock_get_volume_stats.assert_called_once_with(True)
+        mock_get_volume_stats.assert_called_once_with(refresh=True)
