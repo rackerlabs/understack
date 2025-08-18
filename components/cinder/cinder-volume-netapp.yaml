@@ -28,6 +28,8 @@ spec:
           netapp_use_legacy_client = false
           volume_backend_name = netapp_nvme
           volume_driver = cinder_understack.dynamic_netapp_driver.NetappCinderDynamicDriver
+          max_over_subscription_ratio = 20.0
+          reserved_percentage = 5
           [scheduler]
           scheduler_default_filters = CapabilitiesFilter,DriverFilter
 
