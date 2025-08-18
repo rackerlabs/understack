@@ -5,7 +5,7 @@ from cinder import exception
 from cinder import interface
 from cinder.objects import volume_type as vol_type_obj
 from cinder.volume import driver as volume_driver
-from cinder.volume.drivers.netapp import options
+from cinder.volume.drivers.netapp import options as na_opts
 from cinder.volume.drivers.netapp.dataontap.client.client_cmode_rest import (
     RestClient as RestNaServer,
 )
@@ -21,14 +21,13 @@ CONF = cfg.CONF
 # Configuration options for dynamic NetApp driver
 # Using cinder.volume.configuration approach for better abstraction
 NETAPP_DYNAMIC_OPTS = [
-    options.netapp_proxy_opts,
-    options.netapp_connection_opts,
-    options.netapp_transport_opts,
-    options.netapp_basicauth_opts,
-    options.netapp_provisioning_opts,
-    options.netapp_cluster_opts,
-    options.netapp_san_opts,
-    volume_driver.volume_opts,
+    na_opts.netapp_connection_opts,
+    na_opts.netapp_basicauth_opts,
+    na_opts.netapp_transport_opts,
+    na_opts.netapp_provisioning_opts,
+    na_opts.netapp_support_opts,
+    na_opts.netapp_san_opts,
+    na_opts.netapp_cluster_opts,
 ]
 
 
@@ -48,63 +47,10 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
         Parent driver creates static connections during init. We defer
         SVM connections until volume creation when we know which SVM to use.
         """
-        self._setup_configuration(**kwargs)
-
         super().__init__(*args, **kwargs)
         self.client = None
         self.ssc_library = None
         self.perf_library = None
-
-    def _setup_configuration(self, **kwargs):
-        """Setup configuration using cinder.volume.configuration module."""
-        from cinder.volume import configuration
-
-        config_obj = kwargs.get("configuration", None)
-
-        if config_obj:
-            # here we can access any cinder-provided config .
-            self.configuration = config_obj
-            config_group = getattr(config_obj, "config_group", "netapp_nvme")
-
-            # Register NetApp-specific options using configuration.append()
-            # Following the exact pattern from upstream NetApp drivers
-
-            try:
-                for opt_group in NETAPP_DYNAMIC_OPTS:
-                    self.configuration.append_config_values(opt_group)
-
-                LOG.info(
-                    "Registered NetApp configuration options for group: %s",
-                    config_group,
-                )
-
-            except Exception as e:
-                LOG.warning("Failed to register configuration options: %s", e)
-                # Continue default configuration handling for backward compatibility
-        else:
-            # Testing/Fallback: Create configuration object with all options
-            config_group = "netapp_nvme"
-            self.configuration = configuration.Configuration(
-                volume_driver.volume_opts, config_group=config_group
-            )
-
-            # Register additional NetApp options for testing
-            try:
-                for opt_group in NETAPP_DYNAMIC_OPTS:
-                    if (
-                        opt_group != volume_driver.volume_opts
-                    ):  # Avoid duplicate registration
-                        self.configuration.append_config_values(opt_group)
-
-                LOG.info(
-                    "Registered NetApp configuration options for testing group: %s",
-                    config_group,
-                )
-
-            except Exception as e:
-                LOG.warning(
-                    "Failed to register configuration options for testing: %s", e
-                )
 
     def do_setup(self, context):
         """Skip static NetApp connections, defer to volume creation time."""
@@ -951,6 +897,11 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """Initialize the driver and create library instance."""
         super().__init__(*args, **kwargs)
         self.library = NetappDynamicLibrary(self.DRIVER_NAME, "NVMe", **kwargs)
+
+    @staticmethod
+    def get_driver_options():
+        """All options this driver supports."""
+        return [item for sublist in NETAPP_DYNAMIC_OPTS for item in sublist]
 
     def do_setup(self, context):
         """Setup the driver."""
