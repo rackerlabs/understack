@@ -76,4 +76,4 @@ class NetappDynamicDriverTestCase(test.TestCase):
     def test_get_volume_stats_calls_library(self, mock_get_volume_stats):
         """Test that get_volume_stats delegates to library."""
         self.driver.get_volume_stats(refresh=True)
-        mock_get_volume_stats.assert_called_once_with(refresh=True)
+        mock_get_volume_stats.assert_called_once_with(True)
