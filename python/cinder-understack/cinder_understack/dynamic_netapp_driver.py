@@ -1,5 +1,7 @@
 """NetApp NVMe driver with dynamic multi-SVM support."""
 
+from contextlib import contextmanager
+
 from cinder import context
 from cinder import exception
 from cinder import interface
@@ -853,6 +855,11 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
             ) from e
 
 
+# We use a + because of the special meaning of # in
+# cinder/volume/volume_utils.py extract_host()
+_SVM_NAME_DELIM = "+"
+
+
 class NetAppMinimalLibrary(NetAppNVMeStorageLibrary):
     """Minimal overriding library.
 
@@ -948,6 +955,32 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def check_for_setup_error(self):
         """Check for setup errors."""
         self.library.check_for_setup_error()
+
+    def _svmify_pool(self, pool: dict, svm_name: str, **kwargs) -> dict:
+        """Applies SVM info to a pool so we can target it and track it."""
+        # We need to prefix our pool_name, which is 1:1 with the FlexVol
+        # name on the SVM, with the SVM name. This is because the name of
+        # a FlexVol is unique within 1 SVM. Two different SVMs can have
+        # the same FlexVol however so we need to prefix it. We avoid
+        # using # as our separator because it has special meaning to
+        # cinder. See the cinder/volume/volume_utils.py extract_host()
+        # function for details.
+        pool_name = pool["pool_name"]
+        pool["pool_name"] = f"{svm_name}{_SVM_NAME_DELIM}{pool_name}"
+        pool["netapp_vserver"] = svm_name
+        pool.update(kwargs)
+        return pool
+
+    @contextmanager
+    def _fix_volume_pool_name(self, svm_name: str, volume):
+        """Strips out the SVM name from the volume host and restores."""
+        original_host = volume.get("host")
+        if not original_host:
+            yield original_host
+        else:
+            volume["host"] = original_host.replace(f"{svm_name}{_SVM_NAME_DELIM}", "")
+            yield volume
+            volume["host"] = original_host
 
     def create_volume(self, volume):
         """Create a volume."""
