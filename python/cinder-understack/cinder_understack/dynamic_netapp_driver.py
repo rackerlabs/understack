@@ -5,14 +5,7 @@ from cinder import exception
 from cinder import interface
 from cinder.objects import volume_type as vol_type_obj
 from cinder.volume import driver as volume_driver
-<<<<<<< HEAD
 from cinder.volume.drivers.netapp import options as na_opts
-from cinder.volume.drivers.netapp.dataontap.client.client_cmode_rest import (
-    RestClient as RestNaServer,
-)
-=======
-from cinder.volume.drivers.netapp import options
->>>>>>> 6cee89ec (per svm code refactored)
 from cinder.volume.drivers.netapp.dataontap.nvme_library import NetAppNVMeStorageLibrary
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -30,6 +23,7 @@ NETAPP_DYNAMIC_OPTS = [
     na_opts.netapp_support_opts,
     na_opts.netapp_san_opts,
     na_opts.netapp_cluster_opts,
+    volume_driver.volume_opts,
 ]
 
 
@@ -39,26 +33,12 @@ class NetappDynamicLibrary:
     Key difference from standard NetApp drivers:
     - Standard: One SVM per backend, all config in cinder.conf
     - Ours: Multiple SVMs per backend, SVM name from volume type
-    current : Per SVM delegation to upstream NetAppNVMeStorageLibrary instances.
-            hence above I have used object insated of NetAppNVMeStorageLibrary
+    - Current : Per SVM delegation to upstream NetAppNVMeStorageLibrary instances.
+            hence above I have used object instead of NetAppNVMeStorageLibrary
             this design uses composition/delegation, not inheritance
             Each SVM gets its own properly configured NetAppNVMeStorageLibrary
     """
 
-<<<<<<< HEAD
-    REQUIRED_CMODE_FLAGS = []
-
-    def __init__(self, *args, **kwargs):
-        """Initialize driver without creating SVM connections.
-
-        Parent driver creates static connections during init. We defer
-        SVM connections until volume creation when we know which SVM to use.
-        """
-        super().__init__(*args, **kwargs)
-        self.client = None
-        self.ssc_library = None
-        self.perf_library = None
-=======
     VERSION = "1.0.0"
     # Added to each svms pool capabilities
 
@@ -68,7 +48,7 @@ class NetappDynamicLibrary:
         self.driver_protocol = driver_protocol
         self.configuration = kwargs.get("configuration")
         self.host = kwargs.get("host", "unknown@unknown")
-        self.app_version = kwargs.get("app_version", "1.0.0")
+        self.app_version = kwargs.get("app_version", self.VERSION)
 
         # Per-SVM upstream library instances
         self.svm_libraries = {}  # svm_name -> NetAppNVMeStorageLibrary
@@ -80,7 +60,6 @@ class NetappDynamicLibrary:
 
     def _setup_configuration(self, **kwargs):
         """Setup configuration using cinder.volume.configuration module."""
-        from cinder.volume import configuration
 
         config_obj = kwargs.get("configuration", None)
 
@@ -134,7 +113,6 @@ class NetappDynamicLibrary:
         from cinder.volume import configuration
 
         LOG.debug("Creating SVM configuration for %s", svm_name)
->>>>>>> 6cee89ec (per svm code refactored)
 
         # Create a new configuration object for this SVM
         svm_config = configuration.Configuration(
@@ -152,43 +130,55 @@ class NetappDynamicLibrary:
                 "Failed to register configuration options for SVM %s: %s", svm_name, e
             )
 
-<<<<<<< HEAD
-    def _get_all_svm_clients_from_volume_types(self):
-        """Connect to all SVMs found in volume type metadata."""
-        svm_clients = {}
-        ctxt = context.get_admin_context()
-=======
         # Copy critical NetApp settings from base configuration
-        netapp_attrs = [
-            "netapp_login",
-            "netapp_password",
-            "netapp_server_hostname",
-            "netapp_transport_type",
-            "netapp_ssl_cert_check",
-            "netapp_server_port",
-            "netapp_private_key_file",
-            "netapp_certificate_file",
-            "netapp_pool_name_search_pattern",
-            "netapp_namespace_ostype",
-            "netapp_host_type",
-            "netapp_driver_reports_provisioned_capacity",
-            "volume_backend_name",
-            "max_over_subscription_ratio",
-            "reserved_percentage",
-        ]
+        # helpful while debugging
+        # netapp_attrs = [
+        #     "netapp_login",
+        #     "netapp_password",
+        #     "netapp_server_hostname",
+        #     "netapp_transport_type",
+        #     "netapp_ssl_cert_check",
+        #     "netapp_server_port",
+        #     "netapp_private_key_file",
+        #     "netapp_certificate_file",
+        #     "netapp_pool_name_search_pattern",
+        #     "netapp_namespace_ostype",
+        #     "netapp_host_type",
+        #     "netapp_driver_reports_provisioned_capacity",
+        #     "volume_backend_name",
+        #     "max_over_subscription_ratio",
+        #     "reserved_percentage",
+        # ]
 
-        for attr in netapp_attrs:
-            if hasattr(self.configuration, attr):
-                try:
-                    base_value = getattr(self.configuration, attr)
-                    if base_value is not None:
-                        setattr(svm_config, attr, base_value)
-                except Exception as e:
-                    LOG.debug("Could not copy attribute %s: %s", attr, e)
+        # Dynamically copy ALL configuration attributes from base to SVM config
+        for opt_group in NETAPP_DYNAMIC_OPTS:
+            for opt in opt_group:
+                attr_name = opt.name
+                if hasattr(self.configuration, attr_name):
+                    try:
+                        base_value = getattr(self.configuration, attr_name)
+                        if base_value is not None:
+                            setattr(svm_config, attr_name, base_value)
+                            LOG.debug("Copied %s = %s to SVM config", attr_name, base_value)
+                    except Exception as e:
+                        LOG.debug("Could not copy attribute %s: %s", attr_name, e)
+
+        # for attr in netapp_attrs:
+        #     if hasattr(self.configuration, attr):
+        #         try:
+        #             base_value = getattr(self.configuration, attr)
+        #             if base_value is not None:
+        #                 setattr(svm_config, attr, base_value)
+        #         except Exception as e:
+        #             LOG.debug("Could not copy attribute %s: %s", attr, e)
 
         # Override the vserver setting for this SVM
         svm_config.netapp_vserver = svm_name
-        svm_config.vserver = svm_name  # Required by REST client
+        # the reason for this was , there is use of zapi client which needed vserver to be set .
+        # I have commented this for now , but I will circle back here for
+        # fixing the error ,but yes for now this is not needed
+        # also while debugging I saw self.client.vserver was getting set .
+        # svm_config.vserver = svm_name  # Required by REST client
 
         return svm_config
 
@@ -198,21 +188,20 @@ class NetappDynamicLibrary:
             return self.svm_libraries[svm_name]
 
         LOG.info("Creating upstream library for SVM: %s", svm_name)
->>>>>>> 6cee89ec (per svm code refactored)
 
         try:
             # Create SVM-specific configuration
             svm_config = self._create_svm_configuration(svm_name)
 
             # Create the upstream library
-            parent_backend = self.host.split("@")[1] if "@" in self.host else "unknown"
-            svm_host = f"{self.host.split('@')[0]}@{parent_backend}"
+            # parent_backend = self.host.split("@")[1] if "@" in self.host else "unknown"
+            # svm_host = f"{self.host.split('@')[0]}@{parent_backend}"
 
             svm_library = NetAppNVMeStorageLibrary(
                 driver_name=f"{self.driver_name}_{svm_name}",
                 driver_protocol=self.driver_protocol,
                 configuration=svm_config,
-                host=svm_host,
+                host=self.host,
                 app_version=self.app_version,
             )
 
@@ -243,12 +232,11 @@ class NetappDynamicLibrary:
 
     def _get_svm_library_for_volume(self, volume):
         """Get the appropriate SVM library for a volume."""
-        if not hasattr(volume, "volume_type") or not volume.volume_type:
+        specs = na_utils.get_volume_extra_specs(volume)
+        if not specs:
             raise exception.VolumeBackendAPIException(
                 data="Volume must have a volume type for SVM selection"
             )
-
-        specs = volume.volume_type.extra_specs
         svm_name = self._get_svm_from_volume_type(specs)
         svm_library = self._get_or_create_svm_library(svm_name)
 
@@ -324,42 +312,16 @@ class NetappDynamicLibrary:
                     pool_name = pool_name.split("#")[-1]
                 volume["host"] = f"{volume['host']}#{pool_name}"
                 LOG.debug("Added pool to host field: %s", volume["host"])
+        else:
+            raise exception.VolumeBackendAPIException(
+                data=f"Invalid host field format: '{original_host}'. "
+                 f"Expected 'hostname@backend' or 'hostname@backend#svm#pool', "
+                 f"but got {len(host_parts)} parts."
+        )
 
         return original_host
 
-    def create_volume(self, volume):
-        """Create a volume by passing to the appropriate SVM library."""
-        LOG.info("Creating volume %s", volume.name)
 
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        original_host = self._adjust_host_field_for_upstream(volume, svm_library)
-
-        try:
-            result = svm_library.create_volume(volume)
-        finally:
-            if original_host:
-                volume["host"] = original_host
-
-        return result
-
-    def delete_volume(self, volume):
-        """Delete a volume by delegating to the appropriate SVM library."""
-        LOG.info("Deleting volume %s", volume.name)
-
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        original_host = self._adjust_host_field_for_upstream(volume, svm_library)
-
-        try:
-            result = svm_library.delete_volume(volume)
-        finally:
-            if original_host:
-                volume["host"] = original_host
-
-        return result
 
     def _ensure_svm_library_setup(self, svm_library, svm_name):
         """Ensure the SVM library is properly set up and connected."""
@@ -512,282 +474,6 @@ class NetappDynamicLibrary:
         """Return the goodness function for Cinder's scheduler scoring."""
         return self.configuration.safe_get("goodness_function")
 
-<<<<<<< HEAD
-    def _get_flexvol_capacity_with_fallback(self, client, vol_name):
-        """Get FlexVol capacity with custom volume name to junction path mapping."""
-        # TODO : find a API endpoint to fetch the junction path with svm and pool
-        try:
-            # First try the standard method
-            return client.get_flexvol_capacity(vol_name)
-        except Exception as e:
-            LOG.debug("Standard capacity retrieval failed for %s: %s", vol_name, e)
-
-            try:
-                # Use the same query pattern as list_flexvols() but with capacity fields
-                query = {
-                    "type": "rw",
-                    "style": "flex*",  # Match both 'flexvol' and 'flexgroup'
-                    "is_svm_root": "false",
-                    "error_state.is_inconsistent": "false",
-                    "state": "online",
-                    "fields": "name,space.available,space.size,nas.path",
-                }
-
-                # Get all volumes like list_flexvols() does
-                volumes_response = client.send_request(
-                    "/storage/volumes/", "get", query=query
-                )
-                records = volumes_response.get("records", [])
-
-                # Filter for the specific volume we want with multiple matching patterns
-                target_volume = None
-                for volume in records:
-                    volume_name = volume.get("name", "")
-                    volume_path = volume.get("nas", {}).get("path", "")
-
-                    # Pattern 1: Exact name match [Ideal scenario]
-                    # but keeping other patterns just to be safe,
-                    # we can delete it in future
-                    # I might have to circle back here ,
-                    # once I find a API endpoint to fetch
-                    # the junction path with svm name and pool name
-                    if volume_name == vol_name:
-                        target_volume = volume
-                        LOG.debug("Found target volume by exact name: %s", vol_name)
-                        break
-
-                    # Pattern 2: Path normalization (handle leading slash differences)
-                    if volume_path:
-                        normalized_vol_path = volume_path.lstrip("/")
-                        normalized_target_path = vol_name.lstrip("/")
-                        if normalized_vol_path == normalized_target_path:
-                            target_volume = volume
-                            LOG.debug(
-                                "Found target volume by path normalization: %s -> %s",
-                                vol_name,
-                                volume_path,
-                            )
-                            break
-
-                    # Pattern 3: sto_lun1 -> lun1 matches /lun1
-                    if vol_name and volume_path and "_" in vol_name:
-                        name_suffix = vol_name.split("_")[-1]
-                        normalized_vol_path = volume_path.lstrip("/")
-                        if normalized_vol_path == name_suffix:
-                            target_volume = volume
-                            LOG.debug(
-                                "Found target volume by name suffix mapping: %s -> %s",
-                                vol_name,
-                                volume_path,
-                            )
-                            break
-
-                    # Pattern 4: sto_lun1 -> sto-lun1 matches /sto-lun1
-                    if vol_name and volume_path:
-                        hyphenated_name = vol_name.replace("_", "-")
-                        normalized_vol_path = volume_path.lstrip("/")
-                        if normalized_vol_path == hyphenated_name:
-                            target_volume = volume
-                            LOG.debug(
-                                "Found target volume by hyphen name mapping: %s -> %s",
-                                vol_name,
-                                volume_path,
-                            )
-                            break
-
-                    # Pattern 5: handle cases where path uses hyphens
-                    # but name uses underscores
-                    if vol_name and volume_path:
-                        normalized_vol_path = volume_path.lstrip("/")
-                        if normalized_vol_path.replace("-", "_") == vol_name:
-                            target_volume = volume
-                            LOG.debug(
-                                "Found target volume by separator conversion: %s -> %s",
-                                vol_name,
-                                volume_path,
-                            )
-                            break
-
-                if not target_volume:
-                    volume_names = [vol.get("name", "unknown") for vol in records]
-                    volume_paths = [
-                        vol.get("nas", {}).get("path", "no-path") for vol in records
-                    ]
-                    raise Exception(
-                        f"Could not find volume {vol_name}. "
-                        f"Available volumes: {volume_names}. "
-                        f"Available paths: {volume_paths}."
-                    )
-
-                # Extract capacity information
-                space_info = target_volume.get("space", {})
-                total_size = space_info.get("size", 0)
-                available_size = space_info.get("available", 0)
-
-                return {
-                    "size-total": float(total_size),
-                    "size-available": float(available_size),
-                }
-
-            except Exception as custom_e:
-                LOG.warning(
-                    "Custom capacity retrieval also failed for %s: %s",
-                    vol_name,
-                    custom_e,
-                )
-                # Return None to trigger fallback values in the calling code
-                raise custom_e
-
-    def _init_rest_client(self, hostname, username, password, vserver):
-        """Create a NetApp REST client for the specified SVM.
-
-        This creates a connection to a specific Storage Virtual Machine using
-        the cluster management credentials. The key difference from the parent
-        driver is that we can create multiple clients for different SVMs
-        dynamically, rather than being locked to one SVM at startup.
-
-        Args:
-            hostname: NetApp cluster management IP/hostname
-            username: Cluster admin username
-            password: Cluster admin password
-            vserver: Target SVM name
-
-        Returns:
-            RestClient: Configured NetApp REST client
-        """
-        LOG.info(
-            "Creating REST client for SVM %s at %s (user: %s)",
-            vserver,
-            hostname,
-            username,
-        )
-
-        # Called from create_volume() to create per-SVM REST connection
-        # This avoids use of global CONF and uses metadata-driven parameters
-        # TODO: Need to circle back here for certs
-        # FIXME: SSL certificate validation is currently disabled for simplicity.
-        # This should be enabled in production environments.
-        client = RestNaServer(
-            hostname=hostname,
-            username=username,
-            password=password,
-            vserver=vserver,
-            transport_type="https",
-            port=443,
-            ssl_cert_path=None,
-            private_key_file=None,
-            certificate_file=None,
-            ca_certificate_file=None,
-            ca_cert_file=None,
-            trace=False,
-            api_trace_pattern="(.*)",
-            certificate_host_validation=False,
-        )
-        return client
-
-    def clean_volume_file_locks(self, volume):
-        """No-op file lock cleanup for REST-based operations.
-
-        Legacy NetApp drivers used file-based locking mechanisms that required
-        cleanup after volume operations. Our REST-based approach doesn't use
-        file locks, so this is a no-op.
-
-        However, Cinder's cleanup routines still call this method, so we need
-        to provide an implementation to prevent AttributeError exceptions.
-        """
-        # Got this when volume was created and mocked the NetApp connection.
-        # When creation failed,
-        # it started its cleanup process and errored out for this method.
-        # In our case, REST-based NetApp doesn't need this,
-        # but must be present to avoid errors.
-        LOG.debug("No-op clean_volume_file_locks in dynamic driver")
-
-    def create_volume(self, volume):
-        """Create a volume with dynamic SVM selection based on volume type metadata.
-
-        This method completely overrides the parent's create_volume method to handle
-        our dynamic pool naming convention (svm_name#flexvol_name).
-        """
-        LOG.info("Creating volume %s on host %s", volume.name, volume.host)
-        # TODO: subsystem
-        # Parse the pool name from volume host to handle our
-        # svm_name#flexvol_name format
-        # Our host format: cinder@netapp_nvme#data-svm1#ucloud1
-        # Standard extract_host expects only one #, but we use two
-        # So we need custom parsing for our svm_name#flexvol_name format
-        if "#" not in volume.host:
-            msg = "No pool information found in volume host field."
-            LOG.error(msg)
-            raise exception.InvalidHost(reason=msg)
-
-        # Split on # and get everything after the backend name
-        # The original driver expects a simple pool name (FlexVol name).
-        # But our dynamic driver needs to support multiple SVMs,
-        # so we created a custom format svm_name#flexvol_name to encode
-        # both the SVM and FlexVol information in the pool name.
-        # This allows the scheduler to differentiate between FlexVols
-        # with the same name on different SVMs.
-        host_parts = volume.host.split("#")
-        if len(host_parts) < 3:
-            # Fallback to standard extraction for single # format
-            from cinder.volume import volume_utils
-
-            pool_name = volume_utils.extract_host(volume.host, level="pool")
-        else:
-            # Our custom format: backend#svm_name#flexvol_name
-            # Combine svm_name#flexvol_name as the pool name
-            pool_name = "#".join(host_parts[1:])
-
-        if pool_name is None:
-            msg = "Pool is not available in the volume host field."
-            LOG.error(msg)
-            raise exception.InvalidHost(reason=msg)
-
-        # Handle our svm_name#flexvol_name format
-        if "#" in pool_name:
-            svm_name, flexvol_name = pool_name.split("#", 1)
-        else:
-            # Fallback for pools without SVM prefix
-            flexvol_name = pool_name
-            svm_name = None
-
-        # Extract SVM metadata from volume type extra_specs
-        specs = volume.volume_type.extra_specs
-        LOG.info(
-            "Parsed pool %s -> SVM: %s, FlexVol: %s, extra_specs: %s",
-            pool_name,
-            svm_name,
-            flexvol_name,
-            specs,
-        )
-
-        # Extract SVM name from volume type metadata
-        vserver = specs.get("netapp:svm_vserver")
-
-        # Everything else from cinder.conf
-        hostname = self.configuration.netapp_server_hostname
-        username = self.configuration.netapp_login
-        password = self.configuration.netapp_password
-        # For NVMe driver, protocol is always nvme
-
-        # Validate required metadata
-        if not vserver:
-            msg = "Missing required NetApp SVM metadata: netapp:svm_vserver"
-            LOG.error(msg)
-            raise exception.VolumeBackendAPIException(data=msg)
-        # Validate cinder.conf parameters
-        if not all([hostname, username, password]):
-            missing_conf = []
-            if not hostname:
-                missing_conf.append("netapp_server_hostname")
-            if not username:
-                missing_conf.append("netapp_login")
-            if not password:
-                missing_conf.append("netapp_password")
-            msg = (
-                f"Missing required NetApp configuration in cinder.conf: "
-                f"{missing_conf}"
-=======
     def update_provider_info(self, *args, **kwargs):
         """Update provider info for existing volumes."""
         # This is typically a no-op for most drivers
@@ -803,7 +489,6 @@ class NetappDynamicLibrary:
                 "Pool already present in host field for volume %s: %s",
                 volume.get("id", "unknown"),
                 current_host,
->>>>>>> 6cee89ec (per svm code refactored)
             )
             return None
 
@@ -833,89 +518,115 @@ class NetappDynamicLibrary:
             )
             return None
 
+    @contextmanager
+    def _svm_library_context(self, volume):
+        """Context manager for operations that don't modify host field."""
+        svm_library, svm_name = self._get_svm_library_for_volume(volume)
+        self._ensure_svm_library_setup(svm_library, svm_name)
+        yield svm_library
+
+    @contextmanager
+    def _volume_operation_context(self, volume):
+        """Context manager for volume operations setup and cleanup."""
+        svm_library, svm_name = self._get_svm_library_for_volume(volume)
+        self._ensure_svm_library_setup(svm_library, svm_name)
+
+        original_host = self._adjust_host_field_for_upstream(volume, svm_library)
+
+        try:
+            yield svm_library
+        finally:
+            if original_host:
+                volume["host"] = original_host
+
+    @contextmanager
+    def _snapshot_operation_context(self, snapshot):
+        """Context manager for snapshot operations setup and cleanup."""
+        volume = snapshot.volume
+        svm_library, svm_name = self._get_svm_library_for_volume(volume)
+        self._ensure_svm_library_setup(svm_library, svm_name)
+        yield svm_library
+
+    def create_volume(self, volume):
+        """Create a volume by passing to the appropriate SVM library."""
+        LOG.info("Creating volume %s", volume.name)
+
+        with self._volume_operation_context(volume) as svm_library:
+            return svm_library.create_volume(volume)
+
+
+    def delete_volume(self, volume):
+        """Delete a volume by delegating to the appropriate SVM library."""
+        LOG.info("Deleting volume %s", volume.name)
+
+        with self._volume_operation_context(volume) as svm_library:
+            return svm_library.delete_volume(volume)
+
     # Delegate snapshot operations to upstream library
     def create_snapshot(self, snapshot):
         """Create a snapshot."""
         LOG.info("Creating snapshot %s", snapshot.name)
 
-        volume = snapshot.volume
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        return svm_library.create_snapshot(snapshot)
+        with self._snapshot_operation_context(snapshot) as svm_library:
+            return svm_library.create_snapshot(snapshot)
 
     def delete_snapshot(self, snapshot):
         """Delete a snapshot."""
         LOG.info("Deleting snapshot %s", snapshot.name)
 
-        volume = snapshot.volume
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        return svm_library.delete_snapshot(snapshot)
+        with self._snapshot_operation_context(snapshot) as svm_library:
+            return svm_library.delete_snapshot(snapshot)
 
     def create_volume_from_snapshot(self, volume, snapshot):
         """Create a volume from snapshot."""
         LOG.info("Creating volume %s from snapshot %s", volume.name, snapshot.name)
 
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        return svm_library.create_volume_from_snapshot(volume, snapshot)
+        with self._volume_operation_context(volume) as svm_library:
+            return svm_library.create_volume_from_snapshot(volume, snapshot)
 
     def create_cloned_volume(self, volume, src_vref):
         """Create a cloned volume."""
         LOG.info("Creating cloned volume %s from %s", volume.name, src_vref.name)
 
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        return svm_library.create_cloned_volume(volume, src_vref)
+        with self._volume_operation_context(volume) as svm_library:
+            return svm_library.create_cloned_volume(volume, src_vref)
 
     def extend_volume(self, volume, new_size):
         """Extend a volume."""
         LOG.info("Extending volume %s to %s GB", volume.name, new_size)
 
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        return svm_library.extend_volume(volume, new_size)
+        with self._volume_operation_context(volume) as svm_library:
+            return svm_library.extend_volume(volume, new_size)
 
     def initialize_connection(self, volume, connector):
         """Initialize connection."""
         LOG.info("Initializing connection for volume %s", volume.name)
 
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        return svm_library.initialize_connection(volume, connector)
+        with self._svm_library_context(volume) as svm_library:
+            return svm_library.initialize_connection(volume, connector)
 
     def terminate_connection(self, volume, connector, **kwargs):
         """Terminate connection."""
         LOG.info("Terminating connection for volume %s", volume.name)
 
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-
-        return svm_library.terminate_connection(volume, connector, **kwargs)
+        with self._svm_library_context(volume) as svm_library:
+            return svm_library.terminate_connection(volume, connector,
+                                                    **kwargs)
 
     def create_export(self, context, volume, connector=None):
         """Create export."""
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-        return svm_library.create_export(context, volume, connector)
+        with self._svm_library_context(volume) as svm_library:
+            return svm_library.create_export(context, volume, connector)
 
     def ensure_export(self, context, volume):
         """Ensure export."""
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-        return svm_library.ensure_export(context, volume)
+        with self._svm_library_context(volume) as svm_library:
+            return svm_library.ensure_export(context, volume)
 
     def remove_export(self, context, volume):
         """Remove export."""
-        svm_library, svm_name = self._get_svm_library_for_volume(volume)
-        self._ensure_svm_library_setup(svm_library, svm_name)
-        return svm_library.remove_export(context, volume)
+        with self._svm_library_context(volume) as svm_library:
+            return svm_library.remove_export(context, volume)
 
 
 @interface.volumedriver
@@ -933,11 +644,6 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """Initialize the driver and create library instance."""
         super().__init__(*args, **kwargs)
         self.library = NetappDynamicLibrary(self.DRIVER_NAME, "NVMe", **kwargs)
-
-    @staticmethod
-    def get_driver_options():
-        """All options this driver supports."""
-        return [item for sublist in NETAPP_DYNAMIC_OPTS for item in sublist]
 
     def do_setup(self, context):
         """Setup the driver."""
@@ -987,6 +693,10 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """Get volume stats."""
         return self.library.get_volume_stats(refresh)
 
+    def update_provider_info(self, volumes, snapshots):
+        """Update provider info."""
+        return self.library.update_provider_info(volumes, snapshots)
+
     def create_export(self, context, volume, connector):
         """Create export for volume."""
         return self.library.create_export(context, volume, connector)
@@ -998,8 +708,6 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def remove_export(self, context, volume):
         """Remove export for volume."""
         return self.library.remove_export(context, volume)
-<<<<<<< HEAD
-=======
 
     def get_pool(self, volume):
         """Get pool name for volume."""
@@ -1012,4 +720,3 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 # [scheduler] scheduler_default_filters = CapabilitiesFilter,DriverFilter
 # Issue with os-vol-host-attr:host
 # Netapi Error
->>>>>>> 6cee89ec (per svm code refactored)
