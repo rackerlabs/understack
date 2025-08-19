@@ -1,11 +1,15 @@
 """NetApp NVMe driver with dynamic multi-SVM support."""
 
+from contextlib import contextmanager
+
 from cinder import context
 from cinder import exception
 from cinder import interface
 from cinder.objects import volume_type as vol_type_obj
+from cinder.volume import configuration
 from cinder.volume import driver as volume_driver
 from cinder.volume.drivers.netapp import options as na_opts
+from cinder.volume.drivers.netapp import utils as na_utils
 from cinder.volume.drivers.netapp.dataontap.nvme_library import NetAppNVMeStorageLibrary
 from oslo_config import cfg
 from oslo_log import log as logging
@@ -58,9 +62,13 @@ class NetappDynamicLibrary:
 
         self._setup_configuration(**kwargs)
 
+    @staticmethod
+    def get_driver_options():
+        """All options this driver supports."""
+        return [item for sublist in NETAPP_DYNAMIC_OPTS for item in sublist]
+
     def _setup_configuration(self, **kwargs):
         """Setup configuration using cinder.volume.configuration module."""
-
         config_obj = kwargs.get("configuration", None)
 
         if config_obj:
@@ -110,8 +118,6 @@ class NetappDynamicLibrary:
 
     def _create_svm_configuration(self, svm_name):
         """Create a configuration object for a specific SVM."""
-        from cinder.volume import configuration
-
         LOG.debug("Creating SVM configuration for %s", svm_name)
 
         # Create a new configuration object for this SVM
@@ -130,26 +136,6 @@ class NetappDynamicLibrary:
                 "Failed to register configuration options for SVM %s: %s", svm_name, e
             )
 
-        # Copy critical NetApp settings from base configuration
-        # helpful while debugging
-        # netapp_attrs = [
-        #     "netapp_login",
-        #     "netapp_password",
-        #     "netapp_server_hostname",
-        #     "netapp_transport_type",
-        #     "netapp_ssl_cert_check",
-        #     "netapp_server_port",
-        #     "netapp_private_key_file",
-        #     "netapp_certificate_file",
-        #     "netapp_pool_name_search_pattern",
-        #     "netapp_namespace_ostype",
-        #     "netapp_host_type",
-        #     "netapp_driver_reports_provisioned_capacity",
-        #     "volume_backend_name",
-        #     "max_over_subscription_ratio",
-        #     "reserved_percentage",
-        # ]
-
         # Dynamically copy ALL configuration attributes from base to SVM config
         for opt_group in NETAPP_DYNAMIC_OPTS:
             for opt in opt_group:
@@ -159,27 +145,14 @@ class NetappDynamicLibrary:
                         base_value = getattr(self.configuration, attr_name)
                         if base_value is not None:
                             setattr(svm_config, attr_name, base_value)
-                            LOG.debug("Copied %s = %s to SVM config", attr_name, base_value)
+                            LOG.debug(
+                                "Copied %s = %s to SVM config", attr_name, base_value
+                            )
                     except Exception as e:
                         LOG.debug("Could not copy attribute %s: %s", attr_name, e)
 
-        # for attr in netapp_attrs:
-        #     if hasattr(self.configuration, attr):
-        #         try:
-        #             base_value = getattr(self.configuration, attr)
-        #             if base_value is not None:
-        #                 setattr(svm_config, attr, base_value)
-        #         except Exception as e:
-        #             LOG.debug("Could not copy attribute %s: %s", attr, e)
-
         # Override the vserver setting for this SVM
         svm_config.netapp_vserver = svm_name
-        # the reason for this was , there is use of zapi client which needed vserver to be set .
-        # I have commented this for now , but I will circle back here for
-        # fixing the error ,but yes for now this is not needed
-        # also while debugging I saw self.client.vserver was getting set .
-        # svm_config.vserver = svm_name  # Required by REST client
-
         return svm_config
 
     def _get_or_create_svm_library(self, svm_name):
@@ -192,7 +165,7 @@ class NetappDynamicLibrary:
         try:
             # Create SVM-specific configuration
             svm_config = self._create_svm_configuration(svm_name)
-            # Create the upstream library
+
             svm_library = NetAppNVMeStorageLibrary(
                 driver_name=f"{self.driver_name}_{svm_name}",
                 driver_protocol=self.driver_protocol,
@@ -311,13 +284,11 @@ class NetappDynamicLibrary:
         else:
             raise exception.VolumeBackendAPIException(
                 data=f"Invalid host field format: '{original_host}'. "
-                 f"Expected 'hostname@backend' or 'hostname@backend#svm#pool', "
-                 f"but got {len(host_parts)} parts."
-        )
+                f"Expected 'hostname@backend' or 'hostname@backend#svm#pool', "
+                f"but got {len(host_parts)} parts."
+            )
 
         return original_host
-
-
 
     def _ensure_svm_library_setup(self, svm_library, svm_name):
         """Ensure the SVM library is properly set up and connected."""
@@ -550,7 +521,6 @@ class NetappDynamicLibrary:
         with self._volume_operation_context(volume) as svm_library:
             return svm_library.create_volume(volume)
 
-
     def delete_volume(self, volume):
         """Delete a volume by delegating to the appropriate SVM library."""
         LOG.info("Deleting volume %s", volume.name)
@@ -606,8 +576,7 @@ class NetappDynamicLibrary:
         LOG.info("Terminating connection for volume %s", volume.name)
 
         with self._svm_library_context(volume) as svm_library:
-            return svm_library.terminate_connection(volume, connector,
-                                                    **kwargs)
+            return svm_library.terminate_connection(volume, connector, **kwargs)
 
     def create_export(self, context, volume, connector=None):
         """Create export."""
