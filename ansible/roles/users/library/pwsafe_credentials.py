@@ -1,14 +1,13 @@
-# pwsafe_credentials.py
 import json
 import os
 import requests
-import json
 import sys
 
 from ansible.module_utils.basic import AnsibleModule
 
 IDENTITY_TOKEN = os.getenv("IDENTITY_TOKEN")
 PWSAFE_ENDPOINT = os.getenv("PASSWORD_SAFE_URL")
+
 
 def get_credentials(project_id, usernames, descriptions):
     headers = {"Accept": "application/json", "X-AUTH-TOKEN": IDENTITY_TOKEN}
@@ -46,11 +45,13 @@ def _filter_service_accounts(credentials, usernames, descriptions):
         ):
             try:
                 json_pwd = json.loads(cred["password"])
-                service_accounts.append({
-                    "username": cred["username"],
-                    "password": json_pwd.get("password"),
-                    "token": json_pwd.get("token"),
-                })
+                service_accounts.append(
+                    {
+                        "username": cred["username"],
+                        "password": json_pwd.get("password"),
+                        "token": json_pwd.get("token"),
+                    }
+                )
             except (KeyError, json.JSONDecodeError):
                 continue
     return service_accounts
@@ -62,15 +63,15 @@ def build_description(env, username):
 
 def run_module():
     module_args = dict(
-        usernames=dict(type='list', required=True),
-        project_id=dict(type='str', required=True),
-        env=dict(type='str', required=True),
+        usernames=dict(type="list", required=True),
+        project_id=dict(type="str", required=True),
+        env=dict(type="str", required=True),
     )
 
     module = AnsibleModule(argument_spec=module_args, supports_check_mode=True)
-    usernames = module.params['usernames']
+    usernames = module.params["usernames"]
     descriptions = [build_description("dev", username) for username in usernames]
-    credentials = get_credentials(module.params['project_id'], usernames, descriptions)
+    credentials = get_credentials(module.params["project_id"], usernames, descriptions)
 
     missing = [u for u in usernames if u not in [c["username"] for c in credentials]]
 
@@ -82,5 +83,6 @@ def run_module():
     )
     module.exit_json(**result)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_module()

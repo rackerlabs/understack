@@ -1,14 +1,14 @@
 ---
 - name: Get Nautobot service accounts from Password-safe
   pwsafe_credentials:
-    project_id: "{{ project_id }}"
+    project_id: "{{ users_project_id }}"
     usernames: "{{ users_names }}"
     env: "dev"
   register: pwsafe_credentials_result
 
 - name: Create missing service accounts in Password Safe
   ansible.builtin.uri:
-    url: "{{ password_safe_url }}/projects/{{ project_id }}/credentials"
+    url: "{{ password_safe_url }}/projects/{{ users_project_id }}/credentials"
     method: POST
     headers:
       Accept: "application/json"
@@ -20,10 +20,8 @@
         description: "dev nautobot {{ item }} user"
         hostname: "{{ nautobot_url }}"
         username: "{{ item }}"
-        password: "{{ {
-          'token': lookup('ansible.builtin.password', '/dev/null length=40 chars=ascii_letters,digits'),
-          'password': lookup('ansible.builtin.password', '/dev/null length=12 chars=ascii_letters,digits')
-        } | to_json }}"
+        password: "{{ {'token': lookup('ansible.builtin.password', '/dev/null length=40 chars=ascii_letters,digits'),
+        'password': lookup('ansible.builtin.password', '/dev/null length=12 chars=ascii_letters,digits')} | to_json }}`"
     status_code: 201
   loop: "{{ pwsafe_credentials_result.missing_usernames | default([]) }}"
   register: created_credentials
@@ -82,7 +80,7 @@
     method: POST
     url_username: "{{ item.username }}"
     url_password: "{{ item.password }}"
-    force_basic_auth: yes
+    force_basic_auth: true
     body_format: json
     body:
       key: "{{ item.token }}"
