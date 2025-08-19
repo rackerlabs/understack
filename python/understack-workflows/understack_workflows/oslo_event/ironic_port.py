@@ -8,6 +8,8 @@ from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 from pynautobot.core.response import Record
 
+from understack_workflows.main.openstack_oslo_event import HandlerResult
+
 logger = logging.getLogger(__name__)
 
 # TODO: we should not hardcode this
@@ -61,7 +63,7 @@ class IronicPortEvent:
 
 def handle_port_create_update(
     _conn: Connection, nautobot: Nautobot, event_data: dict
-) -> int:
+) -> HandlerResult:
     """Operates on an Ironic Port create and update event."""
     event = IronicPortEvent.from_event_dict(event_data)
 
@@ -100,10 +102,10 @@ def handle_port_create_update(
 
     # Handle cable management if we have remote switch connection information
     if event.remote_port_id and event.remote_switch_info:
-        return _handle_cable_management(nautobot, intf, event)
+        return HandlerResult(exit_code=_handle_cable_management(nautobot, intf, event))
 
     logger.debug("No remote connection info available for interface %s", event.uuid)
-    return 0
+    return HandlerResult(0)
 
 
 def _create_cable(nautobot: Nautobot, switch_intf, event: IronicPortEvent) -> int:
@@ -195,7 +197,9 @@ def _handle_cable_management(
         return _create_cable(nautobot, switch_intf, event)
 
 
-def handle_port_delete(_conn: Connection, nautobot: Nautobot, event_data: dict) -> int:
+def handle_port_delete(
+    _conn: Connection, nautobot: Nautobot, event_data: dict
+) -> HandlerResult:
     """Operates on an Ironic Port delete event."""
     event = IronicPortEvent.from_event_dict(event_data)
 
@@ -207,7 +211,7 @@ def handle_port_delete(_conn: Connection, nautobot: Nautobot, event_data: dict) 
         logger.debug(
             "Interface %s not found in Nautobot, nothing to delete", event.uuid
         )
-        return 0
+        return HandlerResult(0)
 
     # Find and delete any existing cable connected to this interface
     existing_cable = nautobot.dcim.cables.get(
@@ -223,4 +227,4 @@ def handle_port_delete(_conn: Connection, nautobot: Nautobot, event_data: dict) 
     logger.info("Deleting interface %s from Nautobot", event.uuid)
     cast(Record, intf).delete()
 
-    return 0
+    return HandlerResult(0)

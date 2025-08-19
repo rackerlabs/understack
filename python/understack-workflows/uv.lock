@@ -1,6 +1,6 @@
 version = 1
-revision = 3
-requires-python = "==3.11.*"
+revision = 2
+requires-python = ">=3.11.0, <3.12"
 
 [[package]]
 name = "annotated-types"
@@ -528,6 +528,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pika"
+version = "1.3.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/db/d4102f356af18f316c67f2cead8ece307f731dd63140e2c71f170ddacf9b/pika-1.3.2.tar.gz", hash = "sha256:b2a327ddddf8570b4965b3576ac77091b850262d34ce8c1d8cb4e4146aa4145f", size = 145029, upload-time = "2023-05-05T14:25:43.368Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/f3/f412836ec714d36f0f4ab581b84c491e3f42c6b5b97a6c6ed1817f3c16d0/pika-1.3.2-py3-none-any.whl", hash = "sha256:0779a7c1fafd805672796085560d290213a465e4f6f76a6fb19e378d8041a14f", size = 155415, upload-time = "2023-05-05T14:25:41.484Z" },
+]
+
+[[package]]
 name = "platformdirs"
 version = "4.3.6"
 source = { registry = "https://pypi.org/simple" }
@@ -1011,6 +1020,7 @@ source = { editable = "." }
 dependencies = [
     { name = "kubernetes" },
     { name = "netapp-ontap" },
+    { name = "pika" },
     { name = "pydantic" },
     { name = "pynautobot" },
     { name = "python-ironicclient" },
@@ -1032,6 +1042,7 @@ test = [
 requires-dist = [
     { name = "kubernetes", specifier = "==33.1.0" },
     { name = "netapp-ontap", specifier = ">=9.17.1.0" },
+    { name = "pika", specifier = ">=1.3.2" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pynautobot", specifier = ">=2.2.1,<3" },
     { name = "python-ironicclient", specifier = ">=5,<6" },

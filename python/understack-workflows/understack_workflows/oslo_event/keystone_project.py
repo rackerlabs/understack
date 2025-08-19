@@ -4,6 +4,7 @@ from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import setup_logger
+from understack_workflows.main.openstack_oslo_event import HandlerResult
 from understack_workflows.netapp_manager import NetAppManager
 
 logger = setup_logger(__name__)
@@ -45,9 +46,11 @@ def _keystone_project_tags(conn: Connection, project_id: str):
 
 def handle_project_created(
     conn: Connection, _nautobot: Nautobot, event_data: dict
-) -> int:
+) -> HandlerResult:
     if event_data.get("event_type") != "identity.project.created":
-        return 1
+        return HandlerResult(
+            exit_code=1, message="project_created handler called for non-create event"
+        )
 
     event = KeystoneProjectEvent.from_event_dict(event_data)
     logger.info("Starting ONTAP SVM and Volume creation workflow.")
@@ -58,7 +61,7 @@ def handle_project_created(
         exit(0)
 
     netapp_manager = NetAppManager()
-    netapp_manager.create_svm(
+    svm_name = netapp_manager.create_svm(
         project_id=event.project_id, aggregate_name=AGGREGATE_NAME
     )
     netapp_manager.create_volume(
@@ -66,4 +69,4 @@ def handle_project_created(
         volume_size=VOLUME_SIZE,
         aggregate_name=AGGREGATE_NAME,
     )
-    return 0
+    return HandlerResult(0, message={"svm_name": svm_name, "status": "created"})

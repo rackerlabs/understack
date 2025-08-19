@@ -3,6 +3,7 @@ import json
 import pathlib
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import pynautobot
@@ -15,6 +16,9 @@ from understack_workflows.helpers import setup_logger
 from understack_workflows.openstack.client import get_openstack_client
 from understack_workflows.oslo_event import ironic_port
 from understack_workflows.oslo_event import keystone_project
+from understack_workflows.oslo_event.notifiers.amqp_cinder_sa import (
+    StorageAutomationNotifier,
+)
 
 logger = setup_logger(__name__)
 
@@ -57,8 +61,13 @@ class NoEventHandlerError(Exception):
 
 
 # Type alias for event handler functions
-EventHandler = Callable[[Connection, NautobotApi, dict[str, Any]], int]
+@dataclass
+class HandlerResult:
+    exit_code: int
+    message: str | dict[str, Any] | None = None
 
+
+EventHandler = Callable[[Connection, NautobotApi, dict[str, Any]], HandlerResult]
 # add the event_type here and the function that should be called
 _event_handlers: dict[str, EventHandler] = {
     "baremetal.port.create.end": ironic_port.handle_port_create_update,
@@ -66,6 +75,8 @@ _event_handlers: dict[str, EventHandler] = {
     "baremetal.port.delete.end": ironic_port.handle_port_delete,
     "identity.project.created": keystone_project.handle_project_created,
 }
+
+_result_notifiers = {"identity.project.created": StorageAutomationNotifier()}
 
 
 def argument_parser():
@@ -191,7 +202,17 @@ def main() -> int:
         logger.exception("Event handler failed")
         sys.exit(_EXIT_HANDLER_ERROR)
 
-    logger.info("Event handler completed successfully with return code: %s", ret)
+    logger.info(
+        "Event handler completed successfully with return code: %s", ret.exit_code
+    )
+
+    try:
+        notifier = _result_notifiers[event_type]
+        if notifier:
+            notifier.publish(event, event_type, ret)
+    except Exception:
+        logger.exception("Result notifier failed")
+        sys.exit(_EXIT_HANDLER_ERROR)
 
     # exit if the event handler provided a return code or just with success
     if isinstance(ret, int):

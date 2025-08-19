@@ -75,6 +75,7 @@ class NetAppManager:
             logger.info(
                 "SVM '%s' created successfully with NVMe protocol allowed", svm.name
             )
+            return name
         except NetAppRestError as e:
             logger.error("Error creating SVM: %s", e)
             exit(1)
