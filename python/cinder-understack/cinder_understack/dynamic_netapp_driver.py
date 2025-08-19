@@ -192,11 +192,7 @@ class NetappDynamicLibrary:
         try:
             # Create SVM-specific configuration
             svm_config = self._create_svm_configuration(svm_name)
-
             # Create the upstream library
-            # parent_backend = self.host.split("@")[1] if "@" in self.host else "unknown"
-            # svm_host = f"{self.host.split('@')[0]}@{parent_backend}"
-
             svm_library = NetAppNVMeStorageLibrary(
                 driver_name=f"{self.driver_name}_{svm_name}",
                 driver_protocol=self.driver_protocol,
