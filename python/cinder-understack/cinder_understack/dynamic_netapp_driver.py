@@ -456,37 +456,6 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
         """Return the goodness function for Cinder's scheduler scoring."""
         return self.configuration.safe_get("goodness_function") or None
 
-    def update_provider_info(self, *args, **kwargs):
-        """Update provider info for existing volumes.
-
-        This is called during service startup to sync our view of volumes
-        with what's actually on the storage. The parent class has some
-        weird argument handling, so we have to be defensive here.
-        """
-        # Called during _sync_provider_info() in VolumeManager.
-        # If not implemented, Cinder raises a TypeError during service startup.
-        # Wrote this logic because it was registered with 3 and was called using 2 args
-        # There is issue with in-built drivers calling logic
-        if len(args) == 2:
-            volumes, snapshots = args
-        elif len(args) >= 3:
-            _, volumes, snapshots = args[:3]
-        else:
-            raise TypeError(
-                "update_provider_info() expects at least volumes and snapshots."
-            )
-        return {}, {}
-
-    def set_throttle(self):
-        """No-op throttle implementation to prevent AttributeError.
-
-        Some parts of Cinder expect this method to exist for rate limiting,
-        but our driver doesn't implement throttling. This empty method
-        prevents crashes when Cinder tries to call it.
-        """
-        # Got AttributeError
-        pass
-
     def _get_flexvol_capacity_with_fallback(self, client, vol_name):
         """Get FlexVol capacity with custom volume name to junction path mapping."""
         # TODO : find a API endpoint to fetch the junction path with svm and pool
