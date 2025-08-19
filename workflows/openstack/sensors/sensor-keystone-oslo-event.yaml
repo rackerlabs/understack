@@ -9,7 +9,6 @@ metadata:
       Triggers on the following Keystone Events:
 
       - identity.project.created
-      - identity.project.deleted
       - other events are silently ignored now
 
       Resulting code should be very similar to:
@@ -38,7 +37,6 @@ spec:
           type: "string"
           value:
             - "identity.project.created"
-            - "identity.project.deleted"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
@@ -64,10 +62,39 @@ spec:
                 generateName: keystone-project-
                 namespace: argo-events
               spec:
+                serviceAccountName: workflow
+                entrypoint: main
                 # defines the parameters being replaced above
                 arguments:
                   parameters:
                     - name: event-json
-                # references the workflow
-                workflowTemplateRef:
-                  name: openstack-oslo-event
+                templates:
+                - name: main
+                  steps:
+                  - - name: oslo-events
+                      templateRef:
+                        name: openstack-oslo-event
+                        template: main
+                      arguments:
+                        parameters:
+                        - name: event-json
+                          value: "{{workflow.parameters.event-json}}"
+                  - - name: ansible-to-nautobot
+                      inline:
+                        container:
+                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+                          args:
+                          - "ansible-playbook"
+                          - "storage_on_svm_create.yml"
+                          - --extra-vars
+                          - "svm_name=os-{{workflow.parameters.project_id}} project_name={{workflow.parameters.project_id}}"
+                          - "-i"
+                          - "inventory/uc-dev/01-nautobot.yaml"
+                            # TODO: this shouldn't be hardcodod to dev, but will work since
+                            # it really talks to https://nautobot-default.svc
+                          env:
+                            - name: NAUTOBOT_TOKEN
+                              valueFrom:
+                                secretKeyRef:
+                                  key: token
+                                  name: nautobot-token
