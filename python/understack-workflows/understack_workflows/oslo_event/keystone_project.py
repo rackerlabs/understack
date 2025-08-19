@@ -55,15 +55,30 @@ def handle_project_created(
     logger.debug("Project %s has tags: %s", event.project_id, tags)
     if SVM_PROJECT_TAG not in tags:
         logger.info("The %s is missing, not creating SVM.", SVM_PROJECT_TAG)
-        exit(0)
+        return 0
 
     netapp_manager = NetAppManager()
     netapp_manager.create_svm(
         project_id=event.project_id, aggregate_name=AGGREGATE_NAME
     )
-    netapp_manager.create_volume(
+    svm_name = netapp_manager.create_volume(
         project_id=event.project_id,
         volume_size=VOLUME_SIZE,
         aggregate_name=AGGREGATE_NAME,
     )
+    with open("/var/run/argo/output.svm_name", "w") as f:  # noqa: S108
+        if not svm_name:
+            svm_name = "not_returned"
+
+        f.write(svm_name)
+
+    _save_result("success", 0)
     return 0
+
+
+def _save_result(msg, exit_code):
+    with open("/var/run/argo/output.msg", "w") as f:  # noqa: S108
+        f.write(msg)
+    with open("/var/run/argo/output.exit_code", "w") as f:  # noqa: S108
+        f.write(str(exit_code))
+    exit(exit_code)
