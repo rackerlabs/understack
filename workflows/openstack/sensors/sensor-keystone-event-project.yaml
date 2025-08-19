@@ -49,11 +49,9 @@ spec:
   triggers:
     - template:
         name: keystone-event-project
-        # uses 'argo' CLI instead of 'kubectl'
-        argoWorkflow:
-          # sets the operation to 'argo submit'
-          operation: submit
-          # edits the source section
+        # creates workflow object directly via k8s API
+        k8s:
+          operation: create
           parameters:
             # first parameter's value is replaced with the event type
             - dest: spec.arguments.parameters.0.value
