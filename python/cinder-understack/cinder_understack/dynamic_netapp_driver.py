@@ -5,7 +5,7 @@ from cinder import exception
 from cinder import interface
 from cinder.objects import volume_type as vol_type_obj
 from cinder.volume import driver as volume_driver
-from cinder.volume.drivers.netapp import options
+from cinder.volume.drivers.netapp import options as na_opts
 from cinder.volume.drivers.netapp.dataontap.client.client_cmode_rest import (
     RestClient as RestNaServer,
 )
@@ -21,14 +21,13 @@ CONF = cfg.CONF
 # Configuration options for dynamic NetApp driver
 # Using cinder.volume.configuration approach for better abstraction
 NETAPP_DYNAMIC_OPTS = [
-    options.netapp_proxy_opts,
-    options.netapp_connection_opts,
-    options.netapp_transport_opts,
-    options.netapp_basicauth_opts,
-    options.netapp_provisioning_opts,
-    options.netapp_cluster_opts,
-    options.netapp_san_opts,
-    volume_driver.volume_opts,
+    na_opts.netapp_connection_opts,
+    na_opts.netapp_basicauth_opts,
+    na_opts.netapp_transport_opts,
+    na_opts.netapp_provisioning_opts,
+    na_opts.netapp_support_opts,
+    na_opts.netapp_san_opts,
+    na_opts.netapp_cluster_opts,
 ]
 
 
@@ -40,84 +39,18 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
     - Ours: Multiple SVMs per backend, SVM name from volume type
     """
 
+    REQUIRED_CMODE_FLAGS = []
+
     def __init__(self, *args, **kwargs):
         """Initialize driver without creating SVM connections.
 
         Parent driver creates static connections during init. We defer
         SVM connections until volume creation when we know which SVM to use.
         """
-        self.initialized = False
+        super().__init__(*args, **kwargs)
         self.client = None
-        driver_name = kwargs.pop("driver_name", "NetAppDynamicNVMe")
-        driver_protocol = kwargs.pop("driver_protocol", "nvme")
-        self.app_version = kwargs.get("app_version", "1.0.0")
-
-        self._setup_configuration(**kwargs)
-
-        super().__init__(driver_name, driver_protocol, **kwargs)
         self.ssc_library = None
         self.perf_library = None
-        self.init_capabilities()
-
-    def _setup_configuration(self, **kwargs):
-        """Setup configuration using cinder.volume.configuration module."""
-        from cinder.volume import configuration
-
-        config_obj = kwargs.get("configuration", None)
-
-        if config_obj:
-            # here we can access any cinder-provided config .
-            self.configuration = config_obj
-            config_group = getattr(config_obj, "config_group", "netapp_nvme")
-
-            # Register NetApp-specific options using configuration.append()
-            # Following the exact pattern from upstream NetApp drivers
-
-            try:
-                for opt_group in NETAPP_DYNAMIC_OPTS:
-                    self.configuration.append_config_values(opt_group)
-
-                LOG.info(
-                    "Registered NetApp configuration options for group: %s",
-                    config_group,
-                )
-
-            except Exception as e:
-                LOG.warning("Failed to register configuration options: %s", e)
-                # Continue default configuration handling for backward compatibility
-        else:
-            # Testing/Fallback: Create configuration object with all options
-            config_group = "netapp_nvme"
-            self.configuration = configuration.Configuration(
-                volume_driver.volume_opts, config_group=config_group
-            )
-
-            # Register additional NetApp options for testing
-            try:
-                for opt_group in NETAPP_DYNAMIC_OPTS:
-                    if (
-                        opt_group != volume_driver.volume_opts
-                    ):  # Avoid duplicate registration
-                        self.configuration.append_config_values(opt_group)
-
-                LOG.info(
-                    "Registered NetApp configuration options for testing group: %s",
-                    config_group,
-                )
-
-            except Exception as e:
-                LOG.warning(
-                    "Failed to register configuration options for testing: %s", e
-                )
-
-    @property
-    def supported(self):
-        # Used by Cinder to determine whether this driver is active/enabled
-        return True
-
-    def get_version(self):
-        # Called at Cinder service startup to report backend driver version
-        return "NetappCinderDynamicDriver 1.0"
 
     def do_setup(self, context):
         """Skip static NetApp connections, defer to volume creation time."""
@@ -131,22 +64,6 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
     def check_for_setup_error(self):
         """Skip static validation since we connect to SVMs dynamically."""
         pass
-
-    def init_capabilities(self):
-        """Set driver capabilities for Cinder scheduler."""
-        max_over_subscription_ratio = self.configuration.max_over_subscription_ratio
-        self._capabilities = {
-            "thin_provisioning_support": True,
-            "thick_provisioning_support": True,
-            "multiattach": True,
-            "snapshot_support": True,
-            "max_over_subscription_ratio": max_over_subscription_ratio,
-        }
-        self.capabilities = self._capabilities
-
-    def set_initialized(self):
-        """Mark driver as ready for volume operations."""
-        self.initialized = True
 
     def _get_all_svm_clients_from_volume_types(self):
         """Connect to all SVMs found in volume type metadata."""
@@ -538,37 +455,6 @@ class NetappDynamicLibrary(NetAppNVMeStorageLibrary):
     def get_goodness_function(self):
         """Return the goodness function for Cinder's scheduler scoring."""
         return self.configuration.safe_get("goodness_function") or None
-
-    def update_provider_info(self, *args, **kwargs):
-        """Update provider info for existing volumes.
-
-        This is called during service startup to sync our view of volumes
-        with what's actually on the storage. The parent class has some
-        weird argument handling, so we have to be defensive here.
-        """
-        # Called during _sync_provider_info() in VolumeManager.
-        # If not implemented, Cinder raises a TypeError during service startup.
-        # Wrote this logic because it was registered with 3 and was called using 2 args
-        # There is issue with in-built drivers calling logic
-        if len(args) == 2:
-            volumes, snapshots = args
-        elif len(args) >= 3:
-            _, volumes, snapshots = args[:3]
-        else:
-            raise TypeError(
-                "update_provider_info() expects at least volumes and snapshots."
-            )
-        return {}, {}
-
-    def set_throttle(self):
-        """No-op throttle implementation to prevent AttributeError.
-
-        Some parts of Cinder expect this method to exist for rate limiting,
-        but our driver doesn't implement throttling. This empty method
-        prevents crashes when Cinder tries to call it.
-        """
-        # Got AttributeError
-        pass
 
     def _get_flexvol_capacity_with_fallback(self, client, vol_name):
         """Get FlexVol capacity with custom volume name to junction path mapping."""
@@ -981,6 +867,11 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         super().__init__(*args, **kwargs)
         self.library = NetappDynamicLibrary(self.DRIVER_NAME, "NVMe", **kwargs)
 
+    @staticmethod
+    def get_driver_options():
+        """All options this driver supports."""
+        return [item for sublist in NETAPP_DYNAMIC_OPTS for item in sublist]
+
     def do_setup(self, context):
         """Setup the driver."""
         self.library.do_setup(context)
@@ -1029,10 +920,6 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """Get volume stats."""
         return self.library.get_volume_stats(refresh)
 
-    def update_provider_info(self, volumes, snapshots):
-        """Update provider info."""
-        return self.library.update_provider_info(volumes, snapshots)
-
     def create_export(self, context, volume, connector):
         """Create export for volume."""
         return self.library.create_export(context, volume, connector)
@@ -1044,12 +931,3 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def remove_export(self, context, volume):
         """Remove export for volume."""
         return self.library.remove_export(context, volume)
-
-
-# NOTES
-# Namespace: Manually created because we skip standard do_setup()
-# Pool: Custom svm#flexvol format to support multi-SVM
-# Client: Runtime creation based on volume type metadata vs static config
-# Metadata: volume type extra_specs vs cinder.conf
-# Library Initialization: Lazy initialization during volume creation
-# Pool Discovery: Multi-SVM aggregation vs single SVM
