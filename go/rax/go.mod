@@ -10,6 +10,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/go-github/v50 v50.2.0
 	github.com/google/go-github/v55 v55.0.0
+	github.com/google/go-github/v74 v74.0.0
 	github.com/nautobot/go-nautobot/v2 v2.3.2-beta
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
