@@ -24,6 +24,7 @@ configs:
     policy.csv: |
       # role:ucadmin can sync applications
       p, role:ucadmin, applications, sync, */*, allow
+      p, role:ucadmin, applications, update, */*, allow
       # role:ucadmin can update clusters so that they can set branch info
       p, role:ucadmin, clusters, update, *, allow
       # role:ucadmin inherits role:readonly
