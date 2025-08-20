@@ -47,7 +47,7 @@ subjects:
 - kind: ServiceAccount
   name: eso-openstack
 ---
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
 metadata:
   name: openstack
