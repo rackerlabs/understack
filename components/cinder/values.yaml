@@ -9,6 +9,8 @@ conf:
     DEFAULT:
       enabled_backends: netapp_nvme
       default_volume_type: netapp_nvme
+      # add DriverFilter to the default list so our SVM filtering function gets called
+      scheduler_default_filters: DriverFilter,AvailabilityZoneFilter,CapacityFilter,CapabilitiesFilter
 
 # typically overridden by environmental
 # values, but should include all endpoints
