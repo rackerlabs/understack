@@ -53,6 +53,10 @@ spec:
               src:
                 dataKey: body
                 dependencyName: keystone-dep
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.payload.target.id
+                dependencyName: keystone-dep
           source:
             # create a workflow in argo-events prefixed with keystone-project-
             resource:
@@ -68,6 +72,7 @@ spec:
                 arguments:
                   parameters:
                     - name: event-json
+                    - name: project_id
                 templates:
                 - name: main
                   steps:
@@ -79,6 +84,16 @@ spec:
                         parameters:
                         - name: event-json
                           value: "{{workflow.parameters.event-json}}"
+                    - name: convert-project-id
+                      inline:
+                        script:
+                          image: python:alpine
+                          command: [python]
+                          source: |
+                              import uuid
+                              project_id_without_dashes = "{{workflow.parameters.project_id}}"
+                              print(str(uuid.UUID(project_id_without_dashes)))
+
                   - - name: ansible-to-nautobot
                       inline:
                         container:
@@ -87,7 +102,7 @@ spec:
                           - "ansible-playbook"
                           - "storage_on_svm_create.yml"
                           - --extra-vars
-                          - "svm_name=os-{{workflow.parameters.project_id}} project_name={{workflow.parameters.project_id}}"
+                          - "svm_name=os-{{workflow.parameters.project_id}} project_name={{steps.convert-project-id.outputs.result}} env=dev"
                           - "-i"
                           - "inventory/uc-dev/01-nautobot.yaml"
                             # TODO: this shouldn't be hardcodod to dev, but will work since
