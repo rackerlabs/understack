@@ -116,4 +116,4 @@ repos:
         # entry: bash -c 'trufflehog --no-update git file://. --since-commit HEAD --results=verified,unknown --fail'
         entry: bash -c 'docker run --rm -v "$(pwd):/workdir" -i --rm trufflesecurity/trufflehog:latest git file:///workdir --since-commit HEAD --results=verified,unknown --fail'
         language: system
-        stages: ["pre-commit", "pre-push"]
+        stages: ["pre-push"]
