@@ -42,10 +42,8 @@ spec:
   triggers:
     - template:
         name: keystone-project
-        # uses 'argo' CLI instead of 'kubectl'
-        argoWorkflow:
-          # sets the operation to 'argo submit'
-          operation: submit
+        k8s:
+          operation: create
           # edits source section
           parameters:
             # first parameter is the parsed oslo.message
