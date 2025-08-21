@@ -117,9 +117,6 @@ def test_handle_project_delete(
         tenant_obj if tenant_exists else None
     )
 
-    mock_delete_network = mocker.patch(
-        "understack_workflows.main.sync_keystone._delete_outside_network"
-    )
     mock_unmap_devices = mocker.patch(
         "understack_workflows.main.sync_keystone._unmap_tenant_from_devices"
     )
@@ -130,12 +127,10 @@ def test_handle_project_delete(
     mock_pynautobot_api.tenancy.tenants.get.assert_called_once_with(id=project_id)
 
     if tenant_exists:
-        mock_delete_network.assert_called_once_with(conn_mock, project_id)
         mock_unmap_devices.assert_called_once_with(
             tenant_id=project_id, nautobot=mock_pynautobot_api
         )
         tenant_obj.delete.assert_called_once()
     else:
-        mock_delete_network.assert_not_called()
         mock_unmap_devices.assert_not_called()
         tenant_obj.delete.assert_not_called()
