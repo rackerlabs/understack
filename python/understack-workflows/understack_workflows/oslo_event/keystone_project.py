@@ -11,7 +11,7 @@ logger = setup_logger(__name__)
 
 SVM_PROJECT_TAG = "UNDERSTACK_SVM"
 AGGREGATE_NAME = "aggr02_n02_NVME"
-VOLUME_SIZE = "1GB"
+VOLUME_SIZE = "514GB"
 
 
 @dataclass
