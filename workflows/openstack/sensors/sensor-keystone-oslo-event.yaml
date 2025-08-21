@@ -102,7 +102,7 @@ spec:
                           - "ansible-playbook"
                           - "storage_on_svm_create.yml"
                           - --extra-vars
-                          - "svm_name=os-{{workflow.parameters.project_id}} project_name={{steps.convert-project-id.outputs.result}} env=dev"
+                          - "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}} env=dev"
                           - "-i"
                           - "inventory/uc-dev/01-nautobot.yaml"
                             # TODO: this shouldn't be hardcodod to dev, but will work since
