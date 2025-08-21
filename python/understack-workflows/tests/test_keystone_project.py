@@ -123,22 +123,29 @@ class TestHandleProjectCreated:
         assert result == 1
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
     def test_handle_project_created_no_svm_tag(
-        self, mock_tags, mock_conn, mock_nautobot, valid_event_data
+        self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_event_data
     ):
         """Test handling project creation without SVM tag."""
         mock_tags.return_value = ["tag1", "tag2"]
 
-        with pytest.raises(SystemExit) as exc_info:
-            handle_project_created(mock_conn, mock_nautobot, valid_event_data)
-
-        assert exc_info.value.code == 0
+        result = handle_project_created(mock_conn, mock_nautobot, valid_event_data)
+        assert result == 0
         mock_tags.assert_called_once_with(mock_conn, "test-project-123")
+        mock_open.assert_called_with("/var/run/argo/output.svm_enabled", "w")
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
     def test_handle_project_created_with_svm_tag(
-        self, mock_tags, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_tags,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Test successful project creation handling with SVM tag."""
         mock_tags.return_value = ["tag1", SVM_PROJECT_TAG, "tag2"]
@@ -158,11 +165,19 @@ class TestHandleProjectCreated:
             volume_size=VOLUME_SIZE,
             aggregate_name=AGGREGATE_NAME,
         )
+        mock_open.assert_called()
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
     def test_handle_project_created_netapp_manager_failure(
-        self, mock_tags, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_tags,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Test handling when NetAppManager creation fails."""
         mock_tags.return_value = [SVM_PROJECT_TAG]
@@ -173,11 +188,19 @@ class TestHandleProjectCreated:
 
         mock_tags.assert_called_once_with(mock_conn, "test-project-123")
         mock_netapp_class.assert_called_once()
+        mock_open.assert_called()
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
     def test_handle_project_created_svm_creation_failure(
-        self, mock_tags, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_tags,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Test handling when SVM creation fails."""
         mock_tags.return_value = [SVM_PROJECT_TAG]
@@ -196,8 +219,15 @@ class TestHandleProjectCreated:
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
     def test_handle_project_created_volume_creation_failure(
-        self, mock_tags, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_tags,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Test handling when volume creation fails."""
         mock_tags.return_value = [SVM_PROJECT_TAG]
@@ -232,8 +262,9 @@ class TestHandleProjectCreated:
             handle_project_created(mock_conn, mock_nautobot, invalid_event_data)
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
     def test_handle_project_created_constants_used(
-        self, mock_tags, mock_conn, mock_nautobot, valid_event_data
+        self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_event_data
     ):
         """Test constants used for aggregate name and volume size."""
         mock_tags.return_value = [SVM_PROJECT_TAG]
@@ -253,6 +284,7 @@ class TestHandleProjectCreated:
             )
             mock_netapp_manager.create_volume.assert_called_once_with(
                 project_id="test-project-123",
-                volume_size="1GB",  # VOLUME_SIZE constant
+                volume_size="514GB",  # VOLUME_SIZE constant
                 aggregate_name="aggr02_n02_NVME",  # AGGREGATE_NAME constant
             )
+        mock_open.assert_called()

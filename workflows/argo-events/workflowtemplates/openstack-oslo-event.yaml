@@ -62,3 +62,11 @@ spec:
         - name: netapp-ini
           secret:
             secretName: netapp-config
+      outputs:
+        parameters:
+          - name: exit_code
+            valueFrom:
+              path: /var/run/argo/output.exit_code
+          - name: msg
+            valueFrom:
+              path: /var/run/argo/output.msg

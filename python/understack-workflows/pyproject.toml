@@ -74,7 +74,9 @@ testpaths = [
 ]
 filterwarnings = [
   # sushy
-  "ignore:pkg_resources is deprecated as an API.:DeprecationWarning"
+  "ignore:pkg_resources is deprecated as an API.:DeprecationWarning",
+  # netapp
+  "ignore:.*Number` field should not be instantiated.*"
 ]
 
 [tool.ruff]

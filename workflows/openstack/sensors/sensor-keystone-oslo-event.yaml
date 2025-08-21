@@ -9,7 +9,6 @@ metadata:
       Triggers on the following Keystone Events:
 
       - identity.project.created
-      - identity.project.deleted
       - other events are silently ignored now
 
       Resulting code should be very similar to:
@@ -38,22 +37,23 @@ spec:
           type: "string"
           value:
             - "identity.project.created"
-            - "identity.project.deleted"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
     - template:
         name: keystone-project
-        # uses 'argo' CLI instead of 'kubectl'
-        argoWorkflow:
-          # sets the operation to 'argo submit'
-          operation: submit
+        k8s:
+          operation: create
           # edits source section
           parameters:
             # first parameter is the parsed oslo.message
             - dest: spec.arguments.parameters.0.value
               src:
                 dataKey: body
+                dependencyName: keystone-dep
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.payload.target.id
                 dependencyName: keystone-dep
           source:
             # create a workflow in argo-events prefixed with keystone-project-
@@ -64,10 +64,51 @@ spec:
                 generateName: keystone-project-
                 namespace: argo-events
               spec:
+                serviceAccountName: workflow
+                entrypoint: main
                 # defines the parameters being replaced above
                 arguments:
                   parameters:
                     - name: event-json
-                # references the workflow
-                workflowTemplateRef:
-                  name: openstack-oslo-event
+                    - name: project_id
+                templates:
+                - name: main
+                  steps:
+                  - - name: oslo-events
+                      templateRef:
+                        name: openstack-oslo-event
+                        template: main
+                      arguments:
+                        parameters:
+                        - name: event-json
+                          value: "{{workflow.parameters.event-json}}"
+                    - name: convert-project-id
+                      inline:
+                        script:
+                          image: python:alpine
+                          command: [python]
+                          source: |
+                              import uuid
+                              project_id_without_dashes = "{{workflow.parameters.project_id}}"
+                              print(str(uuid.UUID(project_id_without_dashes)))
+
+                  - - name: ansible-to-nautobot
+                      when: "{{steps.oslo-events.outputs.svm_enabled}} == 'true'"
+                      inline:
+                        container:
+                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+                          args:
+                          - "ansible-playbook"
+                          - "storage_on_svm_create.yml"
+                          - --extra-vars
+                          - "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}} env=dev"
+                          - "-i"
+                          - "inventory/uc-dev/01-nautobot.yaml"
+                            # TODO: this shouldn't be hardcodod to dev, but will work since
+                            # it really talks to https://nautobot-default.svc
+                          env:
+                            - name: NAUTOBOT_TOKEN
+                              valueFrom:
+                                secretKeyRef:
+                                  key: token
+                                  name: nautobot-token
