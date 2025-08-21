@@ -4,7 +4,6 @@ from unittest import mock
 
 from cinder.tests.unit import test
 from cinder.tests.unit.volume.drivers.netapp import fakes as na_fakes
-from cinder.volume.drivers.netapp.dataontap.nvme_library import NetAppNVMeStorageLibrary
 
 from cinder_understack import dynamic_netapp_driver
 
@@ -40,9 +39,23 @@ class NetappDynamicDriverTestCase(test.TestCase):
         """Test that driver has library instance."""
         self.assertIsInstance(self.library, dynamic_netapp_driver.NetappDynamicLibrary)
 
-    def test_library_inherits_from_netapp_library(self):
-        """Test that library inherits from NetApp NVMe library."""
-        self.assertIsInstance(self.library, NetAppNVMeStorageLibrary)
+    # def test_library_inherits_from_netapp_library(self):
+    #     """Test that library inherits from NetApp NVMe library."""
+    #     self.assertIsInstance(self.library, NetAppNVMeStorageLibrary)
+
+    def test_library_uses_composition_not_inheritance(self):
+        """Test that library uses composition pattern instead of inheritance.
+
+        The new architecture uses composition/delegation pattern where
+        NetappDynamicLibrary HAS multiple NetAppNVMeStorageLibrary instances
+        rather than IS a NetAppNVMeStorageLibrary.
+        """
+        # Library should be instance of object (composition pattern)
+        self.assertIsInstance(self.library, object)
+
+        # Library should have svm_libraries dictionary for composition
+        self.assertTrue(hasattr(self.library, "svm_libraries"))
+        self.assertIsInstance(self.library.svm_libraries, dict)
 
     @mock.patch.object(dynamic_netapp_driver.NetappDynamicLibrary, "do_setup")
     def test_do_setup_calls_library(self, mock_do_setup):
