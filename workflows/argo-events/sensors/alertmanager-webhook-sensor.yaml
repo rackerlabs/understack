@@ -31,11 +31,9 @@ spec:
   triggers:
     - template:
         name: alertmanager-workflow-trigger
-        # uses 'argo' CLI instead of 'kubectl'
-        argoWorkflow:
-          # sets the operation to 'argo submit'
-          operation: submit
-
+        # creates workflow object directly via k8s API
+        k8s:
+          operation: create
           parameters:
           - src:
               dependencyName: alertmanager-dep
