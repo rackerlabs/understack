@@ -21,8 +21,6 @@ _EXIT_SUCCESS = 0
 _EXIT_API_ERROR = 1
 _EXIT_EVENT_UNKNOWN = 2
 
-OUTSIDE_NETWORK_NAME = "OUTSIDE"
-
 
 class Event(StrEnum):
     ProjectCreate = "identity.project.created"
@@ -50,55 +48,7 @@ def argument_parser():
     return parser
 
 
-def _create_outside_network(conn: Connection, project_id: uuid.UUID):
-    network = _find_outside_network(conn, project_id.hex)
-    if network:
-        logger.info(
-            "%s Network %s already exists for this tenant",
-            OUTSIDE_NETWORK_NAME,
-            network.id,
-        )
-    else:
-        payload = {
-            "project_id": project_id.hex,
-            "name": OUTSIDE_NETWORK_NAME,
-            "router:external": False,
-        }
-        network = conn.network.create_network(**payload)  # type: ignore
-        logger.info(
-            "Created %s Network %s for tenant", OUTSIDE_NETWORK_NAME, network.id
-        )
-        conn.network.create_rbac_policy(  # type: ignore
-            object_type="network",
-            object_id=network.id,
-            action="access_as_external",
-            target_project_id=project_id.hex,
-        )
-        conn.network.create_rbac_policy(  # type: ignore
-            object_type="network",
-            object_id=network.id,
-            action="access_as_shared",
-            target_project_id=project_id.hex,
-        )
-
-
-def _delete_outside_network(conn: Connection, project_id: uuid.UUID):
-    network = _find_outside_network(conn, project_id.hex)
-    if network:
-        conn.delete_network(network.id)
-        logger.info(
-            "Deleted %s Network %s for this tenant", OUTSIDE_NETWORK_NAME, network.id
-        )
-
-
-def _find_outside_network(conn: Connection, project_id: str):
-    return conn.network.find_network(  # type: ignore
-        project_id=project_id,
-        name_or_id=OUTSIDE_NETWORK_NAME,
-    )
-
-
-def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str, bool]:
+def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str]:
     project = conn.identity.get_project(project_id.hex)  # type: ignore
     domain_id = project.domain_id
     is_default_domain = domain_id == "default"
@@ -110,7 +60,7 @@ def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str, bo
         domain_name = domain.name
 
     tenant_name = f"{domain_name}:{project.name}"
-    return tenant_name, str(project.description), is_default_domain
+    return tenant_name, str(project.description)
 
 
 def _unmap_tenant_from_devices(
@@ -127,14 +77,12 @@ def handle_project_create(
     conn: Connection, nautobot: pynautobot.api, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to create tenant %s", project_id.hex)
-    tenant_name, tenant_description, is_default_domain = _tenant_attrs(conn, project_id)
+    tenant_name, tenant_description = _tenant_attrs(conn, project_id)
 
     try:
         tenant = nautobot.tenancy.tenants.create(
             id=str(project_id), name=tenant_name, description=tenant_description
         )
-        if is_default_domain:
-            _create_outside_network(conn, project_id)
     except Exception:
         logger.exception(
             "Unable to create project %s / %s", str(project_id), tenant_name
@@ -149,7 +97,7 @@ def handle_project_update(
     conn: Connection, nautobot: pynautobot.api, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to update tenant %s", project_id.hex)
-    tenant_name, tenant_description, is_default_domain = _tenant_attrs(conn, project_id)
+    tenant_name, tenant_description = _tenant_attrs(conn, project_id)
 
     existing_tenant = nautobot.tenancy.tenants.get(id=project_id)
     logger.info("existing_tenant: %s", existing_tenant)
@@ -170,8 +118,6 @@ def handle_project_update(
                 existing_tenant.last_updated,  # type: ignore
             )
 
-        if is_default_domain:
-            _create_outside_network(conn, project_id)
     except Exception:
         logger.exception(
             "Unable to update project %s / %s", str(project_id), tenant_name
@@ -189,7 +135,6 @@ def handle_project_delete(
         logger.warning("tenant %s does not exist, nothing to delete", project_id)
         return _EXIT_SUCCESS
 
-    _delete_outside_network(conn, project_id)
     _unmap_tenant_from_devices(tenant_id=project_id, nautobot=nautobot)
 
     tenant = cast(Record, tenant)
