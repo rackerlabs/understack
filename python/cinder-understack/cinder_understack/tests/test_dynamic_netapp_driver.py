@@ -106,3 +106,103 @@ class NetappDynamicDriverTestCase(test.TestCase):
         """Test that get_volume_stats delegates to library."""
         self.driver.get_volume_stats(refresh=True)
         mock_get_volume_stats.assert_called_with(True)
+
+    # Mocked check_for_setup_errort to avoid below error .
+    # NetAppDriverException: No pools are available for provisioning volumes.
+    @mock.patch(
+        "cinder_understack.dynamic_netapp_driver.loopingcall.FixedIntervalLoopingCall"
+    )
+    @mock.patch.object(NetAppNVMeStorageLibrary, "check_for_setup_error")
+    def test_looping_call_starts_once(self, mock_check_setup, mock_looping_call_class):
+        """Test that looping call starts correctly and only once."""
+        # To avoid config errors mocking the SVM lib setup check
+        mock_check_setup.return_value = None
+
+        # Mock instance for FixedIntervalLoopingCall
+        mock_looping_instance = mock.Mock()
+        mock_looping_call_class.return_value = mock_looping_instance
+
+        # Clear the looping call so that it can be start
+        self.driver._looping_call = None
+
+        # Trigger setup error check ( to start the loop)
+        self.driver.check_for_setup_error()
+
+        # Verify loop initialized and started
+        mock_looping_call_class.assert_called_once_with(
+            self.driver._refresh_svm_libraries
+        )
+        # Todo: Use constants for interval and initial_delay
+        mock_looping_instance.start.assert_called_once_with(interval=300)
+
+        # Test second call should not start loop again
+        mock_looping_instance.reset_mock()
+        self.driver.check_for_setup_error()
+        mock_looping_instance.start.assert_not_called()
+
+    @mock.patch.object(
+        dynamic_netapp_driver.NetappCinderDynamicDriver, "_create_svm_lib"
+    )
+    @mock.patch.object(dynamic_netapp_driver.NetappCinderDynamicDriver, "_get_svms")
+    def test_refresh_svm_libraries_adds_and_removes_svms(
+        self, mock_get_svms, mock_create_svm_lib
+    ):
+        """Test _refresh_svm_libraries add new SVMs and removes stale ones."""
+        # Existing SVMs (before refresh called)
+        expected_svm = f"os-{self.project_id}"
+
+        self.driver._libraries = {
+            "os-old-svm": mock.Mock(vserver="os-old-svm"),
+            expected_svm: mock.Mock(vserver=expected_svm),
+        }
+
+        self.driver._get_svms = mock_get_svms
+        # Returned by _get_svms (after refresh)
+        mock_get_svms.return_value = [expected_svm, "os-new-svm"]
+
+        # make the created lib look like the real thing
+        mock_lib_instance = mock.create_autospec(
+            dynamic_netapp_driver.NetAppMinimalLibrary, instance=True
+        )
+
+        # Mock the new lib instance created
+        mock_lib_instance.vserver = "os-new-svm"
+        mock_create_svm_lib.return_value = mock_lib_instance
+
+        # Trigger refresh
+        self.driver._context = self.ctxt
+
+        self.driver._actual_refresh_svm_libraries(self.ctxt)
+
+        # Check stale SVM was removed
+        self.assertNotIn("os-old-svm", self.driver._libraries)
+
+        # Check SVM was retained
+        self.assertIn(expected_svm, self.driver._libraries)
+
+        # Check new SVM was added
+        self.assertIn("os-new-svm", self.driver._libraries)
+
+        # New SVM lib should've been created and setup
+        mock_create_svm_lib.assert_called_once_with("os-new-svm")
+        mock_lib_instance.do_setup.assert_called_once_with(self.ctxt)
+        mock_lib_instance.check_for_setup_error.assert_called_once()
+
+    @mock.patch.object(
+        dynamic_netapp_driver.NetappCinderDynamicDriver, "_create_svm_lib"
+    )
+    @mock.patch.object(dynamic_netapp_driver.NetappCinderDynamicDriver, "_get_svms")
+    def test_refresh_svm_libraries_handles_lib_creation_failure(
+        self, mock_get_svms, mock_create_svm_lib
+    ):
+        """Ensure that failure in lib creation is caught and logged, not raised."""
+        mock_get_svms.return_value = ["os-new-failing-svm"]
+        mock_create_svm_lib.side_effect = Exception("Simulated failure")
+
+        self.driver._libraries = {}
+
+        # Should not raise exception
+        self.driver._actual_refresh_svm_libraries(mock.Mock())
+
+        # The failing SVM should not be added to self._libraries
+        self.assertNotIn("os-new-failing-svm", self.driver._libraries)
