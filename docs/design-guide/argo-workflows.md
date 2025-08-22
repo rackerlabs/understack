@@ -13,28 +13,33 @@ and maintenance tasks.
 while the actual workflows run in another dedicated namespace (argo-events),
 to ensure proper security isolation and resource control. This separation
 is provided by [Argo Workflows][argo-wf] but poorly documented upstream which
-they call [Managed Namespace][argo-wf-managed-ns].
+they call [Managed Namespace][argo-wf-managed-ns]. Unfortunately the
+likely better approach at achieving this managed namespace installation
+would be to use the cluster based install which uses ClusterRoles but then
+binds the ClusterRole to a specific namespace instead of a ClusterRoleBinding.
+This is the approach we take.
 
 ### Argo Workflows Configuration
 
 We do not use the `namespace-install.yaml` provided by the project as it
-combines everything into one YAML and we need to split it out. It combines:
+combines everything into one YAML and focuses on running everything in
+one namespace while we want separation. What we ultimately need:
 
 * CRDs
 * Argo Server, which is the UI and the API for Argo Workflows and Argo Events
 * Argo Workflows Controller, which is the executor for the workflow and creates
 the pods
-* Server Role, which is the Role and RoleBinding for the Argo Server to access
+* Server RBAC, which is the ClusterRole and RoleBinding for the Argo Server to access
 the workflow, the pods, the logs, and inputs for user visibility
-* Workflow Controller Role, which is the Role and RoleBinding to give the controller
+* Workflow Controller RBAC, which is the ClusterRole and RoleBinding to give the controller
 access to run and manage the workflows.
 
 The CRDs, the Argo Server, and the Argo Workflow Controller will all be installed
-into the (argo) namespace while the 2 Roles and RoleBindings need to be installed
+into the (argo) namespace while the 2 RoleBindings need to be installed
 into the namespace where the workflow execute, which is (argo-events).
 
 The Argo Server and the Workflow Controller additionally need access to additional
-resources. The Argo Server needs access to the configmap, the SSO secret
+resources. The Argo Server needs access to the configmap, the SSO secret.
 
 ## Template-Only Execution Model
 
