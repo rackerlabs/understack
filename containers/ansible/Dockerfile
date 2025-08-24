@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS prod
+FROM python:3.13-slim AS prod
 
 ENV PIP_NO_CACHE_DIR=off \
     PIP_DISABLE_PIP_VERSION_CHECK=on \
