@@ -15,9 +15,6 @@ resources:
   - argo-server-role.yaml
   - argo-server-rolebinding.yaml
 
-  # ingress for workflows.${DNS_ZONE} to the argo server for the UI
-  - ingress.yaml
-
   # external secret for SSO auth
   - external-secret-argo-sso.yaml
 
@@ -73,5 +70,4 @@ configMapGenerator:
   - name: workflow-controller-configmap
     behavior: merge
     files:
-      - sso
       - workflowDefaults=workflow-defaults
