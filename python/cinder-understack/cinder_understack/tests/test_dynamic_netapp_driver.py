@@ -106,3 +106,38 @@ class NetappDynamicDriverTestCase(test.TestCase):
         """Test that get_volume_stats delegates to library."""
         self.driver.get_volume_stats(refresh=True)
         mock_get_volume_stats.assert_called_with(True)
+
+    # Mocked check_for_setup_errort to avoid below error .
+    # NetAppDriverException: No pools are available for provisioning volumes.
+    @mock.patch(
+        "cinder_understack.dynamic_netapp_driver.loopingcall.FixedIntervalLoopingCall"
+    )
+    @mock.patch.object(NetAppNVMeStorageLibrary, "check_for_setup_error")
+    def test_looping_call_starts_once(self, mock_check_setup, mock_looping_call_class):
+        """Test that looping call starts correctly and only once."""
+        # To avoid config errors mocking the SVM lib setup check
+        mock_check_setup.return_value = None
+
+        # Mock instance for FixedIntervalLoopingCall
+        mock_looping_instance = mock.Mock()
+        mock_looping_call_class.return_value = mock_looping_instance
+
+        # Clear the looping call so that it can be start
+        self.driver._looping_call = None
+
+        # Trigger setup error check ( to start the loop)
+        self.driver.check_for_setup_error()
+
+        # Verify loop initialized and started
+        mock_looping_call_class.assert_called_once_with(
+            self.driver._refresh_svm_libraries
+        )
+        # Todo: Use constants for interval and initial_delay
+        mock_looping_instance.start.assert_called_once_with(
+            interval=60, initial_delay=10
+        )
+
+        # Test second call should not start loop again
+        mock_looping_instance.reset_mock()
+        self.driver.check_for_setup_error()
+        mock_looping_instance.start.assert_not_called()
