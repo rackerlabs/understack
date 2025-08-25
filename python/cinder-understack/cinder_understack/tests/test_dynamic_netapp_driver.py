@@ -133,9 +133,7 @@ class NetappDynamicDriverTestCase(test.TestCase):
             self.driver._refresh_svm_libraries
         )
         # Todo: Use constants for interval and initial_delay
-        mock_looping_instance.start.assert_called_once_with(
-            interval=60, initial_delay=10
-        )
+        mock_looping_instance.start.assert_called_once_with(interval=300)
 
         # Test second call should not start loop again
         mock_looping_instance.reset_mock()

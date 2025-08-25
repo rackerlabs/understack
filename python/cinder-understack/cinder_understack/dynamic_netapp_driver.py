@@ -34,6 +34,13 @@ netapp_dynamic_opts = [
         "the driver to dynamically select different SVMs based on the "
         "volume's project/tenant ID instead of being confined to one SVM.",
     ),
+    cfg.IntOpt(
+        "netapp_svm_discovery_interval",
+        default=300,
+        help="In seconds for SVM discovery. The driver will "
+        "periodically scan the NetApp cluster for new SVMs matching the "
+        "configured prefix.",
+    ),
 ]
 
 # Configuration options for dynamic NetApp driver
@@ -229,7 +236,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def _remove_svm_lib(self, svm_name: str, svm_lib: NetAppMinimalLibrary):
         """Remove resources for a given SVM library."""
-        # WIP
+        # TODO: Need to free up resources here.
         LOG.info("Removing resources for SVM library %s", svm_name)
         # Stop any looping calls if they exist
         if svm_lib._looping_call and hasattr(svm_lib, "loopingcalls"):
@@ -242,61 +249,43 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def _refresh_svm_libraries(self):
         """Refresh the SVM libraries."""
-        LOG.info("********************")
-        LOG.info("From refresh :Start refreshing SVM libraries")
-
+        LOG.info("Start refreshing SVM libraries")
         # Print all current library keys
-        LOG.info(
-            "From refresh :Existing library keys: %s", list(self._libraries.keys())
-        )
-
+        LOG.info("Existing library keys: %s", list(self._libraries.keys()))
         # Get the current SVMs from cluster
         current_svms = self._get_svms()
-        LOG.info("From refresh :Current SVMs detected from cluster: %s", current_svms)
-
+        LOG.info("Current SVMs detected from cluster: %s", current_svms)
         # Remove libraries for SVMs that no longer exist
         for svm_name in list(self._libraries.keys()):
             if svm_name not in current_svms:
-                LOG.info(
-                    "From refresh :Removing stale NVMe library for SVM: %s", svm_name
-                )
-                # TODO :  stop looping calls, free resources.
+                LOG.info("Removing stale NVMe library for SVM: %s", svm_name)
+                # TODO : stop looping calls, free resources.
                 svm_lib = self._libraries.get(svm_name)
                 self._remove_svm_lib(svm_name, svm_lib)
                 del self._libraries[svm_name]
             else:
-                LOG.info(
-                    "From refresh :SVM %s still exists. Keeping library.", svm_name
-                )
-
+                LOG.info("SVM %s still exists. Keeping library.", svm_name)
         # Add new SVM libraries
         for svm_name in current_svms:
             if svm_name not in self._libraries:
-                LOG.info(
-                    "From refresh :Creating NVMe library for new SVM: %s", svm_name
-                )
+                LOG.info("Creating NVMe library for new SVM: %s", svm_name)
                 try:
                     lib = self._create_svm_lib(svm_name)
                     # Call do_setup to initialize the library
                     lib.do_setup(self._context)
                     lib.check_for_setup_error()
-                    LOG.info(
-                        "From refresh :Library creation success for SVM: %s", svm_name
-                    )
+                    LOG.info("Library creation success for SVM: %s", svm_name)
                     self._libraries[svm_name] = lib
                 except Exception as e:
                     LOG.exception(
-                        "From refresh :Failed to create library for SVM %s: %s",
+                        "Failed to create library for SVM %s: %s",
                         svm_name,
                         str(e),
                     )
             else:
-                LOG.info("From refresh :Library already exists for SVM: %s", svm_name)
+                LOG.info("Library already exists for SVM: %s", svm_name)
 
-        LOG.info(
-            "From refresh :Final libraries loaded: %s", list(self._libraries.keys())
-        )
-        LOG.info("********************")
+        LOG.info("Final libraries loaded: %s", list(self._libraries.keys()))
 
     def check_for_setup_error(self):
         """Check for setup errors."""
@@ -306,10 +295,15 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
         # looping call to refresh SVM libraries
         if not self._looping_call:
-            self._looping_call = loopingcall.FixedIntervalLoopingCall(
-                self._refresh_svm_libraries
-            )
-            self._looping_call.start(interval=60, initial_delay=10)
+            interval = self.configuration.safe_get("netapp_svm_discovery_interval")
+            if interval and interval > 0:
+                self._looping_call = loopingcall.FixedIntervalLoopingCall(
+                    self._refresh_svm_libraries
+                )
+                # removed initial_delay the first call run after full interval .
+                self._looping_call.start(interval=interval)
+            else:
+                LOG.info("SVM discovery timer disabled (interval=%s)", interval)
 
     def _svmify_pool(self, pool: dict, svm_name: str, **kwargs) -> dict:
         """Applies SVM info to a pool so we can target it and track it."""
