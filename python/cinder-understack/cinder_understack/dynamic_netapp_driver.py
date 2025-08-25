@@ -145,11 +145,10 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         self._libraries = {}
         # aggregated stats
         self._stats = self._empty_volume_stats()
-        # looping call to refresh SVM libraries
-        self._looping_call = loopingcall.FixedIntervalLoopingCall(
-            self._refresh_svm_libraries
-        )
-        self._looping_call.start(interval=60, initial_delay=10)
+        # looping call placeholder
+        self._looping_call = None
+        # context placeholder
+        self._context = None
 
     def _create_svm_lib(self, svm_name: str) -> NetAppMinimalLibrary:
         # we create a configuration object per SVM library to
@@ -248,6 +247,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
                 LOG.info(
                     "From refresh :Removing stale NVMe library for SVM: %s", svm_name
                 )
+                # TODO :  stop looping calls, free resources.
                 del self._libraries[svm_name]
             else:
                 LOG.info(
@@ -262,6 +262,9 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
                 )
                 try:
                     lib = self._create_svm_lib(svm_name)
+                    # Call do_setup to initialize the library
+                    lib.do_setup(self._context)
+                    lib.check_for_setup_error()
                     LOG.info(
                         "From refresh :Library creation success for SVM: %s", svm_name
                     )
@@ -285,6 +288,12 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         for svm_name, svm_lib in self._libraries.items():
             LOG.info("Checking NVMe library for errors for SVM %s", svm_name)
             svm_lib.check_for_setup_error()
+
+        # looping call to refresh SVM libraries
+        self._looping_call = loopingcall.FixedIntervalLoopingCall(
+            self._refresh_svm_libraries
+        )
+        self._looping_call.start(interval=60, initial_delay=10)
 
     def _svmify_pool(self, pool: dict, svm_name: str, **kwargs) -> dict:
         """Applies SVM info to a pool so we can target it and track it."""
