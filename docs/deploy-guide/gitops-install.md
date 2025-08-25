@@ -161,6 +161,29 @@ For authentication, please review the [authentication](auth.md) documentation.
 For OpenStack Helm components, an empty file in `$UC_DEPLOY/my-k3s/helm-configs`
 has been created for each component for you to use for customization.
 
+### Argo Workflows
+
+To allow UI and API access to Argo Workflows you must configure SSO and
+the Ingress. In your `$UC_DEPLOY/my-k3s/manifests/` make a `argo-workflows`
+directory and copy in `components/argo-workflows/sso` and
+`components/argo-workflows/ingress.yaml` while making the appropriate modifications.
+You will then need to add `kustomization.yaml` with the following:
+
+```yaml
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ingress.yaml
+
+configMapGenerator:
+  - name: workflow-controller-configmap
+    behavior: merge
+    files:
+      - sso
+```
+
 ## Doing the Deployment
 
 At this point we will use our configs to make the actual deployment.
