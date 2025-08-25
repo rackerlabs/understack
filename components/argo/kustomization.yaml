@@ -3,14 +3,13 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  # We are doing upstream's namespace-install.yaml but since we
-  # want the actual workflows to run in a different namespace
-  # the roles are created there
-  - https://github.com/argoproj/argo-workflows/manifests/base?ref=v3.5.10
-  # give the workflow controller access it needs
-  - workflow-controller-runtime.yaml
-  # give the argo-server access it needs
-  - argo-server-runtime.yaml
+  # We are wanting to limit the scope and access down to
+  # just the namespaces we want to give access for workflows
+  # to run and the argo-server to be able to see workflows and
+  # argo events so we need to split up what we install. So
+  # we delete the ClusterRoleBinding and instead create RoleBindings
+  # to the ClusterRole for just the namespaces we want.
+  - https://github.com/argoproj/argo-workflows/manifests/cluster-install/?ref=v3.6.10
 
   # ingress for workflows.${DNS_ZONE} to the argo server for the UI
   - ingress.yaml
@@ -21,13 +20,27 @@ resources:
 # keep all the images consistent
 images:
   - name: quay.io/argoproj/workflow-controller
-    newTag: v3.5.10
+    newTag: v3.6.10
   - name: quay.io/argoproj/argoexec
-    newTag: v3.5.10
+    newTag: v3.6.10
   - name: quay.io/argoproj/argocli
-    newTag: v3.5.10
+    newTag: v3.6.10
 
 patches:
+- target:
+    group: rbac.authorization.k8s.io
+    version: v1
+    kind: ClusterRoleBinding
+    name: argo-binding
+  path: delete-workflow-controller-crb.yaml
+
+- target:
+    group: rbac.authorization.k8s.io
+    version: v1
+    kind: ClusterRoleBinding
+    name: argo-server-binding
+  path: delete-argo-server-crb.yaml
+
 # see the patch for details on the change
 - target:
     group: apps
