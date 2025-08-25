@@ -227,6 +227,19 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             svm_lib.do_setup(ctxt)
             self._libraries[svm_name] = svm_lib
 
+    def _remove_svm_lib(self, svm_name: str, svm_lib: NetAppMinimalLibrary):
+        """Remove resources for a given SVM library."""
+        # WIP
+        LOG.info("Removing resources for SVM library %s", svm_name)
+        # Stop any looping calls if they exist
+        if svm_lib._looping_call and hasattr(svm_lib, "loopingcalls"):
+            LOG.info("Stopping looping call for SVM library %s", svm_name)
+            svm_lib.loopingcalls.stop_tasks()
+            # Adding None coz it has a reference to the looping call
+            svm_lib.looping_call = None
+            # There are other attributes which are in svm_lib even after
+            # Stopping the looping.
+
     def _refresh_svm_libraries(self):
         """Refresh the SVM libraries."""
         LOG.info("********************")
@@ -248,6 +261,8 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
                     "From refresh :Removing stale NVMe library for SVM: %s", svm_name
                 )
                 # TODO :  stop looping calls, free resources.
+                svm_lib = self._libraries.get(svm_name)
+                self._remove_svm_lib(svm_name, svm_lib)
                 del self._libraries[svm_name]
             else:
                 LOG.info(

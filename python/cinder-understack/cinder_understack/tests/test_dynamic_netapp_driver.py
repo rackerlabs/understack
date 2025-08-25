@@ -155,13 +155,15 @@ class NetappDynamicDriverTestCase(test.TestCase):
     ):
         """Test _refresh_svm_libraries add new SVMs and removes stale ones."""
         # Existing SVMs (before refresh called)
+        expected_svm = f"os-{self.project_id}"
+
         self.driver._libraries = {
             "os-old-svm": mock.Mock(vserver="os-old-svm"),
-            "os-common-svm": mock.Mock(vserver="os-common-svm"),
+            expected_svm: mock.Mock(vserver=expected_svm),
         }
 
         # Returned by _get_svms (after refresh)
-        mock_get_svms.return_value = ["os-common-svm", "os-new-svm"]
+        mock_get_svms.return_value = [expected_svm, "os-new-svm"]
 
         # Mock the new lib instance created
         mock_lib_instance = mock.Mock(vserver="os-new-svm")
@@ -174,8 +176,8 @@ class NetappDynamicDriverTestCase(test.TestCase):
         # Check stale SVM was removed
         self.assertNotIn("os-old-svm", self.driver._libraries)
 
-        # Check common SVM was retained
-        self.assertIn("os-common-svm", self.driver._libraries)
+        # Check SVM was retained
+        self.assertIn(expected_svm, self.driver._libraries)
 
         # Check new SVM was added
         self.assertIn("os-new-svm", self.driver._libraries)
