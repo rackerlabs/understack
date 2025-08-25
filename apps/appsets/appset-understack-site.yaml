@@ -159,7 +159,7 @@ spec:
             {{- end }}
           {{- end }}
           {{- if hasKey $source "kustomize" }}
-          kustomize: {{ $source.kustomize | toJson }}
+          kustomize: {{ $source.kustomize | toJson | replace "{{.dns_zone}}" (index $root.metadata.annotations "dns_zone") }}
           {{- end }}
           {{- if hasKey $source "path" }}
           path: {{ $source.path | replace "{{.name}}" $root.name }}

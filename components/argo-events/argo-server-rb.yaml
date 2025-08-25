@@ -1,8 +1,0 @@
-apiVersion: apps/v1
-kind: RoleBinding
-metadata:
-  name: argo-server-binding
-subjects:
-- kind: ServiceAccount
-  name: argo-server
-  namespace: argo
