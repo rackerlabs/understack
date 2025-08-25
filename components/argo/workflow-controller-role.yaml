@@ -1,0 +1,8 @@
+---
+- op: add
+  path: /rules/-
+  value:
+    apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "watch"]
+    resourceNames: ["workflow-controller-configmap"]

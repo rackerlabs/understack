@@ -1,0 +1,30 @@
+# This is a role and rolebinding to provide the argo-server with permissions
+# it needs to run in its own namespace.
+# - to read the configmap for its configuration
+# - read the SSO secret
+# - create and read other secrets for auth tokens
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-server-role
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - watch
+    resourceNames:
+      - workflow-controller-configmap
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - create
+    resourceNames:
+      - argo-sso
+      - sso
