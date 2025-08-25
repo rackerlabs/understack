@@ -13,7 +13,7 @@ sources:
               path: /data/sso
               value: |-
                 # This is the root URL of the OIDC provider (required).
-                issuer: https://dex.{{.dns_zone}}
+                issuer: https://dex.{{index .metadata.annotations "dns_zone"}}
                 # This defines how long your login is valid for (in hours). (optional)
                 # If omitted, defaults to 10h. Example below is 10 days.
                 sessionExpiry: 240h
@@ -30,7 +30,7 @@ sources:
                 # This is the redirect URL supplied to the provider (optional). It must
                 # be in the form <argo-server-root-url>/oauth2/callback. It must be
                 # browser-accessible. If omitted, will be automatically generated.
-                redirectUrl: https://workflows.{{.dns_zone}}/oauth2/callback
+                redirectUrl: https://workflows.{{index .metadata.annotations "dns_zone"}}/oauth2/callback
                 # Additional scopes to request. Typically needed for SSO RBAC. >= v2.12
                 scopes:
                   - groups
@@ -45,7 +45,7 @@ sources:
           patch: |-
             - op: replace
               path: /spec/rules/0/host
-              value: workflows.{{.dns_zone}}
+              value: workflows.{{index .metadata.annotations "dns_zone"}}
             - op: replace
               path: /spec/tls/0/hosts/0
-              value: workflows.{{.dns_zone}}
+              value: workflows.{{index .metadata.annotations "dns_zone"}}
