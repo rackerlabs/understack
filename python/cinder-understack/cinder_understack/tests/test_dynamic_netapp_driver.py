@@ -143,15 +143,11 @@ class NetappDynamicDriverTestCase(test.TestCase):
         mock_looping_instance.start.assert_not_called()
 
     @mock.patch.object(
-        dynamic_netapp_driver.NetAppMinimalLibrary, "check_for_setup_error"
-    )
-    @mock.patch.object(dynamic_netapp_driver.NetAppMinimalLibrary, "do_setup")
-    @mock.patch.object(
         dynamic_netapp_driver.NetappCinderDynamicDriver, "_create_svm_lib"
     )
     @mock.patch.object(dynamic_netapp_driver.NetappCinderDynamicDriver, "_get_svms")
     def test_refresh_svm_libraries_adds_and_removes_svms(
-        self, mock_get_svms, mock_create_svm_lib, mock_do_setup, mock_check_setup
+        self, mock_get_svms, mock_create_svm_lib
     ):
         """Test _refresh_svm_libraries add new SVMs and removes stale ones."""
         # Existing SVMs (before refresh called)
@@ -162,11 +158,17 @@ class NetappDynamicDriverTestCase(test.TestCase):
             expected_svm: mock.Mock(vserver=expected_svm),
         }
 
+        self.driver._get_svms = mock_get_svms
         # Returned by _get_svms (after refresh)
         mock_get_svms.return_value = [expected_svm, "os-new-svm"]
 
+        # make the created lib look like the real thing
+        mock_lib_instance = mock.create_autospec(
+            dynamic_netapp_driver.NetAppMinimalLibrary, instance=True
+        )
+
         # Mock the new lib instance created
-        mock_lib_instance = mock.Mock(vserver="os-new-svm")
+        mock_lib_instance.vserver = "os-new-svm"
         mock_create_svm_lib.return_value = mock_lib_instance
 
         # Trigger refresh
@@ -184,8 +186,8 @@ class NetappDynamicDriverTestCase(test.TestCase):
 
         # New SVM lib should've been created and setup
         mock_create_svm_lib.assert_called_once_with("os-new-svm")
-        mock_do_setup.assert_called_once_with(self.ctxt)
-        mock_check_setup.assert_called_once()
+        mock_lib_instance.do_setup.assert_called_once_with(self.ctxt)
+        mock_lib_instance.check_for_setup_error.assert_called_once()
 
     @mock.patch.object(
         dynamic_netapp_driver.NetappCinderDynamicDriver, "_create_svm_lib"
