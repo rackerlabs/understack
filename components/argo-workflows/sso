@@ -13,6 +13,10 @@ clientId:
 clientSecret:
   name: argo-sso
   key: client-secret
+# This is the redirect URL supplied to the provider (optional). It must
+# be in the form <argo-server-root-url>/oauth2/callback. It must be
+# browser-accessible. If omitted, will be automatically generated.
+redirectUrl: https://workflows.argo.svc/oauth2/callback
 # Additional scopes to request. Typically needed for SSO RBAC. >= v2.12
 scopes:
   - groups
