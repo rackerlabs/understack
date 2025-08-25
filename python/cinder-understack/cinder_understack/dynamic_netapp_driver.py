@@ -290,10 +290,11 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             svm_lib.check_for_setup_error()
 
         # looping call to refresh SVM libraries
-        self._looping_call = loopingcall.FixedIntervalLoopingCall(
-            self._refresh_svm_libraries
-        )
-        self._looping_call.start(interval=60, initial_delay=10)
+        if not self._looping_call:
+            self._looping_call = loopingcall.FixedIntervalLoopingCall(
+                self._refresh_svm_libraries
+            )
+            self._looping_call.start(interval=60, initial_delay=10)
 
     def _svmify_pool(self, pool: dict, svm_name: str, **kwargs) -> dict:
         """Applies SVM info to a pool so we can target it and track it."""
