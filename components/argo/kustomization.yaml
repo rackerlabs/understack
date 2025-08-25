@@ -11,6 +11,10 @@ resources:
   # to the ClusterRole for just the namespaces we want.
   - https://github.com/argoproj/argo-workflows/manifests/cluster-install/?ref=v3.6.10
 
+  # adds argo-server role so the argo-server has enough permissions to run
+  - argo-server-role.yaml
+  - argo-server-rolebinding.yaml
+
   # ingress for workflows.${DNS_ZONE} to the argo server for the UI
   - ingress.yaml
 
@@ -40,6 +44,13 @@ patches:
     kind: ClusterRoleBinding
     name: argo-server-binding
   path: delete-argo-server-crb.yaml
+
+- target:
+    group: rbac.authorization.k8s.io
+    version: v1
+    kind: Role
+    name: argo-role
+  path: workflow-controller-role.yaml
 
 # see the patch for details on the change
 - target:
