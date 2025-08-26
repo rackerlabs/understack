@@ -64,9 +64,9 @@ spec:
             secretName: netapp-config
       outputs:
         parameters:
-          - name: exit_code
+          - name: svm_name
             valueFrom:
-              path: /var/run/argo/output.exit_code
-          - name: msg
+              path: /var/run/argo/output.svm_name
+          - name: svm_enabled
             valueFrom:
-              path: /var/run/argo/output.msg
+              path: /var/run/argo/output.svm_enabled
