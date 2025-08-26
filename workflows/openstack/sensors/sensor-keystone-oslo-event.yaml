@@ -10,7 +10,7 @@ metadata:
 
       - identity.project.created
       - identity.project.updated
-      - other events are silently ignored now
+      - identity.project.deleted
 
       Resulting code should be very similar to:
 
@@ -39,6 +39,7 @@ spec:
           value:
             - "identity.project.created"
             - "identity.project.updated"
+            - "identity.project.deleted"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:

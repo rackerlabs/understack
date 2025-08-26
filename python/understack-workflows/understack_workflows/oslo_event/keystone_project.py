@@ -118,6 +118,31 @@ def handle_project_updated(
     return 0
 
 
+def handle_project_deleted(
+    conn: Connection, _nautobot: Nautobot, event_data: dict
+) -> int:
+    if event_data.get("event_type") != "identity.project.deleted":
+        logger.error("Received event that is not identity.project.deleted")
+        return 1
+
+    event = KeystoneProjectEvent.from_event_dict(event_data)
+    logger.info("Starting ONTAP SVM and Volume delete workflow.")
+    try:
+        netapp_manager = NetAppManager()
+        svm_exists = netapp_manager.check_if_svm_exists(project_id=event.project_id)
+
+        if svm_exists:
+            logger.info("SVM for project %s exists - cleaning it up.", event.project_id)
+            netapp_manager.cleanup_project(event.project_id)
+        else:
+            logger.info("SVM for project %s did not exist.", event.project_id)
+        _save_output("svm_created", str(False))
+    except Exception as e:
+        logger.error(e)
+        return 1
+    return 0
+
+
 def _create_svm_and_volume(netapp_manager, event) -> str:
     svm_name = netapp_manager.create_svm(
         project_id=event.project_id, aggregate_name=AGGREGATE_NAME

@@ -10,6 +10,7 @@ from understack_workflows.oslo_event.keystone_project import VOLUME_SIZE
 from understack_workflows.oslo_event.keystone_project import KeystoneProjectEvent
 from understack_workflows.oslo_event.keystone_project import _keystone_project_tags
 from understack_workflows.oslo_event.keystone_project import handle_project_created
+from understack_workflows.oslo_event.keystone_project import handle_project_deleted
 from understack_workflows.oslo_event.keystone_project import handle_project_updated
 
 
@@ -593,3 +594,133 @@ class TestHandleProjectUpdated:
                 call("/var/run/argo/output.svm_name", "w"),
             ]
             mock_open.assert_has_calls(expected_calls, any_order=True)
+
+
+class TestHandleProjectDeleted:
+    """Test cases for handle_project_deleted function."""
+
+    @pytest.fixture
+    def mock_conn(self):
+        """Create a mock OpenStack connection."""
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_nautobot(self):
+        """Create a mock Nautobot instance."""
+        return MagicMock()
+
+    @pytest.fixture
+    def valid_delete_event_data(self):
+        """Create valid delete event data for testing."""
+        return {
+            "event_type": "identity.project.deleted",
+            "payload": {"target": {"id": "test-project-123"}},
+        }
+
+    def test_handle_project_deleted_wrong_event_type(self, mock_conn, mock_nautobot):
+        """Test handling event with wrong event type."""
+        event_data = {
+            "event_type": "identity.project.created",
+            "payload": {"target": {"id": "test-project-123"}},
+        }
+
+        result = handle_project_deleted(mock_conn, mock_nautobot, event_data)
+        assert result == 1
+
+    @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    def test_handle_project_deleted_svm_exists(
+        self,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_delete_event_data,
+    ):
+        """Test project deletion when SVM exists."""
+        mock_netapp_manager = MagicMock()
+        mock_netapp_manager.check_if_svm_exists.return_value = True
+        mock_netapp_class.return_value = mock_netapp_manager
+
+        result = handle_project_deleted(
+            mock_conn, mock_nautobot, valid_delete_event_data
+        )
+
+        assert result == 0
+        mock_netapp_manager.check_if_svm_exists.assert_called_once_with(
+            project_id="test-project-123"
+        )
+        mock_netapp_manager.cleanup_project.assert_called_once_with("test-project-123")
+
+    @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    def test_handle_project_deleted_svm_does_not_exist(
+        self,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_delete_event_data,
+    ):
+        """Test project deletion when SVM does not exist."""
+        mock_netapp_manager = MagicMock()
+        mock_netapp_manager.check_if_svm_exists.return_value = False
+        mock_netapp_class.return_value = mock_netapp_manager
+
+        result = handle_project_deleted(
+            mock_conn, mock_nautobot, valid_delete_event_data
+        )
+
+        assert result == 0
+        mock_netapp_manager.check_if_svm_exists.assert_called_once_with(
+            project_id="test-project-123"
+        )
+        mock_netapp_manager.cleanup_project.assert_not_called()
+
+    @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    def test_handle_project_deleted_netapp_manager_failure(
+        self,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_delete_event_data,
+    ):
+        """Test handling when NetAppManager creation fails during deletion."""
+        mock_netapp_class.side_effect = Exception("NetApp connection failed")
+
+        result = handle_project_deleted(
+            mock_conn, mock_nautobot, valid_delete_event_data
+        )
+
+        assert result == 1  # Should return 1 on exception
+        mock_netapp_class.assert_called_once()
+
+    @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    def test_handle_project_deleted_cleanup_failure(
+        self,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_delete_event_data,
+    ):
+        """Test handling when cleanup_project fails during deletion."""
+        mock_netapp_manager = MagicMock()
+        mock_netapp_manager.check_if_svm_exists.return_value = True
+        mock_netapp_manager.cleanup_project.side_effect = Exception("Cleanup failed")
+        mock_netapp_class.return_value = mock_netapp_manager
+
+        result = handle_project_deleted(
+            mock_conn, mock_nautobot, valid_delete_event_data
+        )
+
+        assert result == 1  # Should return 1 on exception
+        mock_netapp_manager.check_if_svm_exists.assert_called_once_with(
+            project_id="test-project-123"
+        )
+        mock_netapp_manager.cleanup_project.assert_called_once_with("test-project-123")
+
+    def test_handle_project_deleted_invalid_event_data(self, mock_conn, mock_nautobot):
+        """Test handling deletion with invalid event data."""
+        invalid_event_data = {
+            "event_type": "identity.project.deleted",
+            "payload": {},  # Missing target
+        }
+
+        with pytest.raises(Exception, match="no target information in payload"):
+            handle_project_deleted(mock_conn, mock_nautobot, invalid_event_data)

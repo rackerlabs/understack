@@ -66,6 +66,7 @@ _event_handlers: dict[str, EventHandler] = {
     "baremetal.port.delete.end": ironic_port.handle_port_delete,
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,
+    "identity.project.deleted": keystone_project.handle_project_deleted,
 }
 
 
