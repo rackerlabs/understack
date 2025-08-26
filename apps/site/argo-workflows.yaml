@@ -2,50 +2,6 @@
 component: argo
 sources:
   - ref: understack
-    path: 'components/argo'
-    kustomize:
-      patches:
-        - target:
-            kind: ConfigMap
-            name: workflow-controller-configmap
-          patch: |-
-            - op: replace
-              path: /data/sso
-              value: |-
-                # This is the root URL of the OIDC provider (required).
-                issuer: https://dex.{{.dns_zone}}
-                # This defines how long your login is valid for (in hours). (optional)
-                # If omitted, defaults to 10h. Example below is 10 days.
-                sessionExpiry: 240h
-                # This is name of the secret and the key in it that contain OIDC client
-                # ID issued to the application by the provider (required).
-                clientId:
-                  name: argo-sso
-                  key: client-id
-                # This is name of the secret and the key in it that contain OIDC client
-                # secret issued to the application by the provider (required).
-                clientSecret:
-                  name: argo-sso
-                  key: client-secret
-                # This is the redirect URL supplied to the provider (optional). It must
-                # be in the form <argo-server-root-url>/oauth2/callback. It must be
-                # browser-accessible. If omitted, will be automatically generated.
-                redirectUrl: https://workflows.{{.dns_zone}}/oauth2/callback
-                # Additional scopes to request. Typically needed for SSO RBAC. >= v2.12
-                scopes:
-                  - groups
-                  - email
-                  - profile
-                # RBAC Config. >= v2.12
-                rbac:
-                  enabled: false
-        - target:
-            kind: Ingress
-            name: argo-workflows
-          patch: |-
-            - op: replace
-              path: /spec/rules/0/host
-              value: workflows.{{.dns_zone}}
-            - op: replace
-              path: /spec/tls/0/hosts/0
-              value: workflows.{{.dns_zone}}
+    path: 'components/argo-workflows'
+  - ref: deploy
+    path: '{{.name}}/manifests/argo-workflows'

@@ -161,6 +161,8 @@ For authentication, please review the [authentication](auth.md) documentation.
 For OpenStack Helm components, an empty file in `$UC_DEPLOY/my-k3s/helm-configs`
 has been created for each component for you to use for customization.
 
+See the Preparing Your Deployment section for component specific details.
+
 ## Doing the Deployment
 
 At this point we will use our configs to make the actual deployment.
