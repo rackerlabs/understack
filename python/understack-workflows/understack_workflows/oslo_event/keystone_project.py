@@ -66,19 +66,62 @@ def handle_project_created(
     svm_name = None
     try:
         netapp_manager = NetAppManager()
-        svm_name = netapp_manager.create_svm(
-            project_id=event.project_id, aggregate_name=AGGREGATE_NAME
-        )
-        netapp_manager.create_volume(
-            project_id=event.project_id,
-            volume_size=VOLUME_SIZE,
-            aggregate_name=AGGREGATE_NAME,
-        )
+        svm_name = _create_svm_and_volume(netapp_manager, event)
     finally:
         if not svm_name:
             svm_name = "not_returned"
         _save_output("svm_name", svm_name)
     return 0
+
+
+def handle_project_updated(
+    conn: Connection, _nautobot: Nautobot, event_data: dict
+) -> int:
+    if event_data.get("event_type") != "identity.project.updated":
+        logger.error("Received event that is not identity.project.updated")
+        return 1
+
+    event = KeystoneProjectEvent.from_event_dict(event_data)
+    logger.info("Starting ONTAP SVM and Volume create/update workflow.")
+    tags = _keystone_project_tags(conn, event.project_id)
+    logger.debug("Project %s has tags: %s", event.project_id, tags)
+
+    project_is_svm_enabled = SVM_PROJECT_TAG in tags
+    _save_output("svm_enabled", str(project_is_svm_enabled))
+
+    svm_name = None
+    try:
+        netapp_manager = NetAppManager()
+        svm_exists = netapp_manager.check_if_svm_exists(project_id=event.project_id)
+
+        # Tag removed
+        if not project_is_svm_enabled and svm_exists:
+            logger.error(
+                "SVM os-%s exists on NetApp but project %s is no longer tagged with %s",
+                event.project_id,
+                event.project_id,
+                SVM_PROJECT_TAG,
+            )
+        # Tag added
+        elif project_is_svm_enabled and not svm_exists:
+            svm_name = _create_svm_and_volume(netapp_manager, event)
+    finally:
+        if not svm_name:
+            svm_name = "not_returned"
+        _save_output("svm_name", svm_name)
+    return 0
+
+
+def _create_svm_and_volume(netapp_manager, event) -> str:
+    svm_name = netapp_manager.create_svm(
+        project_id=event.project_id, aggregate_name=AGGREGATE_NAME
+    )
+    netapp_manager.create_volume(
+        project_id=event.project_id,
+        volume_size=VOLUME_SIZE,
+        aggregate_name=AGGREGATE_NAME,
+    )
+    return svm_name
 
 
 def _save_output(name, value):

@@ -9,6 +9,7 @@ metadata:
       Triggers on the following Keystone Events:
 
       - identity.project.created
+      - identity.project.updated
       - other events are silently ignored now
 
       Resulting code should be very similar to:
@@ -37,6 +38,7 @@ spec:
           type: "string"
           value:
             - "identity.project.created"
+            - "identity.project.updated"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:

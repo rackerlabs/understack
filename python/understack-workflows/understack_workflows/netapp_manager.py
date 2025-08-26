@@ -105,6 +105,15 @@ class NetAppManager:
             logger.error("Error creating Volume: %s", e)
             exit(1)
 
+    def check_if_svm_exists(self, project_id):
+        svm_name = self._svm_name(project_id)
+
+        try:
+            if Svm.find(name=svm_name):
+                return True
+        except NetAppRestError:
+            return False
+
     def _svm_name(self, project_id):
         return f"os-{project_id}"
 
