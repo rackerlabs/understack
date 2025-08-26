@@ -5,6 +5,7 @@ import urllib3
 from netapp_ontap import config
 from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
+from netapp_ontap.resources import NvmeNamespace
 from netapp_ontap.resources import Svm
 from netapp_ontap.resources import Volume
 
@@ -80,6 +81,32 @@ class NetAppManager:
             logger.error("Error creating SVM: %s", e)
             exit(1)
 
+    def delete_svm(self, svm_name: str) -> bool:
+        """Deletes a Storage Virtual Machine (SVM) based on its name.
+
+        Args:
+            svm_name (str): The name of the SVM to delete
+
+        Returns:
+            bool: True if deleted successfully, False otherwise
+
+        Note:
+            All non-root volumes, NVMe namespaces, and other dependencies
+            must be deleted prior to deleting the SVM.
+        """
+        try:
+            # Find the SVM by name
+            svm = Svm()
+            svm.get(name=svm_name)
+            logger.info("Found SVM '%s' with UUID %s", svm_name, svm.uuid)
+            svm.delete()
+            logger.info("SVM '%s' deletion initiated successfully", svm_name)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to delete SVM '%s': %s", svm_name, str(e))
+            return False
+
     def create_volume(
         self, project_id: str, volume_size: str, aggregate_name: str
     ) -> str:
@@ -105,6 +132,41 @@ class NetAppManager:
             logger.error("Error creating Volume: %s", e)
             exit(1)
 
+    def delete_volume(self, volume_name: str, force: bool = False) -> bool:
+        """Deletes a volume based on volume name.
+
+        Args:
+            volume_name (str): The name of the volume to delete
+            force (bool): If True, attempts to delete even if volume has dependencies
+
+        Returns:
+            bool: True if deleted successfully, False otherwise
+
+        Raises:
+            Exception: If volume not found or deletion fails
+        """
+        try:
+            vol = Volume()
+            vol.get(name=volume_name)
+
+            logger.info("Found volume '%s'", volume_name)
+
+            # Check if volume is online and has data
+            if hasattr(vol, "state") and vol.state == "online":
+                logger.warning("Volume '%s' is online", volume_name)
+
+            if force:
+                vol.delete(allow_delete_while_mapped=True)
+            else:
+                vol.delete()
+
+            logger.info("Volume '%s' deletion initiated successfully", volume_name)
+            return True
+
+        except Exception as e:
+            logger.error("Failed to delete volume '%s': %s", volume_name, str(e))
+            return False
+
     def check_if_svm_exists(self, project_id):
         svm_name = self._svm_name(project_id)
 
@@ -113,6 +175,31 @@ class NetAppManager:
                 return True
         except NetAppRestError:
             return False
+
+    def mapped_namespaces(self, svm_name, volume_name):
+        if not config.CONNECTION:
+            return
+
+        ns_list = NvmeNamespace.get_collection(
+            query=f"svm.name={svm_name}&location.volume.name={volume_name}",
+            fields="uuid,name,status.mapped",
+        )
+        return ns_list
+
+    def cleanup_project(self, project_id: str) -> dict[str, bool]:
+        """Removes a Volume and SVM associated with a project.
+
+        Note: This method will delete the data if volume is still in use.
+        """
+        svm_name = self._svm_name(project_id)
+        vol_name = self._volume_name(project_id)
+        delete_vol_result = self.delete_volume(vol_name)
+        logger.debug("Delete volume result: %s", delete_vol_result)
+
+        delete_svm_result = self.delete_svm(svm_name)
+        logger.debug("Delete SVM result: %s", delete_svm_result)
+
+        return {"volume": delete_vol_result, "svm": delete_svm_result}
 
     def _svm_name(self, project_id):
         return f"os-{project_id}"
