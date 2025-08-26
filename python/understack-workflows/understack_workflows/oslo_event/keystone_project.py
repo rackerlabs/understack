@@ -96,12 +96,13 @@ def handle_project_updated(
 
         # Tag removed
         if not project_is_svm_enabled and svm_exists:
-            logger.error(
+            logger.warning(
                 "SVM os-%s exists on NetApp but project %s is no longer tagged with %s",
                 event.project_id,
                 event.project_id,
                 SVM_PROJECT_TAG,
             )
+            netapp_manager.cleanup_project(event.project_id)
         # Tag added
         elif project_is_svm_enabled and not svm_exists:
             svm_name = _create_svm_and_volume(netapp_manager, event)

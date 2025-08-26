@@ -395,7 +395,46 @@ class TestHandleProjectUpdated:
         mock_netapp_manager.check_if_svm_exists.assert_called_once_with(
             project_id="test-project-123"
         )
+        # Should call cleanup_project when tag is removed but SVM exists
+        mock_netapp_manager.cleanup_project.assert_called_once_with("test-project-123")
         # Should not create SVM or volume when tag is removed
+        mock_netapp_manager.create_svm.assert_not_called()
+        mock_netapp_manager.create_volume.assert_not_called()
+
+    @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
+    def test_handle_project_updated_svm_tag_removed_no_svm(
+        self,
+        mock_open,
+        mock_tags,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_update_event_data,
+    ):
+        """Test project update when SVM_UNDERSTACK tag is removed but no SVM exists."""
+        # Project no longer has SVM tag
+        mock_tags.return_value = ["tag1", "tag2"]
+
+        mock_netapp_manager = MagicMock()
+        mock_netapp_manager.check_if_svm_exists.return_value = (
+            False  # No SVM exists and tag removed
+        )
+        mock_netapp_class.return_value = mock_netapp_manager
+
+        result = handle_project_updated(
+            mock_conn, mock_nautobot, valid_update_event_data
+        )
+
+        assert result == 0
+        mock_tags.assert_called_once_with(mock_conn, "test-project-123")
+        mock_netapp_manager.check_if_svm_exists.assert_called_once_with(
+            project_id="test-project-123"
+        )
+        # Should not call cleanup_project when no SVM exists
+        mock_netapp_manager.cleanup_project.assert_not_called()
+        # Should not create SVM or volume
         mock_netapp_manager.create_svm.assert_not_called()
         mock_netapp_manager.create_volume.assert_not_called()
 
