@@ -136,7 +136,6 @@ def handle_project_deleted(
             netapp_manager.cleanup_project(event.project_id)
         else:
             logger.info("SVM for project %s did not exist.", event.project_id)
-        _save_output("svm_created", str(False))
     except Exception as e:
         logger.error(e)
         return 1
