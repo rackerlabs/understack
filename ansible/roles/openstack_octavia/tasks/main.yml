@@ -1,0 +1,91 @@
+---
+
+- name: Get network info
+  openstack.cloud.networks_info:
+    name: "{{ load_balancer_network_name }}"
+  register: existing_networks
+  run_one: true
+
+- name: Create network if not exists
+  openstack.cloud.network:
+    name: "{{ load_balancer_network_name }}"
+    provider_network_type: "{{ provider_network_type }}"
+    state: present
+  when: existing_networks | length == 0
+  run_one: true
+
+- name: Create a new subnet in neutron
+  openstack.cloud.subnet:
+    network_name: "{{ load_balancer_network_name }}"
+    name: "{{ load_balancer_subnet_name }}"
+    cidr: "{{ load_balancer_subnet }}"
+    allocation_pool_start: "{{ load_balancer_subnet_start }}"
+    allocation_pool_end: "{{ load_balancer_subnet_end }}"
+    state: present
+  run_one: true
+
+- name: Create a security group
+  openstack.cloud.security_group:
+    name: lb-mgmt-sec-grp
+    state: present
+    description: security group for octavia load balancers
+  run_one: true
+
+- name: Create a security group rule
+  openstack.cloud.security_group_rule:
+    security_group: lb-mgmt-sec-grp
+    protocol: icmp
+    remote_ip_prefix: 0.0.0.0/0
+  run_one: true
+
+- name: Create a security group rule
+  openstack.cloud.security_group_rule:
+    security_group: lb-mgmt-sec-grp
+    protocol: tcp
+    port_range_min: 22
+    port_range_max: 22
+    remote_ip_prefix: 0.0.0.0/0
+  run_one: true
+
+- name: Create a security group rule
+  openstack.cloud.security_group_rule:
+    security_group: lb-mgmt-sec-grp
+    protocol: tcp
+    port_range_min: 9443
+    port_range_max: 9443
+    remote_ip_prefix: 0.0.0.0/0
+  run_one: true
+
+- name: Create a security group for octavia health manager
+  openstack.cloud.security_group:
+    name: lb-health-mgr-sec-grp
+    state: present
+    description: security group for octavia health manager
+  run_one: true
+
+- name: Create a health group security rules
+  openstack.cloud.security_group_rule:
+    security_group: lb-health-mgr-sec-grp
+    protocol: udp
+    port_range_min: 5555
+    port_range_max: 5555
+    remote_ip_prefix: 0.0.0.0/0
+  run_one: true
+
+# We want to create the ports on the ovn nodes. In Understack, we can
+# identify those as the nodes having the ansible host var setting
+# `ovs_enabled=true`.
+- name: Create ports
+  openstack.cloud.port:
+    name: "octavia-health-manager-port-{{ item }}"
+    network: lb-mgmt-net
+    security_groups: lb-health-mgr-sec-grp
+    device_owner: "Octavia:health-mgr"
+    binding_host_id: "{{ item }}"
+    state: present
+  with_items: "{{ groups['all']
+                  | map('extract', hostvars)
+                  | selectattr('ovs_enabled', 'defined')
+                  | selectattr('ovs_enabled', 'equalto', true)
+                  | map(attribute='inventory_hostname')
+                  | list }}"
