@@ -13,7 +13,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-- name: OpenStack Network
+- name: OpenStack Octavia Post Deployment
   hosts: neutron
   connection: local
 
@@ -26,4 +26,4 @@
         - OS_CLOUD
 
   roles:
-    - role: openstack_network
+    - role: openstack_octavia
