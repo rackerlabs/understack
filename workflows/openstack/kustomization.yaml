@@ -24,3 +24,8 @@ resources:
   - sensors/sensor-ironic-node-port.yaml
   - secrets/nautobot-token.yaml
   - secrets/openstack-svc-acct.yaml
+
+  # Runs the ansible playbook openstack_octavia.yaml after
+  # ArgoCD successfully deploys the octavia app
+  # - eventsources/eventsource-k8s-openstack-octavia.yaml
+  # - sensors/sensor-k8s-octavia-deployment.yaml

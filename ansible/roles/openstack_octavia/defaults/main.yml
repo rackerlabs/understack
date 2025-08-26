@@ -1,0 +1,7 @@
+---
+openstack_octavia_load_balancer_network_name: "lb-mgmt-net"
+openstack_octavia_load_balancer_subnet_name: "lb-mgmt-subnet"
+openstack_octavia_load_balancer_subnet: "172.31.0.0/24"
+openstack_octavia_load_balancer_subnet_start: "172.31.0.2"
+openstack_octavia_load_balancer_subnet_end: "172.31.0.200"
+openstack_octavia_provider_network_type: "ovn"
