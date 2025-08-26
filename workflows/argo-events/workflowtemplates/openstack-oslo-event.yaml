@@ -70,3 +70,6 @@ spec:
           - name: svm_enabled
             valueFrom:
               path: /var/run/argo/output.svm_enabled
+          - name: svm_created
+            valueFrom:
+              path: /var/run/argo/output.svm_created

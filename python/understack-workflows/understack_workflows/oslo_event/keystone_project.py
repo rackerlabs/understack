@@ -67,6 +67,7 @@ def handle_project_created(
     try:
         netapp_manager = NetAppManager()
         svm_name = _create_svm_and_volume(netapp_manager, event)
+        _save_output("svm_created", str(True))
     finally:
         if not svm_name:
             svm_name = "not_returned"
@@ -104,8 +105,12 @@ def handle_project_updated(
             )
             netapp_manager.cleanup_project(event.project_id)
         # Tag added
-        elif project_is_svm_enabled and not svm_exists:
-            svm_name = _create_svm_and_volume(netapp_manager, event)
+        elif project_is_svm_enabled:
+            if svm_exists:
+                _save_output("svm_created", str(False))
+            else:
+                svm_name = _create_svm_and_volume(netapp_manager, event)
+            _save_output("svm_created", str(True))
     finally:
         if not svm_name:
             svm_name = "not_returned"

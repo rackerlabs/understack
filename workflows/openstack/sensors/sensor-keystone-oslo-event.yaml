@@ -95,7 +95,7 @@ spec:
                               print(str(uuid.UUID(project_id_without_dashes)))
 
                   - - name: ansible-to-nautobot
-                      when: "{{steps.oslo-events.outputs.parameters.svm_enabled}} == True"
+                      when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
                       inline:
                         container:
                           image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
