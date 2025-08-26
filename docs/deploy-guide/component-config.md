@@ -95,7 +95,13 @@ in your deployment repo.
 
 ## Modifying Environment State
 
-TODO: more to come
+For both global and site cluster there are common configuration
+settings which must be made. For UnderStack we have chosen to
+create a `ConfigMap` in a namespace called `understack` with
+data for the applications in that namespace. These files
+should live at `my-site/manifest/<namespace>/configmap-understack.yaml`.
+To add it you can run `kustomize edit add resource configmap-understack.yaml`
+from the `my-site/manifest/<namespace>` directory.
 
 [argocd]: <https://argo-cd.readthedocs.io/en/stable/>
 [argocd-app]: <https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification/>
