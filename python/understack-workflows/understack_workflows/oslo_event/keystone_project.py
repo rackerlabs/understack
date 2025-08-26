@@ -66,10 +66,10 @@ def handle_project_created(
     svm_name = None
     try:
         netapp_manager = NetAppManager()
-        netapp_manager.create_svm(
+        svm_name = netapp_manager.create_svm(
             project_id=event.project_id, aggregate_name=AGGREGATE_NAME
         )
-        svm_name = netapp_manager.create_volume(
+        netapp_manager.create_volume(
             project_id=event.project_id,
             volume_size=VOLUME_SIZE,
             aggregate_name=AGGREGATE_NAME,

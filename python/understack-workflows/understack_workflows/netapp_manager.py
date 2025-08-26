@@ -75,11 +75,14 @@ class NetAppManager:
             logger.info(
                 "SVM '%s' created successfully with NVMe protocol allowed", svm.name
             )
+            return svm.name
         except NetAppRestError as e:
             logger.error("Error creating SVM: %s", e)
             exit(1)
 
-    def create_volume(self, project_id: str, volume_size: str, aggregate_name: str):
+    def create_volume(
+        self, project_id: str, volume_size: str, aggregate_name: str
+    ) -> str:
         """Creates a new volume within a specific SVM and aggregate."""
         volume_name = self._volume_name(project_id)
         logger.info(
@@ -97,6 +100,7 @@ class NetAppManager:
             volume.post()
             volume.get()
             logger.info("Volume %s created.", volume_name)
+            return volume_name
         except NetAppRestError as e:
             logger.error("Error creating Volume: %s", e)
             exit(1)
