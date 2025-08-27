@@ -14,6 +14,8 @@ spec:
     server: '*'
   - namespace: 'mariadb-operator'
     server: '*'
+  - namespace: 'mariadb-operator-green'
+    server: '*'
   - namespace: 'cnpg-system'
     server: '*'
   - namespace: 'external-secrets'
