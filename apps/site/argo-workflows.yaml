@@ -3,5 +3,3 @@ component: argo
 sources:
   - ref: understack
     path: 'components/argo-workflows'
-  - ref: deploy
-    path: '{{.name}}/manifests/argo-workflows'
