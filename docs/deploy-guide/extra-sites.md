@@ -27,7 +27,6 @@ place it where we've cloned understack. A complete file would look like:
 # this can remain as the literal value and will ensure it computes the right path
 UC_DEPLOY="$(cd "$(dirname ${BASH_SOURCE[0]})" && git rev-parse --show-toplevel)"
 DEPLOY_NAME="my-site"
-DNS_ZONE=home.lab
 UC_DEPLOY_EMAIL="my@email"
 NO_ARGOCD=yes
 ```
@@ -69,7 +68,6 @@ metadata:
     uc_repo_ref: HEAD
     uc_deploy_git_url: "${UC_DEPLOY_GIT_URL}"
     uc_deploy_ref: HEAD
-    dns_zone: "${DNS_ZONE}"
   labels:
     argocd.argoproj.io/secret-type: cluster
 type: Opaque
