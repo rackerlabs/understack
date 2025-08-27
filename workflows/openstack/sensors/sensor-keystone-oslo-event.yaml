@@ -104,6 +104,7 @@ spec:
                           - "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}} env=dev"
                           - "-i"
                           - "inventory/uc-dev/01-nautobot.yaml"
+                          - "-vvv"
                             # TODO: this shouldn't be hardcodod to dev, but will work since
                             # it really talks to https://nautobot-default.svc
                           env:
