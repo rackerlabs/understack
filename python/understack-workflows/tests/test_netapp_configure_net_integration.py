@@ -1,10 +1,20 @@
 import argparse
+import json
+import pathlib
 from contextlib import nullcontext
 from unittest.mock import Mock, patch
 
 import pytest
 
 from understack_workflows.main.netapp_configure_net import VIRTUAL_MACHINES_QUERY
+
+
+def load_json_sample(filename: str) -> dict:
+    """Load JSON sample data from the json_samples directory."""
+    here = pathlib.Path(__file__).parent
+    sample_path = here / "json_samples" / filename
+    with sample_path.open("r") as f:
+        return json.load(f)
 
 
 class TestIntegrationTests:
@@ -26,26 +36,7 @@ class TestIntegrationTests:
 
         # Mock successful GraphQL response
         mock_response = Mock()
-        mock_response.json = {
-            "data": {
-                "virtual_machines": [
-                    {
-                        "interfaces": [
-                            {
-                                "name": "N1-lif-A",
-                                "ip_addresses": [{"address": "100.127.0.21/29"}],
-                                "tagged_vlans": [{"vid": 2002}]
-                            },
-                            {
-                                "name": "N1-lif-B",
-                                "ip_addresses": [{"address": "100.127.128.21/29"}],
-                                "tagged_vlans": [{"vid": 2002}]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
+        mock_response.json = load_json_sample("nautobot_graphql_vm_response_single.json")
 
         # Mock Nautobot client
         mock_nautobot_instance = Mock()
@@ -71,7 +62,7 @@ class TestIntegrationTests:
         # Verify GraphQL query was executed
         mock_nautobot_instance.session.graphql.query.assert_called_once_with(
             query=VIRTUAL_MACHINES_QUERY,
-            variables={"device_names": ["os-123456781234567890ab123456789012"]}
+            variables={"device_names": ["os-12345678123456789abc123456789012"]}
         )
 
         # Verify output was printed
@@ -102,36 +93,7 @@ class TestIntegrationTests:
 
         # Mock complex GraphQL response with multiple interfaces
         mock_response = Mock()
-        mock_response.json = {
-            "data": {
-                "virtual_machines": [
-                    {
-                        "interfaces": [
-                            {
-                                "name": "N1-lif-A",
-                                "ip_addresses": [{"address": "100.127.0.21/29"}],
-                                "tagged_vlans": [{"vid": 2002}]
-                            },
-                            {
-                                "name": "N1-lif-B",
-                                "ip_addresses": [{"address": "100.127.128.21/29"}],
-                                "tagged_vlans": [{"vid": 2002}]
-                            },
-                            {
-                                "name": "N2-lif-A",
-                                "ip_addresses": [{"address": "100.127.0.22/29"}],
-                                "tagged_vlans": [{"vid": 2002}]
-                            },
-                            {
-                                "name": "N2-lif-B",
-                                "ip_addresses": [{"address": "100.127.128.22/29"}],
-                                "tagged_vlans": [{"vid": 2002}]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
+        mock_response.json = load_json_sample("nautobot_graphql_vm_response_complex.json")
 
         # Mock Nautobot client
         mock_nautobot_instance = Mock()
@@ -224,11 +186,7 @@ class TestIntegrationTests:
 
         # Mock GraphQL error response
         mock_response = Mock()
-        mock_response.json = {
-            "errors": [
-                {"message": "GraphQL syntax error"}
-            ]
-        }
+        mock_response.json = load_json_sample("nautobot_graphql_vm_response_error.json")
 
         # Mock Nautobot client
         mock_nautobot_instance = Mock()
@@ -258,24 +216,7 @@ class TestIntegrationTests:
 
         # Mock GraphQL response with invalid interface data (multiple IP addresses)
         mock_response = Mock()
-        mock_response.json = {
-            "data": {
-                "virtual_machines": [
-                    {
-                        "interfaces": [
-                            {
-                                "name": "invalid-interface",
-                                "ip_addresses": [
-                                    {"address": "192.168.1.10/24"},
-                                    {"address": "192.168.1.11/24"}
-                                ],
-                                "tagged_vlans": [{"vid": 100}]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
+        mock_response.json = load_json_sample("nautobot_graphql_vm_response_invalid_multiple_ips.json")
 
         # Mock Nautobot client
         mock_nautobot_instance = Mock()
@@ -305,11 +246,7 @@ class TestIntegrationTests:
 
         # Mock GraphQL response with no virtual machines
         mock_response = Mock()
-        mock_response.json = {
-            "data": {
-                "virtual_machines": []
-            }
-        }
+        mock_response.json = load_json_sample("nautobot_graphql_vm_response_empty.json")
 
         # Mock Nautobot client
         mock_nautobot_instance = Mock()
@@ -356,7 +293,7 @@ class TestIntegrationTests:
                 "argv": ['netapp_configure_net.py', '--project-id', '55555555-6666-7777-8888-999999999999'],
                 "expected_url": "http://nautobot-default.nautobot.svc.cluster.local",
                 "expected_token": "fallback-token",
-                "expected_device": "os-555555556666777788889999999999999"
+                "expected_device": "os-55555555666677778888999999999999"
             },
             {
                 "name": "custom_url_only",
@@ -370,7 +307,7 @@ class TestIntegrationTests:
                 "argv": ['netapp_configure_net.py', '--project-id', '77777777-8888-9999-aaaa-bbbbbbbbbbbb', '--nautobot_url', 'https://full.custom.com', '--nautobot_token', 'full-custom-token'],
                 "expected_url": "https://full.custom.com",
                 "expected_token": "full-custom-token",
-                "expected_device": "os-778888999aaaabbbbbbbbbbbb"
+                "expected_device": "os-7777777788889999aaaabbbbbbbbbbbb"
             }
         ]
 
@@ -379,23 +316,13 @@ class TestIntegrationTests:
             mock_nautobot_class.reset_mock()
             mock_credential.reset_mock()
 
-            # Mock successful GraphQL response
+            # Mock successful GraphQL response (use single interface sample)
             mock_response = Mock()
-            mock_response.json = {
-                "data": {
-                    "virtual_machines": [
-                        {
-                            "interfaces": [
-                                {
-                                    "name": f"interface-{test_case['name']}",
-                                    "ip_addresses": [{"address": "192.168.1.10/24"}],
-                                    "tagged_vlans": [{"vid": 100}]
-                                }
-                            ]
-                        }
-                    ]
-                }
-            }
+            sample_data = load_json_sample("nautobot_graphql_vm_response_single.json")
+            # Customize the interface name for this test case
+            sample_data["data"]["virtual_machines"][0]["interfaces"][0]["name"] = f"interface-{test_case['name']}"
+            sample_data["data"]["virtual_machines"][0]["interfaces"][1]["name"] = f"interface-{test_case['name']}-B"
+            mock_response.json = sample_data
 
             # Mock Nautobot client
             mock_nautobot_instance = Mock()

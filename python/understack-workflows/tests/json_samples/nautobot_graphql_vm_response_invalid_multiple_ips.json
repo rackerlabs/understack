@@ -1,0 +1,26 @@
+{
+  "data": {
+    "virtual_machines": [
+      {
+        "interfaces": [
+          {
+            "name": "invalid-interface",
+            "ip_addresses": [
+              {
+                "address": "192.168.1.10/24"
+              },
+              {
+                "address": "192.168.1.11/24"
+              }
+            ],
+            "tagged_vlans": [
+              {
+                "vid": 100
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
