@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import uuid
 from dataclasses import dataclass
 
 import pynautobot
@@ -82,18 +83,39 @@ class VirtualMachineNetworkInfo:
         return cls(interfaces=interfaces)
 
 
+def validate_and_normalize_uuid(value: str) -> str:
+    """Validate that the input is a valid UUID and normalize it by removing dashes.
+
+    Args:
+        value: String that should be a valid UUID (with or without dashes)
+
+    Returns:
+        str: UUID string with dashes removed
+
+    Raises:
+        argparse.ArgumentTypeError: If the input is not a valid UUID
+    """
+    try:
+        # Try to parse as UUID - this handles both formats (with and without dashes)
+        uuid_obj = uuid.UUID(value)
+        # Return the hex string without dashes
+        return uuid_obj.hex
+    except ValueError as e:
+        raise argparse.ArgumentTypeError(f"Invalid UUID format: {value}") from e
+
+
 def argument_parser():
     """Parse command line arguments for netapp network configuration."""
     parser = argparse.ArgumentParser(
         description="Query Nautobot for virtual machine network configuration based on project ID",
     )
 
-    # Add required project_id argument
+    # Add required project_id argument with UUID validation
     parser.add_argument(
         "--project-id",
-        type=str,
+        type=validate_and_normalize_uuid,
         required=True,
-        help="OpenStack project ID to query for virtual machine network configuration"
+        help="OpenStack project ID (UUID) to query for virtual machine network configuration"
     )
 
     # Add Nautobot connection arguments using the helper

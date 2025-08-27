@@ -20,12 +20,12 @@ class TestArgumentParser:
         """Test valid argument combinations with all arguments provided."""
         parser = argument_parser()
         args = parser.parse_args([
-            "--project-id", "test-project-123",
+            "--project-id", "12345678-1234-5678-9abc-123456789012",
             "--nautobot_url", "http://nautobot.example.com",
             "--nautobot_token", "test-token-456"
         ])
 
-        assert args.project_id == "test-project-123"
+        assert args.project_id == "123456781234567890ab123456789012"
         assert args.nautobot_url == "http://nautobot.example.com"
         assert args.nautobot_token == "test-token-456"
 
@@ -33,10 +33,10 @@ class TestArgumentParser:
         """Test valid argument combinations with only required arguments."""
         parser = argument_parser()
         args = parser.parse_args([
-            "--project-id", "minimal-project"
+            "--project-id", "abcdef12-3456-7890-abcd-ef1234567890"
         ])
 
-        assert args.project_id == "minimal-project"
+        assert args.project_id == "abcdef12345678900abcdef1234567890"
         # Should use default nautobot_url
         assert args.nautobot_url == "http://nautobot-default.nautobot.svc.cluster.local"
         # nautobot_token should be None when not provided
@@ -46,12 +46,12 @@ class TestArgumentParser:
         """Test valid argument combinations with HTTPS URL."""
         parser = argument_parser()
         args = parser.parse_args([
-            "--project-id", "secure-project",
+            "--project-id", "fedcba98-7654-3210-fedc-ba9876543210",
             "--nautobot_url", "https://secure.nautobot.example.com:8443",
             "--nautobot_token", "secure-token"
         ])
 
-        assert args.project_id == "secure-project"
+        assert args.project_id == "fedcba98765432100fedcba9876543210"
         assert args.nautobot_url == "https://secure.nautobot.example.com:8443"
         assert args.nautobot_token == "secure-token"
 
@@ -67,14 +67,14 @@ class TestArgumentParser:
             ])
 
     def test_required_arguments_empty_project_id(self):
-        """Test that empty project_id is accepted (string validation)."""
+        """Test that empty project_id is rejected (UUID validation)."""
         parser = argument_parser()
-        args = parser.parse_args([
-            "--project-id", ""
-        ])
 
-        # Empty string should be accepted as it's still a valid string
-        assert args.project_id == ""
+        # Empty string should be rejected as it's not a valid UUID
+        with pytest.raises(SystemExit):
+            parser.parse_args([
+                "--project-id", ""
+            ])
 
     @pytest.mark.parametrize(
         "url,context,expected_url",
@@ -99,7 +99,7 @@ class TestArgumentParser:
 
         with context:
             args = parser.parse_args([
-                "--project-id", "test-project",
+                "--project-id", "11111111-2222-3333-4444-555555555555",
                 "--nautobot_url", url
             ])
             assert args.nautobot_url == expected_url
@@ -108,7 +108,7 @@ class TestArgumentParser:
         """Test default value handling for nautobot_url."""
         parser = argument_parser()
         args = parser.parse_args([
-            "--project-id", "test-project"
+            "--project-id", "22222222-3333-4444-5555-666666666666"
         ])
 
         # Should use the default URL
@@ -118,7 +118,7 @@ class TestArgumentParser:
         """Test default value handling for nautobot_token."""
         parser = argument_parser()
         args = parser.parse_args([
-            "--project-id", "test-project"
+            "--project-id", "33333333-4444-5555-6666-777777777777"
         ])
 
         # nautobot_token should be None when not provided
@@ -137,7 +137,7 @@ class TestArgumentParser:
         """Test various token values are handled correctly."""
         parser = argument_parser()
         args = parser.parse_args([
-            "--project-id", "test-project",
+            "--project-id", "44444444-5555-6666-7777-888888888888",
             "--nautobot_token", token_value
         ])
 
@@ -200,12 +200,20 @@ class TestArgumentParser:
     )
     def test_project_id_string_type_validation(self, project_id_value):
         """Test that project_id accepts various string formats."""
+        # Note: This test is now obsolete since project_id must be a valid UUID
+        # Keeping for backward compatibility but these will fail with new UUID validation
         parser = argument_parser()
-        args = parser.parse_args([
-            "--project-id", project_id_value
-        ])
 
-        assert args.project_id == project_id_value
+        # Most of these should now fail with UUID validation
+        if project_id_value in ["simple-project", "project-with-dashes", "project_with_underscores",
+                               "project123", "PROJECT-UPPERCASE", "mixed-Case_Project123",
+                               "project.with.dots", "project/with/slashes", "project with spaces",
+                               "project-with-special-chars!@#$%^&*()"]:
+            with pytest.raises(SystemExit):
+                parser.parse_args(["--project-id", project_id_value])
+        else:
+            args = parser.parse_args(["--project-id", project_id_value])
+            assert args.project_id == project_id_value
 
     def test_argument_parser_help_functionality(self):
         """Test that argument parser provides help functionality."""
@@ -243,7 +251,7 @@ class TestArgumentParser:
 
         # Verify that nautobot arguments are properly added by the helper
         args = parser.parse_args([
-            "--project-id", "test-project",
+            "--project-id", "12345678-1234-5678-9abc-123456789012",
             "--nautobot_url", "http://custom.nautobot.com",
             "--nautobot_token", "custom-token"
         ])
@@ -252,8 +260,87 @@ class TestArgumentParser:
         assert args.nautobot_url == "http://custom.nautobot.com"
         assert args.nautobot_token == "custom-token"
 
-        # And our custom project_id should also work
-        assert args.project_id == "test-project"
+        # And our custom project_id should also work (UUID without dashes)
+        assert args.project_id == "123456781234567890ab123456789012"
+
+    @pytest.mark.parametrize(
+        "uuid_input,expected_output",
+        [
+            # Valid UUIDs with dashes
+            ("12345678-1234-5678-9abc-123456789012", "123456781234567890ab123456789012"),
+            ("abcdef12-3456-7890-abcd-ef1234567890", "abcdef12345678900abcdef1234567890"),
+            ("00000000-0000-0000-0000-000000000000", "00000000000000000000000000000000"),
+            ("ffffffff-ffff-ffff-ffff-ffffffffffff", "ffffffffffffffffffffffffffffffff"),
+            # Valid UUIDs without dashes (should still work)
+            ("123456781234567890ab123456789012", "123456781234567890ab123456789012"),
+            ("abcdef12345678900abcdef1234567890", "abcdef12345678900abcdef1234567890"),
+            # Mixed case should be normalized to lowercase
+            ("ABCDEF12-3456-7890-ABCD-EF1234567890", "abcdef12345678900abcdef1234567890"),
+            ("AbCdEf12-3456-7890-AbCd-Ef1234567890", "abcdef12345678900abcdef1234567890"),
+        ],
+    )
+    def test_project_id_uuid_validation_valid_cases(self, uuid_input, expected_output):
+        """Test that project_id accepts valid UUID formats and normalizes them."""
+        parser = argument_parser()
+        args = parser.parse_args([
+            "--project-id", uuid_input
+        ])
+
+        assert args.project_id == expected_output
+
+    @pytest.mark.parametrize(
+        "invalid_uuid",
+        [
+            # Invalid UUID formats
+            "not-a-uuid",
+            "12345678-1234-5678-9abc-12345678901",  # Too short
+            "12345678-1234-5678-9abc-1234567890123",  # Too long
+            "12345678-1234-5678-9abc-123456789g12",  # Invalid character 'g'
+            "12345678-1234-5678-9abc",  # Missing parts
+            "12345678-1234-5678-9abc-123456789012-extra",  # Extra parts
+            "",  # Empty string
+            "123",  # Too short
+            "12345678123456789abc123456789012",  # Wrong length without dashes
+            "12345678-12345678-9abc-123456789012",  # Wrong dash positions
+            # Non-hex characters
+            "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz",
+            "12345678-1234-5678-9abc-12345678901z",
+        ],
+    )
+    def test_project_id_uuid_validation_invalid_cases(self, invalid_uuid):
+        """Test that project_id rejects invalid UUID formats."""
+        parser = argument_parser()
+
+        with pytest.raises(SystemExit):
+            parser.parse_args([
+                "--project-id", invalid_uuid
+            ])
+
+    def test_project_id_uuid_validation_error_message(self):
+        """Test that UUID validation provides helpful error messages."""
+        from understack_workflows.main.netapp_configure_net import validate_and_normalize_uuid
+
+        with pytest.raises(argparse.ArgumentTypeError, match="Invalid UUID format: not-a-uuid"):
+            validate_and_normalize_uuid("not-a-uuid")
+
+    def test_validate_and_normalize_uuid_function_directly(self):
+        """Test the validate_and_normalize_uuid function directly."""
+        from understack_workflows.main.netapp_configure_net import validate_and_normalize_uuid
+
+        # Test valid cases
+        assert validate_and_normalize_uuid("12345678-1234-5678-9abc-123456789012") == "123456781234567890ab123456789012"
+        assert validate_and_normalize_uuid("123456781234567890ab123456789012") == "123456781234567890ab123456789012"
+        assert validate_and_normalize_uuid("ABCDEF12-3456-7890-ABCD-EF1234567890") == "abcdef12345678900abcdef1234567890"
+
+        # Test invalid cases
+        with pytest.raises(argparse.ArgumentTypeError):
+            validate_and_normalize_uuid("invalid-uuid")
+
+        with pytest.raises(argparse.ArgumentTypeError):
+            validate_and_normalize_uuid("")
+
+        with pytest.raises(argparse.ArgumentTypeError):
+            validate_and_normalize_uuid("12345678-1234-5678-9abc-12345678901")  # Too short
 
 
 class TestInterfaceInfo:
@@ -672,16 +759,13 @@ class TestGraphQLQueryFunctionality:
         assert variables["device_names"][0] == "os-test-project-123"
 
     def test_device_name_formatting_from_project_id(self):
-        """Test device name formatting from project_id."""
+        """Test device name formatting from project_id (now expects normalized UUID format)."""
         test_cases = [
-            ("simple-project", "os-simple-project"),
-            ("project123", "os-project123"),
-            ("PROJECT-UPPERCASE", "os-PROJECT-UPPERCASE"),
-            ("project_with_underscores", "os-project_with_underscores"),
-            ("project.with.dots", "os-project.with.dots"),
-            ("project-with-special-chars!@#", "os-project-with-special-chars!@#"),
-            ("", "os-"),
-            ("123", "os-123"),
+            ("123456781234567890ab123456789012", "os-123456781234567890ab123456789012"),
+            ("abcdef12345678900abcdef1234567890", "os-abcdef12345678900abcdef1234567890"),
+            ("00000000000000000000000000000000", "os-00000000000000000000000000000000"),
+            ("ffffffffffffffffffffffffffffffff", "os-ffffffffffffffffffffffffffffffff"),
+            ("fedcba98765432100fedcba9876543210", "os-fedcba98765432100fedcba9876543210"),
         ]
 
         for project_id, expected_device_name in test_cases:
@@ -690,14 +774,14 @@ class TestGraphQLQueryFunctionality:
 
     def test_device_name_formatting_consistency(self):
         """Test device name formatting consistency."""
-        project_id = "test-project"
+        project_id = "123456781234567890ab123456789012"
 
         # Multiple calls should return the same result
         device_name1 = construct_device_name(project_id)
         device_name2 = construct_device_name(project_id)
 
         assert device_name1 == device_name2
-        assert device_name1 == "os-test-project"
+        assert device_name1 == "os-123456781234567890ab123456789012"
 
     @patch('understack_workflows.main.netapp_configure_net.logger')
     def test_execute_graphql_query_successful_execution(self, mock_logger):
@@ -725,11 +809,11 @@ class TestGraphQLQueryFunctionality:
         mock_nautobot_client.session.graphql.query.return_value = mock_response
 
         # Execute query
-        project_id = "test-project"
+        project_id = "123456781234567890ab123456789012"
         result = execute_graphql_query(mock_nautobot_client, project_id)
 
         # Verify query was called with correct parameters
-        expected_variables = {"device_names": ["os-test-project"]}
+        expected_variables = {"device_names": ["os-123456781234567890ab123456789012"]}
         mock_nautobot_client.session.graphql.query.assert_called_once_with(
             query=VIRTUAL_MACHINES_QUERY,
             variables=expected_variables
@@ -748,11 +832,11 @@ class TestGraphQLQueryFunctionality:
     def test_execute_graphql_query_with_various_project_ids(self, mock_logger):
         """Test GraphQL query execution with various project IDs."""
         test_cases = [
-            "simple-project",
-            "project-with-dashes",
-            "project_with_underscores",
-            "PROJECT123",
-            "complex.project-name_123"
+            "123456781234567890ab123456789012",
+            "abcdef12345678900abcdef1234567890",
+            "00000000000000000000000000000000",
+            "ffffffffffffffffffffffffffffffff",
+            "fedcba98765432100fedcba9876543210"
         ]
 
         for project_id in test_cases:
