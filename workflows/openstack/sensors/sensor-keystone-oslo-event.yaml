@@ -9,7 +9,8 @@ metadata:
       Triggers on the following Keystone Events:
 
       - identity.project.created
-      - other events are silently ignored now
+      - identity.project.updated
+      - identity.project.deleted
 
       Resulting code should be very similar to:
 
@@ -37,6 +38,8 @@ spec:
           type: "string"
           value:
             - "identity.project.created"
+            - "identity.project.updated"
+            - "identity.project.deleted"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
@@ -93,7 +96,7 @@ spec:
                               print(str(uuid.UUID(project_id_without_dashes)))
 
                   - - name: ansible-to-nautobot
-                      when: "{{steps.oslo-events.outputs.parameters.svm_enabled}} == True"
+                      when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
                       inline:
                         container:
                           image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest

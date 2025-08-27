@@ -67,6 +67,16 @@ spec:
           - name: svm_name
             valueFrom:
               path: /var/run/argo/output.svm_name
+              default: ""
           - name: svm_enabled
             valueFrom:
               path: /var/run/argo/output.svm_enabled
+              default: "False"
+          - name: svm_created
+            valueFrom:
+              path: /var/run/argo/output.svm_created
+              default: "False"
+          - name: project_tags
+            valueFrom:
+              path: /var/run/argo/output.project_tags
+              default: ""
