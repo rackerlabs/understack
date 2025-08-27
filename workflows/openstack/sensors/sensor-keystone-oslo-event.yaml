@@ -95,7 +95,28 @@ spec:
                               project_id_without_dashes = "{{workflow.parameters.project_id}}"
                               print(str(uuid.UUID(project_id_without_dashes)))
 
-                  - - name: ansible-to-nautobot
+                  - - name: ansible-create-project
+                      when: "{{steps.oslo-events.outputs.parameters.svm_enabled}} == True"
+                      inline:
+                        container:
+                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+                          command: [ansible-playbook]
+                          args:
+                          - "storage_on_create_project.yml"
+                          - --extra-vars
+                          - "project_id={{steps.convert-project-id.outputs.result}} env=dev"
+                          - "-i"
+                          - "inventory/uc-dev/01-nautobot.yaml"
+                          - "-vvv"
+                            # TODO: this shouldn't be hardcodod to dev, but will work since
+                            # it really talks to https://nautobot-default.svc
+                          env:
+                            - name: NAUTOBOT_TOKEN
+                              valueFrom:
+                                secretKeyRef:
+                                  key: token
+                                  name: nautobot-token
+                  - - name: ansible-create-svm
                       when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
                       inline:
                         container:
