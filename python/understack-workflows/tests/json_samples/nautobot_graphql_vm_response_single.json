@@ -1,0 +1,36 @@
+{
+  "data": {
+    "virtual_machines": [
+      {
+        "interfaces": [
+          {
+            "name": "N1-lif-A",
+            "ip_addresses": [
+              {
+                "address": "100.127.0.21/29"
+              }
+            ],
+            "tagged_vlans": [
+              {
+                "vid": 2002
+              }
+            ]
+          },
+          {
+            "name": "N1-lif-B",
+            "ip_addresses": [
+              {
+                "address": "100.127.128.21/29"
+              }
+            ],
+            "tagged_vlans": [
+              {
+                "vid": 2002
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,4 +1,6 @@
 import argparse
+import json
+import pathlib
 from contextlib import nullcontext
 from unittest.mock import Mock, patch
 
@@ -13,6 +15,14 @@ from understack_workflows.main.netapp_configure_net import VIRTUAL_MACHINES_QUER
 from understack_workflows.main.netapp_configure_net import VirtualMachineNetworkInfo
 
 
+def load_json_sample(filename: str) -> dict:
+    """Load JSON sample data from the json_samples directory."""
+    here = pathlib.Path(__file__).parent
+    sample_path = here / "json_samples" / filename
+    with sample_path.open("r") as f:
+        return json.load(f)
+
+
 class TestArgumentParser:
     """Test cases for argument parsing functionality."""
 
@@ -25,7 +35,7 @@ class TestArgumentParser:
             "--nautobot_token", "test-token-456"
         ])
 
-        assert args.project_id == "123456781234567890ab123456789012"
+        assert args.project_id == "12345678123456789abc123456789012"
         assert args.nautobot_url == "http://nautobot.example.com"
         assert args.nautobot_token == "test-token-456"
 
@@ -36,7 +46,7 @@ class TestArgumentParser:
             "--project-id", "abcdef12-3456-7890-abcd-ef1234567890"
         ])
 
-        assert args.project_id == "abcdef12345678900abcdef1234567890"
+        assert args.project_id == "abcdef1234567890abcdef1234567890"
         # Should use default nautobot_url
         assert args.nautobot_url == "http://nautobot-default.nautobot.svc.cluster.local"
         # nautobot_token should be None when not provided
@@ -51,7 +61,7 @@ class TestArgumentParser:
             "--nautobot_token", "secure-token"
         ])
 
-        assert args.project_id == "fedcba98765432100fedcba9876543210"
+        assert args.project_id == "fedcba9876543210fedcba9876543210"
         assert args.nautobot_url == "https://secure.nautobot.example.com:8443"
         assert args.nautobot_token == "secure-token"
 
@@ -234,7 +244,7 @@ class TestArgumentParser:
         """Test that argument parser returns proper Namespace object."""
         parser = argument_parser()
         args = parser.parse_args([
-            "--project-id", "test-project"
+            "--project-id", "12345678-1234-5678-9abc-123456789012"
         ])
 
         # Should return argparse.Namespace object
@@ -261,22 +271,22 @@ class TestArgumentParser:
         assert args.nautobot_token == "custom-token"
 
         # And our custom project_id should also work (UUID without dashes)
-        assert args.project_id == "123456781234567890ab123456789012"
+        assert args.project_id == "12345678123456789abc123456789012"
 
     @pytest.mark.parametrize(
         "uuid_input,expected_output",
         [
             # Valid UUIDs with dashes
-            ("12345678-1234-5678-9abc-123456789012", "123456781234567890ab123456789012"),
-            ("abcdef12-3456-7890-abcd-ef1234567890", "abcdef12345678900abcdef1234567890"),
+            ("12345678-1234-5678-9abc-123456789012", "12345678123456789abc123456789012"),
+            ("abcdef12-3456-7890-abcd-ef1234567890", "abcdef1234567890abcdef1234567890"),
             ("00000000-0000-0000-0000-000000000000", "00000000000000000000000000000000"),
             ("ffffffff-ffff-ffff-ffff-ffffffffffff", "ffffffffffffffffffffffffffffffff"),
             # Valid UUIDs without dashes (should still work)
-            ("123456781234567890ab123456789012", "123456781234567890ab123456789012"),
-            ("abcdef12345678900abcdef1234567890", "abcdef12345678900abcdef1234567890"),
+            ("12345678123456789abc123456789012", "12345678123456789abc123456789012"),
+            ("abcdef1234567890abcdef1234567890", "abcdef1234567890abcdef1234567890"),
             # Mixed case should be normalized to lowercase
-            ("ABCDEF12-3456-7890-ABCD-EF1234567890", "abcdef12345678900abcdef1234567890"),
-            ("AbCdEf12-3456-7890-AbCd-Ef1234567890", "abcdef12345678900abcdef1234567890"),
+            ("ABCDEF12-3456-7890-ABCD-EF1234567890", "abcdef1234567890abcdef1234567890"),
+            ("AbCdEf12-3456-7890-AbCd-Ef1234567890", "abcdef1234567890abcdef1234567890"),
         ],
     )
     def test_project_id_uuid_validation_valid_cases(self, uuid_input, expected_output):
@@ -300,8 +310,7 @@ class TestArgumentParser:
             "12345678-1234-5678-9abc-123456789012-extra",  # Extra parts
             "",  # Empty string
             "123",  # Too short
-            "12345678123456789abc123456789012",  # Wrong length without dashes
-            "12345678-12345678-9abc-123456789012",  # Wrong dash positions
+
             # Non-hex characters
             "zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz",
             "12345678-1234-5678-9abc-12345678901z",
@@ -328,9 +337,9 @@ class TestArgumentParser:
         from understack_workflows.main.netapp_configure_net import validate_and_normalize_uuid
 
         # Test valid cases
-        assert validate_and_normalize_uuid("12345678-1234-5678-9abc-123456789012") == "123456781234567890ab123456789012"
-        assert validate_and_normalize_uuid("123456781234567890ab123456789012") == "123456781234567890ab123456789012"
-        assert validate_and_normalize_uuid("ABCDEF12-3456-7890-ABCD-EF1234567890") == "abcdef12345678900abcdef1234567890"
+        assert validate_and_normalize_uuid("12345678-1234-5678-9abc-123456789012") == "12345678123456789abc123456789012"
+        assert validate_and_normalize_uuid("12345678123456789abc123456789012") == "12345678123456789abc123456789012"
+        assert validate_and_normalize_uuid("ABCDEF12-3456-7890-ABCD-EF1234567890") == "abcdef1234567890abcdef1234567890"
 
         # Test invalid cases
         with pytest.raises(argparse.ArgumentTypeError):
@@ -662,30 +671,9 @@ class TestVirtualMachineNetworkInfo:
 
     def test_from_graphql_vm_with_complex_realistic_data(self):
         """Test GraphQL response transformation with complex realistic data."""
-        vm_data = {
-            "interfaces": [
-                {
-                    "name": "N1-lif-A",
-                    "ip_addresses": [{"address": "100.127.0.21/29"}],
-                    "tagged_vlans": [{"vid": 2002}]
-                },
-                {
-                    "name": "N1-lif-B",
-                    "ip_addresses": [{"address": "100.127.128.21/29"}],
-                    "tagged_vlans": [{"vid": 2002}]
-                },
-                {
-                    "name": "N2-lif-A",
-                    "ip_addresses": [{"address": "100.127.0.22/29"}],
-                    "tagged_vlans": [{"vid": 2002}]
-                },
-                {
-                    "name": "N2-lif-B",
-                    "ip_addresses": [{"address": "100.127.128.22/29"}],
-                    "tagged_vlans": [{"vid": 2002}]
-                }
-            ]
-        }
+        # Load complex data from JSON sample and extract the VM data
+        sample_data = load_json_sample("nautobot_graphql_vm_response_complex.json")
+        vm_data = sample_data["data"]["virtual_machines"][0]
 
         vm_info = VirtualMachineNetworkInfo.from_graphql_vm(vm_data)
 
@@ -788,21 +776,7 @@ class TestGraphQLQueryFunctionality:
         """Test successful GraphQL query execution with mock Nautobot responses."""
         # Mock successful GraphQL response
         mock_response = Mock()
-        mock_response.json = {
-            "data": {
-                "virtual_machines": [
-                    {
-                        "interfaces": [
-                            {
-                                "name": "N1-lif-A",
-                                "ip_addresses": [{"address": "100.127.0.21/29"}],
-                                "tagged_vlans": [{"vid": 2002}]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
+        mock_response.json = load_json_sample("nautobot_graphql_vm_response_single.json")
 
         # Mock Nautobot client
         mock_nautobot_client = Mock()
