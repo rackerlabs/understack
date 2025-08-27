@@ -132,11 +132,28 @@ class TestHandleProjectCreated:
     ):
         """Test handling project creation without SVM tag."""
         mock_tags.return_value = ["tag1", "tag2"]
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
 
         result = handle_project_created(mock_conn, mock_nautobot, valid_event_data)
         assert result == 0
         mock_tags.assert_called_once_with(mock_conn, "test-project-123")
-        mock_open.assert_called_with("/var/run/argo/output.svm_enabled", "w")
+
+        # Verify both project_tags and svm_enabled files are written
+        expected_calls = [
+            call("/var/run/argo/output.project_tags", "w"),
+            call("/var/run/argo/output.svm_enabled", "w"),
+        ]
+        mock_open.assert_has_calls(expected_calls, any_order=True)
+
+        # Check that JSON-encoded tags were written
+        write_calls = mock_file.write.call_args_list
+        json_tags_written = False
+        for call_args in write_calls:
+            if call_args[0][0] == '["tag1", "tag2"]':
+                json_tags_written = True
+                break
+        assert json_tags_written, "Project tags should be written as JSON"
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
@@ -154,6 +171,8 @@ class TestHandleProjectCreated:
         mock_tags.return_value = ["tag1", SVM_PROJECT_TAG, "tag2"]
         mock_netapp_manager = MagicMock()
         mock_netapp_class.return_value = mock_netapp_manager
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
 
         result = handle_project_created(mock_conn, mock_nautobot, valid_event_data)
 
@@ -168,7 +187,24 @@ class TestHandleProjectCreated:
             volume_size=VOLUME_SIZE,
             aggregate_name=AGGREGATE_NAME,
         )
-        mock_open.assert_called()
+
+        # Verify project tags are written as JSON
+        expected_calls = [
+            call("/var/run/argo/output.project_tags", "w"),
+            call("/var/run/argo/output.svm_enabled", "w"),
+            call("/var/run/argo/output.svm_created", "w"),
+            call("/var/run/argo/output.svm_name", "w"),
+        ]
+        mock_open.assert_has_calls(expected_calls, any_order=True)
+
+        # Check that JSON-encoded tags were written
+        write_calls = mock_file.write.call_args_list
+        json_tags_written = False
+        for call_args in write_calls:
+            if call_args[0][0] == '["tag1", "UNDERSTACK_SVM", "tag2"]':
+                json_tags_written = True
+                break
+        assert json_tags_written, "Project tags should be written as JSON"
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
@@ -292,6 +328,36 @@ class TestHandleProjectCreated:
             )
         mock_open.assert_called()
 
+    @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
+    def test_handle_project_created_json_tags_output(
+        self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_event_data
+    ):
+        """Test that project tags are written as JSON to output file."""
+        test_tags = ["custom_tag", "another_tag", SVM_PROJECT_TAG]
+        mock_tags.return_value = test_tags
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        with patch(
+            "understack_workflows.oslo_event.keystone_project.NetAppManager"
+        ) as mock_netapp_class:
+            mock_netapp_manager = MagicMock()
+            mock_netapp_class.return_value = mock_netapp_manager
+
+            result = handle_project_created(mock_conn, mock_nautobot, valid_event_data)
+
+            assert result == 0
+
+            # Verify project_tags file is written
+            mock_open.assert_any_call("/var/run/argo/output.project_tags", "w")
+
+            # Check that the exact JSON representation of tags was written
+            import json
+
+            expected_json = json.dumps(test_tags)
+            mock_file.write.assert_any_call(expected_json)
+
 
 class TestHandleProjectUpdated:
     """Test cases for handle_project_updated function."""
@@ -338,7 +404,10 @@ class TestHandleProjectUpdated:
     ):
         """Test project update when SVM_UNDERSTACK tag is added."""
         # Project now has SVM tag
-        mock_tags.return_value = ["tag1", SVM_PROJECT_TAG, "tag2"]
+        test_tags = ["tag1", SVM_PROJECT_TAG, "tag2"]
+        mock_tags.return_value = test_tags
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
 
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = (
@@ -364,6 +433,13 @@ class TestHandleProjectUpdated:
             volume_size=VOLUME_SIZE,
             aggregate_name=AGGREGATE_NAME,
         )
+
+        # Verify project tags are written as JSON
+        mock_open.assert_any_call("/var/run/argo/output.project_tags", "w")
+        import json
+
+        expected_json = json.dumps(test_tags)
+        mock_file.write.assert_any_call(expected_json)
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
@@ -588,12 +664,45 @@ class TestHandleProjectUpdated:
             )
 
             assert result == 0
-            # Verify output files are written
+            # Verify output files are written including project_tags
             expected_calls = [
+                call("/var/run/argo/output.project_tags", "w"),
                 call("/var/run/argo/output.svm_enabled", "w"),
                 call("/var/run/argo/output.svm_name", "w"),
             ]
             mock_open.assert_has_calls(expected_calls, any_order=True)
+
+    @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
+    def test_handle_project_updated_json_tags_empty_list(
+        self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_update_event_data
+    ):
+        """Test that empty project tags are written as JSON empty list."""
+        mock_tags.return_value = []
+        mock_file = MagicMock()
+        mock_open.return_value.__enter__.return_value = mock_file
+
+        with patch(
+            "understack_workflows.oslo_event.keystone_project.NetAppManager"
+        ) as mock_netapp_class:
+            mock_netapp_manager = MagicMock()
+            mock_netapp_manager.check_if_svm_exists.return_value = False
+            mock_netapp_class.return_value = mock_netapp_manager
+
+            result = handle_project_updated(
+                mock_conn, mock_nautobot, valid_update_event_data
+            )
+
+            assert result == 0
+
+            # Verify project_tags file is written
+            mock_open.assert_any_call("/var/run/argo/output.project_tags", "w")
+
+            # Check that empty list JSON was written
+            import json
+
+            expected_json = json.dumps([])
+            mock_file.write.assert_any_call(expected_json)
 
 
 class TestHandleProjectDeleted:

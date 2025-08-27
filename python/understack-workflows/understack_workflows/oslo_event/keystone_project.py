@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 
 from openstack.connection import Connection
@@ -55,6 +56,7 @@ def handle_project_created(
     logger.info("Starting ONTAP SVM and Volume creation workflow.")
     tags = _keystone_project_tags(conn, event.project_id)
     logger.debug("Project %s has tags: %s", event.project_id, tags)
+    _save_output("project_tags", json.dumps(tags))
 
     project_is_svm_enabled = SVM_PROJECT_TAG in tags
     _save_output("svm_enabled", str(project_is_svm_enabled))
@@ -86,6 +88,7 @@ def handle_project_updated(
     logger.info("Starting ONTAP SVM and Volume create/update workflow.")
     tags = _keystone_project_tags(conn, event.project_id)
     logger.debug("Project %s has tags: %s", event.project_id, tags)
+    _save_output("project_tags", json.dumps(tags))
 
     project_is_svm_enabled = SVM_PROJECT_TAG in tags
     _save_output("svm_enabled", str(project_is_svm_enabled))

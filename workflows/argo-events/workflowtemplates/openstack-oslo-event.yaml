@@ -76,3 +76,7 @@ spec:
             valueFrom:
               path: /var/run/argo/output.svm_created
               default: "False"
+          - name: project_tags
+            valueFrom:
+              path: /var/run/argo/output.project_tags
+              default: ""
