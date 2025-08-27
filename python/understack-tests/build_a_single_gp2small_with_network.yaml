@@ -12,6 +12,9 @@ subtasks:
           config_drive: true
           force_delete: false
       contexts:
+        users_custom:
+          tenants: 1
+          users_per_tenant: 1
         network:
           start_cidr: 192.168.91.0/24
           dns_nameservers: [8.8.8.8]
