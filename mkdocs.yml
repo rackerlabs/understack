@@ -128,6 +128,7 @@ nav:
     - Quick Start: deploy-guide/gitops-install.md
     - Preparing Our Deployment:
       - deploy-guide/deploy-repo.md
+      - deploy-guide/component-config.md
       - deploy-guide/auth.md
       - deploy-guide/config-argo-workflows.md
     - Starting the Deployment:

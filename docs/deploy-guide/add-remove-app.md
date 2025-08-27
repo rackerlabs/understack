@@ -1,45 +1,17 @@
-# Adding / Removing Applications
+# Adding / Removing Components
 
-The applications that are deployed using [ArgoCD][argocd]'s
+UnderStack **Components** are deployed via [ArgoCD]
+as [Applications][argocd-app], these are generated using [ArgoCD][argocd]'s
 [ApplicationSet][argocd-appset] controller. This allows us to use common
-patterns to deploy each of the applications and allow specific environments
-to modify or disable some applications.
+patterns to deploy each of the components and allow specific environments
+to modify or disable some components. See the [Configuring Components](./component-config.md)
+guide for more info on how to do so.
 
-## Modifying an application
+## Adding a Component to UnderStack
 
-To create an environment specific modification to an application you must
-first determine if it's being deployed with Helm or Kustomize.
-
-### Helm
-
-Most of the applications can have their Helm values overridden by adding
-or modifying `$DEPLOY_NAME/helm-configs/$APPLICATION.yaml` in your deployment
-repo.
-
-### Kustomize
-
-To make changes you will need to add or modify files in `$DEPLOY_NAME/manifests/$APPLICATION/`
-in your deployment repo.
-
-## Removing an application for a specific deploy
-
-To remove an application from being deployed, create an `apps.yaml` file in your deployment
-repo at `$DEPLOY_NAME/apps.yaml`). The `apps.yaml` file
-contains a list of objects, where each object has a `component` field that is the name
-of the component (app) and an optional `skip` field that can be set to `true`:
-
-```yaml
-- component: metallb
-  skip: true
-- component: dex
-  skip: false  # optional, defaults to false
-```
-
-## Adding an application to UnderStack
-
-Adding an application to UnderStack involves deciding on the correct ApplicationSet
+Adding a Component to UnderStack involves deciding on the correct ApplicationSet
 (AppSet) to include it in, then going to that AppSet's directory in `apps/<appset>/`
-and adding a YAML file which contains the application configuration.
+and adding a YAML file which contains the Application configuration.
 
 The YAML file should contain:
 
@@ -80,9 +52,10 @@ sources:
 
 ## Removing an application from UnderStack
 
-Removing an application permanently from UnderStack is as easy as
+Removing a Component permanently from UnderStack is as easy as
 deleting its YAML config from its AppSet in the `apps/<appset>/`
 directory.
 
 [argocd]: <https://argo-cd.readthedocs.io/en/stable/>
+[argocd-app]: <https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification/>
 [argocd-appset]: <https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/>
