@@ -8,7 +8,8 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 COPY python/understack-tests/uv.lock python/understack-tests/pyproject.toml /code/
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --verbose --locked --no-dev
 COPY python/understack-tests /code
-
+RUN mkdir -p /opt/rally/plugins
+COPY python/understack-tests/rally-plugins /opt/rally/plugins
 
 FROM builder AS prod
 WORKDIR /code
