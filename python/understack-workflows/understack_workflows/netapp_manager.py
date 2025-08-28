@@ -82,6 +82,10 @@ class NetappIPInterfaceConfig:
     def base_port_name(self):
         return f"e4{self.side.lower()}"
 
+    @cached_property
+    def broadcast_domain_name(self):
+        return f"Fabric-{self.side}"
+
 
 class NetAppManager:
     """Manages NetApp ONTAP operations including SVM and volume creation."""
@@ -269,12 +273,16 @@ class NetAppManager:
 
         interface = IpInterface()
         interface.name = config.name
-        interface.ip = {"address": config.address, "netmask": config.network.netmask}
+        interface.ip = {
+            "address": str(config.address),
+            "netmask": str(config.network.netmask),
+        }
         interface.enabled = True
         interface.svm = {"name": self._svm_name(project_id)}
         interface.location = {
             "auto_revert": True,
-            "home_port": {"uuid": str(self.create_home_port(config))},
+            "home_port": {"uuid": str(self.create_home_port(config).uuid)},
+            "broadcast_domain": {"name": config.broadcast_domain_name},
         }
         interface.service_policy = {"name": "default-data-nvme-tcp"}
         logger.debug("Creating IpInterface: %s", interface)
@@ -289,6 +297,10 @@ class NetAppManager:
         resource.type = "vlan"
         resource.node = {"name": home_node.name}
         resource.enabled = True
+        resource.broadcast_domain = {
+            "name": config.broadcast_domain_name,
+            "ipspace": {"name": "Default"},
+        }
         resource.vlan = {
             "tag": config.vlan_id,
             "base_port": {
