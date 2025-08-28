@@ -15,7 +15,10 @@ logger = setup_logger(__name__, level=logging.INFO)
 
 # GraphQL query to retrieve virtual machine network information as specified in
 # requirements
-VIRTUAL_MACHINES_QUERY = "query ($device_names: [String]){virtual_machines(name: $device_names) {interfaces { name ip_addresses{ address } tagged_vlans { vid }}}}"  # noqa: E501
+VIRTUAL_MACHINES_QUERY = (
+    "query ($device_names: [String]){virtual_machines(name: $device_names) "
+    "{interfaces { name ip_addresses{ address } tagged_vlans { vid }}}}"
+)
 
 
 @dataclass
@@ -115,7 +118,8 @@ def validate_and_normalize_uuid(value: str) -> str:
 def argument_parser():
     """Parse command line arguments for netapp network configuration."""
     parser = argparse.ArgumentParser(
-        description="Query Nautobot for SVM network configuration based on project ID",
+        description="Query Nautobot for SVM network configuration and create "
+        "NetApp interfaces based on project ID",
     )
 
     # Add required project_id argument with UUID validation
@@ -129,7 +133,9 @@ def argument_parser():
     parser.add_argument(
         "--netapp-config-path",
         type=str,
-        help="Path to NetApp config with credentials",
+        default="/etc/netapp/netapp_nvme.conf",
+        help="Path to NetApp config with credentials "
+        "(default: /etc/netapp/netapp_nvme.conf)",
     )
 
     # Add Nautobot connection arguments using the helper
@@ -137,7 +143,7 @@ def argument_parser():
 
 
 def construct_device_name(project_id: str) -> str:
-    """Construct device name from project_id using the format 'os-{project_id}'.
+    """Construct device name from project_id using format 'os-{project_id}'.
 
     Args:
         project_id: The OpenStack project ID
@@ -207,10 +213,12 @@ def validate_and_transform_response(
     """Validate and transform GraphQL response into structured data objects.
 
     Args:
-        graphql_response: Complete GraphQL response containing data and potential errors
+        graphql_response: Complete GraphQL response containing data and
+            potential errors
 
     Returns:
-        list[VirtualMachineNetworkInfo]: List of validated SVM network information
+        list[VirtualMachineNetworkInfo]: List of validated SVM network
+            information
 
     Raises:
         ValueError: If any interface validation fails
@@ -243,23 +251,25 @@ def validate_and_transform_response(
 def do_action(
     nautobot_client: Nautobot, netapp_manager: NetAppManager, project_id: str
 ) -> tuple[dict, list[VirtualMachineNetworkInfo]]:
-    """Execute the main GraphQL query and process results.
+    """Execute main GraphQL query, process results, and create NetApp interfaces.
 
     This function orchestrates the workflow by:
     1. Executing GraphQL query using constructed device name
     2. Processing and validating query results
-    3. Returning structured data objects
-    4. Handling all error scenarios with appropriate exit codes
+    3. Creating NetApp LIF interfaces using the validated data
+    4. Returning structured data objects
+    5. Handling all error scenarios with appropriate exit codes
 
     Args:
         nautobot_client: Nautobot API client instance
-        netapp_manager: NetAppManager API client
+        netapp_manager: NetAppManager API client for creating LIF interfaces
         project_id: OpenStack project ID to query for
 
     Returns:
         tuple: (raw_graphql_response, validated_vm_network_infos)
             - raw_graphql_response: Complete GraphQL response as dict
-            - validated_vm_network_infos: List of VirtualMachineNetworkInfo objects
+            - validated_vm_network_infos: List of VirtualMachineNetworkInfo
+                objects
 
     Raises:
         SystemExit: With appropriate exit codes for different error scenarios:
@@ -284,14 +294,14 @@ def do_action(
         if validated_data:
             total_interfaces = sum(len(vm.interfaces) for vm in validated_data)
             logger.info(
-                "Successfully processed %d virtual machine(s) with %d total interfaces "
-                "for device: %s",
+                "Successfully processed %d virtual machine(s) with %d total "
+                "interfaces for device: %s",
                 len(validated_data),
                 total_interfaces,
                 device_name,
             )
         else:
-            logger.warning("No virtual machines found for device: ", device_name)
+            logger.warning("No virtual machines found for device: %s", device_name)
 
     except ValueError as e:
         # Handle data validation error scenarios with exit code 3
@@ -308,17 +318,40 @@ def do_action(
 
         # Handle other unexpected errors with exit code 2 (query-related)
         else:
-            logger.error("Nautobot error: ", error_msg)
+            logger.error("Nautobot error: %s", error_msg)
             raise SystemExit(2) from e
 
-    netapp_create_interfaces(netapp_manager, validated_data[0], project_id)
+    if validated_data:
+        netapp_create_interfaces(netapp_manager, validated_data[0], project_id)
+
     # Return structured data objects
     return raw_response, validated_data
 
 
 def netapp_create_interfaces(
-    mgr: NetAppManager, nautobot_response: VirtualMachineNetworkInfo, project_id: str
-):
+    mgr: NetAppManager,
+    nautobot_response: VirtualMachineNetworkInfo,
+    project_id: str,
+) -> None:
+    """Create NetApp LIF interfaces based on Nautobot VM network configuration.
+
+    This function converts the validated Nautobot response into NetApp interface
+    configurations and creates the corresponding LIF (Logical Interface) on the
+    NetApp storage system.
+
+    Args:
+        mgr: NetAppManager instance for creating LIF interfaces
+        nautobot_response: Validated virtual machine network information from
+            Nautobot
+        project_id: OpenStack project ID for logging and context
+
+    Returns:
+        None
+
+    Raises:
+        Exception: If SVM for the project is not found
+        NetAppRestError: If LIF creation fails on the NetApp system
+    """
     configs = NetappIPInterfaceConfig.from_nautobot_response(nautobot_response)
     for interface_config in configs:
         logger.info("Creating LIF %s for project %s", interface_config.name, project_id)
@@ -362,7 +395,8 @@ def format_and_display_output(
     # Log detailed interface information at debug level
     for i, vm in enumerate(structured_data):
         logger.debug(
-            "SVM/Virtual machine %d has {len(vm.interfaces)} interface(s):", i + 1
+            "SVM/Virtual machine %d has {len(vm.interfaces)} interface(s):",
+            i + 1,
         )
         for interface in vm.interfaces:
             logger.debug(
@@ -379,13 +413,16 @@ def main():
     This function follows the established pattern by:
     1. Parsing command line arguments using argument_parser()
     2. Establishing Nautobot connection using parsed arguments
-    3. Calling do_action() with appropriate parameters
-    4. Handling return codes and exit appropriately
+    3. Initializing NetAppManager with configuration path
+    4. Calling do_action() with appropriate parameters to query Nautobot and
+       create NetApp interfaces
+    5. Handling return codes and exit appropriately
 
     Returns:
         int: Exit code (0 for success, non-zero for errors)
-            - 0: Success
-            - 1: Connection errors, authentication failures, initialization errors
+            - 0: Success - interfaces created successfully
+            - 1: Connection errors, authentication failures, initialization
+                 errors
             - 2: GraphQL query errors, syntax errors, execution errors
             - 3: Data validation errors, interface validation failures
     """
