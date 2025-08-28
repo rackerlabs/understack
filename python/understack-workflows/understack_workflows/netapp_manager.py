@@ -6,6 +6,7 @@ import os
 import re
 from dataclasses import dataclass
 from functools import cached_property
+from typing import TYPE_CHECKING
 
 import urllib3
 from netapp_ontap import config
@@ -20,7 +21,9 @@ from netapp_ontap.resources import Svm
 from netapp_ontap.resources import Volume
 
 from understack_workflows.helpers import setup_logger
-from understack_workflows.main.netapp_configure_net import VirtualMachineNetworkInfo
+
+if TYPE_CHECKING:
+    from understack_workflows.main.netapp_configure_net import VirtualMachineNetworkInfo
 
 logger = setup_logger(__name__)
 
@@ -64,7 +67,7 @@ class NetappIPInterfaceConfig:
             raise ValueError("Cannot determine node index from name %s", self.name)
 
     @classmethod
-    def from_nautobot_response(cls, response: VirtualMachineNetworkInfo):
+    def from_nautobot_response(cls, response: "VirtualMachineNetworkInfo"):
         result = []
         for interface in response.interfaces:
             address, _ = interface.address.split("/")
