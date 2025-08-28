@@ -288,6 +288,7 @@ class NetAppManager:
             "broadcast_domain": {"name": config.broadcast_domain_name},
         }
         interface.service_policy = {"name": "default-data-nvme-tcp"}
+        logger.debug("Creating IpInterface: %s", interface)
         interface.post(hydrate=True)
 
     def create_home_port(self, config: NetappIPInterfaceConfig):
@@ -311,6 +312,7 @@ class NetAppManager:
                 "node": {"name": home_node.name},
             },
         }
+        logger.debug("Creating Home Port: %s", resource)
         resource.post(hydrate=True)
         return resource
 
@@ -322,6 +324,11 @@ class NetAppManager:
             if match:
                 node_index = int(match.group())
                 if node_index == config.desired_node_number:
+                    logger.debug(
+                        "Node %s matched desired_node_number of %d",
+                        node.name,
+                        config.desired_node_number,
+                    )
                     return node
         return None
 
