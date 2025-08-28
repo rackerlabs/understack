@@ -238,13 +238,8 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         # TODO: Need to free up resources here.
         LOG.info("Removing resources for SVM library %s", svm_name)
         # Stop any looping calls if they exist
-        if svm_lib._looping_call and hasattr(svm_lib, "loopingcalls"):
+        if hasattr(svm_lib, "loopingcalls"):
             LOG.info("Stopping looping call for SVM library %s", svm_name)
-            svm_lib.loopingcalls.stop_tasks()
-            # Adding None coz it has a reference to the looping call
-            svm_lib.looping_call = None
-            # There are other attributes which are in svm_lib even after
-            # Stopping the looping.
 
     def _refresh_svm_libraries(self):
         return self._actual_refresh_svm_libraries(context.get_admin_context())

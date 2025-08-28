@@ -10,8 +10,18 @@ from cinder.tests.unit import test
 from cinder.tests.unit import utils as test_utils
 from cinder.tests.unit.volume.drivers.netapp import fakes as na_fakes
 from cinder.volume.drivers.netapp.dataontap.nvme_library import NetAppNVMeStorageLibrary
+from cinder.volume.drivers.netapp.dataontap.utils import loopingcalls
 
 from cinder_understack import dynamic_netapp_driver
+
+
+def _create_mock_svm_lib(svm_name: str):
+    mock_lib = mock.create_autospec(
+        dynamic_netapp_driver.NetAppMinimalLibrary, instance=True
+    )
+    mock_lib.vserver = svm_name
+    mock_lib.loopingcalls = loopingcalls.LoopingCalls()
+    return mock_lib
 
 
 class NetappDynamicDriverTestCase(test.TestCase):
@@ -152,8 +162,8 @@ class NetappDynamicDriverTestCase(test.TestCase):
         expected_svm = f"os-{self.project_id}"
 
         self.driver._libraries = {
-            "os-old-svm": mock.Mock(vserver="os-old-svm"),
-            expected_svm: mock.Mock(vserver=expected_svm),
+            "os-old-svm": _create_mock_svm_lib("os-old-svm"),
+            expected_svm: _create_mock_svm_lib(expected_svm),
         }
 
         self.driver._get_svms = mock_get_svms
@@ -161,12 +171,7 @@ class NetappDynamicDriverTestCase(test.TestCase):
         mock_get_svms.return_value = [expected_svm, "os-new-svm"]
 
         # make the created lib look like the real thing
-        mock_lib_instance = mock.create_autospec(
-            dynamic_netapp_driver.NetAppMinimalLibrary, instance=True
-        )
-
-        # Mock the new lib instance created
-        mock_lib_instance.vserver = "os-new-svm"
+        mock_lib_instance = _create_mock_svm_lib("os-new-svm")
         mock_create_svm_lib.return_value = mock_lib_instance
 
         # Trigger refresh
