@@ -1,15 +1,26 @@
+# pyright: reportAttributeAccessIssue=false
+
 import configparser
+import ipaddress
 import os
+import re
+from dataclasses import dataclass
+from functools import cached_property
 
 import urllib3
 from netapp_ontap import config
 from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
+from netapp_ontap.resource import Resource
+from netapp_ontap.resources import IpInterface
+from netapp_ontap.resources import Node
 from netapp_ontap.resources import NvmeNamespace
+from netapp_ontap.resources import Port
 from netapp_ontap.resources import Svm
 from netapp_ontap.resources import Volume
 
 from understack_workflows.helpers import setup_logger
+from understack_workflows.main.netapp_configure_net import VirtualMachineNetworkInfo
 
 logger = setup_logger(__name__)
 
@@ -18,6 +29,58 @@ logger = setup_logger(__name__)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 SVM_PROJECT_TAG = "UNDERSTACK_SVM"
+
+
+@dataclass
+class NetappIPInterfaceConfig:
+    name: str
+    address: ipaddress.IPv4Address
+    network: ipaddress.IPv4Network
+    vlan_id: int
+
+    def netmask_long(self):
+        return self.network.netmask
+
+    @cached_property
+    def side(self):
+        last_character = self.name[-1].upper()
+        if last_character in ["A", "B"]:
+            return last_character
+        raise ValueError("Cannot determine side from interface %s", self.name)
+
+    @cached_property
+    def desired_node_number(self) -> int:
+        """Node index in the cluster.
+
+        Please note that actual node hostname will be different.
+        First node is 1, second is 2 (not zero-indexed).
+        """
+        name_part = self.name.split("-")[0]
+        if name_part == "N1":
+            return 1
+        elif name_part == "N2":
+            return 2
+        else:
+            raise ValueError("Cannot determine node index from name %s", self.name)
+
+    @classmethod
+    def from_nautobot_response(cls, response: VirtualMachineNetworkInfo):
+        result = []
+        for interface in response.interfaces:
+            address, _ = interface.address.split("/")
+            result.append(
+                NetappIPInterfaceConfig(
+                    name=interface.name,
+                    address=ipaddress.IPv4Address(address),
+                    network=ipaddress.IPv4Network(interface.address, strict=False),
+                    vlan_id=interface.vlan,
+                )
+            )
+        return result
+
+    @cached_property
+    def base_port_name(self):
+        return f"e4{self.side.lower()}"
 
 
 class NetAppManager:
@@ -168,12 +231,9 @@ class NetAppManager:
             return False
 
     def check_if_svm_exists(self, project_id):
-        svm_name = self._svm_name(project_id)
-
-        try:
-            if Svm.find(name=svm_name):
-                return True
-        except NetAppRestError:
+        if self._svm_by_project(project_id):
+            return True
+        else:
             return False
 
     def mapped_namespaces(self, svm_name, volume_name):
@@ -200,6 +260,71 @@ class NetAppManager:
         logger.debug("Delete SVM result: %s", delete_svm_result)
 
         return {"volume": delete_vol_result, "svm": delete_svm_result}
+
+    def create_lif(self, project_id, config: NetappIPInterfaceConfig):
+        svm = self._svm_by_project(project_id)
+        if not svm:
+            logger.error("SVM for project %s not found", project_id)
+            raise Exception("SVM Not Found")
+
+        interface = IpInterface()
+        interface.name = config.name
+        interface.ip = {"address": config.address, "netmask": config.network.netmask}
+        interface.enabled = True
+        interface.svm = {"name": self._svm_name(project_id)}
+        interface.location = {
+            "auto_revert": True,
+            "home_port": {"uuid": str(self.create_home_port(config))},
+        }
+        interface.service_policy = {"name": "default-data-nvme-tcp"}
+        logger.debug("Creating IpInterface: %s", interface)
+        interface.post(hydrate=True)
+
+    def create_home_port(self, config: NetappIPInterfaceConfig):
+        home_node = self.identify_home_node(config)
+        if not home_node:
+            raise Exception("Could not find home node for %s.", config)
+
+        resource = Port()
+        resource.type = "vlan"
+        resource.node = {"name": home_node.name}
+        resource.enabled = True
+        resource.vlan = {
+            "tag": config.vlan_id,
+            "base_port": {
+                "name": config.base_port_name,
+                "node": {"name": home_node.name},
+            },
+        }
+        logger.debug("Creating Home Port: %s", resource)
+        resource.post(hydrate=True)
+        return resource
+
+    def identify_home_node(self, config: NetappIPInterfaceConfig) -> Resource | None:
+        nodes = list(Node.get_collection())
+
+        for node in nodes:
+            match = re.search(r"\d+$", str(node.name))
+            if match:
+                node_index = int(match.group())
+                if node_index == config.desired_node_number:
+                    logger.debug(
+                        "Node %s matched desired_node_number of %d",
+                        node.name,
+                        config.desired_node_number,
+                    )
+                    return node
+        return None
+
+    def _svm_by_project(self, project_id):
+        try:
+            svm_name = self._svm_name(project_id)
+            svm = Svm.find(name=svm_name)
+            if svm:
+                return svm
+        except NetAppRestError:
+            return None
+        return None
 
     def _svm_name(self, project_id):
         return f"os-{project_id}"
