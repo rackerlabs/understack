@@ -10,14 +10,12 @@ helmGlobals:
 
 helmCharts:
 - name: mariadb-operator-crds
-  includeCRDs: false
   namespace: mariadb-operator
   releaseName: mariadb-operator-crds
   version: 25.8.3
   repo: https://mariadb-operator.github.io/mariadb-operator
 
 - name: mariadb-operator
-  includeCRDs: false
   namespace: mariadb-operator
   valuesFile: values.yaml
   releaseName: mariadb-operator

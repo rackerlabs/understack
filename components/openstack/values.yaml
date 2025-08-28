@@ -13,6 +13,16 @@ mariadb:
     size: 10Gi
     resizeInUseVolumes: true
     waitForVolumeResize: true
+    volumeClaimTemplate:
+      storageClassName: ceph-block-single
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 10Gi
+
+  # Enable Galera cluster with 3 replicas
+  replicas: 3
 
 # -- OpenStack RabbitMQ instance settings
 rabbitmq:
