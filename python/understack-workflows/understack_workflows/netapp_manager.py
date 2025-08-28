@@ -299,7 +299,6 @@ class NetAppManager:
         resource = Port()
         resource.type = "vlan"
         resource.node = {"name": home_node.name}
-        resource.name = config.name
         resource.enabled = True
         resource.broadcast_domain = {
             "name": config.broadcast_domain_name,
