@@ -201,8 +201,11 @@ class NetappDynamicDriverTestCase(test.TestCase):
         self, mock_get_svms, mock_create_svm_lib
     ):
         """Ensure that failure in lib creation is caught and logged, not raised."""
-        mock_get_svms.return_value = ["os-new-failing-svm"]
-        mock_create_svm_lib.side_effect = Exception("Simulated failure")
+        test_svm_name = "os-new-failing_svm"
+        mock_get_svms.return_value = [test_svm_name]
+        mock_svm_lib = _create_mock_svm_lib(test_svm_name)
+        mock_svm_lib.check_for_setup_error.side_effect = Exception("Simulated failure")
+        mock_create_svm_lib.return_value = mock_svm_lib
 
         self.driver._libraries = {}
 
