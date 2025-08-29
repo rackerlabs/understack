@@ -444,7 +444,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def create_export(self, context, volume, connector):
         """Create export for volume."""
         with self._volume_to_library(volume) as lib:
-            return lib.create_export(context, volume, connector)
+            return lib.create_export(context, volume)
 
     def ensure_export(self, context, volume):
         """Ensure export for volume."""
