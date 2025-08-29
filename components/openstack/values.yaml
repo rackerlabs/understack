@@ -14,6 +14,7 @@ mariadb:
     resizeInUseVolumes: true
     waitForVolumeResize: true
     volumeClaimTemplate:
+      storageClassName: ceph-block-single
       accessModes:
         - ReadWriteOnce
       resources:
