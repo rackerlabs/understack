@@ -1,4 +1,4 @@
-"""Integration tests for NetAppManager service coordination."""
+"""Consolidated integration tests for NetAppManager cross-service coordination."""
 
 import os
 import tempfile
@@ -13,7 +13,7 @@ from understack_workflows.netapp.manager import NetAppManager
 
 
 class TestNetAppManagerIntegration:
-    """Integration tests for NetAppManager service coordination."""
+    """Integration tests for NetAppManager cross-service coordination."""
 
     @pytest.fixture
     def mock_config_file(self):
@@ -28,6 +28,69 @@ netapp_password = test-password
             f.flush()
             yield f.name
         os.unlink(f.name)
+
+    # ========================================================================
+    # Service Coordination Tests
+    # ========================================================================
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_service_initialization_coordination(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test that all services are properly initialized and coordinated."""
+        manager = NetAppManager(mock_config_file)
+
+        # Verify all services are initialized with proper dependencies
+        from understack_workflows.netapp.client import NetAppClient
+        from understack_workflows.netapp.config import NetAppConfig
+        from understack_workflows.netapp.error_handler import ErrorHandler
+        from understack_workflows.netapp.lif_service import LifService
+        from understack_workflows.netapp.svm_service import SvmService
+        from understack_workflows.netapp.volume_service import VolumeService
+
+        assert isinstance(manager._client, NetAppClient)
+        assert isinstance(manager._config, NetAppConfig)
+        assert isinstance(manager._error_handler, ErrorHandler)
+        assert isinstance(manager._svm_service, SvmService)
+        assert isinstance(manager._volume_service, VolumeService)
+        assert isinstance(manager._lif_service, LifService)
+
+        # Verify services share the same client and error handler instances
+        assert manager._svm_service._client is manager._client
+        assert manager._svm_service._error_handler is manager._error_handler
+        assert manager._volume_service._client is manager._client
+        assert manager._volume_service._error_handler is manager._error_handler
+        assert manager._lif_service._client is manager._client
+        assert manager._lif_service._error_handler is manager._error_handler
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_cross_service_error_propagation(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test error propagation across service boundaries."""
+        manager = NetAppManager(mock_config_file)
+
+        # Test SVM service error propagation
+        manager._svm_service.create_svm = MagicMock(
+            side_effect=SvmOperationError("SVM creation failed")
+        )
+
+        with pytest.raises(SvmOperationError, match="SVM creation failed"):
+            manager.create_svm("test-project", "test-aggregate")
+
+        # Test Volume service error propagation
+        manager._volume_service.create_volume = MagicMock(
+            side_effect=VolumeOperationError("Volume creation failed")
+        )
+
+        with pytest.raises(VolumeOperationError, match="Volume creation failed"):
+            manager.create_volume("test-project", "1TB", "test-aggregate")
+
+    # ========================================================================
+    # Cleanup Project Integration Tests
+    # ========================================================================
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
@@ -46,22 +109,20 @@ netapp_password = test-password
 
         result = manager.cleanup_project(project_id)
 
-        # Verify service coordination
+        # Verify service coordination sequence
         manager._volume_service.exists.assert_called_once_with(project_id)
         manager._svm_service.exists.assert_called_once_with(project_id)
-        manager._volume_service.delete_volume.assert_called_once_with(
-            project_id, force=True
-        )
+        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
         manager._svm_service.delete_svm.assert_called_once_with(project_id)
 
         assert result == {"volume": True, "svm": True}
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_cleanup_project_volume_failure_stops_svm_deletion(
+    def test_cleanup_project_volume_failure_coordination(
         self, mock_host_connection, mock_config, mock_config_file
     ):
-        """Test that SVM deletion is skipped when volume deletion fails."""
+        """Test coordination when volume deletion fails."""
         manager = NetAppManager(mock_config_file)
         project_id = "test-project-123"
 
@@ -74,19 +135,17 @@ netapp_password = test-password
         result = manager.cleanup_project(project_id)
 
         # Verify volume service was called but SVM service was not
-        manager._volume_service.delete_volume.assert_called_once_with(
-            project_id, force=True
-        )
+        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
         manager._svm_service.delete_svm.assert_not_called()
 
         assert result == {"volume": False, "svm": False}
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_cleanup_project_volume_success_svm_failure(
+    def test_cleanup_project_partial_failure_coordination(
         self, mock_host_connection, mock_config, mock_config_file
     ):
-        """Test handling when volume deletion succeeds but SVM deletion fails."""
+        """Test coordination when volume succeeds but SVM deletion fails."""
         manager = NetAppManager(mock_config_file)
         project_id = "test-project-123"
 
@@ -99,19 +158,17 @@ netapp_password = test-password
         result = manager.cleanup_project(project_id)
 
         # Verify both services were called
-        manager._volume_service.delete_volume.assert_called_once_with(
-            project_id, force=True
-        )
+        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
         manager._svm_service.delete_svm.assert_called_once_with(project_id)
 
         assert result == {"volume": True, "svm": False}
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_cleanup_project_nonexistent_resources(
+    def test_cleanup_project_nonexistent_resources_coordination(
         self, mock_host_connection, mock_config, mock_config_file
     ):
-        """Test cleanup when resources don't exist."""
+        """Test coordination when resources don't exist."""
         manager = NetAppManager(mock_config_file)
         project_id = "nonexistent-project"
 
@@ -132,14 +189,46 @@ netapp_password = test-password
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_cleanup_project_exception_handling(
+    def test_cleanup_project_mixed_existence_scenarios(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test cleanup coordination with mixed resource existence scenarios."""
+        # Scenario 1: Only volume exists
+        manager = NetAppManager(mock_config_file)
+        manager._volume_service.exists = MagicMock(return_value=True)
+        manager._svm_service.exists = MagicMock(return_value=False)
+        manager._volume_service.delete_volume = MagicMock(return_value=True)
+        manager._svm_service.delete_svm = MagicMock()
+
+        result = manager.cleanup_project("test-project-1")
+
+        manager._volume_service.delete_volume.assert_called_once_with("test-project-1", force=True)
+        manager._svm_service.delete_svm.assert_not_called()
+        assert result == {"volume": True, "svm": True}
+
+        # Scenario 2: Only SVM exists (create new manager instance)
+        manager2 = NetAppManager(mock_config_file)
+        manager2._volume_service.exists = MagicMock(return_value=False)
+        manager2._svm_service.exists = MagicMock(return_value=True)
+        manager2._volume_service.delete_volume = MagicMock()
+        manager2._svm_service.delete_svm = MagicMock(return_value=True)
+
+        result = manager2.cleanup_project("test-project-2")
+
+        manager2._volume_service.delete_volume.assert_not_called()
+        manager2._svm_service.delete_svm.assert_called_once_with("test-project-2")
+        assert result == {"volume": True, "svm": True}
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_cleanup_project_exception_handling_coordination(
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test exception handling during cleanup coordination."""
+        # Test volume service exception
         manager = NetAppManager(mock_config_file)
         project_id = "test-project-123"
 
-        # Mock volume service to raise exception
         manager._volume_service.exists = MagicMock(return_value=True)
         manager._volume_service.delete_volume = MagicMock(
             side_effect=VolumeOperationError("Volume deletion failed")
@@ -147,102 +236,150 @@ netapp_password = test-password
         manager._svm_service.exists = MagicMock(return_value=True)
         manager._svm_service.delete_svm = MagicMock()
 
-        # The cleanup_project method catches exceptions and returns failure status
         result = manager.cleanup_project(project_id)
 
         # Verify SVM deletion was not attempted due to volume deletion failure
         manager._svm_service.delete_svm.assert_not_called()
         assert result == {"volume": False, "svm": False}
 
-    @patch("understack_workflows.netapp.manager.config")
-    @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_service_method_delegation_create_svm(
-        self, mock_host_connection, mock_config, mock_config_file
-    ):
-        """Test that create_svm properly delegates to SvmService."""
-        manager = NetAppManager(mock_config_file)
-        project_id = "test-project-123"
-        aggregate = "test-aggregate"
-
-        manager._svm_service.create_svm = MagicMock(return_value="os-test-project-123")
-
-        result = manager.create_svm(project_id, aggregate)
-
-        manager._svm_service.create_svm.assert_called_once_with(project_id, aggregate)
-        assert result == "os-test-project-123"
-
-    @patch("understack_workflows.netapp.manager.config")
-    @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_service_method_delegation_create_volume(
-        self, mock_host_connection, mock_config, mock_config_file
-    ):
-        """Test that create_volume properly delegates to VolumeService."""
-        manager = NetAppManager(mock_config_file)
-        project_id = "test-project-123"
-        size = "1TB"
-        aggregate = "test-aggregate"
-
-        manager._volume_service.create_volume = MagicMock(
-            return_value="vol_test-project-123"
+        # Test SVM service exception after successful volume deletion (new manager instance)
+        manager2 = NetAppManager(mock_config_file)
+        manager2._volume_service.exists = MagicMock(return_value=True)
+        manager2._volume_service.delete_volume = MagicMock(return_value=True)
+        manager2._svm_service.exists = MagicMock(return_value=True)
+        manager2._svm_service.delete_svm = MagicMock(
+            side_effect=SvmOperationError("SVM has dependencies")
         )
 
-        result = manager.create_volume(project_id, size, aggregate)
+        result = manager2.cleanup_project(project_id)
 
-        manager._volume_service.create_volume.assert_called_once_with(
-            project_id, size, aggregate
-        )
-        assert result == "vol_test-project-123"
+        # Verify both services were called despite SVM failure
+        manager2._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager2._svm_service.delete_svm.assert_called_once_with(project_id)
+        assert result == {"volume": True, "svm": False}
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_service_method_delegation_check_svm_exists(
+    def test_cleanup_project_existence_check_failures(
         self, mock_host_connection, mock_config, mock_config_file
     ):
-        """Test that check_if_svm_exists properly delegates to SvmService."""
+        """Test cleanup coordination when existence checks fail."""
         manager = NetAppManager(mock_config_file)
         project_id = "test-project-123"
 
+        # Mock existence check failures
+        manager._volume_service.exists = MagicMock(side_effect=Exception("Connection error"))
+        manager._svm_service.exists = MagicMock(side_effect=Exception("Connection error"))
+        manager._volume_service.delete_volume = MagicMock(return_value=True)
+        manager._svm_service.delete_svm = MagicMock(return_value=True)
+
+        result = manager.cleanup_project(project_id)
+
+        # Verify cleanup still proceeds (assumes both exist when check fails)
+        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager._svm_service.delete_svm.assert_called_once_with(project_id)
+        assert result == {"volume": True, "svm": True}
+
+    # ========================================================================
+    # Cross-Service Workflow Tests
+    # ========================================================================
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_end_to_end_project_lifecycle(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test complete project lifecycle across all services."""
+        manager = NetAppManager(mock_config_file)
+        project_id = "lifecycle-test-project"
+
+        # Mock successful creation workflow
+        manager._svm_service.create_svm = MagicMock(return_value=f"os-{project_id}")
+        manager._volume_service.create_volume = MagicMock(return_value=f"vol_{project_id}")
         manager._svm_service.exists = MagicMock(return_value=True)
+        manager._volume_service.exists = MagicMock(return_value=True)
 
-        result = manager.check_if_svm_exists(project_id)
+        # Mock successful cleanup workflow
+        manager._volume_service.delete_volume = MagicMock(return_value=True)
+        manager._svm_service.delete_svm = MagicMock(return_value=True)
 
-        manager._svm_service.exists.assert_called_once_with(project_id)
-        assert result is True
+        # Test creation phase
+        svm_result = manager.create_svm(project_id, "test-aggregate")
+        volume_result = manager.create_volume(project_id, "1TB", "test-aggregate")
+
+        assert svm_result == f"os-{project_id}"
+        assert volume_result == f"vol_{project_id}"
+
+        # Test cleanup phase
+        cleanup_result = manager.cleanup_project(project_id)
+
+        assert cleanup_result == {"volume": True, "svm": True}
+
+        # Verify all service interactions
+        manager._svm_service.create_svm.assert_called_once_with(project_id, "test-aggregate")
+        manager._volume_service.create_volume.assert_called_once_with(
+            project_id, "1TB", "test-aggregate"
+        )
+        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager._svm_service.delete_svm.assert_called_once_with(project_id)
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_error_propagation_across_services(
+    def test_service_state_consistency_across_operations(
         self, mock_host_connection, mock_config, mock_config_file
     ):
-        """Test that errors from services are properly propagated."""
+        """Test that service state remains consistent across multiple operations."""
         manager = NetAppManager(mock_config_file)
-        project_id = "test-project-123"
 
-        # Test SVM service error propagation
-        manager._svm_service.create_svm = MagicMock(
-            side_effect=SvmOperationError("SVM creation failed")
-        )
+        # Verify all services share the same dependencies
+        client_id = id(manager._client)
+        error_handler_id = id(manager._error_handler)
 
-        with pytest.raises(SvmOperationError, match="SVM creation failed"):
-            manager.create_svm(project_id, "test-aggregate")
+        assert id(manager._svm_service._client) == client_id
+        assert id(manager._volume_service._client) == client_id
+        assert id(manager._lif_service._client) == client_id
 
-        # Test Volume service error propagation
-        manager._volume_service.create_volume = MagicMock(
-            side_effect=VolumeOperationError("Volume creation failed")
-        )
-
-        with pytest.raises(VolumeOperationError, match="Volume creation failed"):
-            manager.create_volume(project_id, "1TB", "test-aggregate")
+        assert id(manager._svm_service._error_handler) == error_handler_id
+        assert id(manager._volume_service._error_handler) == error_handler_id
+        assert id(manager._lif_service._error_handler) == error_handler_id
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_method_signatures(
+    def test_logging_coordination_across_services(
         self, mock_host_connection, mock_config, mock_config_file
     ):
-        """Test that all public method signatures remain unchanged."""
+        """Test that logging is properly coordinated across services."""
         manager = NetAppManager(mock_config_file)
 
-        # Mock all service methods
+        # Mock service methods
+        manager._volume_service.exists = MagicMock(return_value=True)
+        manager._svm_service.exists = MagicMock(return_value=True)
+        manager._volume_service.delete_volume = MagicMock(return_value=True)
+        manager._svm_service.delete_svm = MagicMock(return_value=False)  # SVM fails
+
+        with patch("understack_workflows.netapp.manager.logger") as mock_logger:
+            result = manager.cleanup_project("test-project-123")
+
+            # Verify appropriate log messages were called at manager level
+            mock_logger.info.assert_any_call("Starting cleanup for project: %s", "test-project-123")
+            mock_logger.info.assert_any_call(
+                "Successfully deleted volume for project: %s", "test-project-123"
+            )
+            mock_logger.warning.assert_any_call(
+                "Failed to delete SVM for project: %s", "test-project-123"
+            )
+
+        assert result == {"volume": True, "svm": False}
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_backward_compatibility_maintained(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test that refactored manager maintains backward compatibility."""
+        manager = NetAppManager(mock_config_file)
+
+        # Mock all service methods to avoid actual calls
         manager._svm_service.create_svm = MagicMock(return_value="test-svm")
         manager._svm_service.delete_svm = MagicMock(return_value=True)
         manager._svm_service.exists = MagicMock(return_value=True)
@@ -253,66 +390,36 @@ netapp_password = test-password
         manager._lif_service.create_home_port = MagicMock()
         manager._lif_service.identify_home_node = MagicMock()
 
-        # Test all public methods can be called with expected signatures
+        # Test all public methods maintain their original signatures and behavior
         try:
-            manager.create_svm("project", "aggregate")
-            manager.delete_svm("svm-name")
-            # Note: delete_svm doesn't have a force parameter
-            manager.create_volume("project", "1TB", "aggregate")
-            manager.delete_volume("volume-name")
-            manager.delete_volume("volume-name", force=True)  # Optional parameter
-            manager.check_if_svm_exists("project")
-            manager.mapped_namespaces("svm", "volume")
-            manager.cleanup_project("project")
+            # Core SVM/Volume operations
+            assert manager.create_svm("project", "aggregate") == "test-svm"
+            assert manager.delete_svm("os-project") is True
+            assert manager.create_volume("project", "1TB", "aggregate") == "test-volume"
+            assert manager.delete_volume("vol_project") is True
+            assert manager.delete_volume("vol_project", force=True) is True
+            assert manager.check_if_svm_exists("project") is True
+            assert manager.mapped_namespaces("os-project", "vol_project") == []
 
-            # Network-related methods would need proper mock objects
-            # but we're testing method signatures
+            # Cleanup operation
+            cleanup_result = manager.cleanup_project("project")
+            assert isinstance(cleanup_result, dict)
+            assert "volume" in cleanup_result
+            assert "svm" in cleanup_result
+
+            # Network operations
             import ipaddress
+            from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 
-            from understack_workflows.netapp.value_objects import (
-                NetappIPInterfaceConfig,
-            )
-
-            mock_config_obj = NetappIPInterfaceConfig(
+            config_obj = NetappIPInterfaceConfig(
                 name="test",
                 address=ipaddress.IPv4Address("192.168.1.1"),
                 network=ipaddress.IPv4Network("192.168.1.0/24"),
                 vlan_id=100,
             )
-            manager.create_lif("project", mock_config_obj)
-            manager.create_home_port(mock_config_obj)
-            manager.identify_home_node(mock_config_obj)
+            manager.create_lif("project", config_obj)
+            manager.create_home_port(config_obj)
+            manager.identify_home_node(config_obj)
 
-        except TypeError as e:
-            pytest.fail(f"Method signature changed: {e}")
-
-    @patch("understack_workflows.netapp.manager.config")
-    @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_service_initialization_dependency_injection(
-        self, mock_host_connection, mock_config, mock_config_file
-    ):
-        """Test that services are properly initialized with dependency injection."""
-        manager = NetAppManager(mock_config_file)
-
-        # Verify all services are initialized
-        assert hasattr(manager, "_client")
-        assert hasattr(manager, "_config")
-        assert hasattr(manager, "_error_handler")
-        assert hasattr(manager, "_svm_service")
-        assert hasattr(manager, "_volume_service")
-        assert hasattr(manager, "_lif_service")
-
-        # Verify services have the expected types
-        from understack_workflows.netapp.client import NetAppClient
-        from understack_workflows.netapp.config import NetAppConfig
-        from understack_workflows.netapp.error_handler import ErrorHandler
-        from understack_workflows.netapp.lif_service import LifService
-        from understack_workflows.netapp.svm_service import SvmService
-        from understack_workflows.netapp.volume_service import VolumeService
-
-        assert isinstance(manager._client, NetAppClient)
-        assert isinstance(manager._config, NetAppConfig)
-        assert isinstance(manager._error_handler, ErrorHandler)
-        assert isinstance(manager._svm_service, SvmService)
-        assert isinstance(manager._volume_service, VolumeService)
-        assert isinstance(manager._lif_service, LifService)
+        except (TypeError, AttributeError) as e:
+            pytest.fail(f"Backward compatibility broken: {e}")
