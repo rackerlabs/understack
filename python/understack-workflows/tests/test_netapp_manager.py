@@ -666,6 +666,30 @@ class TestNetappIPInterfaceConfig:
 
         assert config.base_port_name == "e4b"
 
+    def test_base_port_name_custom_prefix_a(self):
+        """Test base_port_name with custom prefix for side A."""
+        config = NetappIPInterfaceConfig(
+            name="N1-test-A",
+            address=ipaddress.IPv4Address("192.168.1.10"),
+            network=ipaddress.IPv4Network("192.168.1.0/24"),
+            vlan_id=100,
+            nic_slot_prefix="e5",
+        )
+
+        assert config.base_port_name == "e5a"
+
+    def test_base_port_name_custom_prefix_b(self):
+        """Test base_port_name with custom prefix for side B."""
+        config = NetappIPInterfaceConfig(
+            name="N1-test-B",
+            address=ipaddress.IPv4Address("192.168.1.10"),
+            network=ipaddress.IPv4Network("192.168.1.0/24"),
+            vlan_id=100,
+            nic_slot_prefix="e6",
+        )
+
+        assert config.base_port_name == "e6b"
+
     def test_broadcast_domain_name_a(self):
         """Test broadcast_domain_name for side A."""
         config = NetappIPInterfaceConfig(

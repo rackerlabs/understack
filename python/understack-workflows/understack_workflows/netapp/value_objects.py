@@ -23,6 +23,7 @@ class NetappIPInterfaceConfig:
     address: ipaddress.IPv4Address
     network: ipaddress.IPv4Network
     vlan_id: int
+    nic_slot_prefix: str = "e4"
 
     def netmask_long(self):
         return self.network.netmask
@@ -50,7 +51,20 @@ class NetappIPInterfaceConfig:
             raise ValueError("Cannot determine node index from name %s", self.name)
 
     @classmethod
-    def from_nautobot_response(cls, response: "VirtualMachineNetworkInfo"):
+    def from_nautobot_response(cls, response: "VirtualMachineNetworkInfo", netapp_config=None):
+        """Create NetappIPInterfaceConfig instances from Nautobot response.
+
+        Args:
+            response: The Nautobot response containing network interface information
+            netapp_config: Optional NetApp configuration to get NIC slot prefix from
+
+        Returns:
+            List of NetappIPInterfaceConfig instances
+        """
+        nic_slot_prefix = "e4"  # Default value
+        if netapp_config:
+            nic_slot_prefix = netapp_config.netapp_nic_slot_prefix
+
         result = []
         for interface in response.interfaces:
             address, _ = interface.address.split("/")
@@ -60,13 +74,15 @@ class NetappIPInterfaceConfig:
                     address=ipaddress.IPv4Address(address),
                     network=ipaddress.IPv4Network(interface.address, strict=False),
                     vlan_id=interface.vlan,
+                    nic_slot_prefix=nic_slot_prefix,
                 )
             )
         return result
 
     @cached_property
     def base_port_name(self):
-        return f"e4{self.side.lower()}"
+        """Get the base port name using the configured NIC slot prefix."""
+        return f"{self.nic_slot_prefix}{self.side.lower()}"
 
     @cached_property
     def broadcast_domain_name(self):

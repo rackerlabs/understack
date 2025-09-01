@@ -49,11 +49,19 @@ class NetAppConfig:
             ) from e
 
         try:
-            return {
+            config_data = {
                 "hostname": parser.get("netapp_nvme", "netapp_server_hostname"),
                 "username": parser.get("netapp_nvme", "netapp_login"),
                 "password": parser.get("netapp_nvme", "netapp_password"),
             }
+
+            # Optional netapp_nic_slot_prefix with default value
+            try:
+                config_data["netapp_nic_slot_prefix"] = parser.get("netapp_nvme", "netapp_nic_slot_prefix")
+            except (configparser.NoSectionError, configparser.NoOptionError):
+                config_data["netapp_nic_slot_prefix"] = "e4"
+
+            return config_data
         except (configparser.NoSectionError, configparser.NoOptionError) as e:
             raise ConfigurationError(
                 f"Missing required configuration in {self._config_path}: {e}",
@@ -107,6 +115,11 @@ class NetAppConfig:
     def password(self) -> str:
         """Get the NetApp login password."""
         return self._config_data["password"]
+
+    @property
+    def netapp_nic_slot_prefix(self) -> str:
+        """Get the NetApp NIC slot prefix."""
+        return self._config_data["netapp_nic_slot_prefix"]
 
     @property
     def config_path(self) -> str:

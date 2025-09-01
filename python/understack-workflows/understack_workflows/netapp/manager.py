@@ -429,3 +429,8 @@ class NetAppManager:
 
     def _volume_name(self, project_id):
         return f"vol_{project_id}"
+
+    @property
+    def config(self):
+        """Get the NetApp configuration."""
+        return self._config

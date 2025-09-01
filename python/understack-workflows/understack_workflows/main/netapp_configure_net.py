@@ -352,7 +352,7 @@ def netapp_create_interfaces(
         Exception: If SVM for the project is not found
         NetAppRestError: If LIF creation fails on the NetApp system
     """
-    configs = NetappIPInterfaceConfig.from_nautobot_response(nautobot_response)
+    configs = NetappIPInterfaceConfig.from_nautobot_response(nautobot_response, mgr.config)
     for interface_config in configs:
         logger.info("Creating LIF %s for project %s", interface_config.name, project_id)
         mgr.create_lif(project_id, interface_config)

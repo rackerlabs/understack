@@ -28,6 +28,21 @@ netapp_password = test-password-123
         os.unlink(f.name)
 
     @pytest.fixture
+    def config_with_nic_prefix(self):
+        """Create a config file with custom NIC slot prefix."""
+        config_content = """[netapp_nvme]
+netapp_server_hostname = test-hostname.example.com
+netapp_login = test-user
+netapp_password = test-password-123
+netapp_nic_slot_prefix = e5
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
+            f.write(config_content)
+            f.flush()
+            yield f.name
+        os.unlink(f.name)
+
+    @pytest.fixture
     def minimal_config_file(self):
         """Create a minimal valid config file."""
         config_content = """[netapp_nvme]
@@ -48,6 +63,7 @@ netapp_password = pass
         assert config.hostname == "test-hostname.example.com"
         assert config.username == "test-user"
         assert config.password == "test-password-123"
+        assert config.netapp_nic_slot_prefix == "e4"  # Default value
         assert config.config_path == valid_config_file
 
     def test_default_config_path(self):
@@ -318,6 +334,21 @@ another_key = another_value
 
         os.unlink(f.name)
 
+    def test_netapp_nic_slot_prefix_custom_value(self, config_with_nic_prefix):
+        """Test NetAppConfig with custom NIC slot prefix."""
+        config = NetAppConfig(config_with_nic_prefix)
+
+        assert config.hostname == "test-hostname.example.com"
+        assert config.username == "test-user"
+        assert config.password == "test-password-123"
+        assert config.netapp_nic_slot_prefix == "e5"
+
+    def test_netapp_nic_slot_prefix_default_value(self, valid_config_file):
+        """Test NetAppConfig uses default NIC slot prefix when not specified."""
+        config = NetAppConfig(valid_config_file)
+
+        assert config.netapp_nic_slot_prefix == "e4"
+
     def test_config_with_extra_options(self):
         """Test config parsing ignores extra options in netapp_nvme section."""
         config_content = """[netapp_nvme]
@@ -338,3 +369,61 @@ another_option = another_value
             assert config.password == "test-password"
 
         os.unlink(f.name)
+    def test_integration_netapp_config_with_from_nautobot_response(self, config_with_nic_prefix):
+        """Test integration between NetAppConfig and NetappIPInterfaceConfig.from_nautobot_response."""
+        from unittest.mock import MagicMock
+        from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
+        import ipaddress
+
+        # Create config with custom NIC prefix
+        config = NetAppConfig(config_with_nic_prefix)
+        assert config.netapp_nic_slot_prefix == "e5"
+
+        # Create a mock nautobot response
+        mock_interface_a = MagicMock()
+        mock_interface_a.name = "N1-test-A"
+        mock_interface_a.address = "192.168.1.10/24"
+        mock_interface_a.vlan = 100
+
+        mock_interface_b = MagicMock()
+        mock_interface_b.name = "N1-test-B"
+        mock_interface_b.address = "192.168.1.11/24"
+        mock_interface_b.vlan = 100
+
+        mock_response = MagicMock()
+        mock_response.interfaces = [mock_interface_a, mock_interface_b]
+
+        # Test that from_nautobot_response uses the custom prefix
+        configs = NetappIPInterfaceConfig.from_nautobot_response(mock_response, config)
+
+        assert len(configs) == 2
+        assert configs[0].base_port_name == "e5a"
+        assert configs[1].base_port_name == "e5b"
+        assert configs[0].nic_slot_prefix == "e5"
+        assert configs[1].nic_slot_prefix == "e5"
+    def test_from_nautobot_response_default_prefix(self, valid_config_file):
+        """Test that from_nautobot_response uses default prefix when no config provided."""
+        from unittest.mock import MagicMock
+        from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
+
+        # Create a mock nautobot response
+        mock_interface = MagicMock()
+        mock_interface.name = "N1-test-A"
+        mock_interface.address = "192.168.1.10/24"
+        mock_interface.vlan = 100
+
+        mock_response = MagicMock()
+        mock_response.interfaces = [mock_interface]
+
+        # Test without config (should use default)
+        configs = NetappIPInterfaceConfig.from_nautobot_response(mock_response)
+        assert len(configs) == 1
+        assert configs[0].base_port_name == "e4a"
+        assert configs[0].nic_slot_prefix == "e4"
+
+        # Test with config that has default prefix
+        config = NetAppConfig(valid_config_file)
+        configs_with_config = NetappIPInterfaceConfig.from_nautobot_response(mock_response, config)
+        assert len(configs_with_config) == 1
+        assert configs_with_config[0].base_port_name == "e4a"
+        assert configs_with_config[0].nic_slot_prefix == "e4"
