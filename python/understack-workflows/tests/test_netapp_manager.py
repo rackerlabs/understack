@@ -74,7 +74,9 @@ netapp_password = test-password
     ):
         """Test create_volume delegates to VolumeService with correct parameters."""
         manager = NetAppManager(mock_config_file)
-        manager._volume_service.create_volume = MagicMock(return_value="vol_test-project")
+        manager._volume_service.create_volume = MagicMock(
+            return_value="vol_test-project"
+        )
 
         result = manager.create_volume("test-project", "1TB", "test-aggregate")
 
@@ -126,7 +128,9 @@ netapp_password = test-password
         result = manager.delete_volume("vol_test-project", force=True)
 
         # Verify delegation extracts project_id correctly
-        manager._volume_service.delete_volume.assert_called_once_with("test-project", True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            "test-project", True
+        )
         assert result is True
 
     @patch("understack_workflows.netapp.manager.config")
@@ -158,7 +162,9 @@ netapp_password = test-password
         result = manager.mapped_namespaces("os-test-project", "vol_test-project")
 
         # Verify delegation with extracted project_id
-        manager._volume_service.get_mapped_namespaces.assert_called_once_with("test-project")
+        manager._volume_service.get_mapped_namespaces.assert_called_once_with(
+            "test-project"
+        )
         assert result == expected_namespaces
 
     @patch("understack_workflows.netapp.manager.config")
@@ -179,7 +185,9 @@ netapp_password = test-password
 
         manager.create_lif("test-project", config_obj)
 
-        manager._lif_service.create_lif.assert_called_once_with("test-project", config_obj)
+        manager._lif_service.create_lif.assert_called_once_with(
+            "test-project", config_obj
+        )
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
@@ -205,6 +213,7 @@ netapp_password = test-password
 
         # Test SVM service error propagation
         from understack_workflows.netapp.exceptions import SvmOperationError
+
         manager._svm_service.create_svm = MagicMock(
             side_effect=SvmOperationError("SVM creation failed")
         )
@@ -214,6 +223,7 @@ netapp_password = test-password
 
         # Test Volume service error propagation
         from understack_workflows.netapp.exceptions import VolumeOperationError
+
         manager._volume_service.create_volume = MagicMock(
             side_effect=VolumeOperationError("Volume creation failed")
         )
@@ -240,7 +250,9 @@ netapp_password = test-password
         # Verify orchestration sequence
         manager._volume_service.exists.assert_called_once_with("test-project")
         manager._svm_service.exists.assert_called_once_with("test-project")
-        manager._volume_service.delete_volume.assert_called_once_with("test-project", force=True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            "test-project", force=True
+        )
         manager._svm_service.delete_svm.assert_called_once_with("test-project")
 
         assert result == {"volume": True, "svm": True}
@@ -262,7 +274,9 @@ netapp_password = test-password
         result = manager.cleanup_project("test-project")
 
         # Verify SVM deletion was not attempted
-        manager._volume_service.delete_volume.assert_called_once_with("test-project", force=True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            "test-project", force=True
+        )
         manager._svm_service.delete_svm.assert_not_called()
 
         assert result == {"volume": False, "svm": False}

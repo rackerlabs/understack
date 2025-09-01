@@ -215,7 +215,8 @@ class TestErrorHandler:
         error_handler.log_warning(message, context)
 
         mock_logger.warning.assert_called_once_with(
-            "%s - Context: %s", message, context
+            "%(message)s - Context: %(context)s",
+            {"message": message, "context": context},
         )
 
     def test_log_warning_without_context(self, error_handler, mock_logger):
@@ -233,7 +234,10 @@ class TestErrorHandler:
 
         error_handler.log_info(message, context)
 
-        mock_logger.info.assert_called_once_with("%s - Context: %s", message, context)
+        mock_logger.info.assert_called_once_with(
+            "%(message)s - Context: %(context)s",
+            {"message": message, "context": context},
+        )
 
     def test_log_info_without_context(self, error_handler, mock_logger):
         """Test logging info without context."""
@@ -250,7 +254,10 @@ class TestErrorHandler:
 
         error_handler.log_debug(message, context)
 
-        mock_logger.debug.assert_called_once_with("%s - Context: %s", message, context)
+        mock_logger.debug.assert_called_once_with(
+            "%(message)s - Context: %(context)s",
+            {"message": message, "context": context},
+        )
 
     def test_log_debug_without_context(self, error_handler, mock_logger):
         """Test logging debug without context."""

@@ -199,12 +199,12 @@ class NetAppClient(NetAppClientInterface):
                     password=self._config.password,
                 )
                 self._error_handler.log_info(
-                    "NetApp connection established to %s",
+                    "NetApp connection established to %(hostname)s",
                     {"hostname": self._config.hostname},
                 )
             else:
                 self._error_handler.log_info(
-                    "Using existing NetApp connection to %s",
+                    "Using existing NetApp connection to %(hostname)s",
                     {"hostname": self._config.hostname},
                 )
         except Exception as e:
@@ -216,7 +216,7 @@ class NetAppClient(NetAppClientInterface):
         """Create a Storage Virtual Machine (SVM)."""
         try:
             self._error_handler.log_info(
-                "Creating SVM: %s",
+                "Creating SVM: %(svm_name)s",
                 {"svm_name": svm_spec.name, "aggregate": svm_spec.aggregate_name},
             )
 
@@ -242,7 +242,7 @@ class NetAppClient(NetAppClientInterface):
             )
 
             self._error_handler.log_info(
-                "SVM '%s' created successfully",
+                "SVM '%(svm_name)s' created successfully",
                 {"svm_name": svm_spec.name, "uuid": result.uuid, "state": result.state},
             )
 
@@ -258,25 +258,30 @@ class NetAppClient(NetAppClientInterface):
     def delete_svm(self, svm_name: str) -> bool:
         """Delete a Storage Virtual Machine (SVM)."""
         try:
-            self._error_handler.log_info("Deleting SVM: %s", {"svm_name": svm_name})
+            self._error_handler.log_info(
+                "Deleting SVM: %(svm_name)s", {"svm_name": svm_name}
+            )
 
             svm = Svm()
             svm.get(name=svm_name)
 
             self._error_handler.log_info(
-                "Found SVM '%s' with UUID %s", {"svm_name": svm_name, "uuid": svm.uuid}
+                "Found SVM '%(svm_name)s' with UUID %(uuid)s",
+                {"svm_name": svm_name, "uuid": svm.uuid},
             )
 
             svm.delete()
 
             self._error_handler.log_info(
-                "SVM '%s' deletion initiated successfully", {"svm_name": svm_name}
+                "SVM '%(svm_name)s' deletion initiated successfully",
+                {"svm_name": svm_name},
             )
             return True
 
         except Exception as e:
             self._error_handler.log_warning(
-                "Failed to delete SVM '%s': %s", {"svm_name": svm_name, "error": str(e)}
+                "Failed to delete SVM '%(svm_name)s': %(error)s",
+                {"svm_name": svm_name, "error": str(e)},
             )
             return False
 
@@ -297,7 +302,8 @@ class NetAppClient(NetAppClientInterface):
             return None
         except Exception as e:
             self._error_handler.log_warning(
-                "Error finding SVM '%s': %s", {"svm_name": svm_name, "error": str(e)}
+                "Error finding SVM '%(svm_name)s': %(error)s",
+                {"svm_name": svm_name, "error": str(e)},
             )
             return None
 
@@ -305,7 +311,7 @@ class NetAppClient(NetAppClientInterface):
         """Create a volume."""
         try:
             self._error_handler.log_info(
-                "Creating volume '%s' with size %s",
+                "Creating volume '%(volume_name)s' with size %(size)s",
                 {
                     "volume_name": volume_spec.name,
                     "size": volume_spec.size,
@@ -333,7 +339,7 @@ class NetAppClient(NetAppClientInterface):
             )
 
             self._error_handler.log_info(
-                "Volume '%s' created successfully",
+                "Volume '%(volume_name)s' created successfully",
                 {
                     "volume_name": volume_spec.name,
                     "uuid": result.uuid,
@@ -358,20 +364,21 @@ class NetAppClient(NetAppClientInterface):
         """Delete a volume."""
         try:
             self._error_handler.log_info(
-                "Deleting volume: %s", {"volume_name": volume_name, "force": force}
+                "Deleting volume: %(volume_name)s",
+                {"volume_name": volume_name, "force": force},
             )
 
             volume = Volume()
             volume.get(name=volume_name)
 
             self._error_handler.log_info(
-                "Found volume '%s'", {"volume_name": volume_name}
+                "Found volume '%(volume_name)s'", {"volume_name": volume_name}
             )
 
             # Check if volume is online and log warning
             if hasattr(volume, "state") and volume.state == "online":
                 self._error_handler.log_warning(
-                    "Volume '%s' is online", {"volume_name": volume_name}
+                    "Volume '%(volume_name)s' is online", {"volume_name": volume_name}
                 )
 
             if force:
@@ -380,14 +387,14 @@ class NetAppClient(NetAppClientInterface):
                 volume.delete()
 
             self._error_handler.log_info(
-                "Volume '%s' deletion initiated successfully",
+                "Volume '%(volume_name)s' deletion initiated successfully",
                 {"volume_name": volume_name},
             )
             return True
 
         except Exception as e:
             self._error_handler.log_warning(
-                "Failed to delete volume '%s': %s",
+                "Failed to delete volume '%(volume_name)s': %(error)s",
                 {"volume_name": volume_name, "force": force, "error": str(e)},
             )
             return False
@@ -411,7 +418,8 @@ class NetAppClient(NetAppClientInterface):
             return None
         except Exception as e:
             self._error_handler.log_warning(
-                "Error finding volume '%s' in SVM '%s': %s",
+                "Error finding volume '%(volume_name)s' in SVM '%(svm_name)s': "
+                "%(error)s",
                 {"volume_name": volume_name, "svm_name": svm_name, "error": str(e)},
             )
             return None
@@ -420,7 +428,7 @@ class NetAppClient(NetAppClientInterface):
         """Create a logical interface (LIF)."""
         try:
             self._error_handler.log_info(
-                "Creating IP interface: %s",
+                "Creating IP interface: %(interface_name)s",
                 {
                     "interface_name": interface_spec.name,
                     "address": interface_spec.address,
@@ -455,7 +463,7 @@ class NetAppClient(NetAppClientInterface):
             )
 
             self._error_handler.log_info(
-                "IP interface '%s' created successfully",
+                "IP interface '%(interface_name)s' created successfully",
                 {"interface_name": interface_spec.name, "uuid": result.uuid},
             )
 
@@ -476,7 +484,7 @@ class NetAppClient(NetAppClientInterface):
         """Create a network port."""
         try:
             self._error_handler.log_info(
-                "Creating port on node %s",
+                "Creating port on node %(node_name)s",
                 {
                     "node_name": port_spec.node_name,
                     "vlan_id": port_spec.vlan_id,
@@ -507,7 +515,7 @@ class NetAppClient(NetAppClientInterface):
             )
 
             self._error_handler.log_info(
-                "Port created successfully on node %s",
+                "Port created successfully on node %(node_name)s",
                 {
                     "node_name": port_spec.node_name,
                     "uuid": result.uuid,
@@ -540,7 +548,8 @@ class NetAppClient(NetAppClientInterface):
                 results.append(NodeResult(name=str(node.name), uuid=str(node.uuid)))
 
             self._error_handler.log_info(
-                "Retrieved %d nodes from cluster", {"node_count": len(results)}
+                "Retrieved %(node_count)d nodes from cluster",
+                {"node_count": len(results)},
             )
             return results
 
@@ -558,7 +567,7 @@ class NetAppClient(NetAppClientInterface):
                 return []
 
             self._error_handler.log_debug(
-                "Querying namespaces for SVM %s, volume %s",
+                "Querying namespaces for SVM %(svm_name)s, volume %(volume_name)s",
                 {
                     "svm_name": namespace_spec.svm_name,
                     "volume_name": namespace_spec.volume_name,
@@ -585,7 +594,7 @@ class NetAppClient(NetAppClientInterface):
                 )
 
             self._error_handler.log_info(
-                "Retrieved %d namespaces",
+                "Retrieved %(namespace_count)d namespaces",
                 {
                     "namespace_count": len(results),
                     "svm": namespace_spec.svm_name,

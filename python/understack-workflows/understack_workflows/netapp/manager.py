@@ -170,12 +170,16 @@ class NetAppManager:
         else:
             # Handle non-standard SVM names by falling back to direct client call
             logger.warning(
-                "Non-standard SVM name format: %s. Using direct deletion.", svm_name
+                "Non-standard SVM name format: %(svm_name)s. Using direct deletion.",
+                {"svm_name": svm_name},
             )
             try:
                 return self._client.delete_svm(svm_name)
             except Exception as e:
-                logger.error("Failed to delete SVM '%s': %s", svm_name, str(e))
+                logger.error(
+                    "Failed to delete SVM '%(svm_name)s': %(error)s",
+                    {"svm_name": svm_name, "error": str(e)},
+                )
                 return False
 
     def create_volume(
@@ -207,13 +211,17 @@ class NetAppManager:
         else:
             # Handle non-standard volume names by falling back to direct client call
             logger.warning(
-                "Non-standard volume name format: %s. Using direct deletion.",
-                volume_name,
+                "Non-standard volume name format: %(volume_name)s. "
+                "Using direct deletion.",
+                {"volume_name": volume_name},
             )
             try:
                 return self._client.delete_volume(volume_name, force)
             except Exception as e:
-                logger.error("Failed to delete volume '%s': %s", volume_name, str(e))
+                logger.error(
+                    "Failed to delete volume '%(volume_name)s': %(error)s",
+                    {"volume_name": volume_name, "error": str(e)},
+                )
                 return False
 
     def check_if_svm_exists(self, project_id):
@@ -264,7 +272,9 @@ class NetAppManager:
 
         Note: This method will delete the data if volume is still in use.
         """
-        logger.info("Starting cleanup for project: %s", project_id)
+        logger.info(
+            "Starting cleanup for project: %(project_id)s", {"project_id": project_id}
+        )
 
         # Track cleanup state for potential rollback
         cleanup_state = {
@@ -280,7 +290,8 @@ class NetAppManager:
             cleanup_state["volume_existed"] = self._volume_service.exists(project_id)
         except Exception as e:
             logger.error(
-                "Failed to check volume existence for %s: %s", project_id, str(e)
+                "Failed to check volume existence for %(project_id)s: %(error)s",
+                {"project_id": project_id, "error": str(e)},
             )
             # Continue with cleanup attempt even if state check fails
             cleanup_state["volume_existed"] = True
@@ -288,14 +299,20 @@ class NetAppManager:
         try:
             cleanup_state["svm_existed"] = self._svm_service.exists(project_id)
         except Exception as e:
-            logger.error("Failed to check SVM existence for %s: %s", project_id, str(e))
+            logger.error(
+                "Failed to check SVM existence for %(project_id)s: %(error)s",
+                {"project_id": project_id, "error": str(e)},
+            )
             # Continue with cleanup attempt even if state check fails
             cleanup_state["svm_existed"] = True
 
         logger.debug(
-            "Initial state - Volume exists: %s, SVM exists: %s",
-            cleanup_state["volume_existed"],
-            cleanup_state["svm_existed"],
+            "Initial state - Volume exists: %(volume_exists)s, "
+            "SVM exists: %(svm_exists)s",
+            {
+                "volume_exists": cleanup_state["volume_existed"],
+                "svm_exists": cleanup_state["svm_existed"],
+            },
         )
 
         # Step 1: Delete volume first (volumes must be deleted before SVM)
@@ -306,29 +323,34 @@ class NetAppManager:
                     project_id, force=True
                 )
                 cleanup_state["volume_deleted"] = delete_vol_result
-                logger.debug("Delete volume result: %s", delete_vol_result)
+                logger.debug(
+                    "Delete volume result: %(result)s", {"result": delete_vol_result}
+                )
 
                 if delete_vol_result:
                     logger.info(
-                        "Successfully deleted volume for project: %s", project_id
+                        "Successfully deleted volume for project: %(project_id)s",
+                        {"project_id": project_id},
                     )
                 else:
                     logger.warning(
-                        "Failed to delete volume for project: %s", project_id
+                        "Failed to delete volume for project: %(project_id)s",
+                        {"project_id": project_id},
                     )
 
             except Exception as e:
                 logger.error(
-                    "Exception during volume deletion for project %s: %s",
-                    project_id,
-                    str(e),
+                    "Exception during volume deletion for project %(project_id)s: "
+                    "%(error)s",
+                    {"project_id": project_id, "error": str(e)},
                 )
                 delete_vol_result = False
         else:
             # Volume doesn't exist, consider it successfully "deleted"
             delete_vol_result = True
             logger.debug(
-                "Volume does not exist for project %s, skipping deletion", project_id
+                "Volume does not exist for project %(project_id)s, skipping deletion",
+                {"project_id": project_id},
             )
 
         # Step 2: Delete SVM (only if volume deletion succeeded or volume didn't exist)
@@ -338,22 +360,26 @@ class NetAppManager:
                 try:
                     delete_svm_result = self._svm_service.delete_svm(project_id)
                     cleanup_state["svm_deleted"] = delete_svm_result
-                    logger.debug("Delete SVM result: %s", delete_svm_result)
+                    logger.debug(
+                        "Delete SVM result: %(result)s", {"result": delete_svm_result}
+                    )
 
                     if delete_svm_result:
                         logger.info(
-                            "Successfully deleted SVM for project: %s", project_id
+                            "Successfully deleted SVM for project: %(project_id)s",
+                            {"project_id": project_id},
                         )
                     else:
                         logger.warning(
-                            "Failed to delete SVM for project: %s", project_id
+                            "Failed to delete SVM for project: %(project_id)s",
+                            {"project_id": project_id},
                         )
 
                 except Exception as e:
                     logger.error(
-                        "Exception during SVM deletion for project %s: %s",
-                        project_id,
-                        str(e),
+                        "Exception during SVM deletion for project %(project_id)s: "
+                        "%(error)s",
+                        {"project_id": project_id, "error": str(e)},
                     )
                     delete_svm_result = False
 
@@ -362,33 +388,40 @@ class NetAppManager:
                     if cleanup_state["volume_deleted"]:
                         logger.error(
                             "Inconsistent state: Volume deleted but SVM deletion "
-                            "failed for project %s. "
+                            "failed for project %(project_id)s. "
                             "Manual cleanup may be required.",
-                            project_id,
+                            {"project_id": project_id},
                         )
             else:
                 logger.warning(
-                    "Skipping SVM deletion for project %s because volume "
+                    "Skipping SVM deletion for project %(project_id)s because volume "
                     "deletion failed",
-                    project_id,
+                    {"project_id": project_id},
                 )
                 delete_svm_result = False
         else:
             # SVM doesn't exist, consider it successfully "deleted"
             delete_svm_result = True
             logger.debug(
-                "SVM does not exist for project %s, skipping deletion", project_id
+                "SVM does not exist for project %(project_id)s, skipping deletion",
+                {"project_id": project_id},
             )
 
         # Log final cleanup status
         if delete_vol_result and delete_svm_result:
-            logger.info("Successfully completed cleanup for project: %s", project_id)
+            logger.info(
+                "Successfully completed cleanup for project: %(project_id)s",
+                {"project_id": project_id},
+            )
         else:
             logger.warning(
-                "Partial cleanup failure for project %s - Volume: %s, SVM: %s",
-                project_id,
-                delete_vol_result,
-                delete_svm_result,
+                "Partial cleanup failure for project %(project_id)s - "
+                "Volume: %(volume_result)s, SVM: %(svm_result)s",
+                {
+                    "project_id": project_id,
+                    "volume_result": delete_vol_result,
+                    "svm_result": delete_svm_result,
+                },
             )
 
         return {"volume": delete_vol_result, "svm": delete_svm_result}

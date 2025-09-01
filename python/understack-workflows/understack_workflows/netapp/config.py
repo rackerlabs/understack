@@ -57,7 +57,9 @@ class NetAppConfig:
 
             # Optional netapp_nic_slot_prefix with default value
             try:
-                config_data["netapp_nic_slot_prefix"] = parser.get("netapp_nvme", "netapp_nic_slot_prefix")
+                config_data["netapp_nic_slot_prefix"] = parser.get(
+                    "netapp_nvme", "netapp_nic_slot_prefix"
+                )
             except (configparser.NoSectionError, configparser.NoOptionError):
                 config_data["netapp_nic_slot_prefix"] = "e4"
 

@@ -112,7 +112,9 @@ netapp_password = test-password
         # Verify service coordination sequence
         manager._volume_service.exists.assert_called_once_with(project_id)
         manager._svm_service.exists.assert_called_once_with(project_id)
-        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            project_id, force=True
+        )
         manager._svm_service.delete_svm.assert_called_once_with(project_id)
 
         assert result == {"volume": True, "svm": True}
@@ -135,7 +137,9 @@ netapp_password = test-password
         result = manager.cleanup_project(project_id)
 
         # Verify volume service was called but SVM service was not
-        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            project_id, force=True
+        )
         manager._svm_service.delete_svm.assert_not_called()
 
         assert result == {"volume": False, "svm": False}
@@ -158,7 +162,9 @@ netapp_password = test-password
         result = manager.cleanup_project(project_id)
 
         # Verify both services were called
-        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            project_id, force=True
+        )
         manager._svm_service.delete_svm.assert_called_once_with(project_id)
 
         assert result == {"volume": True, "svm": False}
@@ -202,7 +208,9 @@ netapp_password = test-password
 
         result = manager.cleanup_project("test-project-1")
 
-        manager._volume_service.delete_volume.assert_called_once_with("test-project-1", force=True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            "test-project-1", force=True
+        )
         manager._svm_service.delete_svm.assert_not_called()
         assert result == {"volume": True, "svm": True}
 
@@ -242,7 +250,8 @@ netapp_password = test-password
         manager._svm_service.delete_svm.assert_not_called()
         assert result == {"volume": False, "svm": False}
 
-        # Test SVM service exception after successful volume deletion (new manager instance)
+        # Test SVM service exception after successful volume deletion (new
+        # manager instance)
         manager2 = NetAppManager(mock_config_file)
         manager2._volume_service.exists = MagicMock(return_value=True)
         manager2._volume_service.delete_volume = MagicMock(return_value=True)
@@ -254,7 +263,9 @@ netapp_password = test-password
         result = manager2.cleanup_project(project_id)
 
         # Verify both services were called despite SVM failure
-        manager2._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager2._volume_service.delete_volume.assert_called_once_with(
+            project_id, force=True
+        )
         manager2._svm_service.delete_svm.assert_called_once_with(project_id)
         assert result == {"volume": True, "svm": False}
 
@@ -268,15 +279,21 @@ netapp_password = test-password
         project_id = "test-project-123"
 
         # Mock existence check failures
-        manager._volume_service.exists = MagicMock(side_effect=Exception("Connection error"))
-        manager._svm_service.exists = MagicMock(side_effect=Exception("Connection error"))
+        manager._volume_service.exists = MagicMock(
+            side_effect=Exception("Connection error")
+        )
+        manager._svm_service.exists = MagicMock(
+            side_effect=Exception("Connection error")
+        )
         manager._volume_service.delete_volume = MagicMock(return_value=True)
         manager._svm_service.delete_svm = MagicMock(return_value=True)
 
         result = manager.cleanup_project(project_id)
 
         # Verify cleanup still proceeds (assumes both exist when check fails)
-        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            project_id, force=True
+        )
         manager._svm_service.delete_svm.assert_called_once_with(project_id)
         assert result == {"volume": True, "svm": True}
 
@@ -295,7 +312,9 @@ netapp_password = test-password
 
         # Mock successful creation workflow
         manager._svm_service.create_svm = MagicMock(return_value=f"os-{project_id}")
-        manager._volume_service.create_volume = MagicMock(return_value=f"vol_{project_id}")
+        manager._volume_service.create_volume = MagicMock(
+            return_value=f"vol_{project_id}"
+        )
         manager._svm_service.exists = MagicMock(return_value=True)
         manager._volume_service.exists = MagicMock(return_value=True)
 
@@ -316,11 +335,15 @@ netapp_password = test-password
         assert cleanup_result == {"volume": True, "svm": True}
 
         # Verify all service interactions
-        manager._svm_service.create_svm.assert_called_once_with(project_id, "test-aggregate")
+        manager._svm_service.create_svm.assert_called_once_with(
+            project_id, "test-aggregate"
+        )
         manager._volume_service.create_volume.assert_called_once_with(
             project_id, "1TB", "test-aggregate"
         )
-        manager._volume_service.delete_volume.assert_called_once_with(project_id, force=True)
+        manager._volume_service.delete_volume.assert_called_once_with(
+            project_id, force=True
+        )
         manager._svm_service.delete_svm.assert_called_once_with(project_id)
 
     @patch("understack_workflows.netapp.manager.config")
@@ -361,12 +384,17 @@ netapp_password = test-password
             result = manager.cleanup_project("test-project-123")
 
             # Verify appropriate log messages were called at manager level
-            mock_logger.info.assert_any_call("Starting cleanup for project: %s", "test-project-123")
             mock_logger.info.assert_any_call(
-                "Successfully deleted volume for project: %s", "test-project-123"
+                "Starting cleanup for project: %(project_id)s",
+                {"project_id": "test-project-123"},
+            )
+            mock_logger.info.assert_any_call(
+                "Successfully deleted volume for project: %(project_id)s",
+                {"project_id": "test-project-123"},
             )
             mock_logger.warning.assert_any_call(
-                "Failed to delete SVM for project: %s", "test-project-123"
+                "Failed to delete SVM for project: %(project_id)s",
+                {"project_id": "test-project-123"},
             )
 
         assert result == {"volume": True, "svm": False}
@@ -409,7 +437,10 @@ netapp_password = test-password
 
             # Network operations
             import ipaddress
-            from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
+
+            from understack_workflows.netapp.value_objects import (
+                NetappIPInterfaceConfig,
+            )
 
             config_obj = NetappIPInterfaceConfig(
                 name="test",

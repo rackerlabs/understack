@@ -51,7 +51,9 @@ class NetappIPInterfaceConfig:
             raise ValueError("Cannot determine node index from name %s", self.name)
 
     @classmethod
-    def from_nautobot_response(cls, response: "VirtualMachineNetworkInfo", netapp_config=None):
+    def from_nautobot_response(
+        cls, response: "VirtualMachineNetworkInfo", netapp_config=None
+    ):
         """Create NetappIPInterfaceConfig instances from Nautobot response.
 
         Args:

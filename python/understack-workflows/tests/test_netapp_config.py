@@ -369,11 +369,14 @@ another_option = another_value
             assert config.password == "test-password"
 
         os.unlink(f.name)
-    def test_integration_netapp_config_with_from_nautobot_response(self, config_with_nic_prefix):
-        """Test integration between NetAppConfig and NetappIPInterfaceConfig.from_nautobot_response."""
+
+    def test_integration_netapp_config_with_from_nautobot_response(
+        self, config_with_nic_prefix
+    ):
+        """Test integration between NetAppConfig and NetappIPInterfaceConfig."""
         from unittest.mock import MagicMock
+
         from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
-        import ipaddress
 
         # Create config with custom NIC prefix
         config = NetAppConfig(config_with_nic_prefix)
@@ -401,9 +404,11 @@ another_option = another_value
         assert configs[1].base_port_name == "e5b"
         assert configs[0].nic_slot_prefix == "e5"
         assert configs[1].nic_slot_prefix == "e5"
+
     def test_from_nautobot_response_default_prefix(self, valid_config_file):
-        """Test that from_nautobot_response uses default prefix when no config provided."""
+        """Test that from_nautobot_response uses default when no config provided."""
         from unittest.mock import MagicMock
+
         from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 
         # Create a mock nautobot response
@@ -423,7 +428,9 @@ another_option = another_value
 
         # Test with config that has default prefix
         config = NetAppConfig(valid_config_file)
-        configs_with_config = NetappIPInterfaceConfig.from_nautobot_response(mock_response, config)
+        configs_with_config = NetappIPInterfaceConfig.from_nautobot_response(
+            mock_response, config
+        )
         assert len(configs_with_config) == 1
         assert configs_with_config[0].base_port_name == "e4a"
         assert configs_with_config[0].nic_slot_prefix == "e4"

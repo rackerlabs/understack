@@ -45,7 +45,7 @@ class LifService:
 
         try:
             self._error_handler.log_info(
-                "Creating LIF for project %s",
+                "Creating LIF for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "svm_name": svm_name,
@@ -83,7 +83,7 @@ class LifService:
             result = self._client.create_ip_interface(interface_spec)
 
             self._error_handler.log_info(
-                "LIF created successfully for project %s",
+                "LIF created successfully for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "interface_name": result.name,
@@ -124,7 +124,7 @@ class LifService:
         """
         try:
             self._error_handler.log_info(
-                "Creating home port for interface %s",
+                "Creating home port for interface %(interface_name)s",
                 {
                     "interface_name": config.name,
                     "vlan_id": config.vlan_id,
@@ -191,7 +191,7 @@ class LifService:
         """
         try:
             self._error_handler.log_debug(
-                "Identifying home node for interface %s",
+                "Identifying home node for interface %(interface_name)s",
                 {
                     "interface_name": config.name,
                     "desired_node_number": config.desired_node_number,
@@ -209,7 +209,8 @@ class LifService:
                     node_index = int(match.group())
                     if node_index == config.desired_node_number:
                         self._error_handler.log_debug(
-                            "Node %s matched desired_node_number of %d",
+                            "Node %(node_name)s matched desired_node_number of "
+                            "%(desired_node_number)d",
                             {
                                 "node_name": node.name,
                                 "node_index": node_index,
@@ -219,7 +220,7 @@ class LifService:
                         return node
 
             self._error_handler.log_warning(
-                "No node found matching desired_node_number %d",
+                "No node found matching desired_node_number %(desired_node_number)d",
                 {
                     "desired_node_number": config.desired_node_number,
                     "interface_name": config.name,
@@ -231,7 +232,8 @@ class LifService:
 
         except Exception as e:
             self._error_handler.log_warning(
-                "Error identifying home node for interface %s: %s",
+                "Error identifying home node for interface %(interface_name)s: "
+                "%(error)s",
                 {"interface_name": config.name, "error": str(e)},
             )
             return None

@@ -45,7 +45,7 @@ class SvmService:
         # Check if SVM already exists
         if self.exists(project_id):
             self._error_handler.log_warning(
-                "SVM already exists for project %s",
+                "SVM already exists for project %(project_id)s",
                 {"project_id": project_id, "svm_name": svm_name},
             )
             raise SvmOperationError(
@@ -64,7 +64,7 @@ class SvmService:
 
         try:
             self._error_handler.log_info(
-                "Creating SVM for project %s",
+                "Creating SVM for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "svm_name": svm_name,
@@ -75,7 +75,7 @@ class SvmService:
             result = self._client.create_svm(svm_spec)
 
             self._error_handler.log_info(
-                "SVM created successfully for project %s",
+                "SVM created successfully for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "svm_name": result.name,
@@ -114,7 +114,7 @@ class SvmService:
 
         try:
             self._error_handler.log_info(
-                "Deleting SVM for project %s",
+                "Deleting SVM for project %(project_id)s",
                 {"project_id": project_id, "svm_name": svm_name},
             )
 

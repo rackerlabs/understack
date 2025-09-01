@@ -57,14 +57,14 @@ class ErrorHandler:
             svm_name = context.get("svm_name")
             raise SvmOperationError(
                 error_message,
-                svm_name=svm_name, # pyright: ignore
+                svm_name=svm_name,  # pyright: ignore
                 context={**context, "netapp_error": str(error)},
             )
         elif "volume" in operation_lower:
             volume_name = context.get("volume_name")
             raise VolumeOperationError(
                 error_message,
-                volume_name=volume_name, # pyright: ignore
+                volume_name=volume_name,  # pyright: ignore
                 context={**context, "netapp_error": str(error)},
             )
         elif any(
@@ -73,7 +73,7 @@ class ErrorHandler:
             interface_name = context.get("interface_name")
             raise NetworkOperationError(
                 error_message,
-                interface_name=interface_name, # pyright: ignore
+                interface_name=interface_name,  # pyright: ignore
                 context={**context, "netapp_error": str(error)},
             )
         else:
@@ -141,11 +141,23 @@ class ErrorHandler:
         """Log a warning message with context.
 
         Args:
-            message: Warning message
+            message: Warning message (may contain %(key)s format placeholders)
             context: Additional context information
         """
         if context:
-            self._logger.warning("%s - Context: %s", message, context)
+            # Format the message using the context dictionary if it contains format
+            # placeholders
+            if "%(" in message:
+                formatted_message = message % context
+                self._logger.warning(
+                    "%(message)s - Context: %(context)s",
+                    {"message": formatted_message, "context": context},
+                )
+            else:
+                self._logger.warning(
+                    "%(message)s - Context: %(context)s",
+                    {"message": message, "context": context},
+                )
         else:
             self._logger.warning(message)
 
@@ -153,11 +165,23 @@ class ErrorHandler:
         """Log an info message with context.
 
         Args:
-            message: Info message
+            message: Info message (may contain %(key)s format placeholders)
             context: Additional context information
         """
         if context:
-            self._logger.info("%s - Context: %s", message, context)
+            # Format the message using the context dictionary if it contains format
+            # placeholders
+            if "%(" in message:
+                formatted_message = message % context
+                self._logger.info(
+                    "%(message)s - Context: %(context)s",
+                    {"message": formatted_message, "context": context},
+                )
+            else:
+                self._logger.info(
+                    "%(message)s - Context: %(context)s",
+                    {"message": message, "context": context},
+                )
         else:
             self._logger.info(message)
 
@@ -165,10 +189,22 @@ class ErrorHandler:
         """Log a debug message with context.
 
         Args:
-            message: Debug message
+            message: Debug message (may contain %(key)s format placeholders)
             context: Additional context information
         """
         if context:
-            self._logger.debug("%s - Context: %s", message, context)
+            # Format the message using the context dictionary if it contains format
+            # placeholders
+            if "%(" in message:
+                formatted_message = message % context
+                self._logger.debug(
+                    "%(message)s - Context: %(context)s",
+                    {"message": formatted_message, "context": context},
+                )
+            else:
+                self._logger.debug(
+                    "%(message)s - Context: %(context)s",
+                    {"message": message, "context": context},
+                )
         else:
             self._logger.debug(message)
