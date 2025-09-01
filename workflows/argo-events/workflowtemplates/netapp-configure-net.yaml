@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: netapp-configure-net
+  annotations:
+    workflows.argoproj.io/title: NetApp LIF configuration
+    workflows.argoproj.io/description: |
+      Configures LIFs on the NetApp based on the Nautobot data.
+
+      To test this workflow you can run it with the following:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/netapp-configure-net \
+      -p project_id=3c1648df945f429893b676648eddff7b
+      ```
+      NOTE: no dashes in project_id !
+
+      Defined in `workflows/argo-events/workflowtemplates/netapp-configure-net.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  serviceAccountName: workflow
+  templates:
+    - name: main
+      inputs:
+        parameters:
+          - name: project_id
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - netapp-configure-interfaces
+        args:
+          - "--project-id"
+          - "{{workflow.parameters.project_id}}"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/netapp
+            name: netapp-ini
+            readOnly: true
+      volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
+        - name: netapp-ini
+          secret:
+            secretName: netapp-config
