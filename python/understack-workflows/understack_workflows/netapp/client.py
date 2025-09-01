@@ -434,7 +434,7 @@ class NetAppClient(NetAppClientInterface):
             interface.enabled = True
             interface.svm = {"name": interface_spec.svm_name}
             interface.location = {
-                "auto_revert": True,
+                "auto_revert": False,
                 "home_port": {"uuid": interface_spec.home_port_uuid},
                 "broadcast_domain": {"name": interface_spec.broadcast_domain_name},
             }
