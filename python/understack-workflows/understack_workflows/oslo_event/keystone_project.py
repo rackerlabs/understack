@@ -5,7 +5,7 @@ from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import setup_logger
-from understack_workflows.netapp_manager import NetAppManager
+from understack_workflows.netapp.manager import NetAppManager
 
 logger = setup_logger(__name__)
 

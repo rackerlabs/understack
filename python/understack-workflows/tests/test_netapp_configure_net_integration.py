@@ -515,8 +515,11 @@ class TestIntegrationTests:
 
 
 class TestIntegrationWithNetAppManager:
-    """Integration tests for complete script execution with NetAppManager
-    integration."""
+    """Integration tests for complete script execution with NetAppManager integration.
+
+    These tests verify the complete workflow of the script including
+    NetAppManager initialization and network configuration operations.
+    """
 
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
@@ -726,8 +729,11 @@ class TestIntegrationWithNetAppManager:
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
-        """Test that script handles empty VM results and skips NetApp interface
-        creation."""
+        """Test script handles empty VM results and skips NetApp interface creation.
+
+        When no VMs are returned from the query, the script should handle this
+        gracefully and skip NetApp interface creation operations.
+        """
         from understack_workflows.main.netapp_configure_net import main
 
         # Mock logger
@@ -790,8 +796,11 @@ class TestIntegrationWithNetAppManager:
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
-        """Test end-to-end NetApp interface creation with realistic data and
-        verify interface details."""
+        """Test end-to-end NetApp interface creation with realistic data.
+
+        This test verifies the complete workflow with realistic VM data
+        and validates that interface details are properly configured.
+        """
         from understack_workflows.main.netapp_configure_net import main
 
         # Mock logger

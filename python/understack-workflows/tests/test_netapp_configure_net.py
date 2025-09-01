@@ -256,8 +256,7 @@ class TestArgumentParser:
     def test_project_id_string_type_validation(self, project_id_value):
         """Test that project_id accepts various string formats."""
         # Note: This test is now obsolete since project_id must be a valid UUID
-        # Keeping for backward compatibility but these will fail with new UUID
-        # validation
+        # These will fail with UUID validation
         parser = argument_parser()
 
         # Most of these should now fail with UUID validation
@@ -747,8 +746,11 @@ class TestVirtualMachineNetworkInfo:
         assert vm_info.interfaces[0].vlan == 4094
 
     def test_from_graphql_vm_propagates_interface_validation_errors(self):
-        """Test that interface validation errors are propagated from
-        VirtualMachineNetworkInfo."""
+        """Test interface validation errors propagated from VirtualMachineNetworkInfo.
+
+        VirtualMachineNetworkInfo validates interface data and should propagate
+        any validation errors that occur during processing.
+        """
         # VM data with invalid interface (multiple IP addresses)
         vm_data = {
             "interfaces": [
@@ -856,8 +858,11 @@ class TestGraphQLQueryFunctionality:
         assert variables["device_names"][0] == "os-test-project-123"
 
     def test_device_name_formatting_from_project_id(self):
-        """Test device name formatting from project_id (now expects normalized
-        UUID format)."""
+        """Test device name formatting from project_id.
+
+        The function now expects normalized UUID format for project IDs
+        and formats device names accordingly.
+        """
         test_cases = [
             ("123456781234567890ab123456789012", "os-123456781234567890ab123456789012"),
             (
@@ -1135,8 +1140,7 @@ class TestGraphQLQueryFunctionality:
 
         assert result["data"]["virtual_machines"] == []
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) "
-            "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
             0,
             "os-empty-project",
         )
@@ -1169,8 +1173,7 @@ class TestGraphQLQueryFunctionality:
         assert len(result["data"]["virtual_machines"]) == 1
         assert result["data"]["virtual_machines"][0]["interfaces"] == []
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) "
-            "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
             1,
             "os-empty-interfaces-project",
         )
@@ -1199,8 +1202,7 @@ class TestGraphQLQueryFunctionality:
 
         # Verify info logging
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) "
-            "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
             1,
             "os-logging-test-project",
         )
@@ -1372,7 +1374,7 @@ class TestNetappCreateInterfaces:
 
             # Verify NetappIPInterfaceConfig.from_nautobot_response was called
             mock_config_class.from_nautobot_response.assert_called_once_with(
-                vm_network_info
+                vm_network_info, mock_netapp_manager.config
             )
 
             # Verify create_lif was called with correct parameters
@@ -1412,7 +1414,7 @@ class TestNetappCreateInterfaces:
 
             # Verify NetappIPInterfaceConfig.from_nautobot_response was called
             mock_config_class.from_nautobot_response.assert_called_once_with(
-                vm_network_info
+                vm_network_info, mock_netapp_manager.config
             )
 
             # Verify create_lif was called for each interface
@@ -1443,7 +1445,7 @@ class TestNetappCreateInterfaces:
 
             # Verify NetappIPInterfaceConfig.from_nautobot_response was called
             mock_config_class.from_nautobot_response.assert_called_once_with(
-                vm_network_info
+                vm_network_info, mock_netapp_manager.config
             )
 
             # Verify create_lif was not called
@@ -1543,7 +1545,7 @@ class TestNetappCreateInterfaces:
 
             # Verify NetappIPInterfaceConfig.from_nautobot_response was called
             mock_config_class.from_nautobot_response.assert_called_once_with(
-                vm_network_info
+                vm_network_info, mock_netapp_manager.config
             )
 
             # Verify create_lif was called for each interface
@@ -1654,8 +1656,11 @@ class TestMainFunctionWithNetAppManager:
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
-        """Test that main function initializes NetAppManager with default config
-        path."""
+        """Test that main function initializes NetAppManager with default config path.
+
+        The main function should properly initialize NetAppManager using the
+        default configuration path when no custom path is provided.
+        """
         from understack_workflows.main.netapp_configure_net import main
 
         # Mock logger

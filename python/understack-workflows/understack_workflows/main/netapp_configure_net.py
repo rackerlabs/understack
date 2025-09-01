@@ -8,8 +8,8 @@ from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.nautobot import Nautobot
-from understack_workflows.netapp_manager import NetappIPInterfaceConfig
-from understack_workflows.netapp_manager import NetAppManager
+from understack_workflows.netapp.manager import NetAppManager
+from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 
 logger = setup_logger(__name__, level=logging.INFO)
 

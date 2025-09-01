@@ -1,0 +1,387 @@
+"""Tests for NetApp value objects."""
+
+import pytest
+
+from understack_workflows.netapp.value_objects import InterfaceResult
+from understack_workflows.netapp.value_objects import InterfaceSpec
+from understack_workflows.netapp.value_objects import NamespaceResult
+from understack_workflows.netapp.value_objects import NamespaceSpec
+from understack_workflows.netapp.value_objects import NodeResult
+from understack_workflows.netapp.value_objects import PortResult
+from understack_workflows.netapp.value_objects import PortSpec
+from understack_workflows.netapp.value_objects import SvmResult
+from understack_workflows.netapp.value_objects import SvmSpec
+from understack_workflows.netapp.value_objects import VolumeResult
+from understack_workflows.netapp.value_objects import VolumeSpec
+
+
+class TestSvmSpec:
+    """Test cases for SvmSpec value object."""
+
+    def test_valid_svm_spec(self):
+        """Test creating a valid SVM specification."""
+        spec = SvmSpec(
+            name="test-svm",
+            aggregate_name="aggr1",
+            language="c.utf_8",
+            allowed_protocols=["nvme"],
+        )
+
+        assert spec.name == "test-svm"
+        assert spec.aggregate_name == "aggr1"
+        assert spec.language == "c.utf_8"
+        assert spec.allowed_protocols == ["nvme"]
+        assert spec.root_volume_name == "test-svm_root"
+
+    def test_svm_spec_defaults(self):
+        """Test SVM specification with default values."""
+        spec = SvmSpec(name="test-svm", aggregate_name="aggr1")
+
+        assert spec.language == "c.utf_8"
+        assert spec.allowed_protocols == ["nvme"]
+
+    def test_svm_spec_multiple_protocols(self):
+        """Test SVM specification with multiple protocols."""
+        spec = SvmSpec(
+            name="test-svm",
+            aggregate_name="aggr1",
+            allowed_protocols=["nvme", "nfs", "iscsi"],
+        )
+
+        assert spec.allowed_protocols == ["nvme", "nfs", "iscsi"]
+
+    def test_svm_spec_immutable(self):
+        """Test that SVM specification is immutable."""
+        spec = SvmSpec(name="test-svm", aggregate_name="aggr1")
+
+        with pytest.raises(AttributeError):
+            spec.name = "new-name"  # type: ignore[misc]
+
+
+class TestVolumeSpec:
+    """Test cases for VolumeSpec value object."""
+
+    def test_valid_volume_spec(self):
+        """Test creating a valid volume specification."""
+        spec = VolumeSpec(
+            name="test-volume", svm_name="test-svm", aggregate_name="aggr1", size="1TB"
+        )
+
+        assert spec.name == "test-volume"
+        assert spec.svm_name == "test-svm"
+        assert spec.aggregate_name == "aggr1"
+        assert spec.size == "1TB"
+
+    def test_volume_spec_various_sizes(self):
+        """Test volume specification with various size formats."""
+        sizes = ["1TB", "500GB", "1.5TB", "100MB", "1KB", "1024B", "invalid-size"]
+
+        for size in sizes:
+            spec = VolumeSpec(
+                name="test-volume",
+                svm_name="test-svm",
+                aggregate_name="aggr1",
+                size=size,
+            )
+            assert spec.size == size
+
+    def test_volume_spec_immutable(self):
+        """Test that volume specification is immutable."""
+        spec = VolumeSpec(
+            name="test-volume", svm_name="test-svm", aggregate_name="aggr1", size="1TB"
+        )
+
+        with pytest.raises(AttributeError):
+            spec.name = "new-name"  # type: ignore[misc]
+
+
+class TestInterfaceSpec:
+    """Test cases for InterfaceSpec value object."""
+
+    def test_valid_interface_spec(self):
+        """Test creating a valid interface specification."""
+        spec = InterfaceSpec(
+            name="test-lif",
+            address="192.168.1.10",
+            netmask="255.255.255.0",
+            svm_name="test-svm",
+            home_port_uuid="port-uuid-123",
+            broadcast_domain_name="Fabric-A",
+        )
+
+        assert spec.name == "test-lif"
+        assert spec.address == "192.168.1.10"
+        assert spec.netmask == "255.255.255.0"
+        assert spec.svm_name == "test-svm"
+        assert spec.home_port_uuid == "port-uuid-123"
+        assert spec.broadcast_domain_name == "Fabric-A"
+        assert spec.service_policy == "default-data-nvme-tcp"
+
+    def test_interface_spec_custom_service_policy(self):
+        """Test interface specification with custom service policy."""
+        spec = InterfaceSpec(
+            name="test-lif",
+            address="192.168.1.10",
+            netmask="255.255.255.0",
+            svm_name="test-svm",
+            home_port_uuid="port-uuid-123",
+            broadcast_domain_name="Fabric-A",
+            service_policy="custom-policy",
+        )
+
+        assert spec.service_policy == "custom-policy"
+
+    def test_interface_spec_ip_info_property(self):
+        """Test interface specification IP info property."""
+        spec = InterfaceSpec(
+            name="test-lif",
+            address="192.168.1.10",
+            netmask="255.255.255.0",
+            svm_name="test-svm",
+            home_port_uuid="port-uuid-123",
+            broadcast_domain_name="Fabric-A",
+        )
+
+        expected_ip_info = {"address": "192.168.1.10", "netmask": "255.255.255.0"}
+        assert spec.ip_info == expected_ip_info
+
+
+class TestPortSpec:
+    """Test cases for PortSpec value object."""
+
+    def test_valid_port_spec(self):
+        """Test creating a valid port specification."""
+        spec = PortSpec(
+            node_name="node-01",
+            vlan_id=100,
+            base_port_name="e4a",
+            broadcast_domain_name="Fabric-A",
+        )
+
+        assert spec.node_name == "node-01"
+        assert spec.vlan_id == 100
+        assert spec.base_port_name == "e4a"
+        assert spec.broadcast_domain_name == "Fabric-A"
+
+    def test_port_spec_vlan_config_property(self):
+        """Test port specification VLAN config property."""
+        spec = PortSpec(
+            node_name="node-01",
+            vlan_id=100,
+            base_port_name="e4a",
+            broadcast_domain_name="Fabric-A",
+        )
+
+        expected_vlan_config = {
+            "tag": 100,
+            "base_port": {"name": "e4a", "node": {"name": "node-01"}},
+        }
+        assert spec.vlan_config == expected_vlan_config
+
+    def test_port_spec_various_vlan_ids(self):
+        """Test port specification with various VLAN IDs."""
+        vlan_ids = [1, 100, 4094, 0, 5000]  # Including invalid ones
+
+        for vlan_id in vlan_ids:
+            spec = PortSpec(
+                node_name="node-01",
+                vlan_id=vlan_id,
+                base_port_name="e4a",
+                broadcast_domain_name="Fabric-A",
+            )
+            assert spec.vlan_id == vlan_id
+
+
+class TestNamespaceSpec:
+    """Test cases for NamespaceSpec value object."""
+
+    def test_valid_namespace_spec(self):
+        """Test creating a valid namespace specification."""
+        spec = NamespaceSpec(svm_name="test-svm", volume_name="test-volume")
+
+        assert spec.svm_name == "test-svm"
+        assert spec.volume_name == "test-volume"
+
+    def test_namespace_spec_query_string(self):
+        """Test namespace specification query string property."""
+        spec = NamespaceSpec(svm_name="test-svm", volume_name="test-volume")
+
+        expected_query = "svm.name=test-svm&location.volume.name=test-volume"
+        assert spec.query_string == expected_query
+
+
+class TestSvmResult:
+    """Test cases for SvmResult value object."""
+
+    def test_valid_svm_result(self):
+        """Test creating a valid SVM result."""
+        result = SvmResult(name="test-svm", uuid="svm-uuid-123", state="online")
+
+        assert result.name == "test-svm"
+        assert result.uuid == "svm-uuid-123"
+        assert result.state == "online"
+
+    def test_svm_result_various_states(self):
+        """Test SVM result with various states."""
+        states = [
+            "online",
+            "offline",
+            "starting",
+            "stopping",
+            "stopped",
+            "unknown",
+            "new-state",
+        ]
+
+        for state in states:
+            result = SvmResult(name="test-svm", uuid="svm-uuid-123", state=state)
+            assert result.state == state
+
+
+class TestVolumeResult:
+    """Test cases for VolumeResult value object."""
+
+    def test_valid_volume_result(self):
+        """Test creating a valid volume result."""
+        result = VolumeResult(
+            name="test-volume",
+            uuid="vol-uuid-123",
+            size="1TB",
+            state="online",
+            svm_name="test-svm",
+        )
+
+        assert result.name == "test-volume"
+        assert result.uuid == "vol-uuid-123"
+        assert result.size == "1TB"
+        assert result.state == "online"
+        assert result.svm_name == "test-svm"
+
+    def test_volume_result_without_svm_name(self):
+        """Test volume result without SVM name."""
+        result = VolumeResult(
+            name="test-volume", uuid="vol-uuid-123", size="1TB", state="online"
+        )
+
+        assert result.svm_name is None
+
+    def test_volume_result_various_states(self):
+        """Test volume result with various states."""
+        states = ["online", "offline", "restricted", "mixed", "unknown", "new-state"]
+
+        for state in states:
+            result = VolumeResult(
+                name="test-volume", uuid="vol-uuid-123", size="1TB", state=state
+            )
+            assert result.state == state
+
+
+class TestNodeResult:
+    """Test cases for NodeResult value object."""
+
+    def test_valid_node_result(self):
+        """Test creating a valid node result."""
+        result = NodeResult(name="node-01", uuid="node-uuid-123")
+
+        assert result.name == "node-01"
+        assert result.uuid == "node-uuid-123"
+
+
+class TestPortResult:
+    """Test cases for PortResult value object."""
+
+    def test_valid_port_result(self):
+        """Test creating a valid port result."""
+        result = PortResult(
+            uuid="port-uuid-123", name="e4a-100", node_name="node-01", port_type="vlan"
+        )
+
+        assert result.uuid == "port-uuid-123"
+        assert result.name == "e4a-100"
+        assert result.node_name == "node-01"
+        assert result.port_type == "vlan"
+
+    def test_port_result_without_type(self):
+        """Test port result without port type."""
+        result = PortResult(uuid="port-uuid-123", name="e4a-100", node_name="node-01")
+
+        assert result.port_type is None
+
+
+class TestInterfaceResult:
+    """Test cases for InterfaceResult value object."""
+
+    def test_valid_interface_result(self):
+        """Test creating a valid interface result."""
+        result = InterfaceResult(
+            name="test-lif",
+            uuid="lif-uuid-123",
+            address="192.168.1.10",
+            netmask="255.255.255.0",
+            enabled=True,
+            svm_name="test-svm",
+        )
+
+        assert result.name == "test-lif"
+        assert result.uuid == "lif-uuid-123"
+        assert result.address == "192.168.1.10"
+        assert result.netmask == "255.255.255.0"
+        assert result.enabled is True
+        assert result.svm_name == "test-svm"
+
+    def test_interface_result_without_svm_name(self):
+        """Test interface result without SVM name."""
+        result = InterfaceResult(
+            name="test-lif",
+            uuid="lif-uuid-123",
+            address="192.168.1.10",
+            netmask="255.255.255.0",
+            enabled=True,
+        )
+
+        assert result.svm_name is None
+
+    def test_interface_result_disabled(self):
+        """Test interface result when disabled."""
+        result = InterfaceResult(
+            name="test-lif",
+            uuid="lif-uuid-123",
+            address="192.168.1.10",
+            netmask="255.255.255.0",
+            enabled=False,
+        )
+
+        assert result.enabled is False
+
+
+class TestNamespaceResult:
+    """Test cases for NamespaceResult value object."""
+
+    def test_valid_namespace_result(self):
+        """Test creating a valid namespace result."""
+        result = NamespaceResult(
+            uuid="ns-uuid-123",
+            name="namespace-1",
+            mapped=True,
+            svm_name="test-svm",
+            volume_name="test-volume",
+        )
+
+        assert result.uuid == "ns-uuid-123"
+        assert result.name == "namespace-1"
+        assert result.mapped is True
+        assert result.svm_name == "test-svm"
+        assert result.volume_name == "test-volume"
+
+    def test_namespace_result_not_mapped(self):
+        """Test namespace result when not mapped."""
+        result = NamespaceResult(uuid="ns-uuid-123", name="namespace-1", mapped=False)
+
+        assert result.mapped is False
+
+    def test_namespace_result_without_optional_fields(self):
+        """Test namespace result without optional fields."""
+        result = NamespaceResult(uuid="ns-uuid-123", name="namespace-1", mapped=False)
+
+        assert result.svm_name is None
+        assert result.volume_name is None
