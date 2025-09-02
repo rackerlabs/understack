@@ -223,7 +223,9 @@ conf:
         OIDCXForwardedHeaders X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
 
         # OIDC provider's .well-known/configuration URL
-        OIDCProviderMetadataURL {{ tuple "dex" "internal" "dex" $ | include "helm-toolkit.endpoints.keystone_endpoint_uri_lookup" }}
+        OIDCProviderMetadataURL {{ tuple "dex" "internal" "dex" $ | include "helm-toolkit.endpoints.keystone_endpoint_uri_lookup" }}/.well-known/openid-configuration
+        # this is so that in the OAuth 2.0 flows we can validate the JWT token
+        OIDCOAuthVerifyJwksUri {{ tuple "dex" "internal" "dex" $ | include "helm-toolkit.endpoints.keystone_endpoint_uri_lookup" }}/keys
         # Client / Application Identifier and Secret
         OIDCClientID keystone
         OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
@@ -237,6 +239,7 @@ conf:
 
         # set the REMOTE_USER to the value of preferred_username
         OIDCRemoteUserClaim preferred_username
+        OIDCOAuthRemoteUserClaim preferred_username
         # scopes that we want to request
         OIDCScope "openid email profile groups"
 
@@ -270,6 +273,13 @@ conf:
         <Location /v3/auth/OS-FEDERATION/identity_providers/sso/protocols/openid/websso>
           Require valid-user
           AuthType openid-connect
+        </Location>
+        # add OAuth 2.0 support for the identity provider 'sso' using the 'mapped' protocol
+        <Location /v3/OS-FEDERATION/identity_providers/sso/protocols/mapped/auth>
+          Require valid-user
+          AuthType oauth20
+          # TODO: variablize this better
+          OIDCPathAuthRequestParams connector_id=machine
         </Location>
     </VirtualHost>
 
@@ -317,7 +327,7 @@ endpoints:
       dex:
         # override this when full deployment
         default: 5556
-    path: '/.well-known/openid-configuration'
+    path: ''
 
 manifests:
   job_credential_cleanup: false
