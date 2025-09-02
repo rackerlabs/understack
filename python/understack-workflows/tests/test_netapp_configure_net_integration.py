@@ -595,6 +595,14 @@ class TestIntegrationWithNetAppManager:
         # The complex sample has 4 interfaces, so create_lif should be called 4 times
         assert mock_netapp_manager_instance.create_lif.call_count == 4
 
+        # Verify route creation was called with correct parameters
+        mock_netapp_manager_instance.create_routes_for_project.assert_called_once()
+        route_call_args = (
+            mock_netapp_manager_instance.create_routes_for_project.call_args
+        )
+        assert route_call_args[0][0] == "12345678123456789abc123456789012"  # project_id
+        assert len(route_call_args[0][1]) == 4  # 4 interface configurations
+
         # Verify output was printed
         mock_print.assert_called_once()
 
@@ -658,6 +666,14 @@ class TestIntegrationWithNetAppManager:
 
         # Verify NetApp LIF creation was called (single sample has 2 interfaces)
         assert mock_netapp_manager_instance.create_lif.call_count == 2
+
+        # Verify route creation was called with correct parameters
+        mock_netapp_manager_instance.create_routes_for_project.assert_called_once()
+        route_call_args = (
+            mock_netapp_manager_instance.create_routes_for_project.call_args
+        )
+        assert route_call_args[0][0] == "12345678123456789abc123456789012"  # project_id
+        assert len(route_call_args[0][1]) == 2  # 2 interface configurations
 
         # Verify output was printed
         mock_print.assert_called_once()
@@ -791,6 +807,9 @@ class TestIntegrationWithNetAppManager:
         # Verify create_lif was NOT called (no interfaces to create)
         mock_netapp_manager_instance.create_lif.assert_not_called()
 
+        # Verify route creation was NOT called (no interfaces to create routes for)
+        mock_netapp_manager_instance.create_routes_for_project.assert_not_called()
+
         # Verify output was still printed (empty results)
         mock_print.assert_called_once()
 
@@ -873,6 +892,14 @@ class TestIntegrationWithNetAppManager:
             assert hasattr(
                 call.args[1], "name"
             )  # Should have interface config with name attribute
+
+        # Verify route creation was called with correct parameters
+        mock_netapp_manager_instance.create_routes_for_project.assert_called_once()
+        route_call_args = (
+            mock_netapp_manager_instance.create_routes_for_project.call_args
+        )
+        assert route_call_args[0][0] == project_id_normalized  # project_id
+        assert len(route_call_args[0][1]) == 4  # 4 interface configurations
 
         # Verify output was printed
         mock_print.assert_called_once()
