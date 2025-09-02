@@ -402,6 +402,9 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def initialize_connection(self, volume, connector):
         """Initialize connection to volume."""
+        # TODO: the nova ironic driver sends the field 'initiator' but the NetApp
+        # cinder driver expects the field to be 'nqn' so copy the field over
+        connector["nqn"] = connector["initiator"]
         with self._volume_to_library(volume) as lib:
             return lib.initialize_connection(volume, connector)
 
