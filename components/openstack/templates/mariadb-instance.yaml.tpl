@@ -15,7 +15,7 @@ spec:
 
   port: 3306
   storage: {{ .Values.mariadb.storage | toJson }}
-
+  replicas: {{ .Values.mariadb.replicas }}
   service:
     type: ClusterIP
 
@@ -27,6 +27,8 @@ spec:
     innodb_autoinc_lock_mode=2
     max_allowed_packet=256M
     max_connections=1024
+    innodb_flush_log_at_trx_commit=2
+    innodb_buffer_pool_size=256M
 
   metrics:
     enabled: true
@@ -36,6 +38,29 @@ spec:
       jobLabel: mariadb-monitoring
       interval: 10s
       scrapeTimeout: 10s
+
+  galera:
+    enabled: true
+    sst: mariabackup
+    replicaThreads: 1
+    agent:
+      port: 5555
+      kubernetesAuth:
+        enabled: true
+    recovery:
+      enabled: true
+      clusterHealthyTimeout: 2m
+      clusterBootstrapTimeout: 10m
+    config:
+      reuseStorageVolume: false
+      volumeClaimTemplate:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: ceph-block-single
+
 ---
 # mariadb-operator backups for openstack
 # https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/BACKUP.md
