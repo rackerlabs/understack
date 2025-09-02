@@ -212,9 +212,17 @@ class RouteSpec:
             str: Route destination in CIDR format
 
         Raises:
-            ValueError: If IP pattern is not supported (third octet not 0 or 128)
+            ValueError: If IP is not in 100.64.0.0/10 subnet or third octet not 0 or 128
         """
         ip = ipaddress.IPv4Address(nexthop_ip)
+
+        # Validate that IP is within 100.64.0.0/10 subnet
+        carrier_grade_nat_network = ipaddress.IPv4Network("100.64.0.0/10")
+        if ip not in carrier_grade_nat_network:
+            raise ValueError(
+                f"IP address {nexthop_ip} is not within required 100.64.0.0/10 subnet"
+            )
+
         third_octet = int(str(ip).split(".")[2])
 
         if third_octet == 0:
