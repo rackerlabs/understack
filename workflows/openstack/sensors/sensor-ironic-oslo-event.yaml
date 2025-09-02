@@ -1,0 +1,118 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ironic-oslo-event
+  annotations:
+    workflows.argoproj.io/title: Process oslo_events for ironic project
+    workflows.argoproj.io/description: |+
+      Triggers on the following Ironic Events:
+
+      - baremetal.node.provision_set.end which happens after a state change on the node
+
+      Resulting code should be very similar to:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/ironic-oslo-event \
+      -p event-json "JSON-payload"
+      ```
+
+      Defined in `workflows/argo-events/sensors/sensor-ironic-oslo-event.yaml`
+spec:
+  dependencies:
+  - eventName: openstack
+    eventSourceName: openstack-ironic
+    name: ironic-dep
+    transform:
+      # the event is a string-ified JSON so we need to decode it
+      # replace the whole event body
+      jq: |
+        .body = (.body["oslo.message"] | fromjson)
+    filters:
+      # applies each of the items in data with 'and' but there's only one
+      dataLogicalOperator: "and"
+      data:
+        - path: "body.event_type"
+          type: "string"
+          value:
+            - "baremetal.node.provision_set.end"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: ironic-project
+        k8s:
+          operation: create
+          # edits source section
+          parameters:
+            # first parameter is the parsed oslo.message
+            - dest: spec.arguments.parameters.0.value # event-json
+              src:
+                dataKey: body
+                dependencyName: ironic-dep
+            - dest: spec.arguments.parameters.1.value # device_id
+              src:
+                dataKey: body.payload.ironic_object\.data.uuid
+                dependencyName: ironic-dep
+            - dest: spec.arguments.parameters.2.value # project_id
+              src:
+                dataKey: body.payload.ironic_object\.data.lessee
+                dependencyName: ironic-dep
+          source:
+            # create a workflow in argo-events prefixed with ironic-prov-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: ironic-prov-
+                namespace: argo-events
+              spec:
+                serviceAccountName: workflow
+                entrypoint: main
+                # defines the parameters being replaced above
+                arguments:
+                  parameters:
+                    - name: event-json
+                    - name: device_id
+                    - name: project_id
+                templates:
+                - name: main
+                  steps:
+                  # - - name: oslo-events
+                  #     templateRef:
+                  #       name: openstack-oslo-event
+                  #       template: main
+                  #     arguments:
+                  #       parameters:
+                  #       - name: event-json
+                  #         value: "{{workflow.parameters.event-json}}"
+                    - name: convert-project-id
+                      inline:
+                        script:
+                          image: python:alpine
+                          command: [python]
+                          source: |
+                              import uuid
+                              project_id_without_dashes = "{{workflow.parameters.project_id}}"
+                              print(str(uuid.UUID(project_id_without_dashes)))
+                    - - name: ansible-on_server_create
+                        when: "{{steps.oslo-events.outputs.parameters.storage}} == 'wanted'"
+                        inline:
+                          container:
+                            image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+                            command: [ansible-playbook]
+                            args:
+                            - "storage_on_server_create.yml"
+                            - --extra-vars
+                            - "project_id={{steps.convert-project-id.outputs.result}} device_id={{workflow.parameters.device_id}} env=dev"
+                            - "-i"
+                            - "inventory/uc-dev/01-nautobot.yaml"
+                            - "-vvv"
+                              # TODO: this shouldn't be hardcodod to dev, but will work since
+                              # it really talks to https://nautobot-default.svc
+                            env:
+                              - name: NAUTOBOT_TOKEN
+                                valueFrom:
+                                  secretKeyRef:
+                                    key: token
+                                    name: nautobot-token
