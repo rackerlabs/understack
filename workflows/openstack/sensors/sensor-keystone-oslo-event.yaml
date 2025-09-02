@@ -137,3 +137,12 @@ spec:
                                 secretKeyRef:
                                   key: token
                                   name: nautobot-token
+                  - - name: netapp-configure-net
+                      when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
+                      templateRef:
+                        name: netapp-configure-net
+                        template: main
+                      arguments:
+                        parameters:
+                        - name: project_id
+                          value: "{{workflow.parameters.project_id}}"

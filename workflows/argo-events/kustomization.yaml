@@ -21,6 +21,7 @@ resources:
   - workflowtemplates/enroll-server.yaml
   - workflowtemplates/reclean-server.yaml
   - workflowtemplates/openstack-oslo-event.yaml
+  - workflowtemplates/netapp-configure-net.yaml
   # Alert automation
   - sensors/alertmanager-webhook-sensor.yaml
   - eventsources/alertmanager-webhook-eventsource.yaml

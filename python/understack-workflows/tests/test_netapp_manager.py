@@ -1,16 +1,19 @@
+"""Refactored NetApp Manager tests focusing on orchestration and delegation."""
+
+import ipaddress
 import os
 import tempfile
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
-from netapp_ontap.error import NetAppRestError
 
-from understack_workflows.netapp_manager import NetAppManager
+from understack_workflows.netapp.manager import NetAppManager
+from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 
 
-class TestNetAppManager:
-    """Test cases for NetAppManager class."""
+class TestNetAppManagerOrchestration:
+    """Test NetAppManager orchestration and delegation responsibilities."""
 
     @pytest.fixture
     def mock_config_file(self):
@@ -26,186 +29,348 @@ netapp_password = test-password
             yield f.name
         os.unlink(f.name)
 
-    @patch("understack_workflows.netapp_manager.config")
-    @patch("understack_workflows.netapp_manager.HostConnection")
-    def test_init_success(self, mock_host_connection, mock_config, mock_config_file):
-        """Test successful NetAppManager initialization."""
-        NetAppManager(mock_config_file)
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_initialization_with_dependency_injection(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test manager initialization sets up all required services."""
+        manager = NetAppManager(mock_config_file)
 
+        # Verify all services are initialized
+        assert hasattr(manager, "_client")
+        assert hasattr(manager, "_config")
+        assert hasattr(manager, "_error_handler")
+        assert hasattr(manager, "_svm_service")
+        assert hasattr(manager, "_volume_service")
+        assert hasattr(manager, "_lif_service")
+
+        # Verify connection setup
         mock_host_connection.assert_called_once_with(
             "test-hostname", username="test-user", password="test-password"
         )
 
-    @patch("understack_workflows.netapp_manager.config")
-    @patch("understack_workflows.netapp_manager.HostConnection")
-    def test_init_default_config_path(self, mock_host_connection, mock_config):
-        """Test NetAppManager initialization with default config path."""
-        with patch.object(NetAppManager, "parse_ontap_config") as mock_parse:
-            mock_parse.return_value = {
-                "hostname": "default-host",
-                "username": "default-user",
-                "password": "default-pass",
-            }
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_create_svm_delegates_to_service(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test create_svm delegates to SvmService with correct parameters."""
+        manager = NetAppManager(mock_config_file)
+        manager._svm_service.create_svm = MagicMock(return_value="os-test-project")
 
-            NetAppManager()
+        result = manager.create_svm("test-project", "test-aggregate")
 
-            mock_parse.assert_called_once_with("/etc/netapp/netapp_nvme.conf")
-            mock_host_connection.assert_called_once_with(
-                "default-host", username="default-user", password="default-pass"
+        # Verify delegation with correct parameters
+        manager._svm_service.create_svm.assert_called_once_with(
+            "test-project", "test-aggregate"
+        )
+        assert result == "os-test-project"
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_create_volume_delegates_to_service(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test create_volume delegates to VolumeService with correct parameters."""
+        manager = NetAppManager(mock_config_file)
+        manager._volume_service.create_volume = MagicMock(
+            return_value="vol_test-project"
+        )
+
+        result = manager.create_volume("test-project", "1TB", "test-aggregate")
+
+        # Verify delegation with correct parameters
+        manager._volume_service.create_volume.assert_called_once_with(
+            "test-project", "1TB", "test-aggregate"
+        )
+        assert result == "vol_test-project"
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_delete_svm_standard_name_delegates_to_service(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test delete_svm with standard naming delegates to SvmService."""
+        manager = NetAppManager(mock_config_file)
+        manager._svm_service.delete_svm = MagicMock(return_value=True)
+
+        result = manager.delete_svm("os-test-project")
+
+        # Verify delegation extracts project_id correctly
+        manager._svm_service.delete_svm.assert_called_once_with("test-project")
+        assert result is True
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_delete_svm_nonstandard_name_uses_client(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test delete_svm with non-standard naming falls back to client."""
+        manager = NetAppManager(mock_config_file)
+        manager._client.delete_svm = MagicMock(return_value=True)
+
+        result = manager.delete_svm("custom-svm-name")
+
+        # Verify fallback to client for non-standard names
+        manager._client.delete_svm.assert_called_once_with("custom-svm-name")
+        assert result is True
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_delete_volume_standard_name_delegates_to_service(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test delete_volume with standard naming delegates to VolumeService."""
+        manager = NetAppManager(mock_config_file)
+        manager._volume_service.delete_volume = MagicMock(return_value=True)
+
+        result = manager.delete_volume("vol_test-project", force=True)
+
+        # Verify delegation extracts project_id correctly
+        manager._volume_service.delete_volume.assert_called_once_with(
+            "test-project", True
+        )
+        assert result is True
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_check_if_svm_exists_delegates_to_service(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test check_if_svm_exists delegates to SvmService."""
+        manager = NetAppManager(mock_config_file)
+        manager._svm_service.exists = MagicMock(return_value=True)
+
+        result = manager.check_if_svm_exists("test-project")
+
+        manager._svm_service.exists.assert_called_once_with("test-project")
+        assert result is True
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_mapped_namespaces_standard_names_delegates_to_service(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test mapped_namespaces with standard naming delegates to VolumeService."""
+        manager = NetAppManager(mock_config_file)
+        expected_namespaces = ["namespace1", "namespace2"]
+        manager._volume_service.get_mapped_namespaces = MagicMock(
+            return_value=expected_namespaces
+        )
+
+        result = manager.mapped_namespaces("os-test-project", "vol_test-project")
+
+        # Verify delegation with extracted project_id
+        manager._volume_service.get_mapped_namespaces.assert_called_once_with(
+            "test-project"
+        )
+        assert result == expected_namespaces
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_create_lif_delegates_to_service(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test create_lif delegates to LifService."""
+        manager = NetAppManager(mock_config_file)
+        manager._lif_service.create_lif = MagicMock()
+
+        config_obj = NetappIPInterfaceConfig(
+            name="N1-test-A",
+            address=ipaddress.IPv4Address("192.168.1.10"),
+            network=ipaddress.IPv4Network("192.168.1.0/24"),
+            vlan_id=100,
+        )
+
+        manager.create_lif("test-project", config_obj)
+
+        manager._lif_service.create_lif.assert_called_once_with(
+            "test-project", config_obj
+        )
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_naming_convention_utilities(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test naming convention utility methods."""
+        manager = NetAppManager(mock_config_file)
+
+        # Test SVM naming
+        assert manager._svm_name("test-project") == "os-test-project"
+
+        # Test volume naming
+        assert manager._volume_name("test-project") == "vol_test-project"
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_error_propagation_from_services(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test that errors from services are properly propagated."""
+        manager = NetAppManager(mock_config_file)
+
+        # Test SVM service error propagation
+        from understack_workflows.netapp.exceptions import SvmOperationError
+
+        manager._svm_service.create_svm = MagicMock(
+            side_effect=SvmOperationError("SVM creation failed")
+        )
+
+        with pytest.raises(SvmOperationError, match="SVM creation failed"):
+            manager.create_svm("test-project", "test-aggregate")
+
+        # Test Volume service error propagation
+        from understack_workflows.netapp.exceptions import VolumeOperationError
+
+        manager._volume_service.create_volume = MagicMock(
+            side_effect=VolumeOperationError("Volume creation failed")
+        )
+
+        with pytest.raises(VolumeOperationError, match="Volume creation failed"):
+            manager.create_volume("test-project", "1TB", "test-aggregate")
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_cleanup_project_orchestration(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test cleanup_project orchestrates services correctly."""
+        manager = NetAppManager(mock_config_file)
+
+        # Mock service methods
+        manager._volume_service.exists = MagicMock(return_value=True)
+        manager._svm_service.exists = MagicMock(return_value=True)
+        manager._volume_service.delete_volume = MagicMock(return_value=True)
+        manager._svm_service.delete_svm = MagicMock(return_value=True)
+
+        result = manager.cleanup_project("test-project")
+
+        # Verify orchestration sequence
+        manager._volume_service.exists.assert_called_once_with("test-project")
+        manager._svm_service.exists.assert_called_once_with("test-project")
+        manager._volume_service.delete_volume.assert_called_once_with(
+            "test-project", force=True
+        )
+        manager._svm_service.delete_svm.assert_called_once_with("test-project")
+
+        assert result == {"volume": True, "svm": True}
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_cleanup_project_volume_failure_stops_svm_deletion(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test cleanup_project stops SVM deletion when volume deletion fails."""
+        manager = NetAppManager(mock_config_file)
+
+        # Mock volume deletion failure
+        manager._volume_service.exists = MagicMock(return_value=True)
+        manager._svm_service.exists = MagicMock(return_value=True)
+        manager._volume_service.delete_volume = MagicMock(return_value=False)
+        manager._svm_service.delete_svm = MagicMock()
+
+        result = manager.cleanup_project("test-project")
+
+        # Verify SVM deletion was not attempted
+        manager._volume_service.delete_volume.assert_called_once_with(
+            "test-project", force=True
+        )
+        manager._svm_service.delete_svm.assert_not_called()
+
+        assert result == {"volume": False, "svm": False}
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_public_api_contract_maintained(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test that all public method signatures are maintained."""
+        manager = NetAppManager(mock_config_file)
+
+        # Mock all service methods to avoid actual calls
+        manager._svm_service.create_svm = MagicMock(return_value="test-svm")
+        manager._svm_service.delete_svm = MagicMock(return_value=True)
+        manager._svm_service.exists = MagicMock(return_value=True)
+        manager._volume_service.create_volume = MagicMock(return_value="test-volume")
+        manager._volume_service.delete_volume = MagicMock(return_value=True)
+        manager._volume_service.get_mapped_namespaces = MagicMock(return_value=[])
+        manager._lif_service.create_lif = MagicMock()
+        manager._lif_service.create_home_port = MagicMock()
+        manager._lif_service.identify_home_node = MagicMock()
+
+        # Test all public methods can be called with expected signatures
+        try:
+            manager.create_svm("project", "aggregate")
+            manager.delete_svm("svm-name")
+            manager.create_volume("project", "1TB", "aggregate")
+            manager.delete_volume("volume-name")
+            manager.delete_volume("volume-name", force=True)
+            manager.check_if_svm_exists("project")
+            manager.mapped_namespaces("svm", "volume")
+            manager.cleanup_project("project")
+
+            # Network-related methods
+            config_obj = NetappIPInterfaceConfig(
+                name="test",
+                address=ipaddress.IPv4Address("192.168.1.1"),
+                network=ipaddress.IPv4Network("192.168.1.0/24"),
+                vlan_id=100,
             )
+            manager.create_lif("project", config_obj)
+            manager.create_home_port(config_obj)
+            manager.identify_home_node(config_obj)
 
-    def test_parse_ontap_config_success(self, mock_config_file):
-        """Test successful config parsing."""
-        manager = NetAppManager.__new__(NetAppManager)
-        result = manager.parse_ontap_config(mock_config_file)
+        except TypeError as e:
+            pytest.fail(f"Public API contract broken: {e}")
 
-        expected = {
-            "hostname": "test-hostname",
-            "username": "test-user",
-            "password": "test-password",
-        }
-        assert result == expected
 
-    def test_parse_ontap_config_file_not_found(self):
-        """Test config parsing when file doesn't exist."""
-        manager = NetAppManager.__new__(NetAppManager)
+class TestNetAppManagerValueObjects:
+    """Test NetappIPInterfaceConfig value object (kept for backward compatibility)."""
 
-        with pytest.raises(SystemExit) as exc_info:
-            manager.parse_ontap_config("/nonexistent/path")
-
-        assert exc_info.value.code == 1
-
-    def test_parse_ontap_config_missing_section(self):
-        """Test config parsing with missing section."""
-        config_content = """[wrong_section]
-some_key = some_value
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
-            f.write(config_content)
-            f.flush()
-
-            manager = NetAppManager.__new__(NetAppManager)
-
-            with pytest.raises(SystemExit) as exc_info:
-                manager.parse_ontap_config(f.name)
-
-            assert exc_info.value.code == 1
-
-        os.unlink(f.name)
-
-    def test_parse_ontap_config_missing_option(self):
-        """Test config parsing with missing required option."""
-        config_content = """[netapp_nvme]
-netapp_server_hostname = test-hostname
-netapp_login = test-user
-# missing netapp_password
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
-            f.write(config_content)
-            f.flush()
-
-            manager = NetAppManager.__new__(NetAppManager)
-
-            with pytest.raises(SystemExit) as exc_info:
-                manager.parse_ontap_config(f.name)
-
-            assert exc_info.value.code == 1
-
-        os.unlink(f.name)
-
-    @patch("understack_workflows.netapp_manager.config")
-    @patch("understack_workflows.netapp_manager.HostConnection")
-    @patch("understack_workflows.netapp_manager.Svm")
-    def test_create_svm_success(
-        self, mock_svm_class, mock_host_connection, mock_config, mock_config_file
-    ):
-        """Test successful SVM creation."""
-        mock_svm_instance = MagicMock()
-        mock_svm_instance.name = "os-test-project-123"
-        mock_svm_class.return_value = mock_svm_instance
-
-        manager = NetAppManager(mock_config_file)
-        manager.create_svm("test-project-123", "test-aggregate")
-
-        mock_svm_class.assert_called_once_with(
-            name="os-test-project-123",
-            aggregates=[{"name": "test-aggregate"}],
-            language="c.utf_8",
-            root_volume={"name": "os-test-project-123_root", "security_style": "unix"},
-            allowed_protocols=["nvme"],
-            nvme={"enabled": True},
+    def test_netmask_long(self):
+        """Test netmask_long method."""
+        config = NetappIPInterfaceConfig(
+            name="N1-storage-A",
+            address=ipaddress.IPv4Address("192.168.1.10"),
+            network=ipaddress.IPv4Network("192.168.1.0/24"),
+            vlan_id=100,
         )
-        mock_svm_instance.post.assert_called_once()
-        mock_svm_instance.get.assert_called_once()
+        assert config.netmask_long() == ipaddress.IPv4Address("255.255.255.0")
 
-    @patch("understack_workflows.netapp_manager.config")
-    @patch("understack_workflows.netapp_manager.HostConnection")
-    @patch("understack_workflows.netapp_manager.Svm")
-    def test_create_svm_failure(
-        self, mock_svm_class, mock_host_connection, mock_config, mock_config_file
-    ):
-        """Test SVM creation failure."""
-        mock_svm_instance = MagicMock()
-        mock_svm_instance.post.side_effect = NetAppRestError("Test error")
-        mock_svm_class.return_value = mock_svm_instance
-
-        manager = NetAppManager(mock_config_file)
-
-        with pytest.raises(SystemExit) as exc_info:
-            manager.create_svm("test-project-123", "test-aggregate")
-
-        assert exc_info.value.code == 1
-
-    @patch("understack_workflows.netapp_manager.config")
-    @patch("understack_workflows.netapp_manager.HostConnection")
-    @patch("understack_workflows.netapp_manager.Volume")
-    def test_create_volume_success(
-        self, mock_volume_class, mock_host_connection, mock_config, mock_config_file
-    ):
-        """Test successful volume creation."""
-        mock_volume_instance = MagicMock()
-        mock_volume_class.return_value = mock_volume_instance
-
-        manager = NetAppManager(mock_config_file)
-        manager.create_volume("test-project-123", "1TB", "test-aggregate")
-
-        mock_volume_class.assert_called_once_with(
-            name="vol_test-project-123",
-            svm={"name": "os-test-project-123"},
-            aggregates=[{"name": "test-aggregate"}],
-            size="1TB",
+    def test_side_property_extraction(self):
+        """Test side property extraction from interface names."""
+        config_a = NetappIPInterfaceConfig(
+            name="N1-test-A",
+            address=ipaddress.IPv4Address("192.168.1.10"),
+            network=ipaddress.IPv4Network("192.168.1.0/24"),
+            vlan_id=100,
         )
-        mock_volume_instance.post.assert_called_once()
-        mock_volume_instance.get.assert_called_once()
+        assert config_a.side == "A"
 
-    @patch("understack_workflows.netapp_manager.config")
-    @patch("understack_workflows.netapp_manager.HostConnection")
-    @patch("understack_workflows.netapp_manager.Volume")
-    def test_create_volume_failure(
-        self, mock_volume_class, mock_host_connection, mock_config, mock_config_file
-    ):
-        """Test volume creation failure."""
-        mock_volume_instance = MagicMock()
-        mock_volume_instance.post.side_effect = NetAppRestError("Test error")
-        mock_volume_class.return_value = mock_volume_instance
+        config_b = NetappIPInterfaceConfig(
+            name="N1-test-B",
+            address=ipaddress.IPv4Address("192.168.1.10"),
+            network=ipaddress.IPv4Network("192.168.1.0/24"),
+            vlan_id=100,
+        )
+        assert config_b.side == "B"
 
-        manager = NetAppManager(mock_config_file)
+    def test_desired_node_number_extraction(self):
+        """Test node number extraction from interface names."""
+        config_n1 = NetappIPInterfaceConfig(
+            name="N1-test-A",
+            address=ipaddress.IPv4Address("192.168.1.10"),
+            network=ipaddress.IPv4Network("192.168.1.0/24"),
+            vlan_id=100,
+        )
+        assert config_n1.desired_node_number == 1
 
-        with pytest.raises(SystemExit) as exc_info:
-            manager.create_volume("test-project-123", "1TB", "test-aggregate")
-
-        assert exc_info.value.code == 1
-
-    @patch("understack_workflows.netapp_manager.config")
-    @patch("understack_workflows.netapp_manager.HostConnection")
-    def test_svm_name(self, mock_host_connection, mock_config, mock_config_file):
-        """Test SVM name generation."""
-        manager = NetAppManager(mock_config_file)
-        assert manager._svm_name("test-project-123") == "os-test-project-123"
-
-    @patch("understack_workflows.netapp_manager.config")
-    @patch("understack_workflows.netapp_manager.HostConnection")
-    def test_volume_name(self, mock_host_connection, mock_config, mock_config_file):
-        """Test volume name generation."""
-        manager = NetAppManager(mock_config_file)
-        assert manager._volume_name("test-project-123") == "vol_test-project-123"
+        config_n2 = NetappIPInterfaceConfig(
+            name="N2-test-B",
+            address=ipaddress.IPv4Address("192.168.1.10"),
+            network=ipaddress.IPv4Network("192.168.1.0/24"),
+            vlan_id=100,
+        )
+        assert config_n2.desired_node_number == 2
