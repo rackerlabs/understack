@@ -21,6 +21,7 @@ from understack_workflows.netapp.value_objects import NamespaceSpec
 from understack_workflows.netapp.value_objects import NodeResult
 from understack_workflows.netapp.value_objects import PortResult
 from understack_workflows.netapp.value_objects import PortSpec
+from understack_workflows.netapp.value_objects import RouteSpec
 from understack_workflows.netapp.value_objects import SvmResult
 from understack_workflows.netapp.value_objects import SvmSpec
 from understack_workflows.netapp.value_objects import VolumeResult
@@ -520,6 +521,180 @@ class TestNetAppClient:
 
         with pytest.raises(NetAppManagerError):
             netapp_client.get_namespaces(namespace_spec)
+
+    @patch("understack_workflows.netapp.client.NetworkRoute")
+    def test_create_route_success(self, mock_route_class, netapp_client):
+        """Test successful route creation."""
+        mock_route_instance = MagicMock()
+        mock_route_instance.uuid = "route-uuid-123"
+        mock_route_class.return_value = mock_route_instance
+
+        route_spec = RouteSpec(
+            svm_name="os-test-project",
+            gateway="100.127.0.17",
+            destination="100.126.0.0/17",
+        )
+
+        result = netapp_client.create_route(route_spec)
+
+        # Verify route configuration
+        assert mock_route_instance.svm == {"name": "os-test-project"}
+        assert mock_route_instance.gateway == "100.127.0.17"
+        assert mock_route_instance.destination == "100.126.0.0/17"
+        mock_route_instance.post.assert_called_once_with(hydrate=True)
+
+        # Verify result
+        assert result.uuid == "route-uuid-123"
+        assert result.gateway == "100.127.0.17"
+        assert result.destination == "100.126.0.0/17"
+        assert result.svm_name == "os-test-project"
+
+    @patch("understack_workflows.netapp.client.NetworkRoute")
+    def test_create_route_netapp_rest_error(self, mock_route_class, netapp_client):
+        """Test route creation with NetAppRestError."""
+        mock_route_instance = MagicMock()
+        mock_route_instance.post.side_effect = NetAppRestError("SVM not found")
+        mock_route_class.return_value = mock_route_instance
+
+        # Configure error handler to raise NetworkOperationError
+        netapp_client._error_handler.handle_netapp_error.side_effect = (
+            NetworkOperationError(
+                "Route creation failed: SVM not found",
+                interface_name="test-route",
+                context={"svm_name": "os-nonexistent-project"},
+            )
+        )
+
+        route_spec = RouteSpec(
+            svm_name="os-nonexistent-project",
+            gateway="100.127.0.17",
+            destination="100.126.0.0/17",
+        )
+
+        with pytest.raises(NetworkOperationError):
+            netapp_client.create_route(route_spec)
+
+        # Verify error handler was called with correct context
+        netapp_client._error_handler.handle_netapp_error.assert_called_once()
+        call_args = netapp_client._error_handler.handle_netapp_error.call_args
+        assert isinstance(call_args[0][0], NetAppRestError)
+        assert call_args[0][1] == "Route creation"
+        assert call_args[0][2]["svm_name"] == "os-nonexistent-project"
+        assert call_args[0][2]["gateway"] == "100.127.0.17"
+        assert call_args[0][2]["destination"] == "100.126.0.0/17"
+
+    @patch("understack_workflows.netapp.client.NetworkRoute")
+    def test_create_route_invalid_svm_error(self, mock_route_class, netapp_client):
+        """Test route creation with invalid SVM name."""
+        mock_route_instance = MagicMock()
+        mock_route_instance.post.side_effect = NetAppRestError(
+            "SVM 'os-invalid-svm' does not exist"
+        )
+        mock_route_class.return_value = mock_route_instance
+
+        # Configure error handler to raise NetworkOperationError
+        netapp_client._error_handler.handle_netapp_error.side_effect = (
+            NetworkOperationError(
+                "Route creation failed: SVM does not exist",
+                interface_name="test-route",
+                context={"svm_name": "os-invalid-svm"},
+            )
+        )
+
+        route_spec = RouteSpec(
+            svm_name="os-invalid-svm",
+            gateway="100.127.0.17",
+            destination="100.126.0.0/17",
+        )
+
+        with pytest.raises(NetworkOperationError):
+            netapp_client.create_route(route_spec)
+
+        # Verify error context includes SVM information
+        call_args = netapp_client._error_handler.handle_netapp_error.call_args
+        assert call_args[0][2]["svm_name"] == "os-invalid-svm"
+
+    @patch("understack_workflows.netapp.client.NetworkRoute")
+    def test_create_route_gateway_unreachable_error(
+        self, mock_route_class, netapp_client
+    ):
+        """Test route creation with unreachable gateway."""
+        mock_route_instance = MagicMock()
+        mock_route_instance.post.side_effect = NetAppRestError(
+            "Gateway 192.168.1.1 is not reachable from SVM network"
+        )
+        mock_route_class.return_value = mock_route_instance
+
+        # Configure error handler to raise NetworkOperationError
+        netapp_client._error_handler.handle_netapp_error.side_effect = (
+            NetworkOperationError(
+                "Route creation failed: Gateway unreachable",
+                interface_name="test-route",
+                context={"gateway": "192.168.1.1"},
+            )
+        )
+
+        route_spec = RouteSpec(
+            svm_name="os-test-project",
+            gateway="192.168.1.1",  # Invalid gateway for this network
+            destination="100.126.0.0/17",
+        )
+
+        with pytest.raises(NetworkOperationError):
+            netapp_client.create_route(route_spec)
+
+        # Verify error context includes gateway information
+        call_args = netapp_client._error_handler.handle_netapp_error.call_args
+        assert call_args[0][2]["gateway"] == "192.168.1.1"
+        assert call_args[0][2]["destination"] == "100.126.0.0/17"
+
+    @patch("understack_workflows.netapp.client.NetworkRoute")
+    def test_create_route_logging_behavior(self, mock_route_class, netapp_client):
+        """Test route creation logging behavior."""
+        mock_route_instance = MagicMock()
+        mock_route_instance.uuid = "route-uuid-456"
+        mock_route_class.return_value = mock_route_instance
+
+        route_spec = RouteSpec(
+            svm_name="os-logging-test",
+            gateway="100.127.128.17",
+            destination="100.126.128.0/17",
+        )
+
+        netapp_client.create_route(route_spec)
+
+        # Verify logging calls
+        error_handler = netapp_client._error_handler
+        log_info_calls = error_handler.log_info.call_args_list
+        log_debug_calls = error_handler.log_debug.call_args_list
+
+        # Should have info logs for start and completion
+        assert len(log_info_calls) >= 2
+
+        # Should have debug log for route creation
+        assert len(log_debug_calls) >= 1
+
+        # Find the route-specific log messages
+        route_start_logs = [
+            call for call in log_info_calls if "Creating route:" in call[0][0]
+        ]
+        route_completion_logs = [
+            call
+            for call in log_info_calls
+            if "Route created successfully:" in call[0][0]
+        ]
+
+        # Verify route start log
+        assert len(route_start_logs) == 1
+        start_log = route_start_logs[0]
+        assert start_log[0][1]["destination"] == "100.126.128.0/17"
+        assert start_log[0][1]["gateway"] == "100.127.128.17"
+        assert start_log[0][1]["svm_name"] == "os-logging-test"
+
+        # Verify route completion log
+        assert len(route_completion_logs) == 1
+        completion_log = route_completion_logs[0]
+        assert completion_log[0][1]["uuid"] == "route-uuid-456"
 
 
 class TestNetAppClientInterface:

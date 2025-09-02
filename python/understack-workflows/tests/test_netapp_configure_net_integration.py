@@ -1129,6 +1129,284 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
     @patch("understack_workflows.main.netapp_configure_net.setup_logger")
+    def test_netapp_rest_error_handling_during_route_creation(
+        self,
+        mock_setup_logger,
+        mock_credential,
+        mock_nautobot_class,
+        mock_netapp_manager_class,
+    ):
+        """Test NetAppRestError handling during route creation."""
+        from understack_workflows.main.netapp_configure_net import main
+        from understack_workflows.netapp.exceptions import NetworkOperationError
+
+        # Mock logger
+        mock_logger = Mock()
+        mock_setup_logger.return_value = mock_logger
+
+        # Mock credential function
+        mock_credential.return_value = "test-token"
+
+        # Mock successful GraphQL response
+        mock_response = Mock()
+        mock_response.json = load_json_sample(
+            "nautobot_graphql_vm_response_single.json"
+        )
+
+        # Mock Nautobot client
+        mock_nautobot_instance = Mock()
+        mock_nautobot_instance.session.graphql.query.return_value = mock_response
+        mock_nautobot_class.return_value = mock_nautobot_instance
+
+        # Mock NetAppManager with NetworkOperationError (which wraps NetAppRestError)
+        mock_netapp_manager_instance = Mock()
+        mock_netapp_manager_instance.create_routes_for_project.side_effect = (
+            NetworkOperationError(
+                "Route creation failed: NetApp REST API error",
+                interface_name="test-route",
+                context={
+                    "svm_name": "os-12345678123456789abc123456789012",
+                    "gateway": "100.127.0.17",
+                    "destination": "100.126.0.0/17",
+                    "netapp_error": "SVM not found",
+                },
+            )
+        )
+        mock_netapp_manager_class.return_value = mock_netapp_manager_instance
+
+        # Mock sys.argv for argument parsing
+        with patch(
+            "sys.argv",
+            [
+                "netapp_configure_net.py",
+                "--project-id",
+                "12345678-1234-5678-9abc-123456789012",
+            ],
+        ):
+            result = main()
+
+        # Verify exit code 1 for NetApp error
+        assert result == 1
+
+        # Verify LIF creation was attempted before route creation failed
+        assert mock_netapp_manager_instance.create_lif.call_count == 2
+
+        # Verify route creation was attempted
+        mock_netapp_manager_instance.create_routes_for_project.assert_called_once()
+
+    @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
+    @patch("understack_workflows.main.netapp_configure_net.Nautobot")
+    @patch("understack_workflows.main.netapp_configure_net.credential")
+    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
+    def test_script_termination_on_route_creation_failure(
+        self,
+        mock_setup_logger,
+        mock_credential,
+        mock_nautobot_class,
+        mock_netapp_manager_class,
+    ):
+        """Test script termination when route creation fails."""
+        from understack_workflows.main.netapp_configure_net import main
+
+        # Mock logger
+        mock_logger = Mock()
+        mock_setup_logger.return_value = mock_logger
+
+        # Mock credential function
+        mock_credential.return_value = "test-token"
+
+        # Mock successful GraphQL response
+        mock_response = Mock()
+        mock_response.json = load_json_sample(
+            "nautobot_graphql_vm_response_complex.json"
+        )
+
+        # Mock Nautobot client
+        mock_nautobot_instance = Mock()
+        mock_nautobot_instance.session.graphql.query.return_value = mock_response
+        mock_nautobot_class.return_value = mock_nautobot_instance
+
+        # Mock NetAppManager with route creation failure that should terminate script
+        mock_netapp_manager_instance = Mock()
+        mock_netapp_manager_instance.create_routes_for_project.side_effect = Exception(
+            "Critical route creation failure: Unable to connect to NetApp system"
+        )
+        mock_netapp_manager_class.return_value = mock_netapp_manager_instance
+
+        # Mock sys.argv for argument parsing
+        with patch(
+            "sys.argv",
+            [
+                "netapp_configure_net.py",
+                "--project-id",
+                "abcdef12-3456-7890-abcd-ef1234567890",
+            ],
+        ):
+            result = main()
+
+        # Verify script terminates with exit code 1 (connection/initialization error)
+        assert result == 1
+
+        # Verify LIF creation completed successfully before route creation failed
+        assert mock_netapp_manager_instance.create_lif.call_count == 4
+
+        # Verify route creation was attempted and failed
+        mock_netapp_manager_instance.create_routes_for_project.assert_called_once()
+
+        # Verify no output was printed due to early termination
+        # (The script should fail before reaching the output formatting stage)
+
+    @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
+    @patch("understack_workflows.main.netapp_configure_net.Nautobot")
+    @patch("understack_workflows.main.netapp_configure_net.credential")
+    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
+    def test_error_logging_and_context_for_route_failures(
+        self,
+        mock_setup_logger,
+        mock_credential,
+        mock_nautobot_class,
+        mock_netapp_manager_class,
+    ):
+        """Test error logging and context information for route failures."""
+        from understack_workflows.main.netapp_configure_net import main
+        from understack_workflows.netapp.exceptions import NetworkOperationError
+
+        # Mock logger
+        mock_logger = Mock()
+        mock_setup_logger.return_value = mock_logger
+
+        # Mock credential function
+        mock_credential.return_value = "test-token"
+
+        # Mock successful GraphQL response
+        mock_response = Mock()
+        mock_response.json = load_json_sample(
+            "nautobot_graphql_vm_response_single.json"
+        )
+
+        # Mock Nautobot client
+        mock_nautobot_instance = Mock()
+        mock_nautobot_instance.session.graphql.query.return_value = mock_response
+        mock_nautobot_class.return_value = mock_nautobot_instance
+
+        # Mock NetAppManager with detailed error context
+        detailed_error = NetworkOperationError(
+            "Route creation failed: Invalid gateway address",
+            interface_name="test-route-gateway",
+            context={
+                "svm_name": "os-12345678123456789abc123456789012",
+                "gateway": "192.168.1.1",  # Invalid gateway for this network
+                "destination": "100.126.0.0/17",
+                "netapp_error": "Gateway not reachable from SVM network",
+                "operation": "Route creation",
+                "timestamp": "2024-01-15T10:30:00Z",
+            },
+        )
+        mock_netapp_manager_instance = Mock()
+        mock_netapp_manager_instance.create_routes_for_project.side_effect = (
+            detailed_error
+        )
+        mock_netapp_manager_class.return_value = mock_netapp_manager_instance
+
+        # Mock sys.argv for argument parsing
+        with patch(
+            "sys.argv",
+            [
+                "netapp_configure_net.py",
+                "--project-id",
+                "12345678-1234-5678-9abc-123456789012",
+            ],
+        ):
+            result = main()
+
+        # Verify exit code 1 for route creation error
+        assert result == 1
+
+        # Verify route creation was attempted
+        mock_netapp_manager_instance.create_routes_for_project.assert_called_once()
+
+        # Verify error context is available in the exception
+        call_args = mock_netapp_manager_instance.create_routes_for_project.call_args
+        assert call_args[0][0] == "12345678123456789abc123456789012"  # project_id
+        # Interface configs should be passed as second argument
+        assert len(call_args[0][1]) == 2  # Two interfaces from single sample
+
+    @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
+    @patch("understack_workflows.main.netapp_configure_net.Nautobot")
+    @patch("understack_workflows.main.netapp_configure_net.credential")
+    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
+    def test_invalid_svm_name_handling_during_route_creation(
+        self,
+        mock_setup_logger,
+        mock_credential,
+        mock_nautobot_class,
+        mock_netapp_manager_class,
+    ):
+        """Test handling of invalid SVM names during route creation."""
+        from understack_workflows.main.netapp_configure_net import main
+        from understack_workflows.netapp.exceptions import SvmOperationError
+
+        # Mock logger
+        mock_logger = Mock()
+        mock_setup_logger.return_value = mock_logger
+
+        # Mock credential function
+        mock_credential.return_value = "test-token"
+
+        # Mock successful GraphQL response
+        mock_response = Mock()
+        mock_response.json = load_json_sample(
+            "nautobot_graphql_vm_response_single.json"
+        )
+
+        # Mock Nautobot client
+        mock_nautobot_instance = Mock()
+        mock_nautobot_instance.session.graphql.query.return_value = mock_response
+        mock_nautobot_class.return_value = mock_nautobot_instance
+
+        # Mock NetAppManager with SVM not found error during route creation
+        svm_error = SvmOperationError(
+            "Route creation failed: SVM 'os-12345678123456789abc123456789012'"
+            "not found",
+            svm_name="os-12345678123456789abc123456789012",
+            context={
+                "operation": "Route creation",
+                "gateway": "100.127.0.17",
+                "destination": "100.126.0.0/17",
+                "netapp_error": "SVM does not exist on NetApp system",
+                "available_svms": ["svm1", "svm2", "default"],
+            },
+        )
+        mock_netapp_manager_instance = Mock()
+        mock_netapp_manager_instance.create_routes_for_project.side_effect = svm_error
+        mock_netapp_manager_class.return_value = mock_netapp_manager_instance
+
+        # Mock sys.argv for argument parsing
+        with patch(
+            "sys.argv",
+            [
+                "netapp_configure_net.py",
+                "--project-id",
+                "12345678-1234-5678-9abc-123456789012",
+            ],
+        ):
+            result = main()
+
+        # Verify exit code 1 for SVM error during route creation
+        assert result == 1
+
+        # Verify LIF creation was attempted before route creation failed
+        assert mock_netapp_manager_instance.create_lif.call_count == 2
+
+        # Verify route creation was attempted with correct SVM name
+        mock_netapp_manager_instance.create_routes_for_project.assert_called_once()
+        call_args = mock_netapp_manager_instance.create_routes_for_project.call_args
+        assert call_args[0][0] == "12345678123456789abc123456789012"  # project_id
+
+    @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
+    @patch("understack_workflows.main.netapp_configure_net.Nautobot")
+    @patch("understack_workflows.main.netapp_configure_net.credential")
+    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_route_creation_logging_verification(
         self,
         mock_setup_logger,

@@ -4,6 +4,7 @@ import ipaddress
 from unittest.mock import Mock
 
 import pytest
+from netapp_ontap.error import NetAppRestError
 
 from understack_workflows.netapp.exceptions import NetAppManagerError
 from understack_workflows.netapp.route_service import RouteService
@@ -433,3 +434,172 @@ class TestRouteService:
         assert any("Creating routes for project" in msg for msg in log_messages)
         assert any("Created route:" in msg for msg in log_messages)
         assert any("Successfully created" in msg for msg in log_messages)
+
+    def test_create_routes_netapp_rest_error_handling(
+        self, route_service, mock_client, mock_error_handler, sample_interface_configs
+    ):
+        """Test NetAppRestError handling during route creation."""
+        project_id = "test-netapp-error"
+
+        # Mock NetAppRestError from client
+        netapp_error = NetAppRestError("SVM 'os-test-netapp-error' not found")
+        mock_client.create_route.side_effect = netapp_error
+
+        # Mock error handler to raise NetworkOperationError
+        mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
+            "Route creation failed"
+        )
+
+        with pytest.raises(NetAppManagerError):
+            route_service.create_routes_from_interfaces(
+                project_id, sample_interface_configs
+            )
+
+        # Verify client was called
+        mock_client.create_route.assert_called_once()
+
+        # Verify error handler was called (should be called twice - once for
+        # individual route, once for overall operation)
+        assert mock_error_handler.handle_operation_error.call_count == 2
+
+        # Check the first call (individual route error)
+        first_call = mock_error_handler.handle_operation_error.call_args_list[0]
+        assert isinstance(first_call[0][0], NetAppRestError)
+        assert "Route creation for nexthop" in first_call[0][1]
+        assert first_call[0][2]["project_id"] == "test-netapp-error"
+        assert first_call[0][2]["svm_name"] == "os-test-netapp-error"
+
+        # Check the second call (overall operation error)
+        second_call = mock_error_handler.handle_operation_error.call_args_list[1]
+        assert isinstance(second_call[0][0], NetAppManagerError)
+        assert "Route creation for project test-netapp-error" in second_call[0][1]
+
+    def test_create_routes_invalid_svm_error_context(
+        self, route_service, mock_client, mock_error_handler, sample_interface_configs
+    ):
+        """Test error context for invalid SVM during route creation."""
+        project_id = "invalid-svm-test"
+        expected_svm_name = "os-invalid-svm-test"
+
+        # Mock NetAppRestError for invalid SVM
+        netapp_error = NetAppRestError(f"SVM '{expected_svm_name}' does not exist")
+        mock_client.create_route.side_effect = netapp_error
+
+        # Mock error handler to raise NetworkOperationError
+        mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
+            "SVM not found"
+        )
+
+        with pytest.raises(NetAppManagerError):
+            route_service.create_routes_from_interfaces(
+                project_id, sample_interface_configs
+            )
+
+        # Verify error context includes SVM information (check first call for
+        # individual route error)
+        first_call = mock_error_handler.handle_operation_error.call_args_list[0]
+        assert first_call[0][2]["svm_name"] == expected_svm_name
+        assert first_call[0][2]["project_id"] == project_id
+
+    def test_create_routes_error_logging_and_context(
+        self, route_service, mock_client, mock_error_handler, sample_interface_configs
+    ):
+        """Test error logging and context information for route failures."""
+        project_id = "error-logging-test"
+
+        # Mock detailed NetAppRestError
+        detailed_error = NetAppRestError(
+            "Route creation failed: Gateway 192.168.1.1 not reachable"
+        )
+        mock_client.create_route.side_effect = detailed_error
+
+        # Mock error handler to raise NetworkOperationError
+        mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
+            "Route creation failed"
+        )
+
+        with pytest.raises(NetAppManagerError):
+            route_service.create_routes_from_interfaces(
+                project_id, sample_interface_configs
+            )
+
+        # Verify error handler was called with detailed context (check first
+        # call for individual route error)
+        first_call = mock_error_handler.handle_operation_error.call_args_list[0]
+        assert first_call[0][2]["project_id"] == project_id
+        assert first_call[0][2]["svm_name"] == "os-error-logging-test"
+        assert "nexthop" in first_call[0][2]
+
+        # Check second call for overall operation context
+        second_call = mock_error_handler.handle_operation_error.call_args_list[1]
+        assert second_call[0][2]["project_id"] == project_id
+        assert second_call[0][2]["interface_count"] == 4  # Four interfaces from sample
+
+    def test_create_routes_partial_success_with_error(
+        self, route_service, mock_client, mock_error_handler, sample_interface_configs
+    ):
+        """Test route creation where first route succeeds but second fails."""
+        project_id = "partial-success-test"
+        expected_svm_name = "os-partial-success-test"
+
+        # Mock first route success, second route failure
+        route_result = RouteResult(
+            uuid="route-uuid-1",
+            gateway="100.127.0.17",
+            destination="100.126.0.0/17",
+            svm_name=expected_svm_name,
+        )
+        netapp_error = NetAppRestError("Second route creation failed")
+        mock_client.create_route.side_effect = [route_result, netapp_error]
+
+        # Mock error handler to raise NetworkOperationError on second call
+        mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
+            "Route creation failed"
+        )
+
+        with pytest.raises(NetAppManagerError):
+            route_service.create_routes_from_interfaces(
+                project_id, sample_interface_configs
+            )
+
+        # Verify both routes were attempted
+        assert mock_client.create_route.call_count == 2
+
+        # Verify error handler was called for the failure (should be called twice)
+        assert mock_error_handler.handle_operation_error.call_count == 2
+
+        # Verify success logging occurred for first route
+        log_info_calls = mock_error_handler.log_info.call_args_list
+        success_logs = [
+            call for call in log_info_calls if "Created route:" in call[0][0]
+        ]
+        assert len(success_logs) == 1  # Only one successful route
+
+    def test_create_routes_script_termination_behavior(
+        self, route_service, mock_client, mock_error_handler, sample_interface_configs
+    ):
+        """Test that route creation errors cause script termination."""
+        project_id = "termination-test"
+
+        # Mock critical NetAppRestError that should terminate script
+        critical_error = NetAppRestError(
+            "Critical system error: NetApp cluster unavailable"
+        )
+        mock_client.create_route.side_effect = critical_error
+
+        # Mock error handler to raise exception that should terminate script
+        mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
+            "Critical route creation failure"
+        )
+
+        # Verify that the exception propagates (would terminate script)
+        with pytest.raises(NetAppManagerError, match="Critical route creation failure"):
+            route_service.create_routes_from_interfaces(
+                project_id, sample_interface_configs
+            )
+
+        # Verify error was handled with appropriate context (check first call
+        # for individual route error)
+        first_call = mock_error_handler.handle_operation_error.call_args_list[0]
+        assert "Critical system error" in str(first_call[0][0])
+        assert first_call[0][2]["project_id"] == project_id
