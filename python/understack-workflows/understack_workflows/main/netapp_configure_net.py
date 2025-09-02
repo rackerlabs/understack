@@ -322,25 +322,27 @@ def do_action(
             raise SystemExit(2) from e
 
     if validated_data:
-        netapp_create_interfaces(netapp_manager, validated_data[0], project_id)
+        netapp_create_interfaces_and_routes(
+            netapp_manager, validated_data[0], project_id
+        )
 
     # Return structured data objects
     return raw_response, validated_data
 
 
-def netapp_create_interfaces(
+def netapp_create_interfaces_and_routes(
     mgr: NetAppManager,
     nautobot_response: VirtualMachineNetworkInfo,
     project_id: str,
 ) -> None:
-    """Create NetApp LIF interfaces based on Nautobot VM network configuration.
+    """Create NetApp LIF interfaces and routes based on Nautobot VM network config.
 
     This function converts the validated Nautobot response into NetApp interface
     configurations and creates the corresponding LIF (Logical Interface) on the
-    NetApp storage system.
+    NetApp storage system, followed by creating routes for network connectivity.
 
     Args:
-        mgr: NetAppManager instance for creating LIF interfaces
+        mgr: NetAppManager instance for creating LIF interfaces and routes
         nautobot_response: Validated virtual machine network information from
             Nautobot
         project_id: OpenStack project ID for logging and context
@@ -350,14 +352,25 @@ def netapp_create_interfaces(
 
     Raises:
         Exception: If SVM for the project is not found
-        NetAppRestError: If LIF creation fails on the NetApp system
+        NetAppRestError: If LIF creation or route creation fails on the NetApp system
     """
+    # Create interface configurations
     configs = NetappIPInterfaceConfig.from_nautobot_response(
         nautobot_response, mgr.config
     )
+
+    # Create LIF interfaces (existing functionality)
     for interface_config in configs:
         logger.info("Creating LIF %s for project %s", interface_config.name, project_id)
         mgr.create_lif(project_id, interface_config)
+
+    # Create routes (new functionality)
+    logger.info("Creating routes for project %s", project_id)
+    route_results = mgr.create_routes_for_project(project_id, configs)
+
+    logger.info(
+        "Successfully created %d routes for project %s", len(route_results), project_id
+    )
     return
 
 
