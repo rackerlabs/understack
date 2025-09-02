@@ -2,6 +2,9 @@
 # https://github.com/dexidp/helm-charts/tree/master/charts/dex#values
 #
 
+image:
+  tag: v2.44.0
+
 replicaCount: 1
 config:
   # See https://dexidp.io/docs/storage/ for more options
