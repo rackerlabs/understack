@@ -1,5 +1,7 @@
 """Tests for NetApp value objects."""
 
+import ipaddress
+
 import pytest
 
 from understack_workflows.netapp.value_objects import InterfaceResult
@@ -9,6 +11,8 @@ from understack_workflows.netapp.value_objects import NamespaceSpec
 from understack_workflows.netapp.value_objects import NodeResult
 from understack_workflows.netapp.value_objects import PortResult
 from understack_workflows.netapp.value_objects import PortSpec
+from understack_workflows.netapp.value_objects import RouteResult
+from understack_workflows.netapp.value_objects import RouteSpec
 from understack_workflows.netapp.value_objects import SvmResult
 from understack_workflows.netapp.value_objects import SvmSpec
 from understack_workflows.netapp.value_objects import VolumeResult
@@ -385,3 +389,152 @@ class TestNamespaceResult:
 
         assert result.svm_name is None
         assert result.volume_name is None
+
+
+class TestRouteSpec:
+    """Test cases for RouteSpec value object."""
+
+    def test_valid_route_spec(self):
+        """Test creating a valid route specification."""
+        spec = RouteSpec(
+            svm_name="os-test-project",
+            gateway="100.127.0.17",
+            destination="100.126.0.0/17",
+        )
+
+        assert spec.svm_name == "os-test-project"
+        assert spec.gateway == "100.127.0.17"
+        assert spec.destination == "100.126.0.0/17"
+
+    def test_route_spec_immutable(self):
+        """Test that route specification is immutable."""
+        spec = RouteSpec(
+            svm_name="os-test-project",
+            gateway="100.127.0.17",
+            destination="100.126.0.0/17",
+        )
+
+        with pytest.raises(AttributeError):
+            spec.svm_name = "new-svm"  # type: ignore[misc]
+
+    def test_from_nexthop_ip_third_octet_zero(self):
+        """Test route destination calculation for third octet = 0."""
+        spec = RouteSpec.from_nexthop_ip("os-test-project", "100.127.0.17")
+
+        assert spec.svm_name == "os-test-project"
+        assert spec.gateway == "100.127.0.17"
+        assert spec.destination == "100.126.0.0/17"
+
+    def test_from_nexthop_ip_third_octet_128(self):
+        """Test route destination calculation for third octet = 128."""
+        spec = RouteSpec.from_nexthop_ip("os-test-project", "100.127.128.17")
+
+        assert spec.svm_name == "os-test-project"
+        assert spec.gateway == "100.127.128.17"
+        assert spec.destination == "100.126.128.0/17"
+
+    def test_from_nexthop_ip_various_valid_ips(self):
+        """Test route destination calculation with various valid IP patterns."""
+        test_cases = [
+            ("192.168.0.1", "100.126.0.0/17"),
+            ("10.0.0.254", "100.126.0.0/17"),
+            ("172.16.128.1", "100.126.128.0/17"),
+            ("203.0.128.100", "100.126.128.0/17"),
+        ]
+
+        for nexthop_ip, expected_destination in test_cases:
+            spec = RouteSpec.from_nexthop_ip("os-test-project", nexthop_ip)
+            assert spec.destination == expected_destination
+            assert spec.gateway == nexthop_ip
+
+    def test_calculate_destination_third_octet_zero(self):
+        """Test _calculate_destination static method for third octet = 0."""
+        destination = RouteSpec._calculate_destination("100.127.0.17")
+        assert destination == "100.126.0.0/17"
+
+    def test_calculate_destination_third_octet_128(self):
+        """Test _calculate_destination static method for third octet = 128."""
+        destination = RouteSpec._calculate_destination("100.127.128.17")
+        assert destination == "100.126.128.0/17"
+
+    def test_calculate_destination_invalid_pattern(self):
+        """Test _calculate_destination with unsupported third octet values."""
+        invalid_ips = [
+            "100.127.1.17",
+            "100.127.64.17",
+            "100.127.127.17",
+            "100.127.129.17",
+            "100.127.255.17",
+        ]
+
+        for invalid_ip in invalid_ips:
+            with pytest.raises(ValueError, match="Unsupported IP pattern"):
+                RouteSpec._calculate_destination(invalid_ip)
+
+    def test_from_nexthop_ip_invalid_pattern(self):
+        """Test from_nexthop_ip with unsupported IP patterns."""
+        with pytest.raises(ValueError, match="Unsupported IP pattern"):
+            RouteSpec.from_nexthop_ip("os-test-project", "100.127.64.17")
+
+    def test_calculate_destination_invalid_ip_format(self):
+        """Test _calculate_destination with invalid IP format."""
+        invalid_formats = [
+            "not.an.ip.address",
+            "256.256.256.256",
+            "192.168.1",
+            "192.168.1.1.1",
+            "",
+        ]
+
+        for invalid_format in invalid_formats:
+            with pytest.raises((ValueError, ipaddress.AddressValueError)):
+                RouteSpec._calculate_destination(invalid_format)
+
+
+class TestRouteResult:
+    """Test cases for RouteResult value object."""
+
+    def test_valid_route_result(self):
+        """Test creating a valid route result."""
+        result = RouteResult(
+            uuid="route-uuid-123",
+            gateway="100.127.0.17",
+            destination="100.126.0.0/17",
+            svm_name="os-test-project",
+        )
+
+        assert result.uuid == "route-uuid-123"
+        assert result.gateway == "100.127.0.17"
+        assert result.destination == "100.126.0.0/17"
+        assert result.svm_name == "os-test-project"
+
+    def test_route_result_immutable(self):
+        """Test that route result is immutable."""
+        result = RouteResult(
+            uuid="route-uuid-123",
+            gateway="100.127.0.17",
+            destination="100.126.0.0/17",
+            svm_name="os-test-project",
+        )
+
+        with pytest.raises(AttributeError):
+            result.uuid = "new-uuid"  # type: ignore[misc]
+
+    def test_route_result_various_destinations(self):
+        """Test route result with various destination formats."""
+        destinations = [
+            "100.126.0.0/17",
+            "100.126.128.0/17",
+            "192.168.1.0/24",
+            "10.0.0.0/8",
+            "0.0.0.0/0",
+        ]
+
+        for destination in destinations:
+            result = RouteResult(
+                uuid="route-uuid-123",
+                gateway="100.127.0.17",
+                destination=destination,
+                svm_name="os-test-project",
+            )
+            assert result.destination == destination
