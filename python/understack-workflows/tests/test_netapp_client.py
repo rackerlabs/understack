@@ -544,5 +544,6 @@ class TestNetAppClientInterface:
             "create_port",
             "get_nodes",
             "get_namespaces",
+            "create_route",
         }
         assert abstract_methods == expected_methods

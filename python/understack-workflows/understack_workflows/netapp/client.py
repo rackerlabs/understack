@@ -14,6 +14,7 @@ from netapp_ontap import config
 from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
 from netapp_ontap.resources import IpInterface
+from netapp_ontap.resources import NetworkRoute
 from netapp_ontap.resources import Node
 from netapp_ontap.resources import NvmeNamespace
 from netapp_ontap.resources import Port
@@ -29,6 +30,8 @@ from understack_workflows.netapp.value_objects import NamespaceSpec
 from understack_workflows.netapp.value_objects import NodeResult
 from understack_workflows.netapp.value_objects import PortResult
 from understack_workflows.netapp.value_objects import PortSpec
+from understack_workflows.netapp.value_objects import RouteResult
+from understack_workflows.netapp.value_objects import RouteSpec
 from understack_workflows.netapp.value_objects import SvmResult
 from understack_workflows.netapp.value_objects import SvmSpec
 from understack_workflows.netapp.value_objects import VolumeResult
@@ -166,6 +169,22 @@ class NetAppClientInterface(ABC):
 
         Returns:
             List[NamespaceResult]: List of matching namespaces
+        """
+        pass
+
+    @abstractmethod
+    def create_route(self, route_spec: RouteSpec) -> RouteResult:
+        """Create a network route.
+
+        Args:
+            route_spec: Specification for the route to create
+
+        Returns:
+            RouteResult: Result of the route creation
+
+        Raises:
+            NetworkOperationError: If route creation fails due to network issues
+            NetAppRestError: If NetApp API returns an error during route creation
         """
         pass
 
@@ -611,5 +630,68 @@ class NetAppClient(NetAppClientInterface):
                 {
                     "svm_name": namespace_spec.svm_name,
                     "volume_name": namespace_spec.volume_name,
+                },
+            )
+
+    def create_route(self, route_spec: RouteSpec) -> RouteResult:
+        """Create a network route.
+
+        Args:
+            route_spec: Specification for the route to create
+
+        Returns:
+            RouteResult: Result of the route creation
+
+        Raises:
+            NetworkOperationError: If route creation fails due to network issues
+            NetAppRestError: If NetApp API returns an error during route creation
+        """
+        try:
+            self._error_handler.log_info(
+                "Creating route: %(destination)s via %(gateway)s for SVM %(svm_name)s",
+                {
+                    "destination": route_spec.destination,
+                    "gateway": route_spec.gateway,
+                    "svm_name": route_spec.svm_name,
+                },
+            )
+
+            route = NetworkRoute()
+            route.svm = {"name": route_spec.svm_name}
+            route.gateway = route_spec.gateway
+            route.destination = route_spec.destination
+
+            self._error_handler.log_debug(
+                "Creating NetworkRoute", {"route": str(route)}
+            )
+            route.post(hydrate=True)
+
+            result = RouteResult(
+                uuid=str(route.uuid),
+                gateway=route_spec.gateway,
+                destination=route_spec.destination,
+                svm_name=route_spec.svm_name,
+            )
+
+            self._error_handler.log_info(
+                "Route created successfully: %(destination)s via %(gateway)s",
+                {
+                    "destination": route_spec.destination,
+                    "gateway": route_spec.gateway,
+                    "uuid": result.uuid,
+                    "svm_name": route_spec.svm_name,
+                },
+            )
+
+            return result
+
+        except NetAppRestError as e:
+            self._error_handler.handle_netapp_error(
+                e,
+                "Route creation",
+                {
+                    "svm_name": route_spec.svm_name,
+                    "gateway": route_spec.gateway,
+                    "destination": route_spec.destination,
                 },
             )
