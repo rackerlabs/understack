@@ -10,9 +10,11 @@ from understack_workflows.netapp.client import NetAppClient
 from understack_workflows.netapp.config import NetAppConfig
 from understack_workflows.netapp.error_handler import ErrorHandler
 from understack_workflows.netapp.lif_service import LifService
+from understack_workflows.netapp.route_service import RouteService
 from understack_workflows.netapp.svm_service import SvmService
 from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 from understack_workflows.netapp.value_objects import NodeResult
+from understack_workflows.netapp.value_objects import RouteResult
 from understack_workflows.netapp.volume_service import VolumeService
 
 logger = setup_logger(__name__)
@@ -35,6 +37,7 @@ class NetAppManager:
         svm_service=None,
         volume_service=None,
         lif_service=None,
+        route_service=None,
         error_handler=None,
     ):
         """Initialize NetAppManager with dependency injection support.
@@ -46,6 +49,7 @@ class NetAppManager:
             svm_service: SvmService instance (optional, for dependency injection)
             volume_service: VolumeService instance (optional, for dependency injection)
             lif_service: LifService instance (optional, for dependency injection)
+            route_service: RouteService instance (optional, for dependency injection)
             error_handler: ErrorHandler instance (optional, for dependency injection)
         """
         # Set up dependencies with dependency injection or create defaults
@@ -56,6 +60,7 @@ class NetAppManager:
             svm_service,
             volume_service,
             lif_service,
+            route_service,
             error_handler,
         )
 
@@ -67,6 +72,7 @@ class NetAppManager:
         svm_service,
         volume_service,
         lif_service,
+        route_service,
         error_handler,
     ):
         """Set up all service dependencies with dependency injection."""
@@ -96,6 +102,7 @@ class NetAppManager:
             and svm_service is None
             and volume_service is None
             and lif_service is None
+            and route_service is None
         ):
             # Traditional constructor usage - set up connection directly
             # Check if connection needs to be established (handle both real and
@@ -144,6 +151,11 @@ class NetAppManager:
             self._lif_service = lif_service
         else:
             self._lif_service = LifService(self._client, self._error_handler)
+
+        if route_service is not None:
+            self._route_service = route_service
+        else:
+            self._route_service = RouteService(self._client, self._error_handler)
 
     def create_svm(self, project_id: str, aggregate_name: str):
         """Creates a new Storage Virtual Machine (SVM)."""
@@ -446,6 +458,49 @@ class NetAppManager:
         Delegates to LifService for node identification.
         """
         return self._lif_service.identify_home_node(config)
+
+    def create_routes_for_project(
+        self,
+        project_id: str,
+        interface_configs: list[NetappIPInterfaceConfig],
+    ) -> list[RouteResult]:
+        """Create routes for a project based on interface configurations.
+
+        Args:
+            project_id: The project identifier
+            interface_configs: List of network interface configurations
+
+        Returns:
+            list[RouteResult]: List of created route results
+
+        Raises:
+            NetworkOperationError: If route creation fails
+        """
+        logger.info(
+            "Creating routes for project %(project_id)s with %(count)d interfaces",
+            {"project_id": project_id, "count": len(interface_configs)},
+        )
+
+        try:
+            results = self._route_service.create_routes_from_interfaces(
+                project_id, interface_configs
+            )
+
+            logger.info(
+                "Successfully created %(count)d routes for project %(project_id)s",
+                {"count": len(results), "project_id": project_id},
+            )
+
+            return results
+
+        except Exception as e:
+            logger.error(
+                "Failed to create routes for project %(project_id)s: %(error)s",
+                {"project_id": project_id, "error": str(e)},
+            )
+            # Re-raise the exception to ensure it propagates up the call stack
+            # This ensures route creation failures terminate script execution
+            raise
 
     def _svm_by_project(self, project_id):
         try:
