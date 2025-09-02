@@ -328,7 +328,23 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         original_host = volume["host"]
         # svm plus pool_name
         svm_pool_name = volume_utils.extract_host(original_host, level="pool")
+        if not svm_pool_name:
+            raise exception.InvalidInput(
+                reason=f"pool name not found in {original_host}"
+            )
+
         svm_name = svm_pool_name.split(_SVM_NAME_DELIM)[0]
+        # workaround when the svm_name has already been stripped from the pool
+        prefix = self.configuration.netapp_vserver_prefix
+        if not svm_name.startswith(prefix):
+            LOG.debug(
+                "Volume host already had SVM name stripped %s, "
+                "using volume project_id %s",
+                original_host,
+                volume["project_id"],
+            )
+            svm_name = f"os-{volume['project_id']}"
+
         try:
             lib = self._libraries[svm_name]
         except KeyError:
@@ -386,6 +402,9 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def initialize_connection(self, volume, connector):
         """Initialize connection to volume."""
+        # TODO: the nova ironic driver sends the field 'initiator' but the NetApp
+        # cinder driver expects the field to be 'nqn' so copy the field over
+        connector["nqn"] = connector["initiator"]
         with self._volume_to_library(volume) as lib:
             return lib.initialize_connection(volume, connector)
 
