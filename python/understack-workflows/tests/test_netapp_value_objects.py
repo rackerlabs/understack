@@ -58,7 +58,9 @@ class TestSvmSpec:
         """Test that SVM specification is immutable."""
         spec = SvmSpec(name="test-svm", aggregate_name="aggr1")
 
-        with pytest.raises(AttributeError):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
             spec.name = "new-name"  # type: ignore[misc]
 
 
@@ -95,7 +97,9 @@ class TestVolumeSpec:
             name="test-volume", svm_name="test-svm", aggregate_name="aggr1", size="1TB"
         )
 
-        with pytest.raises(AttributeError):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
             spec.name = "new-name"  # type: ignore[misc]
 
 
@@ -114,7 +118,7 @@ class TestInterfaceSpec:
         )
 
         assert spec.name == "test-lif"
-        assert spec.address == "192.168.1.10"
+        assert str(spec.address) == "192.168.1.10"
         assert spec.netmask == "255.255.255.0"
         assert spec.svm_name == "test-svm"
         assert spec.home_port_uuid == "port-uuid-123"
@@ -148,6 +152,36 @@ class TestInterfaceSpec:
 
         expected_ip_info = {"address": "192.168.1.10", "netmask": "255.255.255.0"}
         assert spec.ip_info == expected_ip_info
+
+    def test_interface_spec_invalid_ip_address(self):
+        """Test interface specification with invalid IP address."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            InterfaceSpec(
+                name="test-lif",
+                address="invalid-ip",
+                netmask="255.255.255.0",
+                svm_name="test-svm",
+                home_port_uuid="port-uuid-123",
+                broadcast_domain_name="Fabric-A",
+            )
+
+    def test_interface_spec_immutable(self):
+        """Test that interface specification is immutable."""
+        spec = InterfaceSpec(
+            name="test-lif",
+            address="192.168.1.10",
+            netmask="255.255.255.0",
+            svm_name="test-svm",
+            home_port_uuid="port-uuid-123",
+            broadcast_domain_name="Fabric-A",
+        )
+
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            spec.name = "new-name"  # type: ignore[misc]
 
 
 class TestPortSpec:
@@ -183,10 +217,10 @@ class TestPortSpec:
         assert spec.vlan_config == expected_vlan_config
 
     def test_port_spec_various_vlan_ids(self):
-        """Test port specification with various VLAN IDs."""
-        vlan_ids = [1, 100, 4094, 0, 5000]  # Including invalid ones
+        """Test port specification with various valid VLAN IDs."""
+        valid_vlan_ids = [1, 100, 4094]  # Valid VLAN IDs
 
-        for vlan_id in vlan_ids:
+        for vlan_id in valid_vlan_ids:
             spec = PortSpec(
                 node_name="node-01",
                 vlan_id=vlan_id,
@@ -194,6 +228,35 @@ class TestPortSpec:
                 broadcast_domain_name="Fabric-A",
             )
             assert spec.vlan_id == vlan_id
+
+    def test_port_spec_invalid_vlan_ids(self):
+        """Test port specification with invalid VLAN IDs."""
+        from pydantic import ValidationError
+
+        invalid_vlan_ids = [0, 4095, 5000, -1]  # Invalid VLAN IDs
+
+        for vlan_id in invalid_vlan_ids:
+            with pytest.raises(ValidationError):
+                PortSpec(
+                    node_name="node-01",
+                    vlan_id=vlan_id,
+                    base_port_name="e4a",
+                    broadcast_domain_name="Fabric-A",
+                )
+
+    def test_port_spec_immutable(self):
+        """Test that port specification is immutable."""
+        spec = PortSpec(
+            node_name="node-01",
+            vlan_id=100,
+            base_port_name="e4a",
+            broadcast_domain_name="Fabric-A",
+        )
+
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            spec.vlan_id = 200  # type: ignore[misc]
 
 
 class TestNamespaceSpec:
@@ -212,6 +275,15 @@ class TestNamespaceSpec:
 
         expected_query = "svm.name=test-svm&location.volume.name=test-volume"
         assert spec.query_string == expected_query
+
+    def test_namespace_spec_immutable(self):
+        """Test that namespace specification is immutable."""
+        spec = NamespaceSpec(svm_name="test-svm", volume_name="test-volume")
+
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            spec.svm_name = "new-svm"  # type: ignore[misc]
 
 
 class TestSvmResult:
@@ -399,22 +471,24 @@ class TestRouteSpec:
         spec = RouteSpec(
             svm_name="os-test-project",
             gateway="100.127.0.17",
-            destination=ipaddress.IPv4Network("100.126.0.0/17"),
+            destination="100.126.0.0/17",
         )
 
         assert spec.svm_name == "os-test-project"
-        assert spec.gateway == "100.127.0.17"
-        assert spec.destination == ipaddress.IPv4Network("100.126.0.0/17")
+        assert str(spec.gateway) == "100.127.0.17"
+        assert str(spec.destination) == "100.126.0.0/17"
 
     def test_route_spec_immutable(self):
         """Test that route specification is immutable."""
         spec = RouteSpec(
             svm_name="os-test-project",
             gateway="100.127.0.17",
-            destination=ipaddress.IPv4Network("100.126.0.0/17"),
+            destination="100.126.0.0/17",
         )
 
-        with pytest.raises(AttributeError):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
             spec.svm_name = "new-svm"  # type: ignore[misc]
 
     def test_from_nexthop_ip_third_octet_zero(self):
@@ -422,16 +496,16 @@ class TestRouteSpec:
         spec = RouteSpec.from_nexthop_ip("os-test-project", "100.127.0.17")
 
         assert spec.svm_name == "os-test-project"
-        assert spec.gateway == "100.127.0.17"
-        assert spec.destination == ipaddress.IPv4Network("100.126.0.0/17")
+        assert str(spec.gateway) == "100.127.0.17"
+        assert str(spec.destination) == "100.126.0.0/17"
 
     def test_from_nexthop_ip_third_octet_128(self):
         """Test route destination calculation for third octet = 128."""
         spec = RouteSpec.from_nexthop_ip("os-test-project", "100.127.128.17")
 
         assert spec.svm_name == "os-test-project"
-        assert spec.gateway == "100.127.128.17"
-        assert spec.destination == ipaddress.IPv4Network("100.126.128.0/17")
+        assert str(spec.gateway) == "100.127.128.17"
+        assert str(spec.destination) == "100.126.128.0/17"
 
     def test_from_nexthop_ip_various_valid_ips(self):
         """Test route destination calculation with various valid IP patterns."""
@@ -445,7 +519,7 @@ class TestRouteSpec:
         for nexthop_ip, expected_destination in test_cases:
             spec = RouteSpec.from_nexthop_ip("os-test-project", nexthop_ip)
             assert spec.destination == expected_destination
-            assert spec.gateway == nexthop_ip
+            assert str(spec.gateway) == nexthop_ip
 
     def test_calculate_destination_third_octet_zero(self):
         """Test _calculate_destination static method for third octet = 0."""
@@ -565,7 +639,7 @@ class TestRouteSpec:
         for nexthop_ip, expected_destination in test_cases:
             spec = RouteSpec.from_nexthop_ip(svm_name, nexthop_ip)
             assert spec.svm_name == svm_name
-            assert spec.gateway == nexthop_ip
+            assert str(spec.gateway) == nexthop_ip
             assert spec.destination == expected_destination
 
     def test_from_nexthop_ip_comprehensive_invalid_patterns(self):
@@ -594,7 +668,7 @@ class TestRouteSpec:
         for ip in edge_cases_zero:
             spec = RouteSpec.from_nexthop_ip(svm_name, ip)
             assert spec.destination == ipaddress.IPv4Network("100.126.0.0/17")
-            assert spec.gateway == ip
+            assert str(spec.gateway) == ip
 
         # Edge cases for third octet = 128 within 100.64.0.0/10 subnet
         edge_cases_128 = [
@@ -606,7 +680,7 @@ class TestRouteSpec:
         for ip in edge_cases_128:
             spec = RouteSpec.from_nexthop_ip(svm_name, ip)
             assert spec.destination == ipaddress.IPv4Network("100.126.128.0/17")
-            assert spec.gateway == ip
+            assert str(spec.gateway) == ip
 
     def test_calculate_destination_boundary_values(self):
         """Test _calculate_destination with boundary values for third octet."""
@@ -697,6 +771,26 @@ class TestRouteSpec:
         for valid_ip, expected_destination in valid_subnet_ips:
             destination = RouteSpec._calculate_destination(valid_ip)
             assert destination == expected_destination
+
+    def test_route_spec_invalid_gateway_ip(self):
+        """Test route specification with gateway IP outside carrier-grade NAT range."""
+        from pydantic import ValidationError
+
+        invalid_gateways = [
+            "192.168.1.1",  # Private network
+            "10.0.0.1",  # Private network
+            "8.8.8.8",  # Public network
+            "100.63.0.1",  # Just below 100.64.0.0/10
+            "100.128.0.1",  # Just above 100.64.0.0/10
+        ]
+
+        for invalid_gateway in invalid_gateways:
+            with pytest.raises(ValidationError):
+                RouteSpec(
+                    svm_name="os-test-project",
+                    gateway=invalid_gateway,
+                    destination="100.126.0.0/17",
+                )
 
 
 class TestRouteResult:

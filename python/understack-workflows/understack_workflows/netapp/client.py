@@ -6,6 +6,7 @@ This module provides a thin abstraction layer over the NetApp ONTAP SDK,
 handling low-level operations and converting between value objects and SDK objects.
 """
 
+import ipaddress
 import logging
 from abc import ABC
 from abc import abstractmethod
@@ -475,7 +476,7 @@ class NetAppClient(NetAppClientInterface):
             result = InterfaceResult(
                 name=str(interface.name),
                 uuid=str(interface.uuid),
-                address=interface_spec.address,
+                address=str(interface_spec.address),
                 netmask=interface_spec.netmask,
                 enabled=True,
                 svm_name=interface_spec.svm_name,
@@ -671,8 +672,8 @@ class NetAppClient(NetAppClientInterface):
 
             result = RouteResult(
                 uuid=str(route.uuid),
-                gateway=route_spec.gateway,
-                destination=route_spec.destination,
+                gateway=str(route_spec.gateway),
+                destination=ipaddress.IPv4Network(str(route_spec.destination)),
                 svm_name=route_spec.svm_name,
             )
 

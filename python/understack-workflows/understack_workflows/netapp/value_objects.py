@@ -7,9 +7,15 @@ and clear interfaces for NetApp SDK interactions.
 
 import ipaddress
 from dataclasses import dataclass
-from dataclasses import field
 from functools import cached_property
+from ipaddress import IPv4Address
+from ipaddress import IPv4Network
 from typing import TYPE_CHECKING
+
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import computed_field
+from pydantic import field_validator
 
 if TYPE_CHECKING:
     from understack_workflows.main.netapp_configure_net import VirtualMachineNetworkInfo
@@ -99,24 +105,27 @@ class NetappIPInterfaceConfig:
 # Specification Value Objects
 
 
-@dataclass(frozen=True)
-class SvmSpec:
+class SvmSpec(BaseModel):
     """Specification for creating a Storage Virtual Machine (SVM)."""
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     aggregate_name: str
     language: str = "c.utf_8"
-    allowed_protocols: list[str] = field(default_factory=lambda: ["nvme"])
+    allowed_protocols: list[str] = ["nvme"]
 
+    @computed_field
     @property
     def root_volume_name(self) -> str:
         """Generate the root volume name for this SVM."""
         return f"{self.name}_root"
 
 
-@dataclass(frozen=True)
-class VolumeSpec:
+class VolumeSpec(BaseModel):
     """Specification for creating a volume."""
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     svm_name: str
@@ -124,33 +133,44 @@ class VolumeSpec:
     size: str
 
 
-@dataclass(frozen=True)
-class InterfaceSpec:
+class InterfaceSpec(BaseModel):
     """Specification for creating a logical interface (LIF)."""
 
+    model_config = ConfigDict(frozen=True)
+
     name: str
-    address: str
+    address: str | IPv4Address
     netmask: str
     svm_name: str
     home_port_uuid: str
     broadcast_domain_name: str
     service_policy: str = "default-data-nvme-tcp"
 
+    @computed_field
     @property
     def ip_info(self) -> dict:
         """Get IP configuration as a dictionary for NetApp SDK."""
-        return {"address": self.address, "netmask": self.netmask}
+        return {"address": str(self.address), "netmask": self.netmask}
 
 
-@dataclass(frozen=True)
-class PortSpec:
+class PortSpec(BaseModel):
     """Specification for creating a network port."""
+
+    model_config = ConfigDict(frozen=True)
 
     node_name: str
     vlan_id: int
     base_port_name: str
     broadcast_domain_name: str
 
+    @field_validator("vlan_id")
+    @classmethod
+    def validate_vlan_id(cls, v):
+        if not 1 <= v <= 4094:
+            raise ValueError("VLAN ID must be between 1 and 4094")
+        return v
+
+    @computed_field
     @property
     def vlan_config(self) -> dict:
         """Get VLAN configuration as a dictionary for NetApp SDK."""
@@ -163,26 +183,48 @@ class PortSpec:
         }
 
 
-@dataclass(frozen=True)
-class NamespaceSpec:
+class NamespaceSpec(BaseModel):
     """Specification for querying NVMe namespaces."""
+
+    model_config = ConfigDict(frozen=True)
 
     svm_name: str
     volume_name: str
 
+    @computed_field
     @property
     def query_string(self) -> str:
         """Generate query string for NetApp SDK namespace collection."""
         return f"svm.name={self.svm_name}&location.volume.name={self.volume_name}"
 
 
-@dataclass(frozen=True)
-class RouteSpec:
+class RouteSpec(BaseModel):
     """Specification for creating a network route."""
 
+    model_config = ConfigDict(frozen=True)
+
     svm_name: str
-    gateway: str
-    destination: ipaddress.IPv4Network
+    gateway: str | IPv4Address
+    destination: str | IPv4Network
+
+    @field_validator("gateway")
+    @classmethod
+    def validate_gateway_in_cgn(cls, v):
+        """Validate gateway is in carrier-grade NAT range."""
+        if isinstance(v, str):
+            v = IPv4Address(v)
+        cgn_network = IPv4Network("100.64.0.0/10")
+        if v not in cgn_network:
+            raise ValueError(f"Gateway {v} must be within 100.64.0.0/10 subnet")
+        return v
+
+    @field_validator("destination")
+    @classmethod
+    def validate_destination(cls, v):
+        """Convert string to IPv4Network if needed."""
+        if isinstance(v, str):
+            return IPv4Network(v)
+        return v
 
     @classmethod
     def from_nexthop_ip(cls, svm_name: str, nexthop_ip: str) -> "RouteSpec":
@@ -206,22 +248,22 @@ class RouteSpec:
         )
 
     @staticmethod
-    def _calculate_destination(nexthop_ip: str) -> ipaddress.IPv4Network:
+    def _calculate_destination(nexthop_ip: str) -> IPv4Network:
         """Calculate route destination based on IP address pattern.
 
         Args:
             nexthop_ip: IP address to analyze for destination calculation
 
         Returns:
-            str: Route destination in CIDR format
+            IPv4Network: Route destination in CIDR format
 
         Raises:
             ValueError: If IP is not in 100.64.0.0/10 subnet or third octet not 0 or 128
         """
-        ip = ipaddress.IPv4Address(nexthop_ip)
+        ip = IPv4Address(nexthop_ip)
 
         # Validate that IP is within 100.64.0.0/10 subnet
-        carrier_grade_nat_network = ipaddress.IPv4Network("100.64.0.0/10")
+        carrier_grade_nat_network = IPv4Network("100.64.0.0/10")
         if ip not in carrier_grade_nat_network:
             raise ValueError(
                 f"IP address {nexthop_ip} is not within required 100.64.0.0/10 subnet"
@@ -230,9 +272,9 @@ class RouteSpec:
         third_octet = int(str(ip).split(".")[2])
 
         if third_octet == 0:
-            return ipaddress.IPv4Network("100.126.0.0/17")
+            return IPv4Network("100.126.0.0/17")
         elif third_octet == 128:
-            return ipaddress.IPv4Network("100.126.128.0/17")
+            return IPv4Network("100.126.128.0/17")
         else:
             raise ValueError(
                 f"Unsupported IP pattern for route destination: {nexthop_ip}"
@@ -309,5 +351,5 @@ class RouteResult:
 
     uuid: str
     gateway: str
-    destination: ipaddress.IPv4Network
+    destination: IPv4Network
     svm_name: str

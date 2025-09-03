@@ -304,7 +304,7 @@ class TestLifService:
         # Verify the interface spec is created correctly
         interface_call_args = mock_client.create_ip_interface.call_args[0][0]
         assert interface_call_args.name == sample_config.name
-        assert interface_call_args.address == str(sample_config.address)
+        assert str(interface_call_args.address) == str(sample_config.address)
         assert interface_call_args.netmask == str(sample_config.network.netmask)
         assert interface_call_args.svm_name == expected_svm_name
         assert interface_call_args.home_port_uuid == mock_port.uuid
