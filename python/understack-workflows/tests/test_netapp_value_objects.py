@@ -1,5 +1,7 @@
 """Tests for NetApp value objects."""
 
+import ipaddress
+
 import pytest
 
 from understack_workflows.netapp.value_objects import InterfaceResult
@@ -9,6 +11,8 @@ from understack_workflows.netapp.value_objects import NamespaceSpec
 from understack_workflows.netapp.value_objects import NodeResult
 from understack_workflows.netapp.value_objects import PortResult
 from understack_workflows.netapp.value_objects import PortSpec
+from understack_workflows.netapp.value_objects import RouteResult
+from understack_workflows.netapp.value_objects import RouteSpec
 from understack_workflows.netapp.value_objects import SvmResult
 from understack_workflows.netapp.value_objects import SvmSpec
 from understack_workflows.netapp.value_objects import VolumeResult
@@ -385,3 +389,360 @@ class TestNamespaceResult:
 
         assert result.svm_name is None
         assert result.volume_name is None
+
+
+class TestRouteSpec:
+    """Test cases for RouteSpec value object."""
+
+    def test_valid_route_spec(self):
+        """Test creating a valid route specification."""
+        spec = RouteSpec(
+            svm_name="os-test-project",
+            gateway="100.127.0.17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
+        )
+
+        assert spec.svm_name == "os-test-project"
+        assert spec.gateway == "100.127.0.17"
+        assert spec.destination == ipaddress.IPv4Network("100.126.0.0/17")
+
+    def test_route_spec_immutable(self):
+        """Test that route specification is immutable."""
+        spec = RouteSpec(
+            svm_name="os-test-project",
+            gateway="100.127.0.17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
+        )
+
+        with pytest.raises(AttributeError):
+            spec.svm_name = "new-svm"  # type: ignore[misc]
+
+    def test_from_nexthop_ip_third_octet_zero(self):
+        """Test route destination calculation for third octet = 0."""
+        spec = RouteSpec.from_nexthop_ip("os-test-project", "100.127.0.17")
+
+        assert spec.svm_name == "os-test-project"
+        assert spec.gateway == "100.127.0.17"
+        assert spec.destination == ipaddress.IPv4Network("100.126.0.0/17")
+
+    def test_from_nexthop_ip_third_octet_128(self):
+        """Test route destination calculation for third octet = 128."""
+        spec = RouteSpec.from_nexthop_ip("os-test-project", "100.127.128.17")
+
+        assert spec.svm_name == "os-test-project"
+        assert spec.gateway == "100.127.128.17"
+        assert spec.destination == ipaddress.IPv4Network("100.126.128.0/17")
+
+    def test_from_nexthop_ip_various_valid_ips(self):
+        """Test route destination calculation with various valid IP patterns."""
+        test_cases = [
+            ("100.64.0.1", ipaddress.IPv4Network("100.126.0.0/17")),
+            ("100.65.0.254", ipaddress.IPv4Network("100.126.0.0/17")),
+            ("100.66.128.1", ipaddress.IPv4Network("100.126.128.0/17")),
+            ("100.67.128.100", ipaddress.IPv4Network("100.126.128.0/17")),
+        ]
+
+        for nexthop_ip, expected_destination in test_cases:
+            spec = RouteSpec.from_nexthop_ip("os-test-project", nexthop_ip)
+            assert spec.destination == expected_destination
+            assert spec.gateway == nexthop_ip
+
+    def test_calculate_destination_third_octet_zero(self):
+        """Test _calculate_destination static method for third octet = 0."""
+        destination = RouteSpec._calculate_destination("100.127.0.17")
+        assert destination == ipaddress.IPv4Network("100.126.0.0/17")
+
+    def test_calculate_destination_third_octet_128(self):
+        """Test _calculate_destination static method for third octet = 128."""
+        destination = RouteSpec._calculate_destination("100.127.128.17")
+        assert destination == ipaddress.IPv4Network("100.126.128.0/17")
+
+    def test_calculate_destination_invalid_pattern(self):
+        """Test _calculate_destination with unsupported third octet values."""
+        invalid_ips = [
+            "100.127.1.17",
+            "100.127.64.17",
+            "100.127.127.17",
+            "100.127.129.17",
+            "100.127.255.17",
+        ]
+
+        for invalid_ip in invalid_ips:
+            with pytest.raises(ValueError, match="Unsupported IP pattern"):
+                RouteSpec._calculate_destination(invalid_ip)
+
+    def test_from_nexthop_ip_invalid_pattern(self):
+        """Test from_nexthop_ip with unsupported IP patterns."""
+        with pytest.raises(ValueError, match="Unsupported IP pattern"):
+            RouteSpec.from_nexthop_ip("os-test-project", "100.127.64.17")
+
+    def test_calculate_destination_invalid_ip_format(self):
+        """Test _calculate_destination with invalid IP format."""
+        invalid_formats = [
+            "not.an.ip.address",
+            "256.256.256.256",
+            "192.168.1",
+            "192.168.1.1.1",
+            "",
+        ]
+
+        for invalid_format in invalid_formats:
+            with pytest.raises((ValueError, ipaddress.AddressValueError)):
+                RouteSpec._calculate_destination(invalid_format)
+
+    def test_calculate_destination_comprehensive_third_octet_zero(self):
+        """Test comprehensive route destination calculation for third octet = 0."""
+        # Test various IP addresses with third octet = 0 within 100.64.0.0/10 subnet
+        test_ips = [
+            "100.64.0.1",
+            "100.65.0.1",
+            "100.66.0.254",
+            "100.67.0.100",
+            "100.68.0.3",
+            "100.127.0.255",
+        ]
+
+        for ip in test_ips:
+            destination = RouteSpec._calculate_destination(ip)
+            assert destination == ipaddress.IPv4Network(
+                "100.126.0.0/17"
+            ), f"Failed for IP: {ip}"
+
+    def test_calculate_destination_comprehensive_third_octet_128(self):
+        """Test comprehensive route destination calculation for third octet = 128."""
+        # Test various IP addresses with third octet = 128 within 100.64.0.0/10 subnet
+        test_ips = [
+            "100.64.128.1",
+            "100.65.128.1",
+            "100.66.128.254",
+            "100.67.128.100",
+            "100.68.128.3",
+            "100.127.128.255",
+        ]
+
+        for ip in test_ips:
+            destination = RouteSpec._calculate_destination(ip)
+            assert destination == ipaddress.IPv4Network(
+                "100.126.128.0/17"
+            ), f"Failed for IP: {ip}"
+
+    def test_calculate_destination_comprehensive_invalid_patterns(self):
+        """Test comprehensive error handling for all invalid third octet values."""
+        # Test all invalid third octet values (not 0 or 128) within 100.64.0.0/10 subnet
+        invalid_third_octets = [1, 2, 63, 64, 127, 129, 192, 254, 255]
+
+        for third_octet in invalid_third_octets:
+            invalid_ip = f"100.64.{third_octet}.1"
+            with pytest.raises(ValueError, match="Unsupported IP pattern"):
+                RouteSpec._calculate_destination(invalid_ip)
+
+    def test_from_nexthop_ip_comprehensive_valid_patterns(self):
+        """Test RouteSpec.from_nexthop_ip with comprehensive valid IP patterns."""
+        # Test cases: (nexthop_ip, expected_destination) - all within 100.64.0.0/10
+        test_cases = [
+            # Third octet = 0 cases
+            ("100.64.0.1", ipaddress.IPv4Network("100.126.0.0/17")),
+            ("100.65.0.254", ipaddress.IPv4Network("100.126.0.0/17")),
+            ("100.66.0.100", ipaddress.IPv4Network("100.126.0.0/17")),
+            ("100.67.0.50", ipaddress.IPv4Network("100.126.0.0/17")),
+            (
+                "100.127.0.17",
+                ipaddress.IPv4Network("100.126.0.0/17"),
+            ),  # From design document example
+            # Third octet = 128 cases
+            ("100.64.128.1", ipaddress.IPv4Network("100.126.128.0/17")),
+            ("100.65.128.254", ipaddress.IPv4Network("100.126.128.0/17")),
+            ("100.66.128.100", ipaddress.IPv4Network("100.126.128.0/17")),
+            ("100.67.128.50", ipaddress.IPv4Network("100.126.128.0/17")),
+            (
+                "100.127.128.17",
+                ipaddress.IPv4Network("100.126.128.0/17"),
+            ),  # From design document example
+        ]
+
+        svm_name = "os-550e8400-e29b-41d4-a716-446655440000"  # Valid UUID format
+
+        for nexthop_ip, expected_destination in test_cases:
+            spec = RouteSpec.from_nexthop_ip(svm_name, nexthop_ip)
+            assert spec.svm_name == svm_name
+            assert spec.gateway == nexthop_ip
+            assert spec.destination == expected_destination
+
+    def test_from_nexthop_ip_comprehensive_invalid_patterns(self):
+        """Test RouteSpec.from_nexthop_ip with comprehensive invalid IP patterns."""
+        svm_name = "os-550e8400-e29b-41d4-a716-446655440000"
+
+        # Test invalid third octet values within 100.64.0.0/10 subnet
+        invalid_third_octets = [1, 2, 63, 64, 127, 129, 192, 254, 255]
+
+        for third_octet in invalid_third_octets:
+            invalid_ip = f"100.64.{third_octet}.1"
+            with pytest.raises(ValueError, match="Unsupported IP pattern"):
+                RouteSpec.from_nexthop_ip(svm_name, invalid_ip)
+
+    def test_from_nexthop_ip_edge_cases(self):
+        """Test RouteSpec.from_nexthop_ip with edge case IP addresses."""
+        svm_name = "os-550e8400-e29b-41d4-a716-446655440000"
+
+        # Edge cases for third octet = 0 within 100.64.0.0/10 subnet
+        edge_cases_zero = [
+            "100.64.0.1",
+            "100.127.0.1",
+            "100.65.0.1",
+        ]
+
+        for ip in edge_cases_zero:
+            spec = RouteSpec.from_nexthop_ip(svm_name, ip)
+            assert spec.destination == ipaddress.IPv4Network("100.126.0.0/17")
+            assert spec.gateway == ip
+
+        # Edge cases for third octet = 128 within 100.64.0.0/10 subnet
+        edge_cases_128 = [
+            "100.64.128.1",
+            "100.127.128.255",
+            "100.65.128.1",
+        ]
+
+        for ip in edge_cases_128:
+            spec = RouteSpec.from_nexthop_ip(svm_name, ip)
+            assert spec.destination == ipaddress.IPv4Network("100.126.128.0/17")
+            assert spec.gateway == ip
+
+    def test_calculate_destination_boundary_values(self):
+        """Test _calculate_destination with boundary values for third octet."""
+        # Test exact boundary values within 100.64.0.0/10 subnet
+        assert RouteSpec._calculate_destination("100.64.0.1") == ipaddress.IPv4Network(
+            "100.126.0.0/17"
+        )
+        assert RouteSpec._calculate_destination(
+            "100.64.128.1"
+        ) == ipaddress.IPv4Network("100.126.128.0/17")
+
+        # Test values just outside boundaries should fail
+        with pytest.raises(ValueError, match="Unsupported IP pattern"):
+            RouteSpec._calculate_destination("100.64.1.1")  # Just above 0
+
+        with pytest.raises(ValueError, match="Unsupported IP pattern"):
+            RouteSpec._calculate_destination("100.64.127.1")  # Just below 128
+
+        with pytest.raises(ValueError, match="Unsupported IP pattern"):
+            RouteSpec._calculate_destination("100.64.129.1")  # Just above 128
+
+    def test_calculate_destination_subnet_validation(self):
+        """Test _calculate_destination validates IP is within 100.64.0.0/10 subnet."""
+        # Test IPs outside 100.64.0.0/10 subnet should fail
+        invalid_subnet_ips = [
+            "192.168.0.1",  # Private network
+            "10.0.0.1",  # Private network
+            "172.16.0.1",  # Private network
+            "8.8.8.8",  # Public network
+            "100.63.0.1",  # Just below 100.64.0.0/10
+            "100.128.0.1",  # Just above 100.64.0.0/10
+            "101.64.0.1",  # Outside range
+            "99.64.0.1",  # Outside range
+        ]
+
+        for invalid_ip in invalid_subnet_ips:
+            with pytest.raises(ValueError, match="not within required 100.64.0.0/10"):
+                RouteSpec._calculate_destination(invalid_ip)
+
+    def test_from_nexthop_ip_subnet_validation(self):
+        """Test RouteSpec.from_nexthop_ip validates IP is within 100.64.0.0/10."""
+        svm_name = "os-550e8400-e29b-41d4-a716-446655440000"
+
+        # Test IPs outside 100.64.0.0/10 subnet should fail
+        invalid_subnet_ips = [
+            "192.168.0.1",  # Private network
+            "10.0.0.1",  # Private network
+            "172.16.128.1",  # Private network
+            "8.8.8.8",  # Public network
+            "100.63.0.1",  # Just below 100.64.0.0/10
+            "100.128.0.1",  # Just above 100.64.0.0/10
+        ]
+
+        for invalid_ip in invalid_subnet_ips:
+            with pytest.raises(ValueError, match="not within required 100.64.0.0/10"):
+                RouteSpec.from_nexthop_ip(svm_name, invalid_ip)
+
+    def test_calculate_destination_valid_subnet_range(self):
+        """Test _calculate_destination accepts valid IPs within 100.64.0.0/10 subnet."""
+        # Test boundary IPs within 100.64.0.0/10 subnet
+        valid_subnet_ips = [
+            (
+                "100.64.0.1",
+                ipaddress.IPv4Network("100.126.0.0/17"),
+            ),  # Start of range, third octet 0
+            (
+                "100.64.128.1",
+                ipaddress.IPv4Network("100.126.128.0/17"),
+            ),  # Start of range, third octet 128
+            (
+                "100.127.0.1",
+                ipaddress.IPv4Network("100.126.0.0/17"),
+            ),  # End of range, third octet 0
+            (
+                "100.127.128.1",
+                ipaddress.IPv4Network("100.126.128.0/17"),
+            ),  # End of range, third octet 128
+            (
+                "100.65.0.100",
+                ipaddress.IPv4Network("100.126.0.0/17"),
+            ),  # Middle of range, third octet 0
+            (
+                "100.66.128.200",
+                ipaddress.IPv4Network("100.126.128.0/17"),
+            ),  # Middle of range, third octet 128
+        ]
+
+        for valid_ip, expected_destination in valid_subnet_ips:
+            destination = RouteSpec._calculate_destination(valid_ip)
+            assert destination == expected_destination
+
+
+class TestRouteResult:
+    """Test cases for RouteResult value object."""
+
+    def test_valid_route_result(self):
+        """Test creating a valid route result."""
+        result = RouteResult(
+            uuid="route-uuid-123",
+            gateway="100.127.0.17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
+            svm_name="os-test-project",
+        )
+
+        assert result.uuid == "route-uuid-123"
+        assert result.gateway == "100.127.0.17"
+        assert result.destination == ipaddress.IPv4Network("100.126.0.0/17")
+        assert result.svm_name == "os-test-project"
+
+    def test_route_result_immutable(self):
+        """Test that route result is immutable."""
+        result = RouteResult(
+            uuid="route-uuid-123",
+            gateway="100.127.0.17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
+            svm_name="os-test-project",
+        )
+
+        with pytest.raises(AttributeError):
+            result.uuid = "new-uuid"  # type: ignore[misc]
+
+    def test_route_result_various_destinations(self):
+        """Test route result with various destination formats."""
+        destinations = [
+            ipaddress.IPv4Network("100.126.0.0/17"),
+            ipaddress.IPv4Network("100.126.128.0/17"),
+            ipaddress.IPv4Network("192.168.1.0/24"),
+            ipaddress.IPv4Network("10.0.0.0/8"),
+            ipaddress.IPv4Network("0.0.0.0/0"),
+        ]
+
+        for destination in destinations:
+            result = RouteResult(
+                uuid="route-uuid-123",
+                gateway="100.127.0.17",
+                destination=destination,
+                svm_name="os-test-project",
+            )
+            assert result.destination == destination

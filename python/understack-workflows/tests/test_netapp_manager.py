@@ -374,3 +374,181 @@ class TestNetAppManagerValueObjects:
             vlan_id=100,
         )
         assert config_n2.desired_node_number == 2
+
+
+class TestNetAppManagerRouteIntegration:
+    """Test NetAppManager route integration functionality."""
+
+    @pytest.fixture
+    def mock_config_file(self):
+        """Create a temporary config file for testing."""
+        config_content = """[netapp_nvme]
+netapp_server_hostname = test-hostname
+netapp_login = test-user
+netapp_password = test-password
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
+            f.write(config_content)
+            f.flush()
+            yield f.name
+        os.unlink(f.name)
+
+    @pytest.fixture
+    def sample_interface_configs(self):
+        """Create sample interface configurations for testing."""
+        return [
+            NetappIPInterfaceConfig(
+                name="N1-lif-A",
+                address=ipaddress.IPv4Address("100.127.0.21"),
+                network=ipaddress.IPv4Network("100.127.0.16/29"),
+                vlan_id=100,
+            ),
+            NetappIPInterfaceConfig(
+                name="N1-lif-B",
+                address=ipaddress.IPv4Address("100.127.128.21"),
+                network=ipaddress.IPv4Network("100.127.128.16/29"),
+                vlan_id=200,
+            ),
+            NetappIPInterfaceConfig(
+                name="N2-lif-A",
+                address=ipaddress.IPv4Address("100.127.0.22"),
+                network=ipaddress.IPv4Network("100.127.0.16/29"),
+                vlan_id=100,
+            ),
+        ]
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_route_service_initialization(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test that RouteService is properly initialized in NetAppManager."""
+        manager = NetAppManager(mock_config_file)
+
+        # Verify route service is initialized
+        assert hasattr(manager, "_route_service")
+        assert manager._route_service is not None
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_create_routes_for_project_delegates_to_service(
+        self,
+        mock_host_connection,
+        mock_config,
+        mock_config_file,
+        sample_interface_configs,
+    ):
+        """Test create_routes_for_project delegates to RouteService."""
+        from understack_workflows.netapp.value_objects import RouteResult
+
+        manager = NetAppManager(mock_config_file)
+
+        # Mock route service
+        expected_results = [
+            RouteResult(
+                uuid="route-uuid-1",
+                gateway="100.127.0.17",
+                destination=ipaddress.IPv4Network("100.126.0.0/17"),
+                svm_name="os-test-project",
+            ),
+            RouteResult(
+                uuid="route-uuid-2",
+                gateway="100.127.128.17",
+                destination=ipaddress.IPv4Network("100.126.128.0/17"),
+                svm_name="os-test-project",
+            ),
+        ]
+        manager._route_service.create_routes_from_interfaces = MagicMock(
+            return_value=expected_results
+        )
+
+        result = manager.create_routes_for_project(
+            "test-project", sample_interface_configs
+        )
+
+        # Verify delegation with correct parameters
+        manager._route_service.create_routes_from_interfaces.assert_called_once_with(
+            "test-project", sample_interface_configs
+        )
+        assert result == expected_results
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_create_routes_for_project_error_handling(
+        self,
+        mock_host_connection,
+        mock_config,
+        mock_config_file,
+        sample_interface_configs,
+    ):
+        """Test create_routes_for_project error handling and propagation."""
+        from understack_workflows.netapp.exceptions import NetworkOperationError
+
+        manager = NetAppManager(mock_config_file)
+
+        # Mock route service to raise an error
+        manager._route_service.create_routes_from_interfaces = MagicMock(
+            side_effect=NetworkOperationError("Route creation failed")
+        )
+
+        # Verify error is propagated
+        with pytest.raises(NetworkOperationError, match="Route creation failed"):
+            manager.create_routes_for_project("test-project", sample_interface_configs)
+
+        # Verify service was called
+        manager._route_service.create_routes_from_interfaces.assert_called_once_with(
+            "test-project", sample_interface_configs
+        )
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_create_routes_for_project_empty_interfaces(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test create_routes_for_project with empty interface list."""
+        manager = NetAppManager(mock_config_file)
+
+        # Mock route service
+        manager._route_service.create_routes_from_interfaces = MagicMock(
+            return_value=[]
+        )
+
+        result = manager.create_routes_for_project("test-project", [])
+
+        # Verify delegation with empty list
+        manager._route_service.create_routes_from_interfaces.assert_called_once_with(
+            "test-project", []
+        )
+        assert result == []
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_route_service_dependency_injection(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test NetAppManager with injected RouteService dependency."""
+        from understack_workflows.netapp.route_service import RouteService
+
+        # Create mock dependencies
+        mock_client = MagicMock()
+        mock_error_handler = MagicMock()
+        mock_route_service = MagicMock(spec=RouteService)
+
+        manager = NetAppManager(
+            config_path=mock_config_file,
+            netapp_client=mock_client,
+            route_service=mock_route_service,
+            error_handler=mock_error_handler,
+        )
+
+        # Verify injected route service is used
+        assert manager._route_service is mock_route_service
+
+        # Test delegation works with injected service
+        mock_route_service.create_routes_from_interfaces.return_value = []
+        result = manager.create_routes_for_project("test-project", [])
+
+        mock_route_service.create_routes_from_interfaces.assert_called_once_with(
+            "test-project", []
+        )
+        assert result == []

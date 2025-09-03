@@ -13,7 +13,9 @@ from understack_workflows.main.netapp_configure_net import VirtualMachineNetwork
 from understack_workflows.main.netapp_configure_net import argument_parser
 from understack_workflows.main.netapp_configure_net import construct_device_name
 from understack_workflows.main.netapp_configure_net import execute_graphql_query
-from understack_workflows.main.netapp_configure_net import netapp_create_interfaces
+from understack_workflows.main.netapp_configure_net import (
+    netapp_create_interfaces_and_routes,
+)
 from understack_workflows.main.netapp_configure_net import (
     validate_and_transform_response,
 )
@@ -1355,6 +1357,8 @@ class TestNetappCreateInterfaces:
         """Test creating NetApp interfaces with single interface configuration."""
         # Mock NetAppManager
         mock_netapp_manager = Mock()
+        # Mock route creation to return empty list
+        mock_netapp_manager.create_routes_for_project.return_value = []
 
         # Create test data
         interface = InterfaceInfo(name="N1-lif-A", address="100.127.0.21/29", vlan=2002)
@@ -1370,7 +1374,9 @@ class TestNetappCreateInterfaces:
             mock_config_class.from_nautobot_response.return_value = [mock_config]
 
             # Call the function
-            netapp_create_interfaces(mock_netapp_manager, vm_network_info, project_id)
+            netapp_create_interfaces_and_routes(
+                mock_netapp_manager, vm_network_info, project_id
+            )
 
             # Verify NetappIPInterfaceConfig.from_nautobot_response was called
             mock_config_class.from_nautobot_response.assert_called_once_with(
@@ -1382,10 +1388,16 @@ class TestNetappCreateInterfaces:
                 project_id, mock_config
             )
 
+            # Verify create_routes_for_project was called with correct parameters
+            mock_netapp_manager.create_routes_for_project.assert_called_once_with(
+                project_id, [mock_config]
+            )
+
     def test_netapp_create_interfaces_with_multiple_interfaces(self):
         """Test creating NetApp interfaces with multiple interface configurations."""
         # Mock NetAppManager
         mock_netapp_manager = Mock()
+        mock_netapp_manager.create_routes_for_project.return_value = []
 
         # Create test data with multiple interfaces
         interfaces = [
@@ -1410,7 +1422,9 @@ class TestNetappCreateInterfaces:
             mock_config_class.from_nautobot_response.return_value = mock_configs
 
             # Call the function
-            netapp_create_interfaces(mock_netapp_manager, vm_network_info, project_id)
+            netapp_create_interfaces_and_routes(
+                mock_netapp_manager, vm_network_info, project_id
+            )
 
             # Verify NetappIPInterfaceConfig.from_nautobot_response was called
             mock_config_class.from_nautobot_response.assert_called_once_with(
@@ -1425,10 +1439,16 @@ class TestNetappCreateInterfaces:
                 assert call.args[0] == project_id
                 assert call.args[1] == mock_configs[i]
 
+            # Verify create_routes_for_project was called with correct parameters
+            mock_netapp_manager.create_routes_for_project.assert_called_once_with(
+                project_id, mock_configs
+            )
+
     def test_netapp_create_interfaces_with_empty_interfaces(self):
         """Test creating NetApp interfaces with empty interface list."""
         # Mock NetAppManager
         mock_netapp_manager = Mock()
+        mock_netapp_manager.create_routes_for_project.return_value = []
 
         # Create test data with no interfaces
         vm_network_info = VirtualMachineNetworkInfo(interfaces=[])
@@ -1441,7 +1461,9 @@ class TestNetappCreateInterfaces:
             mock_config_class.from_nautobot_response.return_value = []
 
             # Call the function
-            netapp_create_interfaces(mock_netapp_manager, vm_network_info, project_id)
+            netapp_create_interfaces_and_routes(
+                mock_netapp_manager, vm_network_info, project_id
+            )
 
             # Verify NetappIPInterfaceConfig.from_nautobot_response was called
             mock_config_class.from_nautobot_response.assert_called_once_with(
@@ -1451,11 +1473,17 @@ class TestNetappCreateInterfaces:
             # Verify create_lif was not called
             mock_netapp_manager.create_lif.assert_not_called()
 
+            # Verify create_routes_for_project was called with empty list
+            mock_netapp_manager.create_routes_for_project.assert_called_once_with(
+                project_id, []
+            )
+
     def test_netapp_create_interfaces_propagates_netapp_manager_exceptions(self):
         """Test that NetAppManager exceptions are propagated correctly."""
         # Mock NetAppManager that raises exception
         mock_netapp_manager = Mock()
         mock_netapp_manager.create_lif.side_effect = Exception("SVM Not Found")
+        mock_netapp_manager.create_routes_for_project.return_value = []
 
         # Create test data
         interface = InterfaceInfo(name="N1-lif-A", address="100.127.0.21/29", vlan=2002)
@@ -1472,7 +1500,7 @@ class TestNetappCreateInterfaces:
 
             # Call the function and expect exception to be propagated
             with pytest.raises(Exception, match="SVM Not Found"):
-                netapp_create_interfaces(
+                netapp_create_interfaces_and_routes(
                     mock_netapp_manager, vm_network_info, project_id
                 )
 
@@ -1485,6 +1513,7 @@ class TestNetappCreateInterfaces:
         """Test that interface creation is properly logged."""
         # Mock NetAppManager
         mock_netapp_manager = Mock()
+        mock_netapp_manager.create_routes_for_project.return_value = []
 
         # Create test data
         interface = InterfaceInfo(
@@ -1506,19 +1535,26 @@ class TestNetappCreateInterfaces:
                 "understack_workflows.main.netapp_configure_net.logger"
             ) as mock_logger:
                 # Call the function
-                netapp_create_interfaces(
+                netapp_create_interfaces_and_routes(
                     mock_netapp_manager, vm_network_info, project_id
                 )
 
-                # Verify logging was called with correct message
-                mock_logger.info.assert_called_once_with(
-                    "Creating LIF %s for project %s", "test-interface", project_id
+                # Verify logging was called with correct messages
+                expected_calls = [
+                    (("Creating LIF %s for project %s", "test-interface", project_id),),
+                ]
+                mock_logger.info.assert_has_calls(expected_calls, any_order=False)
+
+                # Verify create_routes_for_project was called
+                mock_netapp_manager.create_routes_for_project.assert_called_once_with(
+                    project_id, [mock_config]
                 )
 
     def test_netapp_create_interfaces_with_realistic_data(self):
         """Test creating NetApp interfaces with realistic interface data."""
         # Mock NetAppManager
         mock_netapp_manager = Mock()
+        mock_netapp_manager.create_routes_for_project.return_value = []
 
         # Load realistic test data from JSON sample
         sample_data = load_json_sample("nautobot_graphql_vm_response_complex.json")
@@ -1541,7 +1577,9 @@ class TestNetappCreateInterfaces:
             mock_config_class.from_nautobot_response.return_value = mock_configs
 
             # Call the function
-            netapp_create_interfaces(mock_netapp_manager, vm_network_info, project_id)
+            netapp_create_interfaces_and_routes(
+                mock_netapp_manager, vm_network_info, project_id
+            )
 
             # Verify NetappIPInterfaceConfig.from_nautobot_response was called
             mock_config_class.from_nautobot_response.assert_called_once_with(
@@ -1557,10 +1595,16 @@ class TestNetappCreateInterfaces:
                 assert call_args.args[0] == project_id
                 assert call_args.args[1] == mock_configs[i]
 
+            # Verify create_routes_for_project was called with correct parameters
+            mock_netapp_manager.create_routes_for_project.assert_called_once_with(
+                project_id, mock_configs
+            )
+
     def test_netapp_create_interfaces_return_value(self):
         """Test that netapp_create_interfaces returns None."""
         # Mock NetAppManager
         mock_netapp_manager = Mock()
+        mock_netapp_manager.create_routes_for_project.return_value = []
 
         # Create test data
         interface = InterfaceInfo(name="N1-lif-A", address="100.127.0.21/29", vlan=2002)
@@ -1576,10 +1620,15 @@ class TestNetappCreateInterfaces:
             mock_config_class.from_nautobot_response.return_value = [mock_config]
 
             # Call the function and verify return value
-            result = netapp_create_interfaces(
+            result = netapp_create_interfaces_and_routes(
                 mock_netapp_manager, vm_network_info, project_id
             )
             assert result is None
+
+            # Verify create_routes_for_project was called
+            mock_netapp_manager.create_routes_for_project.assert_called_once_with(
+                project_id, [mock_config]
+            )
 
 
 class TestArgumentParserNetappConfigPath:
@@ -1683,6 +1732,7 @@ class TestMainFunctionWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv with default netapp config path
@@ -1739,6 +1789,7 @@ class TestMainFunctionWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv with custom netapp config path
@@ -1811,18 +1862,20 @@ class TestMainFunctionWithNetAppManager:
             "/etc/netapp/netapp_nvme.conf"
         )
 
-    @patch("understack_workflows.main.netapp_configure_net.netapp_create_interfaces")
+    @patch(
+        "understack_workflows.main.netapp_configure_net.netapp_create_interfaces_and_routes"
+    )
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
     @patch("understack_workflows.main.netapp_configure_net.setup_logger")
-    def test_main_function_calls_netapp_create_interfaces(
+    def test_main_function_calls_netapp_create_interfaces_and_routes(
         self,
         mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
-        mock_netapp_create_interfaces,
+        mock_netapp_create_interfaces_and_routes,
     ):
         """Test that main function calls netapp_create_interfaces through do_action."""
         from understack_workflows.main.netapp_configure_net import main
@@ -1847,6 +1900,7 @@ class TestMainFunctionWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv
@@ -1865,11 +1919,11 @@ class TestMainFunctionWithNetAppManager:
         # Verify successful execution
         assert result == 0
 
-        # Verify netapp_create_interfaces was called
-        mock_netapp_create_interfaces.assert_called_once()
-        call_args = mock_netapp_create_interfaces.call_args
+        # Verify netapp_create_interfaces_and_routes was called
+        mock_netapp_create_interfaces_and_routes.assert_called_once()
+        call_args = mock_netapp_create_interfaces_and_routes.call_args
 
-        # Verify the arguments passed to netapp_create_interfaces
+        # Verify the arguments passed to netapp_create_interfaces_and_routes
         assert (
             call_args.args[0] == mock_netapp_manager_instance
         )  # NetAppManager instance

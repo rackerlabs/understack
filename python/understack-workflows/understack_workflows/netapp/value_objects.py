@@ -90,6 +90,11 @@ class NetappIPInterfaceConfig:
     def broadcast_domain_name(self):
         return f"Fabric-{self.side}"
 
+    @cached_property
+    def route_nexthop(self):
+        """Calculate next hop for the static route to reach the clients."""
+        return next(self.network.hosts())
+
 
 # Specification Value Objects
 
@@ -171,6 +176,69 @@ class NamespaceSpec:
         return f"svm.name={self.svm_name}&location.volume.name={self.volume_name}"
 
 
+@dataclass(frozen=True)
+class RouteSpec:
+    """Specification for creating a network route."""
+
+    svm_name: str
+    gateway: str
+    destination: ipaddress.IPv4Network
+
+    @classmethod
+    def from_nexthop_ip(cls, svm_name: str, nexthop_ip: str) -> "RouteSpec":
+        """Create RouteSpec from nexthop IP with calculated destination.
+
+        Args:
+            svm_name: Name of the Storage Virtual Machine
+            nexthop_ip: IP address of the route gateway/nexthop
+
+        Returns:
+            RouteSpec: Route specification with calculated destination
+
+        Raises:
+            ValueError: If IP pattern is not supported for route destination calculation
+        """
+        destination = cls._calculate_destination(nexthop_ip)
+        return cls(
+            svm_name=svm_name,
+            gateway=nexthop_ip,
+            destination=destination,
+        )
+
+    @staticmethod
+    def _calculate_destination(nexthop_ip: str) -> ipaddress.IPv4Network:
+        """Calculate route destination based on IP address pattern.
+
+        Args:
+            nexthop_ip: IP address to analyze for destination calculation
+
+        Returns:
+            str: Route destination in CIDR format
+
+        Raises:
+            ValueError: If IP is not in 100.64.0.0/10 subnet or third octet not 0 or 128
+        """
+        ip = ipaddress.IPv4Address(nexthop_ip)
+
+        # Validate that IP is within 100.64.0.0/10 subnet
+        carrier_grade_nat_network = ipaddress.IPv4Network("100.64.0.0/10")
+        if ip not in carrier_grade_nat_network:
+            raise ValueError(
+                f"IP address {nexthop_ip} is not within required 100.64.0.0/10 subnet"
+            )
+
+        third_octet = int(str(ip).split(".")[2])
+
+        if third_octet == 0:
+            return ipaddress.IPv4Network("100.126.0.0/17")
+        elif third_octet == 128:
+            return ipaddress.IPv4Network("100.126.128.0/17")
+        else:
+            raise ValueError(
+                f"Unsupported IP pattern for route destination: {nexthop_ip}"
+            )
+
+
 # Result Value Objects
 
 
@@ -233,3 +301,13 @@ class NamespaceResult:
     mapped: bool
     svm_name: str | None = None
     volume_name: str | None = None
+
+
+@dataclass(frozen=True)
+class RouteResult:
+    """Result of a route creation operation."""
+
+    uuid: str
+    gateway: str
+    destination: ipaddress.IPv4Network
+    svm_name: str
