@@ -14,6 +14,15 @@
       ],
       "automerge": true,
       "automergeType": "branch"
+    },
+    {
+      "matchPackageNames": [
+        "quay.io/argoproj/workflow-controller",
+        "quay.io/argoproj/argoexec",
+        "quay.io/argoproj/argocli"
+      ],
+      "groupName": "Argo Workflows",
+      "commitMessageTopic": "Argo Workflows"
     }
   ],
   "customManagers": [
