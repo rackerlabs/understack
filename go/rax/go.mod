@@ -8,7 +8,7 @@ require (
 	github.com/go-git/go-git/v5 v5.16.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
-	github.com/google/go-github/v50 v50.2.0
+	github.com/google/go-github/v74 v74.0.0
 	github.com/google/go-github/v55 v55.0.0
 	github.com/nautobot/go-nautobot/v2 v2.3.2-beta
 	github.com/onsi/ginkgo/v2 v2.22.0
