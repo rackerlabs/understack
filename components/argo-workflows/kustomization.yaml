@@ -23,7 +23,7 @@ images:
   - name: quay.io/argoproj/workflow-controller
     newTag: v3.6.10
   - name: quay.io/argoproj/argoexec
-    newTag: v3.6.10
+    newTag: v3.7.1
   - name: quay.io/argoproj/argocli
     newTag: v3.6.10
 
