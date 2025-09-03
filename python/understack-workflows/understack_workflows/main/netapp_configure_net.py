@@ -410,8 +410,9 @@ def format_and_display_output(
     # Log detailed interface information at debug level
     for i, vm in enumerate(structured_data):
         logger.debug(
-            "SVM/Virtual machine %d has {len(vm.interfaces)} interface(s):",
+            "SVM/Virtual machine %d has %d interface(s):",
             i + 1,
+            len(vm.interfaces),
         )
         for interface in vm.interfaces:
             logger.debug(
