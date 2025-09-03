@@ -17,8 +17,92 @@ from pydantic import field_validator
 from ipaddress import IPv4Address
 from ipaddress import IPv4Network
 
-if TYPE_CHECKING:
-    from understack_workflows.main.netapp_configure_net import VirtualMachineNetworkInfo
+
+class InterfaceInfo(BaseModel):
+    """Information about a network interface from GraphQL response."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    address: str
+    vlan: int
+
+    @field_validator("vlan")
+    @classmethod
+    def validate_vlan(cls, v):
+        """Validate VLAN ID is in valid range (1-4094)."""
+        if not 1 <= v <= 4094:
+            raise ValueError("VLAN ID must be between 1 and 4094")
+        return v
+
+    @classmethod
+    def from_graphql_interface(cls, interface_data: dict) -> "InterfaceInfo":
+        """Create InterfaceInfo from GraphQL interface data with validation.
+
+        Args:
+            interface_data: GraphQL interface data containing name,
+                            ip_addresses, and tagged_vlans
+
+        Returns:
+            InterfaceInfo: Validated interface information
+
+        Raises:
+            ValueError: If interface has zero or multiple IP addresses or VLANs
+        """
+        name = interface_data.get("name", "")
+        ip_addresses = interface_data.get("ip_addresses", [])
+        tagged_vlans = interface_data.get("tagged_vlans", [])
+
+        # Validate exactly one IP address
+        if len(ip_addresses) == 0:
+            raise ValueError(f"Interface '{name}' has no IP addresses")
+        elif len(ip_addresses) > 1:
+            raise ValueError(
+                f"Interface '{name}' has multiple IP addresses:"
+                f" {[ip['address'] for ip in ip_addresses]}"
+            )
+
+        # Validate exactly one tagged VLAN
+        if len(tagged_vlans) == 0:
+            raise ValueError(f"Interface '{name}' has no tagged VLANs")
+        elif len(tagged_vlans) > 1:
+            raise ValueError(
+                f"Interface '{name}' has multiple tagged VLANs:"
+                f" {[vlan['vid'] for vlan in tagged_vlans]}"
+            )
+
+        address = ip_addresses[0]["address"]
+        vlan = tagged_vlans[0]["vid"]
+
+        return cls(name=name, address=address, vlan=vlan)
+
+
+class VirtualMachineNetworkInfo(BaseModel):
+    """Network information for a virtual machine from GraphQL response."""
+
+    model_config = ConfigDict(frozen=True)
+
+    interfaces: list[InterfaceInfo]
+
+    @classmethod
+    def from_graphql_vm(cls, vm_data: dict) -> "VirtualMachineNetworkInfo":
+        """Create VirtualMachineNetworkInfo from GraphQL virtual machine data.
+
+        Args:
+            vm_data: GraphQL virtual machine data containing interfaces
+
+        Returns:
+            VirtualMachineNetworkInfo: Validated virtual machine network information
+
+        Raises:
+            ValueError: If any interface validation fails
+        """
+        interfaces = []
+        for interface_data in vm_data.get("interfaces", []):
+            interface_info = InterfaceInfo.from_graphql_interface(interface_data)
+            interfaces.append(interface_info)
+
+        return cls(interfaces=interfaces)
 
 
 @dataclass
@@ -58,7 +142,7 @@ class NetappIPInterfaceConfig:
 
     @classmethod
     def from_nautobot_response(
-        cls, response: "VirtualMachineNetworkInfo", netapp_config=None
+        cls, response: VirtualMachineNetworkInfo, netapp_config=None
     ):
         """Create NetappIPInterfaceConfig instances from Nautobot response.
 
