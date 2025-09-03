@@ -5,7 +5,7 @@ go 1.23.6
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/charmbracelet/log v0.4.2
-	github.com/gookit/goutil v0.6.18
+	github.com/gookit/goutil v0.7.1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	k8s.io/api v0.32.3
@@ -74,10 +74,10 @@ require (
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
-	golang.org/x/term v0.28.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/protobuf v1.36.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
