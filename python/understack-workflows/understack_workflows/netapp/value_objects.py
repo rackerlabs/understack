@@ -6,16 +6,16 @@ and clear interfaces for NetApp SDK interactions.
 """
 
 import ipaddress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cached_property
-from ipaddress import IPv4Address
-from ipaddress import IPv4Network
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import computed_field
 from pydantic import field_validator
+from ipaddress import IPv4Address
+from ipaddress import IPv4Network
 
 if TYPE_CHECKING:
     from understack_workflows.main.netapp_configure_net import VirtualMachineNetworkInfo
@@ -152,6 +152,16 @@ class InterfaceSpec(BaseModel):
         """Get IP configuration as a dictionary for NetApp SDK."""
         return {"address": str(self.address), "netmask": self.netmask}
 
+    @field_validator("address")
+    @classmethod
+    def validate_ip(cls, v):
+        try:
+            if isinstance(v, str):
+                IPv4Address(v)
+        except Exception as e:
+            raise ValueError from e
+        return v
+
 
 class PortSpec(BaseModel):
     """Specification for creating a network port."""
@@ -284,18 +294,20 @@ class RouteSpec(BaseModel):
 # Result Value Objects
 
 
-@dataclass(frozen=True)
-class SvmResult:
+class SvmResult(BaseModel):
     """Result of an SVM operation."""
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     uuid: str
     state: str
 
 
-@dataclass(frozen=True)
-class VolumeResult:
+class VolumeResult(BaseModel):
     """Result of a volume operation."""
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     uuid: str
@@ -304,17 +316,19 @@ class VolumeResult:
     svm_name: str | None = None
 
 
-@dataclass(frozen=True)
-class NodeResult:
+class NodeResult(BaseModel):
     """Result of a node query operation."""
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     uuid: str
 
 
-@dataclass(frozen=True)
-class PortResult:
+class PortResult(BaseModel):
     """Result of a port operation."""
+
+    model_config = ConfigDict(frozen=True)
 
     uuid: str
     name: str
@@ -322,21 +336,23 @@ class PortResult:
     port_type: str | None = None
 
 
-@dataclass(frozen=True)
-class InterfaceResult:
+class InterfaceResult(BaseModel):
     """Result of an interface operation."""
+
+    model_config = ConfigDict(frozen=True)
 
     name: str
     uuid: str
-    address: str
+    address: str | IPv4Address
     netmask: str
     enabled: bool
     svm_name: str | None = None
 
 
-@dataclass(frozen=True)
-class NamespaceResult:
+class NamespaceResult(BaseModel):
     """Result of a namespace query operation."""
+
+    model_config = ConfigDict(frozen=True)
 
     uuid: str
     name: str
@@ -345,11 +361,12 @@ class NamespaceResult:
     volume_name: str | None = None
 
 
-@dataclass(frozen=True)
-class RouteResult:
+class RouteResult(BaseModel):
     """Result of a route creation operation."""
+
+    model_config = ConfigDict(frozen=True)
 
     uuid: str
     gateway: str
-    destination: IPv4Network
+    destination: str | IPv4Network
     svm_name: str

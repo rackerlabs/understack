@@ -328,7 +328,7 @@ class TestNetAppClient:
         assert isinstance(result, InterfaceResult)
         assert result.name == "test-interface"
         assert result.uuid == "interface-uuid-123"
-        assert result.address == "192.168.1.10"
+        assert str(result.address) == "192.168.1.10"
         assert result.netmask == "255.255.255.0"
         assert result.enabled is True
         assert result.svm_name == "test-svm"
