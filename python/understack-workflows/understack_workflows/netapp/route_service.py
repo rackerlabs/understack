@@ -45,11 +45,6 @@ class RouteService:
             NetworkOperationError: If route creation fails
         """
         try:
-            self._error_handler.log_info(
-                "Creating routes for project %(project_id)s",
-                {"project_id": project_id},
-            )
-
             # Extract unique nexthop addresses
             unique_nexthops = self._extract_unique_nexthops(interface_configs)
 
@@ -88,11 +83,6 @@ class RouteService:
                             "nexthop": nexthop,
                         },
                     )
-
-            self._error_handler.log_info(
-                "Successfully created %(count)d routes for project %(project_id)s",
-                {"count": len(results), "project_id": project_id},
-            )
 
             return results
 

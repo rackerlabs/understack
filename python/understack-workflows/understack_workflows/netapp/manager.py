@@ -476,19 +476,9 @@ class NetAppManager:
         Raises:
             NetworkOperationError: If route creation fails
         """
-        logger.info(
-            "Creating routes for project %(project_id)s with %(count)d interfaces",
-            {"project_id": project_id, "count": len(interface_configs)},
-        )
-
         try:
             results = self._route_service.create_routes_from_interfaces(
                 project_id, interface_configs
-            )
-
-            logger.info(
-                "Successfully created %(count)d routes for project %(project_id)s",
-                {"count": len(results), "project_id": project_id},
             )
 
             return results

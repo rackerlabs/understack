@@ -500,49 +500,7 @@ netapp_password = test-password
             "test-project", sample_interface_configs
         )
 
-    @patch("understack_workflows.netapp.manager.config")
-    @patch("understack_workflows.netapp.manager.HostConnection")
-    def test_create_routes_for_project_logging(
-        self,
-        mock_host_connection,
-        mock_config,
-        mock_config_file,
-        sample_interface_configs,
-    ):
-        """Test create_routes_for_project logging behavior."""
-        from understack_workflows.netapp.value_objects import RouteResult
 
-        manager = NetAppManager(mock_config_file)
-
-        # Mock route service
-        expected_results = [
-            RouteResult(
-                uuid="route-uuid-1",
-                gateway="100.127.0.17",
-                destination="100.126.0.0/17",
-                svm_name="os-test-project",
-            ),
-        ]
-        manager._route_service.create_routes_from_interfaces = MagicMock(
-            return_value=expected_results
-        )
-
-        with patch("understack_workflows.netapp.manager.logger") as mock_logger:
-            result = manager.create_routes_for_project(
-                "test-project", sample_interface_configs
-            )
-
-            # Verify logging calls
-            mock_logger.info.assert_any_call(
-                "Creating routes for project %(project_id)s with %(count)d interfaces",
-                {"project_id": "test-project", "count": 3},
-            )
-            mock_logger.info.assert_any_call(
-                "Successfully created %(count)d routes for project %(project_id)s",
-                {"count": 1, "project_id": "test-project"},
-            )
-
-        assert result == expected_results
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")

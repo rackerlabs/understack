@@ -1542,8 +1542,6 @@ class TestNetappCreateInterfaces:
                 # Verify logging was called with correct messages
                 expected_calls = [
                     (("Creating LIF %s for project %s", "test-interface", project_id),),
-                    (("Creating routes for project %s", project_id),),
-                    (("Successfully created %d routes for project %s", 0, project_id),),
                 ]
                 mock_logger.info.assert_has_calls(expected_calls, any_order=False)
 

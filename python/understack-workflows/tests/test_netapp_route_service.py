@@ -104,13 +104,13 @@ class TestRouteService:
         assert isinstance(route_specs[0], RouteSpec)
         assert route_specs[0].svm_name == expected_svm_name
         assert route_specs[0].gateway in ["100.127.0.17", "100.127.128.17"]
-        assert route_specs[0].destination in ["100.126.0.0/17", "100.126.128.0/17"]
+        assert route_specs[0].destination in [ipaddress.IPv4Network("100.126.0.0/17"), ipaddress.IPv4Network("100.126.128.0/17")]
 
         # Check second route spec
         assert isinstance(route_specs[1], RouteSpec)
         assert route_specs[1].svm_name == expected_svm_name
         assert route_specs[1].gateway in ["100.127.0.17", "100.127.128.17"]
-        assert route_specs[1].destination in ["100.126.0.0/17", "100.126.128.0/17"]
+        assert route_specs[1].destination in [ipaddress.IPv4Network("100.126.0.0/17"), ipaddress.IPv4Network("100.126.128.0/17")]
 
         # Verify different gateways were used
         gateways = {spec.gateway for spec in route_specs}
@@ -169,7 +169,7 @@ class TestRouteService:
         assert isinstance(call_args, RouteSpec)
         assert call_args.svm_name == expected_svm_name
         assert call_args.gateway == "100.127.0.17"
-        assert call_args.destination == "100.126.0.0/17"
+        assert call_args.destination == ipaddress.IPv4Network("100.126.0.0/17")
 
     def test_create_routes_from_interfaces_empty_list(
         self, route_service, mock_client, mock_error_handler
@@ -185,8 +185,8 @@ class TestRouteService:
         # Verify client was not called
         mock_client.create_route.assert_not_called()
 
-        # Verify logging
-        mock_error_handler.log_info.assert_called()
+        # Verify logging - no logging expected for empty list
+        mock_error_handler.log_info.assert_not_called()
 
     def test_create_routes_from_interfaces_route_creation_error(
         self, route_service, mock_client, mock_error_handler, sample_interface_configs
@@ -385,9 +385,9 @@ class TestRouteService:
         # Find specs by gateway to verify destinations
         for spec in route_specs:
             if spec.gateway == "100.127.0.17":
-                assert spec.destination == "100.126.0.0/17"
+                assert spec.destination == ipaddress.IPv4Network("100.126.0.0/17")
             elif spec.gateway == "100.127.128.17":
-                assert spec.destination == "100.126.128.0/17"
+                assert spec.destination == ipaddress.IPv4Network("100.126.128.0/17")
             else:
                 pytest.fail(f"Unexpected gateway: {spec.gateway}")
 
@@ -423,17 +423,15 @@ class TestRouteService:
         log_info_calls = mock_error_handler.log_info.call_args_list
         log_debug_calls = mock_error_handler.log_debug.call_args_list
 
-        # Should have info logs for: start, each route creation, completion
-        assert len(log_info_calls) >= 4  # start + 2 routes + completion
+        # Should have info logs for: each route creation (no start/completion logs)
+        assert len(log_info_calls) >= 2  # 2 routes created
 
         # Should have debug logs for nexthop extraction
         assert len(log_debug_calls) >= 1
 
         # Verify specific log messages
         log_messages = [call[0][0] for call in log_info_calls]
-        assert any("Creating routes for project" in msg for msg in log_messages)
         assert any("Created route:" in msg for msg in log_messages)
-        assert any("Successfully created" in msg for msg in log_messages)
 
     def test_create_routes_netapp_rest_error_handling(
         self, route_service, mock_client, mock_error_handler, sample_interface_configs

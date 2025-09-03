@@ -359,18 +359,13 @@ def netapp_create_interfaces_and_routes(
         nautobot_response, mgr.config
     )
 
-    # Create LIF interfaces (existing functionality)
+    # Create LIF interfaces
     for interface_config in configs:
         logger.info("Creating LIF %s for project %s", interface_config.name, project_id)
         mgr.create_lif(project_id, interface_config)
 
-    # Create routes (new functionality)
-    logger.info("Creating routes for project %s", project_id)
-    route_results = mgr.create_routes_for_project(project_id, configs)
-
-    logger.info(
-        "Successfully created %d routes for project %s", len(route_results), project_id
-    )
+    # Create routes
+    mgr.create_routes_for_project(project_id, configs)
     return
 
 
