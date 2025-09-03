@@ -448,13 +448,13 @@ netapp_password = test-password
             RouteResult(
                 uuid="route-uuid-1",
                 gateway="100.127.0.17",
-                destination="100.126.0.0/17",
+                destination=ipaddress.IPv4Network("100.126.0.0/17"),
                 svm_name="os-test-project",
             ),
             RouteResult(
                 uuid="route-uuid-2",
                 gateway="100.127.128.17",
-                destination="100.126.128.0/17",
+                destination=ipaddress.IPv4Network("100.126.128.0/17"),
                 svm_name="os-test-project",
             ),
         ]
@@ -499,8 +499,6 @@ netapp_password = test-password
         manager._route_service.create_routes_from_interfaces.assert_called_once_with(
             "test-project", sample_interface_configs
         )
-
-
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")

@@ -73,13 +73,13 @@ class TestRouteService:
             RouteResult(
                 uuid="route-uuid-1",
                 gateway="100.127.0.17",
-                destination="100.126.0.0/17",
+                destination=ipaddress.IPv4Network("100.126.0.0/17"),
                 svm_name=expected_svm_name,
             ),
             RouteResult(
                 uuid="route-uuid-2",
                 gateway="100.127.128.17",
-                destination="100.126.128.0/17",
+                destination=ipaddress.IPv4Network("100.126.128.0/17"),
                 svm_name=expected_svm_name,
             ),
         ]
@@ -104,13 +104,19 @@ class TestRouteService:
         assert isinstance(route_specs[0], RouteSpec)
         assert route_specs[0].svm_name == expected_svm_name
         assert route_specs[0].gateway in ["100.127.0.17", "100.127.128.17"]
-        assert route_specs[0].destination in [ipaddress.IPv4Network("100.126.0.0/17"), ipaddress.IPv4Network("100.126.128.0/17")]
+        assert route_specs[0].destination in [
+            ipaddress.IPv4Network("100.126.0.0/17"),
+            ipaddress.IPv4Network("100.126.128.0/17"),
+        ]
 
         # Check second route spec
         assert isinstance(route_specs[1], RouteSpec)
         assert route_specs[1].svm_name == expected_svm_name
         assert route_specs[1].gateway in ["100.127.0.17", "100.127.128.17"]
-        assert route_specs[1].destination in [ipaddress.IPv4Network("100.126.0.0/17"), ipaddress.IPv4Network("100.126.128.0/17")]
+        assert route_specs[1].destination in [
+            ipaddress.IPv4Network("100.126.0.0/17"),
+            ipaddress.IPv4Network("100.126.128.0/17"),
+        ]
 
         # Verify different gateways were used
         gateways = {spec.gateway for spec in route_specs}
@@ -148,7 +154,7 @@ class TestRouteService:
         route_result = RouteResult(
             uuid="route-uuid-1",
             gateway="100.127.0.17",
-            destination="100.126.0.0/17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
             svm_name=expected_svm_name,
         )
         mock_client.create_route.return_value = route_result
@@ -219,7 +225,7 @@ class TestRouteService:
         route_result = RouteResult(
             uuid="route-uuid-1",
             gateway="100.127.0.17",
-            destination="100.126.0.0/17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
             svm_name=expected_svm_name,
         )
         mock_client.create_route.side_effect = [
@@ -323,7 +329,7 @@ class TestRouteService:
         route_result = RouteResult(
             uuid="route-uuid-1",
             gateway="100.127.0.17",
-            destination="100.126.0.0/17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
             svm_name=expected_svm_name,
         )
         mock_client.create_route.return_value = route_result
@@ -365,13 +371,13 @@ class TestRouteService:
             RouteResult(
                 uuid="route-uuid-1",
                 gateway="100.127.0.17",
-                destination="100.126.0.0/17",
+                destination=ipaddress.IPv4Network("100.126.0.0/17"),
                 svm_name=expected_svm_name,
             ),
             RouteResult(
                 uuid="route-uuid-2",
                 gateway="100.127.128.17",
-                destination="100.126.128.0/17",
+                destination=ipaddress.IPv4Network("100.126.128.0/17"),
                 svm_name=expected_svm_name,
             ),
         ]
@@ -403,13 +409,13 @@ class TestRouteService:
             RouteResult(
                 uuid="route-uuid-1",
                 gateway="100.127.0.17",
-                destination="100.126.0.0/17",
+                destination=ipaddress.IPv4Network("100.126.0.0/17"),
                 svm_name=expected_svm_name,
             ),
             RouteResult(
                 uuid="route-uuid-2",
                 gateway="100.127.128.17",
-                destination="100.126.128.0/17",
+                destination=ipaddress.IPv4Network("100.126.128.0/17"),
                 svm_name=expected_svm_name,
             ),
         ]
@@ -544,7 +550,7 @@ class TestRouteService:
         route_result = RouteResult(
             uuid="route-uuid-1",
             gateway="100.127.0.17",
-            destination="100.126.0.0/17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
             svm_name=expected_svm_name,
         )
         netapp_error = NetAppRestError("Second route creation failed")

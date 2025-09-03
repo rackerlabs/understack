@@ -659,7 +659,10 @@ class NetAppClient(NetAppClientInterface):
             route = NetworkRoute()
             route.svm = {"name": route_spec.svm_name}
             route.gateway = route_spec.gateway
-            route.destination = route_spec.destination
+            route.destination = {
+                "address": str(route_spec.destination.network_address),
+                "netmask": str(route_spec.destination.netmask),
+            }
 
             self._error_handler.log_debug(
                 "Creating NetworkRoute", {"route": str(route)}

@@ -182,7 +182,7 @@ class RouteSpec:
 
     svm_name: str
     gateway: str
-    destination: str
+    destination: ipaddress.IPv4Network
 
     @classmethod
     def from_nexthop_ip(cls, svm_name: str, nexthop_ip: str) -> "RouteSpec":
@@ -199,10 +199,14 @@ class RouteSpec:
             ValueError: If IP pattern is not supported for route destination calculation
         """
         destination = cls._calculate_destination(nexthop_ip)
-        return cls(svm_name=svm_name, gateway=nexthop_ip, destination=destination)
+        return cls(
+            svm_name=svm_name,
+            gateway=nexthop_ip,
+            destination=destination,
+        )
 
     @staticmethod
-    def _calculate_destination(nexthop_ip: str) -> str:
+    def _calculate_destination(nexthop_ip: str) -> ipaddress.IPv4Network:
         """Calculate route destination based on IP address pattern.
 
         Args:
@@ -226,9 +230,9 @@ class RouteSpec:
         third_octet = int(str(ip).split(".")[2])
 
         if third_octet == 0:
-            return "100.126.0.0/17"
+            return ipaddress.IPv4Network("100.126.0.0/17")
         elif third_octet == 128:
-            return "100.126.128.0/17"
+            return ipaddress.IPv4Network("100.126.128.0/17")
         else:
             raise ValueError(
                 f"Unsupported IP pattern for route destination: {nexthop_ip}"
@@ -305,5 +309,5 @@ class RouteResult:
 
     uuid: str
     gateway: str
-    destination: str
+    destination: ipaddress.IPv4Network
     svm_name: str

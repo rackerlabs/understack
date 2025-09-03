@@ -1,5 +1,6 @@
 import json
 import pathlib
+from ipaddress import IPv4Network
 from unittest.mock import Mock
 from unittest.mock import patch
 
@@ -954,13 +955,13 @@ class TestRouteCreationIntegration:
             RouteResult(
                 uuid="route-uuid-1",
                 gateway="100.127.0.17",
-                destination="100.126.0.0/17",
+                destination=IPv4Network("100.126.0.0/17"),
                 svm_name="os-12345678123456789abc123456789012",
             ),
             RouteResult(
                 uuid="route-uuid-2",
                 gateway="100.127.128.17",
-                destination="100.126.128.0/17",
+                destination=IPv4Network("100.126.128.0/17"),
                 svm_name="os-12345678123456789abc123456789012",
             ),
         ]
@@ -1054,13 +1055,13 @@ class TestRouteCreationIntegration:
             RouteResult(
                 uuid="route-uuid-1",
                 gateway="100.127.0.17",
-                destination="100.126.0.0/17",
+                destination=IPv4Network("100.126.0.0/17"),
                 svm_name="os-12345678123456789abc123456789012",
             ),
             RouteResult(
                 uuid="route-uuid-2",
                 gateway="100.127.128.17",
-                destination="100.126.128.0/17",
+                destination=IPv4Network("100.126.128.0/17"),
                 svm_name="os-12345678123456789abc123456789012",
             ),
         ]
@@ -1469,13 +1470,13 @@ class TestRouteCreationIntegration:
             RouteResult(
                 uuid="route-uuid-1",
                 gateway="100.127.0.17",
-                destination="100.126.0.0/17",
+                destination=IPv4Network("100.126.0.0/17"),
                 svm_name="os-12345678123456789abc123456789012",
             ),
             RouteResult(
                 uuid="route-uuid-2",
                 gateway="100.127.128.17",
-                destination="100.126.128.0/17",
+                destination=IPv4Network("100.126.128.0/17"),
                 svm_name="os-12345678123456789abc123456789012",
             ),
         ]
@@ -1548,7 +1549,7 @@ class TestRouteCreationIntegration:
             RouteResult(
                 uuid="route-uuid-1",
                 gateway="100.127.0.17",
-                destination="100.126.0.0/17",
+                destination=IPv4Network("100.126.0.0/17"),
                 svm_name="os-12345678123456789abc123456789012",
             ),
         ]

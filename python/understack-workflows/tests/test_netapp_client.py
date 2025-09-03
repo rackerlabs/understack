@@ -1,5 +1,6 @@
 """Tests for NetAppClient abstraction layer."""
 
+import ipaddress
 from unittest.mock import MagicMock
 from unittest.mock import Mock
 from unittest.mock import patch
@@ -532,7 +533,7 @@ class TestNetAppClient:
         route_spec = RouteSpec(
             svm_name="os-test-project",
             gateway="100.127.0.17",
-            destination="100.126.0.0/17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
         )
 
         result = netapp_client.create_route(route_spec)
@@ -540,13 +541,16 @@ class TestNetAppClient:
         # Verify route configuration
         assert mock_route_instance.svm == {"name": "os-test-project"}
         assert mock_route_instance.gateway == "100.127.0.17"
-        assert mock_route_instance.destination == "100.126.0.0/17"
+        assert mock_route_instance.destination == {
+            "address": "100.126.0.0",
+            "netmask": "255.255.128.0",
+        }
         mock_route_instance.post.assert_called_once_with(hydrate=True)
 
         # Verify result
         assert result.uuid == "route-uuid-123"
         assert result.gateway == "100.127.0.17"
-        assert result.destination == "100.126.0.0/17"
+        assert result.destination == ipaddress.IPv4Network("100.126.0.0/17")
         assert result.svm_name == "os-test-project"
 
     @patch("understack_workflows.netapp.client.NetworkRoute")
@@ -568,7 +572,7 @@ class TestNetAppClient:
         route_spec = RouteSpec(
             svm_name="os-nonexistent-project",
             gateway="100.127.0.17",
-            destination="100.126.0.0/17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
         )
 
         with pytest.raises(NetworkOperationError):
@@ -581,7 +585,7 @@ class TestNetAppClient:
         assert call_args[0][1] == "Route creation"
         assert call_args[0][2]["svm_name"] == "os-nonexistent-project"
         assert call_args[0][2]["gateway"] == "100.127.0.17"
-        assert call_args[0][2]["destination"] == "100.126.0.0/17"
+        assert call_args[0][2]["destination"] == ipaddress.IPv4Network("100.126.0.0/17")
 
     @patch("understack_workflows.netapp.client.NetworkRoute")
     def test_create_route_invalid_svm_error(self, mock_route_class, netapp_client):
@@ -604,7 +608,7 @@ class TestNetAppClient:
         route_spec = RouteSpec(
             svm_name="os-invalid-svm",
             gateway="100.127.0.17",
-            destination="100.126.0.0/17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
         )
 
         with pytest.raises(NetworkOperationError):
@@ -637,7 +641,7 @@ class TestNetAppClient:
         route_spec = RouteSpec(
             svm_name="os-test-project",
             gateway="192.168.1.1",  # Invalid gateway for this network
-            destination="100.126.0.0/17",
+            destination=ipaddress.IPv4Network("100.126.0.0/17"),
         )
 
         with pytest.raises(NetworkOperationError):
@@ -646,7 +650,7 @@ class TestNetAppClient:
         # Verify error context includes gateway information
         call_args = netapp_client._error_handler.handle_netapp_error.call_args
         assert call_args[0][2]["gateway"] == "192.168.1.1"
-        assert call_args[0][2]["destination"] == "100.126.0.0/17"
+        assert call_args[0][2]["destination"] == ipaddress.IPv4Network("100.126.0.0/17")
 
     @patch("understack_workflows.netapp.client.NetworkRoute")
     def test_create_route_logging_behavior(self, mock_route_class, netapp_client):
@@ -658,7 +662,7 @@ class TestNetAppClient:
         route_spec = RouteSpec(
             svm_name="os-logging-test",
             gateway="100.127.128.17",
-            destination="100.126.128.0/17",
+            destination=ipaddress.IPv4Network("100.126.128.0/17"),
         )
 
         netapp_client.create_route(route_spec)
@@ -687,7 +691,9 @@ class TestNetAppClient:
         # Verify route start log
         assert len(route_start_logs) == 1
         start_log = route_start_logs[0]
-        assert start_log[0][1]["destination"] == "100.126.128.0/17"
+        assert start_log[0][1]["destination"] == ipaddress.IPv4Network(
+            "100.126.128.0/17"
+        )
         assert start_log[0][1]["gateway"] == "100.127.128.17"
         assert start_log[0][1]["svm_name"] == "os-logging-test"
 
