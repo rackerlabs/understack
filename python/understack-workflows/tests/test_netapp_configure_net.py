@@ -1861,6 +1861,10 @@ class TestMainFunctionWithNetAppManager:
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
+        # Properly mock the config property with netapp_nic_slot_prefix
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv with default netapp config path
@@ -1917,6 +1921,10 @@ class TestMainFunctionWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 

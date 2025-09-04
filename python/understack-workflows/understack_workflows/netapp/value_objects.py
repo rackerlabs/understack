@@ -6,8 +6,6 @@ and clear interfaces for NetApp SDK interactions.
 """
 
 import ipaddress
-from dataclasses import dataclass, field
-from functools import cached_property
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
@@ -105,27 +103,37 @@ class VirtualMachineNetworkInfo(BaseModel):
         return cls(interfaces=interfaces)
 
 
-@dataclass
-class NetappIPInterfaceConfig:
+class NetappIPInterfaceConfig(BaseModel):
     """Configuration for NetApp IP interface creation."""
 
     name: str
-    address: ipaddress.IPv4Address
-    network: ipaddress.IPv4Network
+    address: IPv4Address
+    network: IPv4Network
     vlan_id: int
     nic_slot_prefix: str = "e4"
+
+    @field_validator("vlan_id")
+    @classmethod
+    def validate_vlan_id(cls, v):
+        """Validate VLAN ID is in valid range (1-4094)."""
+        if not 1 <= v <= 4094:
+            raise ValueError("VLAN ID must be between 1 and 4094")
+        return v
 
     def netmask_long(self):
         return self.network.netmask
 
-    @cached_property
-    def side(self):
+    @computed_field
+    @property
+    def side(self) -> str:
+        """Extract side (A or B) from interface name."""
         last_character = self.name[-1].upper()
         if last_character in ["A", "B"]:
             return last_character
-        raise ValueError("Cannot determine side from interface %s", self.name)
+        raise ValueError(f"Cannot determine side from interface {self.name}")
 
-    @cached_property
+    @computed_field
+    @property
     def desired_node_number(self) -> int:
         """Node index in the cluster.
 
@@ -138,7 +146,25 @@ class NetappIPInterfaceConfig:
         elif name_part == "N2":
             return 2
         else:
-            raise ValueError("Cannot determine node index from name %s", self.name)
+            raise ValueError(f"Cannot determine node index from name {self.name}")
+
+    @computed_field
+    @property
+    def base_port_name(self) -> str:
+        """Get the base port name using the configured NIC slot prefix."""
+        return f"{self.nic_slot_prefix}{self.side.lower()}"
+
+    @computed_field
+    @property
+    def broadcast_domain_name(self) -> str:
+        """Get the broadcast domain name based on the side."""
+        return f"Fabric-{self.side}"
+
+    @computed_field
+    @property
+    def route_nexthop(self) -> IPv4Address:
+        """Calculate next hop for the static route to reach the clients."""
+        return IPv4Address(str(next(self.network.hosts())))
 
     @classmethod
     def from_nautobot_response(
@@ -160,30 +186,18 @@ class NetappIPInterfaceConfig:
         result = []
         for interface in response.interfaces:
             address, _ = interface.address.split("/")
+            # Create network with strict=False to handle host addresses
+            network = IPv4Network(interface.address, strict=False)
             result.append(
                 NetappIPInterfaceConfig(
                     name=interface.name,
-                    address=ipaddress.IPv4Address(address),
-                    network=ipaddress.IPv4Network(interface.address, strict=False),
+                    address=address,  # Pydantic will handle IPv4Address conversion
+                    network=network,
                     vlan_id=interface.vlan,
                     nic_slot_prefix=nic_slot_prefix,
                 )
             )
         return result
-
-    @cached_property
-    def base_port_name(self):
-        """Get the base port name using the configured NIC slot prefix."""
-        return f"{self.nic_slot_prefix}{self.side.lower()}"
-
-    @cached_property
-    def broadcast_domain_name(self):
-        return f"Fabric-{self.side}"
-
-    @cached_property
-    def route_nexthop(self):
-        """Calculate next hop for the static route to reach the clients."""
-        return next(self.network.hosts())
 
 
 # Specification Value Objects
