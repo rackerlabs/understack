@@ -5,15 +5,13 @@ and results for NetApp operations. These value objects provide type safety
 and clear interfaces for NetApp SDK interactions.
 """
 
-import ipaddress
-from typing import TYPE_CHECKING
+from ipaddress import IPv4Address
+from ipaddress import IPv4Network
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import computed_field
 from pydantic import field_validator
-from ipaddress import IPv4Address
-from ipaddress import IPv4Network
 
 
 class InterfaceInfo(BaseModel):
@@ -191,7 +189,7 @@ class NetappIPInterfaceConfig(BaseModel):
             result.append(
                 NetappIPInterfaceConfig(
                     name=interface.name,
-                    address=address,  # Pydantic will handle IPv4Address conversion
+                    address=address,  # type: ignore[arg-type] # Pydantic will handle IPv4Address conversion
                     network=network,
                     vlan_id=interface.vlan,
                     nic_slot_prefix=nic_slot_prefix,
@@ -319,20 +317,26 @@ class RouteSpec(BaseModel):
     @classmethod
     def validate_gateway_in_cgn(cls, v):
         """Validate gateway is in carrier-grade NAT range."""
-        if isinstance(v, str):
-            v = IPv4Address(v)
-        cgn_network = IPv4Network("100.64.0.0/10")
-        if v not in cgn_network:
-            raise ValueError(f"Gateway {v} must be within 100.64.0.0/10 subnet")
-        return v
+        try:
+            if isinstance(v, str):
+                v = IPv4Address(v)
+            cgn_network = IPv4Network("100.64.0.0/10")
+            if v not in cgn_network:
+                raise ValueError(f"Gateway {v} must be within 100.64.0.0/10 subnet")
+            return v
+        except Exception as e:
+            raise ValueError(f"Invalid gateway address: {e}") from e
 
     @field_validator("destination")
     @classmethod
     def validate_destination(cls, v):
         """Convert string to IPv4Network if needed."""
-        if isinstance(v, str):
-            return IPv4Network(v)
-        return v
+        try:
+            if isinstance(v, str):
+                return IPv4Network(v)
+            return v
+        except Exception as e:
+            raise ValueError(f"Invalid destination network: {e}") from e
 
     @classmethod
     def from_nexthop_ip(cls, svm_name: str, nexthop_ip: str) -> "RouteSpec":

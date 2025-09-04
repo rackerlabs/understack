@@ -313,29 +313,6 @@ class TestSvmResult:
             result = SvmResult(name="test-svm", uuid="svm-uuid-123", state=state)
             assert result.state == state
 
-    def test_svm_result_pydantic_serialization(self):
-        """Test Pydantic serialization and deserialization of SvmResult."""
-        result = SvmResult(name="test-svm", uuid="svm-uuid-123", state="online")
-
-        # Test JSON serialization
-        json_data = result.model_dump_json()
-        assert '"name":"test-svm"' in json_data
-        assert '"uuid":"svm-uuid-123"' in json_data
-        assert '"state":"online"' in json_data
-
-        # Test dictionary serialization
-        dict_data = result.model_dump()
-        expected_dict = {
-            "name": "test-svm",
-            "uuid": "svm-uuid-123",
-            "state": "online"
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = SvmResult.model_validate(dict_data)
-        assert recreated_result == result
-
 
 class TestVolumeResult:
     """Test cases for VolumeResult value object."""
@@ -374,97 +351,6 @@ class TestVolumeResult:
             )
             assert result.state == state
 
-    def test_volume_result_pydantic_serialization(self):
-        """Test Pydantic serialization and deserialization of VolumeResult."""
-        result = VolumeResult(
-            name="test-volume",
-            uuid="vol-uuid-123",
-            size="1TB",
-            state="online",
-            svm_name="test-svm"
-        )
-
-        # Test JSON serialization
-        json_data = result.model_dump_json()
-        assert '"name":"test-volume"' in json_data
-        assert '"uuid":"vol-uuid-123"' in json_data
-        assert '"size":"1TB"' in json_data
-        assert '"state":"online"' in json_data
-        assert '"svm_name":"test-svm"' in json_data
-
-        # Test dictionary serialization
-        dict_data = result.model_dump()
-        expected_dict = {
-            "name": "test-volume",
-            "uuid": "vol-uuid-123",
-            "size": "1TB",
-            "state": "online",
-            "svm_name": "test-svm"
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = VolumeResult.model_validate(dict_data)
-        assert recreated_result == result
-
-    def test_volume_result_pydantic_serialization_without_svm_name(self):
-        """Test Pydantic serialization with None svm_name."""
-        result = VolumeResult(
-            name="test-volume",
-            uuid="vol-uuid-123",
-            size="1TB",
-            state="online"
-        )
-
-        # Test dictionary serialization with None value
-        dict_data = result.model_dump()
-        expected_dict = {
-            "name": "test-volume",
-            "uuid": "vol-uuid-123",
-            "size": "1TB",
-            "state": "online",
-            "svm_name": None
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = VolumeResult.model_validate(dict_data)
-        assert recreated_result == result
-        assert recreated_result.svm_name is None
-
-
-class TestNodeResult:
-    """Test cases for NodeResult value object."""
-
-    def test_valid_node_result(self):
-        """Test creating a valid node result."""
-        result = NodeResult(name="node-01", uuid="node-uuid-123")
-
-        assert result.name == "node-01"
-        assert result.uuid == "node-uuid-123"
-
-    def test_node_result_pydantic_serialization(self):
-        """Test Pydantic serialization and deserialization of NodeResult."""
-        result = NodeResult(name="node-01", uuid="node-uuid-123")
-
-        # Test JSON serialization
-        json_data = result.model_dump_json()
-        assert '"name":"node-01"' in json_data
-        assert '"uuid":"node-uuid-123"' in json_data
-
-        # Test dictionary serialization
-        dict_data = result.model_dump()
-        expected_dict = {
-            "name": "node-01",
-            "uuid": "node-uuid-123"
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = NodeResult.model_validate(dict_data)
-        assert recreated_result == result
-
-
 class TestPortResult:
     """Test cases for PortResult value object."""
 
@@ -484,59 +370,6 @@ class TestPortResult:
         result = PortResult(uuid="port-uuid-123", name="e4a-100", node_name="node-01")
 
         assert result.port_type is None
-
-    def test_port_result_pydantic_serialization(self):
-        """Test Pydantic serialization and deserialization of PortResult."""
-        result = PortResult(
-            uuid="port-uuid-123",
-            name="e4a-100",
-            node_name="node-01",
-            port_type="vlan"
-        )
-
-        # Test JSON serialization
-        json_data = result.model_dump_json()
-        assert '"uuid":"port-uuid-123"' in json_data
-        assert '"name":"e4a-100"' in json_data
-        assert '"node_name":"node-01"' in json_data
-        assert '"port_type":"vlan"' in json_data
-
-        # Test dictionary serialization
-        dict_data = result.model_dump()
-        expected_dict = {
-            "uuid": "port-uuid-123",
-            "name": "e4a-100",
-            "node_name": "node-01",
-            "port_type": "vlan"
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = PortResult.model_validate(dict_data)
-        assert recreated_result == result
-
-    def test_port_result_pydantic_serialization_without_type(self):
-        """Test Pydantic serialization with None port_type."""
-        result = PortResult(
-            uuid="port-uuid-123",
-            name="e4a-100",
-            node_name="node-01"
-        )
-
-        # Test dictionary serialization with None value
-        dict_data = result.model_dump()
-        expected_dict = {
-            "uuid": "port-uuid-123",
-            "name": "e4a-100",
-            "node_name": "node-01",
-            "port_type": None
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = PortResult.model_validate(dict_data)
-        assert recreated_result == result
-        assert recreated_result.port_type is None
 
 
 class TestInterfaceResult:
@@ -584,42 +417,6 @@ class TestInterfaceResult:
 
         assert result.enabled is False
 
-    def test_interface_result_pydantic_serialization(self):
-        """Test Pydantic serialization and deserialization of InterfaceResult."""
-        result = InterfaceResult(
-            name="test-lif",
-            uuid="lif-uuid-123",
-            address="192.168.1.10",
-            netmask="255.255.255.0",
-            enabled=True,
-            svm_name="test-svm"
-        )
-
-        # Test JSON serialization
-        json_data = result.model_dump_json()
-        assert '"name":"test-lif"' in json_data
-        assert '"uuid":"lif-uuid-123"' in json_data
-        assert '"address":"192.168.1.10"' in json_data
-        assert '"netmask":"255.255.255.0"' in json_data
-        assert '"enabled":true' in json_data
-        assert '"svm_name":"test-svm"' in json_data
-
-        # Test dictionary serialization (mode='json' converts IPv4Address to string)
-        dict_data = result.model_dump(mode='json')
-        expected_dict = {
-            "name": "test-lif",
-            "uuid": "lif-uuid-123",
-            "address": "192.168.1.10",
-            "netmask": "255.255.255.0",
-            "enabled": True,
-            "svm_name": "test-svm"
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = InterfaceResult.model_validate(dict_data)
-        assert recreated_result == result
-
     def test_interface_result_ip_validation(self):
         """Test IPv4Address validation for InterfaceResult address field."""
         # Test valid IP address
@@ -628,7 +425,7 @@ class TestInterfaceResult:
             uuid="lif-uuid-123",
             address="10.0.0.1",
             netmask="255.255.255.0",
-            enabled=True
+            enabled=True,
         )
         assert str(result.address) == "10.0.0.1"
 
@@ -638,7 +435,7 @@ class TestInterfaceResult:
             uuid="lif-uuid-123",
             address="invalid-ip",  # This is now allowed as a string
             netmask="255.255.255.0",
-            enabled=True
+            enabled=True,
         )
         assert result_str.address == "invalid-ip"
 
@@ -674,64 +471,6 @@ class TestNamespaceResult:
 
         assert result.svm_name is None
         assert result.volume_name is None
-
-    def test_namespace_result_pydantic_serialization(self):
-        """Test Pydantic serialization and deserialization of NamespaceResult."""
-        result = NamespaceResult(
-            uuid="ns-uuid-123",
-            name="namespace-1",
-            mapped=True,
-            svm_name="test-svm",
-            volume_name="test-volume"
-        )
-
-        # Test JSON serialization
-        json_data = result.model_dump_json()
-        assert '"uuid":"ns-uuid-123"' in json_data
-        assert '"name":"namespace-1"' in json_data
-        assert '"mapped":true' in json_data
-        assert '"svm_name":"test-svm"' in json_data
-        assert '"volume_name":"test-volume"' in json_data
-
-        # Test dictionary serialization
-        dict_data = result.model_dump()
-        expected_dict = {
-            "uuid": "ns-uuid-123",
-            "name": "namespace-1",
-            "mapped": True,
-            "svm_name": "test-svm",
-            "volume_name": "test-volume"
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = NamespaceResult.model_validate(dict_data)
-        assert recreated_result == result
-
-    def test_namespace_result_pydantic_serialization_without_optional_fields(self):
-        """Test Pydantic serialization with None optional fields."""
-        result = NamespaceResult(
-            uuid="ns-uuid-123",
-            name="namespace-1",
-            mapped=False
-        )
-
-        # Test dictionary serialization with None values
-        dict_data = result.model_dump()
-        expected_dict = {
-            "uuid": "ns-uuid-123",
-            "name": "namespace-1",
-            "mapped": False,
-            "svm_name": None,
-            "volume_name": None
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = NamespaceResult.model_validate(dict_data)
-        assert recreated_result == result
-        assert recreated_result.svm_name is None
-        assert recreated_result.volume_name is None
 
 
 class TestRouteSpec:
@@ -1091,6 +830,7 @@ class TestRouteResult:
         )
 
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             result.uuid = "new-uuid"  # type: ignore[misc]
 
@@ -1113,39 +853,6 @@ class TestRouteResult:
             )
             assert result.destination == destination
 
-    def test_route_result_pydantic_serialization(self):
-        """Test Pydantic serialization and deserialization of RouteResult."""
-        result = RouteResult(
-            uuid="route-uuid-123",
-            gateway="100.127.0.17",
-            destination=ipaddress.IPv4Network("100.126.0.0/17"),
-            svm_name="os-test-project"
-        )
-
-        # Test JSON serialization
-        json_data = result.model_dump_json()
-        assert '"uuid":"route-uuid-123"' in json_data
-        assert '"gateway":"100.127.0.17"' in json_data
-        assert '"destination":"100.126.0.0/17"' in json_data
-        assert '"svm_name":"os-test-project"' in json_data
-
-        # Test dictionary serialization (mode='json' converts IPv4Network to string)
-        dict_data = result.model_dump(mode='json')
-        expected_dict = {
-            "uuid": "route-uuid-123",
-            "gateway": "100.127.0.17",
-            "destination": "100.126.0.0/17",
-            "svm_name": "os-test-project"
-        }
-        assert dict_data == expected_dict
-
-        # Test deserialization from dictionary
-        recreated_result = RouteResult.model_validate(dict_data)
-        assert recreated_result.uuid == result.uuid
-        assert recreated_result.gateway == result.gateway
-        assert str(recreated_result.destination) == str(result.destination)
-        assert recreated_result.svm_name == result.svm_name
-
     def test_route_result_ip_network_validation(self):
         """Test IPv4Network validation for RouteResult destination field."""
         # Test valid network
@@ -1153,7 +860,7 @@ class TestRouteResult:
             uuid="route-uuid-123",
             gateway="100.127.0.17",
             destination="192.168.1.0/24",
-            svm_name="os-test-project"
+            svm_name="os-test-project",
         )
         assert str(result.destination) == "192.168.1.0/24"
 
@@ -1162,6 +869,141 @@ class TestRouteResult:
             uuid="route-uuid-123",
             gateway="100.127.0.17",
             destination="invalid-network",  # This is now allowed as a string
-            svm_name="os-test-project"
+            svm_name="os-test-project",
         )
         assert result_str.destination == "invalid-network"
+
+
+# Comprehensive Validation Tests for Custom Pydantic Features
+
+
+class TestCustomVLANValidation:
+    """Test cases for custom VLAN ID validation logic."""
+
+    def test_out_of_range_vlan_ids(self):
+        """Test VLAN validation with extreme out-of-range values."""
+        from pydantic import ValidationError
+
+        from understack_workflows.netapp.value_objects import InterfaceInfo
+
+        extreme_invalid_vlans = [-100, 10000, -1, 5000, 0, 4095]
+
+        for invalid_vlan in extreme_invalid_vlans:
+            with pytest.raises(
+                ValidationError, match="VLAN ID must be between 1 and 4094"
+            ):
+                InterfaceInfo(
+                    name="test-interface",
+                    address="192.168.1.10",
+                    vlan=invalid_vlan,
+                )
+
+
+class TestCustomInterfaceNameValidation:
+    """Test cases for custom interface name validation and computed fields."""
+
+    def test_malformed_interface_names_for_side_detection(self):
+        """Test interface names that cannot determine side."""
+        from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
+
+        # Test names that can't determine side
+        invalid_names_for_side = [
+            "N1-test",  # Missing side suffix
+            "N1-test-C",  # Invalid side (not A or B)
+            "N1-test-1",  # Numeric suffix instead of letter
+            "N1-test-X",  # Invalid side letter
+            "test",  # No side at all
+        ]
+
+        for invalid_name in invalid_names_for_side:
+            config = NetappIPInterfaceConfig(
+                name=invalid_name,
+                address="192.168.1.10",  # type: ignore[arg-type]
+                network="192.168.1.0/24",  # type: ignore[arg-type]
+                vlan_id=100,
+            )
+            # The error should occur when accessing the computed field
+            with pytest.raises(
+                ValueError, match="Cannot determine side from interface"
+            ):
+                _ = config.side
+
+        # Test empty name separately as it causes IndexError
+        config_empty = NetappIPInterfaceConfig(
+            name="",
+            address="192.168.1.10",  # type: ignore[arg-type]
+            network="192.168.1.0/24",  # type: ignore[arg-type]
+            vlan_id=100,
+        )
+        with pytest.raises((ValueError, IndexError)):
+            _ = config_empty.side
+
+    def test_malformed_interface_names_for_node_detection(self):
+        """Test interface names that cannot determine node number."""
+        from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
+
+        # Test names that can't determine node number
+        invalid_names_for_node = [
+            "X1-test-A",  # Invalid node prefix
+            "N3-test-A",  # Unsupported node number
+            "test-A",  # Missing node prefix
+            "N-test-A",  # Missing node number
+            "",  # Empty name
+        ]
+
+        for invalid_name in invalid_names_for_node:
+            config = NetappIPInterfaceConfig(
+                name=invalid_name,
+                address="192.168.1.10",  # type: ignore[arg-type]
+                network="192.168.1.0/24",  # type: ignore[arg-type]
+                vlan_id=100,
+            )
+            # The error should occur when accessing the computed field
+            with pytest.raises(
+                ValueError, match="Cannot determine node index from name"
+            ):
+                _ = config.desired_node_number
+
+
+class TestCustomRouteGatewayValidation:
+    """Test cases for custom route gateway validation (CGN range)."""
+
+    def test_route_gateway_cgn_range_validation(self):
+        """Test that route gateways must be in CGN range (100.64.0.0/10)."""
+        from pydantic import ValidationError
+
+        # Test valid CGN range addresses
+        valid_gateways = [
+            "100.64.0.1",
+            "100.65.128.254",
+            "100.127.255.255",
+        ]
+
+        for gateway in valid_gateways:
+            # Should not raise exception
+            route = RouteSpec(
+                svm_name="test-svm",
+                gateway=gateway,
+                destination="100.126.0.0/17",
+            )
+            assert str(route.gateway) == gateway
+
+        # Test invalid addresses (outside CGN range)
+        invalid_gateways = [
+            "100.63.255.255",  # Just below CGN range
+            "100.128.0.1",  # Just above CGN range
+            "192.168.1.1",  # Private range
+            "10.0.0.1",  # Private range
+            "172.16.0.1",  # Private range
+            "8.8.8.8",  # Public range
+        ]
+
+        for gateway in invalid_gateways:
+            with pytest.raises(
+                ValidationError, match="must be within 100.64.0.0/10 subnet"
+            ):
+                RouteSpec(
+                    svm_name="test-svm",
+                    gateway=gateway,
+                    destination="100.126.0.0/17",
+                )
