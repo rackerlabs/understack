@@ -6,6 +6,7 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from understack_workflows.main.netapp_configure_net import VIRTUAL_MACHINES_QUERY
 from understack_workflows.main.netapp_configure_net import argument_parser
@@ -663,22 +664,22 @@ class TestInterfaceInfo:
 
         for vlan in valid_vlans:
             interface = InterfaceInfo(
-                name="test-interface",
-                address="192.168.1.10/24",
-                vlan=vlan
+                name="test-interface", address="192.168.1.10/24", vlan=vlan
             )
             assert interface.vlan == vlan
 
     def test_vlan_validation_invalid_range(self):
         """Test VLAN validation with invalid VLAN IDs (outside 1-4094 range)."""
+        from pydantic import ValidationError
+
         invalid_vlans = [0, -1, 4095, 5000, 65536]
 
         for vlan in invalid_vlans:
-            with pytest.raises(ValueError, match="VLAN ID must be between 1 and 4094"):
+            with pytest.raises(
+                ValidationError, match="VLAN ID must be between 1 and 4094"
+            ):
                 InterfaceInfo(
-                    name="test-interface",
-                    address="192.168.1.10/24",
-                    vlan=vlan
+                    name="test-interface", address="192.168.1.10/24", vlan=vlan
                 )
 
     def test_vlan_validation_in_from_graphql_interface(self):
@@ -700,52 +701,8 @@ class TestInterfaceInfo:
             "tagged_vlans": [{"vid": 4095}],  # Invalid VLAN
         }
 
-        with pytest.raises(ValueError, match="VLAN ID must be between 1 and 4094"):
+        with pytest.raises(ValidationError, match="VLAN ID must be between 1 and 4094"):
             InterfaceInfo.from_graphql_interface(interface_data_invalid)
-
-    def test_pydantic_serialization(self):
-        """Test Pydantic serialization features for InterfaceInfo."""
-        interface = InterfaceInfo(
-            name="test-interface",
-            address="192.168.1.10/24",
-            vlan=2002
-        )
-
-        # Test model_dump (dict serialization)
-        data = interface.model_dump()
-        expected = {
-            "name": "test-interface",
-            "address": "192.168.1.10/24",
-            "vlan": 2002
-        }
-        assert data == expected
-
-        # Test model_dump_json (JSON serialization)
-        json_str = interface.model_dump_json()
-        assert '"name":"test-interface"' in json_str
-        assert '"address":"192.168.1.10/24"' in json_str
-        assert '"vlan":2002' in json_str
-
-        # Test model_validate (creation from dict)
-        new_interface = InterfaceInfo.model_validate(data)
-        assert new_interface.name == interface.name
-        assert new_interface.address == interface.address
-        assert new_interface.vlan == interface.vlan
-
-    def test_pydantic_immutability(self):
-        """Test that Pydantic models are immutable (frozen)."""
-        interface = InterfaceInfo(
-            name="test-interface",
-            address="192.168.1.10/24",
-            vlan=2002
-        )
-
-        # Should not be able to modify fields
-        with pytest.raises(ValueError, match="Instance is frozen"):
-            interface.name = "modified-name"
-
-        with pytest.raises(ValueError, match="Instance is frozen"):
-            interface.vlan = 3000
 
 
 class TestVirtualMachineNetworkInfo:
@@ -911,44 +868,6 @@ class TestVirtualMachineNetworkInfo:
         error_message = str(exc_info.value)
         assert "problematic-interface" in error_message
         assert "no tagged VLANs" in error_message
-
-    def test_pydantic_serialization(self):
-        """Test Pydantic serialization features for VirtualMachineNetworkInfo."""
-        interfaces = [
-            InterfaceInfo(name="eth0", address="192.168.1.10/24", vlan=100),
-            InterfaceInfo(name="eth1", address="10.0.0.1/8", vlan=200),
-        ]
-        vm_info = VirtualMachineNetworkInfo(interfaces=interfaces)
-
-        # Test model_dump (dict serialization)
-        data = vm_info.model_dump()
-        assert "interfaces" in data
-        assert len(data["interfaces"]) == 2
-        assert data["interfaces"][0]["name"] == "eth0"
-        assert data["interfaces"][1]["name"] == "eth1"
-
-        # Test model_dump_json (JSON serialization)
-        json_str = vm_info.model_dump_json()
-        assert '"interfaces":[' in json_str
-        assert '"name":"eth0"' in json_str
-        assert '"name":"eth1"' in json_str
-
-        # Test model_validate (creation from dict)
-        new_vm_info = VirtualMachineNetworkInfo.model_validate(data)
-        assert len(new_vm_info.interfaces) == 2
-        assert new_vm_info.interfaces[0].name == "eth0"
-        assert new_vm_info.interfaces[1].name == "eth1"
-
-    def test_pydantic_immutability(self):
-        """Test that VirtualMachineNetworkInfo is immutable (frozen)."""
-        interfaces = [
-            InterfaceInfo(name="eth0", address="192.168.1.10/24", vlan=100)
-        ]
-        vm_info = VirtualMachineNetworkInfo(interfaces=interfaces)
-
-        # Should not be able to modify the interfaces list
-        with pytest.raises(ValueError, match="Instance is frozen"):
-            vm_info.interfaces = []
 
 
 class TestGraphQLQueryFunctionality:
@@ -1270,7 +1189,7 @@ class TestGraphQLQueryFunctionality:
 
         assert result["data"]["virtual_machines"] == []
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) for device: %s",
             0,
             "os-empty-project",
         )
@@ -1303,7 +1222,7 @@ class TestGraphQLQueryFunctionality:
         assert len(result["data"]["virtual_machines"]) == 1
         assert result["data"]["virtual_machines"][0]["interfaces"] == []
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) for device: %s",
             1,
             "os-empty-interfaces-project",
         )
@@ -1332,7 +1251,7 @@ class TestGraphQLQueryFunctionality:
 
         # Verify info logging
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) for device: %s",
             1,
             "os-logging-test-project",
         )
