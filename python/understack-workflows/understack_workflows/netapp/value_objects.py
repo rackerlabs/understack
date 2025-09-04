@@ -9,6 +9,7 @@ from ipaddress import IPv4Address
 from ipaddress import IPv4Network
 
 from pydantic import BaseModel
+from pydantic import Field
 from pydantic import ConfigDict
 from pydantic import computed_field
 from pydantic import field_validator
@@ -104,7 +105,7 @@ class VirtualMachineNetworkInfo(BaseModel):
 class NetappIPInterfaceConfig(BaseModel):
     """Configuration for NetApp IP interface creation."""
 
-    name: str
+    name: str = Field(pattern=r'^N\d-lif-(A|B)$')
     address: IPv4Address
     network: IPv4Network
     vlan_id: int

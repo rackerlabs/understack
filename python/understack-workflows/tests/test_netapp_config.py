@@ -384,12 +384,12 @@ another_option = another_value
 
         # Create a mock nautobot response
         mock_interface_a = MagicMock()
-        mock_interface_a.name = "N1-test-A"
+        mock_interface_a.name = "N1-lif-A"
         mock_interface_a.address = "192.168.1.10/24"
         mock_interface_a.vlan = 100
 
         mock_interface_b = MagicMock()
-        mock_interface_b.name = "N1-test-B"
+        mock_interface_b.name = "N1-lif-B"
         mock_interface_b.address = "192.168.1.11/24"
         mock_interface_b.vlan = 100
 
@@ -413,7 +413,7 @@ another_option = another_value
 
         # Create a mock nautobot response
         mock_interface = MagicMock()
-        mock_interface.name = "N1-test-A"
+        mock_interface.name = "N1-lif-A"
         mock_interface.address = "192.168.1.10/24"
         mock_interface.vlan = 100
 

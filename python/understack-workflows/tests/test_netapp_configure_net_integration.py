@@ -491,13 +491,6 @@ class TestIntegrationTests:
             # Mock successful GraphQL response (use single interface sample)
             mock_response = Mock()
             sample_data = load_json_sample("nautobot_graphql_vm_response_single.json")
-            # Customize the interface name for this test case
-            sample_data["data"]["virtual_machines"][0]["interfaces"][0]["name"] = (
-                f"interface-{test_case['name']}"
-            )
-            sample_data["data"]["virtual_machines"][0]["interfaces"][1]["name"] = (
-                f"interface-{test_case['name']}-B"
-            )
             mock_response.json = sample_data
 
             # Mock NetAppManager

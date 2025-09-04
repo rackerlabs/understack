@@ -913,55 +913,42 @@ class TestCustomInterfaceNameValidation:
             "N1-test-1",  # Numeric suffix instead of letter
             "N1-test-X",  # Invalid side letter
             "test",  # No side at all
+            "",
         ]
 
         for invalid_name in invalid_names_for_side:
-            config = NetappIPInterfaceConfig(
-                name=invalid_name,
-                address="192.168.1.10",  # type: ignore[arg-type]
-                network="192.168.1.0/24",  # type: ignore[arg-type]
-                vlan_id=100,
-            )
-            # The error should occur when accessing the computed field
-            with pytest.raises(
-                ValueError, match="Cannot determine side from interface"
-            ):
+            with pytest.raises(ValueError):
+                config = NetappIPInterfaceConfig(
+                    name=invalid_name,
+                    address="192.168.1.10",  # type: ignore[arg-type]
+                    network="192.168.1.0/24",  # type: ignore[arg-type]
+                    vlan_id=100,
+                )
                 _ = config.side
-
-        # Test empty name separately as it causes IndexError
-        config_empty = NetappIPInterfaceConfig(
-            name="",
-            address="192.168.1.10",  # type: ignore[arg-type]
-            network="192.168.1.0/24",  # type: ignore[arg-type]
-            vlan_id=100,
-        )
-        with pytest.raises((ValueError, IndexError)):
-            _ = config_empty.side
 
     def test_malformed_interface_names_for_node_detection(self):
         """Test interface names that cannot determine node number."""
         from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 
-        # Test names that can't determine node number
+        # Test names that can't determine node number or side
         invalid_names_for_node = [
             "X1-test-A",  # Invalid node prefix
             "N3-test-A",  # Unsupported node number
             "test-A",  # Missing node prefix
             "N-test-A",  # Missing node number
+            "N1-blah",  # Missing side
             "",  # Empty name
         ]
 
         for invalid_name in invalid_names_for_node:
-            config = NetappIPInterfaceConfig(
-                name=invalid_name,
-                address="192.168.1.10",  # type: ignore[arg-type]
-                network="192.168.1.0/24",  # type: ignore[arg-type]
-                vlan_id=100,
-            )
             # The error should occur when accessing the computed field
-            with pytest.raises(
-                ValueError, match="Cannot determine node index from name"
-            ):
+            with pytest.raises(ValueError):
+                config = NetappIPInterfaceConfig(
+                    name=invalid_name,
+                    address="192.168.1.10",  # type: ignore[arg-type]
+                    network="192.168.1.0/24",  # type: ignore[arg-type]
+                    vlan_id=100,
+                )
                 _ = config.desired_node_number
 
 
