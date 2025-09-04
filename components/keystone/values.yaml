@@ -306,6 +306,9 @@ manifests:
   secret_db: false
   secret_keystone: true
   service_ingress_api: false
+  # these next two we create ourselves to avoid helm hooks issues
+  secret_credential_keys: false
+  secret_fernet_keys: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
