@@ -8,4 +8,6 @@ sources:
       releaseName: projectsveltos
       valuesObject:
         installCRDs: true
+  - ref: understack
+    path: 'components/projectsveltos'
 componentNamespace: projectsveltos
