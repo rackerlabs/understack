@@ -8,7 +8,6 @@ from understack_workflows.netapp.value_objects import InterfaceResult
 from understack_workflows.netapp.value_objects import InterfaceSpec
 from understack_workflows.netapp.value_objects import NamespaceResult
 from understack_workflows.netapp.value_objects import NamespaceSpec
-from understack_workflows.netapp.value_objects import NodeResult
 from understack_workflows.netapp.value_objects import PortResult
 from understack_workflows.netapp.value_objects import PortSpec
 from understack_workflows.netapp.value_objects import RouteResult
@@ -351,6 +350,7 @@ class TestVolumeResult:
             )
             assert result.state == state
 
+
 class TestPortResult:
     """Test cases for PortResult value object."""
 
@@ -588,9 +588,9 @@ class TestRouteSpec:
 
         for ip in test_ips:
             destination = RouteSpec._calculate_destination(ip)
-            assert destination == ipaddress.IPv4Network(
-                "100.126.0.0/17"
-            ), f"Failed for IP: {ip}"
+            assert destination == ipaddress.IPv4Network("100.126.0.0/17"), (
+                f"Failed for IP: {ip}"
+            )
 
     def test_calculate_destination_comprehensive_third_octet_128(self):
         """Test comprehensive route destination calculation for third octet = 128."""
@@ -606,9 +606,9 @@ class TestRouteSpec:
 
         for ip in test_ips:
             destination = RouteSpec._calculate_destination(ip)
-            assert destination == ipaddress.IPv4Network(
-                "100.126.128.0/17"
-            ), f"Failed for IP: {ip}"
+            assert destination == ipaddress.IPv4Network("100.126.128.0/17"), (
+                f"Failed for IP: {ip}"
+            )
 
     def test_calculate_destination_comprehensive_invalid_patterns(self):
         """Test comprehensive error handling for all invalid third octet values."""

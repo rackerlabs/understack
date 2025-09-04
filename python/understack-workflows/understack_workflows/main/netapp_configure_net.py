@@ -9,7 +9,6 @@ from understack_workflows.helpers import setup_logger
 from understack_workflows.nautobot import Nautobot
 from understack_workflows.netapp.manager import NetAppManager
 from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
-from understack_workflows.netapp.value_objects import InterfaceInfo
 from understack_workflows.netapp.value_objects import VirtualMachineNetworkInfo
 
 logger = setup_logger(__name__, level=logging.INFO)
@@ -20,7 +19,6 @@ VIRTUAL_MACHINES_QUERY = (
     "query ($device_names: [String]){virtual_machines(name: $device_names) "
     "{interfaces { name ip_addresses{ address } tagged_vlans { vid }}}}"
 )
-
 
 
 def validate_and_normalize_uuid(value: str) -> str:
