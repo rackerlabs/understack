@@ -475,7 +475,7 @@ class NetAppClient(NetAppClientInterface):
             result = InterfaceResult(
                 name=str(interface.name),
                 uuid=str(interface.uuid),
-                address=interface_spec.address,
+                address=str(interface_spec.address),
                 netmask=interface_spec.netmask,
                 enabled=True,
                 svm_name=interface_spec.svm_name,
@@ -671,8 +671,8 @@ class NetAppClient(NetAppClientInterface):
 
             result = RouteResult(
                 uuid=str(route.uuid),
-                gateway=route_spec.gateway,
-                destination=route_spec.destination,
+                gateway=str(route_spec.gateway),
+                destination=str(route_spec.destination),
                 svm_name=route_spec.svm_name,
             )
 

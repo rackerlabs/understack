@@ -6,10 +6,9 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from understack_workflows.main.netapp_configure_net import VIRTUAL_MACHINES_QUERY
-from understack_workflows.main.netapp_configure_net import InterfaceInfo
-from understack_workflows.main.netapp_configure_net import VirtualMachineNetworkInfo
 from understack_workflows.main.netapp_configure_net import argument_parser
 from understack_workflows.main.netapp_configure_net import construct_device_name
 from understack_workflows.main.netapp_configure_net import execute_graphql_query
@@ -19,6 +18,8 @@ from understack_workflows.main.netapp_configure_net import (
 from understack_workflows.main.netapp_configure_net import (
     validate_and_transform_response,
 )
+from understack_workflows.netapp.value_objects import InterfaceInfo
+from understack_workflows.netapp.value_objects import VirtualMachineNetworkInfo
 
 
 def load_json_sample(filename: str) -> dict:
@@ -657,6 +658,52 @@ class TestInterfaceInfo:
         assert "200" in error_message
         assert "300" in error_message
 
+    def test_vlan_validation_valid_range(self):
+        """Test VLAN validation with valid VLAN IDs (1-4094)."""
+        valid_vlans = [1, 100, 2002, 4094]
+
+        for vlan in valid_vlans:
+            interface = InterfaceInfo(
+                name="test-interface", address="192.168.1.10/24", vlan=vlan
+            )
+            assert interface.vlan == vlan
+
+    def test_vlan_validation_invalid_range(self):
+        """Test VLAN validation with invalid VLAN IDs (outside 1-4094 range)."""
+        from pydantic import ValidationError
+
+        invalid_vlans = [0, -1, 4095, 5000, 65536]
+
+        for vlan in invalid_vlans:
+            with pytest.raises(
+                ValidationError, match="VLAN ID must be between 1 and 4094"
+            ):
+                InterfaceInfo(
+                    name="test-interface", address="192.168.1.10/24", vlan=vlan
+                )
+
+    def test_vlan_validation_in_from_graphql_interface(self):
+        """Test VLAN validation works in from_graphql_interface method."""
+        # Test valid VLAN
+        interface_data = {
+            "name": "test-interface",
+            "ip_addresses": [{"address": "192.168.1.10/24"}],
+            "tagged_vlans": [{"vid": 2002}],
+        }
+
+        interface = InterfaceInfo.from_graphql_interface(interface_data)
+        assert interface.vlan == 2002
+
+        # Test invalid VLAN
+        interface_data_invalid = {
+            "name": "test-interface",
+            "ip_addresses": [{"address": "192.168.1.10/24"}],
+            "tagged_vlans": [{"vid": 4095}],  # Invalid VLAN
+        }
+
+        with pytest.raises(ValidationError, match="VLAN ID must be between 1 and 4094"):
+            InterfaceInfo.from_graphql_interface(interface_data_invalid)
+
 
 class TestVirtualMachineNetworkInfo:
     """Test cases for VirtualMachineNetworkInfo data class and validation."""
@@ -1142,7 +1189,7 @@ class TestGraphQLQueryFunctionality:
 
         assert result["data"]["virtual_machines"] == []
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) for device: %s",
             0,
             "os-empty-project",
         )
@@ -1175,7 +1222,7 @@ class TestGraphQLQueryFunctionality:
         assert len(result["data"]["virtual_machines"]) == 1
         assert result["data"]["virtual_machines"][0]["interfaces"] == []
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) for device: %s",
             1,
             "os-empty-interfaces-project",
         )
@@ -1204,7 +1251,7 @@ class TestGraphQLQueryFunctionality:
 
         # Verify info logging
         mock_logger.info.assert_called_with(
-            "GraphQL query successful. Found %s virtual machine(s) " "for device: %s",
+            "GraphQL query successful. Found %s virtual machine(s) for device: %s",
             1,
             "os-logging-test-project",
         )
@@ -1733,6 +1780,10 @@ class TestMainFunctionWithNetAppManager:
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
+        # Properly mock the config property with netapp_nic_slot_prefix
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv with default netapp config path
@@ -1789,6 +1840,10 @@ class TestMainFunctionWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 

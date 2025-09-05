@@ -38,7 +38,7 @@ class TestLifService:
     def sample_config(self):
         """Create a sample NetappIPInterfaceConfig for testing."""
         return NetappIPInterfaceConfig(
-            name="N1-test-A",
+            name="N1-lif-A",
             address=ipaddress.IPv4Address("192.168.1.10"),
             network=ipaddress.IPv4Network("192.168.1.0/24"),
             vlan_id=100,
@@ -203,7 +203,7 @@ class TestLifService:
         ]
         mock_client.get_nodes.return_value = mock_nodes
 
-        # sample_config has name "N1-test-A" which should match node-01
+        # sample_config has name "N1-lif-A" which should match node-01
         result = lif_service.identify_home_node(sample_config)
 
         assert result == mock_nodes[0]  # node-01
@@ -214,7 +214,7 @@ class TestLifService:
     ):
         """Test node identification for N2 interface."""
         config = NetappIPInterfaceConfig(
-            name="N2-test-B",
+            name="N2-lif-B",
             address=ipaddress.IPv4Address("192.168.1.11"),
             network=ipaddress.IPv4Network("192.168.1.0/24"),
             vlan_id=200,
@@ -304,7 +304,7 @@ class TestLifService:
         # Verify the interface spec is created correctly
         interface_call_args = mock_client.create_ip_interface.call_args[0][0]
         assert interface_call_args.name == sample_config.name
-        assert interface_call_args.address == str(sample_config.address)
+        assert str(interface_call_args.address) == str(sample_config.address)
         assert interface_call_args.netmask == str(sample_config.network.netmask)
         assert interface_call_args.svm_name == expected_svm_name
         assert interface_call_args.home_port_uuid == mock_port.uuid
@@ -343,10 +343,10 @@ class TestLifService:
     ):
         """Test the node number extraction logic with various node names."""
         test_cases = [
-            ("node-01", "N1-test-A", 1),
-            ("node-02", "N2-test-B", 2),
-            ("cluster-node-01", "N1-test-A", 1),
-            ("netapp-node-02", "N2-test-B", 2),
+            ("node-01", "N1-lif-A", 1),
+            ("node-02", "N2-lif-B", 2),
+            ("cluster-node-01", "N1-lif-A", 1),
+            ("netapp-node-02", "N2-lif-B", 2),
         ]
 
         for node_name, interface_name, expected_number in test_cases:

@@ -443,7 +443,7 @@ netapp_password = test-password
             )
 
             config_obj = NetappIPInterfaceConfig(
-                name="test",
+                name="N3-lif-A",
                 address=ipaddress.IPv4Address("192.168.1.1"),
                 network=ipaddress.IPv4Network("192.168.1.0/24"),
                 vlan_id=100,
