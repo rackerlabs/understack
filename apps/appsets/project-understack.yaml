@@ -29,6 +29,8 @@ spec:
     server: '*'
   - namespace: 'kube-system'
     server: '*'
+  - namespace: 'projectsveltos'
+    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
