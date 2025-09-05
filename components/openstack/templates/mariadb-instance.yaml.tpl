@@ -7,14 +7,16 @@ metadata:
     # do not allow ArgoCD to delete our DB
     argocd.argoproj.io/sync-options: Delete=false
 spec:
-  rootPasswordSecretKeyRef: {{ .Values.mariadb.rootPasswordSecretKeyRef | toJson }}
+  rootPasswordSecretKeyRef:
+{{ toYaml .Values.mariadb.rootPasswordSecretKeyRef | indent 4 }}
 
   # renovate: datasource=docker
   image: docker-registry1.mariadb.com/library/mariadb:11.4.4
   imagePullPolicy: IfNotPresent
 
   port: 3306
-  storage: {{ .Values.mariadb.storage | toJson }}
+  storage:
+{{ toYaml .Values.mariadb.storage | indent 4 }}
   replicas: {{ .Values.mariadb.replicas }}
   service:
     type: ClusterIP

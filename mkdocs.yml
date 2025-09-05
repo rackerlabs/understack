@@ -130,6 +130,7 @@ nav:
       - deploy-guide/deploy-repo.md
       - deploy-guide/component-config.md
       - deploy-guide/config-dex.md
+      - deploy-guide/config-openstack.md
       - deploy-guide/auth.md
       - deploy-guide/config-argo-workflows.md
     - Starting the Deployment:

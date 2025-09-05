@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenStack Helm Chart Values",
+  "description": "Schema for OpenStack component values.yaml configuration",
+  "type": "object",
+  "properties": {
+    "mariadb": {
+      "type": "object",
+      "description": "OpenStack mariadb instance settings",
+      "properties": {
+        "rootPasswordSecretKeyRef": {
+          "type": "object",
+          "description": "Root password settings",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Secret name containing the root password"
+            },
+            "key": {
+              "type": "string",
+              "description": "Key within the secret containing the password"
+            },
+            "generate": {
+              "type": "boolean",
+              "description": "Whether to generate the password if it doesn't exist"
+            }
+          },
+          "required": ["name", "key"],
+          "additionalProperties": false
+        },
+        "storage": {
+          "type": "object",
+          "description": "Storage settings",
+          "properties": {
+            "size": {
+              "type": "string",
+              "pattern": "^[0-9]+(Gi|G|Mi|M|Ki|K)$",
+              "description": "Storage size (e.g., 10Gi)"
+            },
+            "resizeInUseVolumes": {
+              "type": "boolean",
+              "description": "Enable resizing volumes while in use"
+            },
+            "waitForVolumeResize": {
+              "type": "boolean",
+              "description": "Wait for volume resize to complete"
+            },
+            "volumeClaimTemplate": {
+              "type": "object",
+              "description": "Volume claim template configuration",
+              "properties": {
+                "storageClassName": {
+                  "type": "string",
+                  "description": "Storage class name for the volume"
+                },
+                "accessModes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"]
+                  },
+                  "description": "Access modes for the volume"
+                },
+                "resources": {
+                  "type": "object",
+                  "properties": {
+                    "requests": {
+                      "type": "object",
+                      "properties": {
+                        "storage": {
+                          "type": "string",
+                          "pattern": "^[0-9]+(Gi|G|Mi|M|Ki|K)$",
+                          "description": "Storage request size"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of MariaDB replicas (Galera cluster size)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rabbitmq": {
+      "type": "object",
+      "description": "OpenStack RabbitMQ instance settings",
+      "properties": {
+        "persistence": {
+          "type": "object",
+          "description": "Storage persistence settings",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "extraObjects": {
+      "type": "array",
+      "description": "Array of extra Kubernetes manifests to deploy",
+      "items": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "description": "Kubernetes API version"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Kubernetes resource kind"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "namespace": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          },
+          "spec": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": ["apiVersion", "kind"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}
