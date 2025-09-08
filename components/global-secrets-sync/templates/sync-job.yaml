@@ -1,0 +1,61 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sync-secrets-job
+  namespace: {{ .Values.global.namespace }}
+spec:
+  template:
+    spec:
+      serviceAccountName: {{ .Values.global.serviceAccountName }}
+      restartPolicy: Never
+      containers:
+        - name: sync-secrets
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              echo "Extracting ServiceAccount Secret from source..."
+              kubectl get secret {{ .Values.global.serviceAccountName }} -n {{ .Values.global.namespace }} -o yaml > /tmp/sa-secret.yaml
+
+            {{- range .Values.destinations }}
+              echo "Syncing credentials and ClusterSecretStore to {{ .name }}..."
+              KUBECONFIG=/kubeconfigs/{{ .name }}/config \
+                kubectl -n {{ .namespace }} apply -f /tmp/sa-secret.yaml
+
+              cat <<EOF | KUBECONFIG=/kubeconfigs/{{ .name }}/config kubectl apply -f -
+              apiVersion: external-secrets.io/v1
+              kind: ClusterSecretStore
+              metadata:
+                name: dex-sso-sync-{{ .name }}
+              spec:
+                provider:
+                  kubernetes:
+                    remoteNamespace: {{ $.Values.global.targetNamespace }}
+                    server:
+                      url: {{ .apiServerURL | quote }}
+                      caProvider:
+                        type: Secret
+                        name: {{ $.Values.global.serviceAccountName }}
+                        key: ca.crt
+                        namespace: {{ .namespace }}
+                    auth:
+                      token:
+                        bearerToken:
+                          name: {{ $.Values.global.serviceAccountName }}
+                          key: token
+                          namespace: {{ .namespace }}
+              EOF
+            {{- end }}
+          volumeMounts:
+        {{- range .Values.destinations }}
+            - name: kubeconfig-{{ .name }}
+              mountPath: /kubeconfigs/{{ .name }}
+        {{- end }}
+      volumes:
+      {{- range .Values.destinations }}
+        - name: kubeconfig-{{ .name }}
+          secret:
+            secretName: {{ .kubeconfigSecret }}
+      {{- end }}

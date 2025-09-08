@@ -1,13 +1,13 @@
----
-component: projectsveltos
-sources:
-  - repoURL: https://projectsveltos.github.io/helm-charts
-    chart: projectsveltos
-    targetRevision: "1.0.2"
-    helm:
-      releaseName: projectsveltos
-      valuesObject:
-        installCRDs: true
-  - ref: understack
-    path: 'components/projectsveltos'
-componentNamespace: projectsveltos
+#---
+#component: projectsveltos
+#sources:
+#  - repoURL: https://projectsveltos.github.io/helm-charts
+#    chart: projectsveltos
+#    targetRevision: "1.0.2"
+#    helm:
+#      releaseName: projectsveltos
+#      valuesObject:
+#        installCRDs: true
+#  - ref: understack
+#    path: 'components/projectsveltos'
+#componentNamespace: projectsveltos
