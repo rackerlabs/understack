@@ -24,7 +24,6 @@ from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks.events import DBEventPayload
 
 from neutron_understack.ironic import IronicClient
-from neutron_understack.nautobot import Nautobot
 from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.tests.helpers import Ml2PluginNoInit
 from neutron_understack.tests.helpers import extend_network_dict
@@ -272,19 +271,13 @@ def port_context(network_context, port_dict, port_binding, ml2_plugin) -> PortCo
 
 
 @pytest.fixture
-def nautobot_client(mocker) -> Nautobot:
-    return mocker.MagicMock(spec_set=Nautobot)
-
-
-@pytest.fixture
 def ironic_client(mocker) -> IronicClient:
     return mocker.MagicMock(spec_set=IronicClient)
 
 
 @pytest.fixture
-def understack_driver(nautobot_client, ironic_client) -> UnderstackDriver:
+def understack_driver(ironic_client) -> UnderstackDriver:
     driver = UnderstackDriver()
-    driver.nb = nautobot_client
     driver.undersync = Undersync("auth_token", "api_url")
     driver.ironic_client = ironic_client
     return driver
