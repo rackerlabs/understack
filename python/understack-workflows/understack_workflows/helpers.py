@@ -4,6 +4,8 @@ import pathlib
 from functools import partial
 from urllib.parse import urlparse
 
+OUTPUT_BASE_PATH = "/var/run/argo"
+
 
 def setup_logger(name: str | None = None, level: int = logging.DEBUG):
     """Standardize our logging.
@@ -59,3 +61,8 @@ def credential(subpath, item):
     ref = pathlib.Path("/etc").joinpath(subpath).joinpath(item)
     with ref.open() as f:
         return f.read().strip()
+
+
+def save_output(name, value):
+    with open(f"{OUTPUT_BASE_PATH}/output.{name}", "w") as f:
+        return f.write(value)

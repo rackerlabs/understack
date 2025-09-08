@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 
+from understack_workflows.helpers import save_output
 from understack_workflows.helpers import setup_logger
 from understack_workflows.netapp.manager import NetAppManager
 
@@ -13,7 +14,6 @@ logger = setup_logger(__name__)
 SVM_PROJECT_TAG = "UNDERSTACK_SVM"
 AGGREGATE_NAME = "aggr02_n02_NVME"
 VOLUME_SIZE = "514GB"
-OUTPUT_BASE_PATH = "/var/run/argo"
 
 
 @dataclass
@@ -56,10 +56,10 @@ def handle_project_created(
     logger.info("Starting ONTAP SVM and Volume creation workflow.")
     tags = _keystone_project_tags(conn, event.project_id)
     logger.debug("Project %s has tags: %s", event.project_id, tags)
-    _save_output("project_tags", json.dumps(tags))
+    save_output("project_tags", json.dumps(tags))
 
     project_is_svm_enabled = SVM_PROJECT_TAG in tags
-    _save_output("svm_enabled", str(project_is_svm_enabled))
+    save_output("svm_enabled", str(project_is_svm_enabled))
 
     if not project_is_svm_enabled:
         logger.info("The %s is missing, not creating SVM.", SVM_PROJECT_TAG)
@@ -69,11 +69,11 @@ def handle_project_created(
     try:
         netapp_manager = NetAppManager()
         svm_name = _create_svm_and_volume(netapp_manager, event)
-        _save_output("svm_created", str(True))
+        save_output("svm_created", str(True))
     finally:
         if not svm_name:
             svm_name = "not_returned"
-        _save_output("svm_name", svm_name)
+        save_output("svm_name", svm_name)
     return 0
 
 
@@ -88,10 +88,10 @@ def handle_project_updated(
     logger.info("Starting ONTAP SVM and Volume create/update workflow.")
     tags = _keystone_project_tags(conn, event.project_id)
     logger.debug("Project %s has tags: %s", event.project_id, tags)
-    _save_output("project_tags", json.dumps(tags))
+    save_output("project_tags", json.dumps(tags))
 
     project_is_svm_enabled = SVM_PROJECT_TAG in tags
-    _save_output("svm_enabled", str(project_is_svm_enabled))
+    save_output("svm_enabled", str(project_is_svm_enabled))
 
     svm_name = None
     try:
@@ -110,14 +110,14 @@ def handle_project_updated(
         # Tag added
         elif project_is_svm_enabled:
             if svm_exists:
-                _save_output("svm_created", str(False))
+                save_output("svm_created", str(False))
             else:
                 svm_name = _create_svm_and_volume(netapp_manager, event)
-            _save_output("svm_created", str(True))
+            save_output("svm_created", str(True))
     finally:
         if not svm_name:
             svm_name = "not_returned"
-        _save_output("svm_name", svm_name)
+        save_output("svm_name", svm_name)
     return 0
 
 
@@ -155,8 +155,3 @@ def _create_svm_and_volume(netapp_manager, event) -> str:
         aggregate_name=AGGREGATE_NAME,
     )
     return svm_name
-
-
-def _save_output(name, value):
-    with open(f"{OUTPUT_BASE_PATH}/output.{name}", "w") as f:
-        return f.write(value)
