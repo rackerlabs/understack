@@ -1,12 +1,8 @@
 nameOverride: "global-secrets-sync"
-
-# Source cluster configuration
-global:
-  namespace: global-secrets-sync
-  serviceAccountName: global-secrets-sync-sa
-  targetNamespace: global-secrets
-  createServiceAccount: true
-  createRBAC: true
-
-# Destination clusters
-sites: []
+targetEnv: dev
+secrets:
+  - name: blah
+    type: Opaque
+    namespace: test
+    data:
+      password: abcdef
