@@ -175,7 +175,6 @@ manifests:
   job_rabbit_init: false
   pod_rally_test: false
   secret_db: false
-  secret_keystone: true
   # OVN has its own pieces and does not need the following:
   # - neutron-dhcp-agent (OVN's does not work with baremetal/ironic currently)
   # - neutron-l3-agent
@@ -197,6 +196,12 @@ manifests:
   daemonset_netns_cleanup_cron: false
   deployment_ironic_agent: true
   service_ingress_server: false
+  # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
+  # Kubernetes section generation in OpenStack Helm, because we want those
+  # to be generated indirectly via ESO as configured in keystoneServiceUsers.enabled
+  # that is later consumed via components/openstack helm chart
+  secret_keystone: false
+  secret_ks_etc: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
