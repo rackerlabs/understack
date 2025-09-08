@@ -78,14 +78,14 @@ spec:
                 templates:
                 - name: main
                   steps:
-                  # - - name: oslo-events
-                  #     templateRef:
-                  #       name: openstack-oslo-event
-                  #       template: main
-                  #     arguments:
-                  #       parameters:
-                  #       - name: event-json
-                  #         value: "{{workflow.parameters.event-json}}"
+                  - - name: oslo-events
+                      templateRef:
+                        name: openstack-oslo-event
+                        template: main
+                      arguments:
+                        parameters:
+                        - name: event-json
+                          value: "{{workflow.parameters.event-json}}"
                     - name: convert-project-id
                       inline:
                         script:

@@ -13,6 +13,7 @@ from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.openstack.client import get_openstack_client
+from understack_workflows.oslo_event import ironic_node
 from understack_workflows.oslo_event import ironic_port
 from understack_workflows.oslo_event import keystone_project
 
@@ -64,6 +65,7 @@ _event_handlers: dict[str, EventHandler] = {
     "baremetal.port.create.end": ironic_port.handle_port_create_update,
     "baremetal.port.update.end": ironic_port.handle_port_create_update,
     "baremetal.port.delete.end": ironic_port.handle_port_delete,
+    "baremetal.node.provision_set.end": ironic_node.handle_provision_end,
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,
     "identity.project.deleted": keystone_project.handle_project_deleted,
