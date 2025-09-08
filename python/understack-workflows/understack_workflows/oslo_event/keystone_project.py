@@ -37,12 +37,19 @@ class KeystoneProjectEvent:
         return KeystoneProjectEvent(project_id)
 
 
-def _keystone_project_tags(conn: Connection, project_id: str):
+def _keystone_project_tags(conn: Connection, project_id: str) -> list:
     project = conn.identity.get_project(project_id)  # pyright: ignore[reportAttributeAccessIssue]
     if hasattr(project, "tags"):
-        return project.tags
+        return project.tags  # type: ignore
     else:
         return []
+
+
+def is_project_svm_enabled(conn, project_id) -> bool:
+    tags = _keystone_project_tags(conn, project_id)
+    logger.debug("Project %s has tags: %s", project_id, tags)
+    save_output("project_tags", json.dumps(tags))
+    return SVM_PROJECT_TAG in tags
 
 
 def handle_project_created(
@@ -54,11 +61,8 @@ def handle_project_created(
 
     event = KeystoneProjectEvent.from_event_dict(event_data)
     logger.info("Starting ONTAP SVM and Volume creation workflow.")
-    tags = _keystone_project_tags(conn, event.project_id)
-    logger.debug("Project %s has tags: %s", event.project_id, tags)
-    save_output("project_tags", json.dumps(tags))
 
-    project_is_svm_enabled = SVM_PROJECT_TAG in tags
+    project_is_svm_enabled = is_project_svm_enabled(conn, event.project_id)
     save_output("svm_enabled", str(project_is_svm_enabled))
 
     if not project_is_svm_enabled:
@@ -86,11 +90,7 @@ def handle_project_updated(
 
     event = KeystoneProjectEvent.from_event_dict(event_data)
     logger.info("Starting ONTAP SVM and Volume create/update workflow.")
-    tags = _keystone_project_tags(conn, event.project_id)
-    logger.debug("Project %s has tags: %s", event.project_id, tags)
-    save_output("project_tags", json.dumps(tags))
-
-    project_is_svm_enabled = SVM_PROJECT_TAG in tags
+    project_is_svm_enabled = is_project_svm_enabled(conn, event.project_id)
     save_output("svm_enabled", str(project_is_svm_enabled))
 
     svm_name = None
