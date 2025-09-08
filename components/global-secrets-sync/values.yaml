@@ -5,4 +5,4 @@ secrets:
     type: Opaque
     namespace: test
     data:
-      password: abcdef
+      password: abcdefg
