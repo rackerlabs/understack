@@ -4,6 +4,21 @@
   "description": "Schema for OpenStack component values.yaml configuration",
   "type": "object",
   "properties": {
+    "regionName": {
+      "type": "string",
+      "description": "OpenStack region that this deployment corresponds to"
+    },
+    "keystoneUrl": {
+      "type": "string",
+      "default": "http://keystone-api.openstack.svc.cluster.local:5000/v3",
+      "description": "Keystone API URL for OpenStack authentication"
+    },
+    "externalSecretsRefreshInterval": {
+      "type": "string",
+      "pattern": "^[0-9]+(s|m|h|d)",
+      "default": "1h",
+      "description": "How often External Secrets Operator refreshes each secret"
+    },
     "mariadb": {
       "type": "object",
       "description": "OpenStack mariadb instance settings",
@@ -104,6 +119,82 @@
       },
       "additionalProperties": false
     },
+    "keystoneServiceUsers": {
+      "type": "object",
+      "description": "OpenStack service users for OpenStack Helm charts",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enables or disables loading OpenStack service users via External Secrets Operator"
+        },
+        "secretStore": {
+          "type": "object",
+          "description": "External Secrets Operator Secret Store configuration",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["ClusterSecretStore", "SecretStore"],
+              "description": "Type of secret store - ClusterSecretStore or SecretStore for namespaced"
+            },
+            "name": {
+              "type": "string",
+              "description": "Name of the ClusterSecretStore or SecretStore to use"
+            }
+          },
+          "required": ["kind", "name"],
+          "additionalProperties": false
+        },
+        "externalLinkAnnotationTemplate": {
+          "type": "string",
+          "description": "Optional template for external link annotations on ExternalSecret resources"
+        },
+        "keystoneInterface": {
+          "type": "string",
+          "default": "internal",
+          "description": "OpenStack service catalog interface to use"
+        },
+        "services": {
+          "type": "object",
+          "description": "Service users organized by service name",
+          "patternProperties": {
+            "^[a-zA-Z0-9_-]+$": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "usage": {
+                    "type": "string",
+                    "description": "Usage identifier for the service user"
+                  },
+                  "remoteRef": {
+                    "type": "string",
+                    "description": "Credential identifier"
+                  },
+                  "section": {
+                    "type": "string",
+                    "description": "Configuration section name"
+                  },
+                  "project_domain_name": {
+                    "type": "string",
+                    "description": "Domain name where this service account will access a project"
+                  },
+                  "project_name": {
+                    "type": "string",
+                    "description": "Project name that this service account will access"
+                  }
+                },
+                "required": [
+                  "usage",
+                  "remoteRef"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "extraObjects": {
       "type": "array",
       "description": "Array of extra Kubernetes manifests to deploy",
@@ -140,5 +231,6 @@
       }
     }
   },
+  "required": ["regionName"],
   "additionalProperties": false
 }

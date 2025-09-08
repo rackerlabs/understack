@@ -15,7 +15,7 @@ type: kubernetes.io/service-account-token
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: eso-openstack-role
+  name: eso-openstack
 rules:
 - apiGroups: [""]
   resources:
@@ -28,6 +28,15 @@ rules:
   - svc-acct-argoworkflow
   - svc-acct-netapp
   - cinder-netapp-config
+  - admin-keystone-password
+  - cinder-keystone-password
+  - glance-keystone-password
+  - ironic-keystone-password
+  - neutron-keystone-password
+  - nova-keystone-password
+  - octavia-keystone-password
+  - placement-keystone-password
+  - skyline-keystone-password
 - apiGroups:
   - authorization.k8s.io
   resources:
@@ -38,11 +47,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: eso-openstack-rolebinding
+  name: eso-openstack
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: eso-openstack-role
+  name: eso-openstack
 subjects:
 - kind: ServiceAccount
   name: eso-openstack

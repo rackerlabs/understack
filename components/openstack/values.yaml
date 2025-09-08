@@ -1,4 +1,11 @@
+# yaml-language-server: $schema=./values.schema.json
 ---
+
+# -- OpenStack region that this deployment corresponds to
+regionName: ""
+
+# -- Keystone API URL for OpenStack authentication
+keystoneUrl: "http://keystone-api.openstack.svc.cluster.local:5000/v3"
 
 # -- OpenStack mariadb instance settings
 mariadb:
@@ -28,6 +35,95 @@ mariadb:
 rabbitmq:
   # -- storage settings
   persistence: {}
+
+# -- OpenStack service users for OpenStack Helm charts
+keystoneServiceUsers:
+  # -- Enables or disables loading OpenStack service users via External Secrets Operator
+  enabled: true
+  # -- External Secrets Operator Secret Store where these service users secrets will come from
+  secretStore:
+    # -- "ClusterSecretStore" or "SecretStore" for namespaced
+    kind: "ClusterSecretStore"
+    # -- Name of the ClusterSecretStore or SecretStore to use
+    name: "openstack"
+  # -- Optional template for external link annotations on ExternalSecret resources
+  externalLinkAnnotationTemplate: ""
+  # -- OpenStack service catalog interface to use
+  keystoneInterface: "internal"
+  # -- OpenStack services with a definition of each of their service accounts
+  services:
+    keystone:
+      - usage: admin
+        remoteRef: &keystone_admin "admin-keystone-password"
+    cinder:
+      - usage: admin
+        remoteRef: *keystone_admin
+      - usage: user
+        remoteRef: "cinder-keystone-password"
+    glance:
+      - usage: admin
+        remoteRef: *keystone_admin
+      - usage: user
+        remoteRef: "glance-keystone-password"
+    ironic:
+      - usage: admin
+        remoteRef: *keystone_admin
+      - usage: user
+        remoteRef: &ironic_svc "ironic-keystone-password"
+      - usage: catalog
+        remoteRef: *ironic_svc
+        section: service_catalog
+      - usage: service
+        remoteRef: *ironic_svc
+        section: service_user
+      - usage: glance
+        remoteRef: *ironic_svc
+      - usage: inspector
+        remoteRef: *ironic_svc
+      - usage: neutron
+        remoteRef: *ironic_svc
+    neutron:
+      - usage: admin
+        remoteRef: *keystone_admin
+      - usage: user
+        remoteRef: &neutron_svc "neutron-keystone-password"
+      - usage: ironic
+        remoteRef: *neutron_svc
+      - usage: nova
+        remoteRef: *neutron_svc
+      - usage: placement
+        remoteRef: *neutron_svc
+    nova:
+      - usage: admin
+        remoteRef: *keystone_admin
+      - usage: user
+        remoteRef: &nova_svc "nova-keystone-password"
+      - usage: ironic
+        remoteRef: *nova_svc
+        project_domain_name: infra
+        project_name: baremetal
+      - usage: neutron
+        remoteRef: *nova_svc
+      - usage: placement
+        remoteRef: *nova_svc
+      - usage: service
+        remoteRef: *nova_svc
+        section: service_user
+    octavia:
+      - usage: admin
+        remoteRef: *keystone_admin
+      - usage: user
+        remoteRef: "octavia-keystone-password"
+    placement:
+      - usage: admin
+        remoteRef: *keystone_admin
+      - usage: user
+        remoteRef: "placement-keystone-password"
+    skyline:
+      - usage: admin
+        remoteRef: *keystone_admin
+      - usage: user
+        remoteRef: "skyline-keystone-password"
 
 # -- Array of extra Kubernetes manifests to deploy
 extraObjects: []

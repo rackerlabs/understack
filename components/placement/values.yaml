@@ -52,6 +52,12 @@ manifests:
   job_db_init: false
   secret_db: false
   service_ingress: false
+  # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
+  # Kubernetes section generation in OpenStack Helm, because we want those
+  # to be generated indirectly via ESO as configured in keystoneServiceUsers.enabled
+  # that is later consumed via components/openstack helm chart
+  secret_keystone: false
+  secret_ks_etc: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
