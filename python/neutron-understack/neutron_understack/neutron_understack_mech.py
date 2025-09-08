@@ -3,7 +3,6 @@ from uuid import UUID
 
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
-from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
@@ -15,8 +14,6 @@ from neutron_understack import config
 from neutron_understack import routers
 from neutron_understack import utils
 from neutron_understack.ironic import IronicClient
-from neutron_understack.nautobot import Nautobot
-from neutron_understack.nautobot import VlanPayload
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
 
@@ -42,25 +39,12 @@ class UnderstackDriver(MechanismDriver):
 
     def initialize(self):
         conf = cfg.CONF.ml2_understack
-        self.nb = Nautobot(conf.nb_url, conf.nb_token)
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
         self.ironic_client = IronicClient()
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         self.subscribe()
 
     def subscribe(self):
-        registry.subscribe(
-            self._create_segment,
-            resources.SEGMENT,
-            events.PRECOMMIT_CREATE,
-            cancellable=True,
-        )
-        registry.subscribe(
-            self._delete_segment,
-            resources.SEGMENT,
-            events.BEFORE_DELETE,
-            cancellable=True,
-        )
         registry.subscribe(
             routers.handle_router_interface_removal,
             resources.PORT,
@@ -72,42 +56,7 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def create_network_postcommit(self, context: NetworkContext):
-        network = context.current
-        network_id = network["id"]
-        network_name = network["name"]
-        project_id = network["project_id"]
-        external = network["router:external"]
-        provider_type = network.get("provider:network_type")
-        physnet = network.get("provider:physical_network")
-        segmentation_id = network.get("provider:segmentation_id")
-        conf = cfg.CONF.ml2_understack
-
-        if provider_type not in [p_const.TYPE_VLAN, p_const.TYPE_VXLAN]:
-            return
-
-        ucvni_group = conf.ucvni_group
-        if segmentation_id is None:
-            raise ValueError("Network %s missing provider:segmentation_id", network_id)
-
-        ucvni_response = self.nb.ucvni_create(
-            network_id=network_id,
-            project_id=project_id,
-            ucvni_group=ucvni_group,
-            network_name=network_name,
-            segmentation_id=segmentation_id,
-        )
-        LOG.info(
-            "network %(net_id)s has been added on ucvni_group %(ucvni_group)s, "
-            "physnet %(physnet)s",
-            {
-                "net_id": network_id,
-                "nautobot_ucvni_uuid": ucvni_response.get("id"),
-                "nautobot_tenant_id": ucvni_response.get("tenant", {}).get("id"),
-                "ucvni_group": ucvni_group,
-                "physnet": physnet,
-            },
-        )
-        self._create_nautobot_namespace(network_id, external)
+        pass
 
     def update_network_precommit(self, context: NetworkContext):
         pass
@@ -119,93 +68,13 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def delete_network_postcommit(self, context: NetworkContext):
-        network = context.current
-        network_id = network["id"]
-        external = network["router:external"]
-        provider_type = network.get("provider:network_type")
-        physnet = network.get("provider:physical_network")
-
-        conf = cfg.CONF.ml2_understack
-        ucvni_group = conf.ucvni_group
-
-        if provider_type != p_const.TYPE_VXLAN:
-            return
-
-        self.nb.ucvni_delete(network_id)
-
-        LOG.info(
-            "network %(net_id)s has been deleted from ucvni_group %(ucvni_group)s, "
-            "physnet %(physnet)s",
-            {"net_id": network_id, "ucvni_group": ucvni_group, "physnet": physnet},
-        )
-        if not external:
-            self._fetch_and_delete_nautobot_namespace(network_id)
+        pass
 
     def create_subnet_precommit(self, context):
         pass
 
     def create_subnet_postcommit(self, context):
-        """Create Prefix in Nautobot to represent this Subnet.
-
-        We divide the world into two kinds of Subnet:
-
-        1) external subnets
-
-           Have a public IP address, hence they all go into a single shared
-           namespace.
-
-           Will have an SVI configured on the leaf switch, which is achieved by
-           associating them with a VNI in nautobot.
-
-        2) non-external subnets
-
-           Have arbitrary IP space, so each Network has its own namespace which
-           means that two networks can both use the same IP block.
-
-           Don't have an SVI, which means we don't associate them with a VNI in
-           nautobot.
-
-        The openstack tenant_id is a hex string without dashes.  We convert this
-        to a normal UUID format for compatibility with Nautobot.
-        """
-        subnet_uuid = context.current["id"]
-        network_uuid = context.current["network_id"]
-        prefix = context.current["cidr"]
-        external = context.current["router:external"]
-        tenant_uuid = context.current["tenant_id"]
-
-        if tenant_uuid:
-            tenant_uuid = str(UUID(tenant_uuid))
-
-        if external:
-            namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
-        else:
-            namespace = network_uuid
-
-        self.nb.subnet_create(
-            subnet_uuid=subnet_uuid,
-            prefix=prefix,
-            namespace_name=namespace,
-            tenant_uuid=tenant_uuid,
-        )
-
-        if external:
-            self.nb.associate_subnet_with_network(
-                network_uuid=network_uuid,
-                subnet_uuid=subnet_uuid,
-            )
-            self.nb.set_svi_role_on_network(
-                role="svi_vxlan_anycast_gateway",
-                network_uuid=network_uuid,
-            )
-
-        LOG.info(
-            "subnet with ID: %s and prefix %s has been "
-            "created in Nautobot namespace %s",
-            subnet_uuid,
-            prefix,
-            namespace,
-        )
+        pass
 
     def update_subnet_precommit(self, context):
         pass
@@ -218,17 +87,6 @@ class UnderstackDriver(MechanismDriver):
 
     def delete_subnet_postcommit(self, context):
         pass
-
-        subnet = context.current
-        subnet_uuid = subnet["id"]
-        prefix = subnet["cidr"]
-
-        self.nb.subnet_delete(subnet_uuid)
-        LOG.info(
-            "subnet with ID: %(uuid)s and prefix %(prefix)s has been "
-            "deleted in Nautobot",
-            {"prefix": prefix, "uuid": subnet_uuid},
-        )
 
     def create_port_precommit(self, context: PortContext):
         pass
@@ -291,26 +149,17 @@ class UnderstackDriver(MechanismDriver):
         trunk_details = context.current.get("trunk_details", {})
         segment_id = context.original_top_bound_segment["id"]
         original_binding = context.original[portbindings.PROFILE]
-        connected_interface_uuid = utils.fetch_connected_interface_uuid(
-            original_binding, self.nb
-        )
 
         if not utils.ports_bound_to_segment(
             segment_id
         ) and utils.is_dynamic_network_segment(segment_id):
             context.release_dynamic_segment(segment_id)
-            self.nb.delete_vlan(segment_id)
 
         networks_to_remove = {segment_id}
 
         LOG.debug(
-            "update_port_postcommit removing vlans %s from interface %s ",
+            "update_port_postcommit removing vlans %s from interface",
             networks_to_remove,
-            connected_interface_uuid,
-        )
-
-        self.nb.remove_port_network_associations(
-            connected_interface_uuid, networks_to_remove
         )
 
         if trunk_details:
@@ -341,7 +190,6 @@ class UnderstackDriver(MechanismDriver):
         if vlan_group_name and is_provisioning_network(context.current["network_id"]):
             # Signals end of the provisioning / cleaning cycle, so we
             # put the port back to its normal tenant mode:
-            self._set_nautobot_port_status(context, "Active")
             self.invoke_undersync(vlan_group_name)
 
     def bind_port(self, context: PortContext) -> None:
@@ -357,8 +205,6 @@ class UnderstackDriver(MechanismDriver):
 
         If there are no VXLAN segments, then bind a VLAN segment instead (this
         is required for VLAN-type networks like the provisioning network).
-
-        We configure the nautobot switch interface with the new VLAN(s).
 
         Then make the required call in to the black box: context.set_binding
         which tells the framework that we have dealt with this port and they
@@ -379,9 +225,6 @@ class UnderstackDriver(MechanismDriver):
             LOG.debug("Refusing to bind due to unsupported vnic_type: %s", vnic_type)
             return
 
-        if is_provisioning_network(port["network_id"]):
-            self._set_nautobot_port_status(context, "Provisioning-Interface")
-
         for segment in context.network.network_segments:
             if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
                 self._bind_port_segment(context, segment)
@@ -389,9 +232,6 @@ class UnderstackDriver(MechanismDriver):
 
     def _bind_port_segment(self, context: PortContext, segment):
         network_id = context.current["network_id"]
-        connected_interface_uuid = utils.fetch_connected_interface_uuid(
-            context.current[portbindings.PROFILE], self.nb
-        )
         mac_address = context.current["mac_address"]
 
         local_link_info = utils.local_link_from_binding_profile(
@@ -410,8 +250,7 @@ class UnderstackDriver(MechanismDriver):
             return
 
         LOG.debug(
-            "bind_port_segment: interface %s network %s vlan group %s",
-            connected_interface_uuid,
+            "bind_port_segment: interface network %s vlan group %s",
             network_id,
             vlan_group_name,
         )
@@ -432,14 +271,6 @@ class UnderstackDriver(MechanismDriver):
             )
 
         LOG.debug("bind_port_segment: Native VLAN segment %s", dynamic_segment)
-        dynamic_segment_vlan_id = dynamic_segment["segmentation_id"]
-
-        self.nb.set_port_vlan_associations(
-            interface_uuid=connected_interface_uuid,
-            native_vlan_id=dynamic_segment_vlan_id,
-            allowed_vlans_ids={dynamic_segment_vlan_id},
-            vlan_group_name=vlan_group_name,
-        )
 
         trunk_details = context.current.get("trunk_details") or {}
         port_id = context.current["id"]
@@ -462,80 +293,6 @@ class UnderstackDriver(MechanismDriver):
 
     def check_vlan_transparency(self, context):
         pass
-
-    def _fetch_and_delete_nautobot_namespace(self, name: str) -> None:
-        namespace_uuid = self.nb.fetch_namespace_by_name(name)
-        LOG.info(
-            "namespace %(name)s nautobot uuid: %(ns_uuid)s",
-            {"name": name, "ns_uuid": namespace_uuid},
-        )
-        self.nb.namespace_delete(namespace_uuid)
-        LOG.info(
-            "namespace with name: %(name)s and uuid: %(ns_uuid)s has been deleted "
-            "from nautobot",
-            {"name": name, "ns_uuid": namespace_uuid},
-        )
-
-    def _create_nautobot_namespace(
-        self, network_id: str, network_is_external: bool
-    ) -> None:
-        if not network_is_external:
-            self.nb.namespace_create(name=network_id)
-            LOG.info(
-                "namespace with name %(network_id)s has been created in Nautobot",
-                {"network_id": network_id},
-            )
-        else:
-            shared_namespace = cfg.CONF.ml2_understack.shared_nautobot_namespace_name
-            LOG.info(
-                "Network %(network_id)s is external, nautobot namespace "
-                "%(shared_nautobot_namespace)s will be used to house all "
-                "prefixes in this network",
-                {
-                    "network_id": network_id,
-                    "shared_nautobot_namespace": shared_namespace,
-                },
-            )
-
-    def _create_segment(self, resource, event, trigger, payload):
-        self._create_vlan(payload.latest_state)
-
-    def _delete_segment(self, resource, event, trigger, payload):
-        self._delete_vlan(payload.latest_state)
-
-    def _create_vlan(self, segment):
-        if not utils.is_valid_vlan_network_segment(segment):
-            return
-
-        vlan_payload = VlanPayload(
-            id=segment.get("id"),
-            vid=segment.get(segment_def.SEGMENTATION_ID),
-            vlan_group_name=segment.get(segment_def.PHYSICAL_NETWORK),
-            network_id=segment.get("network_id"),
-        )
-
-        LOG.info(
-            "creating vlan in nautobot for segment %(segment)s",
-            {"segment": segment},
-        )
-        self.nb.create_vlan_and_associate_vlan_to_ucvni(vlan_payload)
-
-    def _delete_vlan(self, segment):
-        if not utils.is_valid_vlan_network_segment(segment):
-            return
-        LOG.info(
-            "deleting vlan in nautobot for segment %(segment)s",
-            {"segment": segment},
-        )
-        self.nb.delete_vlan(
-            vlan_id=segment.get("id"),
-        )
-
-    def _set_nautobot_port_status(self, context: PortContext, status: str):
-        profile = context.current[portbindings.PROFILE]
-        interface_uuid = utils.fetch_connected_interface_uuid(profile, self.nb)
-        LOG.debug("Set interface %s to %s status", interface_uuid, status)
-        self.nb.configure_port_status(interface_uuid, status=status)
 
 
 def is_provisioning_network(network_id: str) -> bool:

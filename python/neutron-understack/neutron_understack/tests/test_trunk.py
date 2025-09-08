@@ -3,7 +3,6 @@ from neutron.plugins.ml2.driver_context import portbindings
 from oslo_config import cfg
 
 from neutron_understack import utils
-from neutron_understack.trunk import SubportSegmentationIDError
 
 
 class TestSubportsAdded:
@@ -58,10 +57,6 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
     def test_when_ucvni_tenant_vlan_id_is_not_set_yet(
         self, mocker, understack_trunk_driver, trunk, subport, network_id, vlan_num
     ):
-        mocker.patch.object(
-            understack_trunk_driver.nb, "fetch_ucvni_tenant_vlan_id", return_value=None
-        )
-
         mocker.patch("neutron_understack.utils.fetch_port_object")
         mocker.patch(
             "neutron_understack.utils.parent_port_is_bound", return_value=False
@@ -70,25 +65,6 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
         understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
             [subport], trunk
         )
-
-        understack_trunk_driver.nb.add_tenant_vlan_tag_to_ucvni.assert_called_once_with(
-            network_uuid=str(network_id), vlan_tag=vlan_num
-        )
-
-    def test_when_segmentation_id_is_different_to_tenant_vlan_id(
-        self, mocker, understack_trunk_driver, vlan_num, subport, trunk
-    ):
-        mocker.patch.object(
-            understack_trunk_driver.nb,
-            "fetch_ucvni_tenant_vlan_id",
-            return_value=(vlan_num + 1),
-        )
-        mocker.patch.object(subport, "delete")
-
-        with pytest.raises(SubportSegmentationIDError):
-            understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
-                [subport], trunk
-            )
 
     def test_when_parent_port_is_bound(
         self,
@@ -100,7 +76,6 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
         port_id,
         vlan_network_segment,
     ):
-        mocker.patch.object(understack_trunk_driver, "_handle_tenant_vlan_id_config")
         mocker.patch(
             "neutron_understack.utils.fetch_port_object", return_value=port_object
         )
@@ -112,15 +87,8 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
             "neutron_understack.utils.network_segment_by_physnet", return_value=None
         )
         mocker.patch("neutron_understack.utils.create_binding_profile_level")
-        mocker.patch.object(understack_trunk_driver.nb, "add_port_vlan_associations")
         understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
             [subport], trunk
-        )
-
-        understack_trunk_driver.nb.add_port_vlan_associations.assert_called_once_with(
-            interface_uuid=str(port_id),
-            vlan_group_name="physnet",
-            allowed_vlans_ids={1800},
         )
 
     def test_subports_add_post(
@@ -146,7 +114,6 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
     def test_when_parent_port_is_unbound(
         self, mocker, understack_trunk_driver, trunk, subport, port_object
     ):
-        mocker.patch.object(understack_trunk_driver, "_handle_tenant_vlan_id_config")
         port_object.bindings[0].vif_type = portbindings.VIF_TYPE_UNBOUND
         mocker.patch(
             "neutron_understack.utils.fetch_port_object", return_value=port_object
@@ -232,15 +199,9 @@ class Test_CleanParentPortSwitchportConfig:
             "_handle_segment_deallocation",
             return_value={network_id},
         )
-        mocker.patch.object(
-            understack_trunk_driver.nb, "remove_port_network_associations"
-        )
 
         understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
 
-        understack_trunk_driver.nb.remove_port_network_associations.assert_called_once_with(
-            interface_uuid=str(port_id), vlan_ids_to_remove={network_id}
-        )
         understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
             vlan_group="physnet",
             dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
@@ -286,19 +247,12 @@ class Test_HandleSegmentDeallocation:
         mocker.patch(
             "neutron_understack.utils.is_dynamic_network_segment", return_value=True
         )
-        mocker.patch.object(understack_trunk_driver.nb, "delete_vlan")
         mocker.patch("neutron_understack.utils.release_dynamic_segment")
 
-        result = understack_trunk_driver._handle_segment_deallocation(
-            [subport], str(host_id)
-        )
+        understack_trunk_driver._handle_segment_deallocation([subport], str(host_id))
 
         utils.release_dynamic_segment.assert_called_once_with(str(network_segment_id))
-        understack_trunk_driver.nb.delete_vlan.assert_called_once_with(
-            vlan_id=str(network_segment_id)
-        )
         port_binding_level.delete.assert_called_once()
-        assert result == {str(network_segment_id)}
 
     def test_when_segment_is_used_by_other_ports(
         self,
@@ -322,17 +276,12 @@ class Test_HandleSegmentDeallocation:
         mocker.patch(
             "neutron_understack.utils.ports_bound_to_segment", return_value=True
         )
-        mocker.patch.object(understack_trunk_driver.nb, "delete_vlan")
         mocker.patch("neutron_understack.utils.release_dynamic_segment")
 
-        result = understack_trunk_driver._handle_segment_deallocation(
-            [subport], str(host_id)
-        )
+        understack_trunk_driver._handle_segment_deallocation([subport], str(host_id))
 
         utils.release_dynamic_segment.assert_not_called()
-        understack_trunk_driver.nb.delete_vlan.assert_not_called()
         port_binding_level.delete.assert_called_once()
-        assert result == {str(network_segment_id)}
 
 
 class TestConfigureTrunk:
