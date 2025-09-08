@@ -12,12 +12,12 @@ mech_understack_opts = [
     cfg.StrOpt(
         "nb_url",
         help="Nautobot URL",
-        required=True,
+        required=False,
     ),
     cfg.StrOpt(
         "nb_token",
         help="Nautobot API token",
-        required=True,
+        required=False,
     ),
     cfg.StrOpt(
         "ucvni_group",
