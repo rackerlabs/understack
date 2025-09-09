@@ -3,6 +3,7 @@ from uuid import UUID
 
 from openstack.connection import Connection
 from pydantic import BaseModel
+from pydantic import computed_field
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
@@ -37,13 +38,19 @@ class IronicProvisionSetEvent(BaseModel):
             node_uuid=payload_data["uuid"],
         )
 
+    @computed_field
+    @property
+    def lessee_undashed(self) -> str:
+        """Returns lessee without dashes."""
+        return self.lessee.hex
+
 
 def handle_provision_end(conn: Connection, _: Nautobot, event_data: dict) -> int:
     """Operates on an Ironic Node provisioning END event."""
     # Check if the project is configured with tags.
     event = IronicProvisionSetEvent.from_event_dict(event_data)
     logger.info("Checking if project %s is tagged with UNDERSTACK_SVM", event.lessee)
-    if not is_project_svm_enabled(conn, event.lessee):
+    if not is_project_svm_enabled(conn, event.lessee_undashed):
         return 0
 
     # Check if the server instance has an appropriate property.
