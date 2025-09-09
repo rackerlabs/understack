@@ -2,6 +2,7 @@ from typing import Self
 from uuid import UUID
 
 from openstack.connection import Connection
+from openstack.exceptions import ConflictException
 from pydantic import BaseModel
 from pydantic import computed_field
 from pynautobot.core.api import Api as Nautobot
@@ -77,13 +78,16 @@ def handle_provision_end(conn: Connection, _: Nautobot, event_data: dict) -> int
 
 def create_volume_connector(conn: Connection, event: IronicProvisionSetEvent):
     logger.info("Creating baremetal volume connector.")
-    connector = conn.baremetal.create_volume_connector(  # pyright: ignore
-        node_uuid=event.node_uuid,
-        type="iqn",
-        connector_id=instance_nqn(event.instance_uuid),
-    )
-    logger.debug("Created connector: %s", connector)
-    return connector
+    try:
+        connector = conn.baremetal.create_volume_connector(  # pyright: ignore
+            node_uuid=event.node_uuid,
+            type="iqn",
+            connector_id=instance_nqn(event.instance_uuid),
+        )
+        logger.debug("Created connector: %s", connector)
+        return connector
+    except ConflictException:
+        logger.info("Connector already exists.")
 
 
 def instance_nqn(instance_id: UUID):
