@@ -14,7 +14,7 @@ metadata:
 
       ```
       argo -n argo-events submit --from workflowtemplate/ironic-oslo-event \
-      -p event-json "JSON-payload"
+      -p event-json "JSON-payload" -p device_id=<UUID> -p project_id=<UUID>
       ```
 
       Defined in `workflows/argo-events/sensors/sensor-ironic-oslo-event.yaml`
@@ -27,7 +27,10 @@ spec:
       # the event is a string-ified JSON so we need to decode it
       # replace the whole event body
       jq: |
-        .body = (.body["oslo.message"] | fromjson)
+        (
+        .body = (.body["oslo.message"] | fromjson) |
+        .body.ironic_object = .body.payload["ironic_object.data"]
+        )
     filters:
       # applies each of the items in data with 'and' but there's only one
       dataLogicalOperator: "and"
@@ -52,11 +55,11 @@ spec:
                 dependencyName: ironic-dep
             - dest: spec.arguments.parameters.1.value # device_id
               src:
-                dataKey: body.payload.ironic_object\.data.uuid
+                dataKey: body.ironic_object.uuid
                 dependencyName: ironic-dep
             - dest: spec.arguments.parameters.2.value # project_id
               src:
-                dataKey: body.payload.ironic_object\.data.lessee
+                dataKey: body.ironic_object.lessee
                 dependencyName: ironic-dep
           source:
             # create a workflow in argo-events prefixed with ironic-prov-
