@@ -27,7 +27,7 @@ class IronicProvisionSetEvent(BaseModel):
 
         payload_data = payload.get("ironic_object.data")
         if payload_data is None:
-            raise Exception("Invalid event. No 'ironic_object.data' in payload")
+            raise ValueError("Invalid event. No 'ironic_object.data' in payload")
 
         return cls(
             owner=payload_data["owner"],
@@ -41,12 +41,13 @@ class IronicProvisionSetEvent(BaseModel):
 def handle_provision_end(conn: Connection, _: Nautobot, event_data: dict) -> int:
     """Operates on an Ironic Node provisioning END event."""
     # Check if the project is configured with tags.
-
     event = IronicProvisionSetEvent.from_event_dict(event_data)
+    logger.info("Checking if project %s is tagged with UNDERSTACK_SVM", event.lessee)
     if not is_project_svm_enabled(conn, event.lessee):
         return 0
 
     # Check if the server instance has an appropriate property.
+    logger.info("Looking up Nova instance %s", event.instance_uuid)
     server = conn.get_server_by_id(event.instance_uuid)
 
     if not server:
@@ -62,4 +63,21 @@ def handle_provision_end(conn: Connection, _: Nautobot, event_data: dict) -> int
 
     save_output("node_uuid", str(event.node_uuid))
     save_output("instance_uuid", str(event.instance_uuid))
+
+    create_volume_connector(conn, event)
     return 0
+
+
+def create_volume_connector(conn: Connection, event: IronicProvisionSetEvent):
+    logger.info("Creating baremetal volume connector.")
+    connector = conn.baremetal.create_volume_connector(  # pyright: ignore
+        node_uuid=event.node_uuid,
+        type="iqn",
+        connector_id=instance_nqn(event.instance_uuid),
+    )
+    logger.debug("Created connector: %s", connector)
+    return connector
+
+
+def instance_nqn(instance_id: UUID):
+    return f"nqn.2014-08.org.nvmexpress:uuid:{instance_id}"
