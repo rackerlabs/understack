@@ -321,21 +321,21 @@ class TestVolumeResult:
         result = VolumeResult(
             name="test-volume",
             uuid="vol-uuid-123",
-            size="1TB",
+            size=1024,
             state="online",
             svm_name="test-svm",
         )
 
         assert result.name == "test-volume"
         assert result.uuid == "vol-uuid-123"
-        assert result.size == "1TB"
+        assert result.size == 1024
         assert result.state == "online"
         assert result.svm_name == "test-svm"
 
     def test_volume_result_without_svm_name(self):
         """Test volume result without SVM name."""
         result = VolumeResult(
-            name="test-volume", uuid="vol-uuid-123", size="1TB", state="online"
+            name="test-volume", uuid="vol-uuid-123", size=1024, state="online"
         )
 
         assert result.svm_name is None
@@ -346,7 +346,7 @@ class TestVolumeResult:
 
         for state in states:
             result = VolumeResult(
-                name="test-volume", uuid="vol-uuid-123", size="1TB", state=state
+                name="test-volume", uuid="vol-uuid-123", size=1024, state=state
             )
             assert result.state == state
 

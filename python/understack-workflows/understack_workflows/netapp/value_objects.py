@@ -749,7 +749,7 @@ class VolumeResult(BaseModel):
         >>> result = VolumeResult(
         ...     name="test-vol",
         ...     uuid="12345678-1234-1234-1234-123456789abc",
-        ...     size="100GB",
+        ...     size=10024,
         ...     state="online",
         ...     svm_name="test-svm"
         ... )
@@ -759,7 +759,7 @@ class VolumeResult(BaseModel):
 
     name: str
     uuid: str
-    size: str
+    size: int
     state: str
     svm_name: str | None = None
 

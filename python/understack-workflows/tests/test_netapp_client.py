@@ -215,7 +215,7 @@ class TestNetAppClient:
         mock_volume_instance = MagicMock()
         mock_volume_instance.name = "test-volume"
         mock_volume_instance.uuid = "volume-uuid-123"
-        mock_volume_instance.size = "1TB"
+        mock_volume_instance.size = 1024
         mock_volume_instance.state = "online"
         mock_volume_class.return_value = mock_volume_instance
 
@@ -231,7 +231,7 @@ class TestNetAppClient:
         assert isinstance(result, VolumeResult)
         assert result.name == "test-volume"
         assert result.uuid == "volume-uuid-123"
-        assert result.size == "1TB"
+        assert result.size == 1024
         assert result.state == "online"
         assert result.svm_name == "test-svm"
 

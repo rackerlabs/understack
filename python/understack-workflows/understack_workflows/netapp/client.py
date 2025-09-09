@@ -352,7 +352,7 @@ class NetAppClient(NetAppClientInterface):
             result = VolumeResult(
                 name=str(volume.name),
                 uuid=str(volume.uuid),
-                size=getattr(volume, "size", volume_spec.size),
+                size=int(getattr(volume, "size", volume_spec.size)),
                 state=getattr(volume, "state", "unknown"),
                 svm_name=volume_spec.svm_name,
             )
@@ -426,7 +426,7 @@ class NetAppClient(NetAppClientInterface):
                 return VolumeResult(
                     name=str(volume.name),
                     uuid=str(volume.uuid),
-                    size=getattr(volume, "size", "unknown"),
+                    size=int(getattr(volume, "size", "unknown")),
                     state=getattr(volume, "state", "unknown"),
                     svm_name=svm_name,
                 )
