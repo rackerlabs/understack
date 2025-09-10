@@ -152,6 +152,7 @@ nav:
       - operator-guide/workflows.md
       - operator-guide/monitoring.md
       - operator-guide/mariadb-operator.md
+      - operator-guide/mariadb-upgrade-runbook.md
       - operator-guide/postgres-operator.md
       - operator-guide/rabbitmq.md
       - operator-guide/rook-ceph.md
