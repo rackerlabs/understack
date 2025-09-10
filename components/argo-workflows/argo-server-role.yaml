@@ -25,6 +25,3 @@ rules:
     verbs:
       - get
       - create
-    resourceNames:
-      - argo-sso
-      - sso
