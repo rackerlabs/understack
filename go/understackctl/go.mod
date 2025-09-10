@@ -8,9 +8,9 @@ require (
 	github.com/gookit/goutil v0.7.1
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/viper v1.20.1
-	k8s.io/api v0.32.3
-	k8s.io/apimachinery v0.32.3
-	k8s.io/client-go v0.32.3
+	k8s.io/api v0.34.1
+	k8s.io/apimachinery v0.34.1
+	k8s.io/client-go v0.34.1
 	sigs.k8s.io/yaml v1.6.0
 )
 
