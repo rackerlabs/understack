@@ -177,7 +177,7 @@ netapp_password = test-password
         manager._lif_service.create_lif = MagicMock()
 
         config_obj = NetappIPInterfaceConfig(
-            name="N1-test-A",
+            name="N1-lif-A",
             address=ipaddress.IPv4Address("192.168.1.10"),
             network=ipaddress.IPv4Network("192.168.1.0/24"),
             vlan_id=100,
@@ -313,7 +313,7 @@ netapp_password = test-password
 
             # Network-related methods
             config_obj = NetappIPInterfaceConfig(
-                name="test",
+                name="N1-lif-B",
                 address=ipaddress.IPv4Address("192.168.1.1"),
                 network=ipaddress.IPv4Network("192.168.1.0/24"),
                 vlan_id=100,
@@ -332,7 +332,7 @@ class TestNetAppManagerValueObjects:
     def test_netmask_long(self):
         """Test netmask_long method."""
         config = NetappIPInterfaceConfig(
-            name="N1-storage-A",
+            name="N1-lif-A",
             address=ipaddress.IPv4Address("192.168.1.10"),
             network=ipaddress.IPv4Network("192.168.1.0/24"),
             vlan_id=100,
@@ -342,7 +342,7 @@ class TestNetAppManagerValueObjects:
     def test_side_property_extraction(self):
         """Test side property extraction from interface names."""
         config_a = NetappIPInterfaceConfig(
-            name="N1-test-A",
+            name="N1-lif-A",
             address=ipaddress.IPv4Address("192.168.1.10"),
             network=ipaddress.IPv4Network("192.168.1.0/24"),
             vlan_id=100,
@@ -350,7 +350,7 @@ class TestNetAppManagerValueObjects:
         assert config_a.side == "A"
 
         config_b = NetappIPInterfaceConfig(
-            name="N1-test-B",
+            name="N1-lif-B",
             address=ipaddress.IPv4Address("192.168.1.10"),
             network=ipaddress.IPv4Network("192.168.1.0/24"),
             vlan_id=100,
@@ -360,7 +360,7 @@ class TestNetAppManagerValueObjects:
     def test_desired_node_number_extraction(self):
         """Test node number extraction from interface names."""
         config_n1 = NetappIPInterfaceConfig(
-            name="N1-test-A",
+            name="N1-lif-A",
             address=ipaddress.IPv4Address("192.168.1.10"),
             network=ipaddress.IPv4Network("192.168.1.0/24"),
             vlan_id=100,
@@ -368,7 +368,7 @@ class TestNetAppManagerValueObjects:
         assert config_n1.desired_node_number == 1
 
         config_n2 = NetappIPInterfaceConfig(
-            name="N2-test-B",
+            name="N2-lif-B",
             address=ipaddress.IPv4Address("192.168.1.10"),
             network=ipaddress.IPv4Network("192.168.1.0/24"),
             vlan_id=100,

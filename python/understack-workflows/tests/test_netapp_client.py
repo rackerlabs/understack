@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 from netapp_ontap.error import NetAppRestError
+from pydantic import ValidationError
 
 from understack_workflows.netapp.client import NetAppClient
 from understack_workflows.netapp.client import NetAppClientInterface
@@ -327,7 +328,7 @@ class TestNetAppClient:
         assert isinstance(result, InterfaceResult)
         assert result.name == "test-interface"
         assert result.uuid == "interface-uuid-123"
-        assert result.address == "192.168.1.10"
+        assert str(result.address) == "192.168.1.10"
         assert result.netmask == "255.255.255.0"
         assert result.enabled is True
         assert result.svm_name == "test-svm"
@@ -540,7 +541,7 @@ class TestNetAppClient:
 
         # Verify route configuration
         assert mock_route_instance.svm == {"name": "os-test-project"}
-        assert mock_route_instance.gateway == "100.127.0.17"
+        assert str(mock_route_instance.gateway) == "100.127.0.17"
         assert mock_route_instance.destination == {
             "address": "100.126.0.0",
             "netmask": "255.255.128.0",
@@ -550,7 +551,7 @@ class TestNetAppClient:
         # Verify result
         assert result.uuid == "route-uuid-123"
         assert result.gateway == "100.127.0.17"
-        assert result.destination == ipaddress.IPv4Network("100.126.0.0/17")
+        assert result.destination == "100.126.0.0/17"
         assert result.svm_name == "os-test-project"
 
     @patch("understack_workflows.netapp.client.NetworkRoute")
@@ -584,7 +585,7 @@ class TestNetAppClient:
         assert isinstance(call_args[0][0], NetAppRestError)
         assert call_args[0][1] == "Route creation"
         assert call_args[0][2]["svm_name"] == "os-nonexistent-project"
-        assert call_args[0][2]["gateway"] == "100.127.0.17"
+        assert str(call_args[0][2]["gateway"]) == "100.127.0.17"
         assert call_args[0][2]["destination"] == ipaddress.IPv4Network("100.126.0.0/17")
 
     @patch("understack_workflows.netapp.client.NetworkRoute")
@@ -638,19 +639,12 @@ class TestNetAppClient:
             )
         )
 
-        route_spec = RouteSpec(
-            svm_name="os-test-project",
-            gateway="192.168.1.1",  # Invalid gateway for this network
-            destination=ipaddress.IPv4Network("100.126.0.0/17"),
-        )
-
-        with pytest.raises(NetworkOperationError):
-            netapp_client.create_route(route_spec)
-
-        # Verify error context includes gateway information
-        call_args = netapp_client._error_handler.handle_netapp_error.call_args
-        assert call_args[0][2]["gateway"] == "192.168.1.1"
-        assert call_args[0][2]["destination"] == ipaddress.IPv4Network("100.126.0.0/17")
+        with pytest.raises(ValidationError):
+            RouteSpec(
+                svm_name="os-test-project",
+                gateway="192.168.1.1",  # Invalid gateway for this network
+                destination=ipaddress.IPv4Network("100.126.0.0/17"),
+            )
 
     @patch("understack_workflows.netapp.client.NetworkRoute")
     def test_create_route_logging_behavior(self, mock_route_class, netapp_client):
@@ -694,7 +688,7 @@ class TestNetAppClient:
         assert start_log[0][1]["destination"] == ipaddress.IPv4Network(
             "100.126.128.0/17"
         )
-        assert start_log[0][1]["gateway"] == "100.127.128.17"
+        assert str(start_log[0][1]["gateway"]) == "100.127.128.17"
         assert start_log[0][1]["svm_name"] == "os-logging-test"
 
         # Verify route completion log

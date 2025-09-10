@@ -52,6 +52,10 @@ class TestIntegrationTests:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -132,6 +136,10 @@ class TestIntegrationTests:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -214,6 +222,10 @@ class TestIntegrationTests:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock Nautobot client to raise connection error
@@ -260,6 +272,10 @@ class TestIntegrationTests:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -311,6 +327,10 @@ class TestIntegrationTests:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -360,6 +380,10 @@ class TestIntegrationTests:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -467,17 +491,14 @@ class TestIntegrationTests:
             # Mock successful GraphQL response (use single interface sample)
             mock_response = Mock()
             sample_data = load_json_sample("nautobot_graphql_vm_response_single.json")
-            # Customize the interface name for this test case
-            sample_data["data"]["virtual_machines"][0]["interfaces"][0]["name"] = (
-                f"interface-{test_case['name']}"
-            )
-            sample_data["data"]["virtual_machines"][0]["interfaces"][1]["name"] = (
-                f"interface-{test_case['name']}-B"
-            )
             mock_response.json = sample_data
 
             # Mock NetAppManager
             mock_netapp_manager_instance = Mock()
+            # Mock the config property to return a proper config object
+            mock_config = Mock()
+            mock_config.netapp_nic_slot_prefix = "e4"
+            mock_netapp_manager_instance.config = mock_config
             mock_netapp_manager_instance.create_routes_for_project.return_value = []
             mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -562,6 +583,10 @@ class TestIntegrationWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -641,6 +666,10 @@ class TestIntegrationWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -713,6 +742,10 @@ class TestIntegrationWithNetAppManager:
 
         # Mock NetAppManager that raises exception during LIF creation
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_lif.side_effect = Exception(
             "SVM not found for project"
         )
@@ -779,6 +812,10 @@ class TestIntegrationWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -852,6 +889,10 @@ class TestIntegrationWithNetAppManager:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -951,6 +992,10 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with route creation results
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         expected_route_results = [
             RouteResult(
                 uuid="route-uuid-1",
@@ -1051,6 +1096,10 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with route creation results
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         expected_route_results = [
             RouteResult(
                 uuid="route-uuid-1",
@@ -1128,6 +1177,10 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with route creation failure
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.side_effect = Exception(
             "Route creation failed: SVM not found"
         )
@@ -1188,6 +1241,10 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with NetworkOperationError (which wraps NetAppRestError)
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.side_effect = (
             NetworkOperationError(
                 "Route creation failed: NetApp REST API error",
@@ -1256,6 +1313,10 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with route creation failure that should terminate script
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.side_effect = Exception(
             "Critical route creation failure: Unable to connect to NetApp system"
         )
@@ -1331,6 +1392,10 @@ class TestRouteCreationIntegration:
             },
         )
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.side_effect = (
             detailed_error
         )
@@ -1406,6 +1471,10 @@ class TestRouteCreationIntegration:
             },
         )
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_instance.create_routes_for_project.side_effect = svm_error
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
@@ -1466,6 +1535,10 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with successful route creation
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         expected_route_results = [
             RouteResult(
                 uuid="route-uuid-1",
@@ -1545,6 +1618,10 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with route creation results
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         expected_route_results = [
             RouteResult(
                 uuid="route-uuid-1",
@@ -1620,6 +1697,10 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager
         mock_netapp_manager_instance = Mock()
+        # Mock the config property to return a proper config object
+        mock_config = Mock()
+        mock_config.netapp_nic_slot_prefix = "e4"
+        mock_netapp_manager_instance.config = mock_config
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
