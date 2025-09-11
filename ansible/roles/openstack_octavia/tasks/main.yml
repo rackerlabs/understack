@@ -1,0 +1,127 @@
+---
+
+- name: Get network info
+  openstack.cloud.networks_info:
+    name: "{{ openstack_octavia_load_balancer_network_name }}"
+  register: existing_networks
+  run_once: true
+
+- name: Create network if not exists
+  openstack.cloud.network:
+    name: "{{ openstack_octavia_load_balancer_network_name }}"
+    provider_network_type: "{{ openstack_octavia_provider_network_type }}"
+    state: present
+  when: existing_networks | length == 0
+  run_once: true
+
+- name: Get network info again with the ID this time
+  openstack.cloud.networks_info:
+    name: "{{ openstack_octavia_load_balancer_network_name }}"
+  register: existing_networks_again
+  run_once: true
+
+- name: Create a new subnet in neutron
+  openstack.cloud.subnet:
+    network_name: "{{ openstack_octavia_load_balancer_network_name }}"
+    name: "{{ openstack_octavia_load_balancer_subnet_name }}"
+    cidr: "{{ openstack_octavia_load_balancer_subnet }}"
+    allocation_pool_start: "{{ openstack_octavia_load_balancer_subnet_start }}"
+    allocation_pool_end: "{{ openstack_octavia_load_balancer_subnet_end }}"
+    state: present
+  run_once: true
+
+- name: Create a security group
+  openstack.cloud.security_group:
+    name: lb-mgmt-sec-grp
+    state: present
+    description: security group for octavia load balancers
+  run_once: true
+
+- name: Create a security group rule
+  openstack.cloud.security_group_rule:
+    security_group: lb-mgmt-sec-grp
+    protocol: icmp
+    remote_ip_prefix: 0.0.0.0/0
+  run_once: true
+
+- name: Create a security group rule
+  openstack.cloud.security_group_rule:
+    security_group: lb-mgmt-sec-grp
+    protocol: tcp
+    port_range_min: 22
+    port_range_max: 22
+    remote_ip_prefix: 0.0.0.0/0
+  run_once: true
+
+- name: Create a security group rule
+  openstack.cloud.security_group_rule:
+    security_group: lb-mgmt-sec-grp
+    protocol: tcp
+    port_range_min: 9443
+    port_range_max: 9443
+    remote_ip_prefix: 0.0.0.0/0
+  run_once: true
+
+- name: Create a security group for octavia health manager
+  openstack.cloud.security_group:
+    name: lb-health-mgr-sec-grp
+    state: present
+    description: security group for octavia health manager
+  run_once: true
+  register: security_group
+
+- name: Create health manager group security rules
+  openstack.cloud.security_group_rule:
+    security_group: lb-health-mgr-sec-grp
+    protocol: udp
+    port_range_min: 5555
+    port_range_max: 5555
+    remote_ip_prefix: 0.0.0.0/0
+  run_once: true
+
+- name: Create ports debug
+  ansible.builtin.debug:
+    msg: "item {{ item }}"
+  with_items: "{{ groups['all']
+                  | map('extract', hostvars)
+                  | selectattr('ovs_enabled', 'defined')
+                  | selectattr('ovs_enabled', 'equalto', true)
+                  | map(attribute='inventory_hostname')
+                  | list }}"
+
+- name: Build octavia_port_names (override or hostname)
+  ansible.builtin.set_fact:
+    octavia_port_names: "{{ octavia_port_names | default([]) + [ (hostvars[item].octavia_host_override | default(item)) ] }}"
+  loop: "{{ groups['all'] }}"
+  when:
+    - hostvars[item].ovs_enabled is defined
+    - hostvars[item].ovs_enabled | bool
+  run_once: true
+  delegate_to: localhost
+  loop_control:
+    label: "{{ item }}"
+
+- name: Create ports debug
+  ansible.builtin.debug:
+    msg: "item {{ item }}"
+  with_items: "{{ octavia_port_names }}"
+  run_once: true
+
+# ansible's openstack.cloud.port module doesn't permit you to specify
+# the binding:host_id, so we have to do it the hard way using
+# openstack.cloud.resource.
+- name: Create Octavia health manager port (set binding host_id)
+  openstack.cloud.resource:
+    state: present
+    service: network
+    type: port
+    attributes:
+      name: "octavia-health-manager-port-{{ item }}"
+      network_id: "{{ existing_networks_again.networks[0].id }}"
+      device_owner: "Octavia:health-mgr"
+      binding_host_id: "{{ item }}"
+      security_groups:
+        - "{{ security_group.security_group.id }}"
+  register: create_octavia_port
+  with_items: "{{ octavia_port_names }}"
+  run_once: true
