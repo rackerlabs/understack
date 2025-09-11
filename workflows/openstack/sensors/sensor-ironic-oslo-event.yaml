@@ -101,7 +101,7 @@ spec:
                       when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
                       inline:
                         container:
-                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:pr-533
                           command: [ansible-playbook]
                           args:
                           - "storage_on_server_create.yml"
@@ -124,7 +124,7 @@ spec:
                       when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
                       inline:
                         container:
-                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:pr-533
                           command: [ansible-playbook]
                           args:
                           - "storage_update_switches.yml"
