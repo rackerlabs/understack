@@ -97,50 +97,28 @@ spec:
 
                   - - name: ansible-create-project
                       when: "{{steps.oslo-events.outputs.parameters.svm_enabled}} == True"
-                      inline:
-                        container:
-                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
-                          command: [ansible-playbook]
-                          args:
-                          - "storage_on_create_project.yml"
-                          - --extra-vars
-                          - "project_id={{steps.convert-project-id.outputs.result}}"
-                          - "-i"
-                          - "inventory/in-cluster/01-nautobot.yaml"
-                          - "-vvv"
-                          env:
-                            - name: NAUTOBOT_TOKEN
-                              valueFrom:
-                                secretKeyRef:
-                                  key: token
-                                  name: nautobot-token
-                          envFrom:
-                            - configMapRef:
-                                name: cluster-metadata
-                                optional: false
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_create_project.yml
+                        - name: extra_vars
+                          value: "project_id={{steps.convert-project-id.outputs.result}}"
+
                   - - name: ansible-create-svm
                       when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
-                      inline:
-                        container:
-                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
-                          command: [ansible-playbook]
-                          args:
-                          - "storage_on_svm_create.yml"
-                          - --extra-vars
-                          - "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}}"
-                          - "-i"
-                          - "inventory/in-cluster/01-nautobot.yaml"
-                          - "-vvv"
-                          env:
-                            - name: NAUTOBOT_TOKEN
-                              valueFrom:
-                                secretKeyRef:
-                                  key: token
-                                  name: nautobot-token
-                          envFrom:
-                            - configMapRef:
-                                name: cluster-metadata
-                                optional: false
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_svm_create.yml
+                        - name: extra_vars
+                          value: svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}}
+
                   - - name: netapp-configure-net
                       when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
                       templateRef:

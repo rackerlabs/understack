@@ -1,0 +1,41 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: ansible-workflow-template
+  annotations:
+    workflows.argoproj.io/title: Run arbitrary ansible playbook from the undercloud-rackspace repo
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/ansible-run.yaml`
+spec:
+  serviceAccountName: workflow
+  templates:
+  - name: ansible-run
+    inputs:
+      parameters:
+      - name: playbook
+        default: "nonexistent.yaml"
+      - name: extra_vars
+        default: "var=default"
+      - name: inventory_file
+        default: inventory/in-cluster/01-nautobot.yaml
+    container:
+      image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+      command: [ansible-playbook]
+      args:
+      - "{{ inputs.parameters.playbook }}"
+      - --extra-vars
+      - "{{ inputs.parameters.extra_vars }}"
+      - "-i"
+      - "{{ inputs.parameters.inventory_file }}"
+      - "-vvv"
+      env:
+      - name: NAUTOBOT_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: token
+            name: nautobot-token
+      envFrom:
+      - configMapRef:
+          name: cluster-metadata
+          optional: false
