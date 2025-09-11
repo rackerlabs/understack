@@ -106,9 +106,9 @@ spec:
                           args:
                           - "storage_on_server_create.yml"
                           - --extra-vars
-                          - "project_id={{steps.convert-project-id.outputs.result}} device_id={{workflow.parameters.device_id}} env=dev"
+                          - "project_id={{steps.convert-project-id.outputs.result}} device_id={{workflow.parameters.device_id}}"
                           - "-i"
-                          - "inventory/uc-dev/01-nautobot.yaml"
+                          - "inventory/in-cluster/01-nautobot.yaml"
                           - "-vvv"
                           env:
                             - name: NAUTOBOT_TOKEN
@@ -116,6 +116,10 @@ spec:
                                 secretKeyRef:
                                   key: token
                                   name: nautobot-token
+                          envFrom:
+                            - configMapRef:
+                                name: cluster-metadata
+                                optional: false
                   - - name: ansible-storage-update
                       when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
                       inline:
@@ -125,7 +129,7 @@ spec:
                           args:
                           - "storage_update_switches.yml"
                           - "-i"
-                          - "inventory/uc-dev/01-nautobot.yaml"
+                          - "inventory/in-cluster/01-nautobot.yaml"
                           - "-vvv"
                           env:
                             - name: NAUTOBOT_TOKEN
@@ -133,3 +137,7 @@ spec:
                                 secretKeyRef:
                                   key: token
                                   name: nautobot-token
+                          envFrom:
+                            - configMapRef:
+                                name: cluster-metadata
+                                optional: false

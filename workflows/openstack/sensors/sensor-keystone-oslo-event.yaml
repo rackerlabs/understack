@@ -104,18 +104,20 @@ spec:
                           args:
                           - "storage_on_create_project.yml"
                           - --extra-vars
-                          - "project_id={{steps.convert-project-id.outputs.result}} env=dev"
+                          - "project_id={{steps.convert-project-id.outputs.result}}"
                           - "-i"
-                          - "inventory/uc-dev/01-nautobot.yaml"
+                          - "inventory/in-cluster/01-nautobot.yaml"
                           - "-vvv"
-                            # TODO: this shouldn't be hardcodod to dev, but will work since
-                            # it really talks to https://nautobot-default.svc
                           env:
                             - name: NAUTOBOT_TOKEN
                               valueFrom:
                                 secretKeyRef:
                                   key: token
                                   name: nautobot-token
+                          envFrom:
+                            - configMapRef:
+                                name: cluster-metadata
+                                optional: false
                   - - name: ansible-create-svm
                       when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
                       inline:
@@ -125,18 +127,20 @@ spec:
                           args:
                           - "storage_on_svm_create.yml"
                           - --extra-vars
-                          - "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}} env=dev"
+                          - "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}}"
                           - "-i"
-                          - "inventory/uc-dev/01-nautobot.yaml"
+                          - "inventory/in-cluster/01-nautobot.yaml"
                           - "-vvv"
-                            # TODO: this shouldn't be hardcodod to dev, but will work since
-                            # it really talks to https://nautobot-default.svc
                           env:
                             - name: NAUTOBOT_TOKEN
                               valueFrom:
                                 secretKeyRef:
                                   key: token
                                   name: nautobot-token
+                          envFrom:
+                            - configMapRef:
+                                name: cluster-metadata
+                                optional: false
                   - - name: netapp-configure-net
                       when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
                       templateRef:
