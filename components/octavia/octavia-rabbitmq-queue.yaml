@@ -27,21 +27,6 @@ spec:
     namespace: openstack
 ---
 apiVersion: rabbitmq.com/v1beta1
-kind: Queue
-metadata:
-  name: octavia-queue
-  namespace: openstack
-spec:
-  name: octavia-qq  # name of the queue
-  vhost: "octavia"  # default to '/' if not provided
-  type: quorum  # without providing a queue type, rabbitmq creates a classic queue
-  autoDelete: false
-  durable: true  # setting 'durable' to false means this queue won't survive a server restart
-  rabbitmqClusterReference:
-    name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
-    namespace: openstack
----
-apiVersion: rabbitmq.com/v1beta1
 kind: Permission
 metadata:
   name: octavia-permission
