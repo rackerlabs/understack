@@ -80,3 +80,15 @@ spec:
             valueFrom:
               path: /var/run/argo/output.project_tags
               default: ""
+          - name: storage
+            valueFrom:
+              path: /var/run/argo/output.storage
+              default: "undefined"
+          - name: node_uuid
+            valueFrom:
+              path: /var/run/argo/output.node_uuid
+              default: "undefined"
+          - name: instance_uuid
+            valueFrom:
+              path: /var/run/argo/output.instance_uuid
+              default: "undefined"

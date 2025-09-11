@@ -52,7 +52,7 @@ class TestVolumeService:
         mock_client.create_volume.return_value = VolumeResult(
             name=expected_volume_name,
             uuid="volume-uuid-123",
-            size=size,
+            size=1024,
             state="online",
             svm_name=expected_svm_name,
         )
@@ -253,21 +253,20 @@ class TestVolumeService:
     ):
         """Test that volume specification is created correctly."""
         project_id = "test-project-789"
-        size = "2TB"
         aggregate_name = "test-aggregate"
 
         mock_client.create_volume.return_value = VolumeResult(
-            name="vol_test-project-789", uuid="uuid-123", size=size, state="online"
+            name="vol_test-project-789", uuid="uuid-123", size=2048, state="online"
         )
 
-        volume_service.create_volume(project_id, size, aggregate_name)
+        volume_service.create_volume(project_id, "2048M", aggregate_name)
 
         # Verify the volume spec is created correctly
         call_args = mock_client.create_volume.call_args[0][0]
         assert call_args.name == "vol_test-project-789"
         assert call_args.svm_name == "os-test-project-789"
         assert call_args.aggregate_name == aggregate_name
-        assert call_args.size == size
+        assert call_args.size == "2048M"
 
     def test_namespace_spec_creation(
         self, volume_service, mock_client, mock_error_handler
@@ -304,7 +303,7 @@ class TestVolumeService:
         mock_volume_result = VolumeResult(
             name=expected_volume_name,
             uuid="volume-uuid-123",
-            size="1TB",
+            size=1024,
             state="online",
             svm_name=expected_svm_name,
         )
