@@ -99,6 +99,57 @@ conf:
 
 # disable the neutron-ironic-agent from loading a non-existent config
 pod:
+  mounts:
+    neutron_db_sync:
+      neutron_db_sync:
+        volumeMounts:
+          # this is upstream but since we're making a list it gets replaced
+          - name: db-sync-conf
+            mountPath: /etc/neutron/plugins/ml2/ml2_conf.ini
+            subPath: ml2_conf.ini
+            readOnly: true
+          - name: neutron-etc-snippets
+            mountPath: /etc/neutron/neutron.conf.d/
+            readOnly: true
+        volumes:
+          - name: neutron-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: neutron-ks-etc
+    neutron_ironic_agent:
+      neutron_ironic_agent:
+        volumeMounts:
+          - name: neutron-etc-snippets
+            mountPath: /etc/neutron/neutron.conf.d/
+            readOnly: true
+        volumes:
+          - name: neutron-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: neutron-ks-etc
+    neutron_server:
+      neutron_server:
+        volumeMounts:
+          - mountPath: /etc/undersync/
+            name: undersync-token
+            readOnly: true
+          - name: neutron-etc-snippets
+            mountPath: /etc/neutron/neutron.conf.d/
+            readOnly: true
+        volumes:
+          - name: undersync-token
+            secret:
+              secretName: undersync-token
+          - name: neutron-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: neutron-ks-etc
+                - secret:
+                    name: neutron-nautobot
+
   use_fqdn:
     neutron_agent: false
   lifecycle:
@@ -107,33 +158,6 @@ pod:
         # this should be set to no more than (pod.replicas.server - 1)
         # usually set on per-deployment basis.
         min_available: 0
-  mounts:
-    neutron_server:
-      neutron_server:
-        volumeMounts:
-          # oslo.config autoloads certain paths in alphabetical order
-          # which gives us the opportunity to inject secrets and extra
-          # configs here. likely the best paths are:
-          # /etc/${project}/${prog}.conf.d/*.conf
-          # /etc/${project}/${project}.conf.d/*.conf
-          # the first would be best for per service separation but since each
-          # service is in its own pod they won't overlap. further more there
-          # is an issue with that see https://bugs.launchpad.net/oslo.config/+bug/2098514
-          # so we'll use the bottom one
-          - mountPath: /etc/neutron/neutron.conf.d/ml2_understack.conf
-            name: neutron-nautobot
-            subPath: ml2_understack.conf
-            readOnly: true
-          - mountPath: /etc/undersync/
-            name: undersync-token
-            readOnly: true
-        volumes:
-          - name: neutron-nautobot
-            secret:
-              secretName: neutron-nautobot
-          - name: undersync-token
-            secret:
-              secretName: undersync-token
   resources:
     enabled: true
 

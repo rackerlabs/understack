@@ -24,6 +24,31 @@ dependencies:
       jobs:
 
 pod:
+  mounts:
+    placement_db_sync:
+      placement_db_sync:
+        volumeMounts:
+          - name: placement-etc-snippets
+            mountPath: /etc/placement/placement.conf.d/
+            readOnly: true
+        volumes:
+          - name: placement-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: placement-ks-etc
+    placement:
+      placement:
+        volumeMounts:
+          - name: placement-etc-snippets
+            mountPath: /etc/placement/placement.conf.d/
+            readOnly: true
+        volumes:
+          - name: placement-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: placement-ks-etc
   lifecycle:
     disruption_budget:
       api:
