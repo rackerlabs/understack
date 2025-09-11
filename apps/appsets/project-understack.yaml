@@ -29,6 +29,10 @@ spec:
     server: '*'
   - namespace: 'kube-system'
     server: '*'
+  - namespace: 'projectsveltos'
+    server: '*'
+  - namespace: 'global-secrets-sync'
+    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'

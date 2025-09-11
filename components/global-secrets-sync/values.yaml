@@ -1,0 +1,8 @@
+nameOverride: "global-secrets-sync"
+targetEnv: dev
+secrets:
+  - name: blah
+    type: Opaque
+    namespace: test
+    data:
+      password: abcdefg
