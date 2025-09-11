@@ -65,6 +65,31 @@ dependencies:
         - glance-ks-endpoints
 
 pod:
+  mounts:
+    glance_db_sync:
+      glance_db_sync:
+        volumeMounts:
+          - name: glance-etc-snippets
+            mountPath: /etc/glance/glance.conf.d/
+            readOnly: true
+        volumes:
+          - name: glance-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: glance-ks-etc
+    glance_api:
+      glance_api:
+        volumeMounts:
+          - name: glance-etc-snippets
+            mountPath: /etc/glance/glance.conf.d/
+            readOnly: true
+        volumes:
+          - name: glance-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: glance-ks-etc
   lifecycle:
     disruption_budget:
       api:

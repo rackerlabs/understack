@@ -83,6 +83,67 @@ dependencies:
       jobs:
 
 pod:
+  mounts:
+    octavia_db_sync:
+      octavia_db_sync:
+        volumeMounts:
+          - name: octavia-etc-snippets
+            mountPath: /etc/octavia/octavia.conf.d/
+            readOnly: true
+        volumes:
+          - name: octavia-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: octavia-ks-etc
+    octavia_driver_agent:
+      octavia_driver_agent:
+        volumeMounts:
+          - name: octavia-etc-snippets
+            mountPath: /etc/octavia/octavia.conf.d/
+            readOnly: true
+        volumes:
+          - name: octavia-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: octavia-ks-etc
+    octavia_api:
+      octavia_api:
+        volumeMounts:
+          - name: octavia-etc-snippets
+            mountPath: /etc/octavia/octavia.conf.d/
+            readOnly: true
+        volumes:
+          - name: octavia-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: octavia-ks-etc
+    octavia_housekeeping:
+      octavia_housekeeping:
+        volumeMounts:
+          - name: octavia-etc-snippets
+            mountPath: /etc/octavia/octavia.conf.d/
+            readOnly: true
+        volumes:
+          - name: octavia-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: octavia-ks-etc
+    octavia_health_manager:
+      octavia_health_manager:
+        volumeMounts:
+          - name: octavia-etc-snippets
+            mountPath: /etc/octavia/octavia.conf.d/
+            readOnly: true
+        volumes:
+          - name: octavia-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: octavia-ks-etc
   resources:
     enabled: true
 
