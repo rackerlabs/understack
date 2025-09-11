@@ -106,11 +106,9 @@ spec:
                           args:
                           - "storage_on_server_create.yml"
                           - --extra-vars
-                          - "project_id={{steps.convert-project-id.outputs.result}} device_id={{workflow.parameters.device_id}} env=$UNDERSTACK_ENV"
-                          - --extra-vars
-                          - "nautobot_url=http://nautobot-default.nautobot.svc nautobot_token=$NAUTOBOT_TOKEN"
+                          - "project_id={{steps.convert-project-id.outputs.result}} device_id={{workflow.parameters.device_id}}"
                           - "-i"
-                          - "inventory/local/01-nautobot.yaml"
+                          - "inventory/in-cluster/01-nautobot.yaml"
                           - "-vvv"
                           env:
                             - name: NAUTOBOT_TOKEN
@@ -130,10 +128,8 @@ spec:
                           command: [ansible-playbook]
                           args:
                           - "storage_update_switches.yml"
-                          - --extra-vars
-                          - "nautobot_url=http://nautobot-default.nautobot.svc nautobot_token=$NAUTOBOT_TOKEN"
                           - "-i"
-                          - "inventory/local/01-nautobot.yaml"
+                          - "inventory/in-cluster/01-nautobot.yaml"
                           - "-vvv"
                           env:
                             - name: NAUTOBOT_TOKEN
