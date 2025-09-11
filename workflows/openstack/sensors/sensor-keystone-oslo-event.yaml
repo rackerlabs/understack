@@ -100,43 +100,52 @@ spec:
                       inline:
                         container:
                           image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
-                          command: [ansible-playbook]
+                          command: ["bash", "-c"]
                           args:
-                          - "storage_on_create_project.yml"
+                          - "ansible-playbook"
                           - --extra-vars
-                          - "project_id={{steps.convert-project-id.outputs.result}} env=dev"
+                          - "project_id={{steps.convert-project-id.outputs.result}} env=$UNDERSTACK_ENV"
+                          - --extra-vars
+                          - "nautobot_url=http://nautobot-default.nautobot.svc nautobot_token=$NAUTOBOT_TOKEN"
                           - "-i"
-                          - "inventory/uc-dev/01-nautobot.yaml"
+                          - "inventory/local/01-nautobot.yaml"
                           - "-vvv"
-                            # TODO: this shouldn't be hardcodod to dev, but will work since
-                            # it really talks to https://nautobot-default.svc
                           env:
                             - name: NAUTOBOT_TOKEN
                               valueFrom:
                                 secretKeyRef:
                                   key: token
                                   name: nautobot-token
+                          envFrom:
+                            - configMapRef:
+                                name: cluster-metadata
+                                optional: false
                   - - name: ansible-create-svm
                       when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
                       inline:
                         container:
                           image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
-                          command: [ansible-playbook]
+                          command: ["bash", "-c"]
                           args:
+                          - "ansible-playbook"
                           - "storage_on_svm_create.yml"
                           - --extra-vars
-                          - "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}} env=dev"
+                          - "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}} env=$UNDERSTACK_ENV"
+                          - --extra-vars
+                          - "nautobot_url=http://nautobot-default.nautobot.svc nautobot_token=$NAUTOBOT_TOKEN"
                           - "-i"
-                          - "inventory/uc-dev/01-nautobot.yaml"
+                          - "inventory/local/01-nautobot.yaml"
                           - "-vvv"
-                            # TODO: this shouldn't be hardcodod to dev, but will work since
-                            # it really talks to https://nautobot-default.svc
                           env:
                             - name: NAUTOBOT_TOKEN
                               valueFrom:
                                 secretKeyRef:
                                   key: token
                                   name: nautobot-token
+                          envFrom:
+                            - configMapRef:
+                                name: cluster-metadata
+                                optional: false
                   - - name: netapp-configure-net
                       when: "{{steps.oslo-events.outputs.parameters.svm_created}} == True"
                       templateRef:
