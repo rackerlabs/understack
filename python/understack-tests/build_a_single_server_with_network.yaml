@@ -1,12 +1,12 @@
 version: 2
-title: "Create the network, provision a gp2.small Ubuntu server and delete it afterwards."
+title: "Create the network, provision a Ubuntu server and delete it afterwards."
 subtasks:
   - title: "Boot and delete"
     workloads:
     - scenario:
         NovaServers.boot_and_delete_server:
           flavor:
-            name: gp2.small
+            name: "{{ flavor | default('gp2.small') }}"
           image:
             name: ^Ubuntu 24.*$
           config_drive: true

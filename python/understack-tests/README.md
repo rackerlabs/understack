@@ -24,12 +24,12 @@ the testing container as environment variables.
 ## Usage
 
 ```shell
-docker run --rm --env-file dev.env ghcr.io/rackerlabs/understack/understack-tests run-scenario build_a_single_gp2small_with_network.yaml
+docker run --rm --env-file dev.env ghcr.io/rackerlabs/understack/understack-tests run-scenario build_a_single_server_with_network.yaml
 ```
 
 ### Available scenarios
 
-- **`build_a_single_gp2small_with_network.yaml`** - boots a simple Ubuntu GP2.SMALL
+- **`build_a_single_server_with_network.yaml`** - boots a simple Ubuntu GP2.SMALL
   server with a plain networking setup. The network is automatically created
   and removed.
 - **`floating_ips.yaml`** - build a network, server, router and associate and
