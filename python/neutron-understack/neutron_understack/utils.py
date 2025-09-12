@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from uuid import UUID
 
 from neutron.db import models_v2
 from neutron.objects import ports as port_obj
@@ -16,7 +15,6 @@ from neutron_lib.plugins.ml2 import api
 from neutron_understack.ml2_type_annotations import NetworkSegmentDict
 from neutron_understack.ml2_type_annotations import PortContext
 from neutron_understack.ml2_type_annotations import PortDict
-from neutron_understack.nautobot import Nautobot
 
 
 def fetch_port_object(port_id: str) -> port_obj.Port:
@@ -197,29 +195,6 @@ def is_dynamic_network_segment(segment_id: str) -> bool:
 
 def local_link_from_binding_profile(binding_profile: dict) -> dict | None:
     return binding_profile.get("local_link_information", [None])[0]
-
-
-def fetch_connected_interface_uuid(binding_profile: dict, nautobot: Nautobot) -> str:
-    """Fetches the connected interface UUID from the port's binding profile.
-
-    If the binding_profile contains a UUID then assume this is a nautotbot
-    interface UUID, else look up the interface in Nautobot
-
-    :param binding_profile: The binding profile of the port.
-    :return: The connected interface UUID.
-    """
-    local_link_info = binding_profile.get("local_link_information", [{}])[0]
-    port_id = local_link_info["port_id"]
-    device_name = local_link_info["switch_info"]
-
-    try:
-        UUID(str(port_id))
-    except ValueError:
-        port_id = nautobot.get_interface_uuid(
-            device_name=device_name,
-            interface_name=port_id,
-        )
-    return port_id
 
 
 def parent_port_is_bound(port: port_obj.Port) -> bool:
