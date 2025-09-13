@@ -16,6 +16,16 @@ The OpenStack component is a Helm chart that creates:
 
 Configure the OpenStack component by editing `$DEPLOY_NAME/helm-configs/openstack.yaml` in your deployment repository.
 
+### Basic Configuration
+
+```yaml
+# Required: OpenStack region name
+regionName: "RegionOne"
+
+# Optional: Keystone API URL (defaults to internal cluster service)
+keystoneUrl: "http://keystone-api.openstack.svc.cluster.local:5000/v3"
+```
+
 ### MariaDB Database Configuration
 
 The MariaDB cluster provides the primary database for OpenStack services:
@@ -64,6 +74,48 @@ rabbitmq:
     size: 8Gi
     storageClassName: ceph-block-single
 ```
+
+### OpenStack Keystone Service Accounts
+
+For production deployments, you can load service account credentials via the External Secrets Operator (ESO) instead of using OpenStack Helm's hardcoded credentials. This enables:
+
+- **Secure credential management** from external secret stores (Vault, AWS Secrets Manager, etc.)
+- **Multi-cluster deployments** where Keystone runs separately from other services
+- **Credential isolation** for different [Sites](./welcome.md)
+
+#### Basic ESO Configuration
+
+Enable ESO integration in your `openstack.yaml`:
+
+```yaml
+keystoneServiceUsers:
+  enabled: true
+  secretStore:
+    kind: "ClusterSecretStore"
+    name: "openstack"
+  keystoneInterface: "internal"
+```
+
+#### Service Account Setup
+
+Each OpenStack service requires specific service accounts. At minimum, define `admin` and `user` accounts:
+
+```yaml
+keystoneServiceUsers:
+  services:
+    nova:
+      - usage: admin
+        remoteRef: "/openstack/admin-keystone-password"
+      - usage: user
+        remoteRef: "/openstack/nova-keystone-password"
+    ironic:
+      - usage: admin
+        remoteRef: "/openstack/admin-keystone-password"
+      - usage: user
+        remoteRef: "/openstack/ironic-keystone-password"
+```
+
+**For complete ESO setup instructions, migration steps, and troubleshooting, see [External Secrets Operator Setup](./secrets-eso-setup.md).**
 
 ### Additional Kubernetes Resources
 
@@ -166,6 +218,7 @@ kubectl get pods -l app=mariadb -w
 
 ## Related Documentation
 
+- [External Secrets Operator Setup](./secrets-eso-setup.md) - Detailed ESO configuration for OpenStack service accounts
 - [Component Configuration](./component-config.md) - General component configuration patterns
 - [Override OpenStack Service Config](./override-openstack-svc-config.md) - Service-specific configuration overrides
 - [Deploy Repo](./deploy-repo.md) - Deployment repository structure
