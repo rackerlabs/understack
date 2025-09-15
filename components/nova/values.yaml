@@ -248,6 +248,10 @@ manifests:
   # that is later consumed via components/openstack helm chart
   secret_keystone: false
   secret_ks_etc: false
+  # less than ideal but currently necessary due to the way the chart
+  # hardcodes the config-file flag which then causes oslo.config to prefer
+  # that data over the directory which we want to override
+  configmap_bin: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
