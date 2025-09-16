@@ -214,6 +214,9 @@ pod:
             mountPath: /var/lib/dnsmasq/
           - name: understack-data
             mountPath: /var/lib/understack
+          - name: ironic-etc-snippets
+            mountPath: /etc/ironic/ironic.conf.d
+            readOnly: true
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -224,6 +227,23 @@ pod:
           - name: understack-data
             persistentVolumeClaim:
               claimName: understack-data
+          - name: ironic-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: ironic-ks-etc
+    ironic_api:
+      ironic_api:
+        volumeMounts:
+          - name: ironic-etc-snippets
+            mountPath: /etc/ironic/ironic.conf.d
+            readOnly: true
+        volumes:
+          - name: ironic-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: ironic-ks-etc
   lifecycle:
     disruption_budget:
       api:
