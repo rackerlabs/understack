@@ -35,8 +35,39 @@ manifests:
   job_db_init: false
   secret_db: false
   service_ingress: false
+  # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
+  # Kubernetes section generation in OpenStack Helm, because we want those
+  # to be generated indirectly via ESO as configured in keystoneServiceUsers.enabled
+  # that is later consumed via components/openstack helm chart
+  secret_keystone: false
+  secret_ks_etc: false
 
 pod:
+  mounts:
+    skyline_db_sync:
+      skyline_db_sync:
+        volumeMounts:
+          - name: skyline-etc-snippets
+            mountPath: /etc/skyline/skyline.conf.d/
+            readOnly: true
+        volumes:
+          - name: skyline-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: skyline-ks-etc
+    skyline:
+      skyline:
+        volumeMounts:
+          - name: skyline-etc-snippets
+            mountPath: /etc/skyline/skyline.conf.d/
+            readOnly: true
+        volumes:
+          - name: skyline-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: skyline-ks-etc
   lifecycle:
     disruption_budget:
       skyline:

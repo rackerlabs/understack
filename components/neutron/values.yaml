@@ -99,6 +99,57 @@ conf:
 
 # disable the neutron-ironic-agent from loading a non-existent config
 pod:
+  mounts:
+    neutron_db_sync:
+      neutron_db_sync:
+        volumeMounts:
+          # this is upstream but since we're making a list it gets replaced
+          - name: db-sync-conf
+            mountPath: /etc/neutron/plugins/ml2/ml2_conf.ini
+            subPath: ml2_conf.ini
+            readOnly: true
+          - name: neutron-etc-snippets
+            mountPath: /etc/neutron/neutron.conf.d/
+            readOnly: true
+        volumes:
+          - name: neutron-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: neutron-ks-etc
+    neutron_ironic_agent:
+      neutron_ironic_agent:
+        volumeMounts:
+          - name: neutron-etc-snippets
+            mountPath: /etc/neutron/neutron.conf.d/
+            readOnly: true
+        volumes:
+          - name: neutron-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: neutron-ks-etc
+    neutron_server:
+      neutron_server:
+        volumeMounts:
+          - mountPath: /etc/undersync/
+            name: undersync-token
+            readOnly: true
+          - name: neutron-etc-snippets
+            mountPath: /etc/neutron/neutron.conf.d/
+            readOnly: true
+        volumes:
+          - name: undersync-token
+            secret:
+              secretName: undersync-token
+          - name: neutron-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: neutron-ks-etc
+                - secret:
+                    name: neutron-nautobot
+
   use_fqdn:
     neutron_agent: false
   lifecycle:
@@ -107,33 +158,6 @@ pod:
         # this should be set to no more than (pod.replicas.server - 1)
         # usually set on per-deployment basis.
         min_available: 0
-  mounts:
-    neutron_server:
-      neutron_server:
-        volumeMounts:
-          # oslo.config autoloads certain paths in alphabetical order
-          # which gives us the opportunity to inject secrets and extra
-          # configs here. likely the best paths are:
-          # /etc/${project}/${prog}.conf.d/*.conf
-          # /etc/${project}/${project}.conf.d/*.conf
-          # the first would be best for per service separation but since each
-          # service is in its own pod they won't overlap. further more there
-          # is an issue with that see https://bugs.launchpad.net/oslo.config/+bug/2098514
-          # so we'll use the bottom one
-          - mountPath: /etc/neutron/neutron.conf.d/ml2_understack.conf
-            name: neutron-nautobot
-            subPath: ml2_understack.conf
-            readOnly: true
-          - mountPath: /etc/undersync/
-            name: undersync-token
-            readOnly: true
-        volumes:
-          - name: neutron-nautobot
-            secret:
-              secretName: neutron-nautobot
-          - name: undersync-token
-            secret:
-              secretName: undersync-token
   resources:
     enabled: true
 
@@ -175,7 +199,6 @@ manifests:
   job_rabbit_init: false
   pod_rally_test: false
   secret_db: false
-  secret_keystone: true
   # OVN has its own pieces and does not need the following:
   # - neutron-dhcp-agent (OVN's does not work with baremetal/ironic currently)
   # - neutron-l3-agent
@@ -197,6 +220,16 @@ manifests:
   daemonset_netns_cleanup_cron: false
   deployment_ironic_agent: true
   service_ingress_server: false
+  # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
+  # Kubernetes section generation in OpenStack Helm, because we want those
+  # to be generated indirectly via ESO as configured in keystoneServiceUsers.enabled
+  # that is later consumed via components/openstack helm chart
+  secret_keystone: false
+  secret_ks_etc: false
+  # less than ideal but currently necessary due to the way the chart
+  # hardcodes the config-file flag which then causes oslo.config to prefer
+  # that data over the directory which we want to override
+  configmap_bin: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm

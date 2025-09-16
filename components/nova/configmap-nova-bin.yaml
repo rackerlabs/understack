@@ -1,0 +1,1406 @@
+apiVersion: v1
+data:
+  bootstrap.sh: |
+    #!/bin/bash
+
+    set -ex
+    export HOME=/tmp
+
+    echo 'Wait for Computes script not enabled'
+
+    echo 'No other bootstrap customizations found.'
+  cell-setup-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    until openstack compute service list --service nova-compute -f value -c State | grep -q "^up$" ;do
+      echo "Waiting for Nova Compute processes to register"
+      sleep 10
+    done
+  cell-setup.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    NOVA_VERSION=$(nova-manage --version 2>&1 | grep -Eo '[0-9]+[.][0-9]+[.][0-9]+')
+
+    # NOTE(portdirect): check if nova fully supports cells v2, and manage
+    # accordingly. Support was complete in ocata (V14.x.x).
+
+    if [ "${NOVA_VERSION%%.*}" -gt "14" ]; then
+      nova-manage cell_v2 discover_hosts --verbose
+    fi
+  db-drop.py: |
+    #!/usr/bin/env python
+
+    # Drops db and user for an OpenStack Service:
+    # Set ROOT_DB_CONNECTION and DB_CONNECTION environment variables to contain
+    # SQLAlchemy strings for the root connection to the database and the one you
+    # wish the service to use. Alternatively, you can use an ini formatted config
+    # at the location specified by OPENSTACK_CONFIG_FILE, and extract the string
+    # from the key OPENSTACK_CONFIG_DB_KEY, in the section specified by
+    # OPENSTACK_CONFIG_DB_SECTION.
+
+    import os
+    import sys
+    try:
+        import ConfigParser
+        PARSER_OPTS = {}
+    except ImportError:
+        import configparser as ConfigParser
+        PARSER_OPTS = {"strict": False}
+    import logging
+    from sqlalchemy import create_engine
+    from sqlalchemy import text
+
+    # Create logger, console handler and formatter
+    logger = logging.getLogger('OpenStack-Helm DB Drop')
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # Set the formatter and add the handler
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+
+    # Get the connection string for the service db root user
+    if "ROOT_DB_CONNECTION" in os.environ:
+        db_connection = os.environ['ROOT_DB_CONNECTION']
+        logger.info('Got DB root connection')
+    else:
+        logger.critical('environment variable ROOT_DB_CONNECTION not set')
+        sys.exit(1)
+
+    mysql_x509 = os.getenv('MARIADB_X509', "")
+    ssl_args = {}
+    if mysql_x509:
+        ssl_args = {'ssl': {'ca': '/etc/mysql/certs/ca.crt',
+                            'key': '/etc/mysql/certs/tls.key',
+                            'cert': '/etc/mysql/certs/tls.crt'}}
+
+    # Get the connection string for the service db
+    if "OPENSTACK_CONFIG_FILE" in os.environ:
+        os_conf = os.environ['OPENSTACK_CONFIG_FILE']
+        if "OPENSTACK_CONFIG_DB_SECTION" in os.environ:
+            os_conf_section = os.environ['OPENSTACK_CONFIG_DB_SECTION']
+        else:
+            logger.critical('environment variable OPENSTACK_CONFIG_DB_SECTION not set')
+            sys.exit(1)
+        if "OPENSTACK_CONFIG_DB_KEY" in os.environ:
+            os_conf_key = os.environ['OPENSTACK_CONFIG_DB_KEY']
+        else:
+            logger.critical('environment variable OPENSTACK_CONFIG_DB_KEY not set')
+            sys.exit(1)
+        try:
+            config = ConfigParser.RawConfigParser(**PARSER_OPTS)
+            logger.info("Using {0} as db config source".format(os_conf))
+            config.read(os_conf)
+            logger.info("Trying to load db config from {0}:{1}".format(
+                os_conf_section, os_conf_key))
+            user_db_conn = config.get(os_conf_section, os_conf_key)
+            logger.info("Got config from {0}".format(os_conf))
+        except:
+            logger.critical("Tried to load config from {0} but failed.".format(os_conf))
+            raise
+    elif "DB_CONNECTION" in os.environ:
+        user_db_conn = os.environ['DB_CONNECTION']
+        logger.info('Got config from DB_CONNECTION env var')
+    else:
+        logger.critical('Could not get db config, either from config file or env var')
+        sys.exit(1)
+
+    # Root DB engine
+    try:
+        root_engine_full = create_engine(db_connection)
+        root_user = root_engine_full.url.username
+        root_password = root_engine_full.url.password
+        drivername = root_engine_full.url.drivername
+        host = root_engine_full.url.host
+        port = root_engine_full.url.port
+        root_engine_url = ''.join([drivername, '://', root_user, ':', root_password, '@', host, ':', str (port)])
+        root_engine = create_engine(root_engine_url, connect_args=ssl_args)
+        connection = root_engine.connect()
+        connection.close()
+        logger.info("Tested connection to DB @ {0}:{1} as {2}".format(
+            host, port, root_user))
+    except:
+        logger.critical('Could not connect to database as root user')
+        raise
+
+    # User DB engine
+    try:
+        user_engine = create_engine(user_db_conn, connect_args=ssl_args)
+        # Get our user data out of the user_engine
+        database = user_engine.url.database
+        user = user_engine.url.username
+        password = user_engine.url.password
+        logger.info('Got user db config')
+    except:
+        logger.critical('Could not get user database config')
+        raise
+
+    # Delete DB
+    try:
+        with root_engine.connect() as connection:
+            connection.execute(text("DROP DATABASE IF EXISTS {0}".format(database)))
+            try:
+                connection.commit()
+            except AttributeError:
+                pass
+        logger.info("Deleted database {0}".format(database))
+    except:
+        logger.critical("Could not drop database {0}".format(database))
+        raise
+
+    # Delete DB User
+    try:
+        with root_engine.connect() as connection:
+            connection.execute(text("DROP USER IF EXISTS {0}".format(user)))
+            try:
+                connection.commit()
+            except AttributeError:
+                pass
+        logger.info("Deleted user {0}".format(user))
+    except:
+        logger.critical("Could not delete user {0}".format(user))
+        raise
+
+    logger.info('Finished DB Management')
+  db-init.py: |
+    #!/usr/bin/env python
+
+    # Creates db and user for an OpenStack Service:
+    # Set ROOT_DB_CONNECTION and DB_CONNECTION environment variables to contain
+    # SQLAlchemy strings for the root connection to the database and the one you
+    # wish the service to use. Alternatively, you can use an ini formatted config
+    # at the location specified by OPENSTACK_CONFIG_FILE, and extract the string
+    # from the key OPENSTACK_CONFIG_DB_KEY, in the section specified by
+    # OPENSTACK_CONFIG_DB_SECTION.
+
+    import os
+    import sys
+    try:
+        import ConfigParser
+        PARSER_OPTS = {}
+    except ImportError:
+        import configparser as ConfigParser
+        PARSER_OPTS = {"strict": False}
+    import logging
+    from sqlalchemy import create_engine
+    from sqlalchemy import text
+
+    # Create logger, console handler and formatter
+    logger = logging.getLogger('OpenStack-Helm DB Init')
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # Set the formatter and add the handler
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+
+    # Get the connection string for the service db root user
+    if "ROOT_DB_CONNECTION" in os.environ:
+        db_connection = os.environ['ROOT_DB_CONNECTION']
+        logger.info('Got DB root connection')
+    else:
+        logger.critical('environment variable ROOT_DB_CONNECTION not set')
+        sys.exit(1)
+
+    mysql_x509 = os.getenv('MARIADB_X509', "")
+    ssl_args = {}
+    if mysql_x509:
+        ssl_args = {'ssl': {'ca': '/etc/mysql/certs/ca.crt',
+                    'key': '/etc/mysql/certs/tls.key',
+                    'cert': '/etc/mysql/certs/tls.crt'}}
+
+    # Get the connection string for the service db
+    if "OPENSTACK_CONFIG_FILE" in os.environ:
+        os_conf = os.environ['OPENSTACK_CONFIG_FILE']
+        if "OPENSTACK_CONFIG_DB_SECTION" in os.environ:
+            os_conf_section = os.environ['OPENSTACK_CONFIG_DB_SECTION']
+        else:
+            logger.critical('environment variable OPENSTACK_CONFIG_DB_SECTION not set')
+            sys.exit(1)
+        if "OPENSTACK_CONFIG_DB_KEY" in os.environ:
+            os_conf_key = os.environ['OPENSTACK_CONFIG_DB_KEY']
+        else:
+            logger.critical('environment variable OPENSTACK_CONFIG_DB_KEY not set')
+            sys.exit(1)
+        try:
+            config = ConfigParser.RawConfigParser(**PARSER_OPTS)
+            logger.info("Using {0} as db config source".format(os_conf))
+            config.read(os_conf)
+            logger.info("Trying to load db config from {0}:{1}".format(
+                os_conf_section, os_conf_key))
+            user_db_conn = config.get(os_conf_section, os_conf_key)
+            logger.info("Got config from {0}".format(os_conf))
+        except:
+            logger.critical("Tried to load config from {0} but failed.".format(os_conf))
+            raise
+    elif "DB_CONNECTION" in os.environ:
+        user_db_conn = os.environ['DB_CONNECTION']
+        logger.info('Got config from DB_CONNECTION env var')
+    else:
+        logger.critical('Could not get db config, either from config file or env var')
+        sys.exit(1)
+
+    # Root DB engine
+    try:
+        root_engine_full = create_engine(db_connection)
+        root_user = root_engine_full.url.username
+        root_password = root_engine_full.url.password
+        drivername = root_engine_full.url.drivername
+        host = root_engine_full.url.host
+        port = root_engine_full.url.port
+        root_engine_url = ''.join([drivername, '://', root_user, ':', root_password, '@', host, ':', str (port)])
+        root_engine = create_engine(root_engine_url, connect_args=ssl_args)
+        connection = root_engine.connect()
+        connection.close()
+        logger.info("Tested connection to DB @ {0}:{1} as {2}".format(
+            host, port, root_user))
+    except:
+        logger.critical('Could not connect to database as root user')
+        raise
+
+    # User DB engine
+    try:
+        user_engine = create_engine(user_db_conn, connect_args=ssl_args)
+        # Get our user data out of the user_engine
+        database = user_engine.url.database
+        user = user_engine.url.username
+        password = user_engine.url.password
+        logger.info('Got user db config')
+    except:
+        logger.critical('Could not get user database config')
+        raise
+
+    # Create DB
+    try:
+        with root_engine.connect() as connection:
+            connection.execute(text("CREATE DATABASE IF NOT EXISTS {0}".format(database)))
+            try:
+                connection.commit()
+            except AttributeError:
+                pass
+        logger.info("Created database {0}".format(database))
+    except:
+        logger.critical("Could not create database {0}".format(database))
+        raise
+
+    # Create DB User
+    try:
+        with root_engine.connect() as connection:
+            connection.execute(
+                text("CREATE USER IF NOT EXISTS \'{0}\'@\'%\' IDENTIFIED BY \'{1}\' {2}".format(
+                    user, password, mysql_x509)))
+            connection.execute(
+                text("GRANT ALL ON `{0}`.* TO \'{1}\'@\'%\'".format(database, user)))
+            try:
+                connection.commit()
+            except AttributeError:
+                pass
+        logger.info("Created user {0} for {1}".format(user, database))
+    except:
+        logger.critical("Could not create user {0} for {1}".format(user, database))
+        raise
+
+    # Test connection
+    try:
+        connection = user_engine.connect()
+        connection.close()
+        logger.info("Tested connection to DB @ {0}:{1}/{2} as {3}".format(
+            host, port, database, user))
+    except:
+        logger.critical('Could not connect to database as user')
+        raise
+
+    logger.info('Finished DB Management')
+  db-sync.sh: |
+    #!/bin/bash
+
+    set -ex
+    NOVA_VERSION=$(nova-manage --version 2>&1 | grep -Eo '[0-9]+[.][0-9]+[.][0-9]+')
+
+    function manage_cells () {
+      # NOTE(portdirect): check if nova fully supports cells v2, and manage
+      # accordingly. Support was complete in ocata (V14.x.x).
+      if [ "${NOVA_VERSION%%.*}" -gt "14" ]; then
+        nova-manage cell_v2 map_cell0
+        nova-manage cell_v2 list_cells | grep -q " cell1 " || \
+          nova-manage cell_v2 create_cell --name=cell1 --verbose
+
+        CELL0_ID=$(nova-manage cell_v2 list_cells | awk -F '|' '/ cell0 / { print $3 }' | tr -d ' ')
+        CELL1_ID=$(nova-manage cell_v2 list_cells | awk -F '|' '/ cell1 / { print $3 }' | tr -d ' ')
+        set +x
+
+        CELL0_TRANSPORT=$(nova-manage cell_v2 list_cells | awk -F '|' '/ cell0 / { print $4 }' | tr -d ' ')
+        if [ -z "${DB_CONNECTION_CELL0}" ]; then
+          echo "ERROR: missing DB_CONNECTION_CELL0"
+          exit 1
+        fi
+        nova-manage cell_v2 update_cell \
+          --cell_uuid="${CELL0_ID}" \
+          --name="cell0" \
+          --transport-url="${CELL0_TRANSPORT}" \
+          --database_connection="${DB_CONNECTION_CELL0}"
+
+        for VAR in TRANSPORT_URL DB_CONNECTION; do
+          if [ -z "${!VAR}" ]; then
+            echo "ERROR: missing $VAR variable"
+            exit 1
+          fi
+        done
+        nova-manage cell_v2 update_cell \
+          --cell_uuid="${CELL1_ID}" \
+          --name="cell1" \
+          --transport-url="${TRANSPORT_URL}" \
+          --database_connection="${DB_CONNECTION}"
+        set -x
+      fi
+    }
+
+    # NOTE(aostapenko) Starting Wallaby nova-manage api_db version returns init version for empty database
+    # greater than 0 # https://opendev.org/openstack/nova/src/branch/stable/wallaby/nova/db/sqlalchemy/migration.py#L32
+    # thus logic prior to this commit does not work. We need to either remove or justify and alter previous logic.
+    nova-manage api_db sync
+    manage_cells
+
+    nova-manage db sync
+
+    nova-manage db online_data_migrations
+
+    echo 'Finished DB migrations'
+  fake-iptables.sh: |
+    #!/bin/bash
+
+    exit 0
+  health-probe.py: |
+    #!/usr/bin/env python
+
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    #     http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    """
+    Health probe script for OpenStack service that uses RPC/unix domain socket for
+    communication. Check's the RPC tcp socket status on the process and send
+    message to service through rpc call method and expects a reply.
+    Use nova's ping method that is designed just for such simple purpose.
+
+    Script returns failure to Kubernetes only when
+      a. TCP socket for the RPC communication are not established.
+      b. service is not reachable or
+      c. service times out sending a reply.
+
+    sys.stderr.write() writes to pod's events on failures.
+
+    Usage example for Nova Compute:
+    # python health-probe.py --config-file /etc/nova/nova.conf \
+    #  --service-queue-name compute
+
+    """
+
+    import json
+    import os
+    import psutil
+    import re
+    import signal
+    import socket
+    import sys
+
+    from oslo_config import cfg
+    from oslo_context import context
+    from oslo_log import log
+    import oslo_messaging
+
+    rpc_timeout = int(os.getenv('RPC_PROBE_TIMEOUT', '60'))
+    rpc_retries = int(os.getenv('RPC_PROBE_RETRIES', '2'))
+
+    tcp_established = "ESTABLISHED"
+
+
+    def _get_hostname(topic, use_fqdn):
+        if use_fqdn and topic == "compute":
+            return socket.getfqdn()
+        return socket.gethostname()
+
+
+    def check_service_status(transport):
+        """Verify service status. Return success if service consumes message"""
+        try:
+            service_queue_name = cfg.CONF.service_queue_name
+            use_fqdn = cfg.CONF.use_fqdn
+            target = oslo_messaging.Target(
+                topic=service_queue_name,
+                server=_get_hostname(service_queue_name, use_fqdn),
+                namespace='baseapi',
+                version="1.1")
+            if hasattr(oslo_messaging, 'get_rpc_client'):
+                client = oslo_messaging.get_rpc_client(transport, target,
+                                                       timeout=rpc_timeout,
+                                                       retry=rpc_retries)
+            else:
+                client = oslo_messaging.RPCClient(transport, target,
+                                                  timeout=rpc_timeout,
+                                                  retry=rpc_retries)
+            client.call(context.RequestContext(),
+                        'ping',
+                        arg=None)
+        except oslo_messaging.exceptions.MessageDeliveryFailure:
+            # Log to pod events
+            sys.stderr.write("Health probe unable to reach message bus")
+            sys.exit(0)  # return success
+        except oslo_messaging.rpc.client.RemoteError as re:
+            message = getattr(re, "message", str(re))
+            if ("Endpoint does not support RPC method" in message) or \
+                    ("Endpoint does not support RPC version" in message):
+                sys.exit(0)  # Call reached the service
+            else:
+                sys.stderr.write("Health probe unable to reach service")
+                sys.exit(1)  # return failure
+        except oslo_messaging.exceptions.MessagingTimeout:
+            sys.stderr.write("Health probe timed out. Agent is down or response "
+                             "timed out")
+            sys.exit(1)  # return failure
+        except Exception as ex:
+            message = getattr(ex, "message", str(ex))
+            sys.stderr.write("Health probe caught exception sending message to "
+                             "service: %s" % message)
+            sys.exit(0)
+        except:
+            sys.stderr.write("Health probe caught exception sending message to"
+                             " service")
+            sys.exit(0)
+
+        finally:
+            if transport:
+                transport.cleanup()
+
+
+    def tcp_socket_status(process, ports):
+        """Check the tcp socket status on a process"""
+        for p in psutil.process_iter():
+            try:
+                with p.oneshot():
+                    if process in " ".join(p.cmdline()):
+                        pcon = p.connections()
+                        for con in pcon:
+                            try:
+                                rport = con.raddr[1]
+                                status = con.status
+                            except IndexError:
+                                continue
+                            if rport in ports and status == tcp_established:
+                                return 1
+            except psutil.Error:
+                continue
+        return 0
+
+
+    def configured_port_in_conf():
+        """Get the rabbitmq/Database port configured in config file"""
+
+        rabbit_ports = set()
+        database_ports = set()
+
+        try:
+            transport_url = oslo_messaging.TransportURL.parse(cfg.CONF)
+            for host in transport_url.hosts:
+                rabbit_ports.add(host.port)
+        except Exception as ex:
+            message = getattr(ex, "message", str(ex))
+            sys.stderr.write("Health probe caught exception reading "
+                             "RabbitMQ ports: %s" % message)
+            sys.exit(0)  # return success
+
+        try:
+            with open(sys.argv[2]) as conf_file:
+                for line in conf_file:
+                    if re.match(r'^\s*connection\s*=', line):
+                        service = line.split(':', 3)[3].split('/')[1].rstrip('\n')
+                        if service == "nova":
+                            database_ports.add(
+                                int(line.split(':', 3)[3].split('/')[0]))
+        except IOError:
+            sys.stderr.write("Nova Config file not present")
+            sys.exit(1)
+
+        return rabbit_ports, database_ports
+
+
+    def test_tcp_socket(service):
+        """Check tcp socket to rabbitmq/db is in Established state"""
+        dict_services = {
+            "compute": "nova-compute",
+            "conductor": "nova-conductor",
+            "scheduler": "nova-scheduler"
+        }
+        r_ports, d_ports = configured_port_in_conf()
+
+        if service in dict_services:
+            proc = dict_services[service]
+            transport = oslo_messaging.TransportURL.parse(cfg.CONF)
+            if r_ports and tcp_socket_status(proc, r_ports) == 0:
+                sys.stderr.write("RabbitMQ socket not established for service "
+                                 "%s with transport %s" % (proc, transport))
+                # Do not kill the pod if RabbitMQ is not reachable/down
+                if not cfg.CONF.liveness_probe:
+                    sys.exit(1)
+
+            # let's do the db check
+            if service != "compute":
+                if d_ports and tcp_socket_status(proc, d_ports) == 0:
+                    sys.stderr.write("Database socket not established for service "
+                                     "%s with transport %s" % (proc, transport))
+                    # Do not kill the pod if database is not reachable/down
+                    # there could be no socket as well as typically connections
+                    # get closed after an idle timeout
+                    # Just log it to pod events
+                    if not cfg.CONF.liveness_probe:
+                        sys.exit(1)
+
+
+    def test_rpc_liveness():
+        """Test if service can consume message from queue"""
+        oslo_messaging.set_transport_defaults(control_exchange='nova')
+
+        rabbit_group = cfg.OptGroup(name='oslo_messaging_rabbit',
+                                    title='RabbitMQ options')
+        cfg.CONF.register_group(rabbit_group)
+        cfg.CONF.register_cli_opt(cfg.StrOpt('service-queue-name'))
+        cfg.CONF.register_cli_opt(cfg.BoolOpt('liveness-probe', default=False,
+                                              required=False))
+        cfg.CONF.register_cli_opt(cfg.BoolOpt('use-fqdn', default=False,
+                                              required=False))
+
+        cfg.CONF(sys.argv[1:])
+
+        log.logging.basicConfig(level=log.ERROR)
+
+        try:
+            transport = oslo_messaging.get_rpc_transport(cfg.CONF)
+        except Exception as ex:
+            message = getattr(ex, "message", str(ex))
+            sys.stderr.write("Message bus driver load error: %s" % message)
+            sys.exit(0)  # return success
+
+        if not cfg.CONF.transport_url or \
+                not cfg.CONF.service_queue_name:
+            sys.stderr.write("Both message bus URL and service's queue name are "
+                             "required for health probe to work")
+            sys.exit(0)  # return success
+
+        try:
+            cfg.CONF.set_override('rabbit_max_retries', 2,
+                                  group=rabbit_group)  # 3 attempts
+        except cfg.NoSuchOptError as ex:
+            cfg.CONF.register_opt(cfg.IntOpt('rabbit_max_retries', default=2),
+                                  group=rabbit_group)
+
+        service = cfg.CONF.service_queue_name
+        test_tcp_socket(service)
+
+        check_service_status(transport)
+
+    def check_pid_running(pid):
+        if psutil.pid_exists(int(pid)):
+           return True
+        else:
+           return False
+
+    if __name__ == "__main__":
+
+        if "liveness-probe" in ','.join(sys.argv):
+            pidfile = "/tmp/liveness.pid"  #nosec
+        else:
+            pidfile = "/tmp/readiness.pid"  #nosec
+        data = {}
+        if os.path.isfile(pidfile):
+            with open(pidfile,'r') as f:
+                file_content = f.read().strip()
+                if file_content:
+                    data = json.loads(file_content)
+
+        if 'pid' in data and check_pid_running(data['pid']):
+            if 'exit_count' in data and data['exit_count'] > 1:
+                # Third time in, kill the previous process
+                os.kill(int(data['pid']), signal.SIGTERM)
+            else:
+                data['exit_count'] = data.get('exit_count', 0) + 1
+                with open(pidfile, 'w') as f:
+                    json.dump(data, f)
+                sys.exit(0)
+        data['pid'] = os.getpid()
+        data['exit_count'] = 0
+        with open(pidfile, 'w') as f:
+            json.dump(data, f)
+
+        test_rpc_liveness()
+
+        sys.exit(0)  # return success
+  ks-endpoints.sh: |
+    #!/bin/bash
+
+    # Copyright 2017 Pete Birley
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    # http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    set -ex
+
+    # Get Service ID
+    OS_SERVICE_ID=$( openstack service list -f csv --quote none | \
+                      grep ",${OS_SERVICE_NAME},${OS_SERVICE_TYPE}$" | \
+                        sed -e "s/,${OS_SERVICE_NAME},${OS_SERVICE_TYPE}//g" )
+
+    # Get Endpoint ID if it exists
+    OS_ENDPOINT_ID=$( openstack endpoint list  -f csv --quote none | \
+                      grep "^[a-z0-9]*,${OS_REGION_NAME},${OS_SERVICE_NAME},${OS_SERVICE_TYPE},True,${OS_SVC_ENDPOINT}," | \
+                      awk -F ',' '{ print $1 }' )
+
+    # Making sure only a single endpoint exists for a service within a region
+    if [ "$(echo $OS_ENDPOINT_ID | wc -w)" -gt "1" ]; then
+      echo "More than one endpoint found, cleaning up"
+      for ENDPOINT_ID in $OS_ENDPOINT_ID; do
+        openstack endpoint delete ${ENDPOINT_ID}
+      done
+      unset OS_ENDPOINT_ID
+    fi
+
+    # Determine if Endpoint needs updated
+    if [[ ${OS_ENDPOINT_ID} ]]; then
+      OS_ENDPOINT_URL_CURRENT=$(openstack endpoint show ${OS_ENDPOINT_ID} -f value -c url)
+      if [ "${OS_ENDPOINT_URL_CURRENT}" == "${OS_SERVICE_ENDPOINT}" ]; then
+        echo "Endpoints Match: no action required"
+        OS_ENDPOINT_UPDATE="False"
+      else
+        echo "Endpoints Dont Match: removing existing entries"
+        openstack endpoint delete ${OS_ENDPOINT_ID}
+        OS_ENDPOINT_UPDATE="True"
+      fi
+    else
+      OS_ENDPOINT_UPDATE="True"
+    fi
+
+    # Update Endpoint if required
+    if [[ "${OS_ENDPOINT_UPDATE}" == "True" ]]; then
+      OS_ENDPOINT_ID=$( openstack endpoint create -f value -c id \
+        --region="${OS_REGION_NAME}" \
+        "${OS_SERVICE_ID}" \
+        ${OS_SVC_ENDPOINT} \
+        "${OS_SERVICE_ENDPOINT}" )
+    fi
+
+    # Display the Endpoint
+    openstack endpoint show ${OS_ENDPOINT_ID}
+  ks-service.sh: |
+    #!/bin/bash
+
+    # Copyright 2017 Pete Birley
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    # http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    set -ex
+
+    # Service boilerplate description
+    OS_SERVICE_DESC="${OS_REGION_NAME}: ${OS_SERVICE_NAME} (${OS_SERVICE_TYPE}) service"
+
+    # Get Service ID if it exists
+    unset OS_SERVICE_ID
+
+    # FIXME - There seems to be an issue once in a while where the
+    # openstack service list fails and encounters an error message such as:
+    #   Unable to establish connection to
+    #   https://keystone-api.openstack.svc.cluster.local:5000/v3/auth/tokens:
+    #   ('Connection aborted.', OSError("(104, 'ECONNRESET')",))
+    # During an upgrade scenario, this would cause the OS_SERVICE_ID to be blank
+    # and it would attempt to create a new service when it was not needed.
+    # This duplicate service would sometimes be used by other services such as
+    # Horizon and would give an 'Invalid Service Catalog' error.
+    # This loop allows for a 'retry' of the openstack service list in an
+    # attempt to get the service list as expected if it does encounter an error.
+    # This loop and recheck can be reverted once the underlying issue is addressed.
+
+    # If OS_SERVICE_ID is blank then wait a few seconds to give it
+    # additional time and try again
+    for i in $(seq 3)
+    do
+      OS_SERVICE_ID=$( openstack service list -f csv --quote none | \
+                       grep ",${OS_SERVICE_NAME},${OS_SERVICE_TYPE}$" | \
+                       sed -e "s/,${OS_SERVICE_NAME},${OS_SERVICE_TYPE}//g" )
+
+      # If the service was found, go ahead and exit successfully.
+      if [[ -n "${OS_SERVICE_ID}" ]]; then
+        exit 0
+      fi
+
+      sleep 2
+    done
+
+    # If we've reached this point and a Service ID was not found,
+    # then create the service
+    OS_SERVICE_ID=$(openstack service create -f value -c id \
+                    --name="${OS_SERVICE_NAME}" \
+                    --description "${OS_SERVICE_DESC}" \
+                    --enable \
+                    "${OS_SERVICE_TYPE}")
+  ks-user.sh: |
+    #!/bin/bash
+
+    # Copyright 2017 Pete Birley
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    # http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    set -ex
+
+    shopt -s nocasematch
+
+    if [[ "${SERVICE_OS_PROJECT_DOMAIN_NAME}" == "Default" ]]
+    then
+      PROJECT_DOMAIN_ID="default"
+    else
+      # Manage project domain
+      PROJECT_DOMAIN_ID=$(openstack domain create --or-show --enable -f value -c id \
+        --description="Domain for ${SERVICE_OS_REGION_NAME}/${SERVICE_OS_PROJECT_DOMAIN_NAME}" \
+        "${SERVICE_OS_PROJECT_DOMAIN_NAME}")
+    fi
+
+    if [[ "${SERVICE_OS_USER_DOMAIN_NAME}" == "Default" ]]
+    then
+      USER_DOMAIN_ID="default"
+    else
+      # Manage user domain
+      USER_DOMAIN_ID=$(openstack domain create --or-show --enable -f value -c id \
+        --description="Domain for ${SERVICE_OS_REGION_NAME}/${SERVICE_OS_USER_DOMAIN_NAME}" \
+        "${SERVICE_OS_USER_DOMAIN_NAME}")
+    fi
+
+    shopt -u nocasematch
+
+    # Manage user project
+    USER_PROJECT_DESC="Service Project for ${SERVICE_OS_REGION_NAME}/${SERVICE_OS_PROJECT_DOMAIN_NAME}"
+    USER_PROJECT_ID=$(openstack project create --or-show --enable -f value -c id \
+        --domain="${PROJECT_DOMAIN_ID}" \
+        --description="${USER_PROJECT_DESC}" \
+        "${SERVICE_OS_PROJECT_NAME}");
+
+    # Manage user
+    USER_DESC="Service User for ${SERVICE_OS_REGION_NAME}/${SERVICE_OS_USER_DOMAIN_NAME}/${SERVICE_OS_SERVICE_NAME}"
+    USER_ID=$(openstack user create --or-show --enable -f value -c id \
+        --domain="${USER_DOMAIN_ID}" \
+        --project-domain="${PROJECT_DOMAIN_ID}" \
+        --project="${USER_PROJECT_ID}" \
+        --description="${USER_DESC}" \
+        "${SERVICE_OS_USERNAME}");
+
+    # Manage user password (we do this in a separate step to ensure the password is updated if required)
+    set +x
+    echo "Setting user password via: openstack user set --password=xxxxxxx ${USER_ID}"
+    openstack user set --password="${SERVICE_OS_PASSWORD}" "${USER_ID}"
+    set -x
+
+    function ks_assign_user_role () {
+      if [[ "$SERVICE_OS_ROLE" == "admin" ]]
+      then
+        USER_ROLE_ID="$SERVICE_OS_ROLE"
+      else
+        USER_ROLE_ID=$(openstack role create --or-show -f value -c id "${SERVICE_OS_ROLE}");
+      fi
+
+      # Manage user role assignment
+      openstack role add \
+          --user="${USER_ID}" \
+          --user-domain="${USER_DOMAIN_ID}" \
+          --project-domain="${PROJECT_DOMAIN_ID}" \
+          --project="${USER_PROJECT_ID}" \
+          "${USER_ROLE_ID}"
+    }
+
+    # Manage user service role
+    IFS=','
+    for SERVICE_OS_ROLE in ${SERVICE_OS_ROLES}; do
+      ks_assign_user_role
+    done
+
+    # Manage user member role
+    : ${MEMBER_OS_ROLE:="member"}
+    export USER_ROLE_ID=$(openstack role create --or-show -f value -c id \
+        "${MEMBER_OS_ROLE}");
+    ks_assign_user_role
+  nova-api-metadata-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    metadata_ip=""
+    if [ -z "${metadata_ip}" ] ; then
+        metadata_ip=$(getent hosts metadata | awk '{print $1}')
+    fi
+
+    cat <<EOF>/tmp/pod-shared/nova-api-metadata.ini
+    [DEFAULT]
+    metadata_host=$metadata_ip
+    EOF
+  nova-api-metadata.sh: |
+    #!/bin/bash
+
+    set -ex
+    COMMAND="${@:-start}"
+
+    function start () {
+      exec uwsgi --ini /etc/nova/nova-metadata-uwsgi.ini
+    }
+
+    function stop () {
+      kill -TERM 1
+    }
+
+    $COMMAND
+  nova-api.sh: |
+    #!/bin/bash
+
+    set -ex
+    COMMAND="${@:-start}"
+
+    function start () {
+      exec uwsgi --ini /etc/nova/nova-api-uwsgi.ini
+    }
+
+    function stop () {
+      kill -TERM 1
+    }
+
+    $COMMAND
+  nova-compute-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    # Make the Nova Instances Dir as this is not autocreated.
+    mkdir -p /var/lib/nova/instances
+
+    # Set Ownership of nova dirs to the nova user
+    chown ${NOVA_USER_UID} /var/lib/nova /var/lib/nova/instances
+
+    migration_interface=""
+    if [[ -z $migration_interface ]]; then
+        # search for interface with default routing
+        # If there is not default gateway, exit
+        migration_network_cidr="0/0"
+        if [ -z "${migration_network_cidr}" ] ; then
+            migration_network_cidr="0/0"
+        fi
+        migration_interface=$(ip -4 route list ${migration_network_cidr} | awk -F 'dev' '{ print $2; exit }' | awk '{ print $1 }') || exit 1
+    fi
+
+    migration_address=$(ip a s $migration_interface | grep 'inet ' | awk '{print $2}' | awk -F "/" '{print $1}' | head -1)
+
+    if [ -z "${migration_address}" ] ; then
+      echo "Var live_migration_interface is empty"
+      exit 1
+    fi
+
+    tee > /tmp/pod-shared/nova-libvirt.conf << EOF
+    [libvirt]
+    live_migration_inbound_addr = $migration_address
+    EOF
+
+    hypervisor_interface=""
+    if [[ -z $hypervisor_interface ]]; then
+        # search for interface with default routing
+        # If there is not default gateway, exit
+        hypervisor_network_cidr="0/0"
+        if [ -z "${hypervisor_network_cidr}" ] ; then
+            hypervisor_network_cidr="0/0"
+        fi
+        hypervisor_interface=$(ip -4 route list ${hypervisor_network_cidr} | awk -F 'dev' '{ print $2; exit }' | awk '{ print $1 }') || exit 1
+    fi
+
+    hypervisor_address=$(ip a s $hypervisor_interface | grep 'inet ' | awk '{print $2}' | awk -F "/" '{print $1}' | head -1)
+
+    if [ -z "${hypervisor_address}" ] ; then
+      echo "Var my_ip is empty"
+      exit 1
+    fi
+
+    tee > /tmp/pod-shared/nova-hypervisor.conf << EOF
+    [DEFAULT]
+    my_ip  = $hypervisor_address
+    EOF
+    tee > /tmp/pod-shared/nova-compute-fqdn.conf << EOF
+    [DEFAULT]
+    host = $(hostname --fqdn)
+    EOF
+  nova-compute-ironic.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    exec nova-compute \
+          --config-file /etc/nova/nova-compute.conf \
+          --config-file /etc/nova/nova-ironic.conf \
+          --config-dir /etc/nova/nova.conf.d
+  nova-compute.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    exec nova-compute \
+          --config-file /etc/nova/nova.conf \
+          --config-file /tmp/pod-shared/nova-console.conf \
+          --config-file /tmp/pod-shared/nova-libvirt.conf \
+          --config-file /tmp/pod-shared/nova-compute-fqdn.conf \
+          --config-file /tmp/pod-shared/nova-hypervisor.conf \
+          --config-dir /etc/nova/nova.conf.d
+  nova-conductor.sh: |
+    #!/bin/bash
+
+    set -x
+    exec nova-conductor \
+          --config-file /etc/nova/nova.conf \
+          --config-dir /etc/nova/nova.conf.d
+  nova-console-compute-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    console_kind="none"
+
+    if [ "${console_kind}" == "novnc" ] ; then
+        client_address=""
+        client_interface=""
+        client_network_cidr="0/0"
+        listen_ip="0.0.0.0"
+    elif [ "${console_kind}" == "spice" ] ; then
+        client_address=""
+        client_interface=""
+        client_network_cidr="0/0"
+        listen_ip="0.0.0.0"
+    elif [ "${console_kind}" == "serial" ] ; then
+        client_address=""
+        client_interface=""
+        client_network_cidr="0/0"
+    fi
+
+    if [ -z "${client_address}" ] ; then
+        if [ -z "${client_interface}" ] ; then
+            if [ -z "${client_network_cidr}" ] ; then
+                client_network_cidr="0/0"
+            fi
+            client_interface=$(ip -4 route list ${client_network_cidr} | awk -F 'dev' '{ print $2; exit }' | awk '{ print $1 }') || exit 1
+        fi
+
+        # determine client ip dynamically based on interface provided
+        client_address=$(ip a s $client_interface | grep 'inet ' | awk '{print $2}' | awk -F "/" '{print $1}' | head -1)
+    fi
+
+    if [ -z "${listen_ip}" ] ; then
+        # The server component listens on all IP addresses and the proxy component
+        # only listens on the management interface IP address of the compute node.
+        listen_ip=0.0.0.0
+    fi
+
+    touch /tmp/pod-shared/nova-console.conf
+    if [ "${console_kind}" == "novnc" ] ; then
+      cat > /tmp/pod-shared/nova-console.conf <<EOF
+    [vnc]
+    server_proxyclient_address = $client_address
+    server_listen = $listen_ip
+    EOF
+    elif [ "${console_kind}" == "spice" ] ; then
+      cat > /tmp/pod-shared/nova-console.conf <<EOF
+    [spice]
+    server_proxyclient_address = $client_address
+    server_listen = $listen_ip
+    EOF
+    elif [ "${console_kind}" == "serial" ] ; then
+      cat > /tmp/pod-shared/nova-console.conf <<EOF
+    [serial_console]
+    proxyclient_address = $client_address
+    EOF
+    fi
+  nova-console-proxy-init-assets.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    console_kind="none"
+    if [ "${console_kind}" == "novnc" ] ; then
+        cp -vaRf /usr/share/novnc/* /tmp/usr/share/novnc/
+    elif [ "${console_kind}" == "spice" ] ; then
+        cp -vaRf /usr/share/spice-html5/* /tmp/usr/share/spice-html5/
+    fi
+  nova-console-proxy-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    console_kind="none"
+
+    if [ "${console_kind}" == "novnc" ] ; then
+        client_address=""
+        client_interface=""
+        client_network_cidr="0/0"
+        listen_ip="0.0.0.0"
+    elif [ "${console_kind}" == "spice" ] ; then
+        client_address=""
+        client_interface=""
+        client_network_cidr="0/0"
+        listen_ip="0.0.0.0"
+    elif [ "${console_kind}" == "serial" ] ; then
+        client_address=""
+        client_interface=""
+        client_network_cidr="0/0"
+    fi
+
+    if [ -z "${client_address}" ] ; then
+        if [ -z "${client_interface}" ] ; then
+            if [ -z "${client_network_cidr}" ] ; then
+                client_network_cidr="0/0"
+            fi
+            client_interface=$(ip -4 route list ${client_network_cidr} | awk -F 'dev' '{ print $2; exit }' | awk '{ print $1 }') || exit 1
+        fi
+
+        # determine client ip dynamically based on interface provided
+        client_address=$(ip a s $client_interface | grep 'inet ' | awk '{print $2}' | awk -F "/" '{print $1}' | head -1)
+    fi
+
+    if [ -z "${listen_ip}" ] ; then
+        listen_ip=$client_address
+    fi
+
+    if [ "${console_kind}" == "novnc" ] ; then
+    cat <<EOF>/tmp/pod-shared/nova-vnc.ini
+    [vnc]
+    server_proxyclient_address = $client_address
+    server_listen = $listen_ip
+    novncproxy_host = $listen_ip
+    EOF
+    elif [ "${console_kind}" == "spice" ] ; then
+    cat <<EOF>/tmp/pod-shared/nova-spice.ini
+    [spice]
+    server_proxyclient_address = $client_address
+    server_listen = $listen_ip
+    EOF
+    elif [ "${console_kind}" == "serial" ] ; then
+    cat <<EOF>/tmp/pod-shared/nova-serial.ini
+    [serial_console]
+    proxyclient_address = $client_address
+    EOF
+    fi
+  nova-console-proxy.sh: |
+    #!/bin/bash
+
+    set -x
+
+    console_kind="none"
+    if [ "${console_kind}" == "novnc" ] ; then
+        exec nova-novncproxy \
+            --config-file /etc/nova/nova.conf \
+            --config-file /tmp/pod-shared/nova-vnc.ini \
+            --config-dir /etc/nova/nova.conf.d
+    elif [ "${console_kind}" == "spice" ] ; then
+        exec nova-spicehtml5proxy\
+            --config-file /etc/nova/nova.conf \
+            --config-file /tmp/pod-shared/nova-spice.ini \
+            --config-dir /etc/nova/nova.conf.d
+    elif [ "${console_kind}" == "serial" ] ; then
+        exec nova-serialproxy\
+            --config-file /etc/nova/nova.conf \
+            --config-file /tmp/pod-shared/nova-serial.ini \
+            --config-dir /etc/nova/nova.conf.d
+    fi
+  nova-scheduler.sh: |
+    #!/bin/bash
+
+    set -xe
+
+    exec nova-scheduler \
+          --config-file /etc/nova/nova.conf \
+          --config-dir /etc/nova/nova.conf.d
+  nova-service-cleaner.sh: |
+    #!/bin/bash
+
+    set -xe
+
+    # If any non-compute service is down, then sleep for 2 times the report_interval
+    # to confirm service is still down.
+    DISABLED_SVC="$(openstack compute service list -f value | grep -v 'nova-compute' | grep 'down' || true)"
+    if [ ! -z "${DISABLED_SVC}" ]; then
+      sleep 60
+    fi
+
+    NOVA_SERVICES_TO_CLEAN="$(openstack compute service list -f value -c Binary | sort | uniq | grep -v '^nova-compute$')"
+    for NOVA_SERVICE in ${NOVA_SERVICES_TO_CLEAN}; do
+      DEAD_SERVICE_IDS=$(openstack compute service list --service ${NOVA_SERVICE} -f json | jq -r '.[] | select(.State == "down") | .ID')
+      for SERVICE_ID in ${DEAD_SERVICE_IDS}; do
+        openstack compute service delete "${SERVICE_ID}"
+      done
+    done
+  rabbit-init.sh: |
+    #!/bin/bash
+    set -e
+    # Extract connection details
+    RABBIT_HOSTNAME=$(echo "${RABBITMQ_ADMIN_CONNECTION}" | \
+      awk -F'[@]' '{print $2}' | \
+      awk -F'[:/]' '{print $1}')
+    RABBIT_PORT=$(echo "${RABBITMQ_ADMIN_CONNECTION}" | \
+      awk -F'[@]' '{print $2}' | \
+      awk -F'[:/]' '{print $2}')
+
+    # Extract Admin User credential
+    RABBITMQ_ADMIN_USERNAME=$(echo "${RABBITMQ_ADMIN_CONNECTION}" | \
+      awk -F'[@]' '{print $1}' | \
+      awk -F'[//:]' '{print $4}')
+    RABBITMQ_ADMIN_PASSWORD=$(echo "${RABBITMQ_ADMIN_CONNECTION}" | \
+      awk -F'[@]' '{print $1}' | \
+      awk -F'[//:]' '{print $5}' | \
+      sed 's/%/\\x/g' | \
+      xargs -0 printf "%b")
+
+    # Extract User credential
+    RABBITMQ_USERNAME=$(echo "${RABBITMQ_USER_CONNECTION}" | \
+      awk -F'[@]' '{print $1}' | \
+      awk -F'[//:]' '{print $4}')
+    RABBITMQ_PASSWORD=$(echo "${RABBITMQ_USER_CONNECTION}" | \
+      awk -F'[@]' '{print $1}' | \
+      awk -F'[//:]' '{print $5}' | \
+      sed 's/%/\\x/g' | \
+      xargs -0 printf "%b")
+
+    # Extract User vHost
+    RABBITMQ_VHOST=$(echo "${RABBITMQ_USER_CONNECTION}" | \
+      awk -F'[@]' '{print $2}' | \
+      awk -F'[:/]' '{print $3}')
+    # Resolve vHost to / if no value is set
+    RABBITMQ_VHOST="${RABBITMQ_VHOST:-/}"
+
+    function rabbitmqadmin_cli () {
+      if [ -n "$RABBITMQ_X509" ]
+      then
+        rabbitmqadmin \
+          --ssl \
+          --ssl-disable-hostname-verification \
+          --ssl-ca-cert-file="${USER_CERT_PATH}/ca.crt" \
+          --ssl-cert-file="${USER_CERT_PATH}/tls.crt" \
+          --ssl-key-file="${USER_CERT_PATH}/tls.key" \
+          --host="${RABBIT_HOSTNAME}" \
+          --port="${RABBIT_PORT}" \
+          --username="${RABBITMQ_ADMIN_USERNAME}" \
+          --password="${RABBITMQ_ADMIN_PASSWORD}" \
+          ${@}
+      else
+        rabbitmqadmin \
+          --host="${RABBIT_HOSTNAME}" \
+          --port="${RABBIT_PORT}" \
+          --username="${RABBITMQ_ADMIN_USERNAME}" \
+          --password="${RABBITMQ_ADMIN_PASSWORD}" \
+          ${@}
+      fi
+    }
+
+    echo "Managing: User: ${RABBITMQ_USERNAME}"
+    rabbitmqadmin_cli \
+      declare user \
+      name="${RABBITMQ_USERNAME}" \
+      password="${RABBITMQ_PASSWORD}" \
+      tags="user"
+
+    echo "Deleting Guest User"
+    rabbitmqadmin_cli \
+      delete user \
+      name="guest" || true
+
+    if [ "${RABBITMQ_VHOST}" != "/" ]
+    then
+      echo "Managing: vHost: ${RABBITMQ_VHOST}"
+      rabbitmqadmin_cli \
+        declare vhost \
+        name="${RABBITMQ_VHOST}"
+    else
+      echo "Skipping root vHost declaration: vHost: ${RABBITMQ_VHOST}"
+    fi
+
+    echo "Managing: Permissions: ${RABBITMQ_USERNAME} on ${RABBITMQ_VHOST}"
+    rabbitmqadmin_cli \
+      declare permission \
+      vhost="${RABBITMQ_VHOST}" \
+      user="${RABBITMQ_USERNAME}" \
+      configure=".*" \
+      write=".*" \
+      read=".*"
+
+    if [ ! -z "$RABBITMQ_AUXILIARY_CONFIGURATION" ]
+    then
+      echo "Applying additional configuration"
+      echo "${RABBITMQ_AUXILIARY_CONFIGURATION}" > /tmp/rmq_definitions.json
+      rabbitmqadmin_cli import /tmp/rmq_definitions.json
+    fi
+  rally-test.sh: "#!/bin/bash\nset -ex\n\n: \"${RALLY_ENV_NAME:=\"openstack-helm\"}\"\n:
+    \"${OS_INTERFACE:=\"public\"}\"\n: \"${RALLY_CLEANUP:=\"true\"}\"\n\nif [ \"x$RALLY_CLEANUP\"
+    == \"xtrue\" ]; then\n  function rally_cleanup {\n    openstack user delete \\\n
+    \       --domain=\"${SERVICE_OS_USER_DOMAIN_NAME}\" \\\n        \"${SERVICE_OS_USERNAME}\"\n
+    \   FLAVORS=$(openstack flavor list -f value --all | awk '$2 ~ /^s_rally_/ { print
+    $1 }')\n    if [ -n \"$FLAVORS\" ]; then\n      echo $FLAVORS | xargs openstack
+    flavor delete\n    fi\n    SERVERS=$(openstack server list -f value --all | awk
+    '$2 ~ /^s_rally_/ { print $1 }')\n    if [ -n \"$SERVERS\" ]; then\n      echo
+    $SERVERS | xargs openstack server delete\n    fi\n    IMAGES=$(openstack image
+    list -f value | awk '$2 ~ /^c_rally_/ { print $1 }')\n    if [ -n \"$IMAGES\"
+    ]; then\n      echo $IMAGES | xargs openstack image delete\n    fi\n    \n  }\n
+    \ trap rally_cleanup EXIT\nfi\n\nfunction create_or_update_db () {\n  revisionResults=$(rally
+    db revision)\n  if [ $revisionResults = \"None\"  ]\n  then\n    rally db create\n
+    \ else\n    rally db upgrade\n  fi\n}\n\ncreate_or_update_db\n\ncat > /tmp/rally-config.json
+    << EOF\n{\n    \"openstack\": {\n        \"auth_url\": \"${OS_AUTH_URL}\",\n        \"region_name\":
+    \"${OS_REGION_NAME}\",\n        \"endpoint_type\": \"${OS_INTERFACE}\",\n        \"admin\":
+    {\n            \"username\": \"${OS_USERNAME}\",\n            \"password\": \"${OS_PASSWORD}\",\n
+    \           \"user_domain_name\": \"${OS_USER_DOMAIN_NAME}\",\n            \"project_name\":
+    \"${OS_PROJECT_NAME}\",\n            \"project_domain_name\": \"${OS_PROJECT_DOMAIN_NAME}\"\n
+    \       },\n        \"users\": [\n            {\n                \"username\":
+    \"${SERVICE_OS_USERNAME}\",\n                \"password\": \"${SERVICE_OS_PASSWORD}\",\n
+    \               \"project_name\": \"${SERVICE_OS_PROJECT_NAME}\",\n                \"user_domain_name\":
+    \"${SERVICE_OS_USER_DOMAIN_NAME}\",\n                \"project_domain_name\":
+    \"${SERVICE_OS_PROJECT_DOMAIN_NAME}\"\n            }\n        ],\n        \"https_insecure\":
+    false,\n        \"https_cacert\": \"${OS_CACERT}\"\n    }\n}\nEOF\nrally deployment
+    create --file /tmp/rally-config.json --name \"${RALLY_ENV_NAME}\"\nrm -f /tmp/rally-config.json\nrally
+    deployment use \"${RALLY_ENV_NAME}\"\nrally deployment check\nrally task validate
+    /etc/rally/rally_tests.yaml\nrally task start /etc/rally/rally_tests.yaml\nrally
+    task sla-check\nrally env cleanup\nrally deployment destroy --deployment \"${RALLY_ENV_NAME}\"\n"
+  ssh-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    export NOVA_USERNAME=$(id -u ${NOVA_USER_UID} -n)
+    export NOVA_USER_HOME=$(eval echo ~${NOVA_USERNAME})
+
+    mkdir -p ${NOVA_USER_HOME}/.ssh
+
+    cat > ${NOVA_USER_HOME}/.ssh/config <<EOF
+    Host *
+      StrictHostKeyChecking no
+      UserKnownHostsFile /dev/null
+      port $SSH_PORT
+      IdentitiesOnly yes
+    EOF
+
+    cp /tmp/nova-ssh/* ${NOVA_USER_HOME}/.ssh/
+    chmod 600 ${NOVA_USER_HOME}/.ssh/id_rsa
+    chown -R ${NOVA_USERNAME}:${NOVA_USERNAME} ${NOVA_USER_HOME}/.ssh
+  ssh-start.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    IFS=','
+    for KEY_TYPE in $KEY_TYPES; do
+        KEY_PATH=/etc/ssh/ssh_host_${KEY_TYPE}_key
+        if [[ ! -f "${KEY_PATH}" ]]; then
+            ssh-keygen -q -t ${KEY_TYPE} -f ${KEY_PATH} -N ""
+        fi
+    done
+    IFS=''
+
+    subnet_address="0.0.0.0/0"
+
+    if [ -z "${subnet_address}" ] ; then
+        subnet_address="0.0.0.0/0"
+    fi
+    listen_interface=$(ip -4 route list ${subnet_address} | awk -F 'dev' '{ print $2; exit }' | awk '{ print $1 }') || exit 1
+    listen_address=$(ip a s $listen_interface | grep 'inet ' | awk '{print $2}' | awk -F "/" '{print $1}' | head -1)
+
+    cat > /tmp/sshd_config_extend <<EOF
+    ListenAddress $listen_address
+    PasswordAuthentication no
+    Match Address $subnet_address
+        PermitRootLogin without-password
+    EOF
+    cat /tmp/sshd_config_extend >> /etc/ssh/sshd_config
+
+    rm /tmp/sshd_config_extend
+
+    mkdir -p /run/sshd
+
+    exec /usr/sbin/sshd -D -e -o Port=$SSH_PORT
+  storage-init.sh: |
+    #!/bin/bash
+
+    set -x
+    if [ "x$STORAGE_BACKEND" == "xrbd" ]; then
+      SECRET=$(mktemp --suffix .yaml)
+      KEYRING=$(mktemp --suffix .keyring)
+      function cleanup {
+          rm -f ${SECRET} ${KEYRING}
+      }
+      trap cleanup EXIT
+    fi
+
+    set -ex
+    if [ "x$STORAGE_BACKEND" == "xrbd" ]; then
+      ceph -s
+      function ensure_pool () {
+        ceph osd pool stats $1 || ceph osd pool create $1 $2
+        if [[ $(ceph mgr versions | awk '/version/{print $3}' | cut -d. -f1) -ge 12 ]]; then
+            ceph osd pool application enable $1 $3
+        fi
+        size_protection=$(ceph osd pool get $1 nosizechange | cut -f2 -d: | tr -d '[:space:]')
+        ceph osd pool set $1 nosizechange 0
+        ceph osd pool set $1 size ${RBD_POOL_REPLICATION}
+        ceph osd pool set $1 nosizechange ${size_protection}
+        ceph osd pool set $1 crush_rule "${RBD_POOL_CRUSH_RULE}"
+      }
+      ensure_pool ${RBD_POOL_NAME} ${RBD_POOL_CHUNK_SIZE} ${RBD_POOL_APP_NAME}
+    fi
+  wait-for-computes-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    # This runs in a bootstrap init container. It counts the number of compute nodes.
+    COMPUTE_NODES=$(kubectl get nodes -o custom-columns=NAME:.metadata.name -l openstack-compute-node=enabled --no-headers | sort)
+    /bin/echo $COMPUTE_NODES > /tmp/compute_nodes.txt
+kind: ConfigMap
+metadata:
+  name: nova-bin

@@ -65,6 +65,31 @@ dependencies:
         - glance-ks-endpoints
 
 pod:
+  mounts:
+    glance_db_sync:
+      glance_db_sync:
+        volumeMounts:
+          - name: glance-etc-snippets
+            mountPath: /etc/glance/glance.conf.d/
+            readOnly: true
+        volumes:
+          - name: glance-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: glance-ks-etc
+    glance_api:
+      glance_api:
+        volumeMounts:
+          - name: glance-etc-snippets
+            mountPath: /etc/glance/glance.conf.d/
+            readOnly: true
+        volumes:
+          - name: glance-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: glance-ks-etc
   lifecycle:
     disruption_budget:
       api:
@@ -109,8 +134,13 @@ manifests:
   job_image_repo_sync: false
   pod_rally_test: false
   secret_db: false
-  secret_keystone: true
   service_ingress_api: false
+  # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
+  # Kubernetes section generation in OpenStack Helm, because we want those
+  # to be generated indirectly via ESO as configured in keystoneServiceUsers.enabled
+  # that is later consumed via components/openstack helm chart
+  secret_keystone: false
+  secret_ks_etc: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm

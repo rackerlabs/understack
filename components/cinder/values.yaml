@@ -62,16 +62,94 @@ pod:
         volumeMounts:
           - mountPath: /var/lib/cinder
             name: var-lib-cinder
-          - mountPath: /etc/cinder/cinder.conf.d/netapp_nvme.conf
-            subPath: netapp_nvme.conf
-            name: volume-backend
+          - name: cinder-etc-snippets
+            mountPath: /etc/cinder/cinder.conf.d/
             readOnly: true
         volumes:
           - name: var-lib-cinder
             emptyDir: {}
-          - name: volume-backend
-            secret:
-              secretName: cinder-netapp-config
+          - name: cinder-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: cinder-ks-etc
+                - secret:
+                    name: volume-backend
+                    items:
+                      - key: netapp_nvme.conf
+                        path: netapp_nvme.conf
+    cinder_volume_usage_audit:
+      cinder_volume_usage_audit:
+        volumeMounts:
+          - name: cinder-etc-snippets
+            mountPath: /etc/cinder/cinder.conf.d/
+            readOnly: true
+        volumes:
+          - name: cinder-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: cinder-ks-etc
+    cinder_db_sync:
+      cinder_db_sync:
+        volumeMounts:
+          - name: cinder-etc-snippets
+            mountPath: /etc/cinder/cinder.conf.d/
+            readOnly: true
+        volumes:
+          - name: cinder-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: cinder-ks-etc
+    cinder_backup:
+      cinder_backup:
+        volumeMounts:
+          - name: cinder-etc-snippets
+            mountPath: /etc/cinder/cinder.conf.d/
+            readOnly: true
+        volumes:
+          - name: cinder-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: cinder-ks-etc
+    cinder_scheduler:
+      cinder_scheduler:
+        volumeMounts:
+          - name: cinder-etc-snippets
+            mountPath: /etc/cinder/cinder.conf.d/
+            readOnly: true
+        volumes:
+          - name: cinder-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: cinder-ks-etc
+    cinder_db_purge:
+      cinder_db_purge:
+        volumeMounts:
+          - name: cinder-etc-snippets
+            mountPath: /etc/cinder/cinder.conf.d/
+            readOnly: true
+        volumes:
+          - name: cinder-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: cinder-ks-etc
+    cinder_api:
+      cinder_api:
+        volumeMounts:
+          - name: cinder-etc-snippets
+            mountPath: /etc/cinder/cinder.conf.d/
+            readOnly: true
+        volumes:
+          - name: cinder-etc-snippets
+            projected:
+              sources:
+                - secret:
+                    name: cinder-ks-etc
   lifecycle:
     disruption_budget:
       deployments:
@@ -126,7 +204,6 @@ dependencies:
         - cinder-ks-endpoints
 
 manifests:
-  secret_keystone: true
   job_backup_storage_init: false
   job_bootstrap: false
   job_clean: false
@@ -141,6 +218,16 @@ manifests:
   secret_registry: false
   service_ingress_api: false
   deployment_backup: false
+  # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
+  # Kubernetes section generation in OpenStack Helm, because we want those
+  # to be generated indirectly via ESO as configured in keystoneServiceUsers.enabled
+  # that is later consumed via components/openstack helm chart
+  secret_keystone: false
+  secret_ks_etc: false
+  # less than ideal but currently necessary due to the way the chart
+  # hardcodes the config-file flag which then causes oslo.config to prefer
+  # that data over the directory which we want to override
+  configmap_bin: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm

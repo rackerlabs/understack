@@ -1,0 +1,1860 @@
+apiVersion: v1
+data:
+  db-drop.py: |
+    #!/usr/bin/env python
+
+    # Drops db and user for an OpenStack Service:
+    # Set ROOT_DB_CONNECTION and DB_CONNECTION environment variables to contain
+    # SQLAlchemy strings for the root connection to the database and the one you
+    # wish the service to use. Alternatively, you can use an ini formatted config
+    # at the location specified by OPENSTACK_CONFIG_FILE, and extract the string
+    # from the key OPENSTACK_CONFIG_DB_KEY, in the section specified by
+    # OPENSTACK_CONFIG_DB_SECTION.
+
+    import os
+    import sys
+    try:
+        import ConfigParser
+        PARSER_OPTS = {}
+    except ImportError:
+        import configparser as ConfigParser
+        PARSER_OPTS = {"strict": False}
+    import logging
+    from sqlalchemy import create_engine
+    from sqlalchemy import text
+
+    # Create logger, console handler and formatter
+    logger = logging.getLogger('OpenStack-Helm DB Drop')
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # Set the formatter and add the handler
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+
+    # Get the connection string for the service db root user
+    if "ROOT_DB_CONNECTION" in os.environ:
+        db_connection = os.environ['ROOT_DB_CONNECTION']
+        logger.info('Got DB root connection')
+    else:
+        logger.critical('environment variable ROOT_DB_CONNECTION not set')
+        sys.exit(1)
+
+    mysql_x509 = os.getenv('MARIADB_X509', "")
+    ssl_args = {}
+    if mysql_x509:
+        ssl_args = {'ssl': {'ca': '/etc/mysql/certs/ca.crt',
+                            'key': '/etc/mysql/certs/tls.key',
+                            'cert': '/etc/mysql/certs/tls.crt'}}
+
+    # Get the connection string for the service db
+    if "OPENSTACK_CONFIG_FILE" in os.environ:
+        os_conf = os.environ['OPENSTACK_CONFIG_FILE']
+        if "OPENSTACK_CONFIG_DB_SECTION" in os.environ:
+            os_conf_section = os.environ['OPENSTACK_CONFIG_DB_SECTION']
+        else:
+            logger.critical('environment variable OPENSTACK_CONFIG_DB_SECTION not set')
+            sys.exit(1)
+        if "OPENSTACK_CONFIG_DB_KEY" in os.environ:
+            os_conf_key = os.environ['OPENSTACK_CONFIG_DB_KEY']
+        else:
+            logger.critical('environment variable OPENSTACK_CONFIG_DB_KEY not set')
+            sys.exit(1)
+        try:
+            config = ConfigParser.RawConfigParser(**PARSER_OPTS)
+            logger.info("Using {0} as db config source".format(os_conf))
+            config.read(os_conf)
+            logger.info("Trying to load db config from {0}:{1}".format(
+                os_conf_section, os_conf_key))
+            user_db_conn = config.get(os_conf_section, os_conf_key)
+            logger.info("Got config from {0}".format(os_conf))
+        except:
+            logger.critical("Tried to load config from {0} but failed.".format(os_conf))
+            raise
+    elif "DB_CONNECTION" in os.environ:
+        user_db_conn = os.environ['DB_CONNECTION']
+        logger.info('Got config from DB_CONNECTION env var')
+    else:
+        logger.critical('Could not get db config, either from config file or env var')
+        sys.exit(1)
+
+    # Root DB engine
+    try:
+        root_engine_full = create_engine(db_connection)
+        root_user = root_engine_full.url.username
+        root_password = root_engine_full.url.password
+        drivername = root_engine_full.url.drivername
+        host = root_engine_full.url.host
+        port = root_engine_full.url.port
+        root_engine_url = ''.join([drivername, '://', root_user, ':', root_password, '@', host, ':', str (port)])
+        root_engine = create_engine(root_engine_url, connect_args=ssl_args)
+        connection = root_engine.connect()
+        connection.close()
+        logger.info("Tested connection to DB @ {0}:{1} as {2}".format(
+            host, port, root_user))
+    except:
+        logger.critical('Could not connect to database as root user')
+        raise
+
+    # User DB engine
+    try:
+        user_engine = create_engine(user_db_conn, connect_args=ssl_args)
+        # Get our user data out of the user_engine
+        database = user_engine.url.database
+        user = user_engine.url.username
+        password = user_engine.url.password
+        logger.info('Got user db config')
+    except:
+        logger.critical('Could not get user database config')
+        raise
+
+    # Delete DB
+    try:
+        with root_engine.connect() as connection:
+            connection.execute(text("DROP DATABASE IF EXISTS {0}".format(database)))
+            try:
+                connection.commit()
+            except AttributeError:
+                pass
+        logger.info("Deleted database {0}".format(database))
+    except:
+        logger.critical("Could not drop database {0}".format(database))
+        raise
+
+    # Delete DB User
+    try:
+        with root_engine.connect() as connection:
+            connection.execute(text("DROP USER IF EXISTS {0}".format(user)))
+            try:
+                connection.commit()
+            except AttributeError:
+                pass
+        logger.info("Deleted user {0}".format(user))
+    except:
+        logger.critical("Could not delete user {0}".format(user))
+        raise
+
+    logger.info('Finished DB Management')
+  db-init.py: |
+    #!/usr/bin/env python
+
+    # Creates db and user for an OpenStack Service:
+    # Set ROOT_DB_CONNECTION and DB_CONNECTION environment variables to contain
+    # SQLAlchemy strings for the root connection to the database and the one you
+    # wish the service to use. Alternatively, you can use an ini formatted config
+    # at the location specified by OPENSTACK_CONFIG_FILE, and extract the string
+    # from the key OPENSTACK_CONFIG_DB_KEY, in the section specified by
+    # OPENSTACK_CONFIG_DB_SECTION.
+
+    import os
+    import sys
+    try:
+        import ConfigParser
+        PARSER_OPTS = {}
+    except ImportError:
+        import configparser as ConfigParser
+        PARSER_OPTS = {"strict": False}
+    import logging
+    from sqlalchemy import create_engine
+    from sqlalchemy import text
+
+    # Create logger, console handler and formatter
+    logger = logging.getLogger('OpenStack-Helm DB Init')
+    logger.setLevel(logging.DEBUG)
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+    # Set the formatter and add the handler
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+
+    # Get the connection string for the service db root user
+    if "ROOT_DB_CONNECTION" in os.environ:
+        db_connection = os.environ['ROOT_DB_CONNECTION']
+        logger.info('Got DB root connection')
+    else:
+        logger.critical('environment variable ROOT_DB_CONNECTION not set')
+        sys.exit(1)
+
+    mysql_x509 = os.getenv('MARIADB_X509', "")
+    ssl_args = {}
+    if mysql_x509:
+        ssl_args = {'ssl': {'ca': '/etc/mysql/certs/ca.crt',
+                    'key': '/etc/mysql/certs/tls.key',
+                    'cert': '/etc/mysql/certs/tls.crt'}}
+
+    # Get the connection string for the service db
+    if "OPENSTACK_CONFIG_FILE" in os.environ:
+        os_conf = os.environ['OPENSTACK_CONFIG_FILE']
+        if "OPENSTACK_CONFIG_DB_SECTION" in os.environ:
+            os_conf_section = os.environ['OPENSTACK_CONFIG_DB_SECTION']
+        else:
+            logger.critical('environment variable OPENSTACK_CONFIG_DB_SECTION not set')
+            sys.exit(1)
+        if "OPENSTACK_CONFIG_DB_KEY" in os.environ:
+            os_conf_key = os.environ['OPENSTACK_CONFIG_DB_KEY']
+        else:
+            logger.critical('environment variable OPENSTACK_CONFIG_DB_KEY not set')
+            sys.exit(1)
+        try:
+            config = ConfigParser.RawConfigParser(**PARSER_OPTS)
+            logger.info("Using {0} as db config source".format(os_conf))
+            config.read(os_conf)
+            logger.info("Trying to load db config from {0}:{1}".format(
+                os_conf_section, os_conf_key))
+            user_db_conn = config.get(os_conf_section, os_conf_key)
+            logger.info("Got config from {0}".format(os_conf))
+        except:
+            logger.critical("Tried to load config from {0} but failed.".format(os_conf))
+            raise
+    elif "DB_CONNECTION" in os.environ:
+        user_db_conn = os.environ['DB_CONNECTION']
+        logger.info('Got config from DB_CONNECTION env var')
+    else:
+        logger.critical('Could not get db config, either from config file or env var')
+        sys.exit(1)
+
+    # Root DB engine
+    try:
+        root_engine_full = create_engine(db_connection)
+        root_user = root_engine_full.url.username
+        root_password = root_engine_full.url.password
+        drivername = root_engine_full.url.drivername
+        host = root_engine_full.url.host
+        port = root_engine_full.url.port
+        root_engine_url = ''.join([drivername, '://', root_user, ':', root_password, '@', host, ':', str (port)])
+        root_engine = create_engine(root_engine_url, connect_args=ssl_args)
+        connection = root_engine.connect()
+        connection.close()
+        logger.info("Tested connection to DB @ {0}:{1} as {2}".format(
+            host, port, root_user))
+    except:
+        logger.critical('Could not connect to database as root user')
+        raise
+
+    # User DB engine
+    try:
+        user_engine = create_engine(user_db_conn, connect_args=ssl_args)
+        # Get our user data out of the user_engine
+        database = user_engine.url.database
+        user = user_engine.url.username
+        password = user_engine.url.password
+        logger.info('Got user db config')
+    except:
+        logger.critical('Could not get user database config')
+        raise
+
+    # Create DB
+    try:
+        with root_engine.connect() as connection:
+            connection.execute(text("CREATE DATABASE IF NOT EXISTS {0}".format(database)))
+            try:
+                connection.commit()
+            except AttributeError:
+                pass
+        logger.info("Created database {0}".format(database))
+    except:
+        logger.critical("Could not create database {0}".format(database))
+        raise
+
+    # Create DB User
+    try:
+        with root_engine.connect() as connection:
+            connection.execute(
+                text("CREATE USER IF NOT EXISTS \'{0}\'@\'%\' IDENTIFIED BY \'{1}\' {2}".format(
+                    user, password, mysql_x509)))
+            connection.execute(
+                text("GRANT ALL ON `{0}`.* TO \'{1}\'@\'%\'".format(database, user)))
+            try:
+                connection.commit()
+            except AttributeError:
+                pass
+        logger.info("Created user {0} for {1}".format(user, database))
+    except:
+        logger.critical("Could not create user {0} for {1}".format(user, database))
+        raise
+
+    # Test connection
+    try:
+        connection = user_engine.connect()
+        connection.close()
+        logger.info("Tested connection to DB @ {0}:{1}/{2} as {3}".format(
+            host, port, database, user))
+    except:
+        logger.critical('Could not connect to database as user')
+        raise
+
+    logger.info('Finished DB Management')
+  db-sync.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    neutron-db-manage \
+      --config-file /etc/neutron/neutron.conf \
+      --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+      --config-dir /etc/neutron/neutron.conf.d \
+      upgrade head
+  health-probe.py: |
+    #!/usr/bin/env python
+
+    """
+    Health probe script for OpenStack agents that uses RPC/unix domain socket for
+    communication. Sends message to agent through rpc call method and expects a
+    reply. It is expected to receive a failure from the agent's RPC server as the
+    method does not exist.
+
+    Script returns failure to Kubernetes only when
+      a. agent is not reachable or
+      b. agent times out sending a reply.
+
+    sys.stderr.write() writes to pod's events on failures.
+
+    Usage example for Neutron L3 agent:
+    # python health-probe.py --config-file /etc/neutron/neutron.conf \
+    #  --config-file /etc/neutron/l3_agent.ini --agent-queue-name l3_agent
+
+    Usage example for Neutron metadata agent:
+    # python health-probe.py --config-file /etc/neutron/neutron.conf \
+    #  --config-file /etc/neutron/metadata_agent.ini
+    """
+
+    import httplib2
+    from http import client as httplib
+    import json
+    import os
+    import psutil
+    import signal
+    import socket
+    import sys
+
+    from oslo_config import cfg
+    from oslo_context import context
+    from oslo_log import log
+    import oslo_messaging
+
+    rpc_timeout = int(os.getenv('RPC_PROBE_TIMEOUT', '60'))
+    rpc_retries = int(os.getenv('RPC_PROBE_RETRIES', '2'))
+    rabbit_port = 5672
+    tcp_established = "ESTABLISHED"
+    log.logging.basicConfig(level=log.ERROR)
+
+
+    def _get_hostname(use_fqdn):
+        if use_fqdn:
+            return socket.getfqdn()
+        return socket.gethostname()
+
+    def check_agent_status(transport):
+        """Verify agent status. Return success if agent consumes message"""
+        try:
+            use_fqdn = cfg.CONF.use_fqdn
+            target = oslo_messaging.Target(
+                topic=cfg.CONF.agent_queue_name,
+                server=_get_hostname(use_fqdn))
+            if hasattr(oslo_messaging, 'get_rpc_client'):
+                client = oslo_messaging.get_rpc_client(transport, target,
+                                                       timeout=rpc_timeout,
+                                                       retry=rpc_retries)
+            else:
+                client = oslo_messaging.RPCClient(transport, target,
+                                                  timeout=rpc_timeout,
+                                                  retry=rpc_retries)
+            client.call(context.RequestContext(),
+                        'pod_health_probe_method_ignore_errors')
+        except oslo_messaging.exceptions.MessageDeliveryFailure:
+            # Log to pod events
+            sys.stderr.write("Health probe unable to reach message bus")
+            sys.exit(0)  # return success
+        except oslo_messaging.rpc.client.RemoteError as re:
+            message = getattr(re, "message", str(re))
+            if ("Endpoint does not support RPC method" in message) or \
+                    ("Endpoint does not support RPC version" in message):
+                sys.exit(0)  # Call reached the agent
+            else:
+                sys.stderr.write("Health probe unable to reach agent")
+                sys.exit(1)  # return failure
+        except oslo_messaging.exceptions.MessagingTimeout:
+            sys.stderr.write("Health probe timed out. Agent is down or response "
+                             "timed out")
+            sys.exit(1)  # return failure
+        except Exception as ex:
+            message = getattr(ex, "message", str(ex))
+            sys.stderr.write("Health probe caught exception sending message to "
+                             "agent: %s" % message)
+            sys.exit(0)
+        except:
+            sys.stderr.write("Health probe caught exception sending message to"
+                             " agent")
+            sys.exit(0)
+
+        finally:
+            if transport:
+                transport.cleanup()
+
+
+    def sriov_readiness_check():
+        """Checks the sriov configuration on the sriov nic's"""
+        return_status = 1
+        with open('/etc/neutron/plugins/ml2/sriov_agent.ini') as nic:
+            for phy in nic:
+                if "physical_device_mappings" in phy:
+                    phy_dev = phy.split('=', 1)[1]
+                    phy_dev1 = phy_dev.rstrip().split(',')
+                    if not phy_dev1:
+                        sys.stderr.write("No Physical devices"
+                                         " configured as SRIOV NICs")
+                        sys.exit(1)
+                    for intf in phy_dev1:
+                        phy, dev = intf.split(':')
+                        try:
+                            with open('/sys/class/net/%s/device/'
+                                      'sriov_numvfs' % dev) as f:
+                                for line in f:
+                                    numvfs = line.rstrip('\n')
+                                    if numvfs:
+                                        return_status = 0
+                        except IOError:
+                            sys.stderr.write("IOError:No sriov_numvfs config file")
+        sys.exit(return_status)
+
+
+    def get_rabbitmq_ports():
+        "Get RabbitMQ ports"
+
+        rabbitmq_ports = set()
+
+        try:
+            transport_url = oslo_messaging.TransportURL.parse(cfg.CONF)
+            for host in transport_url.hosts:
+                rabbitmq_ports.add(host.port)
+        except Exception as ex:
+            message = getattr(ex, "message", str(ex))
+            sys.stderr.write("Health probe caught exception reading "
+                             "RabbitMQ ports: %s" % message)
+            sys.exit(0)  # return success
+
+        return rabbitmq_ports
+
+
+    def tcp_socket_state_check(agentq):
+        """Check if the tcp socket to rabbitmq is in Established state"""
+        rabbit_sock_count = 0
+        parentId = 0
+        if agentq == "l3_agent":
+            proc = "neutron-l3-agen"
+        elif agentq == "dhcp_agent":
+            proc = "neutron-dhcp-ag"
+        elif agentq == "q-agent-notifier-tunnel-update":
+            proc = "neutron-openvsw"
+        else:
+            proc = "neutron-metadat"
+
+        rabbitmq_ports = get_rabbitmq_ports()
+
+        for p in psutil.process_iter():
+            try:
+                with p.oneshot():
+                    if proc in " ".join(p.cmdline()):
+                        if parentId == 0:
+                            parentId = p.pid
+                        else:
+                            if p.ppid() == parentId:
+                                continue
+                        pcon = p.connections()
+                        for con in pcon:
+                            try:
+                                port = con.raddr[1]
+                                status = con.status
+                            except IndexError:
+                                continue
+                            if port in rabbitmq_ports and\
+                                    status == tcp_established:
+                                rabbit_sock_count = rabbit_sock_count + 1
+            except psutil.Error:
+                continue
+
+        if rabbit_sock_count == 0:
+            sys.stderr.write("RabbitMQ sockets not Established")
+            # Do not kill the pod if RabbitMQ is not reachable/down
+            if not cfg.CONF.liveness_probe:
+                sys.exit(1)
+
+
+    class UnixDomainHTTPConnection(httplib.HTTPConnection):
+        """Connection class for HTTP over UNIX domain socket."""
+
+        def __init__(self, host, port=None, strict=None, timeout=None,
+                     proxy_info=None):
+            httplib.HTTPConnection.__init__(self, host, port, strict)
+            self.timeout = timeout
+            self.socket_path = cfg.CONF.metadata_proxy_socket
+
+        def connect(self):
+            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            if self.timeout:
+                self.sock.settimeout(self.timeout)
+            self.sock.connect(self.socket_path)
+
+
+    def test_socket_liveness():
+        """Test if agent can respond to message over the socket"""
+        cfg.CONF.register_cli_opt(cfg.BoolOpt('liveness-probe', default=False,
+                                              required=False))
+        cfg.CONF.register_cli_opt(cfg.BoolOpt('use-fqdn', default=False,
+                                              required=False))
+        cfg.CONF(sys.argv[1:])
+
+        try:
+            metadata_proxy_socket = cfg.CONF.metadata_proxy_socket
+        except cfg.NoSuchOptError:
+            cfg.CONF.register_opt(cfg.StrOpt(
+                'metadata_proxy_socket',
+                default='/var/lib/neutron/openstack-helm/metadata_proxy'))
+
+        headers = {'X-Forwarded-For': '169.254.169.254',
+                   'X-Neutron-Router-ID': 'pod-health-probe-check-ignore-errors'}
+
+        h = httplib2.Http(timeout=30)
+
+        try:
+            resp, content = h.request(
+                'http://169.254.169.254',
+                method='GET',
+                headers=headers,
+                connection_type=UnixDomainHTTPConnection)
+        except socket.error as se:
+            msg = "Socket error: Health probe failed to connect to " \
+                  "Neutron Metadata agent: "
+            if se.strerror:
+                sys.stderr.write(msg + se.strerror)
+            else:
+                sys.stderr.write(msg + getattr(se, "message"))
+            sys.exit(1)  # return failure
+        except Exception as ex:
+            message = getattr(ex, "message", str(ex))
+            sys.stderr.write("Health probe caught exception sending message to "
+                             "Neutron Metadata agent: %s" % message)
+            sys.exit(0)  # return success
+
+        if resp.status >= 500:  # Probe expects HTTP error code 404
+            msg = "Health probe failed: Neutron Metadata agent failed to" \
+                  " process request: "
+            sys.stderr.write(msg + str(resp.__dict__))
+            sys.exit(1)  # return failure
+
+
+    def test_rpc_liveness():
+        """Test if agent can consume message from queue"""
+        oslo_messaging.set_transport_defaults(control_exchange='neutron')
+
+        rabbit_group = cfg.OptGroup(name='oslo_messaging_rabbit',
+                                    title='RabbitMQ options')
+        cfg.CONF.register_group(rabbit_group)
+        cfg.CONF.register_cli_opt(cfg.StrOpt('agent-queue-name'))
+        cfg.CONF.register_cli_opt(cfg.BoolOpt('liveness-probe', default=False,
+                                              required=False))
+        cfg.CONF.register_cli_opt(cfg.BoolOpt('use-fqdn', default=False,
+                                              required=False))
+
+        cfg.CONF(sys.argv[1:])
+
+        try:
+            transport = oslo_messaging.get_rpc_transport(cfg.CONF)
+        except Exception as ex:
+            message = getattr(ex, "message", str(ex))
+            sys.stderr.write("Message bus driver load error: %s" % message)
+            sys.exit(0)  # return success
+
+        if not cfg.CONF.transport_url or \
+                not cfg.CONF.agent_queue_name:
+            sys.stderr.write("Both message bus URL and agent queue name are "
+                             "required for Health probe to work")
+            sys.exit(0)  # return success
+
+        try:
+            cfg.CONF.set_override('rabbit_max_retries', 2,
+                                  group=rabbit_group)  # 3 attempts
+        except cfg.NoSuchOptError as ex:
+            cfg.CONF.register_opt(cfg.IntOpt('rabbit_max_retries', default=2),
+                                  group=rabbit_group)
+
+        agentq = cfg.CONF.agent_queue_name
+        tcp_socket_state_check(agentq)
+
+        check_agent_status(transport)
+
+    def check_pid_running(pid):
+        if psutil.pid_exists(int(pid)):
+           return True
+        else:
+           return False
+
+    if __name__ == "__main__":
+
+        if "liveness-probe" in ','.join(sys.argv):
+            pidfile = "/tmp/liveness.pid"  #nosec
+        else:
+            pidfile = "/tmp/readiness.pid"  #nosec
+        data = {}
+        if os.path.isfile(pidfile):
+            with open(pidfile,'r') as f:
+                file_content = f.read().strip()
+                if file_content:
+                    data = json.loads(file_content)
+
+        if 'pid' in data and check_pid_running(data['pid']):
+            if 'exit_count' in data and data['exit_count'] > 1:
+                # Third time in, kill the previous process
+                os.kill(int(data['pid']), signal.SIGTERM)
+            else:
+                data['exit_count'] = data.get('exit_count', 0) + 1
+                with open(pidfile, 'w') as f:
+                    json.dump(data, f)
+                sys.exit(0)
+
+        data['pid'] = os.getpid()
+        data['exit_count'] = 0
+        with open(pidfile, 'w') as f:
+            json.dump(data, f)
+
+        if "sriov_agent.ini" in ','.join(sys.argv):
+            sriov_readiness_check()
+        elif "metadata_agent.ini" not in ','.join(sys.argv):
+            test_rpc_liveness()
+        else:
+            test_socket_liveness()
+
+        sys.exit(0)  # return success
+  ks-endpoints.sh: |
+    #!/bin/bash
+
+    # Copyright 2017 Pete Birley
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    # http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    set -ex
+
+    # Get Service ID
+    OS_SERVICE_ID=$( openstack service list -f csv --quote none | \
+                      grep ",${OS_SERVICE_NAME},${OS_SERVICE_TYPE}$" | \
+                        sed -e "s/,${OS_SERVICE_NAME},${OS_SERVICE_TYPE}//g" )
+
+    # Get Endpoint ID if it exists
+    OS_ENDPOINT_ID=$( openstack endpoint list  -f csv --quote none | \
+                      grep "^[a-z0-9]*,${OS_REGION_NAME},${OS_SERVICE_NAME},${OS_SERVICE_TYPE},True,${OS_SVC_ENDPOINT}," | \
+                      awk -F ',' '{ print $1 }' )
+
+    # Making sure only a single endpoint exists for a service within a region
+    if [ "$(echo $OS_ENDPOINT_ID | wc -w)" -gt "1" ]; then
+      echo "More than one endpoint found, cleaning up"
+      for ENDPOINT_ID in $OS_ENDPOINT_ID; do
+        openstack endpoint delete ${ENDPOINT_ID}
+      done
+      unset OS_ENDPOINT_ID
+    fi
+
+    # Determine if Endpoint needs updated
+    if [[ ${OS_ENDPOINT_ID} ]]; then
+      OS_ENDPOINT_URL_CURRENT=$(openstack endpoint show ${OS_ENDPOINT_ID} -f value -c url)
+      if [ "${OS_ENDPOINT_URL_CURRENT}" == "${OS_SERVICE_ENDPOINT}" ]; then
+        echo "Endpoints Match: no action required"
+        OS_ENDPOINT_UPDATE="False"
+      else
+        echo "Endpoints Dont Match: removing existing entries"
+        openstack endpoint delete ${OS_ENDPOINT_ID}
+        OS_ENDPOINT_UPDATE="True"
+      fi
+    else
+      OS_ENDPOINT_UPDATE="True"
+    fi
+
+    # Update Endpoint if required
+    if [[ "${OS_ENDPOINT_UPDATE}" == "True" ]]; then
+      OS_ENDPOINT_ID=$( openstack endpoint create -f value -c id \
+        --region="${OS_REGION_NAME}" \
+        "${OS_SERVICE_ID}" \
+        ${OS_SVC_ENDPOINT} \
+        "${OS_SERVICE_ENDPOINT}" )
+    fi
+
+    # Display the Endpoint
+    openstack endpoint show ${OS_ENDPOINT_ID}
+  ks-service.sh: |
+    #!/bin/bash
+
+    # Copyright 2017 Pete Birley
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    # http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    set -ex
+
+    # Service boilerplate description
+    OS_SERVICE_DESC="${OS_REGION_NAME}: ${OS_SERVICE_NAME} (${OS_SERVICE_TYPE}) service"
+
+    # Get Service ID if it exists
+    unset OS_SERVICE_ID
+
+    # FIXME - There seems to be an issue once in a while where the
+    # openstack service list fails and encounters an error message such as:
+    #   Unable to establish connection to
+    #   https://keystone-api.openstack.svc.cluster.local:5000/v3/auth/tokens:
+    #   ('Connection aborted.', OSError("(104, 'ECONNRESET')",))
+    # During an upgrade scenario, this would cause the OS_SERVICE_ID to be blank
+    # and it would attempt to create a new service when it was not needed.
+    # This duplicate service would sometimes be used by other services such as
+    # Horizon and would give an 'Invalid Service Catalog' error.
+    # This loop allows for a 'retry' of the openstack service list in an
+    # attempt to get the service list as expected if it does encounter an error.
+    # This loop and recheck can be reverted once the underlying issue is addressed.
+
+    # If OS_SERVICE_ID is blank then wait a few seconds to give it
+    # additional time and try again
+    for i in $(seq 3)
+    do
+      OS_SERVICE_ID=$( openstack service list -f csv --quote none | \
+                       grep ",${OS_SERVICE_NAME},${OS_SERVICE_TYPE}$" | \
+                       sed -e "s/,${OS_SERVICE_NAME},${OS_SERVICE_TYPE}//g" )
+
+      # If the service was found, go ahead and exit successfully.
+      if [[ -n "${OS_SERVICE_ID}" ]]; then
+        exit 0
+      fi
+
+      sleep 2
+    done
+
+    # If we've reached this point and a Service ID was not found,
+    # then create the service
+    OS_SERVICE_ID=$(openstack service create -f value -c id \
+                    --name="${OS_SERVICE_NAME}" \
+                    --description "${OS_SERVICE_DESC}" \
+                    --enable \
+                    "${OS_SERVICE_TYPE}")
+  ks-user.sh: |
+    #!/bin/bash
+
+    # Copyright 2017 Pete Birley
+    #
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    # http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    set -ex
+
+    shopt -s nocasematch
+
+    if [[ "${SERVICE_OS_PROJECT_DOMAIN_NAME}" == "Default" ]]
+    then
+      PROJECT_DOMAIN_ID="default"
+    else
+      # Manage project domain
+      PROJECT_DOMAIN_ID=$(openstack domain create --or-show --enable -f value -c id \
+        --description="Domain for ${SERVICE_OS_REGION_NAME}/${SERVICE_OS_PROJECT_DOMAIN_NAME}" \
+        "${SERVICE_OS_PROJECT_DOMAIN_NAME}")
+    fi
+
+    if [[ "${SERVICE_OS_USER_DOMAIN_NAME}" == "Default" ]]
+    then
+      USER_DOMAIN_ID="default"
+    else
+      # Manage user domain
+      USER_DOMAIN_ID=$(openstack domain create --or-show --enable -f value -c id \
+        --description="Domain for ${SERVICE_OS_REGION_NAME}/${SERVICE_OS_USER_DOMAIN_NAME}" \
+        "${SERVICE_OS_USER_DOMAIN_NAME}")
+    fi
+
+    shopt -u nocasematch
+
+    # Manage user project
+    USER_PROJECT_DESC="Service Project for ${SERVICE_OS_REGION_NAME}/${SERVICE_OS_PROJECT_DOMAIN_NAME}"
+    USER_PROJECT_ID=$(openstack project create --or-show --enable -f value -c id \
+        --domain="${PROJECT_DOMAIN_ID}" \
+        --description="${USER_PROJECT_DESC}" \
+        "${SERVICE_OS_PROJECT_NAME}");
+
+    # Manage user
+    USER_DESC="Service User for ${SERVICE_OS_REGION_NAME}/${SERVICE_OS_USER_DOMAIN_NAME}/${SERVICE_OS_SERVICE_NAME}"
+    USER_ID=$(openstack user create --or-show --enable -f value -c id \
+        --domain="${USER_DOMAIN_ID}" \
+        --project-domain="${PROJECT_DOMAIN_ID}" \
+        --project="${USER_PROJECT_ID}" \
+        --description="${USER_DESC}" \
+        "${SERVICE_OS_USERNAME}");
+
+    # Manage user password (we do this in a separate step to ensure the password is updated if required)
+    set +x
+    echo "Setting user password via: openstack user set --password=xxxxxxx ${USER_ID}"
+    openstack user set --password="${SERVICE_OS_PASSWORD}" "${USER_ID}"
+    set -x
+
+    function ks_assign_user_role () {
+      if [[ "$SERVICE_OS_ROLE" == "admin" ]]
+      then
+        USER_ROLE_ID="$SERVICE_OS_ROLE"
+      else
+        USER_ROLE_ID=$(openstack role create --or-show -f value -c id "${SERVICE_OS_ROLE}");
+      fi
+
+      # Manage user role assignment
+      openstack role add \
+          --user="${USER_ID}" \
+          --user-domain="${USER_DOMAIN_ID}" \
+          --project-domain="${PROJECT_DOMAIN_ID}" \
+          --project="${USER_PROJECT_ID}" \
+          "${USER_ROLE_ID}"
+    }
+
+    # Manage user service role
+    IFS=','
+    for SERVICE_OS_ROLE in ${SERVICE_OS_ROLES}; do
+      ks_assign_user_role
+    done
+
+    # Manage user member role
+    : ${MEMBER_OS_ROLE:="member"}
+    export USER_ROLE_ID=$(openstack role create --or-show -f value -c id \
+        "${MEMBER_OS_ROLE}");
+    ks_assign_user_role
+  neutron-bagpipe-bgp-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    # handle any bridge mappings
+    for bmap in `sed 's/[{}"]//g' /tmp/auto_bridge_add | tr "," "\n"`; do
+      bridge=${bmap%:*}
+      iface=${bmap#*:}
+    done
+  neutron-bagpipe-bgp.sh: |
+    #!/bin/bash
+
+    set -x
+    exec bagpipe-bgp
+  neutron-bgp-dragent.sh: |
+    #!/bin/bash
+
+    set -x
+    exec neutron-bgp-dragent \
+          --config-file /etc/neutron/neutron.conf \
+          --config-file /etc/neutron/bgp_dragent.ini \
+          --config-dir /etc/neutron/neutron.conf.d \
+          --debug
+  neutron-dhcp-agent-init.sh: |
+    #!/bin/bash
+
+    set -ex
+  neutron-dhcp-agent.sh: |
+    #!/bin/bash
+
+    set -x
+    exec neutron-dhcp-agent \
+      --config-file /etc/neutron/neutron.conf \
+      --config-file /tmp/pod-shared/ovn.ini \
+      --config-file /etc/neutron/dhcp_agent.ini \
+      --config-dir /etc/neutron/neutron.conf.d
+  neutron-ironic-agent-init.sh: |
+    #!/bin/bash
+
+    set -ex
+  neutron-ironic-agent.sh: |
+    #!/bin/bash
+
+    set -ex
+    COMMAND="${@:-start}"
+
+    function start () {
+      exec ironic-neutron-agent \
+            --config-file /etc/neutron/neutron.conf \
+            --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+            --config-dir /etc/neutron/neutron.conf.d
+    }
+
+    function stop () {
+      kill -TERM 1
+    }
+
+    $COMMAND
+  neutron-l2gw-agent.sh: |
+    #!/bin/bash
+
+    set -x
+    exec neutron-l2gateway-agent \
+          --config-file=/etc/neutron/neutron.conf \
+          --config-file=/etc/neutron/l2gw_agent.ini \
+          --config-dir /etc/neutron/neutron.conf.d
+
+  neutron-l3-agent-init.sh: |
+    #!/bin/bash
+
+    set -ex
+  neutron-l3-agent.sh: |
+    #!/bin/bash
+
+    set -x
+
+    exec neutron-l3-agent \
+          --config-file /etc/neutron/neutron.conf \
+          --config-file /etc/neutron/l3_agent.ini \
+          --config-dir /etc/neutron/neutron.conf.d
+  neutron-linuxbridge-agent-init-modules.sh: |
+    #!/bin/bash
+
+    set -ex
+    chroot /mnt/host-rootfs modprobe bridge
+    chroot /mnt/host-rootfs modprobe ip6_tables
+    chroot /mnt/host-rootfs modprobe ebtables
+  neutron-linuxbridge-agent-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    # configure all bridge mappings defined in config
+    # /tmp/auto_bridge_add is one line json file: {"br-ex1":"eth1","br-ex2":"eth2"}
+    for bmap in `sed 's/[{}"]//g' /tmp/auto_bridge_add | tr "," "\n"`
+    do
+      bridge=${bmap%:*}
+      iface=${bmap#*:}
+      # adding existing bridge would break out the script when -e is set
+      set +e
+      ip link add name $bridge type bridge
+      set -e
+      ip link set dev $bridge up
+      if [ -n "$iface" ] && [ "$iface" != "null" ]
+      then
+        ip link set dev $iface  master $bridge
+      fi
+    done
+
+    tunnel_interface=""
+    if [ -z "${tunnel_interface}" ] ; then
+        # search for interface with tunnel network routing
+        tunnel_network_cidr="0/0"
+        if [ -z "${tunnel_network_cidr}" ] ; then
+            tunnel_network_cidr="0/0"
+        fi
+        # If there is not tunnel network gateway, exit
+        tunnel_interface=$(ip -4 route list ${tunnel_network_cidr} | awk -F 'dev' '{ print $2; exit }' \
+            | awk '{ print $1 }') || exit 1
+    fi
+
+    # determine local-ip dynamically based on interface provided but only if tunnel_types is not null
+    LOCAL_IP=$(ip a s $tunnel_interface | grep 'inet ' | awk '{print $2}' | awk -F "/" 'NR==1 {print $1}')
+    if [ -z "${LOCAL_IP}" ] ; then
+      echo "Var LOCAL_IP is empty"
+      exit 1
+    fi
+
+    tee > /tmp/pod-shared/ml2-local-ip.ini << EOF
+    [vxlan]
+    local_ip = "${LOCAL_IP}"
+    EOF
+  neutron-linuxbridge-agent.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    exec neutron-linuxbridge-agent \
+      --config-file /etc/neutron/neutron.conf \
+      --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+      --config-file /tmp/pod-shared/ml2-local-ip.ini \
+      --config-file /etc/neutron/plugins/ml2/linuxbridge_agent.ini \
+      --config-dir /etc/neutron/neutron.conf.d
+  neutron-metadata-agent-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    chown ${NEUTRON_USER_UID} /var/lib/neutron/openstack-helm
+    chown ${NEUTRON_USER_UID} /run/openvswitch/db.sock
+  neutron-netns-cleanup-cron.sh: |
+    #!/bin/bash
+
+    set -xe
+
+    # Run "neutron-netns-cleanup" every 5 minutes
+    while sleep 300; do
+        neutron-netns-cleanup \
+            --config-file /etc/neutron/neutron.conf \
+            --config-file /etc/neutron/dhcp_agent.ini \
+            --config-file /etc/neutron/l3_agent.ini \
+            --config-dir /etc/neutron/neutron.conf.d
+    done
+  neutron-openvswitch-agent-init-modules.sh: |
+    #!/bin/bash
+
+    set -ex
+    chroot /mnt/host-rootfs modprobe ip6_tables
+  neutron-openvswitch-agent-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    OVS_SOCKET=/run/openvswitch/db.sock
+    chown neutron: ${OVS_SOCKET}
+
+    # This enables the usage of 'ovs-appctl' from neutron pod.
+    OVS_PID=$(cat /run/openvswitch/ovs-vswitchd.pid)
+    OVS_CTL=/run/openvswitch/ovs-vswitchd.${OVS_PID}.ctl
+    chown neutron: ${OVS_CTL}
+
+    function get_dpdk_config_value {
+      values=${@:1:$#-1}
+      filter=${!#}
+      value=$(echo ${values} | jq -r ${filter})
+      if [[ "${value}" == "null" ]]; then
+        echo ""
+      else
+        echo "${value}"
+      fi
+    }
+
+
+    DPDK_CONFIG_FILE=/tmp/dpdk.conf
+    DPDK_CONFIG=""
+    DPDK_ENABLED=false
+    if [ -f ${DPDK_CONFIG_FILE} ]; then
+      DPDK_CONFIG=$(cat ${DPDK_CONFIG_FILE})
+      if [[ $(get_dpdk_config_value ${DPDK_CONFIG} '.enabled') == "true" ]]; then
+        DPDK_ENABLED=true
+      fi
+    fi
+
+    function bind_nic {
+      echo $2 > /sys/bus/pci/devices/$1/driver_override
+      echo $1 > /sys/bus/pci/drivers/$2/bind
+    }
+
+    function unbind_nic {
+      echo $1 > /sys/bus/pci/drivers/$2/unbind
+      echo > /sys/bus/pci/devices/$1/driver_override
+    }
+
+    function get_name_by_pci_id {
+      path=$(find /sys/bus/pci/devices/$1/ -name net)
+      if [ -n "${path}" ] ; then
+        echo $(ls -1 $path/)
+      fi
+    }
+
+    function get_ip_address_from_interface {
+      local interface=$1
+      local ip=$(ip -4 -o addr s "${interface}" | awk '{ print $4; exit }' | awk -F '/' 'NR==1 {print $1}')
+      if [ -z "${ip}" ] ; then
+        exit 1
+      fi
+      echo ${ip}
+    }
+
+    function get_ip_prefix_from_interface {
+      local interface=$1
+      local prefix=$(ip -4 -o addr s "${interface}" | awk '{ print $4; exit }' | awk -F '/' 'NR==1 {print $2}')
+      if [ -z "${prefix}" ] ; then
+        exit 1
+      fi
+      echo ${prefix}
+    }
+
+    function migrate_ip {
+      pci_id=$1
+      bridge_name=$2
+
+      local src_nic=$(get_name_by_pci_id ${pci_id})
+      if [ -n "${src_nic}" ] ; then
+        bridge_exists=$(ip a s "${bridge_name}" | grep "${bridge_name}" | cut -f2 -d':' 2> /dev/null)
+        if [ -z "${bridge_exists}" ] ; then
+          echo "Bridge "${bridge_name}" does not exist. Creating it on demand."
+          init_ovs_dpdk_bridge "${bridge_name}"
+        fi
+
+        migrate_ip_from_nic ${src_nic} ${bridge_name}
+      fi
+    }
+
+    function migrate_ip_from_nic {
+      src_nic=$1
+      bridge_name=$2
+
+      # Enabling explicit error handling: We must avoid to lose the IP
+      # address in the migration process. Hence, on every error, we
+      # attempt to assign the IP back to the original NIC and exit.
+      set +e
+
+      ip=$(get_ip_address_from_interface ${src_nic})
+      prefix=$(get_ip_prefix_from_interface ${src_nic})
+
+      bridge_ip=$(get_ip_address_from_interface "${bridge_name}")
+      bridge_prefix=$(get_ip_prefix_from_interface "${bridge_name}")
+
+      ip link set ${bridge_name} up
+
+      if [[ -n "${ip}" && -n "${prefix}" ]]; then
+        ip addr flush dev ${src_nic}
+        if [ $? -ne 0 ] ; then
+          ip addr add ${ip}/${prefix} dev ${src_nic}
+          echo "Error while flushing IP from ${src_nic}."
+          exit 1
+        fi
+
+        ip addr add ${ip}/${prefix} dev "${bridge_name}"
+        if [ $? -ne 0 ] ; then
+          echo "Error assigning IP to bridge "${bridge_name}"."
+          ip addr add ${ip}/${prefix} dev ${src_nic}
+          exit 1
+        fi
+      elif [[ -n "${bridge_ip}" && -n "${bridge_prefix}" ]]; then
+        echo "Bridge '${bridge_name}' already has IP assigned. Keeping the same:: IP:[${bridge_ip}]; Prefix:[${bridge_prefix}]..."
+      elif [[ -z "${bridge_ip}" && -z "${ip}" ]]; then
+        echo "Interface and bridge have no ips configured. Leaving as is."
+      else
+        echo "Interface ${name} has invalid IP address. IP:[${ip}]; Prefix:[${prefix}]..."
+        exit 1
+      fi
+
+      set -e
+    }
+
+    function get_pf_or_vf_pci {
+      dpdk_pci_id=${1}
+      vf_index=${2}
+
+      if [ -n "$vf_index" ]
+      then
+        iface=$(get_name_by_pci_id "${dpdk_pci_id}")
+        sysfs_numvfs_path="/sys/class/net/${iface}/device/sriov_numvfs"
+        if [[ -f /sys/class/net/${iface}/device/sriov_numvfs &&
+              "$(cat /sys/class/net/${iface}/device/sriov_numvfs)" -ne "0" &&
+              -e /sys/class/net/${iface}/device/virtfn${vf_index} ]]
+        then
+          dpdk_pci_id=$(ls -la /sys/class/net/${iface}/device/virtfn${vf_index})
+          dpdk_pci_id=${dpdk_pci_id#*"../"}
+        else
+          echo "Error fetching the VF PCI for PF: ["${iface}", "${dpdk_pci_id}"] and VF-Index: ${vf_index}."
+          exit 1
+        fi
+      fi
+    }
+
+    function bind_dpdk_nic {
+      target_driver=${1}
+      pci_id=${2}
+
+      current_driver="$(get_driver_by_address "${pci_id}" )"
+      if [ "$current_driver" != "$target_driver" ]; then
+        if [ "$current_driver" != "" ]; then
+          unbind_nic "${pci_id}" ${current_driver}
+        fi
+        bind_nic "${pci_id}" ${target_driver}
+      fi
+    }
+
+    function ensure_vf_state {
+      iface=${1}
+      vf_string=${2}
+      check_string=${3}
+      expected=${4}
+
+      # wait for the vf really get the needed state
+      for i in 0 1 2 4 8 16 32; do
+        sleep ${i};
+        if [ "$(ip link show ${iface} | grep "${vf_string} " | grep -Eo "${check_string}")" == "${expected}" ]; then
+          break;
+        fi;
+      done
+    }
+
+    function process_dpdk_nics {
+      target_driver=$(get_dpdk_config_value ${DPDK_CONFIG} '.driver')
+      # loop over all nics
+      echo $DPDK_CONFIG | jq -r -c '.nics[]' | \
+      while IFS= read -r nic; do
+        local port_name=$(get_dpdk_config_value ${nic} '.name')
+        local pci_id=$(get_dpdk_config_value ${nic} '.pci_id')
+        local iface=$(get_dpdk_config_value ${nic} '.iface')
+        if [ -n ${iface} ] && [ -z ${pci_id} ]; then
+          local pci_id=$(get_address_by_nicname ${iface})
+        else
+          iface=$(get_name_by_pci_id "${pci_id}")
+        fi
+        local bridge=$(get_dpdk_config_value ${nic} '.bridge')
+        local vf_index=$(get_dpdk_config_value ${nic} '.vf_index')
+
+        if [[ $(get_dpdk_config_value ${nic} '.migrate_ip') == true ]] ; then
+          migrate_ip "${pci_id}" "${bridge}"
+        fi
+
+        if [ -n "${iface}" ]; then
+          ip link set ${iface} promisc on
+          if [ -n "${vf_index}" ]; then
+            vf_string="vf ${vf_index}"
+            ip link set ${iface} ${vf_string} trust on
+            ensure_vf_state "${iface}" "${vf_string}" "trust o(n|ff)" "trust on"
+
+            # NOTE: To ensure proper toggle of spoofchk,
+            # turn it on then off.
+            ip link set ${iface} ${vf_string} spoofchk on
+            ensure_vf_state "${iface}" "${vf_string}" "spoof checking o(n|ff)" "spoof checking on"
+            ip link set ${iface} ${vf_string} spoofchk off
+            ensure_vf_state "${iface}" "${vf_string}" "spoof checking o(n|ff)" "spoof checking off"
+          fi
+        fi
+
+        # Fetch the PCI to be bound to DPDK driver.
+        # In case VF Index is configured then PCI of that particular VF
+        # is bound to DPDK, otherwise PF PCI is bound to DPDK.
+        get_pf_or_vf_pci "${pci_id}" "${vf_index}"
+
+        bind_dpdk_nic ${target_driver} "${dpdk_pci_id}"
+
+        dpdk_options=""
+        ofport_request=$(get_dpdk_config_value ${nic} '.ofport_request')
+        if [ -n "${ofport_request}" ]; then
+          dpdk_options+='ofport_request=${ofport_request} '
+        fi
+        n_rxq=$(get_dpdk_config_value ${nic} '.n_rxq')
+        if [ -n "${n_rxq}" ]; then
+          dpdk_options+='options:n_rxq=${n_rxq} '
+        fi
+        n_txq=$(get_dpdk_config_value ${nic} '.n_txq')
+        if [ -n "${n_txq}" ]; then
+          dpdk_options+='options:n_txq=${n_txq} '
+        fi
+        pmd_rxq_affinity=$(get_dpdk_config_value ${nic} '.pmd_rxq_affinity')
+        if [ -n "${pmd_rxq_affinity}" ]; then
+          dpdk_options+='other_config:pmd-rxq-affinity=${pmd_rxq_affinity} '
+        fi
+        mtu=$(get_dpdk_config_value ${nic} '.mtu')
+        if [ -n "${mtu}" ]; then
+          dpdk_options+='mtu_request=${mtu} '
+        fi
+        n_rxq_size=$(get_dpdk_config_value ${nic} '.n_rxq_size')
+        if [ -n "${n_rxq_size}" ]; then
+          dpdk_options+='options:n_rxq_desc=${n_rxq_size} '
+        fi
+        n_txq_size=$(get_dpdk_config_value ${nic} '.n_txq_size')
+        if [ -n "${n_txq_size}" ]; then
+          dpdk_options+='options:n_txq_desc=${n_txq_size} '
+        fi
+        vhost_iommu_support=$(get_dpdk_config_value ${nic} '.vhost-iommu-support')
+        if [ -n "${vhost_iommu_support}" ]; then
+          dpdk_options+='options:vhost-iommu-support=${vhost_iommu_support} '
+        fi
+
+        ovs-vsctl --db=unix:${OVS_SOCKET} --may-exist add-port ${bridge} ${port_name} \
+           -- set Interface ${port_name} type=dpdk options:dpdk-devargs=${pci_id} ${dpdk_options}
+
+      done
+    }
+
+    function process_dpdk_bonds {
+      target_driver=$(get_dpdk_config_value ${DPDK_CONFIG} '.driver')
+      # loop over all bonds
+      echo $DPDK_CONFIG | jq -r -c '.bonds[]' > /tmp/bonds_array
+      while IFS= read -r bond; do
+        local bond_name=$(get_dpdk_config_value ${bond} '.name')
+        local dpdk_bridge=$(get_dpdk_config_value ${bond} '.bridge')
+        local migrate_ip=$(get_dpdk_config_value ${bond} '.migrate_ip')
+        local mtu=$(get_dpdk_config_value ${bond} '.mtu')
+        local n_rxq=$(get_dpdk_config_value ${bond} '.n_rxq')
+        local n_txq=$(get_dpdk_config_value ${bond} '.n_txq')
+        local ofport_request=$(get_dpdk_config_value ${bond} '.ofport_request')
+        local n_rxq_size=$(get_dpdk_config_value ${bond} '.n_rxq_size')
+        local n_txq_size=$(get_dpdk_config_value ${bond} '.n_txq_size')
+        local vhost_iommu_support=$(get_dpdk_config_value ${bond} '.vhost-iommu-support')
+        local ovs_options=$(get_dpdk_config_value ${bond} '.ovs_options')
+
+        local nic_name_str=""
+        local dev_args_str=""
+        local ip_migrated=false
+
+        echo $bond | jq -r -c '.nics[]' > /tmp/nics_array
+        while IFS= read -r nic; do
+          local pci_id=$(get_dpdk_config_value ${nic} '.pci_id')
+          local iface=$(get_dpdk_config_value ${nic} '.iface')
+          if [ -n ${iface} ] && [ -z ${pci_id} ]; then
+            local pci_id=$(get_address_by_nicname ${iface})
+          else
+            iface=$(get_name_by_pci_id "${pci_id}")
+          fi
+          local nic_name=$(get_dpdk_config_value ${nic} '.name')
+          local pmd_rxq_affinity=$(get_dpdk_config_value ${nic} '.pmd_rxq_affinity')
+          local vf_index=$(get_dpdk_config_value ${nic} '.vf_index')
+          local vf_string=""
+
+          if [[ ${migrate_ip} = "true" && ${ip_migrated} = "false" ]]; then
+            migrate_ip "${pci_id}" "${dpdk_bridge}"
+            ip_migrated=true
+          fi
+
+          if [ -n "${iface}" ]; then
+            ip link set ${iface} promisc on
+            if [ -n "${vf_index}" ]; then
+              vf_string="vf ${vf_index}"
+              ip link set ${iface} ${vf_string} trust on
+              ensure_vf_state "${iface}" "${vf_string}" "trust o(n|ff)" "trust on"
+
+              # NOTE: To ensure proper toggle of spoofchk,
+              # turn it on then off.
+              ip link set ${iface} ${vf_string} spoofchk on
+              ensure_vf_state "${iface}" "${vf_string}" "spoof checking o(n|ff)" "spoof checking on"
+              ip link set ${iface} ${vf_string} spoofchk off
+              ensure_vf_state "${iface}" "${vf_string}" "spoof checking o(n|ff)" "spoof checking off"
+            fi
+          fi
+
+          # Fetch the PCI to be bound to DPDK driver.
+          # In case VF Index is configured then PCI of that particular VF
+          # is bound to DPDK, otherwise PF PCI is bound to DPDK.
+          get_pf_or_vf_pci "${pci_id}" "${vf_index}"
+
+          bind_dpdk_nic ${target_driver} "${dpdk_pci_id}"
+
+          nic_name_str+=" "${nic_name}""
+          dev_args_str+=" -- set Interface "${nic_name}" type=dpdk options:dpdk-devargs=""${dpdk_pci_id}"
+
+          if [[ -n ${mtu} ]]; then
+            dev_args_str+=" -- set Interface "${nic_name}" mtu_request=${mtu}"
+          fi
+
+          if [[ -n ${n_rxq} ]]; then
+            dev_args_str+=" -- set Interface "${nic_name}" options:n_rxq=${n_rxq}"
+          fi
+
+          if [[ -n ${n_txq} ]]; then
+            dev_args_str+=" -- set Interface "${nic_name}" options:n_txq=${n_txq}"
+          fi
+
+          if [[ -n ${ofport_request} ]]; then
+            dev_args_str+=" -- set Interface "${nic_name}" ofport_request=${ofport_request}"
+          fi
+
+          if [[ -n ${pmd_rxq_affinity} ]]; then
+            dev_args_str+=" -- set Interface "${nic_name}" other_config:pmd-rxq-affinity=${pmd_rxq_affinity}"
+          fi
+
+          if [[ -n ${n_rxq_size} ]]; then
+            dev_args_str+=" -- set Interface "${nic_name}" options:n_rxq_desc=${n_rxq_size}"
+          fi
+
+          if [[ -n ${n_txq_size} ]]; then
+            dev_args_str+=" -- set Interface "${nic_name}" options:n_txq_desc=${n_txq_size}"
+          fi
+
+          if [[ -n ${vhost_iommu_support} ]]; then
+            dev_args_str+=" -- set Interface "${nic_name}" options:vhost-iommu-support=${vhost_iommu_support}"
+          fi
+        done < /tmp/nics_array
+
+        if [ "${UPDATE_DPDK_BOND_CONFIG}" == "true" ]; then
+          echo -e "NOTE: UPDATE_DPDK_BOND_CONFIG is set to true.\
+          \nThis might cause disruptions in ovs traffic.\
+          \nTo avoid this disruption set UPDATE_DPDK_BOND_CONFIG to false."
+          ovs-vsctl --db=unix:${OVS_SOCKET} set Bridge "${dpdk_bridge}" other_config:update_config=true
+          ovs_update_config=true
+        else
+          ovs_update_config=$(ovs-vsctl --columns=other_config --no-heading -d json list bridge "${dpdk_bridge}" \
+            | jq -r '.[1][] as $list | if $list[0] == "update_config" then $list[1] else empty end')
+        fi
+
+
+        if [ "${ovs_update_config}" == "true" ] || [ "${ovs_update_config}" == "" ];
+        then
+          ovs-vsctl --db=unix:${OVS_SOCKET} --if-exists del-port "${bond_name}"
+          ovs-vsctl --db=unix:${OVS_SOCKET} set Bridge "${dpdk_bridge}" other_config:update_config=false
+          ovs-vsctl --db=unix:${OVS_SOCKET} --may-exist add-bond "${dpdk_bridge}" "${bond_name}" \
+            ${nic_name_str} \
+            ${ovs_options} ${dev_args_str}
+        fi
+
+      done < "/tmp/bonds_array"
+    }
+
+    function set_dpdk_module_log_level {
+      # loop over all target modules
+      if [ -n "$(get_dpdk_config_value ${DPDK_CONFIG} '.modules')" ]; then
+        echo $DPDK_CONFIG | jq -r -c '.modules[]' > /tmp/modules_array
+        while IFS= read -r module; do
+          local mod_name=$(get_dpdk_config_value ${module} '.name')
+          local mod_level=$(get_dpdk_config_value ${module} '.log_level')
+
+          ovs-appctl -t ${OVS_CTL} vlog/set ${mod_name}:${mod_level}
+          ovs-appctl -t ${OVS_CTL} vlog/list|grep ${mod_name}
+        done < /tmp/modules_array
+      fi
+    }
+
+    function get_driver_by_address {
+      if [[ -e /sys/bus/pci/devices/$1/driver ]]; then
+        echo $(ls /sys/bus/pci/devices/$1/driver -al | awk '{n=split($NF,a,"/"); print a[n]}')
+      fi
+    }
+
+    function get_address_by_nicname {
+      if [[ -e /sys/class/net/$1 ]]; then
+        local pci_address=$(readlink -f /sys/class/net/$1/device | xargs basename)
+        if [[ -e /sys/bus/pci/devices/${pci_address} ]]; then
+          echo ${pci_address}
+        else
+          echo "PCI id for interface $1 cannot be found" >&2
+        fi
+      else
+        echo "Interface name $1 cannot be found" >&2
+      fi
+    }
+
+    function init_ovs_dpdk_bridge {
+      bridge=$1
+      ovs-vsctl --db=unix:${OVS_SOCKET} --may-exist add-br ${bridge} \
+      -- set Bridge ${bridge} datapath_type=netdev
+      ip link set ${bridge} up
+    }
+
+    # create all additional bridges defined in the DPDK section
+    function init_ovs_dpdk_bridges {
+      for br in $(get_dpdk_config_value ${DPDK_CONFIG} '.bridges[].name'); do
+        init_ovs_dpdk_bridge ${br}
+      done
+    }
+
+    # handle any bridge mappings
+    # /tmp/auto_bridge_add is one line json file: {"br-ex1":"eth1","br-ex2":"eth2"}
+    for bmap in `sed 's/[{}"]//g' /tmp/auto_bridge_add | tr "," "\n"`
+    do
+      bridge=${bmap%:*}
+      iface=${bmap#*:}
+      if [[ "${DPDK_ENABLED}" == "true" ]]; then
+        ovs-vsctl --db=unix:${OVS_SOCKET} --may-exist add-br $bridge -- set bridge $bridge datapath_type=netdev
+      else
+        ovs-vsctl --db=unix:${OVS_SOCKET} --may-exist add-br $bridge
+      fi
+      if [ -n "$iface" ] && [ "$iface" != "null" ] && ( ip link show $iface 1>/dev/null 2>&1 );
+      then
+        ovs-vsctl --db=unix:${OVS_SOCKET} --may-exist add-port $bridge $iface
+        migrate_ip_from_nic $iface $bridge
+        if [[ "${DPDK_ENABLED}" != "true" ]]; then
+          ip link set dev $iface up
+        fi
+      fi
+    done
+
+    tunnel_types="vxlan"
+    if [[ -n "${tunnel_types}" ]] ; then
+        tunnel_interface=""
+        if [ -z "${tunnel_interface}" ] ; then
+            # search for interface with tunnel network routing
+            tunnel_network_cidr="0/0"
+            if [ -z "${tunnel_network_cidr}" ] ; then
+                tunnel_network_cidr="0/0"
+            fi
+            # If there is not tunnel network gateway, exit
+            tunnel_interface=$(ip -4 route list ${tunnel_network_cidr} | awk -F 'dev' '{ print $2; exit }' \
+                | awk '{ print $1 }') || exit 1
+        fi
+    fi
+
+    if [[ "${DPDK_ENABLED}" == "true" ]]; then
+      init_ovs_dpdk_bridges
+      process_dpdk_nics
+      process_dpdk_bonds
+      set_dpdk_module_log_level
+    fi
+
+    # determine local-ip dynamically based on interface provided but only if tunnel_types is not null
+    if [[ -n "${tunnel_types}" ]] ; then
+      LOCAL_IP=$(get_ip_address_from_interface ${tunnel_interface})
+      if [ -z "${LOCAL_IP}" ] ; then
+        echo "Var LOCAL_IP is empty"
+        exit 1
+      fi
+
+    tee > /tmp/pod-shared/ml2-local-ip.ini << EOF
+    [ovs]
+    local_ip = "${LOCAL_IP}"
+    EOF
+
+      if [[ "${DPDK_ENABLED}" == "true" ]]; then
+        PREFIX=$(get_ip_prefix_from_interface "${tunnel_interface}")
+
+        # loop over all nics
+        echo $DPDK_CONFIG | jq -r -c '.bridges[]' | \
+        while IFS= read -r br; do
+          bridge_name=$(get_dpdk_config_value ${br} '.name')
+          tunnel_underlay_vlan=$(get_dpdk_config_value ${br} '.tunnel_underlay_vlan')
+
+          if [[ "${bridge_name}" == "${tunnel_interface}" ]]; then
+            # Route the tunnel traffic via the physical bridge
+            if [[ -n "${LOCAL_IP}" && -n "${PREFIX}" ]]; then
+              if [[ -n $(ovs-appctl -t ${OVS_CTL} ovs/route/show | grep "${LOCAL_IP}" | grep -v '^Cached:') ]]; then
+                ovs-appctl -t ${OVS_CTL} ovs/route/del "${LOCAL_IP}"/"${PREFIX}"
+              fi
+              ovs-appctl -t ${OVS_CTL} ovs/route/add "${LOCAL_IP}"/"${PREFIX}" "${tunnel_interface}"
+
+              if [[ -n "${tunnel_underlay_vlan}" ]]; then
+                # If there is not tunnel network gateway, exit
+                IFS=. read -r i1 i2 i3 i4 <<< "${LOCAL_IP}"
+                IFS=. read -r xx m1 m2 m3 m4 <<< $(for a in $(seq 1 32); do if [ $(((a - 1) % 8)) -eq 0 ]; then echo -n .; fi; if [ $a -le ${PREFIX} ]; then echo -n 1; else echo -n 0; fi; done)
+                tunnel_network_cidr=$(printf "%d.%d.%d.%d\n" "$((i1 & (2#$m1)))" "$((i2 & (2#$m2)))" "$((i3 & (2#$m3)))" "$((i4 & (2#$m4)))") || exit 1
+                # Put a new flow to tag all the tunnel traffic with configured vlan-id
+                if [[ -n $(ovs-ofctl dump-flows "${tunnel_interface}" | grep "nw_dst=${tunnel_network_cidr}") ]]; then
+                  ovs-ofctl del-flows "${tunnel_interface}" "cookie=0x9999/-1, table=0, ip,nw_dst=${tunnel_network_cidr}"
+                fi
+                ovs-ofctl add-flow "${tunnel_interface}" "cookie=0x9999, table=0, priority=8, ip,nw_dst=${tunnel_network_cidr}, actions=mod_vlan_vid:${tunnel_underlay_vlan},NORMAL"
+              fi
+            fi
+            break
+          fi
+        done
+      fi
+    fi
+  neutron-openvswitch-agent-liveness.sh: |
+    #!/bin/bash
+
+    set -e
+
+    /tmp/neutron-openvswitch-agent-readiness.sh
+
+    python \
+        /tmp/health-probe.py \
+        --config-file \
+        /etc/neutron/neutron.conf \
+        --config-file \
+        /etc/neutron/plugins/ml2/openvswitch_agent.ini \
+        --config-dir \
+        /etc/neutron/neutron.conf.d \
+        --agent-queue-name \
+        q-agent-notifier-tunnel-update \
+        --liveness-probe
+  neutron-openvswitch-agent-readiness.sh: |
+    #!/bin/bash
+
+    set -e
+
+    OVS_PID=$(cat /run/openvswitch/ovs-vswitchd.pid)
+    OVS_CTL=/run/openvswitch/ovs-vswitchd.${OVS_PID}.ctl
+
+    ovs-vsctl list-br | grep -q br-int
+
+    [ -z "$(/usr/bin/ovs-vsctl show | grep error:)" ]
+  neutron-openvswitch-agent.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    exec neutron-openvswitch-agent \
+      --config-file /etc/neutron/neutron.conf \
+      --config-file /tmp/pod-shared/ml2-local-ip.ini \
+      --config-file /etc/neutron/plugins/ml2/openvswitch_agent.ini \
+      --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+      --config-dir /etc/neutron/neutron.conf.d
+  neutron-ovn-db-sync.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    neutron-ovn-db-sync-util \
+            --config-file /etc/neutron/neutron.conf \
+            --config-file /tmp/pod-shared/ovn.ini \
+            --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+            --config-dir /etc/neutron/neutron.conf.d \
+            --ovn-neutron_sync_mode "$1"
+  neutron-ovn-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    # See: https://bugs.launchpad.net/neutron/+bug/2028442
+    mkdir -p /tmp/pod-shared
+    tee > /tmp/pod-shared/ovn.ini << EOF
+    [ovn]
+    ovn_nb_connection=tcp:$OVN_OVSDB_NB_SERVICE_HOST:$OVN_OVSDB_NB_SERVICE_PORT_OVSDB
+    ovn_sb_connection=tcp:$OVN_OVSDB_SB_SERVICE_HOST:$OVN_OVSDB_SB_SERVICE_PORT_OVSDB
+    EOF
+  neutron-ovn-metadata-agent.sh: |
+    #!/bin/bash
+
+    set -x
+
+    exec neutron-ovn-metadata-agent \
+          --config-file /etc/neutron/neutron.conf \
+          --config-file /etc/neutron/ovn_metadata_agent.ini \
+          --config-file /tmp/pod-shared/ovn.ini \
+          --config-dir /etc/neutron/neutron.conf.d
+  neutron-ovn-vpn-agent-init.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    chown ${NEUTRON_USER_UID} /var/lib/neutron/openstack-helm
+  neutron-ovn-vpn-agent.sh: |
+    #!/bin/bash
+
+    set -x
+
+    exec neutron-ovn-vpn-agent \
+          --config-file /etc/neutron/neutron.conf \
+          --config-file /etc/neutron/neutron_vpnaas.conf \
+          --config-file /etc/neutron/neutron_ovn_vpn_agent.ini \
+          --config-file /tmp/pod-shared/ovn.ini \
+          --config-dir /etc/neutron/neutron.conf.d
+  neutron-rpc-server.sh: |
+    #!/bin/bash
+
+    set -ex
+    COMMAND="${@:-start}"
+
+    function start () {
+      exec neutron-rpc-server \
+            --config-file /etc/neutron/neutron.conf \
+            --config-file /tmp/pod-shared/ovn.ini \
+            --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+            --config-dir /etc/neutron/neutron.conf.d
+    }
+
+    function stop () {
+      kill -TERM 1
+    }
+
+    $COMMAND
+  neutron-server.sh: |
+    #!/bin/bash
+
+    set -ex
+    COMMAND="${@:-start}"
+
+    function start () {
+    # (ricolin): Currently ovn have issue with uWSGI,
+    # let's keep using non-uWSGI way until this bug fixed:
+    # https://bugs.launchpad.net/neutron/+bug/1912359
+      start_ovn
+    }
+
+    function start_ovn () {
+      exec neutron-server \
+            --config-file /etc/neutron/neutron.conf \
+            --config-file /tmp/pod-shared/ovn.ini \
+            --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+            --config-dir /etc/neutron/neutron.conf.d
+    }
+
+    function stop () {
+      kill -TERM 1
+    }
+
+    $COMMAND
+  neutron-sriov-agent-init.sh: |
+    #!/bin/bash
+
+    #NOTE: Please limit "besteffort" to dev env with mixed hardware computes only
+    #      For prod env, the target nic should be there, if not, script should error out.
+    set -ex
+    BESTEFFORT=false
+
+    if $BESTEFFORT; then
+      exit 0
+    fi
+  neutron-sriov-agent.sh: |
+    #!/bin/bash
+
+    set -ex
+
+    exec neutron-sriov-nic-agent \
+      --config-file /etc/neutron/neutron.conf \
+      --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+      --config-file /etc/neutron/plugins/ml2/sriov_agent.ini \
+      --config-dir /etc/neutron/neutron.conf.d
+  neutron-test-force-cleanup.sh: |
+    #!/bin/bash
+
+    # Licensed under the Apache License, Version 2.0 (the "License");
+    # you may not use this file except in compliance with the License.
+    # You may obtain a copy of the License at
+    #
+    #     http://www.apache.org/licenses/LICENSE-2.0
+    #
+    # Unless required by applicable law or agreed to in writing, software
+    # distributed under the License is distributed on an "AS IS" BASIS,
+    # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    # See the License for the specific language governing permissions and
+    # limitations under the License.
+
+    set -ex
+
+    if openstack project show "${OS_TEST_PROJECT_NAME}" --domain="${OS_TEST_PROJECT_DOMAIN_NAME}" ; then
+      OS_TEST_PROJECT_ID=$(openstack project show "${OS_TEST_PROJECT_NAME}" -f value -c id --domain="${OS_TEST_PROJECT_DOMAIN_NAME}")
+      ospurge --purge-project "${OS_TEST_PROJECT_ID}"
+      openstack quota set "${OS_TEST_PROJECT_ID}" --networks "${NETWORK_QUOTA}" --ports "${PORT_QUOTA}" --routers "${ROUTER_QUOTA}" --subnets "${SUBNET_QUOTA}" --secgroups "${SEC_GROUP_QUOTA}"
+    fi
+  rabbit-init.sh: |
+    #!/bin/bash
+    set -e
+    # Extract connection details
+    RABBIT_HOSTNAME=$(echo "${RABBITMQ_ADMIN_CONNECTION}" | \
+      awk -F'[@]' '{print $2}' | \
+      awk -F'[:/]' '{print $1}')
+    RABBIT_PORT=$(echo "${RABBITMQ_ADMIN_CONNECTION}" | \
+      awk -F'[@]' '{print $2}' | \
+      awk -F'[:/]' '{print $2}')
+
+    # Extract Admin User credential
+    RABBITMQ_ADMIN_USERNAME=$(echo "${RABBITMQ_ADMIN_CONNECTION}" | \
+      awk -F'[@]' '{print $1}' | \
+      awk -F'[//:]' '{print $4}')
+    RABBITMQ_ADMIN_PASSWORD=$(echo "${RABBITMQ_ADMIN_CONNECTION}" | \
+      awk -F'[@]' '{print $1}' | \
+      awk -F'[//:]' '{print $5}' | \
+      sed 's/%/\\x/g' | \
+      xargs -0 printf "%b")
+
+    # Extract User credential
+    RABBITMQ_USERNAME=$(echo "${RABBITMQ_USER_CONNECTION}" | \
+      awk -F'[@]' '{print $1}' | \
+      awk -F'[//:]' '{print $4}')
+    RABBITMQ_PASSWORD=$(echo "${RABBITMQ_USER_CONNECTION}" | \
+      awk -F'[@]' '{print $1}' | \
+      awk -F'[//:]' '{print $5}' | \
+      sed 's/%/\\x/g' | \
+      xargs -0 printf "%b")
+
+    # Extract User vHost
+    RABBITMQ_VHOST=$(echo "${RABBITMQ_USER_CONNECTION}" | \
+      awk -F'[@]' '{print $2}' | \
+      awk -F'[:/]' '{print $3}')
+    # Resolve vHost to / if no value is set
+    RABBITMQ_VHOST="${RABBITMQ_VHOST:-/}"
+
+    function rabbitmqadmin_cli () {
+      if [ -n "$RABBITMQ_X509" ]
+      then
+        rabbitmqadmin \
+          --ssl \
+          --ssl-disable-hostname-verification \
+          --ssl-ca-cert-file="${USER_CERT_PATH}/ca.crt" \
+          --ssl-cert-file="${USER_CERT_PATH}/tls.crt" \
+          --ssl-key-file="${USER_CERT_PATH}/tls.key" \
+          --host="${RABBIT_HOSTNAME}" \
+          --port="${RABBIT_PORT}" \
+          --username="${RABBITMQ_ADMIN_USERNAME}" \
+          --password="${RABBITMQ_ADMIN_PASSWORD}" \
+          ${@}
+      else
+        rabbitmqadmin \
+          --host="${RABBIT_HOSTNAME}" \
+          --port="${RABBIT_PORT}" \
+          --username="${RABBITMQ_ADMIN_USERNAME}" \
+          --password="${RABBITMQ_ADMIN_PASSWORD}" \
+          ${@}
+      fi
+    }
+
+    echo "Managing: User: ${RABBITMQ_USERNAME}"
+    rabbitmqadmin_cli \
+      declare user \
+      name="${RABBITMQ_USERNAME}" \
+      password="${RABBITMQ_PASSWORD}" \
+      tags="user"
+
+    echo "Deleting Guest User"
+    rabbitmqadmin_cli \
+      delete user \
+      name="guest" || true
+
+    if [ "${RABBITMQ_VHOST}" != "/" ]
+    then
+      echo "Managing: vHost: ${RABBITMQ_VHOST}"
+      rabbitmqadmin_cli \
+        declare vhost \
+        name="${RABBITMQ_VHOST}"
+    else
+      echo "Skipping root vHost declaration: vHost: ${RABBITMQ_VHOST}"
+    fi
+
+    echo "Managing: Permissions: ${RABBITMQ_USERNAME} on ${RABBITMQ_VHOST}"
+    rabbitmqadmin_cli \
+      declare permission \
+      vhost="${RABBITMQ_VHOST}" \
+      user="${RABBITMQ_USERNAME}" \
+      configure=".*" \
+      write=".*" \
+      read=".*"
+
+    if [ ! -z "$RABBITMQ_AUXILIARY_CONFIGURATION" ]
+    then
+      echo "Applying additional configuration"
+      echo "${RABBITMQ_AUXILIARY_CONFIGURATION}" > /tmp/rmq_definitions.json
+      rabbitmqadmin_cli import /tmp/rmq_definitions.json
+    fi
+  rally-test.sh: "#!/bin/bash\nset -ex\n\n: \"${RALLY_ENV_NAME:=\"openstack-helm\"}\"\n:
+    \"${OS_INTERFACE:=\"public\"}\"\n: \"${RALLY_CLEANUP:=\"true\"}\"\n\nif [ \"x$RALLY_CLEANUP\"
+    == \"xtrue\" ]; then\n  function rally_cleanup {\n    openstack user delete \\\n
+    \       --domain=\"${SERVICE_OS_USER_DOMAIN_NAME}\" \\\n        \"${SERVICE_OS_USERNAME}\"\n
+    \   # NOTE: We will make the best effort to clean up rally generated networks
+    and routers,\n    # but should not block further automated deployment.\n    set
+    +e\n    PATTERN=\"^[sc]_rally_\"\n    \n    ROUTERS=$(openstack router list --format=value
+    -c Name | grep -e $PATTERN | sort | tr -d '\\r')\n    NETWORKS=$(openstack network
+    list --format=value -c Name | grep -e $PATTERN | sort | tr -d '\\r')\n    \n    for
+    ROUTER in $ROUTERS\n    do\n      openstack router unset --external-gateway $ROUTER\n
+    \     openstack router set --disable --no-ha $ROUTER\n    \n      SUBNS=$(openstack
+    router show $ROUTER -c interfaces_info --format=value | python -m json.tool |
+    grep -oP '(?<=\"subnet_id\": \")[a-f0-9\\-]{36}(?=\")' | sort | uniq)\n      for
+    SUBN in $SUBNS\n      do\n        openstack router remove subnet $ROUTER $SUBN\n
+    \     done\n    \n      for PORT in $(openstack port list --router $ROUTER --format=value
+    -c ID | tr -d '\\r')\n      do\n        openstack router remove port $ROUTER $PORT\n
+    \     done\n    \n      openstack router delete $ROUTER\n    done\n    \n    for
+    NETWORK in $NETWORKS\n    do\n      for PORT in $(openstack port list --network
+    $NETWORK --format=value -c ID | tr -d '\\r')\n      do\n        openstack port
+    delete $PORT\n      done\n      openstack network delete $NETWORK\n    done\n
+    \   set -e\n    \n  }\n  trap rally_cleanup EXIT\nfi\n\nfunction create_or_update_db
+    () {\n  revisionResults=$(rally db revision)\n  if [ $revisionResults = \"None\"
+    \ ]\n  then\n    rally db create\n  else\n    rally db upgrade\n  fi\n}\n\ncreate_or_update_db\n\ncat
+    > /tmp/rally-config.json << EOF\n{\n    \"openstack\": {\n        \"auth_url\":
+    \"${OS_AUTH_URL}\",\n        \"region_name\": \"${OS_REGION_NAME}\",\n        \"endpoint_type\":
+    \"${OS_INTERFACE}\",\n        \"admin\": {\n            \"username\": \"${OS_USERNAME}\",\n
+    \           \"password\": \"${OS_PASSWORD}\",\n            \"user_domain_name\":
+    \"${OS_USER_DOMAIN_NAME}\",\n            \"project_name\": \"${OS_PROJECT_NAME}\",\n
+    \           \"project_domain_name\": \"${OS_PROJECT_DOMAIN_NAME}\"\n        },\n
+    \       \"users\": [\n            {\n                \"username\": \"${SERVICE_OS_USERNAME}\",\n
+    \               \"password\": \"${SERVICE_OS_PASSWORD}\",\n                \"project_name\":
+    \"${SERVICE_OS_PROJECT_NAME}\",\n                \"user_domain_name\": \"${SERVICE_OS_USER_DOMAIN_NAME}\",\n
+    \               \"project_domain_name\": \"${SERVICE_OS_PROJECT_DOMAIN_NAME}\"\n
+    \           }\n        ],\n        \"https_insecure\": false,\n        \"https_cacert\":
+    \"${OS_CACERT}\"\n    }\n}\nEOF\nrally deployment create --file /tmp/rally-config.json
+    --name \"${RALLY_ENV_NAME}\"\nrm -f /tmp/rally-config.json\nrally deployment use
+    \"${RALLY_ENV_NAME}\"\nrally deployment check\nrally task validate /etc/rally/rally_tests.yaml\nrally
+    task start /etc/rally/rally_tests.yaml\nrally task sla-check\nrally env cleanup\nrally
+    deployment destroy --deployment \"${RALLY_ENV_NAME}\"\n"
+kind: ConfigMap
+metadata:
+  name: neutron-bin

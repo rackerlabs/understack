@@ -6,3 +6,7 @@ resources:
   - cinder-mariadb-db.yaml
   - cinder-rabbitmq-queue.yaml
   - cinder-volume-netapp.yaml
+  # less than ideal addition but necessary so that we can have the cinder.conf.d loading
+  # working due to the way the chart hardcodes the config-file parameter which then
+  # takes precedence over the directory
+  - configmap-cinder-bin.yaml
