@@ -39,6 +39,10 @@ spec:
           type: "string"
           value:
             - "baremetal.node.provision_set.end"
+        - path: "body.ironic_object.previous_provision_state"
+          type: "string"
+          value:
+            - "deploying"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
