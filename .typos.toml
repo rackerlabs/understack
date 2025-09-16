@@ -27,3 +27,5 @@ fo = "fo"
 sme = "sme"
 4caf50 = "4caf50"
 ist = "ist"
+# upstream OpenStack Helm typo
+retreive = "retreive"
