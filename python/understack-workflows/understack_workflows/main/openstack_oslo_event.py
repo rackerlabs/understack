@@ -16,6 +16,8 @@ from understack_workflows.openstack.client import get_openstack_client
 from understack_workflows.oslo_event import ironic_node
 from understack_workflows.oslo_event import ironic_port
 from understack_workflows.oslo_event import keystone_project
+from understack_workflows.oslo_event import neutron_network
+from understack_workflows.oslo_event import neutron_subnet
 
 logger = setup_logger(__name__)
 
@@ -69,6 +71,12 @@ _event_handlers: dict[str, EventHandler] = {
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,
     "identity.project.deleted": keystone_project.handle_project_deleted,
+    "network.create.end": neutron_network.handle_network_create_or_update,
+    "network.update.end": neutron_network.handle_network_create_or_update,
+    "network.delete.end": neutron_network.handle_network_delete,
+    "subnet.create.end": neutron_subnet.handle_subnet_create_or_update,
+    "subnet.update.end": neutron_subnet.handle_subnet_create_or_update,
+    "subnet.delete.end": neutron_subnet.handle_subnet_delete,
 }
 
 
