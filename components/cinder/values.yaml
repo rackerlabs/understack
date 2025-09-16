@@ -74,7 +74,7 @@ pod:
                 - secret:
                     name: cinder-ks-etc
                 - secret:
-                    name: volume-backend
+                    name: cinder-netapp-config
                     items:
                       - key: netapp_nvme.conf
                         path: netapp_nvme.conf
