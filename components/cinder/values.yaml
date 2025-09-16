@@ -5,6 +5,14 @@ conf:
   backends:
     # disable the hardcoded one in the OpenStack Helm values.yaml
     rbd1: null
+    netapp_nvme:
+      netapp_server_port: "443"
+      netapp_storage_family: ontap_cluster
+      netapp_storage_protocol: nvme
+      netapp_transport_type: https
+      netapp_use_legacy_client: false
+      volume_backend_name: netapp_nvme
+      volume_driver: cinder_understack.dynamic_netapp_driver.NetappCinderDynamicDriver
   cinder:
     DEFAULT:
       enabled_backends: netapp_nvme
@@ -74,10 +82,8 @@ pod:
                 - secret:
                     name: cinder-ks-etc
                 - secret:
-                    name: volume-backend
-                    items:
-                      - key: netapp_nvme.conf
-                        path: netapp_nvme.conf
+                    name: cinder-netapp-config
+                    optional: true
     cinder_volume_usage_audit:
       cinder_volume_usage_audit:
         volumeMounts:
