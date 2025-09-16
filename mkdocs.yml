@@ -136,6 +136,10 @@ nav:
       - deploy-guide/config-argo-workflows.md
     - Starting the Deployment:
       - deploy-guide/management-cluster.md
+    - Post Deployment:
+      - deploy-guide/load-balancers.md
+      - deploy-guide/testing-verification.md
+      - deploy-guide/troubleshooting.md
     - Further Actions:
       - deploy-guide/extra-sites.md
       - deploy-guide/add-remove-app.md
