@@ -1,10 +1,6 @@
 {{- if .Values.keystoneServiceUsers.enabled }}
 {{- range $serviceName, $users := .Values.keystoneServiceUsers.services }}
 {{- range $_, $user := $users }}
-{{/* special override for the admin user since its in the bootstrap domain of default */}}
-{{- $user_domain_name := eq $user.usage "admin" | ternary "default" "service" }}
-{{- $project_domain_name := eq $user.usage "admin" | ternary "default" ( default "service" $user.project_domain_name ) }}
-{{- $project_name := eq $user.usage "admin" | ternary "admin" ( default "service" $user.project_name ) }}
 ---
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -27,9 +23,9 @@ spec:
         OS_AUTH_URL: {{ $.Values.keystoneUrl | quote }}
         OS_DEFAULT_DOMAIN: 'default'
         OS_INTERFACE: {{ $.Values.keystoneServiceUsers.keystoneInterface | quote }}
-        OS_PROJECT_DOMAIN_NAME: {{ $project_domain_name | quote }}
-        OS_PROJECT_NAME: {{ $project_name | quote }}
-        OS_USER_DOMAIN_NAME: {{ $user_domain_name | quote }}
+        OS_PROJECT_DOMAIN_NAME: {{ include "openstack.serviceuser.project_domain_name" $user | quote }}
+        OS_PROJECT_NAME: {{ include "openstack.serviceuser.project_name" $user | quote }}
+        OS_USER_DOMAIN_NAME: {{ include "openstack.serviceuser.user_domain_name" $user | quote }}
         OS_USERNAME: {{ `{{ .username }}` | quote }}
         OS_PASSWORD: {{ `{{ .password }}` | quote }}
         OS_REGION_NAME: {{ $.Values.regionName | quote }}
@@ -62,6 +58,9 @@ spec:
         {{- $shouldSkip := or (eq $user.usage "test") (eq $user.usage "admin") }}
         {{- if not $shouldSkip }}
           [{{ $section }}]
+          project_domain_name={{ include "openstack.serviceuser.project_domain_name" $user }}
+          project_name={{ include "openstack.serviceuser.project_name" $user  }}
+          user_domain_name={{ include "openstack.serviceuser.user_domain_name" $user }}
           username={{ printf "{{ (fromJson .%s).username }}" $user.usage }}
           password={{ printf "{{ (fromJson .%s).password }}" $user.usage }}
           region_name={{ $.Values.regionName | quote }}
