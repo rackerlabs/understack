@@ -39,6 +39,10 @@ spec:
           type: "string"
           value:
             - "baremetal.node.provision_set.end"
+        - path: "body.ironic_object.previous_provision_state"
+          type: "string"
+          value:
+            - "deploying"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
@@ -99,37 +103,21 @@ spec:
                               print(str(uuid.UUID(project_id_without_dashes)))
                   - - name: ansible-on-server-create
                       when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
-                      inline:
-                        container:
-                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
-                          command: [ansible-playbook]
-                          args:
-                          - "storage_on_server_create.yml"
-                          - --extra-vars
-                          - "project_id={{steps.convert-project-id.outputs.result}} device_id={{workflow.parameters.device_id}} env=dev"
-                          - "-i"
-                          - "inventory/uc-dev/01-nautobot.yaml"
-                          - "-vvv"
-                          env:
-                            - name: NAUTOBOT_TOKEN
-                              valueFrom:
-                                secretKeyRef:
-                                  key: token
-                                  name: nautobot-token
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_server_create.yml
+                        - name: extra_vars
+                          value: project_id={{steps.convert-project-id.outputs.result}} device_id={{workflow.parameters.device_id}}
                   - - name: ansible-storage-update
                       when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
-                      inline:
-                        container:
-                          image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
-                          command: [ansible-playbook]
-                          args:
-                          - "storage_update_switches.yml"
-                          - "-i"
-                          - "inventory/uc-dev/01-nautobot.yaml"
-                          - "-vvv"
-                          env:
-                            - name: NAUTOBOT_TOKEN
-                              valueFrom:
-                                secretKeyRef:
-                                  key: token
-                                  name: nautobot-token
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_update_switches.yml
