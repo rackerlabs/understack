@@ -3,6 +3,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 helmCharts:
   - name: external-dns-rackspace
+    namespace: "openstack"
     releaseName: external-dns-rackspace
     repo: oci://ghcr.io/rackerlabs/charts
     version: 0.0.1
