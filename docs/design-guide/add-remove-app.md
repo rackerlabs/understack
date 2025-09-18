@@ -4,7 +4,7 @@ UnderStack **Components** are deployed via [ArgoCD]
 as [Applications][argocd-app], these are generated using [ArgoCD][argocd]'s
 [ApplicationSet][argocd-appset] controller. This allows us to use common
 patterns to deploy each of the components and allow specific environments
-to modify or disable some components. See the [Configuring Components](./component-config.md)
+to modify or disable some components. See the [Configuring Components](../deploy-guide/component-config.md)
 guide for more info on how to do so.
 
 ## Adding a Component to UnderStack
@@ -50,11 +50,25 @@ sources:
 
 {% endraw %}
 
+### Configuring the namespace
+
+If the namespace you'll be adding the component to is currently not in
+use, you will have to add it to the appropriate AppProject for the
+ApplicationSet in one of the following:
+
+- `apps/appsets/project-understack-infra.yaml`
+- `apps/appsets/project-understack-operators.yaml`
+- `apps/appsets/project-understack.yaml`
+
 ## Removing an application from UnderStack
 
 Removing a Component permanently from UnderStack is as easy as
 deleting its YAML config from its AppSet in the `apps/<appset>/`
 directory.
+
+!!! note
+    Remove the namespace from the AppProject if it is no longer
+    in use.
 
 [argocd]: <https://argo-cd.readthedocs.io/en/stable/>
 [argocd-app]: <https://argo-cd.readthedocs.io/en/stable/user-guide/application-specification/>

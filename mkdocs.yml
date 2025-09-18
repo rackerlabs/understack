@@ -119,6 +119,7 @@ nav:
       - component-ansible.md
   - 'Design Guide':
     - design-guide/intro.md
+    - design-guide/add-remove-app.md
     - design-guide/neutron-networking.md
     - design-guide/argo-workflows.md
     - design-guide/argo-events.md
@@ -142,7 +143,6 @@ nav:
       - deploy-guide/troubleshooting.md
     - Further Actions:
       - deploy-guide/extra-sites.md
-      - deploy-guide/add-remove-app.md
       - deploy-guide/override-openstack-svc-config.md
   - 'Operator Guide':
     - operator-guide/index.md
