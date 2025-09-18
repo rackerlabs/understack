@@ -2,10 +2,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: neutron-event-network-segment-range
+  name: neutron-oslo-event
   namespace: argo-events
   annotations:
-    workflows.argoproj.io/title: Add/edit Nautobot UCVNIGroup range field on Neutron network-segment-range operations
+    workflows.argoproj.io/title: Add/edit Nautobot objects according to Neutron events
     workflows.argoproj.io/description: |+
       Triggers on Events from Neutron:
 
@@ -21,11 +21,11 @@ spec:
     name: oslo-event-type
     transform:
       # the event is a string-ified JSON so we need to decode it
-      jq: ".body[\"oslo.message\"] | fromjson"
+      jq: '{body: (.body["oslo.message"] | fromjson)}'
     filters:
       dataLogicalOperator: "and"
       data:
-        - path: "event_type"
+        - path: body.event_type
           type: "string"
           # any of the values will trigger
           value:
@@ -35,7 +35,6 @@ spec:
             - "subnet.create.end"
             - "subnet.update.end"
             - "subnet.delete.end"
-
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
@@ -56,7 +55,7 @@ spec:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: ironic-node-port-
+                generateName: neutron-oslo-event-
                 namespace: argo-events
               spec:
                 # defines the parameters being replaced above
