@@ -1,0 +1,6 @@
+apiVersion: v2
+name: global-secrets-sync
+description: Helm chart to sync Kubernetes secrets between clusters using External Secrets
+type: application
+version: 0.1.0
+appVersion: "1.0"

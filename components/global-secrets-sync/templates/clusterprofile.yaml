@@ -1,0 +1,13 @@
+---
+apiVersion: config.projectsveltos.io/v1alpha1
+kind: ClusterProfile
+metadata:
+  name: {{ .Release.Name }}-secrets
+spec:
+  clusterSelector:
+    matchLabels:
+      understack.rackspace.com/env: {{ .Values.targetEnv }}
+  policyRefs:
+    - kind: ConfigMap
+      name: {{ .Release.Name }}-policies
+      namespace: {{ .Release.Namespace }}

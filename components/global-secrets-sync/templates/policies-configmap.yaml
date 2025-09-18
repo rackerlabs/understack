@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-policies
+  namespace: {{ .Release.Namespace }}
+data:
+  {{- range .Values.secrets }}
+  {{ .name }}.yaml: |
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: {{.name}}
+      namespace: {{.namespace}}
+    type: {{ .type | default "Opaque" }}
+    data:
+      {{- range $k, $v := .data }}
+      {{ $k }}: {{ $v | b64enc }}
+      {{- end }}
+  {{- end }}
