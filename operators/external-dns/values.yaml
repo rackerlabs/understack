@@ -1,0 +1,13 @@
+---
+namespace: "openstack"
+externalDns:
+  image:
+    repository: "registry.k8s.io/external-dns/external-dns"
+    tag: "v0.18.0"
+
+rackspaceWebhook:
+  image:
+    repository: "ghcr.io/rackerlabs/external-dns-rackspace-webhook"
+    tag: "0.0.1"
+  secret:
+    create: false # this will allow us to use secretsStore of own choice like, sealedSecrets
