@@ -1,0 +1,5 @@
+---
+component: external-dns
+sources:
+  - ref: understack
+    path: 'operators/external-dns'
