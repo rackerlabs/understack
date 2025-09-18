@@ -42,7 +42,7 @@ images:
     neutron_metadata: "ghcr.io/rackerlabs/understack/neutron:2024.2-ubuntu_jammy"
     neutron_ovn_metadata: "ghcr.io/rackerlabs/understack/neutron:2024.2-ubuntu_jammy"
     neutron_openvswitch_agent: "ghcr.io/rackerlabs/understack/neutron:2024.2-ubuntu_jammy"
-    neutron_server: "ghcr.io/rackerlabs/understack/neutron:2024.2-ubuntu_jammy"
+    neutron_server: "ghcr.io/rackerlabs/understack/neutron:pr-1234"
     neutron_rpc_server: "ghcr.io/rackerlabs/understack/neutron:2024.2-ubuntu_jammy"
     neutron_bagpipe_bgp: "ghcr.io/rackerlabs/understack/neutron:2024.2-ubuntu_jammy"
     neutron_netns_cleanup_cron: "ghcr.io/rackerlabs/understack/neutron:2024.2-ubuntu_jammy"

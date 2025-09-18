@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import pathlib
 from functools import partial
 from urllib.parse import urlparse
@@ -43,12 +44,15 @@ def _valid_url(value):
 
 
 def parser_nautobot_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    default_value = os.getenv(
+        "NAUTOBOT_URL", "http://nautobot-default.nautobot.svc.cluster.local"
+    )
     parser.add_argument(
         "--nautobot_url",
         type=_valid_url,
         required=False,
         help="Nautobot API %(default)s",
-        default="http://nautobot-default.nautobot.svc.cluster.local",
+        default=default_value,
     )
     parser.add_argument("--nautobot_token", type=str, required=False)
     return parser

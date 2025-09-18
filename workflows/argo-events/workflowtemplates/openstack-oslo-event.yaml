@@ -36,7 +36,7 @@ spec:
             raw:
               data: "{{inputs.parameters.event-json}}"
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1234
         command:
           - openstack-oslo-event
         args:
@@ -52,6 +52,10 @@ spec:
           - mountPath: /etc/netapp
             name: netapp-ini
             readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+              optional: false
       volumes:
         - name: nb-token
           secret:
