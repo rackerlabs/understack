@@ -12,7 +12,7 @@ metadata:
       Defined in `workflows/argo-events/sensors/alertmanager-webhook-sensor.yaml`
 spec:
   template:
-    serviceAccountName: operate-workflow-sa
+    serviceAccountName: sensor-submit-workflow
   dependencies:
   - name: alertmanager-dep
     eventSourceName: alertmanager-webhook-eventsource
