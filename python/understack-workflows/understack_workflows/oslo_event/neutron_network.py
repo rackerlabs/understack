@@ -21,9 +21,6 @@ class NetworkEvent:
     network_name: str
     tenant_id: UUID
     external: bool
-    network_type: str | None
-    physical_network: str | None
-    segmentation_id: int | None
 
     @classmethod
     def from_event_dict(cls, data: dict) -> Self:
@@ -34,9 +31,6 @@ class NetworkEvent:
             network["name"],
             UUID(network["project_id"]),
             bool(network["router:external"]),
-            network["provider:network_type"],
-            network["provider:physical_network"],
-            network["provider:segmentation_id"],
         )
 
 
@@ -45,9 +39,6 @@ def handle_network_create_or_update(
 ) -> int:
     """Handle Openstack Neutron Network CRUD Event."""
     event = NetworkEvent.from_event_dict(event_data)
-
-    if event.network_type not in APPLICABLE_NETWORK_TYPES:
-        return 0
 
     _ensure_nautobot_ipam_namespace_exists(nautobot, str(event.network_uuid))
     _create_nautobot_ucvni(nautobot, event, ucvni_group_name)
@@ -58,9 +49,6 @@ def handle_network_create_or_update(
 def handle_network_delete(_conn, nautobot: Nautobot, event_data: dict) -> int:
     """Handle Openstack Neutron Network CRUD Event."""
     event = NetworkEvent.from_event_dict(event_data)
-
-    if event.network_type not in APPLICABLE_NETWORK_TYPES:
-        return 0
 
     _delete_nautobot_ipam_namespace(nautobot, str(event.network_uuid))
     _delete_nautotbot_ucvni(nautobot, id=str(event.network_uuid))
@@ -84,7 +72,6 @@ def _create_nautobot_ucvni(
         "status": {"name": "Active"},
         "tenant": str(event.tenant_id),
         "ucvni_group": {"name": ucvni_group_name},
-        "ucvni_id": event.segmentation_id,
     }
     try:
         response = nautobot.plugins.undercloud_vni.ucvnis.create(payload)
