@@ -98,6 +98,8 @@ keystoneServiceUsers:
         remoteRef: *keystone_admin
       - usage: user
         remoteRef: &nova_svc "nova-keystone-password"
+      - usage: cinder
+        remoteRef: *nova_svc
       - usage: ironic
         remoteRef: *nova_svc
         project_domain_name: infra
