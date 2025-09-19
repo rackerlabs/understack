@@ -1,5 +1,5 @@
 ---
-namespace: "openstack"
+namespace: "external-dns"
 externalDns:
   image:
     repository: "registry.k8s.io/external-dns/external-dns"
