@@ -54,7 +54,7 @@ The easiest way to configure your client is via `clouds.yaml`.
 
 ```yaml title="$HOME/.config/openstack/clouds.yaml"
 clouds:
-  understack:
+  my-site:
     auth_type: v3websso
     identity_provider: sso
     protocol: openid
@@ -62,6 +62,7 @@ clouds:
       auth_url: {{ config.extra.auth_url }}
       project_domain_name: Default
       project_name: myproject
+    region_name: {{ config.extra.region_name }}
 ```
 
 <!-- markdownlint-capture -->
@@ -75,14 +76,14 @@ With the above configuration in `$HOME/.config/openstack/clouds.yaml` you
 will be able to run the OpenStack CLI as follows:
 
 ```bash
-openstack --os-cloud understack <sub-command-here>
+openstack --os-cloud my-site <sub-command-here>
 ```
 
 Or you can set the `OS_CLOUD` environment variable once and shorten the
 command as follows:
 
 ```bash
-export OS_CLOUD=understack
+export OS_CLOUD=my-site
 openstack <sub-command-here>
 ```
 
@@ -115,19 +116,20 @@ Note the auth_type and auth options are slightly different than in the above SSO
 
 ```yaml title="$HOME/.config/openstack/clouds.yaml"
 clouds:
-  understack-application:
+  my-site-app:
     auth_type: v3applicationcredential
     auth:
       auth_url: {{ config.extra.auth_url }}
       application_credential_id: ${FROM_ABOVE}
       application_credential_secret: ${FROM_ABOVE}
+    region_name: {{ config.extra.region_name }}
 ```
 
 The `openstack` cli, `terraform` and `ansible` can all use application credentials and
 the `OS_CLOUD` environment variable:
 
 ```bash
-export OS_CLOUD=understack-application
+export OS_CLOUD=my-site-app
 ```
 
 There are a number of additional features and options available in the OpenStack documentation:
