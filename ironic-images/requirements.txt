@@ -1,4 +1,4 @@
 diskimage-builder==3.39.0
 ironic-python-agent-builder==6.1.0
-python-keystoneclient==5.6.0
+python-keystoneclient==5.7.0
 python-swiftclient==4.8.0
