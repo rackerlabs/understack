@@ -1,0 +1,7 @@
+{{- range .Values.clusters }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .name }}-secrets
+{{- end }}
