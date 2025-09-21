@@ -1,0 +1,31 @@
+---
+- name: Nautobot service accounts for Undercloud services
+  connection: local
+  hosts: nautobot
+  gather_facts: false
+
+  pre_tasks:
+    - name: Load Nautobot credentials from environment
+      ansible.builtin.set_fact:
+        nautobot_data: "{{ lookup('env', 'EXTRA_VARS') | from_json }}"
+
+    - name: Decode Nautobot credentials
+      ansible.builtin.set_fact:
+        nautobot_hostname: "{{ nautobot_data.hostname | b64decode }}"
+        nautobot_username: "{{ nautobot_data.username | b64decode }}"
+        nautobot_password: "{{ nautobot_data.password | b64decode }}"
+        nautobot_user_token: "{{ nautobot_data.token | b64decode }}"
+
+    - name: Ensure nautobot is up and responding
+      ansible.builtin.uri:
+        url: "https://{{ nautobot_hostname }}/health/"
+        method: GET
+        validate_certs: false
+      register: nautobot_up_check
+      until: nautobot_up_check.status == 200
+      retries: 24  # Retries for 24 * 5 seconds = 120 seconds = 2 minutes
+      delay: 5  # Every 5 seconds
+      check_mode: false
+
+  roles:
+    - role: users
