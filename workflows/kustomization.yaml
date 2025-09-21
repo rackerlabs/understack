@@ -4,3 +4,4 @@ kind: Kustomization
 resources:
   - openstack
   - argo-events
+  - nautobot
