@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "understack-hardware-manager"
+version = "0.0.1"
+authors = [{ name = "Understack Developers" }]
+description = "IPA Hardware Manager: custom steps"
+license = {text = "Apache-2"}
+requires-python = "~=3.11.0"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: OpenStack",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: System :: Hardware",
+]
+
+[project.entry-points."ironic_python_agent.hardware_managers"]
+understack_hwm = "understack_hwm.hardware_manager:UnderstackHardwareManager"
+
+[tool.hatch.build.targets.wheel]
+packages = ["understack_hwm"]
