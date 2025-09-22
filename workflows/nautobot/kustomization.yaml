@@ -7,7 +7,8 @@ resources:
   - eventbus/eventbus-default.yaml
   - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
 
-  # noutobot secret
+  # nautobot secret
   - serviceaccounts/k8s-secret-events-nautobot.yaml
+  - serviceaccounts/k8s-job-create.yaml
   - eventsources/k8s-secret-nautobot-token.yaml
   - sensors/k8s-nautobot-secret.yaml
