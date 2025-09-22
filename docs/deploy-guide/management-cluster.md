@@ -13,11 +13,53 @@ approach that UnderStack uses to deploy it's services with ArgoCD is the
 If you already have [ArgoCD][argocd] deployed and available to be used then you
 can skip this section.
 
+### Configuring ArgoCD
+
+To configure ArgoCD you'll need to create a `$DEPLOY_NAME/helm-configs/argocd.yaml`
+in your deploy repo. In there you can configure the DNS name that will be used
+for the Ingress as well as the authentication. An example of which can be:
+
+```yaml title="$DEPLOY_NAME/helm-configs/argocd.yaml"
+global:
+  domain: argocd.your.dns.zone
+
+configs:
+  cm:
+    oidc.config: |-
+      name: SSO
+      issuer: $argocd-sso:issuer
+      clientID: $argocd-sso:client-id
+      clientSecret: $argocd-sso:client-secret
+      requiredIDTokenClaims: {"groups": {"essential": true}}
+      cliClientID: argocdcli
+```
+
+This assumes that you have a `Secret` in the `argocd` namespace called `argocd-sso`
+which has the following keys:
+
+- `issuer`
+- `client-id`
+- `client-secret`
+
+Which will be used for OIDC authentication. See [Configuring Dex](./config-dex.md)
+for information on how to use the [Dex](https://dexidp.io) that is included
+for authentication.
+
+You can also include the following:
+
+```yaml ttile="$DEPLOY_NAME/helm-configs/argocd.yaml"
+extraObjects:
+  - # k8s object like a secret definition
+```
+
+Or any other valid values for the Argo CD Helm Chart.
+
 The following command will do an initial deployment of ArgoCD that can
 then be customized further.
 
 ```bash title="installing ArgoCD"
-kubectl kustomize --enable-helm https://github.com/rackerlabs/understack/bootstrap/argocd/ | kubectl apply -f -
+cd path_to_understack_repo
+./bootstrap/argocd.sh
 ```
 
 ## Configuring your Global and/or Site Cluster in ArgoCD

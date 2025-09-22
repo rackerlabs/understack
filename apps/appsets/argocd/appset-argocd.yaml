@@ -28,35 +28,22 @@ spec:
     spec:
       project: default
       sources:
+        - repoURL: https://argoproj.github.io/argo-helm
+          chart: argo-cd
+          targetRevision: 8.3.9
+          helm:
+            releaseName: argo-cd
+            valueFiles:
+              - $understack/components/argocd/values.yaml
+              - $deploy/{{.name}}/helm-configs/argocd.yaml
+            ignoreMissingValueFiles: true
         - repoURL: '{{index .metadata.annotations "uc_repo_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_repo_ref"}}'
-          path: bootstrap/argocd/
-          kustomize:
-            components:
-              - components/sso
-            patches:
-              - target:
-                  kind: ConfigMap
-                  name: argocd-cm
-                patch: |-
-                  - op: replace
-                    path: /data/url
-                    value: https://argocd.{{index .metadata.annotations "dns_zone"}}
-              - target:
-                  kind: Ingress
-                patch: |-
-                  - op: replace
-                    path: /spec/rules/0/host
-                    value: argocd.{{index .metadata.annotations "dns_zone"}}
-                  - op: replace
-                    path: /spec/tls/0/hosts/0
-                    value: argocd.{{index .metadata.annotations "dns_zone"}}
-                  - op: replace
-                    path: '/metadata/annotations/cert-manager.io~1cluster-issuer'
-                    value: understack-cluster-issuer
+          ref: understack
         - repoURL: '{{index .metadata.annotations "uc_deploy_git_url"}}'
           targetRevision: '{{index .metadata.annotations "uc_deploy_ref"}}'
           path: '{{.name}}/manifests/argocd'
+          ref: deploy
       ignoreDifferences:
         - kind: Secret
           namespace: argocd
