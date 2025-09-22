@@ -1,6 +1,6 @@
 apiVersion: v2
-name: site-secrets
-description: Orchestrating secrets across kubernetes clusters (global-site) using External SecretStore
+name: secretstore-gen-secrets
+description: Secret store backed External Secrets generator
 type: application
 version: 0.1.0
 appVersion: "1.0"
