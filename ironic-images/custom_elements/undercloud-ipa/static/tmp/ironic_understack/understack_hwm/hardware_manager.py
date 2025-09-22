@@ -25,7 +25,7 @@ class UnderstackHardwareManager(hardware.HardwareManager):
         return [
             {
                 "step": "write_storage_ips",
-                "priority": 10,
+                "priority": 50,
                 "interface": "deploy",
                 "reboot_requested": False,
             }
