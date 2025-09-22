@@ -1,8 +1,1 @@
-site:
-  name: uc-iad3-dev
-  partition: uc-dev
-  env: dev
-  role: aio
-  secretStore:
-    kind: SecretStore
-    name: vault
+---
