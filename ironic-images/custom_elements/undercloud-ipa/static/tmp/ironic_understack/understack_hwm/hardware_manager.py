@@ -1,5 +1,5 @@
 from ironic_python_agent import hardware
-from ironic_python_agent import inject_files
+from ironic_python_agent.inject_files import inject_files
 from oslo_log import log
 
 LOG = log.getLogger()
@@ -25,7 +25,17 @@ class UnderstackHardwareManager(hardware.HardwareManager):
         return [
             {
                 "step": "write_storage_ips",
-                "priority": 10,
+                "priority": 50,
+                "interface": "deploy",
+                "reboot_requested": False,
+            }
+        ]
+
+    def get_service_steps(self, node, ports):
+        return [
+            {
+                "step": "write_storage_ips",
+                "priority": 50,
                 "interface": "deploy",
                 "reboot_requested": False,
             }
@@ -40,7 +50,7 @@ class UnderstackHardwareManager(hardware.HardwareManager):
     def write_storage_ips(self, node, ports):
         # If not specified, the agent will determine the partition based on the
         # first part of the path.
-        partition = None
+        # partition = None
         file_contents = """
             [
                 {
@@ -56,9 +66,9 @@ class UnderstackHardwareManager(hardware.HardwareManager):
         files = [
             {
                 "path": "/config-2/somefile.txt",
-                "partition": partition,
+                "partition": "/dev/sda4",
                 "content": file_contents,
-                "mode": "644",
+                "mode": 644,
             }
         ]
         inject_files(node, ports, files)
