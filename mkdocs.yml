@@ -99,6 +99,7 @@ validation:
 
 extra:
   auth_url: !ENV [OS_AUTH_URL, "https://your.endpoint.url/v3"]
+  region_name: !ENV [OS_REGION_NAME, "my-site"]
 
 nav:
   - Home: index.md
