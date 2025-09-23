@@ -1,3 +1,5 @@
+import base64
+
 from ironic_python_agent import hardware
 from ironic_python_agent.inject_files import inject_files
 from oslo_log import log
@@ -52,22 +54,32 @@ class UnderstackHardwareManager(hardware.HardwareManager):
         # first part of the path.
         # partition = None
         file_contents = """
-            [
-                {
-                    "address": "100.126.0.30/30",
-                    "mac": "D4:04:E6:4F:87:85"
-                },
-                {
-                    "address": "100.126.128.30/30",
-                    "mac": "14:23:F3:F5:3B:A1"
-                }
-            ]
-        """
+datasource:
+  NoCloud:
+    network-config: |
+    version: 2
+    ethernets:
+      interface0:
+        match:
+          macaddress: "52:54:00:12:34:00"
+        set-name: interface0
+        addresses:
+          - 100.126.0.6/255.255.255.252
+        gateway4: 100.126.0.5
+      interface1:
+        match:
+          macaddress: "14:23:F3:F5:3A:D1"
+        set-name: interface0
+        addresses:
+          - 100.126.128.6/255.255.255.252
+        gateway4: 100.126.128.5
+"""
+        file_encoded = base64.b64encode(file_contents.encode("utf-8")).decode("utf-8")
         files = [
             {
-                "path": "/config-2/somefile.txt",
-                "partition": "/dev/sda4",
-                "content": file_contents,
+                "path": "/etc/cloud/cloud.cfg.d/95-undercloud-storage.cfg",
+                "partition": "/dev/sda3",
+                "content": file_encoded,
                 "mode": 644,
             }
         ]
