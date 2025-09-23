@@ -8,6 +8,21 @@ from pynautobot.core.response import Record
 from pynautobot.models import dcim
 
 
+class NautobotRequestError(Exception):
+    def __init__(self, e: pynautobot.RequestError):
+        try:
+            self._error_string = (
+                f"Nautobot API ERROR {e.req.status_code} "
+                f"for {e.base} {e.request_body}: {e.args[0]}"
+            )
+        except Exception:
+            self._error_string = "Nautobot API ERROR"
+
+    def __str__(self):
+        """String form of the exception."""
+        return self._error_string
+
+
 class Nautobot:
     def __init__(self, url, token, logger=None, session=None):
         """Initialize our Nautobot API wrapper."""

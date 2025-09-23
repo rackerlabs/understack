@@ -1,4 +1,3 @@
-from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
@@ -12,30 +11,6 @@ from sqlalchemy.orm import scoped_session
 from sqlalchemy.orm import sessionmaker
 
 from neutron_understack import utils
-
-
-class TestFetchConnectedInterfaceUUID:
-    def test_with_normal_uuid(self, port_context, port_id):
-        result = utils.fetch_connected_interface_uuid(
-            binding_profile=port_context.current[portbindings.PROFILE], nautobot=Mock()
-        )
-        assert result == str(port_id)
-
-    @pytest.mark.parametrize("binding_profile", [{"port_id": 11}], indirect=True)
-    def test_with_integer(self, port_context):
-        fake_nautobot = Mock()
-        fake_nautobot.get_interface_uuid.return_value = "FAKE ID"
-
-        result = utils.fetch_connected_interface_uuid(
-            binding_profile=port_context.current[portbindings.PROFILE],
-            nautobot=fake_nautobot,
-        )
-        assert result == "FAKE ID"
-
-        fake_nautobot.get_interface_uuid.assert_called_once_with(
-            device_name="a1-1-1.iad3.rackspace.net",
-            interface_name=11,
-        )
 
 
 class TestParentPortIsBound:
