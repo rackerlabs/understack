@@ -24,6 +24,11 @@
       ],
       "groupName": "Argo Workflows",
       "commitMessageTopic": "Argo Workflows"
+    },
+    {
+      "matchDatasources": ["golang-version"],
+      "groupName": "Go",
+      "commitMessageTopic": "Go"
     }
   ],
   "customManagers": [
