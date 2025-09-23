@@ -29,6 +29,11 @@
       "matchDatasources": ["golang-version"],
       "groupName": "Go",
       "commitMessageTopic": "Go"
+    },
+    {
+      "enabled": false,
+      "matchPackageNames": ["python"],
+      "matchUpdateTypes": ["major", "minor"]
     }
   ],
   "customManagers": [
