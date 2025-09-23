@@ -19,7 +19,8 @@
       "matchPackageNames": [
         "quay.io/argoproj/workflow-controller",
         "quay.io/argoproj/argoexec",
-        "quay.io/argoproj/argocli"
+        "quay.io/argoproj/argocli",
+        "argoproj/argo-workflows"
       ],
       "groupName": "Argo Workflows",
       "commitMessageTopic": "Argo Workflows"
