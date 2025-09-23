@@ -112,14 +112,19 @@ your shell.
 
 ### Populating the infrastructure
 
-TODO: some examples and documentation on how to build out a cluster
+For details on how to configure ArgoCD, see the
+[Management Cluster](./management-cluster.md) page.
 
 ### Bootstrapping ArgoCD and Sealed-Secrets
 
 If you do not have ArgoCD deployed then you can use the following:
 
 ```bash
-kubectl kustomize --enable-helm https://github.com/rackerlabs/understack/bootstrap/ | kubectl apply -f -
+kubectl kustomize --enable-helm \
+  https://github.com/rackerlabs/understack/bootstrap/sealed-secrets/ \
+  | kubectl apply -f -
+cd path_to_understack_repo
+./bootstrap/argocd.sh
 ```
 
 ### Generating secrets
