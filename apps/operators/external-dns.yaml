@@ -1,5 +1,14 @@
 ---
 component: external-dns
 sources:
-  - ref: understack
-    path: 'operators/external-dns'
+  - repoURL: ghcr.io/rackerlabs/charts
+    chart: external-dns-rackspace
+    targetRevision: 0.0.1
+    helm:
+      releaseName: external-dns-rackspace
+      namespace: "external-dns"
+      ignoreMissingValueFiles: true
+      valueFiles:
+        - $deploy/{{.name}}/helm-configs/external-dns.yaml
+  - ref: deploy
+    path: '{{.name}}/manifests/external-dns'
