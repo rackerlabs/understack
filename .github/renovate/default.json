@@ -9,7 +9,6 @@
     ":approveMajorUpdates",
     "github>rackerlabs/understack//.github/renovate/automergeGitHubActions",
     "github>rackerlabs/understack//.github/renovate/precommit",
-    "github>rackerlabs/understack//.github/renovate/pythonMinorApprove",
     ":maintainLockFilesMonthly",
     ":automergeDigest"
   ]
