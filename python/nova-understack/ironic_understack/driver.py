@@ -1,5 +1,3 @@
-import copy
-
 from nova import exception
 from nova.i18n import _
 from nova.virt.ironic.driver import IronicDriver
@@ -94,10 +92,28 @@ class IronicUnderstackDriver(IronicDriver):
         }
 
     def _merge_storage_netinfo(self, original, new_info):
-        merged = copy.deepcopy(original)
-        for link in new_info["links"]:
-            merged["links"].append(link)
-
-        for network in new_info["networks"]:
-            merged["networks"].append(network)
-        return merged
+        print("original network_info: %s", original)
+        # merged = copy.deepcopy(original)
+        # merged["networks"].append(
+        #     model.VIF(
+        #         type=model.VIF_TYPE_OTHER,
+        #         active=True,
+        #         vnic_type=model.VNIC_TYPE_BAREMETAL,
+        #         network=model.Network(
+        #             id=str(uuid.UUID()),
+        #             subnets=model.Subnet(
+        #                 cidr="126.0.0.0/30",
+        #                 version=4,
+        #                 routes=model.Route(
+        #                     cidr="127.0.0.0/16", gateway=model.IP(address="126.0.0.1")
+        #                 ),
+        #             ),
+        #         ),
+        #     )
+        # )
+        # for link in new_info["links"]:
+        #     merged["links"].append(link)
+        #
+        # for network in new_info["networks"]:
+        #     merged["networks"].append(network)
+        return original
