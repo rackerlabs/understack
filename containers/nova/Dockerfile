@@ -12,3 +12,5 @@ RUN apt-get update && \
 COPY containers/nova/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.10/site-packages && \
     QUILT_PATCHES=/tmp/patches quilt push -a
+COPY python/nova-understack /tmp/nova-understack
+RUN pip install --no-cache-dir /tmp/nova-understack
