@@ -1,6 +1,10 @@
+import logging
+
 from nova import exception
 from nova.i18n import _
 from nova.virt.ironic.driver import IronicDriver
+
+logger = logging.getLogger(__name__)
 
 
 class IronicUnderstackDriver(IronicDriver):
@@ -93,6 +97,7 @@ class IronicUnderstackDriver(IronicDriver):
 
     def _merge_storage_netinfo(self, original, new_info):
         print("original network_info: %s", original)
+        logger.debug("original_network_info: %s", original)
         # merged = copy.deepcopy(original)
         # merged["networks"].append(
         #     model.VIF(
