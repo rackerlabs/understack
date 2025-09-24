@@ -157,6 +157,7 @@ nav:
     - 'Infrastructure':
       - operator-guide/workflows.md
       - operator-guide/monitoring.md
+      - operator-guide/bmc-password.md
       - operator-guide/mariadb-operator.md
       - operator-guide/mariadb-upgrade-runbook.md
       - operator-guide/postgres-operator.md
