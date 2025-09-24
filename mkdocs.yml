@@ -149,6 +149,7 @@ nav:
     - operator-guide/index.md
     - 'OpenStack':
       - operator-guide/openstack-ironic.md
+      - operator-guide/openstack-ironic-inspection-guide.md
       - operator-guide/openstack-neutron.md
       - operator-guide/openstack-placement.md
     - 'Networking':
