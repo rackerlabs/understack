@@ -134,7 +134,6 @@ nav:
       - deploy-guide/config-dex.md
       - deploy-guide/config-openstack.md
       - deploy-guide/secrets-eso-setup.md
-      - deploy-guide/generate-external-secrets.md
       - deploy-guide/openstack-svc-users.md
       - deploy-guide/auth.md
       - deploy-guide/config-argo-workflows.md
