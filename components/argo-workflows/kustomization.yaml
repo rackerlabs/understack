@@ -38,13 +38,6 @@ patches:
 - target:
     group: rbac.authorization.k8s.io
     version: v1
-    kind: ClusterRoleBinding
-    name: argo-server-binding
-  path: delete-argo-server-crb.yaml
-
-- target:
-    group: rbac.authorization.k8s.io
-    version: v1
     kind: Role
     name: argo-role
   path: workflow-controller-role.yaml
