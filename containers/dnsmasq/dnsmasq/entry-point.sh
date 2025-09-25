@@ -2,6 +2,8 @@
 
 set -eux
 
+# shellcheck disable=SC1091
+# This is irrelevant because this only runs inside of a container.
 . /helpers.sh
 
 mkdir -p /etc/dnsmasq.d/
