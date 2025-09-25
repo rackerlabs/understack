@@ -1,7 +1,5 @@
 import logging
 
-from nova import exception
-from nova.i18n import _
 from nova.virt.ironic.driver import IronicDriver
 
 logger = logging.getLogger(__name__)
@@ -10,60 +8,6 @@ logger = logging.getLogger(__name__)
 class IronicUnderstackDriver(IronicDriver):
     capabilities = IronicDriver.capabilities
     rebalances_nodes = IronicDriver.rebalances_nodes
-
-    def spawn(
-        self,
-        context,
-        instance,
-        image_meta,
-        injected_files,
-        admin_password,
-        allocations,
-        network_info=None,
-        block_device_info=None,
-        power_on=True,
-        accel_info=None,
-    ):
-        """Deploy an instance.
-
-        Args:
-            context: The security context.
-            instance: The instance object.
-            image_meta: Image dict returned by nova.image.glance
-                that defines the image from which to boot this instance.
-            injected_files: User files to inject into instance.
-            admin_password: Administrator password to set in instance.
-            allocations: Information about resources allocated to the
-                instance via placement, of the form returned by
-                SchedulerReportClient.get_allocations_for_consumer.
-                Ignored by this driver.
-            network_info: Instance network information.
-            block_device_info: Instance block device information.
-            accel_info: Accelerator requests for this instance.
-            power_on: True if the instance should be powered on, False otherwise.
-        """
-        node_id = instance.get("node")
-        if not node_id:
-            raise exception.NovaException(
-                _("Ironic node uuid not supplied to driver for instance %s.")
-                % instance.uuid
-            )
-
-        storage_netinfo = self._lookup_storage_netinfo(node_id)
-        network_info = self._merge_storage_netinfo(network_info, storage_netinfo)
-
-        return super().spawn(
-            context,
-            instance,
-            image_meta,
-            injected_files,
-            admin_password,
-            allocations,
-            network_info,
-            block_device_info,
-            power_on,
-            accel_info,
-        )
 
     def _lookup_storage_netinfo(self, node_id):
         return {
@@ -95,6 +39,18 @@ class IronicUnderstackDriver(IronicDriver):
             ],
         }
 
+    def _get_network_metadata(self, node, network_info):
+        base_metadata = super()._get_network_metadata(node, network_info)
+        if not base_metadata:
+            return base_metadata
+        additions = self._lookup_storage_netinfo(node["uuid"])
+        for link in additions["links"]:
+            base_metadata["links"].append(link)
+        for network in additions["networks"]:
+            base_metadata["networks"].append(network)
+        return base_metadata
+
     def _merge_storage_netinfo(self, original, new_info):
         print("original network_info: %s", original)
+
         return original
