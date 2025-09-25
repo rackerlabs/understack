@@ -32,7 +32,7 @@ This command tells Ironic to boot the node into the inspection environment and g
 
 ### Argo Workflow Integration
 
-Our Argo [enroll-server](https://workflows.dev.undercloud.rackspace.net/workflow-templates/argo-events/enroll-server) workflow already runs Redfish inspection.
+Our Argo [enroll-server](https://github.com/rackerlabs/understack/blob/05b7fb1a8ab9efd3b2f6544b5c62874ed39a3de5/workflows/argo-events/workflowtemplates/enroll-server.yaml#L41) workflow already runs Redfish inspection.
 Therefore, just running `openstack baremetal node inventory save` is enough to retrieve the inspection data.
 
 ---

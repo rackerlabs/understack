@@ -1,19 +1,26 @@
 ---
+# Runbook Name: Dell Boot Interface Reconfiguration
+# Purpose: Ensure Dell baremetal nodes boot via HTTP (http-ipxe) with fallback PXE enabled.
 
 - interface: bios
   step: apply_configuration
   args:
     settings:
+      # Enable PXE boot on NIC 1-1
       - name: PxeDev1EnDis
         value: Enabled
       - name: PxeDev1Interface
         value: NIC.Slot.1-1
+
+      # Enable HTTP boot on NIC 1-1
       - name: HttpDev1EnDis
         value: Enabled
       - name: HttpDev1Interface
         value: NIC.Slot.1-1
       - name: HttpDev1TlsMode
         value: None
+
+      # Set timezone to UTC
       - name: TimeZone
         value: UTC
   order: 1

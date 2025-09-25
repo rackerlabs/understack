@@ -150,6 +150,7 @@ nav:
     - 'OpenStack':
       - operator-guide/openstack-ironic.md
       - operator-guide/openstack-ironic-inspection-guide.md
+      - operator-guide/openstack-ironic-change-boot-interface.md
       - operator-guide/openstack-neutron.md
       - operator-guide/openstack-placement.md
     - 'Networking':
