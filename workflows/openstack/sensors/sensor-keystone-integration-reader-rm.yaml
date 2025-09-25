@@ -1,0 +1,66 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: keystone-integration-reader-rm
+  namespace: openstack
+spec:
+  template:
+    serviceAccountName: k8s-openstack-events-secrets
+  # events the Sensor listens for
+  dependencies:
+    - name: secret-dep
+      eventName: keystone-integration-reader-delete
+      eventSourceName: k8s-openstack-secrets
+  # actions executed when dependencies are satisfied (StandardK8STrigger designed to create or update a generic Kubernetes resource.)
+  triggers:
+    - template:
+        name: keystone-user-delete
+        k8s:
+          operation: create
+          source:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                generateName: keystone-integration-reader-rm-
+              spec:
+                ttlSecondsAfterFinished: 600
+                backoffLimit: 3
+                template:
+                  spec:
+                    containers:
+                      - name: keystone-user-delete
+                        image: quay.io/airshipit/heat:2024.2-ubuntu_jammy
+                        command: ["sh", "-c"]
+                        args:
+                          - |
+                            echo "Received Secret Event ${EVENT_TYPE} for ${SECRET_NAME}"
+                            set -x
+                            SVC_USER=$(python -c "import json,os; print(json.loads(os.environ.get('LABELS') or '{}').get('understack.rackspace.com/keystone-user',''))")
+                            SVC_USER=${SVC_USER:-$SECRET_NAME}
+                            openstack user delete --domain service "${SVC_USER}"
+                        env:
+                          - name: EVENT_TYPE
+                            value: "placeholder"
+                          - name: SECRET_NAME
+                            value: "placeholder"
+                          - name: LABELS
+                            value: "placeholder"
+                        envFrom:
+                          - secretRef:
+                              name: keystone-keystone-admin
+                    restartPolicy: OnFailure
+          parameters:
+            - src:
+                dependencyName: secret-dep
+                dataKey: body.type
+              dest: spec.template.spec.containers.0.env.0.value
+            - src:
+                dependencyName: secret-dep
+                dataKey: body.metadata.name
+              dest: spec.template.spec.containers.0.env.1.value
+            - src:
+                dependencyName: secret-dep
+                dataKey: body.metadata.labels
+              dest: spec.template.spec.containers.0.env.2.value
