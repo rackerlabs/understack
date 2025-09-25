@@ -31,6 +31,14 @@
       "commitMessageTopic": "Go"
     },
     {
+      "matchPackageNames": [
+        "mariadb-operator",
+        "mariadb-operator-crds"
+      ],
+      "groupName": "MariaDB Operator",
+      "commitMessageTopic": "MariaDB Operator"
+    },
+    {
       "enabled": false,
       "matchPackageNames": ["python"],
       "matchUpdateTypes": ["major", "minor"]
