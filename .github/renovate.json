@@ -26,6 +26,7 @@
       "commitMessageTopic": "Argo Workflows"
     },
     {
+      "matchManagers": ["asdf", "gomod"],
       "matchDatasources": ["golang-version"],
       "groupName": "Go",
       "commitMessageTopic": "Go"
