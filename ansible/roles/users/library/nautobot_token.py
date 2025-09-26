@@ -2,23 +2,24 @@ from ansible.module_utils.basic import AnsibleModule
 import requests
 
 
-def get_existing_token(base_url, username, password, user_token):
-    """Return the token dict if it exists, otherwise None."""
+def get_existing_token(base_url, username, password, user_token, module):
     headers = {"Accept": "application/json"}
     tokens_url = f"{base_url}/api/users/tokens/"
 
     try:
         response = requests.get(tokens_url, headers=headers, auth=(username, password))
         response.raise_for_status()
-    except requests.exceptions.RequestException:
-        return None
+    except requests.exceptions.RequestException as e:
+        module.fail_json(
+            msg=f"Failed to fetch existing tokens for user {username}: {str(e)}"
+        )
 
     tokens = response.json().get("results", [])
     return next((t for t in tokens if t.get("key") == user_token), None)
 
 
-def create_new_token(base_url, username, password, user_token, description):
-    """Create a new Nautobot token using Basic Auth. Returns the token dict or None."""
+def create_new_token(base_url, username, password, user_token, description, module):
+    """Create a new Nautobot token using Basic Auth."""
     tokens_url = f"{base_url}/api/users/tokens/"
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     payload = {"key": user_token, "description": description, "write_enabled": True}
@@ -28,24 +29,12 @@ def create_new_token(base_url, username, password, user_token, description):
             tokens_url, headers=headers, json=payload, auth=(username, password)
         )
         response.raise_for_status()
-    except requests.exceptions.RequestException:
-        return None
+    except requests.exceptions.RequestException as e:
+        module.fail_json(
+            msg=f"Failed to create new token for user {username}: {str(e)}"
+        )
 
     return response.json()
-
-
-def format_token_response(token):
-    """Normalize token dict fields for output."""
-    if not token:
-        return None
-    return {
-        "id": str(token.get("id")),
-        "display": str(token.get("display")),
-        "created": str(token.get("created")),
-        "expires": str(token.get("expires")),
-        "write_enabled": bool(token.get("write_enabled")),
-        "description": str(token.get("description", "No description")),
-    }
 
 
 def run_module():
@@ -66,23 +55,25 @@ def run_module():
     token_description = module.params["token_description"]
 
     # fetch existing token
-    token = get_existing_token(base_url, username, password, user_token)
+    token = get_existing_token(base_url, username, password, user_token, module)
     if token:
         module.exit_json(
             changed=False,
-            message=f"Found existing token for {username}",
-            token=format_token_response(token),
+            username=username,
+            message=f"Found existing Nautobot token for user {username}",
         )
 
     # No token found → try creating new
-    new_token = create_new_token(base_url, username, password, user_token, token_description)
+    new_token = create_new_token(
+        base_url, username, password, user_token, token_description, module
+    )
     if not new_token:
-        module.fail_json(msg="Failed to create new token")
+        module.fail_json(msg=f"Failed to create new token for user {username}")
 
     module.exit_json(
         changed=True,
-        message=f"No token found, created new token for {username}",
-        token=format_token_response(new_token),
+        username=username,
+        message=f"No token found, created new Nautobot token for user {username}",
     )
 
 
