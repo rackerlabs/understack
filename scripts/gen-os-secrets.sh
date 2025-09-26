@@ -1,50 +1,82 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-if [ $# -ne 1 ]; then
+# Check arguments
+if [ "$#" -ne 1 ]; then
     echo "$(basename "$0") <output-file>" >&2
     exit 1
 fi
 
+# Enable safer bash settings
 set -o pipefail
 
-if ! type -p yq > /dev/null; then
+# Check dependencies
+if ! command -v yq >/dev/null; then
     echo "You must have yq installed to use this script" >&2
     exit 1
 fi
 
-if ! type -p kubectl > /dev/null; then
+if ! command -v kubectl >/dev/null; then
     echo "You must have kubectl installed to use this script" >&2
     exit 1
 fi
 
-KUSTOMIZE_VERSION=$(kubectl version --client -o yaml | yq .kustomizeVersion)
-if ! (echo -e "v5.0.0\n$KUSTOMIZE_VERSION" | sort -V -C); then
-  echo "kustomize needs to be at version 5.0.0 or newer (comes with kubectl 1.27+)"
-  exit 1
+# Get kustomize version (declare/assign separately)
+KUSTOMIZE_VERSION=""
+KUSTOMIZE_VERSION=$(kubectl version --client -o yaml | yq '.kustomizeVersion')
+if ! (printf '%s\n' "v5.0.0" "$KUSTOMIZE_VERSION" | sort -V -C); then
+    echo "kustomize needs to be at version 5.0.0 or newer (comes with kubectl 1.27+)"
+    exit 1
 fi
 
-SCRIPTS_DIR="$(dirname "$0")"
+# Scripts directory
+SCRIPTS_DIR=""
+SCRIPTS_DIR=$(dirname "$0")
 
 echo "This script will attempt to look up the existing values this repo used"
 echo "or will generate new values. The output below will be related to that."
 
 # memcache secret key
-export MEMCACHE_SECRET_KEY=$("${SCRIPTS_DIR}/pwgen.sh" 64)
+MEMCACHE_SECRET_KEY=""
+MEMCACHE_SECRET_KEY=$("${SCRIPTS_DIR}/pwgen.sh" 64)
+export MEMCACHE_SECRET_KEY
 
 # keystone admin
-export KEYSTONE_ADMIN_PASSWORD=$(kubectl -n openstack get secret keystone-admin -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+KEYSTONE_ADMIN_PASSWORD=""
+KEYSTONE_ADMIN_PASSWORD=$(kubectl -n openstack get secret keystone-admin \
+  -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+export KEYSTONE_ADMIN_PASSWORD
+
 # keystone mariadb
-export KEYSTONE_DB_PASSWORD=$(kubectl -n openstack get secret keystone-db-password -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+KEYSTONE_DB_PASSWORD=""
+KEYSTONE_DB_PASSWORD=$(kubectl -n openstack get secret keystone-db-password \
+  -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+export KEYSTONE_DB_PASSWORD
+
 # keystone rabbitmq
-export KEYSTONE_RABBITMQ_PASSWORD=$(kubectl -n openstack get secret keystone-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+KEYSTONE_RABBITMQ_PASSWORD=""
+KEYSTONE_RABBITMQ_PASSWORD=$(kubectl -n openstack get secret keystone-rabbitmq-password \
+  -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+export KEYSTONE_RABBITMQ_PASSWORD
 
 # ironic keystone service account
-export IRONIC_KEYSTONE_PASSWORD=$(kubectl -n openstack get secret ironic-keystone-password -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
-# ironic mariadb
-export IRONIC_DB_PASSWORD=$(kubectl -n openstack get secret ironic-db-password -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
-# ironic rabbitmq
-export IRONIC_RABBITMQ_PASSWORD=$(kubectl -n openstack get secret ironic-rabbitmq-password -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+IRONIC_KEYSTONE_PASSWORD=""
+IRONIC_KEYSTONE_PASSWORD=$(kubectl -n openstack get secret ironic-keystone-password \
+  -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+export IRONIC_KEYSTONE_PASSWORD
 
+# ironic mariadb
+IRONIC_DB_PASSWORD=""
+IRONIC_DB_PASSWORD=$(kubectl -n openstack get secret ironic-db-password \
+  -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+export IRONIC_DB_PASSWORD
+
+# ironic rabbitmq
+IRONIC_RABBITMQ_PASSWORD=""
+IRONIC_RABBITMQ_PASSWORD=$(kubectl -n openstack get secret ironic-rabbitmq-password \
+  -o jsonpath='{.data.password}' | base64 -d || "${SCRIPTS_DIR}/pwgen.sh")
+export IRONIC_RABBITMQ_PASSWORD
+
+# Generate output
 yq '(.. | select(tag == "!!str")) |= envsubst' \
     "${SCRIPTS_DIR}/../components/openstack-secrets.tpl.yaml" \
     > "$1"
