@@ -22,6 +22,11 @@ spec:
         env:
           - name: RACK_ENV
             value: "production"
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: token
         envFrom:
           - secretRef:
               name: settings
