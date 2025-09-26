@@ -41,7 +41,7 @@
     },
     {
       "enabled": false,
-      "matchPackageNames": ["python"],
+      "matchPackageNames": ["python", "actions/python-versions"],
       "matchUpdateTypes": ["major", "minor"]
     }
   ],
