@@ -10,14 +10,15 @@ usage() {
 template() {
     local subvars
     subvars="\$DNS_ZONE \$UC_DEPLOY_GIT_URL \$DEPLOY_NAME"
+    # shellcheck disable=SC2002  # Using cat for clarity with envsubst
     cat "$1" | envsubst "${subvars}" > "$2"
 }
 
-if [ $# -ne 1 ]; then
+if [ "$#" -ne 1 ]; then
     usage
 fi
 
-SCRIPTS_DIR=$(dirname "$0")
+SCRIPTS_DIR="$(dirname "$0")"
 
 if [ ! -f "$1" ]; then
     echo "Did not get a file with environment variables." >&2
@@ -43,7 +44,7 @@ if [ ! -d "${UC_DEPLOY}" ]; then
     usage
 fi
 
-if [ "x${DEPLOY_NAME}" = "x" ]; then
+if [ -z "${DEPLOY_NAME}" ]; then
     echo "DEPLOY_NAME is not set." >&2
     usage
 fi
@@ -57,14 +58,16 @@ export DEPLOY_NAME
 
 # create helm-configs directory for values.yaml overrides
 mkdir -p "${UC_DEPLOY_HELM_CFG}"
-for component in dex; do
+
+# shellcheck disable=SC2043
+for component in "dex"; do
     helmvals="${UC_DEPLOY_HELM_CFG}/${component}.yaml"
     if [ -f "${helmvals}" ]; then
         echo "You have ${helmvals} already, not overwriting"
         continue
     fi
-    if  [ -f "${UC_REPO_COMPONENTS}/${component}/values.tpl.yaml" ]; then
-            template "${UC_REPO_COMPONENTS}/${component}/values.tpl.yaml" "${helmvals}"
+    if [ -f "${UC_REPO_COMPONENTS}/${component}/values.tpl.yaml" ]; then
+        template "${UC_REPO_COMPONENTS}/${component}/values.tpl.yaml" "${helmvals}"
     else
         echo "# add your values.yaml overrides for the helm chart here" > "${helmvals}"
     fi
