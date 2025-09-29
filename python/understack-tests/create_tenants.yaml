@@ -1,0 +1,10 @@
+---
+KeystoneBasic.create_tenant:
+  - runner:
+      type: constant        # run N iterations
+      times: 1000           # <-- create 1000 tenants
+      concurrency: 10       # number of parallel workers
+    context:
+      users:
+        tenants: 1
+        users_per_tenant: 1

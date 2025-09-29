@@ -81,6 +81,17 @@ conf:
       api_max_retries: 90  # number of times to retry. default is 60.
       api_retry_interval: 10  # number of sesconds between retries. default is 2.
 
+    # https://docs.openstack.org/nova/2025.1/admin/scheduling.html#the-filter-scheduler
+    filter_scheduler:
+      available_filters: nova.scheduler.filters.all_filters
+      enabled_filters:
+        - ComputeFilter
+        - ComputeCapabilitiesFilter
+        - ImagePropertiesFilter
+        - ServerGroupAntiAffinityFilter
+        - ServerGroupAffinityFilter
+        - JsonFilter
+
 console:
   # we are working with baremetal nodes and not QEMU so we don't need novnc or spice
   # connected to QEMU
