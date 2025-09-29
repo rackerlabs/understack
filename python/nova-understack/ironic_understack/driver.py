@@ -1,6 +1,10 @@
 import logging
+from uuid import UUID
 
 from nova.virt.ironic.driver import IronicDriver
+
+from .conf import CONF
+from .nautobot_client import NautobotClient
 
 logger = logging.getLogger(__name__)
 
@@ -9,48 +13,30 @@ class IronicUnderstackDriver(IronicDriver):
     capabilities = IronicDriver.capabilities
     rebalances_nodes = IronicDriver.rebalances_nodes
 
-    def _lookup_storage_netinfo(self, node_id):
-        return {
-            "links": [
-                {
-                    "id": "storage-iface-uuid",
-                    "vif_id": "generate_or_obtain",
-                    "type": "phy",
-                    "mtu": 9000,
-                    "ethernet_mac_address": "d4:04:e6:4f:90:18",
-                }
-            ],
-            "networks": [
-                {
-                    "id": "network0",
-                    "type": "ipv4",
-                    "link": "storage-iface-uuid",
-                    "ip_address": "126.0.0.2",
-                    "netmask": "255.255.255.252",
-                    "routes": [
-                        {
-                            "network": "127.0.0.0",
-                            "netmask": "255.255.0.0",
-                            "gateway": "126.0.0.1",
-                        }
-                    ],
-                    "network_id": "generate_or_obtain",
-                }
-            ],
-        }
+    def __init__(self, virtapi, read_only=False):
+        self._nautobot_connection = NautobotClient(
+            CONF.nova_understack.nautobot_base_url,
+            CONF.nova_understack.nautobot_api_key,
+        )
+
+        super().__init__(virtapi, read_only)
 
     def _get_network_metadata(self, node, network_info):
+        """Obtain network_metadata to be used in config drive.
+
+        This pulls storage IP information and adds it to the base
+        information obtained by original IronicDriver.
+        """
         base_metadata = super()._get_network_metadata(node, network_info)
         if not base_metadata:
             return base_metadata
-        additions = self._lookup_storage_netinfo(node["uuid"])
-        for link in additions["links"]:
+
+        extra_interfaces = self._nautobot_connection.storage_network_config_for_node(
+            UUID(node["uuid"])
+        )
+
+        for link in extra_interfaces["links"]:
             base_metadata["links"].append(link)
-        for network in additions["networks"]:
+        for network in extra_interfaces["networks"]:
             base_metadata["networks"].append(network)
         return base_metadata
-
-    def _merge_storage_netinfo(self, original, new_info):
-        print("original network_info: %s", original)
-
-        return original
