@@ -11,3 +11,4 @@ resources:
   # working due to the way the chart hardcodes the config-file parameter which then
   # takes precedence over the directory
   - configmap-nova-bin.yaml
+  - nova-nautobot-token.yaml

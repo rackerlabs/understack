@@ -232,6 +232,8 @@ pod:
               sources:
                 - secret:
                     name: nova-ks-etc
+                - secret:
+                    name: nova-nautobot
   lifecycle:
     disruption_budget:
       osapi:
