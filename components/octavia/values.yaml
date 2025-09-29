@@ -52,6 +52,11 @@ conf:
       ovn_sb_connection: tcp:ovn-ovsdb-sb.openstack.svc.cluster.local:6642
     task_flow:
       jobboard_enabled: false
+  octavia_api_uwsgi:
+    uwsgi:
+      # When upgrading to 2025.2 remove this as the wsgi script was removed
+      # https://opendev.org/openstack/openstack-helm/commit/b1d85c20e36adac9eaee584ef095d9c010cc1dc4
+      wsgi-file: /var/lib/openstack/bin/octavia-wsgi
 
 dependencies:
   dynamic:
