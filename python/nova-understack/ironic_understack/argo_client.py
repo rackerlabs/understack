@@ -17,9 +17,13 @@ class ArgoClient:
         self.token = token
         self.session = requests.Session()
         self.session.headers.update(
-            {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+            {
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": "application/json",
+            }
         )
         self.namespace = namespace
+        print(f"Token: {self.token}")
 
     def _generate_workflow_name(self, playbook_name: str) -> str:
         """Generate workflow name based on playbook name.
