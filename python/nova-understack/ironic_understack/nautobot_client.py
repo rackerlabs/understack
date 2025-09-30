@@ -28,6 +28,16 @@ class IPAddress:
         return str(self.interface.ip)
 
     @property
+    def target_network(self) -> ipaddress.IPv4Network:
+        """Returns the respective target-side network."""
+        third_octet = self.address.split(".")[2]
+        if third_octet not in ["0", "128"]:
+            raise ValueError(
+                f"Cannot determine the target-side network from {self.address}"
+            )
+        return ipaddress.IPv4Network(f"100.127.{third_octet}.0/24")
+
+    @property
     def address_with_prefix(self) -> str:
         """Get the IP address with prefix as string."""
         return str(self.interface)
@@ -130,8 +140,8 @@ class Interface:
             "netmask": str(ip.netmask),
             "routes": [
                 {
-                    "network": "127.0.0.0",
-                    "netmask": "255.255.0.0",
+                    "network": str(ip.target_network.network_address),
+                    "netmask": str(ip.target_network.netmask),
                     "gateway": ip.calculated_gateway,
                 }
             ],
