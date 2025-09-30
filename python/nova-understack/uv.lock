@@ -807,6 +807,7 @@ version = "0.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "nova" },
+    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -817,7 +818,10 @@ test = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "nova", specifier = ">=30.1" }]
+requires-dist = [
+    { name = "nova", specifier = ">=30.1" },
+    { name = "requests", specifier = ">=2.25.0" },
+]
 
 [package.metadata.requires-dev]
 test = [

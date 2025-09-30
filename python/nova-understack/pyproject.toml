@@ -12,6 +12,7 @@ readme = "README.md"
 license = "MIT"
 dependencies = [
     "nova>=30.1",
+    "requests>=2.25.0",
 ]
 
 [dependency-groups]
