@@ -1,8 +1,8 @@
 ---
-KeystoneBasic.create_tenant:
+NeutronNetworks.create_and_delete_networks:
   - runner:
       type: constant        # run N iterations
-      times: 1000           # <-- create 1000 tenants
+      times: 1000           # <-- create 1000 networks
       concurrency: 50       # number of parallel workers
     context:
       users:
