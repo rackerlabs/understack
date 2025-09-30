@@ -21,7 +21,28 @@ class ArgoClient:
         )
         self.namespace = namespace
 
-    def run_playbook(self, playbook_name: str, project_id: str, device_id: str) -> dict:
+    def _generate_workflow_name(self, playbook_name: str) -> str:
+        """Generate workflow name based on playbook name.
+
+        Strips .yaml/.yml suffix and creates ansible-<name>- format.
+
+        Args:
+            playbook_name: Name of the Ansible playbook
+
+        Returns:
+            str: Generated workflow name in format ansible-<name>-
+
+        Examples:
+            storage_on_server_create.yml -> ansible-storage_on_server_create-
+            network_setup.yaml -> ansible-network_setup-
+            deploy_app -> ansible-deploy_app-
+        """
+        base_name = playbook_name.replace("_", "-")
+        if base_name.endswith((".yaml", ".yml")):
+            base_name = base_name.rsplit(".", 1)[0]
+        return f"ansible-{base_name}-"
+
+    def run_playbook(self, playbook_name: str, **extra_vars) -> dict:
         """Run an Ansible playbook via Argo Workflows.
 
         This method creates a workflow from the ansible-workflow-template and waits
@@ -29,9 +50,7 @@ class ArgoClient:
 
         Args:
             playbook_name: Name of the Ansible playbook to run
-            project_id: Project ID parameter for the playbook
-            device_id: Device ID parameter for the playbook
-            env: Environment parameter (dev, staging, prod)
+            **extra_vars: Arbitrary key/value pairs to pass as extra_vars to Ansible
 
         Returns:
             dict: The final workflow status
@@ -40,10 +59,16 @@ class ArgoClient:
             requests.RequestException: If API requests fail
             RuntimeError: If workflow fails or times out
         """
+        # Convert extra_vars dict to space-separated key=value string
+        extra_vars_str = " ".join(f"{key}={value}" for key, value in extra_vars.items())
+
+        # Generate workflow name based on playbook name
+        generate_name = self._generate_workflow_name(playbook_name)
+
         # Create workflow from template
         workflow_request = {
             "workflow": {
-                "metadata": {"generateName": "ansible-on-server-create-"},
+                "metadata": {"generateName": generate_name},
                 "spec": {
                     "workflowTemplateRef": {"name": "ansible-workflow-template"},
                     "entrypoint": "ansible-run",
@@ -52,10 +77,7 @@ class ArgoClient:
                             {"name": "playbook", "value": playbook_name},
                             {
                                 "name": "extra_vars",
-                                "value": (
-                                    f"project_id={project_id}"
-                                    f" device_id={device_id}",
-                                ),
+                                "value": extra_vars_str,
                             },
                         ]
                     },
