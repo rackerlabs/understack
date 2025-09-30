@@ -12,3 +12,5 @@ resources:
   # takes precedence over the directory
   - configmap-nova-bin.yaml
   - nova-nautobot-token.yaml
+  - secret-nova-argo-token.yaml
+  - roles-nova-argo-token.yaml

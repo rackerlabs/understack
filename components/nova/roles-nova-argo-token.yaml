@@ -1,0 +1,34 @@
+# These roles allow nova-compute-ironic to create and list Argo workflows
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  creationTimestamp: null
+  name: nova-argo-workflows
+  namespace: argo-events
+rules:
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflows
+  verbs:
+  - get
+  - list
+  - create
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  creationTimestamp: null
+  name: nova-argo-workflows
+  namespace: argo-events
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nova-argo-workflows
+subjects:
+- kind: ServiceAccount
+  name: nova-compute-ironic
+  namespace: openstack
+---
