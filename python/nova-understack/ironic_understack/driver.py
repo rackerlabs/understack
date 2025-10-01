@@ -74,7 +74,7 @@ class IronicUnderstackDriver(IronicDriver):
         ### Understack modified code START
         if instance.metadata["storage"] == "wanted":
             logger.info("Instance %s requires storage network setup.", instance.uuid)
-            project_id = instance.project_id
+            project_id = str(UUID(instance.project_id))
             device_id = node["uuid"]
             playbook_args = {"device_id": device_id, "project_id": project_id}
             logger.info(
