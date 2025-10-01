@@ -1,6 +1,7 @@
 import time
 
 import requests
+import urllib3
 
 
 class ArgoClient:
@@ -21,6 +22,8 @@ class ArgoClient:
         self.token = token or self._kubernetes_token
         self.session = requests.Session()
         self.session.verify = ssl_verify
+        if not ssl_verify:
+            urllib3.disable_warnings()
         self.session.headers.update(
             {
                 "Authorization": f"Bearer {self.token}",
