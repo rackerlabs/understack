@@ -66,6 +66,30 @@ Clean the node:
 openstack baremetal node clean --clean-steps raid-clean-steps.json --disable-ramdisk ${NODE_UUID}
 ```
 
+## Build nova server to specific ironic node
+
+Sometimes we need to build to a specific baremetal node. This can be accomplished by using the
+[OpenStack Nova filter schedulers](https://docs.openstack.org/nova/2025.1/admin/scheduling.html#the-filter-scheduler)
+hint:
+
+``` text
+--hint query='["=","$hypervisor_hostname","<ironic-node-uuid>"]'
+```
+
+Below is a full example, where UUID `86eb7354-cc10-4173-8ff2-d1ac2ea6befd` is a node
+in the `openstack baremetal node list`:
+
+``` bash
+openstack server create \
+  --flavor gp2.small \
+  --image 'My-Ubuntu-24.04' \
+  --nic net-id=demo-project \
+  --key-name team \
+  --use-config-drive \
+  --hint query='["=","$hypervisor_hostname","86eb7354-cc10-4173-8ff2-d1ac2ea6befd"]' \
+  server-jsonfilter-test
+```
+
 ## Troubleshooting Ironic Nodes
 
 ### Node History
