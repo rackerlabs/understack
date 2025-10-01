@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: log-debug
+spec:
+  template:
+    container:
+      env:
+        - name: LOG_LEVEL
+          value: debug
+  dependencies:
+    - name: nautobot-token-secret
+      eventSourceName: k8s-secret-nautobot-token
+      eventName: nautobot-token-secret
+  triggers:
+    - template:
+        name: log-trigger
+        log:
+          intervalSeconds: 20

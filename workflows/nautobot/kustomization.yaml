@@ -12,3 +12,4 @@ resources:
   - serviceaccounts/k8s-job-create.yaml
   - eventsources/k8s-secret-nautobot-token.yaml
   - sensors/k8s-nautobot-secret.yaml
+  - sensors/log-debug.yaml
