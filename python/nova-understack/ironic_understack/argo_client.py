@@ -6,16 +6,21 @@ import requests
 class ArgoClient:
     """Client for interacting with Argo Workflows REST API."""
 
-    def __init__(self, url: str, token: str, namespace="argo-events"):
+    def __init__(
+        self, url: str, token: str | None, namespace="argo-events", ssl_verify=False
+    ):
         """Initialize the Argo client.
 
         Args:
             url: Base URL of the Argo Workflows server
-            token: Authentication token for API access
+            (Optional) token: Authentication token for API access. If not provided
+                the default token from
+                /var/run/secrets/kubernetes.io/serviceaccount/token is used.
         """
         self.url = url.rstrip("/")
-        self.token = token
+        self.token = token or self._kubernetes_token
         self.session = requests.Session()
+        self.session.verify = ssl_verify
         self.session.headers.update(
             {
                 "Authorization": f"Bearer {self.token}",
@@ -23,7 +28,6 @@ class ArgoClient:
             }
         )
         self.namespace = namespace
-        print(f"Token: {self.token}")
 
     def _generate_workflow_name(self, playbook_name: str) -> str:
         """Generate workflow name based on playbook name.
@@ -45,6 +49,18 @@ class ArgoClient:
         if base_name.endswith((".yaml", ".yml")):
             base_name = base_name.rsplit(".", 1)[0]
         return f"ansible-{base_name}-"
+
+    @property
+    def _kubernetes_token(self) -> str:
+        """Reads pod's Kubernetes token.
+
+        Args:
+            None
+        Returns:
+            str: value of the token
+        """
+        with open("/var/run/secrets/kubernetes.io/serviceaccount/token") as f:
+            return f.read()
 
     def run_playbook(self, playbook_name: str, **extra_vars) -> dict:
         """Run an Ansible playbook via Argo Workflows.

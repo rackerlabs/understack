@@ -12,6 +12,11 @@ def setup_conf():
             default="https://nautobot.nautobot.svc",
         ),
         cfg.StrOpt("nautobot_api_key", help="Nautotbot's API key", default=""),
+        cfg.StrOpt(
+            "argo_api_url",
+            help="Argo Workflows API url",
+            default="https://argo-server.argo.svc:2746",
+        ),
     ]
     cfg.CONF.register_group(grp)
     cfg.CONF.register_opts(opts, group=grp)

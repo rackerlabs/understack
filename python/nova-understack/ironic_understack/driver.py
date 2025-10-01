@@ -9,6 +9,7 @@ from nova.api.metadata import base as instance_metadata
 from nova.virt import configdrive
 from nova.virt.ironic.driver import IronicDriver
 
+from .argo_client import ArgoClient
 from .conf import CONF
 from .nautobot_client import NautobotClient
 
@@ -24,6 +25,8 @@ class IronicUnderstackDriver(IronicDriver):
             CONF.nova_understack.nautobot_base_url,
             CONF.nova_understack.nautobot_api_key,
         )
+
+        self._argo_connection = ArgoClient(CONF.nova_understack.argo_api_url, None)
 
         super().__init__(virtapi, read_only)
 
@@ -68,8 +71,22 @@ class IronicUnderstackDriver(IronicDriver):
         if not extra_md:
             extra_md = {}
 
+        ### Understack modified code START
         if instance.metadata["storage"] == "wanted":
             logger.info("Instance %s requires storage network setup.", instance.uuid)
+            project_id = instance.project_id
+            device_id = node["uuid"]
+            playbook_args = {"device_id": device_id, "project_id": project_id}
+            logger.info(
+                "Scheduling ansible run of storage_on_server_create.yml for "
+                "device_id=%(device_id)s project_id=%(project_id)s",
+                playbook_args,
+            )
+            result = self._argo_connection.run_playbook(
+                "storage_on_server_create.yml", **playbook_args
+            )
+            logger.debug("Ansible result: %s", result)
+            logger.info("Playbook run completed, collecting rest of metadata.")
             network_metadata = self._get_network_metadata_with_storage(
                 node, network_info
             )
@@ -79,6 +96,7 @@ class IronicUnderstackDriver(IronicDriver):
                 instance.uuid,
             )
             network_metadata = self._get_network_metadata(node, network_info)
+        ### Understack modified code END
 
         i_meta = instance_metadata.InstanceMetadata(
             instance,
