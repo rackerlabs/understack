@@ -1,9 +1,0 @@
-#!/bin/bash
-
-# dib-lint: disable=set setu setpipefail indent
-if [ ${DIB_DEBUG_TRACE:-0} -gt 0 ]; then
-    set -x
-fi
-set -e
-
-/opt/ironic-python-agent/bin/python -m pip install /tmp/ironic_understack/
