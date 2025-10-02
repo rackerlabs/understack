@@ -17,8 +17,8 @@ import traceback
 def validate_uuid(uuid_string: str) -> str:
     """Validate that the provided string is a valid UUID."""
     try:
-        uuid.UUID(uuid_string)
-        return uuid_string
+        result = uuid.UUID(uuid_string)
+        return str(result)
     except ValueError:
         raise argparse.ArgumentTypeError(f"'{uuid_string}' is not a valid UUID")
 
