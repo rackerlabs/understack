@@ -44,7 +44,7 @@ spec:
           - name: operation
           - name: device_id
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.1-ubuntu_jammy
         command:
           - openstack
         args:
@@ -70,7 +70,7 @@ spec:
         parameters:
           - name: device_id
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2024.2-ubuntu_jammy
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.1-ubuntu_jammy
         command:
           - openstack
         args:

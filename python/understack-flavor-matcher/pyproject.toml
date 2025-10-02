@@ -7,7 +7,7 @@ name = "understack-flavor-matcher"
 version = "0.0.0"
 description = "Baremetal node flavor classifier"
 authors = [{ name = "Marek Skrobacki", email = "marek.skrobacki@rackspace.co.uk" }]
-requires-python = "~=3.10"
+requires-python = ">=3.10,<4"
 readme = "README.md"
 license = "MIT"
 dependencies = ["pyyaml~=6.0"]
