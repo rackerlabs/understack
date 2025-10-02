@@ -1,6 +1,10 @@
+import logging
+
 from nova import exception
 from nova.i18n import _
 from nova.virt.ironic.driver import IronicDriver
+
+logger = logging.getLogger(__name__)
 
 
 class IronicUnderstackDriver(IronicDriver):
