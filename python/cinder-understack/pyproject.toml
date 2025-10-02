@@ -7,7 +7,7 @@ name = "cinder-understack"
 version = "0.1.0"
 description = "Cinder driver package for UnderStack"
 authors = [{ name = "Understack Developers" }]
-requires-python = "~=3.10"
+requires-python = "~=3.10.0"
 readme = "README.rst"
 license = "Apache-2.0"
 classifiers = [
@@ -24,7 +24,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
-  "cinder>=25.0.0,<26",
+  "cinder>=26.0.0,<27",
   "oslo.utils>=6.0.0,<8"
 ]
 

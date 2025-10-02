@@ -12,7 +12,7 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.11"
 understack-flavor-matcher = {path = "../../python/understack-flavor-matcher"}
-python-novaclient = "^18.7.0"
+python-novaclient = "^18.8.0"
 watchdog = "^6.0.0"
 
 [tool.poetry.group.dev.dependencies]
