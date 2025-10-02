@@ -12,7 +12,7 @@ subtasks:
           config_drive: true
           force_delete: false
       contexts:
-        users_custom:
+        users:
           tenants: 1
           users_per_tenant: 1
         network:
