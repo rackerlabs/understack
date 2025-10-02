@@ -1,0 +1,34 @@
+---
+- name: Query user in Nautobot
+  ansible.builtin.uri:
+    url: "https://{{ nautobot_hostname }}/api/users/users/{{ nautobot_username }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+    return_content: true
+    status_code: [200, 404]
+  register: user_query_result
+
+- name: Create user in Nautobot if missing
+  ansible.builtin.uri:
+    url: "https://{{ nautobot_hostname }}/api/users/users/"
+    method: POST
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      username: "{{ nautobot_username }}"
+      password: "{{ nautobot_password }}"
+      is_staff: true
+      is_superuser: true
+    status_code: [201]
+  when: user_query_result.status == 404
+
+- name: Ensure Nautobot token exists for user
+  nautobot_token:
+    base_url: "https://{{ nautobot_hostname }}"
+    username: "{{ nautobot_username }}"
+    password: "{{ nautobot_password }}"
+    user_token: "{{ nautobot_user_token }}"
+  register: nautobot_token_result
