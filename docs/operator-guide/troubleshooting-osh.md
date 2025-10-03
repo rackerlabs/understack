@@ -24,7 +24,7 @@ helm template \
     ironic \  # what we are deploying
     openstack-helm/ironic \  # the path the chart's source is in
     --namespace openstack \
-    -f understack/components/openstack-2024.2-jammy.yaml \  # the version we are deploying
+    -f understack/components/images-openstack.yaml \  # the version we are deploying
     -f understack/components/ironic/values.yaml \  # common configs
     -f your-deploy/$YOUR_ENV/manifests/secret-openstack.yaml \  # credentials
     -f your-deploy/$YOUR_ENV/helm-configs/ironic.yaml  # your specific overrides
@@ -39,7 +39,7 @@ helm template \
     ironic \  # what we are deploying
     openstack-helm/ironic \  # the path the chart's source is in
     --namespace openstack \
-    -f understack/components/openstack-2024.2-jammy.yaml \  # the version we are deploying
+    -f understack/components/images-openstack.yaml \  # the version we are deploying
     -f understack/components/ironic/values.yaml \  # common configs
     -f your-deploy/$YOUR_ENV/manifests/secret-openstack.yaml \  # credentials
     -f your-deploy/$YOUR_ENV/helm-configs/ironic.yaml \  # your specific overrides

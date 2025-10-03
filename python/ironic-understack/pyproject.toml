@@ -7,11 +7,11 @@ name = "ironic-understack"
 version = "0.0.0"
 description = "Ironic hooks for Understack"
 authors = [{ name = "Marek Skrobacki", email = "marek.skrobacki@rackspace.co.uk" }]
-requires-python = "~=3.10"
+requires-python = "~=3.10.0"
 readme = "README.md"
 license = "MIT"
 dependencies = [
-    "ironic>=24.1",
+    "ironic>=29.0,<30",
     "pyyaml~=6.0",
     "understack-flavor-matcher",
 ]

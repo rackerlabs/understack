@@ -94,7 +94,7 @@ class NetAppMinimalLibrary(NetAppNVMeStorageLibrary):
         would check that the dynamic config group we made existed in the
         parsed config, which it does not and it would then fail.
         """
-        na_utils.check_flags(self.REQUIRED_FLAGS, self.configuration)
+        na_utils.check_flags(self.REQUIRED_FLAGS_BASIC, self.configuration)
         self.namespace_ostype = (
             self.configuration.netapp_namespace_ostype or self.DEFAULT_NAMESPACE_OS
         )
