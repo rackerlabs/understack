@@ -1,5 +1,55 @@
 # Ironic
 
+## Overview
+
+OpenStack Ironic is the bare metal provisioning service used to manage and provision physical servers. It provides a hardware abstraction layer through various drivers that support different vendor-specific management interfaces (such as Redfish, IPMI, and iDRAC).
+
+The primary Ironic objects you'll interact with are:
+
+- **Nodes**: Represent physical servers, containing hardware specifications, BMC credentials, and provisioning state
+- **Ports**: Represent physical network connections to switches, identified by MAC addresses
+
+### Hardware Enrollment
+
+Hardware enrollment is an automated process in UnderStack. For details on how servers are discovered and enrolled, see [TODO: Hardware Enrollment Documentation].
+
+### Manual Node and Port Creation
+
+While enrollment is typically automatic, you can manually create nodes and ports when needed:
+
+Create a baremetal node:
+
+The `--driver` parameter is hardware-specific. Use `redfish` for generic Redfish-compliant hardware, `idrac-redfish` for Dell servers, `ilo5` for HPE Gen10+ servers, etc. The `--resource-class` should match your hardware type and size (see [Setting baremetal node flavor](#setting-baremetal-node-flavor) below for details).
+
+```bash
+openstack baremetal node create \
+  --driver idrac-redfish \
+  --inspect-interface idrac-redfish \
+  --driver-info redfish_address=https://10.0.0.100 \
+  --driver-info redfish_username=admin \
+  --driver-info redfish_password=secret \
+  --resource-class baremetal.gp2.small \
+  --name server-001
+```
+
+Create a port for the node:
+
+The `--physical-network` value represents the VLAN group or network segment that this server is connected to. The `--local-link-connection` parameters describe the switch-side connection information (switch MAC, hostname, and port). You must create a port entry for each physical network interface that will be used on the machine. If the port is used for PXE booting, add `--pxe-enabled true`.
+
+```bash
+physnet="n7-13-network"
+switch="n7-13-3.dfw3"
+
+openstack baremetal port create \
+  --physical-network $physnet \
+  --local-link-connection switch_id=00:00:00:00:00:00 \
+  --local-link-connection switch_info=${switch} \
+  --local-link-connection 'port_id=Ethernet1/12' \
+  --node ${node_id} \
+  --name ${NODE_NAME}-${PORT_NAME} \
+  00:00:00:00:03:0b  # MAC address of the physical port
+```
+
 ## Setting baremetal node flavor
 
 Upstream docs: <https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html>
