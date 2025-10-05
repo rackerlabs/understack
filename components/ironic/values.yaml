@@ -22,7 +22,7 @@ conductor:
     # it is only necessary because the above pxe is disabled, its init
     # creates this path
     - name: create-tftpboot
-      image: quay.io/airshipit/heat:2024.2-ubuntu_jammy
+      image: quay.io/airshipit/heat:2025.1-ubuntu_jammy
       imagePullPolicy: IfNotPresent
       command: [bash]
       args:

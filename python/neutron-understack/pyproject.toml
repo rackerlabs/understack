@@ -7,7 +7,7 @@ name = "neutron-understack"
 version = "0.1.0"
 description = "Undercloud's ML2 driver for neutron"
 authors = [{ name = "Understack Developers" }]
-requires-python = "~=3.10"
+requires-python = "~=3.10.0"
 readme = "README.rst"
 license = "Apache-2.0"
 classifiers = [
@@ -26,7 +26,7 @@ classifiers = [
 dependencies = [
     "requests>=2,<3",
     "neutron-lib>=3,<4",
-    "neutron>=25,<26",
+    "neutron>=26,<27",
     "pynautobot>=2.6.1,<3",
 ]
 
