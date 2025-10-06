@@ -51,29 +51,20 @@ class IronicUnderstackDriver(IronicDriver):
             base_metadata["networks"].append(network)
         return base_metadata
 
-    # This is almost exact copy of the IronicDriver's _generate_configdrive,
-    # but we make a determination if injecting storage IPs information is needed
-    # based on the instance 'storage' property.
-    def _generate_configdrive(
-        self, context, instance, node, network_info, extra_md=None, files=None
-    ):
-        """Generate a config drive with optional storage info.
+    def _understack_get_network_metadata(self, instance, node, network_info):
+        """Get network metadata with optional storage network configuration.
+
+        This method implements the Understack-specific logic for determining
+        whether to include storage network configuration based on instance
+        metadata and configuration settings.
 
         :param instance: The instance object.
         :param node: The node object.
         :param network_info: Instance network information.
-        :param extra_md: Optional, extra metadata to be added to the
-                         configdrive.
-        :param files: Optional, a list of paths to files to be added to
-                      the configdrive.
-
+        :returns: Network metadata dictionary
         """
-        if not extra_md:
-            extra_md = {}
-
-        ### Understack modified code START
         if (
-            instance.metadata["storage"] == "wanted"
+            instance.metadata.get("storage") == "wanted"
             and CONF.nova_understack.ip_injection_enabled
         ):
             logger.info("Instance %s requires storage network setup.", instance.uuid)
@@ -99,6 +90,31 @@ class IronicUnderstackDriver(IronicDriver):
                 instance.uuid,
             )
             network_metadata = self._get_network_metadata(node, network_info)
+
+        return network_metadata
+
+    # This is almost exact copy of the IronicDriver's _generate_configdrive,
+    # but we make a determination if injecting storage IPs information is needed
+    # based on the instance 'storage' property.
+    def _generate_configdrive(
+        self, context, instance, node, network_info, extra_md=None, files=None
+    ):
+        """Generate a config drive with optional storage info.
+
+        :param instance: The instance object.
+        :param node: The node object.
+        :param network_info: Instance network information.
+        :param extra_md: Optional, extra metadata to be added to the
+                         configdrive.
+        :param files: Optional, a list of paths to files to be added to
+                      the configdrive.
+
+        """
+        if not extra_md:
+            extra_md = {}
+
+        ### Understack modified code START
+        network_metadata = self._understack_get_network_metadata(instance, node, network_info)
         ### Understack modified code END
 
         i_meta = instance_metadata.InstanceMetadata(

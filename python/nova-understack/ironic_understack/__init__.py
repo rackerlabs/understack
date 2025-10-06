@@ -1,3 +1,3 @@
-from nova.virt.ironic_understack import driver
+from .driver import IronicUnderstackDriver
 
-IronicUnderstackDriver = driver.IronicUnderstackDriver
+__all__ = ["IronicUnderstackDriver"]
