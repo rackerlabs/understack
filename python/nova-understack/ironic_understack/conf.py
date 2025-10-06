@@ -22,6 +22,11 @@ def setup_conf():
             help="Name of the Ansible playbook to execute when server is created.",
             default="storage_on_server_create.yml",
         ),
+        cfg.BoolOpt(
+            "ip_injection_enabled",
+            help="Controls if Nova should inject storage IPs to config drive.",
+            default=True,
+        ),
     ]
     cfg.CONF.register_group(grp)
     cfg.CONF.register_opts(opts, group=grp)

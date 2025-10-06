@@ -72,7 +72,10 @@ class IronicUnderstackDriver(IronicDriver):
             extra_md = {}
 
         ### Understack modified code START
-        if instance.metadata["storage"] == "wanted":
+        if (
+            instance.metadata["storage"] == "wanted"
+            and CONF.nova_understack.ip_injection_enabled
+        ):
             logger.info("Instance %s requires storage network setup.", instance.uuid)
             project_id = str(UUID(instance.project_id))
             device_id = node["uuid"]
