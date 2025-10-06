@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from neutron.db import models_v2
 from neutron.objects import ports as port_obj
 from neutron.objects.network import NetworkSegment
+from neutron.objects.network_segment_range import NetworkSegmentRange
 from neutron.plugins.ml2.driver_context import portbindings
 from neutron.services.trunk.plugin import TrunkPlugin
 from neutron_lib import constants
@@ -11,6 +12,7 @@ from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
 from neutron_lib.plugins import directory
 from neutron_lib.plugins.ml2 import api
+from oslo_config import cfg
 
 from neutron_understack.ml2_type_annotations import NetworkSegmentDict
 from neutron_understack.ml2_type_annotations import PortContext
@@ -240,3 +242,56 @@ def vlan_segment_for_physnet(
             and segment[api.PHYSICAL_NETWORK] == physnet
         ):
             return segment
+
+
+def fetch_vlan_network_segment_ranges() -> list[NetworkSegmentRange]:
+    context = n_context.get_admin_context()
+
+    return NetworkSegmentRange.get_objects(context, network_type="vlan", shared=True)
+
+
+def allowed_tenant_vlan_id_ranges() -> list[tuple[int, int]]:
+    all_vlan_range_objects = fetch_vlan_network_segment_ranges()
+    all_vlan_ranges = [(vr.minimum, vr.maximum) for vr in all_vlan_range_objects]
+    merged_ranges = merge_overlapped_ranges(all_vlan_ranges)
+    default_range = tuple(cfg.CONF.ml2_understack.default_tenant_vlan_id_range)
+    return fetch_gaps_in_ranges(merged_ranges, default_range)
+
+
+def merge_overlapped_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    merged = []
+    for start, end in sorted(ranges):
+        if not merged or start > merged[-1][1] + 1:
+            merged.append([start, end])
+        else:
+            merged[-1][1] = max(merged[-1][1], end)
+    return [tuple(lst) for lst in merged]
+
+
+def fetch_gaps_in_ranges(
+    ranges: list[tuple[int, int]], default_range: tuple[int, int]
+) -> list[tuple[int, int]]:
+    free_ranges = []
+    prev_end = default_range[0] - 1
+    for start, end in ranges:
+        if start > prev_end + 1:
+            free_ranges.append((prev_end + 1, start - 1))
+        prev_end = end
+    if prev_end < default_range[1]:
+        free_ranges.append((prev_end + 1, default_range[1]))
+    return free_ranges
+
+
+def segmentation_id_in_ranges(
+    segmentation_id: int, ranges: list[tuple[int, int]]
+) -> bool:
+    return any(start <= segmentation_id <= end for start, end in ranges)
+
+
+def printable_ranges(ranges: list[tuple[int, int]]) -> str:
+    return ",".join(
+        [
+            f"{str(tpl[0])}-{str(tpl[1])}" if tpl[0] != tpl[1] else str(tpl[0])
+            for tpl in ranges
+        ]
+    )

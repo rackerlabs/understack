@@ -82,6 +82,15 @@ mech_understack_opts = [
             "Nautobot."
         ),
     ),
+    cfg.ListOpt(
+        "default_tenant_vlan_id_range",
+        default=[1, 3799],
+        item_type=cfg.types.Integer(min=1, max=4094),
+        help=(
+            "List of 2 comma separated integers, that represents a VLAN range, that"
+            "will be used for mapped VLANs on the switches."
+        ),
+    ),
 ]
 
 l3_svc_cisco_asa_opts = [
