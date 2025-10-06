@@ -83,7 +83,7 @@ class IronicUnderstackDriver(IronicDriver):
                 playbook_args,
             )
             result = self._argo_connection.run_playbook(
-                "storage_on_server_create.yml", **playbook_args
+                CONF.nova_understack.ansible_playbook_filename, **playbook_args
             )
             logger.debug("Ansible result: %s", result)
             logger.info("Playbook run completed, collecting rest of metadata.")
