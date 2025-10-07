@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nova-understack"
+version = "0.0.0"
+description = "Nova drivers for Understack"
+authors = [{ name = "Marek Skrobacki", email = "marek.skrobacki@rackspace.co.uk" }]
+requires-python = "~=3.10.0"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+    "nova>=30.1",
+    "requests>=2.25.0",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=8.3.2,<9",
+    "pytest-github-actions-annotate-failures",
+    "pytest-cov>=6.2.1,<7",
+]
+
+[tool.uv]
+default-groups = ["test"]
+
+[tool.hatch.build.targets.sdist]
+include = ["nova_understack"]
+
+[tool.hatch.build.targets.wheel]
+include = ["nova_understack"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra --cov=nova_understack"
+testpaths = [
+    "tests",
+]
+
+[tool.ruff]
+# use our default and override anything we need specifically
+extend = "../pyproject.toml"
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",     # allow 'assert' for pytest
+    "S105",     # allow hardcoded passwords for testing
+    "S106",     # allow hardcoded passwords for testing
+]

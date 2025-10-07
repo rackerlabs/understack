@@ -1,0 +1,27 @@
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: nova-nautobot
+  namespace: openstack
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: nautobot
+  target:
+    name: nova-nautobot
+    creationPolicy: Owner
+    deletionPolicy: Delete
+    template:
+      engineVersion: v2
+      data:
+        nova-nautobot.conf: |
+          [nova_understack]
+          nautobot_base_url = http://nautobot-default.nautobot.svc.cluster.local
+          nautobot_api_key = {{ .token }}
+  data:
+  - secretKey: token
+    remoteRef:
+      key: nautobot-superuser
+      property: apitoken

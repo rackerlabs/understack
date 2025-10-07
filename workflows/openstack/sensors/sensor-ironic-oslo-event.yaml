@@ -101,17 +101,6 @@ spec:
                               import uuid
                               project_id_without_dashes = "{{workflow.parameters.project_id}}"
                               print(str(uuid.UUID(project_id_without_dashes)))
-                  - - name: ansible-on-server-create
-                      when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
-                      templateRef:
-                        name: ansible-workflow-template
-                        template: ansible-run
-                      arguments:
-                        parameters:
-                        - name: playbook
-                          value: storage_on_server_create.yml
-                        - name: extra_vars
-                          value: project_id={{steps.convert-project-id.outputs.result}} device_id={{workflow.parameters.device_id}}
                   - - name: ansible-storage-update
                       when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
                       templateRef:
