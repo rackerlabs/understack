@@ -114,7 +114,9 @@ class IronicUnderstackDriver(IronicDriver):
             extra_md = {}
 
         ### Understack modified code START
-        network_metadata = self._understack_get_network_metadata(instance, node, network_info)
+        network_metadata = self._understack_get_network_metadata(
+            instance, node, network_info
+        )
         ### Understack modified code END
 
         i_meta = instance_metadata.InstanceMetadata(
