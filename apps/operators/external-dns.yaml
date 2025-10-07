@@ -3,7 +3,7 @@ component: external-dns
 sources:
   - repoURL: ghcr.io/rackerlabs/charts
     chart: external-dns-rackspace
-    targetRevision: 0.0.5
+    targetRevision: 0.1.0
     helm:
       releaseName: external-dns-rackspace
       namespace: "external-dns"
