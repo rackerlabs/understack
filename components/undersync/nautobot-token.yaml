@@ -3,7 +3,6 @@ apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: nautobot-token
-  namespace: openstack
 spec:
   refreshInterval: 1h
   secretStoreRef:
@@ -21,7 +20,7 @@ spec:
   data:
   - secretKey: token
     remoteRef:
-      key: openstack-token
+      key: undersync-token
       property: token
       # necessary to avoid argoproj/argo-cd#13004
       conversionStrategy: Default
