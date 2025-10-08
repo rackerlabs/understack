@@ -35,6 +35,7 @@ docker run --rm --env-file dev.env ghcr.io/rackerlabs/understack/understack-test
 - **`floating_ips.yaml`** - build a network, server, router and associate and
   dissociate floating IP
 - **`create_tenants.yaml`** - creates and deletes 1000 tenants/projects.
+- **`bulk_networks_test.yaml`** - creates and deletes 1000 networks.
 
 ## Listing available scenario plugins
 
