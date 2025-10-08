@@ -59,6 +59,6 @@
 - name: Set 'flavorsync' role
   openstack.cloud.role_assignment:
     user: "{{ _flavor_sync_user.user.id }}"
-    domain: default
+    domain: service
     role: flavorsync
     state: present
