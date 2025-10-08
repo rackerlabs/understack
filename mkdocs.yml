@@ -139,6 +139,7 @@ nav:
       - deploy-guide/config-openstack.md
       - deploy-guide/secrets-eso-setup.md
       - deploy-guide/openstack-svc-users.md
+      - deploy-guide/nautobot-secrets.md
       - deploy-guide/auth.md
       - deploy-guide/config-argo-workflows.md
     - Starting the Deployment:
