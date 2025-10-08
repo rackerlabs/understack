@@ -3,7 +3,7 @@ component: nautobot
 sources:
   - repoURL: https://nautobot.github.io/helm-charts/
     chart: nautobot
-    targetRevision: 2.4.6
+    targetRevision: 2.5.6
     helm:
       releaseName: nautobot
       valueFiles:
