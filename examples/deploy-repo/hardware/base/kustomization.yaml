@@ -10,3 +10,9 @@ configMapGenerator:
       - cisco-nexus-9336c-fx2.yaml=../device-types/cisco-nexus-9336c-fx2.yaml
       - dell-poweredge-r7615.yaml=../device-types/dell-poweredge-r7615.yaml
       - palo-alto-pa-5220.yaml=../device-types/palo-alto-pa-5220.yaml
+  - name: flavors
+    options:
+      disableNameSuffixHash: true
+    files:
+      - m1.small.yaml=../flavors/m1.small.yaml
+      - m1.small.nicX.yaml=../flavors/m1.small.nicX.yaml
