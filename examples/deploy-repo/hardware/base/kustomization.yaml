@@ -1,0 +1,12 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+configMapGenerator:
+  - name: device-types
+    options:
+      disableNameSuffixHash: true
+    files:
+      - cisco-nexus-9336c-fx2.yaml=../device-types/cisco-nexus-9336c-fx2.yaml
+      - dell-poweredge-r7615.yaml=../device-types/dell-poweredge-r7615.yaml
+      - palo-alto-pa-5220.yaml=../device-types/palo-alto-pa-5220.yaml
