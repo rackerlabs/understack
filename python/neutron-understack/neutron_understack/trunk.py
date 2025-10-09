@@ -4,6 +4,7 @@ from neutron.objects.ports import PortBindingLevel
 from neutron.objects.trunk import SubPort
 from neutron.services.trunk.drivers import base as trunk_base
 from neutron.services.trunk.models import Trunk
+from neutron_lib import exceptions as exc
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
 from neutron_lib.callbacks import registry
@@ -19,6 +20,14 @@ LOG = log.getLogger(__name__)
 SUPPORTED_INTERFACES = (portbindings.VIF_TYPE_OTHER,)
 
 SUPPORTED_SEGMENTATION_TYPES = (trunk_consts.SEGMENTATION_TYPE_VLAN,)
+
+
+class SubportSegmentationIDError(exc.NeutronException):
+    message = (
+        "Segmentation ID: %(seg_id)s cannot be set to the Subport: "
+        "%(subport_id)s as it falls outside of allowed ranges: "
+        "%(network_segment_ranges)s. Please use different Segmentation ID."
+    )
 
 
 class UnderStackTrunkDriver(trunk_base.DriverBase):
@@ -96,12 +105,42 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
     def _handle_tenant_vlan_id_and_switchport_config(
         self, subports: list[SubPort], trunk: Trunk
     ) -> None:
+        self._check_subports_segmentation_id(subports, trunk.id)
         parent_port_obj = utils.fetch_port_object(trunk.port_id)
 
         if utils.parent_port_is_bound(parent_port_obj):
             self._add_subports_networks_to_parent_port_switchport(
                 parent_port_obj, subports
             )
+
+    def _check_subports_segmentation_id(
+        self, subports: list[SubPort], trunk_id: str
+    ) -> None:
+        """Checks if a subport's segmentation_id is within the allowed range.
+
+        A switchport cannot have a mapped VLAN ID equal to the native VLAN ID.
+        Since the user specifies the VLAN ID (segmentation_id) when adding a
+        subport, an error is raised if it falls within any VLAN network segment
+        range, as these ranges are used to allocate VLAN tags for all VLAN
+        segments, including native VLANs.
+
+        The only case where this check is not required is for a network node
+        trunk, since its subport segmentation_ids are the same as the network
+        segment VLAN tags allocated to the subports. Therefore, there is no
+        possibility of conflict with the native VLAN.
+        """
+        if trunk_id == cfg.CONF.ml2_understack.network_node_trunk_uuid:
+            return
+
+        ns_ranges = utils.allowed_tenant_vlan_id_ranges()
+        for subport in subports:
+            seg_id = subport.segmentation_id
+            if not utils.segmentation_id_in_ranges(seg_id, ns_ranges):
+                raise SubportSegmentationIDError(
+                    seg_id=seg_id,
+                    subport_id=subport.port_id,
+                    network_segment_ranges=utils.printable_ranges(ns_ranges),
+                )
 
     def configure_trunk(self, trunk_details: dict, port_id: str) -> None:
         parent_port_obj = utils.fetch_port_object(port_id)
@@ -146,6 +185,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         vlan_group_name = self.ironic_client.baremetal_port_physical_network(
             local_link_info
         )
+
         self._handle_segment_allocation(subports, vlan_group_name, binding_host)
 
     def clean_trunk(
