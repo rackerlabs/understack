@@ -185,6 +185,65 @@ The schema enforces:
 * Conditional requirements (servers must have resource classes)
 * Numeric constraints (e.g., `u_height > 0`)
 
+## Resource Class Assignment
+
+When a device-type defines multiple resource classes for the same hardware model, the Ironic inspection process determines which resource class to assign to each discovered node through exact hardware matching.
+
+### Inspection Hook Matching Logic
+
+The `resource-class` inspection hook in `python/ironic-understack` performs the following steps:
+
+1. **Hardware Discovery**: Ironic inspection discovers hardware specifications:
+    * CPU cores and model
+    * Memory size (in MB)
+    * Drive sizes and count
+    * System manufacturer and model
+
+2. **Device-Type Matching**: Hook reads device-types ConfigMap and matches:
+    * Manufacturer name (e.g., "Dell", "HPE")
+    * Model name (e.g., "PowerEdge R7615")
+
+3. **Resource Class Matching**: Within matched device-type, hook compares discovered specs against each resource class:
+    * CPU details must match `cpu.cores` and `cpu.model` exactly
+    * Memory size must match `memory.size` (converted to MB)
+    * Drive count and sizes must match `drives` array
+    * Network interface count must match `nic_count`
+
+4. **Assignment**: Hook sets `resource_class` property on Ironic node to the matching resource class name
+
+### Example Matching Scenario
+
+Device-type definition with multiple resource classes:
+
+```yaml
+manufacturer: Dell
+model: PowerEdge R7615
+resource_class:
+  - name: m1.small
+    cpu: {cores: 16, model: AMD EPYC 9124}
+    memory: {size: 128}
+    drives: [{size: 480}, {size: 480}]
+  - name: m1.medium
+    cpu: {cores: 32, model: AMD EPYC 9334}
+    memory: {size: 256}
+    drives: [{size: 960}, {size: 960}]
+```
+
+Inspection discovers Dell PowerEdge R7615 with 32 cores, 256 GB RAM, two 960 GB drives:
+
+* Matches device-type: Dell PowerEdge R7615
+* Matches resource class: m1.medium (exact CPU/memory/drives match)
+* Sets `node.resource_class = "m1.medium"`
+
+### Matching Requirements
+
+* **Exact matching**: All specs (CPU cores, memory size, drive sizes) must match exactly
+* **No partial matches**: If any spec differs, resource class is not matched
+* **No match fallback**: If no resource class matches discovered specs, inspection fails with error
+* **Drive order matters**: Drive sizes are matched in array order
+
+This ensures predictable resource class assignment and prevents misconfiguration.
+
 ## Management Workflow
 
 Device types are managed through the `understackctl` CLI tool:
@@ -195,7 +254,7 @@ Device types are managed through the `understackctl` CLI tool:
 2. Validate and add with `understackctl device-type add <file>` (automatically updates Kustomization)
 3. Commit to Git and submit pull request
 4. ArgoCD detects changes and updates ConfigMap
-5. Platform components consume updated definitions
+5. Ironic inspection hook reads updated ConfigMap and uses new definitions for matching
 
 **Updating existing device types:**
 

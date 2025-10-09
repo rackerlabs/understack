@@ -121,8 +121,9 @@ nav:
   - 'Design Guide':
     - design-guide/intro.md
     - design-guide/add-remove-app.md
-    - design-guide/device-types.md
-    - design-guide/flavors.md
+    - 'Hardware Definitions':
+      - design-guide/device-types.md
+      - design-guide/flavors.md
     - design-guide/neutron-networking.md
     - design-guide/argo-workflows.md
     - design-guide/argo-events.md
