@@ -129,3 +129,107 @@ class TestIsRouterInterface:
     def test_router_interface_false_device_owner_none(self):
         context = PortContext(current={"device_owner": None})
         assert not utils.is_router_interface(context)
+
+
+class TestMergeOverlappedRanges:
+    def test_single_range(self):
+        assert utils.merge_overlapped_ranges([(1, 5)]) == [(1, 5)]
+
+    def test_no_overlap(self):
+        ranges = [(1, 3), (5, 7), (9, 10)]
+        expected = [(1, 3), (5, 7), (9, 10)]
+        assert utils.merge_overlapped_ranges(ranges) == expected
+
+    def test_simple_overlap(self):
+        ranges = [(1, 4), (2, 5)]
+        expected = [(1, 5)]
+        assert utils.merge_overlapped_ranges(ranges) == expected
+
+    def test_multiple_ranges(self):
+        ranges = [(1, 3), (2, 6), (8, 10), (15, 18)]
+        expected = [(1, 6), (8, 10), (15, 18)]
+        assert utils.merge_overlapped_ranges(ranges) == expected
+
+    def test_touching_ranges(self):
+        ranges = [(1, 4), (5, 7), (8, 10)]
+        expected = [(1, 10)]
+        assert utils.merge_overlapped_ranges(ranges) == expected
+
+    def test_unsorted_input(self):
+        ranges = [(8, 10), (1, 3), (2, 7), (15, 18)]
+        expected = [(1, 10), (15, 18)]
+        assert utils.merge_overlapped_ranges(ranges) == expected
+
+
+class TestFetchGapsInRanges:
+    def test_full_coverage(self):
+        assert utils.fetch_gaps_in_ranges([(1, 10)], (1, 10)) == []
+
+    def test_gap_at_start(self):
+        assert utils.fetch_gaps_in_ranges([(5, 8)], (1, 10)) == [(1, 4), (9, 10)]
+
+    def test_gap_at_end(self):
+        assert utils.fetch_gaps_in_ranges([(1, 6)], (1, 10)) == [(7, 10)]
+
+    def test_gap_in_middle(self):
+        assert utils.fetch_gaps_in_ranges([(1, 2), (5, 10)], (1, 10)) == [(3, 4)]
+
+    def test_multiple_gaps(self):
+        result = utils.fetch_gaps_in_ranges([(1, 2), (4, 5), (8, 8)], (1, 10))
+        assert result == [(3, 3), (6, 7), (9, 10)]
+
+
+class DummyRange:
+    def __init__(self, minimum, maximum):
+        self.minimum = minimum
+        self.maximum = maximum
+
+
+class TestAllowedTenantVlanIdRanges:
+    def test_multiple_non_overlapping_ranges(
+        self,
+        mocker,
+    ):
+        mocker.patch(
+            "oslo_config.cfg.CONF.ml2_understack.default_tenant_vlan_id_range",
+            [1, 2000],
+        )
+        mocker.patch(
+            "neutron_understack.utils.fetch_vlan_network_segment_ranges",
+            return_value=[DummyRange(500, 700), DummyRange(900, 1200)],
+        )
+        expected_result = [(1, 499), (701, 899), (1201, 2000)]
+        result = utils.allowed_tenant_vlan_id_ranges()
+        assert result == expected_result
+
+    def test_multiple_overlapping_ranges(
+        self,
+        mocker,
+    ):
+        mocker.patch(
+            "oslo_config.cfg.CONF.ml2_understack.default_tenant_vlan_id_range",
+            [1, 2000],
+        )
+        mocker.patch(
+            "neutron_understack.utils.fetch_vlan_network_segment_ranges",
+            return_value=[DummyRange(500, 700), DummyRange(600, 1200)],
+        )
+        expected_result = [(1, 499), (1201, 2000)]
+        result = utils.allowed_tenant_vlan_id_ranges()
+        assert result == expected_result
+
+    def test_single_range(
+        self,
+        mocker,
+    ):
+        mocker.patch(
+            "oslo_config.cfg.CONF.ml2_understack.default_tenant_vlan_id_range",
+            [1, 2000],
+        )
+        mocker.patch(
+            "neutron_understack.utils.fetch_vlan_network_segment_ranges",
+            return_value=[DummyRange(500, 700)],
+        )
+        expected_result = [(1, 499), (701, 2000)]
+        result = utils.allowed_tenant_vlan_id_ranges()
+        assert result == expected_result

@@ -3,6 +3,7 @@ from neutron.plugins.ml2.driver_context import portbindings
 from oslo_config import cfg
 
 from neutron_understack import utils
+from neutron_understack.trunk import SubportSegmentationIDError
 
 
 class TestSubportsAdded:
@@ -54,17 +55,21 @@ class TestTrunkCreated:
 @pytest.mark.usefixtures("ironic_baremetal_port_physical_network")
 @pytest.mark.usefixtures("utils_fetch_subport_network_id_patch")
 class Test_HandleTenantVlanIDAndSwitchportConfig:
-    def test_when_ucvni_tenant_vlan_id_is_not_set_yet(
+    def test_that_check_subports_segmentation_id_is_called(
         self, mocker, understack_trunk_driver, trunk, subport, network_id, vlan_num
     ):
         mocker.patch("neutron_understack.utils.fetch_port_object")
         mocker.patch(
             "neutron_understack.utils.parent_port_is_bound", return_value=False
         )
-
+        subport_seg_id_check = mocker.patch.object(
+            understack_trunk_driver, "_check_subports_segmentation_id"
+        )
         understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
             [subport], trunk
         )
+
+        subport_seg_id_check.assert_called_once()
 
     def test_when_parent_port_is_bound(
         self,
@@ -76,6 +81,7 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
         port_id,
         vlan_network_segment,
     ):
+        mocker.patch.object(understack_trunk_driver, "_check_subports_segmentation_id")
         mocker.patch(
             "neutron_understack.utils.fetch_port_object", return_value=port_object
         )
@@ -87,9 +93,13 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
             "neutron_understack.utils.network_segment_by_physnet", return_value=None
         )
         mocker.patch("neutron_understack.utils.create_binding_profile_level")
+        add_subports_networks = mocker.patch.object(
+            understack_trunk_driver, "_add_subports_networks_to_parent_port_switchport"
+        )
         understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
             [subport], trunk
         )
+        add_subports_networks.assert_called_once()
 
     def test_subports_add_post(
         self,
@@ -114,20 +124,18 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
     def test_when_parent_port_is_unbound(
         self, mocker, understack_trunk_driver, trunk, subport, port_object
     ):
+        mocker.patch.object(understack_trunk_driver, "_check_subports_segmentation_id")
         port_object.bindings[0].vif_type = portbindings.VIF_TYPE_UNBOUND
         mocker.patch(
             "neutron_understack.utils.fetch_port_object", return_value=port_object
         )
-        mocker.patch.object(
+        add_subports_networks = mocker.patch.object(
             understack_trunk_driver, "_add_subports_networks_to_parent_port_switchport"
         )
         understack_trunk_driver._handle_tenant_vlan_id_and_switchport_config(
             [subport], trunk
         )
-
-        (
-            understack_trunk_driver._add_subports_networks_to_parent_port_switchport.assert_not_called()
-        )
+        add_subports_networks.assert_not_called()
 
 
 class TestSubportsDeleted:
@@ -322,3 +330,51 @@ class TestCleanTrunk:
             subports=[],
             invoke_undersync=False,
         )
+
+
+class TestCheckSubportsSegmentationId:
+    def test_when_trunk_id_is_network_node_trunk_id(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk_id,
+    ):
+        mocker.patch(
+            "oslo_config.cfg.CONF.ml2_understack.network_node_trunk_uuid",
+            trunk_id,
+        )
+        result = understack_trunk_driver._check_subports_segmentation_id([], trunk_id)
+        assert result is None
+
+    def test_when_segmentation_id_is_in_allowed_range(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk_id,
+        subport,
+    ):
+        allowed_ranges = mocker.patch(
+            "neutron_understack.utils.allowed_tenant_vlan_id_ranges",
+            return_value=[(1, 1500)],
+        )
+        subport.segmentation_id = 500
+        result = understack_trunk_driver._check_subports_segmentation_id(
+            [subport], trunk_id
+        )
+        allowed_ranges.assert_called_once()
+        assert result is None
+
+    def test_when_segmentation_id_is_not_in_allowed_range(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk_id,
+        subport,
+    ):
+        mocker.patch(
+            "neutron_understack.utils.allowed_tenant_vlan_id_ranges",
+            return_value=[(1, 1500)],
+        )
+        subport.segmentation_id = 1600
+        with pytest.raises(SubportSegmentationIDError):
+            understack_trunk_driver._check_subports_segmentation_id([subport], trunk_id)
