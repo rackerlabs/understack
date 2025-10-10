@@ -267,20 +267,20 @@ traits:
 
 Guarantees instances get nodes with GPU hardware.
 
-### Legacy Hardware Exclusion
+### NIC-Specific Hardware
 
-Prevent scheduling on older hardware:
+Require specific network hardware:
 
 ```yaml
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
-name: compute.modern
+name: m1.small.mellanox-cx5
 resource_class: m1.small
 traits:
-  - trait: OLD_NIC
-    requirement: absent
+  - trait: NIC_MELLANOX_CX5
+    requirement: required
 ```
 
-Excludes nodes with the `CUSTOM_OLD_NIC` trait from this flavor.
+Only matches nodes with Mellanox ConnectX-5 network cards.
 
 ### Multiple Traits
 
@@ -304,8 +304,8 @@ Requires NVMe storage but excludes GPU nodes.
 ### Naming Conventions
 
 * **Generic flavors**: Use simple, descriptive names (e.g., `compute.standard`, `m1.small`)
-* **Specialized flavors**: Append trait indicators (e.g., `m1.small.nicX`, `compute.gpu`)
-* **Exclusion flavors**: Use descriptive suffixes (e.g., `m1.small.no-gpu`, `compute.modern`)
+* **Specialized flavors**: Append trait indicators (e.g., `m1.small.mellanox-cx5`, `compute.gpu`)
+* **Exclusion flavors**: Use descriptive suffixes (e.g., `m1.small.no-gpu`)
 
 ### Resource Class References
 
@@ -422,20 +422,20 @@ traits:
 
 Guarantees GPU hardware for compute workloads.
 
-### Modern Hardware Flavor
+### Combined Hardware Requirements
 
 ```yaml
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
-name: compute.modern
+name: m1.medium.mellanox-cx5-nvme
 resource_class: m1.medium
 traits:
-  - trait: OLD_NIC
-    requirement: absent
-  - trait: OLD_FIRMWARE
-    requirement: absent
+  - trait: NIC_MELLANOX_CX5
+    requirement: required
+  - trait: NVME
+    requirement: required
 ```
 
-Excludes nodes with outdated hardware traits.
+Requires both Mellanox ConnectX-5 and NVMe storage.
 
 ## Integration with Device-Types
 
