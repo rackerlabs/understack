@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Hardware flavors define matching criteria for Ironic bare metal nodes based on resource classes and traits. They act as filters that select which nodes are eligible for specific Nova flavors, with the Nova flavor properties (vCPUs, RAM, disk) derived from the matched device-type resource class.
+Hardware flavor definitions are YAML specifications that define how to create Nova flavors for bare metal nodes. Each hardware flavor definition results in a corresponding Nova flavor that users see when running `openstack flavor list`. These definitions specify matching criteria based on resource classes and traits, determining which Ironic bare metal nodes are eligible for each Nova flavor.
+
+The Nova flavor properties (vCPUs, RAM, disk) are automatically derived from the matched device-type resource class, and scheduling is performed using resource class and trait matching.
 
 Flavors enable operators to:
 
