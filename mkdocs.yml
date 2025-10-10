@@ -123,6 +123,7 @@ nav:
     - design-guide/add-remove-app.md
     - 'Hardware Definitions':
       - design-guide/device-types.md
+      - design-guide/hardware-traits.md
       - design-guide/flavors.md
     - design-guide/neutron-networking.md
     - design-guide/argo-workflows.md
