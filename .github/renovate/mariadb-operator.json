@@ -1,0 +1,22 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "onboarding": false,
+  "requireConfig": "ignored",
+  "enabledManagers": ["regex"],
+  "regexManagers": [
+    {
+      "fileMatch": ["^understack/operators/mariadb-operator/kustomization\\.yaml$"],
+      "matchStrings": [
+        "(?m)^[ \\t]*- name:\\s*(?<depName>[^\\s]+)[\\s\\S]*?repo:\\s*(?<registryUrl>[^\\s]+)[\\s\\S]*?version:\\s*(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "helm"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchDatasources": ["helm"],
+      "groupName": "mariadb-operator Helm charts"
+    }
+  ]
+}
