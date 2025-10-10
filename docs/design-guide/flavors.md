@@ -24,15 +24,17 @@ Flavors enable operators to:
 
 ### Data Flow
 
-```text
-Hardware Inspection → Traits Applied to Ironic Node
-                   → resource_class Set (from device-type)
+```mermaid
+graph TD
+    A[Hardware Inspection] -->|Discovers hardware| B[Ironic Node]
+    A -->|Sets traits| B
+    A -->|Sets resource_class| B
 
-Device-Type Resource Class → CPU cores, RAM, drives defined
+    C[Device-Type Definition] -->|Defines specs for resource_class| D[CPU, RAM, Drive specs]
 
-Flavor Definition → Match by resource_class
-                 → Filter by trait requirements
-                 → Nova Flavor (properties from device-type)
+    E[Flavor Definition] -->|Matches nodes by| F[resource_class + traits]
+    D -->|Provides properties| G[Nova Flavor Created]
+    F --> G
 ```
 
 ## Schema Structure
