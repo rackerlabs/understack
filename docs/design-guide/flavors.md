@@ -364,6 +364,8 @@ resource_class: m1.small  # Links to device-type resource class
 
 The flavor-matcher looks up `m1.small` in device-type definitions to find the CPU (16 cores), memory (128 GB), and drives (480 GB) when creating the Nova flavor.
 
+**Important**: Resource class names must be unique across all device types. Each resource class name should only be defined in one device type to avoid conflicts and ensure predictable Nova flavor creation. Validation checks enforce this constraint.
+
 ### Multiple Flavors, Single Resource Class
 
 A single device-type resource class supports multiple flavors with different trait filters:
