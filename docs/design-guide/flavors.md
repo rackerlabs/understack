@@ -259,10 +259,15 @@ Users can choose between generic availability or guaranteed NVMe storage. Both f
 
 ### Trait Design
 
-* Define traits at appropriate granularity (model-specific vs. category)
-* Document trait meanings and discovery logic
-* Use consistent trait naming across the organization
-* Avoid over-fragmentation (too many specific traits reduces hardware pool flexibility)
+* Define traits at appropriate granularity - both specific (model-level) and general (category-level) traits are useful
+* Specific traits enable precise hardware selection and maximize flexibility for users with specialized needs
+* General traits provide broader hardware pools for users with less specific requirements
+* Document trait meanings and discovery logic in a central registry (see [hardware-traits.md](hardware-traits.md) for standard traits)
+* Use consistent trait naming across the organization:
+    * Reference the standard traits documented in hardware-traits.md
+    * For custom traits, establish naming conventions in your deployment repository's trait registry
+    * Follow the pattern: `CATEGORY_VENDOR_MODEL` (e.g., `NIC_MELLANOX_CX5`, `GPU_NVIDIA_A100`)
+    * Coordinate with other teams when defining new traits to avoid duplicates or conflicts
 
 ### Resource Class Alignment
 
