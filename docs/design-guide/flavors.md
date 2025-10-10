@@ -216,19 +216,19 @@ traits:
 
 Guarantees instances get hardware with GPU capabilities while using the `m1.large` resource class specifications for vCPUs/RAM/disk.
 
-### Legacy Hardware Exclusion
+### Hardware Requirement with Exclusion
 
-Exclude older hardware from general availability:
+Require specific hardware while excluding others:
 
 ```yaml
-name: compute.modern
+name: m1.small.mellanox-cx5
 resource_class: m1.small
 traits:
-  - trait: OLD_NIC
-    requirement: absent
+  - trait: NIC_MELLANOX_CX5
+    requirement: required
 ```
 
-Prevents scheduling on nodes with outdated network cards.
+Guarantees instances get nodes with Mellanox ConnectX-5 network cards.
 
 ### Multiple Flavors per Resource Class
 
@@ -254,8 +254,8 @@ Users can choose between generic availability or guaranteed NVMe storage. Both f
 ### Naming Conventions
 
 * **Base flavor**: Use simple names matching resource class (e.g., `m1.small`)
-* **Specialized flavors**: Append trait indicators (e.g., `m1.small.nicX`, `m1.large.gpu`)
-* **Exclusion flavors**: Use descriptive suffixes (e.g., `m1.small.no-gpu`, `compute.modern`)
+* **Specialized flavors**: Append trait indicators (e.g., `m1.small.mellanox-cx5`, `m1.large.gpu`)
+* **Exclusion flavors**: Use descriptive suffixes (e.g., `m1.small.no-gpu`)
 
 ### Trait Design
 
