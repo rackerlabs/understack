@@ -335,7 +335,7 @@ matching during hardware enrollment and accurate Nova flavor creation.
   interfaces, specific switch ports)
 * Mark management interfaces with `mgmt_only: true`
 * Follow standard interface type naming (e.g., `1000base-t`, `10gbase-x-sfp+`,
-  `25gbase-x-sfp28`)
+  `25gbase-x-sfp28`) - see [Nautobot interface types](https://docs.nautobot.com/projects/core/en/stable/user-guide/core-data-model/dcim/interface/#interface-type) for available values
 * Use `nic_count` in resource classes to specify minimum user-usable network
   ports (not tied to specific named interfaces)
 
