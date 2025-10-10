@@ -57,6 +57,7 @@ Flavor definitions are YAML files validated against `schema/flavor.schema.json`.
 ### Example: Generic Flavor
 
 ```yaml
+---
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
 name: m1.small
 resource_class: m1.small
@@ -67,6 +68,7 @@ This matches all Ironic nodes with `resource_class=m1.small`, regardless of trai
 ### Example: Trait-Specific Flavor
 
 ```yaml
+---
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
 name: m1.small.nicX
 resource_class: m1.small
@@ -80,6 +82,7 @@ This matches only nodes with `resource_class=m1.small` AND the `CUSTOM_NICX` tra
 ### Example: Exclusion Flavor
 
 ```yaml
+---
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
 name: m1.small.no-gpu
 resource_class: m1.small
@@ -200,6 +203,7 @@ And extra_specs for scheduling:
 Create flavors that match any hardware in a resource class:
 
 ```yaml
+---
 name: compute.standard
 resource_class: m1.medium
 ```
@@ -211,6 +215,7 @@ Users get any available `m1.medium` server, providing flexibility and maximizing
 Create flavors for specific hardware capabilities:
 
 ```yaml
+---
 name: compute.gpu
 resource_class: m1.large
 traits:
@@ -225,6 +230,7 @@ Guarantees instances get hardware with GPU capabilities while using the `m1.larg
 Require specific hardware while excluding others:
 
 ```yaml
+---
 name: m1.small.mellanox-cx5
 resource_class: m1.small
 traits:
@@ -239,10 +245,11 @@ Guarantees instances get nodes with Mellanox ConnectX-5 network cards.
 Define multiple flavors for the same resource class with different trait requirements:
 
 ```yaml
+---
 # Generic flavor
 name: m1.small
 resource_class: m1.small
-
+---
 # Specialized variant
 name: m1.small.nvme
 resource_class: m1.small
@@ -341,6 +348,7 @@ Each flavor's `resource_class` must match a resource class defined in a device-t
 **Device-Type Definition** (`dell-poweredge-r7615.yaml`):
 
 ```yaml
+---
 class: server
 manufacturer: Dell
 model: PowerEdge R7615
@@ -360,6 +368,7 @@ resource_class:
 **Flavor Definition** (`m1.small.yaml`):
 
 ```yaml
+---
 name: m1.small
 resource_class: m1.small  # Links to device-type resource class
 ```
@@ -373,17 +382,18 @@ The flavor-matcher looks up `m1.small` in device-type definitions to find the CP
 A single device-type resource class supports multiple flavors with different trait filters:
 
 ```yaml
+---
 # Generic: matches all m1.small nodes
 name: m1.small
 resource_class: m1.small
-
+---
 # Specialized: only nodes with NICX trait
 name: m1.small.nicX
 resource_class: m1.small
 traits:
   - trait: NICX
     requirement: required
-
+---
 # Exclusion: nodes without GPU
 name: m1.small.no-gpu
 resource_class: m1.small
