@@ -145,11 +145,20 @@ The flavor-matcher service (or workflow component) consumes both flavor and devi
 
 ### Nova Flavor Property Derivation
 
-Nova flavor properties are derived from the device-type resource class:
+Nova flavor properties (vcpus, ram, disk) are derived from the device-type resource class for convenience. For bare metal flavors, these properties are informational only - the actual scheduling is done through the `extra_specs` properties where resource consumption is set to 0. See [OpenStack Ironic flavor configuration documentation](https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html) for details on how Nova flavors work with Ironic.
+
+Derived properties:
 
 * **vcpus**: CPU cores from resource class `cpu.cores`
 * **ram**: Memory size from resource class `memory.size` (converted to MB)
 * **disk**: Primary drive size from resource class `drives[0].size` (or 0 for diskless)
+
+The extra_specs properties are set for scheduling:
+
+* **resources:VCPU='0'**: Bare metal doesn't consume virtual CPU resources
+* **resources:MEMORY_MB='0'**: Bare metal doesn't consume virtual memory resources
+* **resources:DISK_GB='0'**: Bare metal doesn't consume virtual disk resources
+* **resources:CUSTOM_BAREMETAL_{RESOURCE_CLASS}='1'**: Requires one bare metal node of the specified resource class
 
 Example device-type resource class:
 
@@ -167,11 +176,18 @@ resource_class:
     nic_count: 2
 ```
 
-This produces a Nova flavor with:
+This produces a Nova flavor with properties:
 
 * vcpus: 16
 * ram: 131072 MB (128 GB * 1024)
 * disk: 480 GB
+
+And extra_specs for scheduling:
+
+* resources:CUSTOM_BAREMETAL_M1_SMALL='1'
+* resources:VCPU='0'
+* resources:MEMORY_MB='0'
+* resources:DISK_GB='0'
 
 ## Use Cases
 

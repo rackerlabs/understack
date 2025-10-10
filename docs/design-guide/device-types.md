@@ -25,7 +25,7 @@ infrastructure management:
 Device type definitions follow the [device-type.schema.json](https://github.com/rackerlabs/understack/blob/main/schema/device-type.schema.json)
 JSON Schema, which enforces validation and consistency across all definitions.
 
-### Core Properties
+### Common Properties
 
 All device types must specify:
 
