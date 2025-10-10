@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+class: server
+manufacturer: Dell
+model: PowerEdge R7615
+u_height: 2
+is_full_depth: true
+
+interfaces:
+  - name: iDRAC
+    type: 1000base-t
+    mgmt_only: true
+
+resource_class:
+  - name: m1.small
+    cpu:
+      cores: 16
+      model: AMD EPYC 9124
+    memory:
+      size: 128
+    drives:
+      - size: 480
+      - size: 480
+    nic_count: 2
+
+  - name: m1.medium
+    cpu:
+      cores: 32
+      model: AMD EPYC 9334
+    memory:
+      size: 256
+    drives:
+      - size: 960
+      - size: 960
+    nic_count: 2
+
+  - name: m1.large
+    cpu:
+      cores: 64
+      model: AMD EPYC 9554
+    memory:
+      size: 512
+    drives:
+      - size: 1920
+      - size: 1920
+    nic_count: 4
