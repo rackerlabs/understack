@@ -50,7 +50,7 @@ resource_class: m1.small
 * `name`: Unique flavor name (e.g., `m1.small`, `compute.standard`)
 * `resource_class`: Must match a resource class defined in a device-type
 
-**Note**: Nova flavor properties (vCPUs, RAM, disk) are automatically derived from the device-type resource class specification.
+**Note**: Nova flavor properties (vCPUs, RAM, disk) are automatically derived from the device-type resource class specification for convenience. Nova performs scheduling by matching the resource class and traits on Ironic nodes. See the [OpenStack Ironic flavor configuration documentation](https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html) for details.
 
 ### 3. Add Trait Requirements (Optional)
 
@@ -176,7 +176,7 @@ Flavor: m1.small
 ═══════════════════════════════════════════
 
 Resource Class: m1.small
-  (Nova properties derived from device-type resource class)
+  (Nova properties derived from device-type for convenience; scheduling uses resource class and traits)
 
 Trait Requirements: None (matches all nodes in resource class)
 ```
@@ -188,7 +188,7 @@ Flavor: m1.small.nicX
 ═══════════════════════════════════════════
 
 Resource Class: m1.small
-  (Nova properties derived from device-type resource class)
+  (Nova properties derived from device-type for convenience; scheduling uses resource class and traits)
 
 Trait Requirements:
   1. NICX [required]
@@ -311,7 +311,7 @@ Requires NVMe storage but excludes GPU nodes.
 
 * Always ensure the `resource_class` exists in device-type definitions before creating flavors
 * Use `understackctl device-type list` to see available resource classes
-* Nova properties (vCPUs, RAM, disk) are automatically derived from the device-type resource class
+* Nova properties (vCPUs, RAM, disk) are automatically derived from the device-type resource class for convenience (scheduling uses resource class and traits)
 
 ### Trait Management
 
