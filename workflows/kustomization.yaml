@@ -4,4 +4,11 @@ kind: Kustomization
 resources:
   - openstack
   - argo-events
-  - nautobot
+
+helmCharts:
+  - name: nautobot-token
+    namespace: openstack
+  - name: nautobot-token
+    namespace: argo-events
+  - name: nautobot-token
+    namespace: undersync
