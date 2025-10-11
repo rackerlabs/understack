@@ -4,4 +4,12 @@ kind: Kustomization
 resources:
   - openstack
   - argo-events
-  - nautobot
+
+helmCharts:
+  - name: nautobot-token
+    # site-clusters superuser token are created in nautobot namespace
+    namespace: nautobot
+  - name: nautobot-token
+    namespace: openstack
+  - name: nautobot-token
+    namespace: argo-events

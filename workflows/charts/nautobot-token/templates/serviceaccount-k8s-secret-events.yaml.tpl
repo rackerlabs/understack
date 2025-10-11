@@ -2,12 +2,14 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: k8s-events-secret-nautobot
+  name: k8s-list-secret-events
+  namespace: "{{ .Release.Namespace }}"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: secret-reader
+  name: k8s-list-secret-reader
+  namespace: "{{ .Release.Namespace }}"
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -17,12 +19,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: secret-reader-binding
+  name: k8s-list-secret-reader-binding
+  namespace: "{{ .Release.Namespace }}"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: secret-reader
+  name: k8s-list-secret-reader
 subjects:
   - kind: ServiceAccount
-    name: k8s-events-secret-nautobot
-    namespace: nautobot
+    name: k8s-list-secret-events
+    namespace: "{{ .Release.Namespace }}"
