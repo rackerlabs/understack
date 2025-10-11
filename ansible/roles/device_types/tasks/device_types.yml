@@ -1,0 +1,37 @@
+---
+- name: Create default device types
+  networktocode.nautobot.device_type:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    model: "{{ device_type_item.model }}"
+    manufacturer: "{{ device_type_item.manufacturer }}"
+    u_height: "{{ device_type_item.u_height }}"
+    is_full_depth: "{{ device_type_item.is_full_depth }}"
+    part_number: "{{ device_type_item.part_number | default('') }}"
+    comments: "{{ device_type_item.comments | default('') }}"
+    subdevice_role: "parent"  # need to set subdevice_role=parent to allow device bays to be attached
+    state: present
+
+- name: Loop through interfaces and add them
+  ansible.builtin.include_tasks: interfaces.yml
+  loop: "{{ device_type_item.interfaces | default('[]') }}"
+  loop_control:
+    loop_var: interface_item
+
+- name: Loop through console ports and add them
+  ansible.builtin.include_tasks: console_ports.yml
+  loop: "{{ device_type_item['console-ports'] | default('[]') }}"
+  loop_control:
+    loop_var: console_port_item
+
+- name: Loop through module bays and add them
+  ansible.builtin.include_tasks: module_bays.yml
+  loop: "{{ device_type_item['module-bays'] | default('[]') }}"
+  loop_control:
+    loop_var: module_bay_item
+
+- name: Loop through power ports and add them
+  ansible.builtin.include_tasks: power_ports.yml
+  loop: "{{ device_type_item['power-ports'] | default('[]') }}"
+  loop_control:
+    loop_var: power_port_item
