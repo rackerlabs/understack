@@ -7,6 +7,5 @@ resources:
   - nova-mariadb-db.yaml  # creates 'nova' database
   - nova-api-mariadb-db.yaml  # creates 'nova_api' database
   - nova-cell0-mariadb-db.yaml  # creates 'nova_cell0' database
-  - nova-nautobot-token.yaml
   - secret-nova-argo-token.yaml
   - roles-nova-argo-token.yaml
