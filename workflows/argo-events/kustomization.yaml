@@ -9,7 +9,6 @@ resources:
   - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
   - secrets/openstack-svc-acct.yaml
   - secrets/operate-workflow-sa.token.yaml
-  - secrets/nautobot-token.yaml
   - eventsources/nautobot-webhook.yaml
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
   - serviceaccounts/openstack-sensor-submit-workflow.yaml

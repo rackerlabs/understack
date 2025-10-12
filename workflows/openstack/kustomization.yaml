@@ -28,5 +28,4 @@ resources:
   - sensors/sensor-ironic-reclean.yaml
   - sensors/sensor-ironic-node-port.yaml
   - sensors/sensor-ironic-oslo-event.yaml
-  - secrets/nautobot-token.yaml
   - secrets/openstack-svc-acct.yaml
