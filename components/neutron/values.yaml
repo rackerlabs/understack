@@ -147,8 +147,6 @@ pod:
               sources:
                 - secret:
                     name: neutron-ks-etc
-                - secret:
-                    name: neutron-nautobot
 
   use_fqdn:
     neutron_agent: false
