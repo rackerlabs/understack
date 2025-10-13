@@ -23,7 +23,7 @@ on:
     types: [checks_requested]
 
 env:
-  OPENSTACK_VERSION: 2025.1
+  OPENSTACK_VERSION: 2025.2
 
 jobs:
   openstack:

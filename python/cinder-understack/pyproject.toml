@@ -24,8 +24,8 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
-  "cinder>=26.0.0,<27",
-  "oslo.utils>=6.0.0,<8"
+  "cinder>=27.0.0,<28",
+  "oslo.utils>=9.0.0,<10"
 ]
 
 [project.urls]
