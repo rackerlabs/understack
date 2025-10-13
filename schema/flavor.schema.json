@@ -1,74 +1,42 @@
 {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://rackerlabs.github.io/understack/schema/flavor.schema.json",
-    "title": "UnderStack Hardware Flavor",
-    "description": "Server flavor configuration schema",
-    "type": "object",
-    "properties": {
-        "name": {
-            "description": "Flavor name for specified configuration (ie gp01.s)",
-            "type": "string"
-        },
-        "manufacturer": {
-            "description": "Manufacturer of the hardware chassis",
-            "type": "string"
-        },
-        "model": {
-            "description": "Model of the hardware chassis",
-            "type": "string"
-        },
-        "cpu_cores": {
-            "description": "Total CPU cores.",
-            "type": "number"
-        },
-        "cpu_model": {
-            "description": "Processor model",
-            "type": "string"
-        },
-        "memory_gb": {
-            "description": "Total memory in GB",
-            "type": "number"
-        },
-        "memory_modules": {
-            "description": "Memory modules",
-            "type": "array",
-            "items": {
-                "type": "number",
-                "description": "Capacity in GB"
-            }
-        },
-        "drives": {
-            "description": "Drives",
-            "type": "array",
-            "items": {
-                "type": "number",
-                "description": "Capacity in GB"
-            }
-        },
-        "pci": {
-            "description": "PCI devices",
-            "type": "array",
-            "items": {
-                "type": "object",
-                "description": "PCI device",
-                "properties": {
-                    "vendor_id": {
-                        "type": "string"
-                    },
-                    "device_id": {
-                        "type": "string"
-                    },
-                    "sub_vendor_id": {
-                        "type": "string"
-                    },
-                    "sub_device_id": {
-                        "type": "string"
-                    }
-                },
-                "required": ["vendor_id", "device_id", "sub_vendor_id", "sub_device_id"]
-
-            }
-        }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rackerlabs.github.io/understack/schema/flavor.schema.json",
+  "title": "UnderStack Hardware Flavor",
+  "description": "Hardware flavor configuration schema for matching Ironic nodes to resource classes with trait filtering",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "Unique flavor name",
+      "type": "string",
+      "minLength": 1
     },
-    "required": [ "name", "manufacturer", "model", "cpu_cores", "cpu_model", "memory_gb", "drives" ]
+    "resource_class": {
+      "description": "Ironic resource class to match (must correspond to a device-type resource class)",
+      "type": "string",
+      "minLength": 1
+    },
+    "traits": {
+      "description": "Hardware traits for node matching (CUSTOM_ prefix added automatically)",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "trait": {
+            "description": "Trait name without CUSTOM_ prefix (e.g., NICX, GPU, NVME)",
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "state": {
+            "description": "Whether the trait must be present (required) or absent",
+            "type": "string",
+            "enum": ["required", "absent"]
+          }
+        },
+        "required": ["trait", "state"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["name", "resource_class"],
+  "additionalProperties": false
 }

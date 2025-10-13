@@ -1,0 +1,138 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://rackerlabs.github.io/understack/schema/device-type.schema.json",
+    "title": "UnderStack Device Type",
+    "description": "Device type configuration schema for hardware models",
+    "type": "object",
+    "properties": {
+        "class": {
+            "description": "Device class category",
+            "type": "string",
+            "enum": ["server", "switch", "firewall"]
+        },
+        "manufacturer": {
+            "description": "Manufacturer of the hardware chassis",
+            "type": "string"
+        },
+        "model": {
+            "description": "Model of the hardware chassis",
+            "type": "string"
+        },
+        "resource_class": {
+            "description": "Resource class configurations",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "Resource class configuration",
+                "properties": {
+                    "name": {
+                        "description": "Resource class name",
+                        "type": "string"
+                    },
+                    "cpu": {
+                        "description": "CPU specifications",
+                        "type": "object",
+                        "properties": {
+                            "cores": {
+                                "description": "Total CPU cores",
+                                "type": "number"
+                            },
+                            "model": {
+                                "description": "Processor model",
+                                "type": "string"
+                            }
+                        },
+                        "required": ["cores", "model"]
+                    },
+                    "memory": {
+                        "description": "Memory specifications",
+                        "type": "object",
+                        "properties": {
+                            "size": {
+                                "description": "Total memory in GB",
+                                "type": "number"
+                            }
+                        },
+                        "required": ["size"]
+                    },
+                    "drives": {
+                        "description": "Drives",
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "description": "Drive",
+                            "properties": {
+                                "size": {
+                                    "type": "number",
+                                    "description": "Capacity in GB"
+                                }
+                            },
+                            "required": ["size"]
+                        }
+                    },
+                    "nic_count": {
+                        "description": "Number of network interface cards",
+                        "type": "integer"
+                    }
+                },
+                "required": ["name", "cpu", "memory", "drives", "nic_count"]
+            }
+        },
+        "u_height": {
+            "description": "Rack unit height",
+            "type": "number",
+            "exclusiveMinimum": 0
+        },
+        "is_full_depth": {
+            "description": "Whether the device is full depth in the rack",
+            "type": "boolean"
+        },
+        "interfaces": {
+            "description": "Network interfaces",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "Network interface",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Interface name"
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "Interface type"
+                    },
+                    "mgmt_only": {
+                        "type": "boolean",
+                        "description": "Whether this interface is management-only"
+                    }
+                },
+                "required": ["name", "type"]
+            }
+        },
+        "power-ports": {
+            "description": "Power ports",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "Power port",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Power port name"
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "Power port type (valid Nautobot power port type, see https://github.com/nautobot/nautobot/blob/develop/nautobot/dcim/choices.py#L507)"
+                    },
+                    "maximum_draw": {
+                        "type": "integer",
+                        "description": "Maximum power draw in watts"
+                    }
+                },
+                "required": ["name", "type"]
+            }
+        }
+    },
+    "required": [ "class", "manufacturer", "model", "u_height", "is_full_depth" ]
+}
