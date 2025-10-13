@@ -341,7 +341,7 @@ git push
 * Use descriptive names that indicate the workload type or size tier
 * Define multiple resource classes for the same device type when you have
   common build variations in your data center
-* Resource class names are set on Ironic nodes and used to create Nova flavors
+* Resource class names are set on Ironic nodes and are used as one of the inputs to create Nova flavors
 
 **Example**: A Dell PowerEdge R7615 chassis might have three common builds:
 
