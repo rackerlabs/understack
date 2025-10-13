@@ -203,7 +203,7 @@ This performs full JSON schema validation including:
 
 * Required field presence
 * Type correctness (strings, numbers, booleans, arrays, objects)
-* Enum constraints (e.g., `class` must be server/switch/firewall)
+* Enum constraints (e.g., `class` must be server/switch/firewall/storage)
 * Conditional requirements (servers must have resource classes)
 * Numeric constraints (e.g., `u_height > 0`)
 
@@ -381,7 +381,7 @@ Ensure all required fields are present: `class`, `manufacturer`, `model`,
 
 **Invalid class value**:
 
-The `class` field must be exactly one of: `server`, `switch`, `firewall`.
+The `class` field must be exactly one of: `server`, `switch`, `firewall`, `storage`.
 
 **Invalid u_height**:
 
@@ -514,4 +514,31 @@ power-ports:
   - name: psu2
     type: iec-60320-c20
     maximum_draw: 1440
+```
+
+### Storage Device Type
+
+```yaml
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+manufacturer: NetApp
+model: FAS8200
+u_height: 3
+is_full_depth: true
+
+interfaces:
+  - name: mgmt
+    type: 1000base-t
+    mgmt_only: true
+    type: 1000base-t
+  - name: e4
+    type: 10gbase-x-sfp+
+  - name: e4
+    type: 10gbase-x-sfp+
+  # ... additional data plane interfaces
+
+power-ports:
+  - name: PSU1
+    type: iec-60320-c14
+  - name: PSU2
+    type: iec-60320-c14
 ```

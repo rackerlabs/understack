@@ -8,7 +8,7 @@
         "class": {
             "description": "Device class category",
             "type": "string",
-            "enum": ["server", "switch", "firewall"]
+            "enum": ["server", "switch", "firewall", "storage"]
         },
         "manufacturer": {
             "description": "Manufacturer of the hardware chassis",
