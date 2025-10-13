@@ -26,13 +26,13 @@
             "type": "string",
             "pattern": "^[A-Z][A-Z0-9_]*$"
           },
-          "requirement": {
+          "state": {
             "description": "Whether the trait must be present (required) or absent",
             "type": "string",
             "enum": ["required", "absent"]
           }
         },
-        "required": ["trait", "requirement"],
+        "required": ["trait", "state"],
         "additionalProperties": false
       }
     }

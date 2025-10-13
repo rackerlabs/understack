@@ -182,7 +182,7 @@ name: compute.nvme
 resource_class: m1.medium
 traits:
   - trait: NVME
-    requirement: required
+    state: required
 ```
 
 Matches only nodes with NVMe storage in m1.medium resource class.
@@ -194,7 +194,7 @@ name: compute.no-gpu
 resource_class: m1.large
 traits:
   - trait: GPU
-    requirement: absent
+    state: absent
 ```
 
 Matches nodes without GPU in m1.large resource class.
@@ -206,9 +206,9 @@ name: compute.nvidia-nvme
 resource_class: m1.large
 traits:
   - trait: GPU_NVIDIA
-    requirement: required
+    state: required
   - trait: NVME
-    requirement: required
+    state: required
 ```
 
 Matches nodes with both NVIDIA GPU and NVMe storage.
@@ -265,9 +265,9 @@ name: compute.gpu-nvme
 resource_class: m1.medium
 traits:
   - trait: GPU_NVIDIA
-    requirement: required
+    state: required
   - trait: NVME
-    requirement: required
+    state: required
 ```
 
 **Result**: Node eligible for `compute.gpu-nvme` flavor, Nova flavor created with m1.medium resource class properties (32 vCPUs, 256GB RAM from device-type).

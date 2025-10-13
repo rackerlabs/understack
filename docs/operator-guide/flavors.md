@@ -62,7 +62,7 @@ name: m1.small.nicX
 resource_class: m1.small
 traits:
   - trait: NICX
-    requirement: required
+    state: required
 ```
 
 **Trait Requirements**:
@@ -70,7 +70,7 @@ traits:
 * `trait`: Hardware trait name WITHOUT the `CUSTOM_` prefix (e.g., `NICX`, `GPU`, `NVME`)
     * Must be uppercase alphanumeric with underscores
     * The system automatically adds `CUSTOM_` prefix when interacting with Ironic
-* `requirement`: Either `required` (node must have trait) or `absent` (node must not have trait)
+* `state`: Either `required` (node must have trait) or `absent` (node must not have trait)
 
 ### 4. Add to Deployment
 
@@ -128,7 +128,7 @@ This performs full JSON schema validation including:
 * Required field presence (name, resource_class)
 * Type correctness (strings)
 * Trait name patterns (uppercase alphanumeric with underscores)
-* Trait requirement enum values (`required` or `absent`)
+* Trait state enum values (`required` or `absent`)
 
 Successful output:
 
@@ -139,7 +139,7 @@ INFO Flavor definition is valid name=m1.small resource_class=m1.small
 Validation errors will show the specific issue:
 
 ```text
-Error: validation failed: traits[0].requirement: must be one of [required, absent]
+Error: validation failed: traits[0].state: must be one of [required, absent]
 Error: validation failed: traits[0].trait: does not match pattern ^[A-Z][A-Z0-9_]*$
 ```
 
@@ -262,7 +262,7 @@ name: compute.gpu
 resource_class: m1.large
 traits:
   - trait: GPU
-    requirement: required
+    state: required
 ```
 
 Guarantees instances get nodes with GPU hardware.
@@ -277,7 +277,7 @@ name: m1.small.mellanox-cx5
 resource_class: m1.small
 traits:
   - trait: NIC_MELLANOX_CX5
-    requirement: required
+    state: required
 ```
 
 Only matches nodes with Mellanox ConnectX-5 network cards.
@@ -292,9 +292,9 @@ name: compute.nvme-no-gpu
 resource_class: m1.medium
 traits:
   - trait: NVME
-    requirement: required
+    state: required
   - trait: GPU
-    requirement: absent
+    state: absent
 ```
 
 Requires NVMe storage but excludes GPU nodes.
@@ -346,9 +346,9 @@ Ensure both `name` and `resource_class` are present in the definition.
 
 Trait names must be uppercase alphanumeric with underscores. Don't include the `CUSTOM_` prefix.
 
-**Invalid requirement**:
+**Invalid state**:
 
-The `requirement` field must be exactly `required` or `absent`.
+The `state` field must be exactly `required` or `absent`.
 
 ### ConfigMap Not Updating
 
@@ -404,7 +404,7 @@ name: m1.small.nicX
 resource_class: m1.small
 traits:
   - trait: NICX
-    requirement: required
+    state: required
 ```
 
 Only matches nodes with the `CUSTOM_NICX` trait.
@@ -417,7 +417,7 @@ name: compute.gpu
 resource_class: m1.large
 traits:
   - trait: GPU
-    requirement: required
+    state: required
 ```
 
 Guarantees GPU hardware for compute workloads.
@@ -430,9 +430,9 @@ name: m1.medium.mellanox-cx5-nvme
 resource_class: m1.medium
 traits:
   - trait: NIC_MELLANOX_CX5
-    requirement: required
+    state: required
   - trait: NVME
-    requirement: required
+    state: required
 ```
 
 Requires both Mellanox ConnectX-5 and NVMe storage.

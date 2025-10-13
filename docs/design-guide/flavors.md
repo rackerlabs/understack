@@ -52,7 +52,7 @@ Flavor definitions are YAML files validated against `schema/flavor.schema.json`.
     * **trait**: Trait name without `CUSTOM_` prefix (e.g., `NICX`, `GPU`, `NVME`)
         * Pattern: `^[A-Z][A-Z0-9_]*$` (uppercase alphanumeric and underscores)
         * `CUSTOM_` prefix is automatically added when interacting with Ironic
-    * **requirement**: Either `required` (node must have trait) or `absent` (node must not have trait)
+    * **state**: Either `required` (node must have trait) or `absent` (node must not have trait)
 
 ### Example: Generic Flavor
 
@@ -74,7 +74,7 @@ name: m1.small.nicX
 resource_class: m1.small
 traits:
   - trait: NICX
-    requirement: required
+    state: required
 ```
 
 This matches only nodes with `resource_class=m1.small` AND the `CUSTOM_NICX` trait. Nova flavor properties still come from the device-type's `m1.small` resource class.
@@ -88,7 +88,7 @@ name: m1.small.no-gpu
 resource_class: m1.small
 traits:
   - trait: GPU
-    requirement: absent
+    state: absent
 ```
 
 This matches nodes with `resource_class=m1.small` that do NOT have the `CUSTOM_GPU` trait.
@@ -220,7 +220,7 @@ name: compute.gpu
 resource_class: m1.large
 traits:
   - trait: GPU
-    requirement: required
+    state: required
 ```
 
 Guarantees instances get hardware with GPU capabilities while using the `m1.large` resource class specifications for vCPUs/RAM/disk.
@@ -235,7 +235,7 @@ name: m1.small.mellanox-cx5
 resource_class: m1.small
 traits:
   - trait: NIC_MELLANOX_CX5
-    requirement: required
+    state: required
 ```
 
 Guarantees instances get nodes with Mellanox ConnectX-5 network cards.
@@ -255,7 +255,7 @@ name: m1.small.nvme
 resource_class: m1.small
 traits:
   - trait: NVME
-    requirement: required
+    state: required
 ```
 
 Users can choose between generic availability or guaranteed NVMe storage. Both flavors have identical Nova properties (derived from device-type `m1.small`), but different hardware selection criteria.
@@ -324,7 +324,7 @@ Flavor definitions undergo JSON schema validation checking:
 * Required field presence (name, resource_class)
 * Type correctness (strings for name/resource_class/traits)
 * Trait name patterns (uppercase alphanumeric with underscores)
-* Trait requirement enum values (`required` or `absent`)
+* Trait state enum values (`required` or `absent`)
 
 Validation happens at:
 
@@ -392,14 +392,14 @@ name: m1.small.nicX
 resource_class: m1.small
 traits:
   - trait: NICX
-    requirement: required
+    state: required
 ---
 # Exclusion: nodes without GPU
 name: m1.small.no-gpu
 resource_class: m1.small
 traits:
   - trait: GPU
-    requirement: absent
+    state: absent
 ```
 
 All three Nova flavors have identical vCPUs/RAM/disk (from device-type `m1.small`), but select different subsets of hardware based on traits.
