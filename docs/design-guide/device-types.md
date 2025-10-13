@@ -29,7 +29,7 @@ JSON Schema, which enforces validation and consistency across all definitions.
 
 All device types must specify:
 
-* **class**: Device category - `server`, `switch`, or `firewall`
+* **class**: Device category - `server`, `switch`, `firewall`, or `storage`
 * **manufacturer**: Hardware vendor (e.g., "Dell", "HPE")
 * **model**: Specific model identifier (e.g., "PowerEdge R7615")
 * **u_height**: Rack unit height (must be greater than 0)
@@ -194,7 +194,7 @@ The schema enforces:
 
 * Required field presence
 * Type correctness (strings, numbers, booleans, arrays, objects)
-* Enum constraints (e.g., `class` must be server/switch/firewall)
+* Enum constraints (e.g., `class` must be server/switch/firewall/storage)
 * Conditional requirements (servers must have resource classes)
 * Numeric constraints (e.g., `u_height > 0`)
 
