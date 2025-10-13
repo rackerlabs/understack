@@ -1,3 +1,3 @@
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
