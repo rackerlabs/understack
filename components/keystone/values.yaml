@@ -143,6 +143,10 @@ pod:
           - name: oidc-secret
             mountPath: /etc/oidc-secret
             readOnly: true
+          - name: keystone-bin
+            mountPath: /var/www/cgi-bin/keystone/keystone-wsgi-public
+            readOnly: true
+            subPath: wsgi.py
         volumes:
           - name: keystone-sso
             secret:
