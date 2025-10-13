@@ -69,6 +69,36 @@ interfaces:
 **Note**: General-purpose network ports for workload traffic are specified
 using `nic_count` in the resource class definition, not here.
 
+### 3a. Add Power Ports (Optional)
+
+Define power inlet specifications for accurate power capacity planning and
+monitoring:
+
+```yaml
+power-ports:
+  - name: psu1
+    type: iec-60320-c14
+    maximum_draw: 750
+  - name: psu2
+    type: iec-60320-c14
+    maximum_draw: 750
+```
+
+Each power port specification includes:
+
+* `name`: Power supply identifier (e.g., "psu1", "psu2", "PSU-A")
+* `type`: Power connector type - see [Nautobot PowerPortTypeChoices](https://github.com/nautobot/nautobot/blob/develop/nautobot/dcim/choices.py#L507) for valid values (e.g., "iec-60320-c14", "iec-60320-c20")
+* `maximum_draw`: Maximum power draw in watts (optional)
+
+Common power port types:
+
+* `iec-60320-c14`: Standard 15A power inlet (most common for servers)
+* `iec-60320-c20`: High-current 20A power inlet (used for high-power servers)
+* `iec-60309-p-n-e-6h`: Industrial 3-phase power connectors
+
+**Note**: Power port information helps with capacity planning and can be
+synchronized to Nautobot for power feed calculations.
+
 ### 4. Define Resource Classes
 
 For server-class devices, specify one or more resource class configurations.
@@ -402,6 +432,14 @@ interfaces:
   - name: NIC2
     type: 10gbase-x-sfp+
 
+power-ports:
+  - name: psu1
+    type: iec-60320-c14
+    maximum_draw: 800
+  - name: psu2
+    type: iec-60320-c14
+    maximum_draw: 800
+
 resource_class:
   - name: compute-standard
     cpu:
@@ -435,6 +473,14 @@ interfaces:
   - name: Ethernet1/2
     type: 100gbase-x-qsfp28
   # ... additional 34 100G QSFP28 ports
+
+power-ports:
+  - name: ps1
+    type: iec-60320-c14
+    maximum_draw: 450
+  - name: ps2
+    type: iec-60320-c14
+    maximum_draw: 450
 ```
 
 ### Firewall Device Type
@@ -460,4 +506,12 @@ interfaces:
   - name: ethernet1/5
     type: 10gbase-x-sfp+
   # ... additional data plane interfaces
+
+power-ports:
+  - name: psu1
+    type: iec-60320-c20
+    maximum_draw: 1440
+  - name: psu2
+    type: iec-60320-c20
+    maximum_draw: 1440
 ```

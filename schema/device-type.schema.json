@@ -109,6 +109,29 @@
                 },
                 "required": ["name", "type"]
             }
+        },
+        "power-ports": {
+            "description": "Power ports",
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "Power port",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Power port name"
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "Power port type (valid Nautobot power port type, see https://github.com/nautobot/nautobot/blob/develop/nautobot/dcim/choices.py#L507)"
+                    },
+                    "maximum_draw": {
+                        "type": "integer",
+                        "description": "Maximum power draw in watts"
+                    }
+                },
+                "required": ["name", "type"]
+            }
         }
     },
     "required": [ "class", "manufacturer", "model", "u_height", "is_full_depth" ]

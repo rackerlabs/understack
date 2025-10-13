@@ -45,6 +45,10 @@ Device types may include:
     * `name`: Interface identifier (e.g., "iDRAC", "eth0", "mgmt")
     * `type`: Physical interface type (e.g., "1000base-t", "10gbase-x-sfp+")
     * `mgmt_only`: Boolean flag indicating management-only interfaces
+* **power-ports**: Power inlet specifications for the device. Each power port has:
+    * `name`: Power port identifier (e.g., "psu1", "psu2")
+    * `type`: Power port connector type (e.g., "iec-60320-c14", "iec-60320-c20") - see [Nautobot PowerPortTypeChoices](https://github.com/nautobot/nautobot/blob/develop/nautobot/dcim/choices.py#L507) for valid values
+    * `maximum_draw`: Maximum power draw in watts (optional)
 * **resource_class**: Array of resource class configurations (required for
   `class: server`)
 
@@ -88,6 +92,15 @@ interfaces:
   - name: iDRAC
     type: 1000base-t
     mgmt_only: true
+
+# Power inlet specifications
+power-ports:
+  - name: psu1
+    type: iec-60320-c14
+    maximum_draw: 750
+  - name: psu2
+    type: iec-60320-c14
+    maximum_draw: 750
 
 resource_class:
   - name: m1.small
