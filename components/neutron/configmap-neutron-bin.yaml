@@ -1655,18 +1655,12 @@ data:
     COMMAND="${@:-start}"
 
     function start () {
-    # (ricolin): Currently ovn have issue with uWSGI,
-    # let's keep using non-uWSGI way until this bug fixed:
-    # https://bugs.launchpad.net/neutron/+bug/1912359
-      start_ovn
-    }
+      confs="--config-file /etc/neutron/neutron.conf"
+      confs+=" --config-file /tmp/pod-shared/ovn.ini"
+      confs+=" --config-file /etc/neutron/plugins/ml2/ml2_conf.ini"
+      confs+=" --config-dir /etc/neutron/neutron.conf.d"
 
-    function start_ovn () {
-      exec neutron-server \
-            --config-file /etc/neutron/neutron.conf \
-            --config-file /tmp/pod-shared/ovn.ini \
-            --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
-            --config-dir /etc/neutron/neutron.conf.d
+      exec uwsgi --ini /etc/neutron/neutron-api-uwsgi.ini --pyargv " $confs "
     }
 
     function stop () {
