@@ -13,6 +13,7 @@ conf:
         session_cookie_httponly: "True"
         allowed_hosts:
           - '*'
+        session_engine: 'django.contrib.sessions.backends.cache_db'
     local_settings_d:
       # Set default options when creating a server from the
       # horizon UI for a more friendly and efficient user experience.
