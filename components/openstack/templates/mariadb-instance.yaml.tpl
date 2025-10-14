@@ -42,26 +42,7 @@ spec:
       scrapeTimeout: 10s
 
   galera:
-    enabled: true
-    sst: mariabackup
-    replicaThreads: 1
-    agent:
-      port: 5555
-      kubernetesAuth:
-        enabled: true
-    recovery:
-      enabled: true
-      clusterHealthyTimeout: 2m
-      clusterBootstrapTimeout: 10m
-    config:
-      reuseStorageVolume: false
-      volumeClaimTemplate:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-        storageClassName: ceph-block-single
+{{ toYaml .Values.mariadb.galera | indent 4 }}
 
 ---
 # mariadb-operator backups for openstack
