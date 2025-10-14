@@ -81,3 +81,23 @@ Watch the restore logs:
 Defaulted container "mariadb" out of: mariadb, mariadb-operator (init)
 💾 Restoring backup: /backup/backup.2025-03-13T09:00:05Z.sql
 ```
+
+## Galera Backup failures
+
+Sometimes the mariadb-operator attempts to take a database backup but fails
+with following error:
+
+```text
+💾 Exporting env
+💾 Writing target file: /backup/0-backup-target.txt
+💾 Taking backup: /backup/backup.2025-10-14T09:07:35Z.sql
+-- Connecting to mariadb-primary.openstack.svc.cluster.local...
+-- Starting transaction...
+mariadb-dump: Got error: 1102: "Incorrect database name '#mysql50#.sst'" when selecting the database
+```
+
+This is generally caused by the leftover replication folder after pod crash
+during a synchronization. If you go to a datadir (`/var/lib/mysql/` by
+default), you won't be able to find the `#mysql50#.sst` folder though because
+the folder name is just `.sst`. Verify if it's empty, remove it and backups
+should start working again.
