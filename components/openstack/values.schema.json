@@ -99,6 +99,121 @@
           },
           "additionalProperties": false
         },
+        "galera": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable or disable Galera"
+            },
+            "sst": {
+              "type": "string",
+              "description": "State Snapshot Transfer method"
+            },
+            "replicaThreads": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Number of replica threads"
+            },
+            "agent": {
+              "type": "object",
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535,
+                  "description": "Agent port number"
+                },
+                "kubernetesAuth": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "description": "Enable Kubernetes authentication for the agent"
+                    }
+                  },
+                  "required": ["enabled"],
+                  "additionalProperties": true
+                }
+              },
+              "required": ["port", "kubernetesAuth"],
+              "additionalProperties": true
+            },
+            "recovery": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Enable recovery"
+                },
+                "clusterHealthyTimeout": {
+                  "type": "string",
+                  "pattern": "^\\d+(s|m|h)$",
+                  "description": "Cluster healthy timeout duration (e.g., '2m')"
+                },
+                "clusterBootstrapTimeout": {
+                  "type": "string",
+                  "pattern": "^\\d+(s|m|h)$",
+                  "description": "Cluster bootstrap timeout duration (e.g., '10m')"
+                }
+              },
+              "required": ["enabled", "clusterHealthyTimeout", "clusterBootstrapTimeout"],
+              "additionalProperties": true
+            },
+            "config": {
+              "type": "object",
+              "properties": {
+                "reuseStorageVolume": {
+                  "type": "boolean",
+                  "description": "Reuse existing storage volume"
+                },
+                "volumeClaimTemplate": {
+                  "type": "object",
+                  "properties": {
+                    "accessModes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Volume access modes"
+                    },
+                    "resources": {
+                      "type": "object",
+                      "properties": {
+                        "requests": {
+                          "type": "object",
+                          "properties": {
+                            "storage": {
+                              "type": "string",
+                              "description": "Storage request size"
+                            }
+                          },
+                          "required": ["storage"],
+                          "additionalProperties": true
+                        }
+                      },
+                      "required": ["requests"],
+                      "additionalProperties": true
+                    },
+                    "storageClassName": {
+                      "type": "string",
+                      "description": "Storage class name for the volume claim"
+                    }
+                  },
+                  "required": ["accessModes", "resources"],
+                  "additionalProperties": true
+                }
+              },
+              "required": ["reuseStorageVolume", "volumeClaimTemplate"],
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "enabled", "sst", "replicaThreads", "agent",
+            "recovery", "config"
+          ],
+          "additionalProperties": true
+        },
         "replicas": {
           "type": "integer",
           "minimum": 1,
