@@ -1,0 +1,6 @@
+---
+component: openstack-workflows
+componentNamespace: openstack
+sources:
+  - ref: understack
+    path: 'workflows/openstack'

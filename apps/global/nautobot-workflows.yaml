@@ -1,0 +1,6 @@
+---
+component: nautobot-workflows
+componentNamespace: nautobot
+sources:
+  - ref: understack
+    path: 'workflows/nautobot'
