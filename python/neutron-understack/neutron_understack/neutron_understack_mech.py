@@ -22,7 +22,6 @@ from .ml2_type_annotations import PortContext
 
 LOG = logging.getLogger(__name__)
 
-config.register_ml2_type_understack_opts(cfg.CONF)
 config.register_ml2_understack_opts(cfg.CONF)
 
 
@@ -296,8 +295,4 @@ class UnderstackDriver(MechanismDriver):
 
 
 def is_provisioning_network(network_id: str) -> bool:
-    provisioning_network = (
-        cfg.CONF.ml2_understack.provisioning_network
-        or cfg.CONF.ml2_type_understack.provisioning_network
-    )
-    return network_id == provisioning_network
+    return network_id == cfg.CONF.ml2_understack.provisioning_network
