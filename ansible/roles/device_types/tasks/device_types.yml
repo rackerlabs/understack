@@ -1,0 +1,88 @@
+---
+- name: Create default device types
+  networktocode.nautobot.device_type:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    model: "{{ device_type_item.model }}"
+    manufacturer: "{{ device_type_item.manufacturer }}"
+    u_height: "{{ device_type_item.u_height }}"
+    is_full_depth: "{{ device_type_item.is_full_depth }}"
+    part_number: "{{ device_type_item.part_number | default('') }}"
+    comments: "{{ device_type_item.comments | default('') }}"
+    subdevice_role: "parent"  # need to set subdevice_role=parent to allow device bays to be attached
+    state: present
+
+- name: Loop through interfaces and add them
+  networktocode.nautobot.device_interface_template:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device_type: "{{ device_type_item.model }}"
+    name: "{{ interface_item.name }}"
+    type: "{{ interface_item.type }}"
+    mgmt_only: "{{ interface_item.mgmt_only | default('false') }}"
+    state: present
+  loop: "{{ device_type_item.interfaces | default([]) | list }}"
+  loop_control:
+    loop_var: interface_item
+  async: 300
+  poll: 0
+  register: task1_jobs
+
+- name: Loop through console ports and add them
+  networktocode.nautobot.console_port_template:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device_type: "{{ device_type_item.model }}"
+    name: "{{ console_port_item.name }}"
+    type: "{{ console_port_item.type }}"
+    state: present
+  loop: "{{ device_type_item['console-ports'] | default([]) | list }}"
+  loop_control:
+    loop_var: console_port_item
+  async: 300
+  poll: 0
+  register: task2_jobs
+
+- name: Loop through module bays and add them
+  networktocode.nautobot.device_bay_template:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device_type: "{{ device_type_item.model }}"
+    name: "{{ module_bay_item.name }}"
+    state: present
+  loop: "{{ device_type_item['module-bays'] | default([]) | list }}"
+  loop_control:
+    loop_var: module_bay_item
+  async: 300
+  poll: 0
+  register: task3_jobs
+
+- name: Loop through power ports and add them
+  networktocode.nautobot.power_port_template:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    device_type: "{{ device_type_item.model }}"
+    name: "{{ power_port_item.name }}"
+    allocated_draw: "{{ power_port_item.allocated_draw | default(1) }}"
+    maximum_draw: "{{ power_port_item.maximum_draw | default(1) }}"
+    type: "{{ power_port_item.type }}"
+    state: present
+  loop: "{{ device_type_item['power-ports'] | default([]) | list }}"
+  loop_control:
+    loop_var: power_port_item
+  async: 300
+  poll: 0
+  register: task4_jobs
+
+- name: Combine all async jobs
+  ansible.builtin.set_fact:
+    all_jobs: "{{ task1_jobs.results + task2_jobs.results + task3_jobs.results + task4_jobs.results }}"
+
+- name: Wait for all API calls (all tasks)
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+  loop: "{{ all_jobs }}"
+  register: all_results
+  until: all_results.finished
+  retries: 30
+  delay: 5

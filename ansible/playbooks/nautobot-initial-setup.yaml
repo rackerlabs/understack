@@ -50,3 +50,4 @@
     - role: computed_fields
     - role: platforms
     - role: relationships
+    - role: device_types
