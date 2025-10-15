@@ -22,8 +22,6 @@ from .ml2_type_annotations import PortContext
 
 LOG = logging.getLogger(__name__)
 
-config.register_ml2_understack_opts(cfg.CONF)
-
 
 SUPPORTED_VNIC_TYPES = [portbindings.VNIC_BAREMETAL, portbindings.VNIC_NORMAL]
 
@@ -37,6 +35,7 @@ class UnderstackDriver(MechanismDriver):
         return portbindings.CONNECTIVITY_L2
 
     def initialize(self):
+        config.register_ml2_understack_opts(cfg.CONF)
         conf = cfg.CONF.ml2_understack
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
         self.ironic_client = IronicClient()
