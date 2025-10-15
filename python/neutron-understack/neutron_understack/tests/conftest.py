@@ -22,7 +22,9 @@ from neutron.services.trunk.models import Trunk as TrunkModel
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks.events import DBEventPayload
+from oslo_config import fixture as config_fixture
 
+from neutron_understack import config as understack_config
 from neutron_understack.ironic import IronicClient
 from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.tests.helpers import Ml2PluginNoInit
@@ -276,7 +278,7 @@ def ironic_client(mocker) -> IronicClient:
 
 
 @pytest.fixture
-def understack_driver(ironic_client) -> UnderstackDriver:
+def understack_driver(oslo_config, ironic_client) -> UnderstackDriver:
     driver = UnderstackDriver()
     driver.undersync = Undersync("auth_token", "api_url")
     driver.ironic_client = ironic_client
@@ -341,18 +343,29 @@ def port_db_payload(network) -> DBEventPayload:
 
 
 @pytest.fixture
-def ml2_understack_conf(mocker, ucvni_group_id) -> None:
-    mocker.patch(
-        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.ucvni_group",
-        str(ucvni_group_id),
+def oslo_config():
+    """CONF from oslo_config is global but we need to override it sometimes."""
+    conf_fixture = config_fixture.Config()
+    conf_fixture.setUp()
+    # register the ml2_understack options
+    understack_config.register_ml2_understack_opts(conf_fixture.conf)
+    yield conf_fixture
+    conf_fixture.cleanUp()
+
+
+@pytest.fixture
+def ml2_understack_conf(oslo_config, ucvni_group_id) -> None:
+    oslo_config.config(
+        ucvni_group=str(ucvni_group_id),
+        group="ml2_understack",
     )
-    mocker.patch(
-        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.network_node_switchport_uuid",
-        "a27f7260-a7c5-4f0c-ac70-6258b026d368",
+    oslo_config.config(
+        network_node_switchport_uuid="a27f7260-a7c5-4f0c-ac70-6258b026d368",
+        group="ml2_understack",
     )
-    mocker.patch(
-        "neutron_understack.neutron_understack_mech.cfg.CONF.ml2_understack.undersync_dry_run",
-        False,
+    oslo_config.config(
+        undersync_dry_run=False,
+        group="ml2_understack",
     )
 
 
