@@ -1,0 +1,6 @@
+---
+component: argo-events-workflows
+componentNamespace: argo-events
+sources:
+  - ref: understack
+    path: 'workflows/argo-events'
