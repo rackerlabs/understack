@@ -1,13 +1,5 @@
 from oslo_config import cfg
 
-type_understack_opts = [
-    cfg.StrOpt(
-        "provisioning_network",
-        help="provisioning_network ID as configured in ironic.conf",
-        default="change_me",
-    ),
-]
-
 mech_understack_opts = [
     cfg.StrOpt(
         "nb_url",
@@ -113,10 +105,6 @@ l3_svc_cisco_asa_opts = [
         default="OUTSIDE",
     ),
 ]
-
-
-def register_ml2_type_understack_opts(config):
-    config.register_opts(type_understack_opts, "ml2_type_understack")
 
 
 def register_ml2_understack_opts(config):

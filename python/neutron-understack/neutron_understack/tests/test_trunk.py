@@ -336,14 +336,23 @@ class TestCheckSubportsSegmentationId:
     def test_when_trunk_id_is_network_node_trunk_id(
         self,
         mocker,
+        oslo_config,
         understack_trunk_driver,
         trunk_id,
     ):
-        mocker.patch(
-            "oslo_config.cfg.CONF.ml2_understack.network_node_trunk_uuid",
-            trunk_id,
+        oslo_config.config(
+            network_node_trunk_uuid=str(trunk_id),
+            group="ml2_understack",
         )
-        result = understack_trunk_driver._check_subports_segmentation_id([], trunk_id)
+        # Mock to ensure the function returns early and doesn't call this
+        allowed_ranges_mock = mocker.patch(
+            "neutron_understack.utils.allowed_tenant_vlan_id_ranges"
+        )
+        result = understack_trunk_driver._check_subports_segmentation_id(
+            [], str(trunk_id)
+        )
+        # Should not call allowed_tenant_vlan_id_ranges because it returns early
+        allowed_ranges_mock.assert_not_called()
         assert result is None
 
     def test_when_segmentation_id_is_in_allowed_range(

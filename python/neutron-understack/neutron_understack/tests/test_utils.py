@@ -189,10 +189,11 @@ class TestAllowedTenantVlanIdRanges:
     def test_multiple_non_overlapping_ranges(
         self,
         mocker,
+        oslo_config,
     ):
-        mocker.patch(
-            "oslo_config.cfg.CONF.ml2_understack.default_tenant_vlan_id_range",
-            [1, 2000],
+        oslo_config.config(
+            default_tenant_vlan_id_range=[1, 2000],
+            group="ml2_understack",
         )
         mocker.patch(
             "neutron_understack.utils.fetch_vlan_network_segment_ranges",
@@ -205,10 +206,11 @@ class TestAllowedTenantVlanIdRanges:
     def test_multiple_overlapping_ranges(
         self,
         mocker,
+        oslo_config,
     ):
-        mocker.patch(
-            "oslo_config.cfg.CONF.ml2_understack.default_tenant_vlan_id_range",
-            [1, 2000],
+        oslo_config.config(
+            default_tenant_vlan_id_range=[1, 2000],
+            group="ml2_understack",
         )
         mocker.patch(
             "neutron_understack.utils.fetch_vlan_network_segment_ranges",
@@ -221,10 +223,11 @@ class TestAllowedTenantVlanIdRanges:
     def test_single_range(
         self,
         mocker,
+        oslo_config,
     ):
-        mocker.patch(
-            "oslo_config.cfg.CONF.ml2_understack.default_tenant_vlan_id_range",
-            [1, 2000],
+        oslo_config.config(
+            default_tenant_vlan_id_range=[1, 2000],
+            group="ml2_understack",
         )
         mocker.patch(
             "neutron_understack.utils.fetch_vlan_network_segment_ranges",
