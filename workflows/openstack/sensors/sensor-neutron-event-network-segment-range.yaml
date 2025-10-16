@@ -3,7 +3,6 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: neutron-event-network-segment-range
-  namespace: argo-events
   annotations:
     workflows.argoproj.io/title: Add/edit Nautobot UCVNIGroup range field on Neutron network-segment-range operations
     workflows.argoproj.io/description: |+

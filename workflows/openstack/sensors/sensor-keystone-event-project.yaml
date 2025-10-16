@@ -3,7 +3,6 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: keystone-event-project
-  namespace: argo-events
   annotations:
     workflows.argoproj.io/title: CRUD Nautobot Tenants from Keystone Projects
     workflows.argoproj.io/description: |+
