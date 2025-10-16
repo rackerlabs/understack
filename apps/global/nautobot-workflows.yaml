@@ -1,6 +1,8 @@
 ---
-component: nautobot-workflows
+component: global-workflows
 componentNamespace: nautobot
 sources:
   - ref: understack
     path: 'workflows/nautobot'
+  - ref: deploy
+    path: '{{.name}}/manifests/global-workflows'

@@ -4,3 +4,5 @@ componentNamespace: argo-events
 sources:
   - ref: understack
     path: 'workflows/argo-events'
+  - ref: deploy
+    path: '{{.name}}/manifests/argo-events-workflows'
