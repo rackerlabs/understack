@@ -95,12 +95,6 @@ spec:
           value: "{{workflow.name}}"
         - name: WF_UID
           value: "{{workflow.uid}}"
-        - name: FLAVORS_DIR
-          valueFrom:
-            configMapKeyRef:
-              name: understack-flavors
-              key: FLAVORS_DIR
-              optional: true
       volumes:
         - name: bmc-master
           secret:
@@ -112,9 +106,8 @@ spec:
           secret:
             secretName: openstack-svc-acct
         - name: understack-flavors
-          persistentVolumeClaim:
-            claimName: understack-flavors
-            readOnly: true
+          configMap:
+            name: flavors
     - name: openstack-wait-cmd
       inputs:
         parameters:
