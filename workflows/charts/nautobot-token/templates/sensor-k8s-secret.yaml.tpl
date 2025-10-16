@@ -1,19 +1,21 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: secret-nautobot-token
+  name: nautobot-token
+  namespace: "{{ .Release.Namespace }}"
   annotations:
     workflows.argoproj.io/title: Nautobot Token
     workflows.argoproj.io/description: |+
       Triggered when the Kubernetes Nautobot token secret is created,
       this process ensures the user is created in Nautobot and a corresponding token is provisioned.
 spec:
+  eventBusName: nautobot-token
   template:
     serviceAccountName: k8s-job-create
   dependencies:
-    - name: nautobot-token-secret
-      eventSourceName: k8s-secret-nautobot-token
-      eventName: nautobot-token-secret
+    - name: nautobot-token-upsert
+      eventSourceName: nautobot-token
+      eventName: nautobot-token-upsert
   triggers:
     - template:
         name: nautobot-users
@@ -22,7 +24,7 @@ spec:
           parameters:
             # Pass the body.data as JSON string into the Job environment
             - src:
-                dependencyName: nautobot-token-secret
+                dependencyName: nautobot-token-upsert
                 dataKey: body.data
                 transformer:
                   jqFilter: '@json'
@@ -33,6 +35,7 @@ spec:
               kind: Job
               metadata:
                 generateName: nautobot-create-token-
+                namespace: nautobot
               spec:
                 template:
                   spec:
