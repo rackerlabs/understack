@@ -17,7 +17,7 @@ else
 	ACTIVATE := $(VENV_DIR)/bin/activate
 endif
 
-WFTMPLS := $(wildcard workflows/*/workflowtemplates/*.yaml)
+WFTMPLS := $(wildcard components/*-workflows/*/workflowtemplates/*.yaml)
 
 .PHONY: help
 help: ## Displays this help message
@@ -31,6 +31,8 @@ $(ACTIVATE): requirements-docs.txt
 .PHONY: wftmpls
 wftmpls: $(WFTMPLS) $(ACTIVATE)
 	@mkdir -p docs/workflows
+	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py components/global-workflows docs/workflows
+	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py components/site-workflows docs/workflows
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py workflows docs/workflows
 
 .PHONY: docs

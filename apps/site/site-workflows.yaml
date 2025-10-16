@@ -3,6 +3,6 @@ component: site-workflows
 componentNamespace: openstack
 sources:
   - ref: understack
-    path: 'workflows/openstack'
+    path: 'components/site-workflows'
   - ref: deploy
     path: '{{.name}}/manifests/site-workflows'

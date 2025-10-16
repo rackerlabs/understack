@@ -12,7 +12,7 @@ metadata:
 
       Submits workflow using workflowtemplate/openstack-oslo-event
 
-      Defined in `workflows/openstack/sensor-neutron-oslo-event.yaml`
+      Defined in `components/site-workflows/sensors/sensor-neutron-oslo-event.yaml`
 spec:
   dependencies:
   - eventName: notifications

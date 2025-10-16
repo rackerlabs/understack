@@ -23,7 +23,7 @@ metadata:
       -p event_type identity.project.created -p project_uuid=00000000-0000-0000-0000-000000000000
       ```
 
-      Defined in `workflows/openstack/sensor-keystone-event-project.yaml`
+      Defined in `components/site-workflows/sensors/sensor-keystone-event-project.yaml`
 spec:
   dependencies:
   - eventName: notifications

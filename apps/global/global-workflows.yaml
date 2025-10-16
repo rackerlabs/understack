@@ -3,6 +3,6 @@ component: global-workflows
 componentNamespace: nautobot
 sources:
   - ref: understack
-    path: 'workflows/nautobot'
+    path: 'components/global-workflows'
   - ref: deploy
     path: '{{.name}}/manifests/global-workflows'
