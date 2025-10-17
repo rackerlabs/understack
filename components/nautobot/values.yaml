@@ -116,9 +116,6 @@ extraObjects:
         "helm.sh/hook-weight": "1"
         "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
     spec:
-      ttlSecondsAfterFinished: 300
-      # allow the ansible container to run for 20 minutes
-      activeDeadlineSeconds: 1200
       backoffLimit: 1
       template:
         spec:
@@ -135,10 +132,10 @@ extraObjects:
               command: ["ansible-runner", "run", "/runner", "--playbook", "nautobot-initial-setup.yaml"]
               resources:
                 requests:
-                  cpu: "100m"
+                  cpu: "1000m"
                   memory: "512Mi"
                 limits:
-                  cpu: "500m"
+                  cpu: "1000m"
                   memory: "512Mi"
               securityContext:
                 allowPrivilegeEscalation: false
