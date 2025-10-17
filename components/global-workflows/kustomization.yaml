@@ -1,12 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - eventbus/eventbus-default.yaml
-  - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
+helmCharts:
+  - name: nautobot-token
+    # site-clusters superuser token are created in nautobot namespace in global cluster
+    namespace: nautobot
+    valuesFile: nautobot-token-values.yaml
 
-  # nautobot secret
-  - serviceaccounts/k8s-secret-events-nautobot.yaml
-  - serviceaccounts/k8s-job-create.yaml
-  - eventsources/k8s-secret-nautobot-token.yaml
-  - sensors/k8s-nautobot-secret.yaml
+helmGlobals:
+  chartHome: ../../workflows/
