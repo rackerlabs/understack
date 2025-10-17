@@ -1,6 +1,6 @@
-# OpenStack Service Users
+# OpenStack Automation Users
 
-Should you need to create service accounts in OpenStack you can do so
+Should you need to an account in OpenStack for automation, you can do so
 by creating a Kubernetes Secret in the `openstack` namespace with
 the following labels:
 

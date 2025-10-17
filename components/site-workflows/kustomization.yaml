@@ -19,8 +19,8 @@ resources:
   - sensors/sensor-keystone-event-project.yaml
   - sensors/sensor-keystone-oslo-event.yaml
   - sensors/sensor-k8s-neutron-deployment.yaml
-  - sensors/sensor-keystone-integration-reader-add.yaml
-  - sensors/sensor-keystone-integration-reader-rm.yaml
+  - sensors/sensor-keystone-automation-user-upsert.yaml
+  - sensors/sensor-keystone-automation-user-delete.yaml
   - sensors/sensor-neutron-event-network-segment-range.yaml
   - sensors/sensor-neutron-olso-event.yaml
   - sensors/sensor-ironic-reclean.yaml
