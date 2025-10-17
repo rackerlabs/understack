@@ -49,15 +49,15 @@ repos:
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/ansible/ansible-lint
-    rev: v25.1.2
+    rev: v25.9.2
     hooks:
       - id: ansible-lint
         entry: "sh -c 'cd ansible && python3 -m ansiblelint -v --force-color'"
         verbose: true
         always_run: false
         additional_dependencies:
-          - ansible
-          - jmespath
+          - ansible-core==2.19.2
+          - jmespath==1.0.1
         files: '^ansible/.*'
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
