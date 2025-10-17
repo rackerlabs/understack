@@ -119,7 +119,7 @@ openstack baremetal node clean --clean-steps raid-clean-steps.json --disable-ram
 ## Build nova server to specific ironic node
 
 Sometimes we need to build to a specific baremetal node. This can be accomplished by using the
-[OpenStack Nova filter schedulers](https://docs.openstack.org/nova/2025.1/admin/scheduling.html#the-filter-scheduler)
+[OpenStack Nova filter schedulers](https://docs.openstack.org/nova/2025.2/admin/scheduling.html#the-filter-scheduler)
 hint:
 
 ``` text

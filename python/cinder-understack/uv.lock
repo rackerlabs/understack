@@ -215,7 +215,7 @@ wheels = [
 
 [[package]]
 name = "cinder"
-version = "26.1.0"
+version = "27.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
@@ -277,9 +277,9 @@ dependencies = [
     { name = "webob" },
     { name = "zstd" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c8/eb/29065874c15578e38c8b3ee21a987e3f1486eb52eadeb4130f3bceca89a3/cinder-26.1.0.tar.gz", hash = "sha256:8c0f132aaf462385c8ff3cf3e7e851dfc1051f7d804bf5f86343ceed296cd94f", size = 6419364, upload-time = "2025-06-21T12:47:02.988Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c2/56/c1d10d7377d8f10da95bb67c11c911308fcc3f3d4f8d9ddbe46702a0bfb7/cinder-27.0.0.tar.gz", hash = "sha256:515bf8b6147a92cc199b83c81d69588ef7f7b271ef00d7fbc25f1c45eded547d", size = 6480684, upload-time = "2025-10-01T10:47:21.483Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/48/a9/375a5834719ba3e75f5a93da2f578e3fcd2d5d260dde39084d63178f1fdc/cinder-26.1.0-py3-none-any.whl", hash = "sha256:67d3e2f696efd1aae3b1b78b574435d82f2526097f878bea72313d3968e44b2d", size = 5277161, upload-time = "2025-06-21T12:47:01.008Z" },
+    { url = "https://files.pythonhosted.org/packages/52/34/8f0154f0c87c244a4dac4a7ad28be254ec7e6b171bbded097d7ccee243a5/cinder-27.0.0-py3-none-any.whl", hash = "sha256:9af8dc0756558581cc25fabbdd20d53281d0ee94e635f19dc64f5615ec91e47c", size = 5328643, upload-time = "2025-10-01T10:47:19.424Z" },
 ]
 
 [[package]]
@@ -300,8 +300,8 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cinder", specifier = ">=26.0.0,<27" },
-    { name = "oslo-utils", specifier = ">=6.0.0,<8" },
+    { name = "cinder", specifier = ">=27.0.0,<28" },
+    { name = "oslo-utils", specifier = ">=9.0.0,<10" },
 ]
 
 [package.metadata.requires-dev]
@@ -1249,7 +1249,7 @@ wheels = [
 
 [[package]]
 name = "oslo-utils"
-version = "7.4.0"
+version = "9.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "debtcollector" },
@@ -1257,14 +1257,15 @@ dependencies = [
     { name = "netaddr" },
     { name = "oslo-i18n" },
     { name = "packaging" },
+    { name = "pbr" },
     { name = "psutil" },
     { name = "pyparsing" },
     { name = "pyyaml" },
     { name = "tzdata" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/f9/16063f827152f862c84c7ee93e25c65435e8ee86684c22ca5c0cdc01cb45/oslo.utils-7.4.0.tar.gz", hash = "sha256:aa5dcb5daa05ddf4b534f2cdeda56f7f21485c96f5cbaf6a8c0871d803b73ece", size = 135993, upload-time = "2024-11-05T18:49:33.21Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/ec/9f12c8ded6eb7ba0774ea4a0e03bfe6cd35fea4cbc944a826c751bb49500/oslo_utils-9.1.0.tar.gz", hash = "sha256:01c3875e7cca005b59465c429f467113b5f4b04211cbd534c9ac2f152276d3b3", size = 138207, upload-time = "2025-08-25T12:49:20.128Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/d1/72a913fe4360c44fc00b2ea24b8b472b768656437a2f52e402b70cf184d5/oslo.utils-7.4.0-py3-none-any.whl", hash = "sha256:6dd15c9fc4fb98d38e5b017f2f5ae171d35a73c5f2ae62a93d5f3bfd9384074b", size = 132117, upload-time = "2024-11-05T18:49:30.616Z" },
+    { url = "https://files.pythonhosted.org/packages/98/47/1303a7050bb1dc6c5cb76a178520a215a7e7181afad637adc26482d7f257/oslo_utils-9.1.0-py3-none-any.whl", hash = "sha256:8779a2db08b84abd2cb155f8314bc6a961aedafd64ee2ff9e234ecbb80251174", size = 134210, upload-time = "2025-08-25T12:49:18.644Z" },
 ]
 
 [[package]]
