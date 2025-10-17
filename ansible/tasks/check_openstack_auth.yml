@@ -1,0 +1,12 @@
+- name: Authenticate to Keystone
+  openstack.cloud.auth:
+    timeout: 20
+  register: auth
+
+- name: Assert OpenStack authentication succeeded
+  ansible.builtin.assert:
+    that:
+      - auth.auth_token is defined
+      - auth.auth_token | length > 0
+    success_msg: "OpenStack authentication successful"
+    fail_msg: "OpenStack authentication failed."
