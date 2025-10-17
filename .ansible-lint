@@ -2,3 +2,8 @@
 
 exclude_paths:
   - ansible/.venv/
+
+# added when we needed to bump ansible-lint to fix dependency breakage
+# this should be cleaned up and removed eventually
+skip_list:
+  - var-naming[no-role-prefix]
