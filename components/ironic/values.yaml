@@ -95,6 +95,9 @@ conf:
       enable_for_undeployed_nodes: true
     metrics:
       backend: collector
+    ilo:
+      # we do not run swift by default so cannot use it by default
+      use_web_server_for_images: true
 
 endpoints:
   oslo_messaging:
