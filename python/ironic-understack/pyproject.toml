@@ -12,6 +12,7 @@ readme = "README.md"
 license = "MIT"
 dependencies = [
     "ironic>=29.0,<30",
+    "pytest-mock>=3.15.1",
     "pyyaml~=6.0",
     "understack-flavor-matcher",
 ]
@@ -20,6 +21,7 @@ dependencies = [
 resource-class = "ironic_understack.resource_class:UndercloudResourceClassHook"
 
 [project.entry-points."ironic.hardware.interfaces.inspect"]
+update-baremetal-port = "ironic_understack.update_baremetal_port:UpdateBaremetalPortsHook"
 redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
 idrac-redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackDracRedfishInspect"
 
