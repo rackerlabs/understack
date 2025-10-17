@@ -1,13 +1,15 @@
 apiVersion: argoproj.io/v1alpha1
 kind: EventSource
 metadata:
-  name: k8s-secret-nautobot-token
+  name: nautobot-token
+  namespace: "{{ .Release.Namespace }}"
 spec:
+  eventBusName: nautobot-token
   template:
-    serviceAccountName: k8s-events-secret-nautobot
+    serviceAccountName: k8s-list-secret-events
   resource:
-    nautobot-token-secret:
-      namespace: nautobot
+    nautobot-token-upsert:
+      namespace: "{{ .Release.Namespace }}"
       resource: secrets
       version: v1
       eventTypes:

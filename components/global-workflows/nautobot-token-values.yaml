@@ -1,0 +1,9 @@
+---
+eventBus:
+  # NATS replicas for event message distribution
+  # Minimum value: 3 (required for quorum)
+  # Default: 3 (recommended for all deployments)
+  replicas: 3
+  # Authentication strategy for NATS
+  # Options: "none" or "token"
+  auth: "token"
