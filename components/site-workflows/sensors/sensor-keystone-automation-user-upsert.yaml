@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: keystone-integration-reader-add
+  name: keystone-automation-user-upsert
   namespace: openstack
 spec:
   template:
@@ -10,12 +10,12 @@ spec:
   # events the Sensor listens for
   dependencies:
     - name: secret-dep
-      eventName: keystone-integration-reader-add
+      eventName: keystone-automation-user-upsert
       eventSourceName: k8s-openstack-secrets
   # actions executed when dependencies are satisfied (StandardK8STrigger designed to create or update a generic Kubernetes resource.)
   triggers:
     - template:
-        name: keystone-user-create-update
+        name: keystone-automation-user-upsert
         k8s:
           operation: create
           source:
@@ -23,14 +23,14 @@ spec:
               apiVersion: batch/v1
               kind: Job
               metadata:
-                generateName: keystone-integration-reader-add-
+                generateName: keystone-automation-user-upsert-
               spec:
                 ttlSecondsAfterFinished: 600
                 backoffLimit: 3
                 template:
                   spec:
                     containers:
-                      - name: keystone-user-create-update
+                      - name: openstackcli
                         image: quay.io/airshipit/heat:2025.1-ubuntu_jammy
                         command: ["sh", "-c"]
                         args:
@@ -40,12 +40,16 @@ spec:
                             SVC_ROLES=$(python -c "import json,os; print(json.loads(os.environ.get('LABELS') or '{}').get('understack.rackspace.com/keystone-role',''))")
                             SVC_USER=$(python -c "import json,os; print(json.loads(os.environ.get('LABELS') or '{}').get('understack.rackspace.com/keystone-user',''))")
                             SVC_USER=${SVC_USER:-$SECRET_NAME}
-                            PROJ_ID=$(openstack project create --or-show --domain service integration -f value -c id)
+                            PROJ_ID=$(openstack project create --or-show --domain service automation -f value -c id)
                             SVC_ID=$(openstack user create --or-show --domain service --project "${PROJ_ID}" --description "${SECRET_NAME}" "${SVC_USER}" -f value -c id)
                             openstack user set --description "${SECRET_NAME}" --project "${PROJ_ID}" "${SVC_ID}"
                             set +x
                             svc_pass=$(cat /tmp/user-create/password)
-                            openstack user set --password "${svc_pass}" "${SVC_ID}"
+                            if [ -z "${svc_pass}" ]; then
+                              echo "Empty password supplied, skipping setting the password"
+                            else
+                              openstack user set --password "${svc_pass}" "${SVC_ID}"
+                            fi
                             set -x
                             openstack role add --user "${SVC_ID}" --project "${PROJ_ID}" reader
                             IFS=','

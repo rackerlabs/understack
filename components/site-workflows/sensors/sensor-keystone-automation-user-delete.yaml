@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: keystone-integration-reader-rm
+  name: keystone-automation-user-delete
   namespace: openstack
 spec:
   template:
@@ -10,12 +10,12 @@ spec:
   # events the Sensor listens for
   dependencies:
     - name: secret-dep
-      eventName: keystone-integration-reader-delete
+      eventName: keystone-automation-user-delete
       eventSourceName: k8s-openstack-secrets
   # actions executed when dependencies are satisfied (StandardK8STrigger designed to create or update a generic Kubernetes resource.)
   triggers:
     - template:
-        name: keystone-user-delete
+        name: keystone-automation-user-delete
         k8s:
           operation: create
           source:
@@ -23,14 +23,14 @@ spec:
               apiVersion: batch/v1
               kind: Job
               metadata:
-                generateName: keystone-integration-reader-rm-
+                generateName: keystone-automation-user-delete-
               spec:
                 ttlSecondsAfterFinished: 600
                 backoffLimit: 3
                 template:
                   spec:
                     containers:
-                      - name: keystone-user-delete
+                      - name: openstackcli
                         image: quay.io/airshipit/heat:2025.1-ubuntu_jammy
                         command: ["sh", "-c"]
                         args:

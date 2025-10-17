@@ -18,12 +18,8 @@
   connection: local
 
   pre_tasks:
-    - name: Fail if ENV variables are not set
-      ansible.builtin.fail:
-        msg: "Environment variable {{ item }} is not set. Exiting playbook."
-      when: lookup('env', item) == ''
-      loop:
-        - OS_CLOUD
+    - name: Check OpenStack connectivity
+      ansible.builtin.import_tasks: ../tasks/check_openstack_auth.yml
 
   roles:
     - role: openstack_octavia
