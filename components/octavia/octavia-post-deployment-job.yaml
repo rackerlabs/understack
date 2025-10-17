@@ -3,18 +3,38 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: octavia-post-deployment-job
-  generateName: octavia-post-deployment-job-
   annotations:
     argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
 spec:
+  backoffLimit: 2
   template:
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
-        - name: octavia-post-deploy
+        - name: ansible
           image: ghcr.io/rackerlabs/understack/ansible:latest
           imagePullPolicy: Always
           command: ["ansible-runner", "run", "/runner", "-vvv", "--playbook", "openstack_octavia.yaml"]
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
           env:
             - name: OS_CLOUD
               value: understack
@@ -27,7 +47,7 @@ spec:
               subPath: inventory.yaml
             - name: ansible-group-vars
               mountPath: /runner/inventory/group_vars/
-            - name: openstack-svc-acct
+            - name: infrasetup
               mountPath: /etc/openstack
               readOnly: true
       volumes:
@@ -42,7 +62,10 @@ spec:
         - name: ansible-group-vars
           configMap:
             name: ansible-group-vars
-        - name: openstack-svc-acct
+        - name: infrasetup
           secret:
-            secretName: openstack-svc-acct
+            secretName: infrasetup
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
       restartPolicy: OnFailure
