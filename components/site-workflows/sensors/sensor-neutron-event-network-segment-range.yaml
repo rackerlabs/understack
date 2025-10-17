@@ -3,7 +3,6 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: neutron-event-network-segment-range
-  namespace: argo-events
   annotations:
     workflows.argoproj.io/title: Add/edit Nautobot UCVNIGroup range field on Neutron network-segment-range operations
     workflows.argoproj.io/description: |+
@@ -18,7 +17,7 @@ metadata:
       -p event_type network_segment_range.create.end -p segment_min_range=1800 segment_max_range=3799
       ```
 
-      Defined in `workflows/openstack/sensor-neutron-event-network-segment-range.yaml`
+      Defined in `components/site-workflows/sensors/sensor-neutron-event-network-segment-range.yaml`
 spec:
   dependencies:
   - eventName: notifications

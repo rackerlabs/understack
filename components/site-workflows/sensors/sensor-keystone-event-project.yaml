@@ -3,7 +3,6 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: keystone-event-project
-  namespace: argo-events
   annotations:
     workflows.argoproj.io/title: CRUD Nautobot Tenants from Keystone Projects
     workflows.argoproj.io/description: |+
@@ -24,7 +23,7 @@ metadata:
       -p event_type identity.project.created -p project_uuid=00000000-0000-0000-0000-000000000000
       ```
 
-      Defined in `workflows/openstack/sensor-keystone-event-project.yaml`
+      Defined in `components/site-workflows/sensors/sensor-keystone-event-project.yaml`
 spec:
   dependencies:
   - eventName: notifications

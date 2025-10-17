@@ -3,7 +3,6 @@ apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
   name: neutron-oslo-event
-  namespace: argo-events
   annotations:
     workflows.argoproj.io/title: Add/edit Nautobot objects according to Neutron events
     workflows.argoproj.io/description: |+
@@ -11,9 +10,9 @@ metadata:
 
       - network create/update/delete
 
-      Submits argo-events using workflowtemplate/openstack-oslo-event
+      Submits workflow using workflowtemplate/openstack-oslo-event
 
-      Defined in `workflows/openstack/sensor-neutron-oslo-event.yaml`
+      Defined in `components/site-workflows/sensors/sensor-neutron-oslo-event.yaml`
 spec:
   dependencies:
   - eventName: notifications
