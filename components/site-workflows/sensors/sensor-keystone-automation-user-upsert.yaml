@@ -45,7 +45,11 @@ spec:
                             openstack user set --description "${SECRET_NAME}" --project "${PROJ_ID}" "${SVC_ID}"
                             set +x
                             svc_pass=$(cat /tmp/user-create/password)
-                            openstack user set --password "${svc_pass}" "${SVC_ID}"
+                            if [ -z "${svc_pass}" ]; then
+                              echo "Empty password supplied, skipping setting the password"
+                            else
+                              openstack user set --password "${svc_pass}" "${SVC_ID}"
+                            fi
                             set -x
                             openstack role add --user "${SVC_ID}" --project "${PROJ_ID}" reader
                             IFS=','
