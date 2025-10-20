@@ -45,7 +45,7 @@ when added to the deployment.
 Start with the YAML language server directive for editor validation:
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/device-type.schema.json
 class: server
 manufacturer: Dell
 model: PowerEdge R7615
@@ -416,7 +416,7 @@ If your editor doesn't validate the YAML:
 ### Server Device Type
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/device-type.schema.json
 class: server
 manufacturer: HPE
 model: ProLiant DL360 Gen10
@@ -457,7 +457,7 @@ resource_class:
 ### Switch Device Type
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/device-type.schema.json
 class: switch
 manufacturer: Cisco
 model: Nexus 9336C-FX2
@@ -486,7 +486,7 @@ power-ports:
 ### Firewall Device Type
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/device-type.schema.json
 class: firewall
 manufacturer: Palo Alto
 model: PA-5220
@@ -519,7 +519,7 @@ power-ports:
 ### Storage Device Type
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/device-type.schema.json
 manufacturer: NetApp
 model: FAS8200
 u_height: 3

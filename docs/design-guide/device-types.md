@@ -80,7 +80,7 @@ Each resource class requires:
 ## Example Definition
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/device-type.schema.json
 class: server
 manufacturer: Dell
 model: PowerEdge R7615
@@ -187,7 +187,7 @@ Device type files include a YAML language server directive for editor-based
 validation:
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/device-type.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/device-type.schema.json
 ```
 
 The schema enforces:

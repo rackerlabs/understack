@@ -58,7 +58,7 @@ Flavor definitions are YAML files validated against `schema/flavor.schema.json`.
 
 ```yaml
 ---
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
 ```
@@ -69,7 +69,7 @@ This matches all Ironic nodes with `resource_class=m1.small`, regardless of trai
 
 ```yaml
 ---
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.nicX
 resource_class: m1.small
 traits:
@@ -83,7 +83,7 @@ This matches only nodes with `resource_class=m1.small` AND the `CUSTOM_NICX` tra
 
 ```yaml
 ---
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.no-gpu
 resource_class: m1.small
 traits:

@@ -40,7 +40,7 @@ Create a new YAML file with your flavor specification. You can create it anywher
 Start with the YAML language server directive for editor validation:
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
 ```
@@ -57,7 +57,7 @@ resource_class: m1.small
 Define hardware trait requirements to filter which nodes match this flavor:
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.nicX
 resource_class: m1.small
 traits:
@@ -245,7 +245,7 @@ git push
 Match all nodes in a resource class without trait filtering:
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: compute.standard
 resource_class: m1.medium
 ```
@@ -257,7 +257,7 @@ This provides maximum flexibility by allowing any hardware in the `m1.medium` re
 Require specific hardware capabilities:
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: compute.gpu
 resource_class: m1.large
 traits:
@@ -272,7 +272,7 @@ Guarantees instances get nodes with GPU hardware.
 Require specific network hardware:
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.mellanox-cx5
 resource_class: m1.small
 traits:
@@ -287,7 +287,7 @@ Only matches nodes with Mellanox ConnectX-5 network cards.
 Combine multiple trait requirements:
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: compute.nvme-no-gpu
 resource_class: m1.medium
 traits:
@@ -389,7 +389,7 @@ If your editor doesn't validate the YAML:
 ### Generic Compute Flavor
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
 ```
@@ -399,7 +399,7 @@ Matches all nodes in the `m1.small` resource class.
 ### NIC-Specific Flavor
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.nicX
 resource_class: m1.small
 traits:
@@ -412,7 +412,7 @@ Only matches nodes with the `CUSTOM_NICX` trait.
 ### GPU Compute Flavor
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: compute.gpu
 resource_class: m1.large
 traits:
@@ -425,7 +425,7 @@ Guarantees GPU hardware for compute workloads.
 ### Combined Hardware Requirements
 
 ```yaml
-# yaml-language-server: $schema=https://rackerlabs.github.io/understack/flavor.schema.json
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.medium.mellanox-cx5-nvme
 resource_class: m1.medium
 traits:
