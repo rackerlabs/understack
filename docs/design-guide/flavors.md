@@ -48,6 +48,7 @@ Flavor definitions are YAML files validated against `schema/flavor.schema.json`.
 
 ### Optional Fields
 
+* **description**: Human-readable description shown in Nova flavor details
 * **traits**: Array of trait requirements for hardware matching
     * **trait**: Trait name without `CUSTOM_` prefix (e.g., `NICX`, `GPU`, `NVME`)
         * Pattern: `^[A-Z][A-Z0-9_]*$` (uppercase alphanumeric and underscores)
@@ -61,6 +62,7 @@ Flavor definitions are YAML files validated against `schema/flavor.schema.json`.
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
+description: Small compute flavor with 16 cores, 128GB RAM, and dual 480GB drives
 ```
 
 This matches all Ironic nodes with `resource_class=m1.small`, regardless of traits. Nova flavor properties (vCPUs, RAM, disk) come from the device-type's `m1.small` resource class definition.
@@ -72,6 +74,7 @@ This matches all Ironic nodes with `resource_class=m1.small`, regardless of trai
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.nicX
 resource_class: m1.small
+description: Small compute flavor with NICX network hardware - 16 cores, 128GB RAM, dual 480GB drives
 traits:
   - trait: NICX
     state: required

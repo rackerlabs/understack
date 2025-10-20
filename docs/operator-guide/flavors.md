@@ -43,6 +43,7 @@ Start with the YAML language server directive for editor validation:
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
+description: Small compute flavor with 16 cores, 128GB RAM, and dual 480GB drives
 ```
 
 **Required Fields**:
@@ -50,16 +51,22 @@ resource_class: m1.small
 * `name`: Unique flavor name (e.g., `m1.small`, `compute.standard`)
 * `resource_class`: Must match a resource class defined in a device-type
 
+**Optional Fields**:
+
+* `description`: Human-readable description shown in Nova flavor details
+* `traits`: Hardware trait requirements for filtering nodes (see below)
+
 **Note**: Nova flavor properties (vCPUs, RAM, disk) are automatically derived from the device-type resource class specification for convenience. Nova performs scheduling by matching the resource class and traits on Ironic nodes. See the [OpenStack Ironic flavor configuration documentation](https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html) for details.
 
-### 3. Add Trait Requirements (Optional)
+### 3. Add Optional Description and Trait Requirements
 
-Define hardware trait requirements to filter which nodes match this flavor:
+Add a description and/or hardware trait requirements to filter which nodes match this flavor:
 
 ```yaml
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.nicX
 resource_class: m1.small
+description: Small compute flavor with NICX network hardware - 16 cores, 128GB RAM, dual 480GB drives
 traits:
   - trait: NICX
     state: required

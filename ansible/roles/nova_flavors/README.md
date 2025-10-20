@@ -23,6 +23,7 @@ See the [UnderStack Flavors Design Guide](https://rackerlabs.github.io/understac
 ```yaml
 name: m1.small.nicX
 resource_class: m1.small
+description: Small compute flavor with NICX network hardware - 16 cores, 128GB RAM, dual 480GB drives
 traits:
   - trait: NICX
     state: required
@@ -53,6 +54,7 @@ resource_class:
 - **vCPUs**: 16 (from device-type cpu.cores)
 - **RAM**: 131072 MB (from device-type memory.size)
 - **Disk**: 480 GB (from device-type drives[0].size)
+- **Description**: "Small compute flavor with NICX network hardware - 16 cores, 128GB RAM, dual 480GB drives" (from flavor.description)
 - **Extra Specs**:
   - `resources:VCPU='0'` - bare metal doesn't consume virtual CPU
   - `resources:MEMORY_MB='0'` - bare metal doesn't consume virtual memory

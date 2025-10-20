@@ -1,3 +1,4 @@
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
+description: Small compute flavor with 16 cores, 128GB RAM, and dual 480GB drives

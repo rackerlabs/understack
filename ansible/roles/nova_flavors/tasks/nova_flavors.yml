@@ -87,6 +87,7 @@
     # Scheduling properties
     extra_specs: "{{ combined_extra_specs }}"
     is_public: true
+    description: "{{ flavor_item.description | d('') }}"
   async: "{{ flavor_creation_timeout }}"
   poll: 0
   register: flavor_job
