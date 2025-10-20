@@ -5,7 +5,7 @@
       "customType": "regex",
       "fileMatch": ["(^|/)images-openstack\\.ya?ml$"],
       "matchStrings": [
-        ":\\s+\"+(?<depName>[^\\s:@\"]+)(?::(?<currentValue>[-a-zA-Z_0-9.]+))?(?:@(?<currentDigest>sha256:[a-zA-Z0-9]+))\"?"
+        ":\\s+\"?(?<depName>[^\\s:@\"]+):(?<currentValue>[-a-zA-Z_0-9.]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\"?"
       ],
       "datasourceTemplate": "docker"
     }
