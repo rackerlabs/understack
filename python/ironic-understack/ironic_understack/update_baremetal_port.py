@@ -82,7 +82,8 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
 
 def _set_local_link_connection(port: Any, node_uuid: str, local_link_connection: dict):
     try:
-        LOG.debug("Updating port %s for node %s", port.address, node_uuid)
+        LOG.debug("Updating port %s for node %s local_link_connection %s",
+                  port.id, node_uuid, local_link_connection)
         port.local_link_connection = local_link_connection
         port.save()
     except exception.IronicException as e:
