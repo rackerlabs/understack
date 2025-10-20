@@ -114,6 +114,10 @@ class NetAppMinimalLibrary(NetAppNVMeStorageLibrary):
             trace=volume_utils.TRACE_API,
             api_trace_pattern=self.configuration.netapp_api_trace_pattern,
             async_rest_timeout=self.configuration.netapp_async_rest_timeout,
+            private_key_file=None,
+            certificate_file=None,
+            ca_certificate_file=None,
+            certificate_host_validation=None,
         )
         self.vserver = self.client.vserver
 
