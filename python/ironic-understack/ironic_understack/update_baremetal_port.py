@@ -102,12 +102,12 @@ def _parse_lldp(lldp_data: LldpData, node_id: str) -> dict[str, str]:
                 decoded[tlv_type] = []
             decoded[tlv_type].append(bytearray(binascii.unhexlify(tlv_value)))
 
-        local_link = {
-            "port_id": _extract_port_id(decoded),
-            "switch_id": _extract_switch_id(decoded),
-            "switch_info": _extract_hostname(decoded),
-        }
-        return { k: v for k, v in local_link.items() if v }
+        port_id = _extract_port_id(decoded)
+        switch_id = _extract_switch_id(decoded)
+        switch_info = _extract_hostname(decoded)
+        if port_id and switch_id and switch_info:
+            return {"port_id": port_id, "switch_id": switch_id, "switch_info": switch_info}
+        LOG.warning("Failed to extract local_link_info from LLDP data for %s", node_id)
     except (binascii.Error, core.MappingError, netaddr.AddrFormatError) as e:
         LOG.warning("Failed to parse lldp_raw data for Node %s: %s", node_id, e)
     return {}
