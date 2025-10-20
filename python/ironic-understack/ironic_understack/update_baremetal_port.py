@@ -36,6 +36,8 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
         Also adds or removes node "traits" based on the inventory data.  We
         control the trait "CUSTOM_STORAGE_SWITCH".
         """
+        LOG.debug(f"{__class__} called with {task=!r} {inventory=!r} {plugin_data=!r}")
+
         lldp_raw: dict[str, LldpData] = plugin_data.get("lldp_raw") or {}
         node_uuid: str = task.node.id
         interfaces: list[dict] = inventory["interfaces"]
