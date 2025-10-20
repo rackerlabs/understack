@@ -115,6 +115,35 @@ git push
 
 ArgoCD will detect the changes and update the flavors ConfigMap.
 
+### Automatic Nova Flavor Synchronization
+
+After the ConfigMaps are updated, UnderStack automatically synchronizes Nova flavors:
+
+1. **ConfigMap Update**: ArgoCD syncs the `flavors` and `device-types` ConfigMaps
+2. **Workflow Trigger**: A post-deployment workflow runs after Nova is deployed
+3. **Flavor Sync**: The workflow reads both ConfigMaps and creates/updates Nova flavors with:
+   * Properties (vcpus, ram, disk) derived from device-type resource class specs
+   * Extra specs for Ironic bare metal scheduling:
+     * `resources:VCPU=0`
+     * `resources:MEMORY_MB=0`
+     * `resources:DISK_GB=0`
+     * `resources:CUSTOM_{RESOURCE_CLASS}=1`
+   * Trait requirements (if specified in flavor definition)
+4. **Verification**: Check that flavors were created:
+
+```bash
+openstack --os-cloud understack flavor list
+openstack --os-cloud understack flavor show m1.small -f yaml
+```
+
+The flavor synchronization runs automatically whenever:
+
+* Nova is deployed/redeployed
+* Flavor ConfigMap is updated
+* Device-type ConfigMap is updated
+
+No manual intervention is required - the system maintains Nova flavors in sync with your GitOps definitions.
+
 ## Validating Flavors
 
 You can validate a flavor definition without adding it to the deployment:

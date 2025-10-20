@@ -139,16 +139,28 @@ ArgoCD detects changes and updates the ConfigMap in the cluster.
 * The system automatically adds `CUSTOM_` when interacting with Ironic APIs
 * Trait names must be uppercase with alphanumeric characters and underscores
 
-### Flavor Matcher
+### Flavor Synchronization
 
-The flavor-matcher service (or workflow component) consumes both flavor and device-type definitions:
+UnderStack automatically synchronizes Nova flavors based on flavor and device-type definitions through a post-deployment workflow:
 
-1. Queries Ironic for nodes with matching `resource_class`
-2. Filters nodes based on trait requirements:
-    * `required`: Node must have the trait
-    * `absent`: Node must NOT have the trait
-3. Looks up the device-type resource class to get CPU, memory, and drive specifications
-4. Creates or updates Nova flavors with properties from the device-type resource class
+**Automation Flow**:
+
+1. **ConfigMap Updates**: Flavor and device-type definitions are stored in ConfigMaps managed by ArgoCD
+2. **Workflow Trigger**: A post-deployment workflow runs automatically after Nova is deployed or when ConfigMaps change
+3. **Ansible Role Execution**: The `nova_flavors` Ansible role processes the definitions:
+   * Reads all flavor YAML files from the `flavors` ConfigMap
+   * Reads all device-type YAML files from the `device-types` ConfigMap
+   * Builds a lookup table mapping resource class names to hardware specifications
+   * Creates/updates Nova flavors with derived properties and scheduling extra_specs
+4. **Reconciliation**: Existing flavors are updated if their properties don't match the definitions
+
+**Trigger Conditions**:
+
+* Nova deployment/redeployment
+* Flavor ConfigMap updates (adding/modifying flavor definitions)
+* Device-type ConfigMap updates (changing resource class specifications)
+
+This ensures Nova flavors always reflect the current GitOps state without manual intervention.
 
 ### Nova Flavor Property Derivation
 
@@ -165,7 +177,7 @@ The extra_specs properties are set for scheduling:
 * **resources:VCPU='0'**: Bare metal doesn't consume virtual CPU resources
 * **resources:MEMORY_MB='0'**: Bare metal doesn't consume virtual memory resources
 * **resources:DISK_GB='0'**: Bare metal doesn't consume virtual disk resources
-* **resources:CUSTOM_BAREMETAL_{RESOURCE_CLASS}='1'**: Requires one bare metal node of the specified resource class
+* **resources:CUSTOM_{RESOURCE_CLASS}='1'**: Requires one bare metal node of the specified resource class
 
 Example device-type resource class:
 
@@ -191,7 +203,7 @@ This produces a Nova flavor with properties:
 
 And extra_specs for scheduling:
 
-* resources:CUSTOM_BAREMETAL_M1_SMALL='1'
+* resources:CUSTOM_M1_SMALL='1'
 * resources:VCPU='0'
 * resources:MEMORY_MB='0'
 * resources:DISK_GB='0'

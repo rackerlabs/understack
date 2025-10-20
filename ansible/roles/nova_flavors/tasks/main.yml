@@ -1,0 +1,48 @@
+---
+# Nova Flavors role - creates OpenStack Nova flavors from flavor and device-type definitions
+# See https://rackerlabs.github.io/understack/design-guide/flavors/
+
+- name: Collect flavor definitions from mounted ConfigMap data
+  ansible.builtin.set_fact:
+    flavors_data: "{{ flavors_data | d([]) + [lookup('file', item.src) | from_yaml] }}"
+  with_community.general.filetree: "{{ flavors_configmap_path }}"
+  when: item.state == "file"
+  check_mode: false
+
+- name: Collect device-type definitions from mounted ConfigMap data
+  ansible.builtin.set_fact:
+    device_types_data: "{{ device_types_data | d([]) + [lookup('file', item.src) | from_yaml] }}"
+  with_community.general.filetree: "{{ device_types_configmap_path }}"
+  when: item.state == "file"
+  check_mode: false
+
+- name: Build resource_class to device-type mapping
+  ansible.builtin.set_fact:
+    resource_class_map: >-
+      {{
+        resource_class_map | d({}) | combine({
+          item.1.name: {
+            'cpu_cores': item.1.cpu.cores,
+            'memory_gb': item.1.memory.size,
+            'disk_gb': item.1.drives[0].size | d(0),
+            'cpu_model': item.1.cpu.model,
+            'device_type': item.0.manufacturer + ' ' + item.0.model
+          }
+        })
+      }}
+  loop: "{{ device_types_data | selectattr('class', 'equalto', 'server') | selectattr('resource_class', 'defined') | subelements('resource_class') }}"
+
+- name: Loop through flavors and create Nova flavors
+  ansible.builtin.include_tasks: nova_flavors.yml
+  loop: "{{ flavors_data }}"
+  loop_control:
+    loop_var: flavor_item
+
+- name: Wait for all Nova flavor creation jobs to complete
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+  loop: "{{ flavor_jobs | d([]) }}"
+  register: flavor_results
+  until: flavor_results.finished
+  retries: "{{ flavor_async_retries }}"
+  delay: "{{ flavor_async_delay }}"
