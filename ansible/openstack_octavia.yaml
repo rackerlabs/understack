@@ -19,7 +19,7 @@
 
   pre_tasks:
     - name: Check OpenStack connectivity
-      ansible.builtin.import_tasks: ../tasks/check_openstack_auth.yml
+      ansible.builtin.import_tasks: tasks/check_openstack_auth.yml
 
   roles:
     - role: openstack_octavia
