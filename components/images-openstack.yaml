@@ -23,7 +23,7 @@ images:
 
     # ironic
     ironic_api: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
-    ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
+    ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:pr-1347"
     ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
     ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
     ironic_pxe_http: "docker.io/nginx:1.13.3"
