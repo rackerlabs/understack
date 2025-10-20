@@ -40,7 +40,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128  # GB
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480  # GB
       - size: 480
@@ -51,7 +51,7 @@ resource_class:
 
 - **Name**: `m1.small.nicX`
 - **vCPUs**: 16 (from device-type cpu.cores)
-- **RAM**: 131072 MB (128 GB * 1024)
+- **RAM**: 131072 MB (from device-type memory.size)
 - **Disk**: 480 GB (from device-type drives[0].size)
 - **Extra Specs**:
   - `resources:VCPU='0'` - bare metal doesn't consume virtual CPU

@@ -23,7 +23,7 @@
         resource_class_map | d({}) | combine({
           item.1.name: {
             'cpu_cores': item.1.cpu.cores,
-            'memory_gb': item.1.memory.size,
+            'memory_mb': item.1.memory.size,
             'disk_gb': item.1.drives[0].size | d(0),
             'cpu_model': item.1.cpu.model,
             'device_type': item.0.manufacturer + ' ' + item.0.model

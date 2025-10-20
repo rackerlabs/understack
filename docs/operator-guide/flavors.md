@@ -482,7 +482,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128  # GB
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480  # GB
       - size: 480
@@ -503,7 +503,7 @@ The flavor-matcher service:
 3. Looks up the device-type `m1.small` resource class
 4. Creates a Nova flavor with:
     * vcpus: 16 (from `cpu.cores`)
-    * ram: 131072 MB (from `memory.size` * 1024)
+    * ram: 131072 MB (from `memory.size`)
     * disk: 480 GB (from `drives[0].size`)
 
 This separation allows you to:

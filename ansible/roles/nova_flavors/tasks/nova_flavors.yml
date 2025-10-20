@@ -82,7 +82,7 @@
     name: "{{ flavor_item.name }}"
     # Properties derived from device-type resource class (informational only)
     vcpus: "{{ resource_specs.cpu_cores }}"
-    ram: "{{ (resource_specs.memory_gb | int * 1024) | int }}"
+    ram: "{{ resource_specs.memory_mb | int }}"
     disk: "{{ resource_specs.disk_gb | int }}"
     # Scheduling properties
     extra_specs: "{{ combined_extra_specs }}"

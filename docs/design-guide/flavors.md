@@ -169,7 +169,7 @@ Nova flavor properties (vcpus, ram, disk) are derived from the device-type resou
 Derived properties:
 
 * **vcpus**: CPU cores from resource class `cpu.cores`
-* **ram**: Memory size from resource class `memory.size` (converted to MB)
+* **ram**: Memory size in MB from resource class `memory.size`
 * **disk**: Primary drive size from resource class `drives[0].size` (or 0 for diskless)
 
 The extra_specs properties are set for scheduling:
@@ -188,7 +188,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480
       - size: 480
@@ -198,7 +198,7 @@ resource_class:
 This produces a Nova flavor with properties:
 
 * vcpus: 16
-* ram: 131072 MB (128 GB * 1024)
+* ram: 131072 MB
 * disk: 480 GB
 
 And extra_specs for scheduling:
@@ -370,7 +370,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480
       - size: 480
@@ -385,7 +385,7 @@ name: m1.small
 resource_class: m1.small  # Links to device-type resource class
 ```
 
-The flavor-matcher looks up `m1.small` in device-type definitions to find the CPU (16 cores), memory (128 GB), and drives (480 GB) when creating the Nova flavor.
+The flavor-matcher looks up `m1.small` in device-type definitions to find the CPU (16 cores), memory (131072 MB), and drives (480 GB) when creating the Nova flavor.
 
 **Important**: Resource class names must be unique across all device types. Each resource class name should only be defined in one device type to avoid conflicts and ensure predictable Nova flavor creation. Validation checks enforce this constraint.
 
