@@ -1,3 +1,5 @@
+import logging
+
 from keystoneauth1 import loading as ks_loading
 from openstack import connection
 from openstack.baremetal.baremetal_service import BaremetalService
@@ -6,10 +8,14 @@ from oslo_config import cfg
 
 IRONIC_SESSION = None
 
+LOG = logging.getLogger(__name__)
+
 
 class IronicClient:
     def __init__(self):
+        LOG.debug("creating ironic client")
         self.irclient = self._get_ironic_client()
+        LOG.debug("created ironic client")
 
     def _get_session(self, group: str) -> ks_loading.session.Session:
         auth = ks_loading.load_auth_from_conf_options(cfg.CONF, group)
