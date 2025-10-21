@@ -13,13 +13,13 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-- name: OpenStack Octavia Post Deployment
-  hosts: neutron
+- name: Keystone Bootstrap
+  hosts: keystone
   connection: local
 
   pre_tasks:
     - name: Check OpenStack connectivity
-      ansible.builtin.import_tasks: ../tasks/check_openstack_auth.yml
+      ansible.builtin.import_tasks: tasks/check_openstack_auth.yml
 
   roles:
-    - role: openstack_octavia
+    - role: keystone_bootstrap

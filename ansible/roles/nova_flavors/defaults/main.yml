@@ -1,0 +1,19 @@
+---
+# Default variables for nova_flavors role
+
+# OpenStack cloud configuration name from clouds.yaml
+# This is used by the openstack.cloud.compute_flavor module
+openstack_cloud: understack
+
+# Path to flavors ConfigMap data (mounted in Argo Workflows)
+flavors_configmap_path: /runner/data/flavors/
+
+# Path to device-types ConfigMap data (mounted in Argo Workflows)
+device_types_configmap_path: /runner/data/device-types/
+
+# Async job timeout in seconds
+flavor_creation_timeout: 300
+
+# Async job polling settings
+flavor_async_retries: 30
+flavor_async_delay: 5

@@ -10,3 +10,4 @@ resources:
   - nova-nautobot-token.yaml
   - secret-nova-argo-token.yaml
   - roles-nova-argo-token.yaml
+  - nova-post-deployment-job.yaml

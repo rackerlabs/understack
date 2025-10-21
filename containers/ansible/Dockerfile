@@ -21,8 +21,7 @@ USER runner
 
 RUN --mount=type=cache,target=/root/.cache/pip ansible-galaxy collection install -r /requirements.yml
 
-COPY ansible/playbooks/ /runner/project/
-COPY ansible/roles/ /runner/project/roles/
+COPY ansible/ /runner/project/
 
 ENTRYPOINT ["dumb-init"]
 CMD ["ansible-runner"]

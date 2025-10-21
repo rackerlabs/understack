@@ -1,0 +1,97 @@
+---
+# Process individual flavor definition and create corresponding Nova flavor
+
+- name: Reset trait specs for {{ flavor_item.name }}
+  ansible.builtin.set_fact:
+    required_trait_specs: {}
+    forbidden_trait_specs: {}
+
+- name: Lookup resource class specifications for {{ flavor_item.name }}
+  ansible.builtin.set_fact:
+    resource_specs: "{{ resource_class_map[flavor_item.resource_class] }}"
+  failed_when: flavor_item.resource_class not in resource_class_map
+
+- name: Build trait requirements for {{ flavor_item.name }}
+  ansible.builtin.set_fact:
+    required_traits: >-
+      {{
+        (flavor_item.traits | d([])
+        | selectattr('state', 'equalto', 'required')
+        | map(attribute='trait')
+        | map('regex_replace', '^(.*)$', 'CUSTOM_\1')
+        | list)
+      }}
+    forbidden_traits: >-
+      {{
+        (flavor_item.traits | d([])
+        | selectattr('state', 'equalto', 'absent')
+        | map(attribute='trait')
+        | map('regex_replace', '^(.*)$', 'CUSTOM_\1')
+        | list)
+      }}
+
+- name: Build resource class key for {{ flavor_item.name }}
+  ansible.builtin.set_fact:
+    resource_class_key: "resources:CUSTOM_{{ flavor_item.resource_class | upper | regex_replace('[^A-Z0-9_]', '_') }}"
+
+- name: Build base extra_specs for {{ flavor_item.name }}
+  ansible.builtin.set_fact:
+    base_extra_specs: >-
+      {{
+        {
+          'resources:VCPU': '0',
+          'resources:MEMORY_MB': '0',
+          'resources:DISK_GB': '0'
+        }
+        | combine({resource_class_key: '1'})
+      }}
+
+- name: Build required trait extra_specs for {{ flavor_item.name }}
+  ansible.builtin.set_fact:
+    required_trait_specs: >-
+      {{
+        required_trait_specs | d({})
+        | combine({'trait:' + item: 'required'})
+      }}
+  loop: "{{ required_traits }}"
+  when: required_traits | length > 0
+
+- name: Build forbidden trait extra_specs for {{ flavor_item.name }}
+  ansible.builtin.set_fact:
+    forbidden_trait_specs: >-
+      {{
+        forbidden_trait_specs | d({})
+        | combine({'trait:' + item: 'forbidden'})
+      }}
+  loop: "{{ forbidden_traits }}"
+  when: forbidden_traits | length > 0
+
+- name: Combine all extra_specs for {{ flavor_item.name }}
+  ansible.builtin.set_fact:
+    combined_extra_specs: >-
+      {{
+        base_extra_specs
+        | combine(required_trait_specs | d({}))
+        | combine(forbidden_trait_specs | d({}))
+      }}
+
+- name: Create or update Nova flavor {{ flavor_item.name }}
+  openstack.cloud.compute_flavor:
+    cloud: "{{ openstack_cloud | d('default') }}"
+    state: present
+    name: "{{ flavor_item.name }}"
+    # Properties derived from device-type resource class (informational only)
+    vcpus: "{{ resource_specs.cpu_cores }}"
+    ram: "{{ resource_specs.memory_mb | int }}"
+    disk: "{{ resource_specs.disk_gb | int }}"
+    # Scheduling properties
+    extra_specs: "{{ combined_extra_specs }}"
+    is_public: true
+    description: "{{ flavor_item.description | d('') }}"
+  async: "{{ flavor_creation_timeout }}"
+  poll: 0
+  register: flavor_job
+
+- name: Store flavor job for async tracking
+  ansible.builtin.set_fact:
+    flavor_jobs: "{{ flavor_jobs | d([]) + [flavor_job] }}"

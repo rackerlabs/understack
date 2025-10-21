@@ -43,6 +43,7 @@ Start with the YAML language server directive for editor validation:
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
+description: Small compute flavor with 16 cores, 128GB RAM, and dual 480GB drives
 ```
 
 **Required Fields**:
@@ -50,16 +51,22 @@ resource_class: m1.small
 * `name`: Unique flavor name (e.g., `m1.small`, `compute.standard`)
 * `resource_class`: Must match a resource class defined in a device-type
 
+**Optional Fields**:
+
+* `description`: Human-readable description shown in Nova flavor details
+* `traits`: Hardware trait requirements for filtering nodes (see below)
+
 **Note**: Nova flavor properties (vCPUs, RAM, disk) are automatically derived from the device-type resource class specification for convenience. Nova performs scheduling by matching the resource class and traits on Ironic nodes. See the [OpenStack Ironic flavor configuration documentation](https://docs.openstack.org/ironic/latest/install/configure-nova-flavors.html) for details.
 
-### 3. Add Trait Requirements (Optional)
+### 3. Add Optional Description and Trait Requirements
 
-Define hardware trait requirements to filter which nodes match this flavor:
+Add a description and/or hardware trait requirements to filter which nodes match this flavor:
 
 ```yaml
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.nicX
 resource_class: m1.small
+description: Small compute flavor with NICX network hardware - 16 cores, 128GB RAM, dual 480GB drives
 traits:
   - trait: NICX
     state: required
@@ -114,6 +121,35 @@ git push
 ```
 
 ArgoCD will detect the changes and update the flavors ConfigMap.
+
+### Automatic Nova Flavor Synchronization
+
+After the ConfigMaps are updated, UnderStack automatically synchronizes Nova flavors:
+
+1. **ConfigMap Update**: ArgoCD syncs the `flavors` and `device-types` ConfigMaps
+2. **Workflow Trigger**: A post-deployment workflow runs after Nova is deployed
+3. **Flavor Sync**: The workflow reads both ConfigMaps and creates/updates Nova flavors with:
+   * Properties (vcpus, ram, disk) derived from device-type resource class specs
+   * Extra specs for Ironic bare metal scheduling:
+     * `resources:VCPU=0`
+     * `resources:MEMORY_MB=0`
+     * `resources:DISK_GB=0`
+     * `resources:CUSTOM_{RESOURCE_CLASS}=1`
+   * Trait requirements (if specified in flavor definition)
+4. **Verification**: Check that flavors were created:
+
+```bash
+openstack --os-cloud understack flavor list
+openstack --os-cloud understack flavor show m1.small -f yaml
+```
+
+The flavor synchronization runs automatically whenever:
+
+* Nova is deployed/redeployed
+* Flavor ConfigMap is updated
+* Device-type ConfigMap is updated
+
+No manual intervention is required - the system maintains Nova flavors in sync with your GitOps definitions.
 
 ## Validating Flavors
 
@@ -453,7 +489,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128  # GB
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480  # GB
       - size: 480
@@ -474,7 +510,7 @@ The flavor-matcher service:
 3. Looks up the device-type `m1.small` resource class
 4. Creates a Nova flavor with:
     * vcpus: 16 (from `cpu.cores`)
-    * ram: 131072 MB (from `memory.size` * 1024)
+    * ram: 131072 MB (from `memory.size`)
     * disk: 480 GB (from `drives[0].size`)
 
 This separation allows you to:

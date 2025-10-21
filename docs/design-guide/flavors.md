@@ -48,6 +48,7 @@ Flavor definitions are YAML files validated against `schema/flavor.schema.json`.
 
 ### Optional Fields
 
+* **description**: Human-readable description shown in Nova flavor details
 * **traits**: Array of trait requirements for hardware matching
     * **trait**: Trait name without `CUSTOM_` prefix (e.g., `NICX`, `GPU`, `NVME`)
         * Pattern: `^[A-Z][A-Z0-9_]*$` (uppercase alphanumeric and underscores)
@@ -61,6 +62,7 @@ Flavor definitions are YAML files validated against `schema/flavor.schema.json`.
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small
 resource_class: m1.small
+description: Small compute flavor with 16 cores, 128GB RAM, and dual 480GB drives
 ```
 
 This matches all Ironic nodes with `resource_class=m1.small`, regardless of traits. Nova flavor properties (vCPUs, RAM, disk) come from the device-type's `m1.small` resource class definition.
@@ -72,6 +74,7 @@ This matches all Ironic nodes with `resource_class=m1.small`, regardless of trai
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/flavor.schema.json
 name: m1.small.nicX
 resource_class: m1.small
+description: Small compute flavor with NICX network hardware - 16 cores, 128GB RAM, dual 480GB drives
 traits:
   - trait: NICX
     state: required
@@ -139,16 +142,28 @@ ArgoCD detects changes and updates the ConfigMap in the cluster.
 * The system automatically adds `CUSTOM_` when interacting with Ironic APIs
 * Trait names must be uppercase with alphanumeric characters and underscores
 
-### Flavor Matcher
+### Flavor Synchronization
 
-The flavor-matcher service (or workflow component) consumes both flavor and device-type definitions:
+UnderStack automatically synchronizes Nova flavors based on flavor and device-type definitions through a post-deployment workflow:
 
-1. Queries Ironic for nodes with matching `resource_class`
-2. Filters nodes based on trait requirements:
-    * `required`: Node must have the trait
-    * `absent`: Node must NOT have the trait
-3. Looks up the device-type resource class to get CPU, memory, and drive specifications
-4. Creates or updates Nova flavors with properties from the device-type resource class
+**Automation Flow**:
+
+1. **ConfigMap Updates**: Flavor and device-type definitions are stored in ConfigMaps managed by ArgoCD
+2. **Workflow Trigger**: A post-deployment workflow runs automatically after Nova is deployed or when ConfigMaps change
+3. **Ansible Role Execution**: The `nova_flavors` Ansible role processes the definitions:
+   * Reads all flavor YAML files from the `flavors` ConfigMap
+   * Reads all device-type YAML files from the `device-types` ConfigMap
+   * Builds a lookup table mapping resource class names to hardware specifications
+   * Creates/updates Nova flavors with derived properties and scheduling extra_specs
+4. **Reconciliation**: Existing flavors are updated if their properties don't match the definitions
+
+**Trigger Conditions**:
+
+* Nova deployment/redeployment
+* Flavor ConfigMap updates (adding/modifying flavor definitions)
+* Device-type ConfigMap updates (changing resource class specifications)
+
+This ensures Nova flavors always reflect the current GitOps state without manual intervention.
 
 ### Nova Flavor Property Derivation
 
@@ -157,7 +172,7 @@ Nova flavor properties (vcpus, ram, disk) are derived from the device-type resou
 Derived properties:
 
 * **vcpus**: CPU cores from resource class `cpu.cores`
-* **ram**: Memory size from resource class `memory.size` (converted to MB)
+* **ram**: Memory size in MB from resource class `memory.size`
 * **disk**: Primary drive size from resource class `drives[0].size` (or 0 for diskless)
 
 The extra_specs properties are set for scheduling:
@@ -165,7 +180,7 @@ The extra_specs properties are set for scheduling:
 * **resources:VCPU='0'**: Bare metal doesn't consume virtual CPU resources
 * **resources:MEMORY_MB='0'**: Bare metal doesn't consume virtual memory resources
 * **resources:DISK_GB='0'**: Bare metal doesn't consume virtual disk resources
-* **resources:CUSTOM_BAREMETAL_{RESOURCE_CLASS}='1'**: Requires one bare metal node of the specified resource class
+* **resources:CUSTOM_{RESOURCE_CLASS}='1'**: Requires one bare metal node of the specified resource class
 
 Example device-type resource class:
 
@@ -176,7 +191,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480
       - size: 480
@@ -186,12 +201,12 @@ resource_class:
 This produces a Nova flavor with properties:
 
 * vcpus: 16
-* ram: 131072 MB (128 GB * 1024)
+* ram: 131072 MB
 * disk: 480 GB
 
 And extra_specs for scheduling:
 
-* resources:CUSTOM_BAREMETAL_M1_SMALL='1'
+* resources:CUSTOM_M1_SMALL='1'
 * resources:VCPU='0'
 * resources:MEMORY_MB='0'
 * resources:DISK_GB='0'
@@ -358,7 +373,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480
       - size: 480
@@ -373,7 +388,7 @@ name: m1.small
 resource_class: m1.small  # Links to device-type resource class
 ```
 
-The flavor-matcher looks up `m1.small` in device-type definitions to find the CPU (16 cores), memory (128 GB), and drives (480 GB) when creating the Nova flavor.
+The flavor-matcher looks up `m1.small` in device-type definitions to find the CPU (16 cores), memory (131072 MB), and drives (480 GB) when creating the Nova flavor.
 
 **Important**: Resource class names must be unique across all device types. Each resource class name should only be defined in one device type to avoid conflicts and ensure predictable Nova flavor creation. Validation checks enforce this constraint.
 

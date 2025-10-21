@@ -112,7 +112,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480
       - size: 480
@@ -124,7 +124,7 @@ resource_class:
       cores: 32
       model: AMD EPYC 9334
     memory:
-      size: 256
+      size: 262144  # MB (256 GB)
     drives:
       - size: 960
       - size: 960

@@ -108,7 +108,7 @@ resource_class:
       cores: 16
       model: AMD EPYC 9124
     memory:
-      size: 128
+      size: 131072  # MB (128 GB)
     drives:
       - size: 480
       - size: 480
@@ -234,11 +234,11 @@ model: PowerEdge R7615
 resource_class:
   - name: m1.small
     cpu: {cores: 16, model: AMD EPYC 9124}
-    memory: {size: 128}
+    memory: {size: 131072}  # MB (128 GB)
     drives: [{size: 480}, {size: 480}]
   - name: m1.medium
     cpu: {cores: 32, model: AMD EPYC 9334}
-    memory: {size: 256}
+    memory: {size: 262144}  # MB (256 GB)
     drives: [{size: 960}, {size: 960}]
 ```
 
