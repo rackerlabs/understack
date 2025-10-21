@@ -2,7 +2,7 @@
 
 Useful commands for working with the MariaDB operator.
 
-Docs: <https://mariadb-operator.github.io/mariadb-operator/latest/>
+Docs: <https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/README.md>
 
 Repo: <https://github.com/mariadb-operator/mariadb-operator>
 
@@ -38,6 +38,93 @@ DB_TO_DUMP=ironic
 ROOTPASSWORD=$(kubectl get secret -n openstack mariadb -o json | jq -r '.data["root-password"]' | base64 -d)
 # perform the db dump
 /usr/local/opt/mariadb/bin/mariadb-dump -h 127.0.0.1 --skip-ssl -u root --password=$ROOTPASSWORD $DB_TO_DUMP | gzip > $DB_TO_DUMP.sql.gz
+```
+
+## Manual backup to a local .sql file
+
+``` bash
+kubectl exec -n openstack -it mariadb-0 -- mariadb-dump -u root -p"$MARIADB_ROOT_PASSWORD" \
+  --single-transaction \
+  --routines \
+  --triggers \
+  --all-databases > full-backup-$(date +%Y%m%d-%H%M).sql
+```
+
+## Logical backup
+
+1. Create a MariaDB Operator backup manifest. In this example we'll call it `create-mariadb-backup.yaml`
+
+``` bash
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Backup
+metadata:
+  name: backup-pre-upgrade
+spec:
+  mariaDbRef:
+    name: mariadb
+  storage:
+    persistentVolumeClaim:
+      resources:
+        requests:
+          storage: 20Gi
+      accessModes:
+        - ReadWriteOnce
+```
+
+1. Apply the manifest:
+
+``` bash
+$ kubectl apply -f create-mariadb-backup.yaml
+backup.k8s.mariadb.com/backup-pre-upgrade created
+```
+
+1. Check and wait until the backup has been completed:
+
+``` bash
+$ kubectl get backup.k8s.mariadb.com/backup-pre-upgrade
+NAME                 COMPLETE   STATUS    MARIADB   AGE
+backup-pre-upgrade   True       Success   mariadb   26s
+```
+
+``` bash
+$ kubectl describe backup.k8s.mariadb.com/backup-pre-upgrade
+Name:         backup-pre-upgrade
+Namespace:    openstack
+Labels:       <none>
+Annotations:  <none>
+API Version:  k8s.mariadb.com/v1alpha1
+Kind:         Backup
+Metadata:
+  Creation Timestamp:  2025-10-21T14:19:28Z
+  Generation:          2
+  Resource Version:    299003488
+  UID:                 6f1481c0-9cc6-46c3-98c4-e64390b09aed
+Spec:
+  Backoff Limit:       5
+  Compression:         none
+  Ignore Global Priv:  true
+  Log Level:           info
+  Maria Db Ref:
+    Name:                mariadb
+    Wait For It:         true
+  Max Retention:         720h0m0s
+  Restart Policy:        OnFailure
+  Service Account Name:  backup-pre-upgrade
+  Storage:
+    Persistent Volume Claim:
+      Access Modes:
+        ReadWriteOnce
+      Resources:
+        Requests:
+          Storage:  20Gi
+Status:
+  Conditions:
+    Last Transition Time:  2025-10-21T14:19:38Z
+    Message:               Success
+    Reason:                JobComplete
+    Status:                True
+    Type:                  Complete
+Events:                    <none>
 ```
 
 ## Restore from a point in time backup
