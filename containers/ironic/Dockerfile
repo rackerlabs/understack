@@ -35,6 +35,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
       pysnmp==5.1.0 \
       pyasn1==0.5.1 \
       'pyasn1-modules<0.4.0'
-COPY containers/ironic/patches /tmp/patches/
-RUN cd /var/lib/openstack/lib/python3.10/site-packages && \
-    QUILT_PATCHES=/tmp/patches quilt push -a
+#COPY containers/ironic/patches /tmp/patches/
+#RUN cd /var/lib/openstack/lib/python3.10/site-packages && \
+#    QUILT_PATCHES=/tmp/patches quilt push -a

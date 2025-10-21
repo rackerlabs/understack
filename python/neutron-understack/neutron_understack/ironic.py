@@ -1,13 +1,20 @@
+import logging
+
 from keystoneauth1 import loading as ks_loading
 from openstack import connection
 from openstack.baremetal.baremetal_service import BaremetalService
 from openstack.baremetal.v1.port import Port as BaremetalPort
 from oslo_config import cfg
 
+IRONIC_SESSION = None
+
+LOG = logging.getLogger(__name__)
+
 
 class IronicClient:
     def __init__(self):
-        self.irclient = self._get_ironic_client()
+        LOG.debug("creating ironic client")
+        LOG.debug("created ironic client")
 
     def _get_session(self, group: str) -> ks_loading.session.Session:
         auth = ks_loading.load_auth_from_conf_options(cfg.CONF, group)
@@ -15,10 +22,18 @@ class IronicClient:
         return session
 
     def _get_ironic_client(self) -> BaremetalService:
-        session = self._get_session("ironic")
+        global IRONIC_SESSION
+        if not IRONIC_SESSION:
+            IRONIC_SESSION = self._get_session("ironic")
 
+        LOG.debug("got session, making connection")
+
+    @property
+    def irclient(self):
         return connection.Connection(
-            session=session, oslo_conf=cfg.CONF, connect_retries=cfg.CONF.http_retries
+            session=IRONIC_SESSION,
+            oslo_conf=cfg.CONF,
+            connect_retries=cfg.CONF.http_retries,
         ).baremetal
 
     def baremetal_port_physical_network(self, local_link_info: dict) -> str | None:

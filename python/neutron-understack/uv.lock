@@ -182,6 +182,18 @@ wheels = [
 ]
 
 [[package]]
+name = "cotyledon"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "setproctitle", marker = "sys_platform != 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bb/15/4f47ad3c352568d5adf9aec06279b1fa3a12a02e02da343dfae0512f2403/cotyledon-2.1.0.tar.gz", hash = "sha256:ddf5d3639efd10789c9708a89890e55529b860986e7ca7d602a13c9eb15d8709", size = 26754, upload-time = "2025-08-30T18:56:04.583Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/14/baf084e49f818049e111bd221075aa54caa71be134052e880c989efd55ad/cotyledon-2.1.0-py3-none-any.whl", hash = "sha256:6b32f069300832b24a3e1a69ced003d8ed725549e38a8a98adb342864adf17cf", size = 25326, upload-time = "2025-08-30T18:56:03.247Z" },
+]
+
+[[package]]
 name = "coverage"
 version = "7.10.7"
 source = { registry = "https://pypi.org/simple" }
@@ -333,11 +345,14 @@ wheels = [
 
 [[package]]
 name = "futurist"
-version = "3.0.0"
+version = "3.2.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4c/24/864408313afba48440ee3a560e1a70b62b39e6c0dfeddea9506699e6e606/futurist-3.0.0.tar.gz", hash = "sha256:6422011792414c39228e114bec5494303aaf06dcd335e4f8dd4f907f78a41f79", size = 44836, upload-time = "2024-02-23T12:20:49.61Z" }
+dependencies = [
+    { name = "debtcollector" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/af/12/786f4aaf9d396d67b1b7b90f248ff994e916605d0751d08a0344a4a785a6/futurist-3.2.1.tar.gz", hash = "sha256:01dd4f30acdfbb2e2eb6091da565eded82d8cbaf6c48a36cc7f73c11cfa7fb3f", size = 49326, upload-time = "2025-08-29T15:06:57.733Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ad/2b/dcdb2dfdc61676ac25676f10f71c9bba77bf81227f3e73f5c678462bffaf/futurist-3.0.0-py3-none-any.whl", hash = "sha256:645565803423c907557d59f82b2e7f33d87fd483316414466d059a0fa5aa5fc9", size = 37008, upload-time = "2024-02-23T12:20:47.54Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/5b/a4418215b594fa44dea7deae61fa406139e2e8acc6442d25f93d80c52c84/futurist-3.2.1-py3-none-any.whl", hash = "sha256:c76a1e7b2c6b264666740c3dffbdcf512bd9684b4b253a3068a0135b43729745", size = 40485, upload-time = "2025-08-29T15:06:56.476Z" },
 ]
 
 [[package]]
@@ -640,7 +655,7 @@ wheels = [
 
 [[package]]
 name = "neutron"
-version = "26.0.1"
+version = "27.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -672,7 +687,7 @@ dependencies = [
     { name = "oslo-reports" },
     { name = "oslo-rootwrap" },
     { name = "oslo-serialization" },
-    { name = "oslo-service" },
+    { name = "oslo-service", extra = ["threading"] },
     { name = "oslo-upgradecheck" },
     { name = "oslo-utils" },
     { name = "oslo-versionedobjects" },
@@ -697,14 +712,14 @@ dependencies = [
     { name = "tooz" },
     { name = "webob" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/30/73/8052fa00e981ada6dc3ff7897758c7bd9e729d9766e9831244697c840e21/neutron-26.0.1.tar.gz", hash = "sha256:6e1633640ea65d359e1f1a2f5c88ea4beb92deb7bb64f3fbe6790cd47d4db01f", size = 12215939, upload-time = "2025-06-13T15:05:35.963Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/cb/1b4d9490b379162549d65091c9583920266ccbd93ecc1da7dd5db4cb2f98/neutron-27.0.0.tar.gz", hash = "sha256:c851ab6bf5792a713d43d8900c9a0751c75d7ccf1b0eb7c452b6d17fec1bec15", size = 12225381, upload-time = "2025-10-01T10:53:28.397Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0a/6a/9681db9c9897d00e0135c3f253527fa4e0c65f2367a3574954dd41a5e615/neutron-26.0.1-py3-none-any.whl", hash = "sha256:04d838052adbe3b1c4861a30cba9ae54dabc857d2c5a139dde73cbea6b19c51b", size = 4333219, upload-time = "2025-06-13T15:05:33.498Z" },
+    { url = "https://files.pythonhosted.org/packages/43/00/3353b5ee7e427fab59d8c5d98e42fb130446c298e228190f1613a9ae4496/neutron-27.0.0-py3-none-any.whl", hash = "sha256:b6f9bd0ec8c3127d54cf96a9a475fcc15f8bbff3437b3f20a1b3cf8a8073dafe", size = 4342183, upload-time = "2025-10-01T10:53:14.997Z" },
 ]
 
 [[package]]
 name = "neutron-lib"
-version = "3.18.2"
+version = "3.22.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "debtcollector" },
@@ -732,9 +747,9 @@ dependencies = [
     { name = "stevedore" },
     { name = "webob" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/86/56/f44432a31a3bcfea3f11c66d08ec2b1b30209ad258f8398e91875bc61b58/neutron_lib-3.18.2.tar.gz", hash = "sha256:faa9d54c164b32d8ac773f3031abb050836cda9a6483479762726a8490bd2fb0", size = 549047, upload-time = "2025-02-27T22:45:18.754Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/07/c3b31378730d8cde3109361e096f90536452808e4a122d4fe7f96b204660/neutron_lib-3.22.0.tar.gz", hash = "sha256:c8f5f9344027f1ac54e6c9f189307e79a9d6bb3470bba70ab949e6acc5c36e9d", size = 549552, upload-time = "2025-10-09T10:15:14.596Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/85/05/5d0ffebd6e95cba6a56be047e96cf4ea8bff2941f82c413fdbcd14567685/neutron_lib-3.18.2-py3-none-any.whl", hash = "sha256:5f5a6ef61f2bedf735d5a6d22f3987e3415a3f5a06acdc52830c4f7037c75476", size = 620897, upload-time = "2025-02-27T22:45:17.15Z" },
+    { url = "https://files.pythonhosted.org/packages/85/32/2a12bb9ba02f38beab2f0c88e3e0d0b79a96be4739527224e9bbd1802b9e/neutron_lib-3.22.0-py3-none-any.whl", hash = "sha256:136e2e781a370b715407fd8527f8a3ffb78967e6f48933b9ffa2b1121404facd", size = 623208, upload-time = "2025-10-09T10:15:12.916Z" },
 ]
 
 [[package]]
@@ -744,8 +759,8 @@ source = { editable = "." }
 dependencies = [
     { name = "neutron" },
     { name = "neutron-lib" },
-    { name = "pynautobot" },
     { name = "requests" },
+    { name = "urllib3" },
 ]
 
 [package.dev-dependencies]
@@ -757,10 +772,10 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "neutron", specifier = ">=26,<27" },
+    { name = "neutron", specifier = ">=27,<28" },
     { name = "neutron-lib", specifier = ">=3,<4" },
-    { name = "pynautobot", specifier = ">=2.6.1,<3" },
     { name = "requests", specifier = ">=2,<3" },
+    { name = "urllib3", specifier = "==1.26.20" },
 ]
 
 [package.metadata.requires-dev]
@@ -1166,7 +1181,7 @@ wheels = [
 
 [[package]]
 name = "oslo-service"
-version = "3.6.0"
+version = "4.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "debtcollector" },
@@ -1183,9 +1198,15 @@ dependencies = [
     { name = "webob" },
     { name = "yappi" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d8/57/6b9544ecf6a919e6580567b6506ae427306ed4c7528a86c377e976abab7c/oslo.service-3.6.0.tar.gz", hash = "sha256:32487367bb1c51c0654618021c3754a6a081151a2800d96eccfce4912356a63a", size = 86583, upload-time = "2024-11-14T09:25:22.699Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/55/ea/be7735dd5e5f8e020b4559edac02c10faba1bac8388a5d6c6f3d8fb87687/oslo_service-4.3.0.tar.gz", hash = "sha256:7d856beee4c860a39e0ad5b2722882ba9f20eabf7fb29f8fdc86db2f7a5532e2", size = 105937, upload-time = "2025-08-28T09:51:42.29Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/97/a7/9cc4d4eb6c1d4be315bc0ba78e627a4bdc6d045996f26791ad872db0a874/oslo.service-3.6.0-py3-none-any.whl", hash = "sha256:3a60eba55950c9fb16e804bf9d48073f626c1f7a0b1a0b32ac821d1a958af751", size = 77007, upload-time = "2024-11-14T09:25:20.664Z" },
+    { url = "https://files.pythonhosted.org/packages/85/04/009b035105b62524af4b9ec99b13334aec3d612f962e168eac2e4c6881f7/oslo_service-4.3.0-py3-none-any.whl", hash = "sha256:00e73b949cfcbe3c335cead78d6f0905afe46e8e482af0e3b75fa6fab43c27c5", size = 101220, upload-time = "2025-08-28T09:51:37.793Z" },
+]
+
+[package.optional-dependencies]
+threading = [
+    { name = "cotyledon" },
+    { name = "futurist" },
 ]
 
 [[package]]
@@ -1463,20 +1484,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fd/1a/cc308a884bd299b651f1633acb978e8596c71c33ca85e9dc9fa33a5399b9/PyNaCl-1.5.0-cp36-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:61f642bf2378713e2c2e1de73444a3778e5f0a38be6fee0fe532fe30060282ff", size = 1117912, upload-time = "2022-01-07T22:05:58.665Z" },
     { url = "https://files.pythonhosted.org/packages/25/2d/b7df6ddb0c2a33afdb358f8af6ea3b8c4d1196ca45497dd37a56f0c122be/PyNaCl-1.5.0-cp36-abi3-win32.whl", hash = "sha256:e46dae94e34b085175f8abb3b0aaa7da40767865ac82c928eeb9e57e1ea8a543", size = 204624, upload-time = "2022-01-07T22:06:00.085Z" },
     { url = "https://files.pythonhosted.org/packages/5e/22/d3db169895faaf3e2eda892f005f433a62db2decbcfbc2f61e6517adfa87/PyNaCl-1.5.0-cp36-abi3-win_amd64.whl", hash = "sha256:20f42270d27e1b6a29f54032090b972d97f0a1b0948cc52392041ef7831fee93", size = 212141, upload-time = "2022-01-07T22:06:01.861Z" },
-]
-
-[[package]]
-name = "pynautobot"
-version = "2.6.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "packaging" },
-    { name = "requests" },
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/43/cb39f53f34b4c3bb25ca993fd7a97b08fb02c61d2b8755385f8fd43e714d/pynautobot-2.6.1.tar.gz", hash = "sha256:f8d04c47f211e7346f8a66a11d5e9943dd5cb6455da6e1c7cd802d2865f48d33", size = 31566, upload-time = "2025-02-14T22:31:53.989Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/ec/0d9ca9f98e00d0e8d23d4653fbf193852f8a00c82b6ef173c4356bb9b81f/pynautobot-2.6.1-py3-none-any.whl", hash = "sha256:50255265e69473be99fa4e0706e7ee5311af9f2d95d9cee7f0361b7270899d99", size = 38895, upload-time = "2025-02-14T22:31:52.102Z" },
 ]
 
 [[package]]
@@ -1987,11 +1994,11 @@ wheels = [
 
 [[package]]
 name = "urllib3"
-version = "2.3.0"
+version = "1.26.20"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/aa/63/e53da845320b757bf29ef6a9062f5c669fe997973f966045cb019c3f4b66/urllib3-2.3.0.tar.gz", hash = "sha256:f8c5449b3cf0861679ce7e0503c7b44b5ec981bec0d1d3795a07f1ba96f0204d", size = 307268, upload-time = "2024-12-22T07:47:30.032Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e4/e8/6ff5e6bc22095cfc59b6ea711b687e2b7ed4bdb373f7eeec370a97d7392f/urllib3-1.26.20.tar.gz", hash = "sha256:40c2dc0c681e47eb8f90e7e27bf6ff7df2e677421fd46756da1161c39ca70d32", size = 307380, upload-time = "2024-08-29T15:43:11.37Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/19/4ec628951a74043532ca2cf5d97b7b14863931476d117c471e8e2b1eb39f/urllib3-2.3.0-py3-none-any.whl", hash = "sha256:1cee9ad369867bfdbbb48b7dd50374c0967a0bb7710050facf0dd6911440e3df", size = 128369, upload-time = "2024-12-22T07:47:28.074Z" },
+    { url = "https://files.pythonhosted.org/packages/33/cf/8435d5a7159e2a9c83a95896ed596f68cf798005fe107cc655b5c5c14704/urllib3-1.26.20-py2.py3-none-any.whl", hash = "sha256:0ed14ccfbf1c30a9072c7ca157e4319b70d65f623e91e7b32fadb2853431016e", size = 144225, upload-time = "2024-08-29T15:43:08.921Z" },
 ]
 
 [[package]]
