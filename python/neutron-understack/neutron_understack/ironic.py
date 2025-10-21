@@ -14,7 +14,6 @@ LOG = logging.getLogger(__name__)
 class IronicClient:
     def __init__(self):
         LOG.debug("creating ironic client")
-        self.irclient = self._get_ironic_client()
         LOG.debug("created ironic client")
 
     def _get_session(self, group: str) -> ks_loading.session.Session:
@@ -27,6 +26,10 @@ class IronicClient:
         if not IRONIC_SESSION:
             IRONIC_SESSION = self._get_session("ironic")
 
+        LOG.debug("got session, making connection")
+
+    @property
+    def irclient(self):
         return connection.Connection(
             session=IRONIC_SESSION,
             oslo_conf=cfg.CONF,
