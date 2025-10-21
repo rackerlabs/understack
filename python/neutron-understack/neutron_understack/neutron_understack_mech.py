@@ -38,9 +38,14 @@ class UnderstackDriver(MechanismDriver):
         config.register_ml2_understack_opts(cfg.CONF)
         conf = cfg.CONF.ml2_understack
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
+        LOG.debug("Finished initializing undersync for 'understack'")
         self.ironic_client = IronicClient()
+        LOG.debug("Finished initializing ironic for 'understack'")
         self.trunk_driver = UnderStackTrunkDriver.create(self)
+        LOG.debug("Finished initializing trunks for 'understack'")
         self.subscribe()
+        LOG.debug("Finished subscribing for 'understack'")
+        LOG.debug("Finished initializing 'understack'")
 
     def subscribe(self):
         registry.subscribe(
