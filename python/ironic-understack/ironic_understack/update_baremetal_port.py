@@ -16,6 +16,7 @@ LOG = logging.getLogger(__name__)
 
 LldpData = list[tuple[int, str]]
 
+
 class UpdateBaremetalPortsHook(base.InspectionHook):
     """Hook to update ports according to LLDP data."""
 
@@ -32,14 +33,20 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
         - local_link_info.switch_id (e.g. "aa:bb:cc:dd:ee:ff")
         - local_link_info.switch_info (e.g. "a1-1-1.ord1")
         - physical_network (e.g. "a1-1-network")
+        - pxe_boot flag?
 
         Also adds or removes node "traits" based on the inventory data.  We
         control the trait "CUSTOM_STORAGE_SWITCH".
+
+        The IPA image will normally have exactly one inventory.interfaces with
+        an ipv4_address address and has_carrier set to True.  This is our pxe
+        boot interface.  We should clear the pxe interface flag on all other
+        baremetal ports.
         """
         LOG.debug(f"{__class__} called with {task=!r} {inventory=!r} {plugin_data=!r}")
 
         lldp_raw: dict[str, LldpData] = plugin_data.get("lldp_raw") or {}
-        node_uuid: str = task.node.id
+        node_uuid: str = task.node.uuid
         interfaces: list[dict] = inventory["interfaces"]
         # The all_interfaces field in plugin_data is provided by the
         # validate-interfaces hook, so it is a dependency for this hook
@@ -64,7 +71,7 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
                 continue
 
             lldp_data = lldp_raw.get(iface["name"]) or iface.get("lldp")
-            if lldp_data is None:
+            if not lldp_data:
                 LOG.warning(
                     "No LLDP data found for interface %s of node %s",
                     mac_address,
@@ -84,8 +91,12 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
 
 def _set_local_link_connection(port: Any, node_uuid: str, local_link_connection: dict):
     try:
-        LOG.debug("Updating port %s for node %s local_link_connection %s",
-                  port.id, node_uuid, local_link_connection)
+        LOG.debug(
+            "Updating port %s for node %s local_link_connection %s",
+            port.uuid,
+            node_uuid,
+            local_link_connection,
+        )
         port.local_link_connection = local_link_connection
         port.save()
     except exception.IronicException as e:
@@ -108,7 +119,11 @@ def _parse_lldp(lldp_data: LldpData, node_id: str) -> dict[str, str]:
         switch_id = _extract_switch_id(decoded)
         switch_info = _extract_hostname(decoded)
         if port_id and switch_id and switch_info:
-            return {"port_id": port_id, "switch_id": switch_id, "switch_info": switch_info}
+            return {
+                "port_id": port_id,
+                "switch_id": switch_id,
+                "switch_info": switch_info,
+            }
         LOG.warning("Failed to extract local_link_info from LLDP data for %s", node_id)
     except (binascii.Error, core.MappingError, netaddr.AddrFormatError) as e:
         LOG.warning("Failed to parse lldp_raw data for Node %s: %s", node_id, e)
@@ -144,10 +159,12 @@ def vlan_group_name(local_link_connection) -> str | None:
     return ironic_understack.vlan_group_name_convention.vlan_group_name(switch_name)
 
 
-def _update_port_physical_network(port, new_physical_network: str|None):
+def _update_port_physical_network(port, new_physical_network: str | None):
     old_physical_network = port.physical_network
 
     if new_physical_network == old_physical_network:
+        LOG.debug("Port %s physical_network already set to %s",
+                  port.id, new_physical_network)
         return
 
     LOG.debug(
@@ -169,15 +186,15 @@ def _update_node_traits(task, vlan_groups: set[str]):
     """
     TRAIT_STORAGE_SWITCH = "CUSTOM_STORAGE_SWITCH"
 
-    storage_vlan_groups = {
-        x for x in vlan_groups if x.endswith("-storage")
-    }
+    storage_vlan_groups = {x for x in vlan_groups if x.endswith("-storage")}
 
     if storage_vlan_groups:
-        task.node.add_trait(TRAIT_STORAGE_SWITCH)
+        existing_traits = task.node.traits.get_trait_names()
+        LOG.debug(f"Existing traits of node {task.node.uuid=} {task.node.traits=} {existing_traits=}")
+        task.node.traits = existing_traits.create(TRAIT_STORAGE_SWITCH)
     else:
         try:
-            task.node.remove_trait(TRAIT_STORAGE_SWITCH)
+            task.node.traits.destroy(TRAIT_STORAGE_SWITCH)
         except openstack.exceptions.NotFoundException:
             pass
 
