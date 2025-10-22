@@ -8,6 +8,7 @@ metadata:
       Defined in `workflows/argo-events/workflowtemplates/enroll-server.yaml`
 kind: WorkflowTemplate
 spec:
+  serviceAccountName: workflow
   entrypoint: main
   arguments:
     parameters:
@@ -58,6 +59,15 @@ spec:
               parameters:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
+        - - name: inspect-server
+            template: openstack-wait-cmd
+            arguments:
+              parameters:
+                - name: operation
+                  value: "inspect"
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
+            when: "{{steps.server-manage-state.outputs.result}} == manageable"
         - - name: avail-server
             template: openstack-wait-cmd
             arguments:
@@ -77,16 +87,13 @@ spec:
           - "{{workflow.parameters.ip_address}}"
         volumeMounts:
           - mountPath: /etc/openstack
-            name: openstack-svc-acct
+            name: baremetal-manage
             readOnly: true
           - mountPath: /etc/nb-token/
             name: nb-token
             readOnly: true
           - mountPath: /etc/bmc_master/
             name: bmc-master
-            readOnly: true
-          - mountPath: /etc/understack_flavors/
-            name: understack-flavors
             readOnly: true
         env:
         - name: WF_NS
@@ -95,12 +102,6 @@ spec:
           value: "{{workflow.name}}"
         - name: WF_UID
           value: "{{workflow.uid}}"
-        - name: FLAVORS_DIR
-          valueFrom:
-            configMapKeyRef:
-              name: understack-flavors
-              key: FLAVORS_DIR
-              optional: true
       volumes:
         - name: bmc-master
           secret:
@@ -108,13 +109,12 @@ spec:
         - name: nb-token
           secret:
             secretName: nautobot-token
-        - name: openstack-svc-acct
+        - name: baremetal-manage
           secret:
-            secretName: openstack-svc-acct
-        - name: understack-flavors
-          persistentVolumeClaim:
-            claimName: understack-flavors
-            readOnly: true
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
     - name: openstack-wait-cmd
       inputs:
         parameters:
@@ -136,12 +136,14 @@ spec:
             value: understack
         volumeMounts:
           - mountPath: /etc/openstack
-            name: openstack-svc-acct
-            readOnly: true
+            name: baremetal-manage
       volumes:
-        - name: openstack-svc-acct
+        - name: baremetal-manage
           secret:
-            secretName: openstack-svc-acct
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
     - name: openstack-set-baremetal-node-raid-config
       inputs:
         parameters:
@@ -190,12 +192,14 @@ spec:
             value: understack
         volumeMounts:
           - mountPath: /etc/openstack
-            name: openstack-svc-acct
-            readOnly: true
+            name: baremetal-manage
       volumes:
-        - name: openstack-svc-acct
+        - name: baremetal-manage
           secret:
-            secretName: openstack-svc-acct
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
     - name: openstack-state-cmd
       inputs:
         parameters:
@@ -218,9 +222,11 @@ spec:
             value: understack
         volumeMounts:
           - mountPath: /etc/openstack
-            name: openstack-svc-acct
-            readOnly: true
+            name: baremetal-manage
       volumes:
-        - name: openstack-svc-acct
+        - name: baremetal-manage
           secret:
-            secretName: openstack-svc-acct
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
