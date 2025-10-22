@@ -25,7 +25,6 @@ dependencies = [
     "python-ironicclient>=5,<6",
     "sushy>=5.3.0,<6",
     "kubernetes==33.1.0",
-    "understack-flavor-matcher",
     "netapp-ontap>=9.17.1.0",
 ]
 
@@ -54,9 +53,6 @@ test = [
 
 [tool.uv]
 default-groups = ["test"]
-
-[tool.uv.sources]
-understack-flavor-matcher = { path = "../understack-flavor-matcher" }
 
 [tool.hatch.build.targets.sdist]
 include = ["understack_workflows"]

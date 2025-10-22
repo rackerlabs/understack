@@ -17,7 +17,6 @@ class NodeMetadata:
     uuid: str
     hostname: str
     manufacturer: str
-    resource_class: str
 
     @property
     def driver(self):
@@ -58,7 +57,6 @@ def update_ironic_node(client, node_meta, bmc):
         "driver_info/redfish_verify_ca=false",
         f"driver_info/redfish_username={bmc.username}",
         f"driver_info/redfish_password={bmc.password}",
-        f"resource_class={node_meta.resource_class}",
         "boot_interface=http-ipxe",
     ]
 
@@ -85,7 +83,6 @@ def create_ironic_node(
                 "redfish_username": bmc.username,
                 "redfish_password": bmc.password,
             },
-            "resource_class": node_meta.resource_class,
             "boot_interface": "http-ipxe",
         }
     )
