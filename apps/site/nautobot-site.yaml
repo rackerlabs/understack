@@ -1,5 +1,6 @@
 ---
-component: nautobot
+component: nautobot-site
+componentNamespace: nautobot
 sources:
   - ref: deploy
-    path: '{{.name}}/manifests/nautobot'
+    path: '{{.name}}/manifests/nautobot-site'

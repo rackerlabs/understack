@@ -6,7 +6,6 @@ resources:
   - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
   - secrets/openstack-svc-acct.yaml
   - secrets/operate-workflow-sa.token.yaml
-  - secrets/nautobot-token.yaml
   - eventsources/nautobot-webhook.yaml
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
   - serviceaccounts/openstack-sensor-submit-workflow.yaml
@@ -24,3 +23,11 @@ resources:
   - sensors/alertmanager-webhook-sensor.yaml
   - eventsources/alertmanager-webhook-eventsource.yaml
   - workflowtemplates/alert-automation-neutron-agent-down.yaml
+
+helmCharts:
+  - name: nautobot-token
+    namespace: argo-events
+    valuesFile: nautobot-token-values.yaml
+
+helmGlobals:
+  chartHome: ../
