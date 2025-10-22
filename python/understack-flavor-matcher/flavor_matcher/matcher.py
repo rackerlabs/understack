@@ -1,28 +1,56 @@
-from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.device_type import DeviceType
+from flavor_matcher.device_type import ResourceClass
 from flavor_matcher.machine import Machine
 
 
 class Matcher:
-    def __init__(self, flavors: list[FlavorSpec]):
-        self.flavors = flavors
+    def __init__(self, device_types: list[DeviceType]):
+        self.device_types = device_types
 
-    def match(self, machine: Machine) -> list[FlavorSpec]:
-        """Find list of all flavors that the machine is eligible for."""
-        results = []
-        for flavor in self.flavors:
-            score = flavor.score_machine(machine)
-            if score > 0:
-                results.append(flavor)
-        return results
+    def match(self, machine: Machine) -> tuple[DeviceType, ResourceClass] | None:
+        """Find the resource class that matches the machine's hardware specs.
 
-    def pick_best_flavor(self, machine: Machine) -> FlavorSpec | None:
-        """Selects the best patching flavor.
+        Returns a tuple of (DeviceType, ResourceClass) that matches the machine,
+        or None if no match is found.
 
-        Obtains list of all flavors that particular machine can be classified as,
-        then tries to select "the best" one.
+        Matching rules:
+        1. Manufacturer and model must match exactly
+        2. CPU model must match exactly
+        3. CPU cores must match exactly
+        4. Memory must match exactly (in MB)
+        5. Must have at least as many drives as specified in resource class
+        6. Each drive must be at least as large as the smallest drive in resource class
         """
-        possible = self.match(machine)
+        for device_type in self.device_types:
+            # Check manufacturer and model
+            if (
+                device_type.manufacturer != machine.manufacturer
+                or device_type.model != machine.model
+            ):
+                continue
 
-        if len(possible) == 0:
-            return None
-        return max(possible, key=lambda flv: flv.memory_gb)
+            # Check each resource class in this device type
+            for resource_class in device_type.resource_class:
+                # Check CPU model
+                if resource_class.cpu.model != machine.cpu:
+                    continue
+
+                # Check CPU cores
+                if resource_class.cpu.cores != machine.cpu_cores:
+                    continue
+
+                # Check memory (in MB)
+                if resource_class.memory.size != machine.memory_mb:
+                    continue
+
+                # Check drives - machine must have enough storage
+                # For simplicity, we check if machine's total disk meets the minimum
+                # drive size specified in resource class
+                min_drive_size = min(d.size for d in resource_class.drives)
+                if machine.disk_gb < min_drive_size:
+                    continue
+
+                # Found a match
+                return (device_type, resource_class)
+
+        return None

@@ -5,7 +5,9 @@ from dataclasses import dataclass
 class Machine:
     memory_mb: int
     cpu: str
+    cpu_cores: int
     disk_gb: int
+    manufacturer: str
     model: str
 
     @property

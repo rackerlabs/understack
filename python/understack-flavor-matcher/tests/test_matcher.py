@@ -1,80 +1,250 @@
 import pytest
 
-from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.device_type import CpuSpec
+from flavor_matcher.device_type import DeviceType
+from flavor_matcher.device_type import DriveSpec
+from flavor_matcher.device_type import MemorySpec
+from flavor_matcher.device_type import ResourceClass
 from flavor_matcher.machine import Machine
 from flavor_matcher.matcher import Matcher
 
 
 @pytest.fixture
-def sample_flavors():
-    return [
-        FlavorSpec(
-            name="small",
-            manufacturer="Dell",
-            model="Fake Machine",
-            memory_gb=4,
-            cpu_cores=2,
-            cpu_model="x86",
-            drives=[20],
-            pci=[],
-        ),
-        FlavorSpec(
-            name="medium",
-            manufacturer="Dell",
-            model="Fake Machine",
-            memory_gb=8,
-            cpu_cores=4,
-            cpu_model="x86",
-            drives=[40],
-            pci=[],
-        ),
-        FlavorSpec(
-            name="large",
-            manufacturer="Dell",
-            model="Fake Machine",
-            memory_gb=16,
-            cpu_cores=8,
-            cpu_model="x86",
-            drives=[80],
-            pci=[],
-        ),
-    ]
+def device_types():
+    """Create sample device types for testing."""
+    # Dell PowerEdge R7615 with multiple resource classes
+    dell_r7615 = DeviceType(
+        class_="server",
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+        u_height=2,
+        is_full_depth=True,
+        resource_class=[
+            ResourceClass(
+                name="m1.small",
+                cpu=CpuSpec(cores=16, model="AMD EPYC 9124"),
+                memory=MemorySpec(size=131072),
+                drives=[DriveSpec(size=480), DriveSpec(size=480)],
+                nic_count=2,
+            ),
+            ResourceClass(
+                name="m1.medium",
+                cpu=CpuSpec(cores=32, model="AMD EPYC 9334"),
+                memory=MemorySpec(size=262144),
+                drives=[DriveSpec(size=960), DriveSpec(size=960)],
+                nic_count=2,
+            ),
+            ResourceClass(
+                name="m1.large",
+                cpu=CpuSpec(cores=64, model="AMD EPYC 9554"),
+                memory=MemorySpec(size=524288),
+                drives=[DriveSpec(size=1920), DriveSpec(size=1920)],
+                nic_count=4,
+            ),
+        ],
+    )
+
+    return [dell_r7615]
 
 
 @pytest.fixture
-def matcher(sample_flavors):
-    return Matcher(flavors=sample_flavors)
+def matcher(device_types):
+    """Create a matcher with test data."""
+    return Matcher(device_types=device_types)
 
 
-@pytest.fixture
-def machine():
-    return Machine(memory_mb=8192, cpu="x86", disk_gb=50, model="Fake Machine")
+def test_match_exact_machine(matcher):
+    """Test matching a machine that exactly matches m1.small resource class."""
+    machine = Machine(
+        memory_mb=131072,  # 128 GB
+        cpu="AMD EPYC 9124",
+        cpu_cores=16,
+        disk_gb=480,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is not None
+    device_type, resource_class = result
+    assert resource_class.name == "m1.small"
+    assert device_type.manufacturer == "Dell"
+    assert device_type.model == "PowerEdge R7615"
 
 
-def test_match(matcher, machine):
-    # This machine should match the small and medium flavors
-    results = matcher.match(machine)
-    assert len(results) == 2
-    assert results[0].name == "small"
-    assert results[1].name == "medium"
+def test_match_machine_small(matcher):
+    """Test that machine matches the m1.small resource class."""
+    machine = Machine(
+        memory_mb=131072,  # 128 GB
+        cpu="AMD EPYC 9124",
+        cpu_cores=16,
+        disk_gb=480,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is not None
+    _, resource_class = result
+    assert resource_class.name == "m1.small"
 
 
-def test_match_no_flavor(matcher):
-    # A machine that does not meet any flavor specs
-    machine = Machine(memory_mb=2048, cpu="x86", disk_gb=10, model="SomeModel")
-    results = matcher.match(machine)
-    assert len(results) == 0
+def test_match_machine_verifies_specs(matcher):
+    """Test that machine matches based on hardware specs."""
+    machine = Machine(
+        memory_mb=131072,  # 128 GB
+        cpu="AMD EPYC 9124",
+        cpu_cores=16,
+        disk_gb=480,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is not None
+    _, resource_class = result
+    assert resource_class.name == "m1.small"
+    assert resource_class.cpu.cores == 16
+    assert resource_class.memory.size == 131072
 
 
-def test_pick_best_flavor2(matcher, machine):
-    # This machine should pick the medium flavor as the best
-    best_flavor = matcher.pick_best_flavor(machine)
-    assert best_flavor is not None
-    assert best_flavor.name == "medium"
+def test_match_medium_machine(matcher):
+    """Test matching a machine to m1.medium resource class."""
+    machine = Machine(
+        memory_mb=262144,  # 256 GB
+        cpu="AMD EPYC 9334",
+        cpu_cores=32,
+        disk_gb=960,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is not None
+    _, resource_class = result
+    assert resource_class.name == "m1.medium"
 
 
-def test_pick_best_flavor_no_match(matcher):
-    # A machine that does not meet any flavor specs
-    machine = Machine(memory_mb=1024, cpu="ARM", disk_gb=10, model="SomeModel")
-    best_flavor = matcher.pick_best_flavor(machine)
-    assert best_flavor is None
+def test_match_medium_machine_with_specs(matcher):
+    """Test matching a medium machine and verify its specs."""
+    machine = Machine(
+        memory_mb=262144,  # 256 GB
+        cpu="AMD EPYC 9334",
+        cpu_cores=32,
+        disk_gb=960,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is not None
+    _, resource_class = result
+    assert resource_class.name == "m1.medium"
+    assert resource_class.cpu.cores == 32
+    assert resource_class.memory.size == 262144
+
+
+def test_no_match_wrong_manufacturer(matcher):
+    """Test that wrong manufacturer doesn't match."""
+    machine = Machine(
+        memory_mb=131072,  # 128 GB
+        cpu="AMD EPYC 9124",
+        cpu_cores=16,
+        disk_gb=480,
+        manufacturer="HP",  # Wrong manufacturer
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is None
+
+
+def test_no_match_wrong_model(matcher):
+    """Test that wrong model doesn't match."""
+    machine = Machine(
+        memory_mb=131072,  # 128 GB
+        cpu="AMD EPYC 9124",
+        cpu_cores=16,
+        disk_gb=480,
+        manufacturer="Dell",
+        model="PowerEdge R7525",  # Wrong model
+    )
+
+    result = matcher.match(machine)
+    assert result is None
+
+
+def test_no_match_wrong_cpu_model(matcher):
+    """Test that wrong CPU model doesn't match."""
+    machine = Machine(
+        memory_mb=131072,  # 128 GB
+        cpu="Intel Xeon",  # Wrong CPU
+        cpu_cores=16,
+        disk_gb=480,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is None
+
+
+def test_no_match_wrong_cpu_cores(matcher):
+    """Test that wrong CPU cores doesn't match."""
+    machine = Machine(
+        memory_mb=131072,  # 128 GB
+        cpu="AMD EPYC 9124",
+        cpu_cores=8,  # Wrong core count
+        disk_gb=480,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is None
+
+
+def test_no_match_wrong_memory(matcher):
+    """Test that wrong memory size doesn't match."""
+    machine = Machine(
+        memory_mb=65536,  # 64 GB - wrong size
+        cpu="AMD EPYC 9124",
+        cpu_cores=16,
+        disk_gb=480,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is None
+
+
+def test_no_match_insufficient_disk(matcher):
+    """Test that insufficient disk space doesn't match."""
+    machine = Machine(
+        memory_mb=131072,  # 128 GB
+        cpu="AMD EPYC 9124",
+        cpu_cores=16,
+        disk_gb=200,  # Too small
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is None
+
+
+def test_match_empty_device_types():
+    """Test matcher with no device types."""
+    matcher = Matcher(device_types=[])
+    machine = Machine(
+        memory_mb=131072,
+        cpu="AMD EPYC 9124",
+        cpu_cores=16,
+        disk_gb=480,
+        manufacturer="Dell",
+        model="PowerEdge R7615",
+    )
+
+    result = matcher.match(machine)
+    assert result is None

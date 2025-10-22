@@ -12,8 +12,9 @@
 """Redfish Inspect Interface modified for Understack."""
 
 import re
+from pathlib import Path
 
-from flavor_matcher.flavor_spec import FlavorSpec
+from flavor_matcher.device_type import DeviceType
 from flavor_matcher.machine import Machine
 from flavor_matcher.matcher import Matcher
 from ironic.drivers.drac import IDRACHardware
@@ -27,8 +28,8 @@ from oslo_utils import units
 from ironic_understack.conf import CONF
 
 LOG = log.getLogger(__name__)
-FLAVORS = FlavorSpec.from_directory(CONF.ironic_understack.flavors_dir)
-LOG.info("Loaded %d flavor specifications.", len(FLAVORS))
+DEVICE_TYPES = DeviceType.from_directory(Path(CONF.ironic_understack.device_types_dir))
+LOG.info("Loaded %d device types.", len(DEVICE_TYPES))
 
 
 class FlavorInspectMixin:
@@ -85,21 +86,29 @@ class FlavorInspectMixin:
         else:
             model_name = model_name_match.group(1)
 
+        # Extract additional fields for new Machine API
+        cpu_cores = inventory.get("cpu", {}).get("count", 0)
+        manufacturer = inventory.get("system_vendor", {}).get("manufacturer", "")
+
         machine = Machine(
             memory_mb=inventory["memory"]["physical_mb"],
             disk_gb=smallest_disk_gb,
             cpu=inventory["cpu"]["model_name"],
+            cpu_cores=cpu_cores,
+            manufacturer=manufacturer,
             model=model_name,
         )
 
-        matcher = Matcher(FLAVORS)
-        best_flavor = matcher.pick_best_flavor(machine)
-        if not best_flavor:
-            LOG.warning("No flavor matched for %s", task.node.uuid)
+        matcher = Matcher(device_types=DEVICE_TYPES)
+        match_result = matcher.match(machine)
+        if not match_result:
+            LOG.warning("No resource class matched for %s", task.node.uuid)
             return upstream_state
-        LOG.info("Matched %s to flavor %s", task.node.uuid, best_flavor)
 
-        task.node.resource_class = f"baremetal.{best_flavor.name}"
+        device_type, resource_class = match_result
+        LOG.info("Matched %s to resource class %s", task.node.uuid, resource_class.name)
+
+        task.node.resource_class = resource_class.name
         task.node.save()
 
         return upstream_state

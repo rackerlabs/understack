@@ -7,9 +7,9 @@ def setup_conf():
     grp = cfg.OptGroup("ironic_understack")
     opts = [
         cfg.StrOpt(
-            "flavors_dir",
-            help="directory storing Flavor description YAML files",
-            default="/var/lib/understack/flavors/undercloud-nautobot-device-types.git/flavors",
+            "device_types_dir",
+            help="directory storing Device Type description YAML files",
+            default="/var/lib/understack/device-types",
         )
     ]
     cfg.CONF.register_group(grp)
