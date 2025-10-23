@@ -45,6 +45,9 @@ class ResourceClassHook(base.InspectionHook):
             cpu_cores = inventory.get("cpu", {}).get("count", 0)
             manufacturer = inventory.get("system_vendor", {}).get("manufacturer", "")
 
+            # trim ' Inc.'
+            manufacturer = manufacturer.replace(" Inc.", "")
+
             machine = Machine(
                 memory_mb=memory_mb,
                 cpu=cpu_model_name,
