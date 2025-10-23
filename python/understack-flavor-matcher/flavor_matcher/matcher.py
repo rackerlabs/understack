@@ -16,7 +16,6 @@ class Matcher:
         Matching rules:
         1. Manufacturer and model must match exactly
         2. CPU model must match exactly
-        3. CPU cores must match exactly
         4. Memory must match exactly (in MB)
         5. Must have at least as many drives as specified in resource class
         6. Each drive must be at least as large as the smallest drive in resource class
@@ -33,10 +32,6 @@ class Matcher:
             for resource_class in device_type.resource_class:
                 # Check CPU model
                 if resource_class.cpu.model != machine.cpu:
-                    continue
-
-                # Check CPU cores
-                if resource_class.cpu.cores != machine.cpu_cores:
                     continue
 
                 # Check memory (in MB)

@@ -189,21 +189,6 @@ def test_no_match_wrong_cpu_model(matcher):
     assert result is None
 
 
-def test_no_match_wrong_cpu_cores(matcher):
-    """Test that wrong CPU cores doesn't match."""
-    machine = Machine(
-        memory_mb=131072,  # 128 GB
-        cpu="AMD EPYC 9124",
-        cpu_cores=8,  # Wrong core count
-        disk_gb=480,
-        manufacturer="Dell",
-        model="PowerEdge R7615",
-    )
-
-    result = matcher.match(machine)
-    assert result is None
-
-
 def test_no_match_wrong_memory(matcher):
     """Test that wrong memory size doesn't match."""
     machine = Machine(
