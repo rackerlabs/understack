@@ -88,7 +88,7 @@ conf:
       loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
-      hooks: "$default_hooks,parse-lldp,local-link-connection,physical-network"
+      hooks: "$default_hooks,parse-lldp,local-link-connection,physical-network,resource-class"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
     sensor_data:
       send_sensor_data: true
@@ -217,6 +217,8 @@ pod:
             mountPath: /var/lib/dnsmasq/
           - name: understack-data
             mountPath: /var/lib/understack
+          - name: device-types
+            mountPath: /var/lib/understack/device-types
           - name: ironic-etc-snippets
             mountPath: /etc/ironic/ironic.conf.d
             readOnly: true
@@ -230,6 +232,9 @@ pod:
           - name: understack-data
             persistentVolumeClaim:
               claimName: understack-data
+          - name: device-types
+            configMap:
+              name: device-types
           - name: ironic-etc-snippets
             projected:
               sources:

@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.entry-points."ironic.inspection.hooks"]
-resource-class = "ironic_understack.resource_class:UndercloudResourceClassHook"
+resource-class = "ironic_understack.resource_class:ResourceClassHook"
 
 [project.entry-points."ironic.hardware.interfaces.inspect"]
 redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"

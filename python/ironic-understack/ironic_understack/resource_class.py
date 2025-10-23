@@ -21,7 +21,7 @@ class NoMatchError(Exception):
     pass
 
 
-class UndercloudResourceClassHook(base.InspectionHook):
+class ResourceClassHook(base.InspectionHook):
     """Hook to set the node's resource_class based on the inventory."""
 
     def __call__(self, task, inventory, plugin_data):
