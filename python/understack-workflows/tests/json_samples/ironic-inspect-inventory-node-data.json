@@ -1,0 +1,753 @@
+{
+    "inventory": {
+        "interfaces": [
+            {
+                "name": "eno8403",
+                "mac_address": "c4:cb:e1:bf:90:dd",
+                "ipv4_address": null,
+                "ipv6_address": null,
+                "has_carrier": false,
+                "lldp": [],
+                "vendor": "0x14e4",
+                "product": "0x165f",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 1000,
+                "pci_address": "0000:c3:00.1",
+                "driver": "tg3"
+            },
+            {
+                "name": "eno3np0",
+                "mac_address": "d4:04:e6:4f:71:28",
+                "ipv4_address": "10.4.50.110",
+                "ipv6_address": "fe80::d604:e6ff:fe4f:7128%eno3np0",
+                "has_carrier": true,
+                "lldp": [
+                    [
+                        1,
+                        "04c47ee0e4553f"
+                    ],
+                    [
+                        2,
+                        "0545746865726e6574312f34"
+                    ],
+                    [
+                        3,
+                        "0078"
+                    ],
+                    [
+                        4,
+                        "44656c6c2d463347535730345f4e49432e496e74656772617465642e312d31"
+                    ],
+                    [
+                        5,
+                        "6632302d332d312e69616433"
+                    ],
+                    [
+                        127,
+                        "0001420101"
+                    ],
+                    [
+                        127,
+                        "00120f042328"
+                    ],
+                    [
+                        127,
+                        "0080c2030faa11343031305f70726f766973696f6e696e67"
+                    ],
+                    [
+                        127,
+                        "0080c2070100000000"
+                    ],
+                    [
+                        127,
+                        "00014208464c4d323732343042384d"
+                    ],
+                    [
+                        0,
+                        ""
+                    ]
+                ],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c5:00.0",
+                "driver": "bnxt_en"
+            },
+            {
+                "name": "eno4np1",
+                "mac_address": "d4:04:e6:4f:71:29",
+                "ipv4_address": null,
+                "ipv6_address": "fe80::d604:e6ff:fe4f:7129%eno4np1",
+                "has_carrier": true,
+                "lldp": [
+                    [
+                        1,
+                        "04401482813ee3"
+                    ],
+                    [
+                        2,
+                        "0545746865726e6574312f34"
+                    ],
+                    [
+                        3,
+                        "0078"
+                    ],
+                    [
+                        4,
+                        "45746865726e6574312f34"
+                    ],
+                    [
+                        5,
+                        "6632302d332d31662e69616433"
+                    ],
+                    [
+                        127,
+                        "0001420101"
+                    ],
+                    [
+                        127,
+                        "00120f0405dc"
+                    ],
+                    [
+                        127,
+                        "0080c2070100000000"
+                    ],
+                    [
+                        127,
+                        "00014208464c4d3237323430384d4c"
+                    ],
+                    [
+                        0,
+                        ""
+                    ]
+                ],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c5:00.1",
+                "driver": "bnxt_en"
+            },
+            {
+                "name": "eno8303",
+                "mac_address": "c4:cb:e1:bf:90:dc",
+                "ipv4_address": null,
+                "ipv6_address": null,
+                "has_carrier": false,
+                "lldp": [],
+                "vendor": "0x14e4",
+                "product": "0x165f",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 1000,
+                "pci_address": "0000:c3:00.0",
+                "driver": "tg3"
+            },
+            {
+                "name": "ens2f0np0",
+                "mac_address": "14:23:f3:f4:c7:e0",
+                "ipv4_address": null,
+                "ipv6_address": null,
+                "has_carrier": false,
+                "lldp": [],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c4:00.0",
+                "driver": "bnxt_en"
+            },
+            {
+                "name": "ens2f1np1",
+                "mac_address": "14:23:f3:f4:c7:e1",
+                "ipv4_address": null,
+                "ipv6_address": "fe80::1623:f3ff:fef4:c7e1%ens2f1np1",
+                "has_carrier": true,
+                "lldp": [
+                    [
+                        1,
+                        "04c47ee0e7a037"
+                    ],
+                    [
+                        2,
+                        "0545746865726e6574312f34"
+                    ],
+                    [
+                        3,
+                        "0078"
+                    ],
+                    [
+                        4,
+                        "45746865726e6574312f34"
+                    ],
+                    [
+                        5,
+                        "6632302d332d32662e69616433"
+                    ],
+                    [
+                        127,
+                        "0001420101"
+                    ],
+                    [
+                        127,
+                        "00120f0405dc"
+                    ],
+                    [
+                        127,
+                        "0080c2070100000000"
+                    ],
+                    [
+                        127,
+                        "00014208464c4d3237323430384e39"
+                    ],
+                    [
+                        0,
+                        ""
+                    ]
+                ],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c4:00.1",
+                "driver": "bnxt_en"
+            }
+        ],
+        "cpu": {
+            "model_name": "AMD EPYC 9124 16-Core Processor",
+            "frequency": "",
+            "count": 32,
+            "architecture": "x86_64",
+            "flags": [
+                "fpu",
+                "vme",
+                "de",
+                "pse",
+                "tsc",
+                "msr",
+                "pae",
+                "mce",
+                "cx8",
+                "apic",
+                "sep",
+                "mtrr",
+                "pge",
+                "mca",
+                "cmov",
+                "pat",
+                "pse36",
+                "clflush",
+                "mmx",
+                "fxsr",
+                "sse",
+                "sse2",
+                "ht",
+                "syscall",
+                "nx",
+                "mmxext",
+                "fxsr_opt",
+                "pdpe1gb",
+                "rdtscp",
+                "lm",
+                "constant_tsc",
+                "rep_good",
+                "amd_lbr_v2",
+                "nopl",
+                "nonstop_tsc",
+                "cpuid",
+                "extd_apicid",
+                "aperfmperf",
+                "rapl",
+                "pni",
+                "pclmulqdq",
+                "monitor",
+                "ssse3",
+                "fma",
+                "cx16",
+                "pcid",
+                "sse4_1",
+                "sse4_2",
+                "x2apic",
+                "movbe",
+                "popcnt",
+                "aes",
+                "xsave",
+                "avx",
+                "f16c",
+                "rdrand",
+                "lahf_lm",
+                "cmp_legacy",
+                "svm",
+                "extapic",
+                "cr8_legacy",
+                "abm",
+                "sse4a",
+                "misalignsse",
+                "3dnowprefetch",
+                "osvw",
+                "ibs",
+                "skinit",
+                "wdt",
+                "tce",
+                "topoext",
+                "perfctr_core",
+                "perfctr_nb",
+                "bpext",
+                "perfctr_llc",
+                "mwaitx",
+                "cpb",
+                "cat_l3",
+                "cdp_l3",
+                "invpcid_single",
+                "hw_pstate",
+                "ssbd",
+                "mba",
+                "perfmon_v2",
+                "ibrs",
+                "ibpb",
+                "stibp",
+                "ibrs_enhanced",
+                "vmmcall",
+                "fsgsbase",
+                "bmi1",
+                "avx2",
+                "smep",
+                "bmi2",
+                "erms",
+                "invpcid",
+                "cqm",
+                "rdt_a",
+                "avx512f",
+                "avx512dq",
+                "rdseed",
+                "adx",
+                "smap",
+                "avx512ifma",
+                "clflushopt",
+                "clwb",
+                "avx512cd",
+                "sha_ni",
+                "avx512bw",
+                "avx512vl",
+                "xsaveopt",
+                "xsavec",
+                "xgetbv1",
+                "xsaves",
+                "cqm_llc",
+                "cqm_occup_llc",
+                "cqm_mbm_total",
+                "cqm_mbm_local",
+                "avx512_bf16",
+                "clzero",
+                "irperf",
+                "xsaveerptr",
+                "rdpru",
+                "wbnoinvd",
+                "amd_ppin",
+                "cppc",
+                "arat",
+                "npt",
+                "lbrv",
+                "svm_lock",
+                "nrip_save",
+                "tsc_scale",
+                "vmcb_clean",
+                "flushbyasid",
+                "decodeassists",
+                "pausefilter",
+                "pfthreshold",
+                "avic",
+                "v_vmsave_vmload",
+                "vgif",
+                "x2avic",
+                "v_spec_ctrl",
+                "avx512vbmi",
+                "umip",
+                "pku",
+                "ospke",
+                "avx512_vbmi2",
+                "gfni",
+                "vaes",
+                "vpclmulqdq",
+                "avx512_vnni",
+                "avx512_bitalg",
+                "avx512_vpopcntdq",
+                "la57",
+                "rdpid",
+                "overflow_recov",
+                "succor",
+                "smca",
+                "fsrm",
+                "flush_l1d"
+            ],
+            "socket_count": 1
+        },
+        "disks": [
+            {
+                "name": "/dev/sda",
+                "model": "PERC H755 Front",
+                "size": 479559942144,
+                "rotational": false,
+                "wwn": "0x6f4ee0806aa736003095101b850794ee",
+                "serial": "00ee9407851b1095300036a76a80e04e",
+                "vendor": "DELL",
+                "wwn_with_extension": "0x6f4ee0806aa736003095101b850794ee",
+                "wwn_vendor_extension": "0x3095101b850794ee",
+                "hctl": "0:3:111:0",
+                "by_path": "/dev/disk/by-path/pci-0000:41:00.0-scsi-0:3:111:0",
+                "logical_sectors": 512,
+                "physical_sectors": 512
+            }
+        ],
+        "memory": {
+            "total": 100793757696,
+            "physical_mb": 98304
+        },
+        "bmc_address": "10.46.96.165",
+        "bmc_v6address": "::/0",
+        "system_vendor": {
+            "product_name": "PowerEdge R7615 (SKU=0AF7;ModelName=PowerEdge R7615)",
+            "serial_number": "F3GSW04",
+            "manufacturer": "Dell Inc.",
+            "firmware": {
+                "vendor": "Dell Inc.",
+                "version": "1.6.10",
+                "build_date": "12/08/2023"
+            }
+        },
+        "boot": {
+            "current_boot_mode": "uefi",
+            "pxe_interface": "d4:04:e6:4f:71:28"
+        },
+        "hostname": "debian",
+        "bmc_mac": "a8:3c:a5:35:41:3a"
+    },
+    "plugin_data": {
+        "root_disk": {
+            "name": "/dev/sda",
+            "model": "PERC H755 Front",
+            "size": 479559942144,
+            "rotational": false,
+            "wwn": "0x6f4ee0806aa736003095101b850794ee",
+            "serial": "00ee9407851b1095300036a76a80e04e",
+            "vendor": "DELL",
+            "wwn_with_extension": "0x6f4ee0806aa736003095101b850794ee",
+            "wwn_vendor_extension": "0x3095101b850794ee",
+            "hctl": "0:3:111:0",
+            "by_path": "/dev/disk/by-path/pci-0000:41:00.0-scsi-0:3:111:0",
+            "logical_sectors": 512,
+            "physical_sectors": 512
+        },
+        "boot_interface": "d4:04:e6:4f:71:28",
+        "configuration": {
+            "collectors": [
+                "default",
+                "logs"
+            ],
+            "managers": [
+                {
+                    "name": "generic_hardware_manager",
+                    "version": "1.2"
+                }
+            ]
+        },
+        "error": null,
+        "all_interfaces": {
+            "eno8403": {
+                "name": "eno8403",
+                "mac_address": "c4:cb:e1:bf:90:dd",
+                "ipv4_address": null,
+                "ipv6_address": null,
+                "has_carrier": false,
+                "lldp": [],
+                "vendor": "0x14e4",
+                "product": "0x165f",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 1000,
+                "pci_address": "0000:c3:00.1",
+                "driver": "tg3",
+                "pxe_enabled": false
+            },
+            "eno3np0": {
+                "name": "eno3np0",
+                "mac_address": "d4:04:e6:4f:71:28",
+                "ipv4_address": "10.4.50.110",
+                "ipv6_address": "fe80::d604:e6ff:fe4f:7128",
+                "has_carrier": true,
+                "lldp": [
+                    [
+                        1,
+                        "04c47ee0e4553f"
+                    ],
+                    [
+                        2,
+                        "0545746865726e6574312f34"
+                    ],
+                    [
+                        3,
+                        "0078"
+                    ],
+                    [
+                        4,
+                        "44656c6c2d463347535730345f4e49432e496e74656772617465642e312d31"
+                    ],
+                    [
+                        5,
+                        "6632302d332d312e69616433"
+                    ],
+                    [
+                        127,
+                        "0001420101"
+                    ],
+                    [
+                        127,
+                        "00120f042328"
+                    ],
+                    [
+                        127,
+                        "0080c2030faa11343031305f70726f766973696f6e696e67"
+                    ],
+                    [
+                        127,
+                        "0080c2070100000000"
+                    ],
+                    [
+                        127,
+                        "00014208464c4d323732343042384d"
+                    ],
+                    [
+                        0,
+                        ""
+                    ]
+                ],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c5:00.0",
+                "driver": "bnxt_en",
+                "pxe_enabled": true
+            },
+            "eno4np1": {
+                "name": "eno4np1",
+                "mac_address": "d4:04:e6:4f:71:29",
+                "ipv4_address": null,
+                "ipv6_address": "fe80::d604:e6ff:fe4f:7129",
+                "has_carrier": true,
+                "lldp": [
+                    [
+                        1,
+                        "04401482813ee3"
+                    ],
+                    [
+                        2,
+                        "0545746865726e6574312f34"
+                    ],
+                    [
+                        3,
+                        "0078"
+                    ],
+                    [
+                        4,
+                        "45746865726e6574312f34"
+                    ],
+                    [
+                        5,
+                        "6632302d332d31662e69616433"
+                    ],
+                    [
+                        127,
+                        "0001420101"
+                    ],
+                    [
+                        127,
+                        "00120f0405dc"
+                    ],
+                    [
+                        127,
+                        "0080c2070100000000"
+                    ],
+                    [
+                        127,
+                        "00014208464c4d3237323430384d4c"
+                    ],
+                    [
+                        0,
+                        ""
+                    ]
+                ],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c5:00.1",
+                "driver": "bnxt_en",
+                "pxe_enabled": false
+            },
+            "eno8303": {
+                "name": "eno8303",
+                "mac_address": "c4:cb:e1:bf:90:dc",
+                "ipv4_address": null,
+                "ipv6_address": null,
+                "has_carrier": false,
+                "lldp": [],
+                "vendor": "0x14e4",
+                "product": "0x165f",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 1000,
+                "pci_address": "0000:c3:00.0",
+                "driver": "tg3",
+                "pxe_enabled": false
+            },
+            "ens2f0np0": {
+                "name": "ens2f0np0",
+                "mac_address": "14:23:f3:f4:c7:e0",
+                "ipv4_address": null,
+                "ipv6_address": null,
+                "has_carrier": false,
+                "lldp": [],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c4:00.0",
+                "driver": "bnxt_en",
+                "pxe_enabled": false
+            },
+            "ens2f1np1": {
+                "name": "ens2f1np1",
+                "mac_address": "14:23:f3:f4:c7:e1",
+                "ipv4_address": null,
+                "ipv6_address": "fe80::1623:f3ff:fef4:c7e1",
+                "has_carrier": true,
+                "lldp": [
+                    [
+                        1,
+                        "04c47ee0e7a037"
+                    ],
+                    [
+                        2,
+                        "0545746865726e6574312f34"
+                    ],
+                    [
+                        3,
+                        "0078"
+                    ],
+                    [
+                        4,
+                        "45746865726e6574312f34"
+                    ],
+                    [
+                        5,
+                        "6632302d332d32662e69616433"
+                    ],
+                    [
+                        127,
+                        "0001420101"
+                    ],
+                    [
+                        127,
+                        "00120f0405dc"
+                    ],
+                    [
+                        127,
+                        "0080c2070100000000"
+                    ],
+                    [
+                        127,
+                        "00014208464c4d3237323430384e39"
+                    ],
+                    [
+                        0,
+                        ""
+                    ]
+                ],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c4:00.1",
+                "driver": "bnxt_en",
+                "pxe_enabled": false
+            }
+        },
+        "valid_interfaces": {
+            "eno3np0": {
+                "name": "eno3np0",
+                "mac_address": "d4:04:e6:4f:71:28",
+                "ipv4_address": "10.4.50.110",
+                "ipv6_address": "fe80::d604:e6ff:fe4f:7128",
+                "has_carrier": true,
+                "lldp": [
+                    [
+                        1,
+                        "04c47ee0e4553f"
+                    ],
+                    [
+                        2,
+                        "0545746865726e6574312f34"
+                    ],
+                    [
+                        3,
+                        "0078"
+                    ],
+                    [
+                        4,
+                        "44656c6c2d463347535730345f4e49432e496e74656772617465642e312d31"
+                    ],
+                    [
+                        5,
+                        "6632302d332d312e69616433"
+                    ],
+                    [
+                        127,
+                        "0001420101"
+                    ],
+                    [
+                        127,
+                        "00120f042328"
+                    ],
+                    [
+                        127,
+                        "0080c2030faa11343031305f70726f766973696f6e696e67"
+                    ],
+                    [
+                        127,
+                        "0080c2070100000000"
+                    ],
+                    [
+                        127,
+                        "00014208464c4d323732343042384d"
+                    ],
+                    [
+                        0,
+                        ""
+                    ]
+                ],
+                "vendor": "0x14e4",
+                "product": "0x16d7",
+                "client_id": null,
+                "biosdevname": null,
+                "speed_mbps": 25000,
+                "pci_address": "0000:c5:00.0",
+                "driver": "bnxt_en",
+                "pxe_enabled": true
+            }
+        },
+        "macs": [
+            "d4:04:e6:4f:71:28"
+        ]
+    }
+}
