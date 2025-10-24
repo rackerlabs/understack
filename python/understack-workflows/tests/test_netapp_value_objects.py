@@ -509,8 +509,8 @@ class TestRouteSpec:
         assert str(spec.gateway) == "100.127.0.17"
         assert str(spec.destination) == "100.126.0.0/17"
 
-    def test_from_nexthop_ip_third_octet_128(self):
-        """Test route destination calculation for third octet = 128."""
+    def test_from_nexthop_ip_third_octet_128_range(self):
+        """Test route destination calculation for third octet in 128-255 range."""
         spec = RouteSpec.from_nexthop_ip("os-test-project", "100.127.128.17")
 
         assert spec.svm_name == "os-test-project"
@@ -531,34 +531,55 @@ class TestRouteSpec:
             assert spec.destination == expected_destination
             assert str(spec.gateway) == nexthop_ip
 
-    def test_calculate_destination_third_octet_zero(self):
-        """Test _calculate_destination static method for third octet = 0."""
-        destination = RouteSpec._calculate_destination("100.127.0.17")
-        assert destination == ipaddress.IPv4Network("100.126.0.0/17")
+    def test_calculate_destination_third_octet_0_to_127_range(self):
+        """Test _calculate_destination static method for third octet in 0-127 range."""
+        # Test boundary values and some values in between
+        test_cases = [
+            "100.127.0.17",  # Lower boundary
+            "100.127.64.17",  # Middle value
+            "100.127.127.17",  # Upper boundary
+        ]
 
-    def test_calculate_destination_third_octet_128(self):
-        """Test _calculate_destination static method for third octet = 128."""
-        destination = RouteSpec._calculate_destination("100.127.128.17")
-        assert destination == ipaddress.IPv4Network("100.126.128.0/17")
+        for ip in test_cases:
+            destination = RouteSpec._calculate_destination(ip)
+            assert destination == ipaddress.IPv4Network("100.126.0.0/17")
+
+    def test_calculate_destination_third_octet_128_to_255_range(self):
+        """Test _calculate_destination static 128-255 range."""
+        # Test boundary values and some values in between
+        test_cases = [
+            "100.127.128.17",  # Lower boundary
+            "100.127.192.17",  # Middle value
+            "100.127.255.17",  # Upper boundary
+        ]
+
+        for ip in test_cases:
+            destination = RouteSpec._calculate_destination(ip)
+            assert destination == ipaddress.IPv4Network("100.126.128.0/17")
 
     def test_calculate_destination_invalid_pattern(self):
-        """Test _calculate_destination with unsupported third octet values."""
+        """Test _calculate_destination with IPs outside 100.64.0.0/10 subnet."""
         invalid_ips = [
-            "100.127.1.17",
-            "100.127.64.17",
-            "100.127.127.17",
-            "100.127.129.17",
-            "100.127.255.17",
+            "192.168.1.17",  # Private network
+            "10.0.0.17",  # Private network
+            "172.16.0.17",  # Private network
+            "8.8.8.8",  # Public network
+            "100.63.255.17",  # Just below 100.64.0.0/10
+            "100.128.0.17",  # Just above 100.64.0.0/10
         ]
 
         for invalid_ip in invalid_ips:
-            with pytest.raises(ValueError, match="Unsupported IP pattern"):
+            with pytest.raises(
+                ValueError, match="not within required 100.64.0.0/10 subnet"
+            ):
                 RouteSpec._calculate_destination(invalid_ip)
 
     def test_from_nexthop_ip_invalid_pattern(self):
-        """Test from_nexthop_ip with unsupported IP patterns."""
-        with pytest.raises(ValueError, match="Unsupported IP pattern"):
-            RouteSpec.from_nexthop_ip("os-test-project", "100.127.64.17")
+        """Test from_nexthop_ip with IPs outside carrier-grade NAT range."""
+        with pytest.raises(
+            ValueError, match="not within required 100.64.0.0/10 subnet"
+        ):
+            RouteSpec.from_nexthop_ip("os-test-project", "192.168.1.17")
 
     def test_calculate_destination_invalid_ip_format(self):
         """Test _calculate_destination with invalid IP format."""
@@ -574,16 +595,16 @@ class TestRouteSpec:
             with pytest.raises((ValueError, ipaddress.AddressValueError)):
                 RouteSpec._calculate_destination(invalid_format)
 
-    def test_calculate_destination_comprehensive_third_octet_zero(self):
-        """Test comprehensive route destination calculation for third octet = 0."""
-        # Test various IP addresses with third octet = 0 within 100.64.0.0/10 subnet
+    def test_calculate_destination_comprehensive_third_octet_0_to_127(self):
+        """Test comprehensive route destination calculation for range 0-127."""
+        # Test various IP addresses with third octets 0-127 within 100.64.0.0/10 subnet
         test_ips = [
-            "100.64.0.1",
-            "100.65.0.1",
-            "100.66.0.254",
-            "100.67.0.100",
-            "100.68.0.3",
-            "100.127.0.255",
+            "100.64.0.1",  # Third octet = 0
+            "100.65.1.1",  # Third octet = 1
+            "100.66.63.254",  # Third octet = 63
+            "100.67.64.100",  # Third octet = 64
+            "100.68.126.3",  # Third octet = 126
+            "100.127.127.255",  # Third octet = 127 (boundary)
         ]
 
         for ip in test_ips:
@@ -592,16 +613,16 @@ class TestRouteSpec:
                 "100.126.0.0/17"
             ), f"Failed for IP: {ip}"
 
-    def test_calculate_destination_comprehensive_third_octet_128(self):
-        """Test comprehensive route destination calculation for third octet = 128."""
-        # Test various IP addresses with third octet = 128 within 100.64.0.0/10 subnet
+    def test_calculate_destination_comprehensive_third_octet_128_to_255(self):
+        """Test comprehensive route destination calculation for range 128-255."""
+        # Test various IP addresses with third octets 128-255 within subnet
         test_ips = [
-            "100.64.128.1",
-            "100.65.128.1",
-            "100.66.128.254",
-            "100.67.128.100",
-            "100.68.128.3",
-            "100.127.128.255",
+            "100.64.128.1",  # Third octet = 128 (boundary)
+            "100.65.129.1",  # Third octet = 129
+            "100.66.192.254",  # Third octet = 192
+            "100.67.200.100",  # Third octet = 200
+            "100.68.254.3",  # Third octet = 254
+            "100.127.255.255",  # Third octet = 255 (boundary)
         ]
 
         for ip in test_ips:
@@ -611,13 +632,21 @@ class TestRouteSpec:
             ), f"Failed for IP: {ip}"
 
     def test_calculate_destination_comprehensive_invalid_patterns(self):
-        """Test comprehensive error handling for all invalid third octet values."""
-        # Test all invalid third octet values (not 0 or 128) within 100.64.0.0/10 subnet
-        invalid_third_octets = [1, 2, 63, 64, 127, 129, 192, 254, 255]
+        """Test comprehensive error handling for IPs outside carrier-grade NAT range."""
+        # Test IPs outside 100.64.0.0/10 subnet - these should all fail
+        invalid_base_addresses = [
+            "100.63",  # Just below the range
+            "100.128",  # Just above the range
+            "192.168",  # Private network
+            "10.0",  # Private network
+            "172.16",  # Private network
+        ]
 
-        for third_octet in invalid_third_octets:
-            invalid_ip = f"100.64.{third_octet}.1"
-            with pytest.raises(ValueError, match="Unsupported IP pattern"):
+        for base_addr in invalid_base_addresses:
+            invalid_ip = f"{base_addr}.1.1"
+            with pytest.raises(
+                ValueError, match="not within required 100.64.0.0/10 subnet"
+            ):
                 RouteSpec._calculate_destination(invalid_ip)
 
     def test_from_nexthop_ip_comprehensive_valid_patterns(self):
@@ -653,15 +682,23 @@ class TestRouteSpec:
             assert spec.destination == expected_destination
 
     def test_from_nexthop_ip_comprehensive_invalid_patterns(self):
-        """Test RouteSpec.from_nexthop_ip with comprehensive invalid IP patterns."""
+        """Test RouteSpec.from_nexthop_ip with IPs outside carrier-grade NAT range."""
         svm_name = "os-550e8400-e29b-41d4-a716-446655440000"
 
-        # Test invalid third octet values within 100.64.0.0/10 subnet
-        invalid_third_octets = [1, 2, 63, 64, 127, 129, 192, 254, 255]
+        # Test IPs outside 100.64.0.0/10 subnet - these should all fail
+        invalid_ips = [
+            "192.168.1.1",  # Private network
+            "10.0.0.1",  # Private network
+            "172.16.0.1",  # Private network
+            "8.8.8.8",  # Public network
+            "100.63.255.1",  # Just below 100.64.0.0/10
+            "100.128.0.1",  # Just above 100.64.0.0/10
+        ]
 
-        for third_octet in invalid_third_octets:
-            invalid_ip = f"100.64.{third_octet}.1"
-            with pytest.raises(ValueError, match="Unsupported IP pattern"):
+        for invalid_ip in invalid_ips:
+            with pytest.raises(
+                ValueError, match="not within required 100.64.0.0/10 subnet"
+            ):
                 RouteSpec.from_nexthop_ip(svm_name, invalid_ip)
 
     def test_from_nexthop_ip_edge_cases(self):
@@ -693,24 +730,22 @@ class TestRouteSpec:
             assert str(spec.gateway) == ip
 
     def test_calculate_destination_boundary_values(self):
-        """Test _calculate_destination with boundary values for third octet."""
-        # Test exact boundary values within 100.64.0.0/10 subnet
-        assert RouteSpec._calculate_destination("100.64.0.1") == ipaddress.IPv4Network(
-            "100.126.0.0/17"
-        )
-        assert RouteSpec._calculate_destination(
-            "100.64.128.1"
-        ) == ipaddress.IPv4Network("100.126.128.0/17")
+        """Test _calculate_destination with boundary values for third octet ranges."""
+        # Test boundary values for 0-127 range (maps to 100.126.0.0/17)
+        expected_0_127 = ipaddress.IPv4Network("100.126.0.0/17")
+        expected_128_255 = ipaddress.IPv4Network("100.126.128.0/17")
 
-        # Test values just outside boundaries should fail
-        with pytest.raises(ValueError, match="Unsupported IP pattern"):
-            RouteSpec._calculate_destination("100.64.1.1")  # Just above 0
+        # Test boundary values for 0-127 range
+        assert RouteSpec._calculate_destination("100.64.0.1") == expected_0_127
+        assert RouteSpec._calculate_destination("100.64.127.1") == expected_0_127
 
-        with pytest.raises(ValueError, match="Unsupported IP pattern"):
-            RouteSpec._calculate_destination("100.64.127.1")  # Just below 128
+        # Test boundary values for 128-255 range
+        assert RouteSpec._calculate_destination("100.64.128.1") == expected_128_255
+        assert RouteSpec._calculate_destination("100.64.255.1") == expected_128_255
 
-        with pytest.raises(ValueError, match="Unsupported IP pattern"):
-            RouteSpec._calculate_destination("100.64.129.1")  # Just above 128
+        # Test values throughout the ranges should work
+        assert RouteSpec._calculate_destination("100.64.1.1") == expected_0_127
+        assert RouteSpec._calculate_destination("100.64.129.1") == expected_128_255
 
     def test_calculate_destination_subnet_validation(self):
         """Test _calculate_destination validates IP is within 100.64.0.0/10 subnet."""

@@ -680,7 +680,7 @@ class RouteSpec(BaseModel):
             IPv4Network: Route destination in CIDR format
 
         Raises:
-            ValueError: If IP is not in 100.64.0.0/10 subnet or third octet not 0 or 128
+            ValueError: If IP is not in 100.64.0.0/10 subnet or not in /17 ranges
         """
         ip = IPv4Address(nexthop_ip)
 
@@ -693,9 +693,10 @@ class RouteSpec(BaseModel):
 
         third_octet = int(str(ip).split(".")[2])
 
-        if third_octet == 0:
+        # Check which /17 network the IP belongs to
+        if 0 <= third_octet <= 127:
             return IPv4Network("100.126.0.0/17")
-        elif third_octet == 128:
+        elif 128 <= third_octet <= 255:
             return IPv4Network("100.126.128.0/17")
         else:
             raise ValueError(
