@@ -27,6 +27,26 @@ def setup_conf():
             help="Controls if Nova should inject storage IPs to config drive.",
             default=True,
         ),
+        cfg.StrOpt(
+            "storage_target_a_prefix",
+            help="Storage Networking Target Prefix A-side",
+            default="100.127.0.0/17",
+        ),
+        cfg.StrOpt(
+            "storage_target_b_prefix",
+            help="Storage Networking Target Prefix B-side",
+            default="100.127.128.0/17",
+        ),
+        cfg.StrOpt(
+            "storage_client_a_prefix",
+            help="Storage Networking Client Prefix A-side",
+            default="100.126.0.0/17",
+        ),
+        cfg.StrOpt(
+            "storage_client_b_prefix",
+            help="Storage Networking Client Prefix B-side",
+            default="100.126.128.0/17",
+        ),
     ]
     cfg.CONF.register_group(grp)
     cfg.CONF.register_opts(opts, group=grp)

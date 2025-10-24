@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 import requests
+from oslo_config import cfg
 
 
 @dataclass
@@ -30,10 +31,11 @@ class IPAddress:
     @property
     def target_network(self) -> ipaddress.IPv4Network:
         """Returns the respective target-side network."""
-        target_a_prefix = ipaddress.IPv4Network("100.127.0.0/17")
-        target_b_prefix = ipaddress.IPv4Network("100.127.128.0/17")
-        client_a_prefix = ipaddress.IPv4Network("100.126.0.0/17")
-        client_b_prefix = ipaddress.IPv4Network("100.126.128.0/17")
+        nova_us_cfg = cfg.CONF.nova_understack
+        target_a_prefix = ipaddress.IPv4Network(nova_us_cfg.storage_target_a_prefix)
+        target_b_prefix = ipaddress.IPv4Network(nova_us_cfg.storage_target_b_prefix)
+        client_a_prefix = ipaddress.IPv4Network(nova_us_cfg.storage_client_a_prefix)
+        client_b_prefix = ipaddress.IPv4Network(nova_us_cfg.storage_client_b_prefix)
 
         if self.interface.ip in client_a_prefix:
             return target_a_prefix
