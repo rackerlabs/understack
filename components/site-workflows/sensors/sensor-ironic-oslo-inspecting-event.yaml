@@ -2,7 +2,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: ironic-oslo-event
+  name: ironic-oslo-inspecting-event
   annotations:
     workflows.argoproj.io/title: Process oslo_events for ironic project
     workflows.argoproj.io/description: |+
@@ -13,11 +13,11 @@ metadata:
       Resulting code should be very similar to:
 
       ```
-      argo -n argo-events submit --from workflowtemplate/ironic-oslo-event \
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
       -p event-json "JSON-payload" -p device_id=<UUID> -p project_id=<UUID>
       ```
 
-      Defined in `workflows/argo-events/sensors/sensor-ironic-oslo-event.yaml`
+      Defined in `workflows/argo-events/sensors/sensor-ironic-oslo-inspecting-event.yaml`
 spec:
   dependencies:
   - eventName: openstack
@@ -42,12 +42,12 @@ spec:
         - path: "body.ironic_object.previous_provision_state"
           type: "string"
           value:
-            - "deploying"
+            - "inspecting"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
     - template:
-        name: ironic-project
+        name: update-nautobot
         k8s:
           operation: create
           parameters:
@@ -56,21 +56,13 @@ spec:
               src:
                 dataKey: body
                 dependencyName: ironic-dep
-            - dest: spec.arguments.parameters.1.value # device_id
-              src:
-                dataKey: body.ironic_object.uuid
-                dependencyName: ironic-dep
-            - dest: spec.arguments.parameters.2.value # project_id
-              src:
-                dataKey: body.ironic_object.lessee
-                dependencyName: ironic-dep
           source:
             # create a workflow in argo-events prefixed with ironic-prov-
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: ironic-prov-
+                generateName: update-nautobot-
                 namespace: argo-events
               spec:
                 serviceAccountName: workflow
@@ -79,34 +71,14 @@ spec:
                 arguments:
                   parameters:
                     - name: event-json
-                    - name: device_id
-                    - name: project_id
                 templates:
                 - name: main
                   steps:
                   - - name: oslo-events
                       templateRef:
-                        name: openstack-oslo-event
+                        name: update-nautobot-on-openstack-oslo-event
                         template: main
                       arguments:
                         parameters:
                         - name: event-json
                           value: "{{workflow.parameters.event-json}}"
-                    - name: convert-project-id
-                      inline:
-                        script:
-                          image: python:alpine
-                          command: [python]
-                          source: |
-                              import uuid
-                              project_id_without_dashes = "{{workflow.parameters.project_id}}"
-                              print(str(uuid.UUID(project_id_without_dashes)))
-                  - - name: ansible-storage-update
-                      when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
-                      templateRef:
-                        name: ansible-workflow-template
-                        template: ansible-run
-                      arguments:
-                        parameters:
-                        - name: playbook
-                          value: storage_update_switches.yml
