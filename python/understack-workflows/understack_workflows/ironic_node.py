@@ -1,5 +1,6 @@
+from dataclasses import dataclass
+
 import ironicclient.common.apiclient.exceptions
-from flavor_matcher.flavor_spec import dataclass
 from ironicclient.common.utils import args_array_to_patch
 
 from understack_workflows.bmc import Bmc
@@ -17,7 +18,6 @@ class NodeMetadata:
     uuid: str
     hostname: str
     manufacturer: str
-    resource_class: str
 
     @property
     def driver(self):
@@ -58,8 +58,8 @@ def update_ironic_node(client, node_meta, bmc):
         "driver_info/redfish_verify_ca=false",
         f"driver_info/redfish_username={bmc.username}",
         f"driver_info/redfish_password={bmc.password}",
-        f"resource_class={node_meta.resource_class}",
         "boot_interface=http-ipxe",
+        "inspect_interface=agent",
     ]
 
     patches = args_array_to_patch("add", updates)
@@ -85,7 +85,7 @@ def create_ironic_node(
                 "redfish_username": bmc.username,
                 "redfish_password": bmc.password,
             },
-            "resource_class": node_meta.resource_class,
             "boot_interface": "http-ipxe",
+            "inspect_interface": "agent",
         }
     )

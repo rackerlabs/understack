@@ -124,7 +124,6 @@ jobs:
         # if you add a container here, add it to the 'clean_containers' job below
         container:
           - name: ironic-nautobot-client
-          - name: nova-flavors
           - name: ansible
           - name: understack-tests
 
@@ -186,7 +185,6 @@ jobs:
           - openstack-client
           - dnsmasq
           - ironic-nautobot-client
-          - nova-flavors
           - ansible
           - understack-tests
 
