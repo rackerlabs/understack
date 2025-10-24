@@ -30,12 +30,19 @@ class IPAddress:
     @property
     def target_network(self) -> ipaddress.IPv4Network:
         """Returns the respective target-side network."""
-        third_octet = self.address.split(".")[2]
-        if third_octet not in ["0", "128"]:
+        target_a_prefix = ipaddress.IPv4Network("100.127.0.0/17")
+        target_b_prefix = ipaddress.IPv4Network("100.127.128.0/17")
+        client_a_prefix = ipaddress.IPv4Network("100.126.0.0/17")
+        client_b_prefix = ipaddress.IPv4Network("100.126.128.0/17")
+
+        if self.interface.ip in client_a_prefix:
+            return target_a_prefix
+        elif self.interface.ip in client_b_prefix:
+            return target_b_prefix
+        else:
             raise ValueError(
-                f"Cannot determine the target-side network from {self.address}"
+                f"Cannot determine the target-side network from {self.interface}"
             )
-        return ipaddress.IPv4Network(f"100.127.{third_octet}.0/24")
 
     @property
     def address_with_prefix(self) -> str:

@@ -54,16 +54,16 @@ class TestIPAddress:
 
     def test_target_network_octet_0(self):
         """Test target_network calculation for third octet 0."""
-        ip = IPAddress.from_address_string("100.127.0.10/24")
+        ip = IPAddress.from_address_string("100.126.0.10/24")
 
-        expected_network = ipaddress.IPv4Network("100.127.0.0/24")
+        expected_network = ipaddress.IPv4Network("100.127.0.0/17")
         assert ip.target_network == expected_network
 
     def test_target_network_octet_128(self):
         """Test target_network calculation for third octet 128."""
-        ip = IPAddress.from_address_string("100.127.128.10/24")
+        ip = IPAddress.from_address_string("100.126.128.10/24")
 
-        expected_network = ipaddress.IPv4Network("100.127.128.0/24")
+        expected_network = ipaddress.IPv4Network("100.127.128.0/17")
         assert ip.target_network == expected_network
 
     def test_target_network_invalid_octet(self):
@@ -230,7 +230,7 @@ class TestInterface:
         """Test OpenStack network generation."""
         # Create IP with specific values for predictable gateway calculation
         ip_assignment = IPAddressAssignment(
-            ip_address=IPAddress.from_address_string("100.127.0.10/24")
+            ip_address=IPAddress.from_address_string("100.126.0.10/24")
         )
         interface = Interface(
             id="interface-1",
@@ -247,13 +247,13 @@ class TestInterface:
             "id": "network-for-if5",
             "type": "ipv4",
             "link": "tap-stor-5",
-            "ip_address": "100.127.0.10",
+            "ip_address": "100.126.0.10",
             "netmask": "255.255.255.0",
             "routes": [
                 {
                     "network": "100.127.0.0",
-                    "netmask": "255.255.255.0",
-                    "gateway": "100.127.0.1",
+                    "netmask": "255.255.128.0",
+                    "gateway": "100.126.0.1",
                 }
             ],
             "network_id": "test-network-id",
@@ -554,7 +554,7 @@ class TestNautobotClient:
                     mac_address="aa:bb:cc:dd:ee:ff",
                     ip_address_assignments=[
                         IPAddressAssignment(
-                            ip_address=IPAddress.from_address_string("100.127.0.10/24")
+                            ip_address=IPAddress.from_address_string("100.126.0.10/24")
                         )
                     ],
                 ),
@@ -564,7 +564,7 @@ class TestNautobotClient:
                     ip_address_assignments=[
                         IPAddressAssignment(
                             ip_address=IPAddress.from_address_string(
-                                "100.127.128.10/24"
+                                "100.126.128.10/24"
                             )
                         )
                     ],
