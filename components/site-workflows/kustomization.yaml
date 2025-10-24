@@ -22,7 +22,8 @@ resources:
   - sensors/sensor-neutron-olso-event.yaml
   - sensors/sensor-ironic-reclean.yaml
   - sensors/sensor-ironic-node-port.yaml
-  - sensors/sensor-ironic-oslo-event.yaml
+  - sensors/sensor-ironic-oslo-deploying-event.yaml
+  - sensors/sensor-ironic-oslo-inspecting-event.yaml
 
 helmCharts:
   - name: nautobot-token
