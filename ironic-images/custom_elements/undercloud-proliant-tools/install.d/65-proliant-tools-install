@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# Copyright 2015 Hewlett-Packard Development Company, L.P.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+if [ ${DIB_DEBUG_TRACE:-1} -gt 0 ]; then
+    set -x
+fi
+
+set -eu
+set -o pipefail
+
+# Set the below variable to allow ssacli to be installed from custom URLs.
+if [[ -n "${DIB_HPSSACLI_URL:=}" ]]; then
+    echo "The environment variable DIB_HPSSACLI_URL is deprecated; use DIB_SSACLI_URL instead."
+fi
+
+DIB_SSACLI_URL=${DIB_SSACLI_URL:-${DIB_HPSSACLI_URL:-https://downloads.hpe.com/pub/softlib2/software1/pubsw-linux/p1857046646/v122802/ssacli-3.10-3.0.x86_64.rpm}}
+curl -k -o /tmp/ssacli.rpm $DIB_SSACLI_URL
+
+if [[ $DISTRO_NAME = "ubuntu" || $DISTRO_NAME = "debian" ]]; then
+    # There is no deb package for ssacli.  Install with alien.
+    alien -i /tmp/ssacli.rpm
+else
+    rpm -iv /tmp/ssacli.rpm
+    rpm --import https://downloads.linux.hpe.com/SDR/hpePublicKey2048_key1.pub
+fi
+
+rm -f /tmp/ssacli.rpm
+
+# Install proliantutils python module in the
+# virtual environment of ironic-python-agent.
+# This is pre-installed by
+# ironic-python-agent-ramdisk/install.d/ironic-python-agent-ramdisk-source-install/60-ironic-python-agent-ramdisk-install.
+IPA_VENV=/opt/ironic-python-agent
+if [[ -d "$IPA_VENV" ]]; then
+    $IPA_VENV/bin/pip install proliantutils
+else
+    pip install proliantutils
+fi
