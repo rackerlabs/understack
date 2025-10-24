@@ -48,6 +48,18 @@ class IronicProvisionSetEvent(BaseModel):
 
 def handle_provision_end(conn: Connection, _: Nautobot, event_data: dict) -> int:
     """Operates on an Ironic Node provisioning END event."""
+    payload = event_data.get("payload", {})
+    payload_data = payload.get("ironic_object.data")
+
+    if payload_data:
+        previous_provision_state = payload_data.get("previous_provision_state")
+        if previous_provision_state != "deploying":
+            logger.info(
+                "Skipping storage setup for previous_provision_state: %s",
+                previous_provision_state,
+            )
+            return 0
+
     # Check if the project is configured with tags.
     event = IronicProvisionSetEvent.from_event_dict(event_data)
     logger.info("Checking if project %s is tagged with UNDERSTACK_SVM", event.lessee)
@@ -63,7 +75,7 @@ def handle_provision_end(conn: Connection, _: Nautobot, event_data: dict) -> int
         save_output("storage", "not-found")
         return 1
 
-    if server.metadata["storage"] == "wanted":
+    if server.metadata.get("storage") == "wanted":
         save_output("storage", "wanted")
     else:
         logger.info("Server %s did not want storage enabled.", server.id)

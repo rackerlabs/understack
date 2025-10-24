@@ -11,6 +11,12 @@ from understack_workflows.oslo_event.ironic_node import handle_provision_end
 from understack_workflows.oslo_event.ironic_node import instance_nqn
 
 
+def _sample_fixture_data(name: str) -> dict:
+    """Load example data from JSON fixture file."""
+    with open(f"tests/json_samples/{name}.json") as f:
+        return json.load(f)
+
+
 class TestIronicProvisionSetEvent:
     """Test cases for IronicProvisionSetEvent class."""
 
@@ -124,9 +130,41 @@ class TestHandleProvisionEnd:
                     "lessee": uuid.uuid4(),
                     "event": "provision_end",
                     "uuid": uuid.uuid4(),
+                    "previous_provision_state": "deploying",
                 }
             },
         }
+
+    @patch("understack_workflows.oslo_event.update_nautobot.handle_provision_end")
+    def test_handle_provision_end_previous_state_inspecting(
+        self, mock_update_nautobot_handler, mock_conn, mock_nautobot, valid_event_data
+    ):
+        """Returns early when previous_provision_state is 'inspecting'.
+
+        Note: When state is 'inspecting', the update_nautobot handler is responsible
+        for processing the event (both handlers are registered for provision_set.end).
+        """
+        valid_event_data["payload"]["ironic_object.data"][
+            "previous_provision_state"
+        ] = "inspecting"
+
+        # Test ironic_node handler returns early
+        result = handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
+
+        assert result == 0
+        # should return early without calling storage-related methods
+        mock_conn.get_server_by_id.assert_not_called()
+
+        # Demonstrate that update_nautobot handler would process this event
+        from understack_workflows.oslo_event import update_nautobot
+
+        mock_update_nautobot_handler.return_value = 0
+        result = update_nautobot.handle_provision_end(
+            mock_conn, mock_nautobot, valid_event_data
+        )
+        mock_update_nautobot_handler.assert_called_once_with(
+            mock_conn, mock_nautobot, valid_event_data
+        )
 
     @patch("understack_workflows.oslo_event.ironic_node.is_project_svm_enabled")
     def test_handle_provision_end_project_not_svm_enabled(
@@ -264,9 +302,25 @@ class TestHandleProvisionEnd:
         mock_server.metadata = {"other_key": "value"}
         mock_conn.get_server_by_id.return_value = mock_server
 
-        # This should raise a KeyError when accessing metadata["storage"]
-        with pytest.raises(KeyError):
-            handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
+        result = handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
+
+        assert result == 0
+        ironic_data = valid_event_data["payload"]["ironic_object.data"]
+        instance_uuid = ironic_data["instance_uuid"]
+        node_uuid = ironic_data["uuid"]
+
+        mock_conn.get_server_by_id.assert_called_once_with(instance_uuid)
+
+        # When storage key is missing, it should be treated as "not-set"
+        expected_calls = [
+            ("storage", "not-set"),
+            ("node_uuid", str(node_uuid)),
+            ("instance_uuid", str(instance_uuid)),
+        ]
+        actual_calls = [call.args for call in mock_save_output.call_args_list]
+        assert actual_calls == expected_calls
+
+        mock_create_connector.assert_called_once()
 
     @patch("understack_workflows.oslo_event.ironic_node.is_project_svm_enabled")
     def test_handle_provision_end_invalid_event_data(
@@ -390,3 +444,75 @@ class TestInstanceNqn:
         result = instance_nqn(known_uuid)
 
         assert result == expected_nqn
+
+
+@pytest.fixture
+def ironic_inspection_data():
+    """Load Ironic inspection inventory data from JSON fixture."""
+    return _sample_fixture_data("ironic-inspect-inventory-node-data")
+
+
+class TestIronicInspectionData:
+    """Test cases for processing Ironic inspection data."""
+
+    def test_chassis_info_from_inspection_data(self, ironic_inspection_data):
+        """Test creating ChassisInfo from ironic-inspect-inventory-node-data.json."""
+        # Import the function to convert inspection data to ChassisInfo
+        from understack_workflows.ironic.inventory import get_device_info
+
+        # Create ChassisInfo from inspection data
+        chassis_info = get_device_info(ironic_inspection_data)
+
+        # Assert basic chassis information
+        assert chassis_info.manufacturer == "Dell Inc."
+        assert chassis_info.model_number == "PowerEdge R7615"
+        assert chassis_info.serial_number == "F3GSW04"
+        assert chassis_info.bmc_ip_address == "10.46.96.165"
+        assert chassis_info.bios_version == "1.6.10"
+        assert chassis_info.power_on is True
+        assert chassis_info.memory_gib == 96
+        assert chassis_info.cpu == "AMD EPYC 9124 16-Core Processor"
+
+        # Assert BMC interface
+        assert chassis_info.bmc_interface.name == "iDRAC"
+        assert chassis_info.bmc_interface.mac_address == "A8:3C:A5:35:41:3A"
+        assert chassis_info.bmc_interface.hostname == "debian"
+        assert str(chassis_info.bmc_interface.ipv4_address) == "10.46.96.165/26"
+
+        # Assert we have the expected number of interfaces (1 BMC + 6 server interfaces)
+        assert len(chassis_info.interfaces) == 7
+
+        # Assert specific server interface details
+        server_interfaces = [
+            iface for iface in chassis_info.interfaces if iface.name != "iDRAC"
+        ]
+
+        # Check that we have interfaces with LLDP data
+        interfaces_with_lldp = [
+            iface
+            for iface in server_interfaces
+            if iface.remote_switch_mac_address is not None
+        ]
+        assert (
+            len(interfaces_with_lldp) == 3
+        )  # eno3np0, eno4np1, ens2f1np1 have LLDP data
+
+        # Verify one specific interface with LLDP data (eno3np0 -> NIC.Integrated.1-1)
+        eno3np0 = next(
+            (
+                iface
+                for iface in chassis_info.interfaces
+                if iface.name == "NIC.Integrated.1-1"
+            ),
+            None,
+        )
+        assert eno3np0 is not None
+        assert eno3np0.mac_address == "D4:04:E6:4F:71:28"
+        assert eno3np0.remote_switch_mac_address == "C4:7E:E0:E4:55:3F"
+        assert eno3np0.remote_switch_port_name == "Ethernet1/4"
+
+        # Verify neighbors (unique switch MAC addresses)
+        assert len(chassis_info.neighbors) == 3
+        assert "C4:7E:E0:E4:55:3F" in chassis_info.neighbors
+        assert "40:14:82:81:3E:E3" in chassis_info.neighbors
+        assert "C4:7E:E0:E7:A0:37" in chassis_info.neighbors
