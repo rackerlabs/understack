@@ -172,14 +172,14 @@ pod:
     nova_compute_ironic:
       - secret:
           name: nova-ks-etc
+      - secret:
+          name: nova-nautobot
     nova_scheduler:
       - secret:
           name: nova-ks-etc
     nova_conductor:
       - secret:
           name: nova-ks-etc
-      - secret:
-          name: nova-nautobot
     nova_archive_deleted_rows:
       - secret:
           name: nova-ks-etc
