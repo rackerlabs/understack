@@ -1,0 +1,75 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nova-post-deploy
+  labels:
+    app.kubernetes.io/name: nova
+    app.kubernetes.io/component: post-deploy
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ansible
+          image: ghcr.io/rackerlabs/understack/ansible:latest
+          imagePullPolicy: Always
+          command: ["ansible-runner", "run", "/runner", "--playbook", "nova-post-deploy.yaml"]
+          resources:
+            requests:
+              cpu: "1000m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: false
+          env:
+            - name: OS_CLOUD
+              value: understack
+          volumeMounts:
+            - name: runner-data-device-types
+              mountPath: /runner/data/device-types/
+            - name: runner-data-flavors
+              mountPath: /runner/data/flavors/
+            - name: ansible-inventory
+              mountPath: /runner/inventory/
+            - name: ansible-group-vars
+              mountPath: /runner/inventory/group_vars/
+            - name: infrasetup
+              mountPath: /etc/openstack
+              readOnly: true
+      volumes:
+        - name: runner-data-device-types
+          configMap:
+            name: device-types
+        - name: runner-data-flavors
+          configMap:
+            name: flavors
+        - name: ansible-inventory
+          configMap:
+            name: ansible-inventory
+        - name: ansible-group-vars
+          configMap:
+            name: ansible-group-vars
+        - name: infrasetup
+          secret:
+            secretName: infrasetup
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
+      restartPolicy: OnFailure

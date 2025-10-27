@@ -2,7 +2,10 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: neutron-post-deployment-job
+  name: nautobot-post-deploy
+  labels:
+    app.kubernetes.io/name: nautobot
+    app.kubernetes.io/component: post-deploy
   annotations:
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/sync-wave: "1"
@@ -21,7 +24,7 @@ spec:
         - name: ansible
           image: ghcr.io/rackerlabs/understack/ansible:latest
           imagePullPolicy: Always
-          command: ["ansible-runner", "run", "/runner", "--playbook", "openstack_network.yaml"]
+          command: ["ansible-runner", "run", "/runner", "--playbook", "nautobot-post-deploy.yaml"]
           resources:
             requests:
               cpu: "1000m"
@@ -36,29 +39,28 @@ spec:
                 - ALL
             readOnlyRootFilesystem: false
           env:
-            - name: OS_CLOUD
-              value: understack
+            - name: NAUTOBOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nautobot-superuser
+                  key: apitoken
+            - name: NAUTOBOT_URL
+              value: http://nautobot-default.nautobot.svc.cluster.local
           volumeMounts:
             - name: ansible-inventory
               mountPath: /runner/inventory/
             - name: ansible-group-vars
               mountPath: /runner/inventory/group_vars/
-            - name: infrasetup
-              mountPath: /etc/openstack
-              readOnly: true
+            - name: device-types
+              mountPath: /runner/data/device-types/
       volumes:
-        - name: runner-data
-          emptyDir: {}
         - name: ansible-inventory
           configMap:
             name: ansible-inventory
         - name: ansible-group-vars
           configMap:
             name: ansible-group-vars
-        - name: infrasetup
-          secret:
-            secretName: infrasetup
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
+        - name: device-types
+          configMap:
+            name: device-types
       restartPolicy: OnFailure
