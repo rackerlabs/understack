@@ -69,6 +69,11 @@ dependencies:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+    driver_agent:
+      jobs:
+        - octavia-db-sync
+        - octavia-ks-user
+        - octavia-ks-endpoints
     worker:
       jobs:
         - octavia-db-sync

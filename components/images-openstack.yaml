@@ -105,6 +105,7 @@ images:
     # octavia
     octavia_api: "ghcr.io/rackerlabs/understack/octavia:2025.1-ubuntu_jammy"
     octavia_db_sync: "ghcr.io/rackerlabs/understack/octavia:2025.1-ubuntu_jammy"
+    octavia_driver_agent: "ghcr.io/rackerlabs/understack/octavia:2025.1-ubuntu_jammy"
     octavia_worker: "ghcr.io/rackerlabs/understack/octavia:2025.1-ubuntu_jammy"
     octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:2025.1-ubuntu_jammy"
     octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:2025.1-ubuntu_jammy"

@@ -139,6 +139,9 @@ keystoneServiceUsers:
         remoteRef: *keystone_admin
       - usage: user
         remoteRef: "octavia-keystone-password"
+      - usage: service
+        remoteRef: "octavia-keystone-password"
+        section: service_auth
     placement:
       - usage: admin
         remoteRef: *keystone_admin
