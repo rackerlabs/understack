@@ -5,7 +5,7 @@ kind: Kustomization
 resources:
   - neutron-mariadb-db.yaml
   - neutron-rabbitmq-queue.yaml
-  - neutron-post-deployment-job.yaml
+  - job-neutron-post-deploy.yaml
   # less than ideal addition but necessary so that we can have the neutron.conf.d loading
   # working due to the way the chart hardcodes the config-file parameter which then
   # takes precedence over the directory

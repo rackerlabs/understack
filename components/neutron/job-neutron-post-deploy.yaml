@@ -2,7 +2,10 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: octavia-post-deployment-job
+  name: neutron-post-deploy
+  labels:
+    app.kubernetes.io/name: neutron
+    app.kubernetes.io/component: post-deploy
   annotations:
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/sync-wave: "1"
@@ -21,7 +24,7 @@ spec:
         - name: ansible
           image: ghcr.io/rackerlabs/understack/ansible:latest
           imagePullPolicy: Always
-          command: ["ansible-runner", "run", "/runner", "-vvv", "--playbook", "openstack_octavia.yaml"]
+          command: ["ansible-runner", "run", "/runner", "--playbook", "neutron-post-deploy.yaml"]
           resources:
             requests:
               cpu: "1000m"

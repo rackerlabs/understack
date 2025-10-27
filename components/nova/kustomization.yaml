@@ -9,4 +9,4 @@ resources:
   - nova-cell0-mariadb-db.yaml  # creates 'nova_cell0' database
   - secret-nova-argo-token.yaml
   - roles-nova-argo-token.yaml
-  - nova-post-deployment-job.yaml
+  - job-nova-post-deploy.yaml

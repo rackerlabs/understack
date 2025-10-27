@@ -24,7 +24,7 @@ spec:
         - name: ansible
           image: ghcr.io/rackerlabs/understack/ansible:latest
           imagePullPolicy: Always
-          command: ["ansible-runner", "run", "/runner", "--playbook", "nautobot-initial-setup.yaml"]
+          command: ["ansible-runner", "run", "/runner", "--playbook", "nautobot-post-deploy.yaml"]
           resources:
             requests:
               cpu: "1000m"
