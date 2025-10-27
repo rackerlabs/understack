@@ -4,6 +4,7 @@ kind: Kustomization
 
 resources:
   - external-secret-nautobot-sso.yaml
+  - job-nautobot-post-deploy.yaml
 
 configMapGenerator:
   - name: nautobot-sso
