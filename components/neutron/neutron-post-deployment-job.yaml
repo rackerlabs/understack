@@ -47,8 +47,6 @@ spec:
               mountPath: /etc/openstack
               readOnly: true
       volumes:
-        - name: runner-data
-          emptyDir: {}
         - name: ansible-inventory
           configMap:
             name: ansible-inventory

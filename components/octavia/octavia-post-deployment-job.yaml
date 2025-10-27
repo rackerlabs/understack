@@ -40,25 +40,16 @@ spec:
               value: understack
           volumeMounts:
             - name: ansible-inventory
-              mountPath: /runner/inventory/hosts.yaml
-              subPath: hosts.yaml
-            - name: ansible-kubernetes-inventory
-              mountPath: /runner/inventory/inventory.yaml
-              subPath: inventory.yaml
+              mountPath: /runner/inventory/
             - name: ansible-group-vars
               mountPath: /runner/inventory/group_vars/
             - name: infrasetup
               mountPath: /etc/openstack
               readOnly: true
       volumes:
-        - name: runner-data
-          emptyDir: {}
         - name: ansible-inventory
           configMap:
             name: ansible-inventory
-        - name: ansible-kubernetes-inventory
-          configMap:
-            name: ansible-kubernetes-inventory
         - name: ansible-group-vars
           configMap:
             name: ansible-group-vars
