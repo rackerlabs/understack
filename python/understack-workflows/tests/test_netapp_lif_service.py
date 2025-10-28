@@ -60,7 +60,7 @@ class TestLifService:
         mock_port = PortResult(
             uuid="port-uuid-123", name="e4a-100", node_name="node-01", port_type="vlan"
         )
-        mock_client.create_port.return_value = mock_port
+        mock_client.get_or_create_port.return_value = mock_port
 
         # Mock interface creation
         mock_interface = InterfaceResult(
@@ -71,7 +71,7 @@ class TestLifService:
             enabled=True,
             svm_name=expected_svm_name,
         )
-        mock_client.create_ip_interface.return_value = mock_interface
+        mock_client.get_or_create_ip_interface.return_value = mock_interface
 
         # Mock node identification
         mock_node = NodeResult(name="node-01", uuid="node-uuid-1")
@@ -83,15 +83,15 @@ class TestLifService:
         mock_client.find_svm.assert_called_once_with(expected_svm_name)
 
         # Verify port was created
-        mock_client.create_port.assert_called_once()
-        port_call_args = mock_client.create_port.call_args[0][0]
+        mock_client.get_or_create_port.assert_called_once()
+        port_call_args = mock_client.get_or_create_port.call_args[0][0]
         assert isinstance(port_call_args, PortSpec)
         assert port_call_args.node_name == "node-01"
         assert port_call_args.vlan_id == 100
 
         # Verify interface was created
-        mock_client.create_ip_interface.assert_called_once()
-        interface_call_args = mock_client.create_ip_interface.call_args[0][0]
+        mock_client.get_or_create_ip_interface.assert_called_once()
+        interface_call_args = mock_client.get_or_create_ip_interface.call_args[0][0]
         assert isinstance(interface_call_args, InterfaceSpec)
         assert interface_call_args.name == sample_config.name
         assert interface_call_args.svm_name == expected_svm_name
@@ -117,8 +117,8 @@ class TestLifService:
         mock_client.find_svm.assert_called_once_with(expected_svm_name)
 
         # Verify no port or interface creation was attempted
-        mock_client.create_port.assert_not_called()
-        mock_client.create_ip_interface.assert_not_called()
+        mock_client.get_or_create_port.assert_not_called()
+        mock_client.get_or_create_ip_interface.assert_not_called()
 
     def test_create_lif_port_creation_error(
         self, lif_service, mock_client, mock_error_handler, sample_config
@@ -137,7 +137,7 @@ class TestLifService:
         mock_client.get_nodes.return_value = [mock_node]
 
         # Mock port creation failure
-        mock_client.create_port.side_effect = Exception("Port creation failed")
+        mock_client.get_or_create_port.side_effect = Exception("Port creation failed")
         mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
             "Operation failed"
         )
@@ -160,15 +160,15 @@ class TestLifService:
         mock_port = PortResult(
             uuid="port-uuid-123", name="e4a-100", node_name="node-01", port_type="vlan"
         )
-        mock_client.create_port.return_value = mock_port
+        mock_client.get_or_create_port.return_value = mock_port
 
         result = lif_service.create_home_port(sample_config)
 
         assert result == mock_port
 
         # Verify port was created with correct specification
-        mock_client.create_port.assert_called_once()
-        call_args = mock_client.create_port.call_args[0][0]
+        mock_client.get_or_create_port.assert_called_once()
+        call_args = mock_client.get_or_create_port.call_args[0][0]
         assert isinstance(call_args, PortSpec)
         assert call_args.node_name == "node-01"
         assert call_args.vlan_id == 100
@@ -189,7 +189,7 @@ class TestLifService:
             lif_service.create_home_port(sample_config)
 
         # Verify no port creation was attempted
-        mock_client.create_port.assert_not_called()
+        mock_client.get_or_create_port.assert_not_called()
 
     def test_identify_home_node_success(
         self, lif_service, mock_client, mock_error_handler, sample_config
@@ -284,10 +284,10 @@ class TestLifService:
         mock_port = PortResult(
             uuid="port-uuid-123", name="e4a-100", node_name="node-01", port_type="vlan"
         )
-        mock_client.create_port.return_value = mock_port
+        mock_client.get_or_create_port.return_value = mock_port
 
         # Mock interface creation
-        mock_client.create_ip_interface.return_value = InterfaceResult(
+        mock_client.get_or_create_ip_interface.return_value = InterfaceResult(
             name=sample_config.name,
             uuid="interface-uuid-123",
             address=str(sample_config.address),
@@ -302,7 +302,7 @@ class TestLifService:
         lif_service.create_lif(project_id, sample_config)
 
         # Verify the interface spec is created correctly
-        interface_call_args = mock_client.create_ip_interface.call_args[0][0]
+        interface_call_args = mock_client.get_or_create_ip_interface.call_args[0][0]
         assert interface_call_args.name == sample_config.name
         assert str(interface_call_args.address) == str(sample_config.address)
         assert interface_call_args.netmask == str(sample_config.network.netmask)
@@ -323,14 +323,14 @@ class TestLifService:
         mock_client.get_nodes.return_value = [mock_node]
 
         # Mock port creation
-        mock_client.create_port.return_value = PortResult(
+        mock_client.get_or_create_port.return_value = PortResult(
             uuid="port-uuid-123", name="e4a-100", node_name="node-01", port_type="vlan"
         )
 
         lif_service.create_home_port(sample_config)
 
         # Verify the port spec is created correctly
-        port_call_args = mock_client.create_port.call_args[0][0]
+        port_call_args = mock_client.get_or_create_port.call_args[0][0]
         assert port_call_args.node_name == "node-01"
         assert port_call_args.vlan_id == sample_config.vlan_id
         assert port_call_args.base_port_name == sample_config.base_port_name

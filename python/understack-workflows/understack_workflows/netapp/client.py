@@ -9,6 +9,7 @@ handling low-level operations and converting between value objects and SDK objec
 import logging
 from abc import ABC
 from abc import abstractmethod
+from typing import cast
 
 from netapp_ontap import config
 from netapp_ontap.error import NetAppRestError
@@ -122,32 +123,34 @@ class NetAppClientInterface(ABC):
         pass
 
     @abstractmethod
-    def create_ip_interface(self, interface_spec: InterfaceSpec) -> InterfaceResult:
-        """Create a logical interface (LIF).
+    def get_or_create_ip_interface(
+        self, interface_spec: InterfaceSpec
+    ) -> InterfaceResult:
+        """Get or create a logical interface (LIF).
 
         Args:
-            interface_spec: Specification for the interface to create
+            interface_spec: Specification for the interface to create or load
 
         Returns:
-            InterfaceResult: Result of the interface creation
+            InterfaceResult: Result of the interface creation or load
 
         Raises:
-            NetworkOperationError: If interface creation fails
+            NetworkOperationError: If interface creation or load fails
         """
         pass
 
     @abstractmethod
-    def create_port(self, port_spec: PortSpec) -> PortResult:
-        """Create a network port.
+    def get_or_create_port(self, port_spec: PortSpec) -> PortResult:
+        """Get or create a network port.
 
         Args:
-            port_spec: Specification for the port to create
+            port_spec: Specification for the port to create or load
 
         Returns:
-            PortResult: Result of the port creation
+            PortResult: Result of the port creation or load
 
         Raises:
-            NetworkOperationError: If port creation fails
+            NetworkOperationError: If port creation or load fails
         """
         pass
 
@@ -443,11 +446,13 @@ class NetAppClient(NetAppClientInterface):
             )
             return None
 
-    def create_ip_interface(self, interface_spec: InterfaceSpec) -> InterfaceResult:
-        """Create a logical interface (LIF)."""
+    def get_or_create_ip_interface(
+        self, interface_spec: InterfaceSpec
+    ) -> InterfaceResult:
+        """Get or create a logical interface (LIF)."""
         try:
             self._error_handler.log_info(
-                "Creating IP interface: %(interface_name)s",
+                "Defining IP interface: %(interface_name)s",
                 {
                     "interface_name": interface_spec.name,
                     "address": interface_spec.address,
@@ -455,22 +460,34 @@ class NetAppClient(NetAppClientInterface):
                 },
             )
 
-            interface = IpInterface()
-            interface.name = interface_spec.name
-            interface.ip = interface_spec.ip_info
-            interface.enabled = True
-            interface.svm = {"name": interface_spec.svm_name}
-            interface.location = {
-                "auto_revert": False,
-                "home_port": {"uuid": interface_spec.home_port_uuid},
-                "broadcast_domain": {"name": interface_spec.broadcast_domain_name},
-            }
-            interface.service_policy = {"name": interface_spec.service_policy}
-
-            self._error_handler.log_debug(
-                "Creating IpInterface", {"interface": str(interface)}
+            # attempt to load the existing interface first
+            pc = IpInterface.get_collection(
+                name=interface_spec.name,
+                svm=interface_spec.svm_name,
             )
-            interface.post(hydrate=True)
+
+            try:
+                # if we got a interface back then we'll use it
+                interface = cast(IpInterface, next(iter(pc)))
+            except StopIteration:
+                # this happens if there was nothing returned
+                # so we'll create a new one
+                interface = IpInterface()
+                interface.name = interface_spec.name
+                interface.ip = interface_spec.ip_info
+                interface.enabled = True
+                interface.svm = {"name": interface_spec.svm_name}
+                interface.location = {
+                    "auto_revert": False,
+                    "home_port": {"uuid": interface_spec.home_port_uuid},
+                    "broadcast_domain": {"name": interface_spec.broadcast_domain_name},
+                }
+                interface.service_policy = {"name": interface_spec.service_policy}
+
+                self._error_handler.log_debug(
+                    "Creating IpInterface", {"interface": str(interface)}
+                )
+                interface.post(hydrate=True)
 
             result = InterfaceResult(
                 name=str(interface.name),
@@ -499,11 +516,11 @@ class NetAppClient(NetAppClientInterface):
                 },
             )
 
-    def create_port(self, port_spec: PortSpec) -> PortResult:
-        """Create a network port."""
+    def get_or_create_port(self, port_spec: PortSpec) -> PortResult:
+        """Get or create a network port."""
         try:
             self._error_handler.log_info(
-                "Creating port on node %(node_name)s",
+                "Defining port on node %(node_name)s",
                 {
                     "node_name": port_spec.node_name,
                     "vlan_id": port_spec.vlan_id,
@@ -511,18 +528,33 @@ class NetAppClient(NetAppClientInterface):
                 },
             )
 
-            port = Port()
-            port.type = "vlan"
-            port.node = {"name": port_spec.node_name}
-            port.enabled = True
-            port.broadcast_domain = {
-                "name": port_spec.broadcast_domain_name,
-                "ipspace": {"name": "Default"},
-            }
-            port.vlan = port_spec.vlan_config
+            # attempt to load the existing port first
+            pc = Port.get_collection(
+                type="vlan",
+                name=f"{port_spec.base_port_name}-{port_spec.vlan_id}",
+                fields="uuid,name,enabled,node,vlan",
+                **{"node.name": port_spec.node_name},  # pyright: ignore[reportArgumentType]
+            )
 
-            self._error_handler.log_debug("Creating Port", {"port": str(port)})
-            port.post(hydrate=True)
+            try:
+                # if we got a port back then we'll use it
+                port = cast(Port, next(iter(pc)))
+            except StopIteration:
+                # this happens if there was nothing returned
+                # so we'll create a new one
+                port = Port()
+                port.type = "vlan"
+                port.node = {"name": port_spec.node_name}
+
+                port.enabled = True
+                port.broadcast_domain = {
+                    "name": port_spec.broadcast_domain_name,
+                    "ipspace": {"name": "Default"},
+                }
+                port.vlan = port_spec.vlan_config
+
+                self._error_handler.log_debug("Creating Port", {"port": str(port)})
+                port.post(hydrate=True)
 
             result = PortResult(
                 uuid=str(port.uuid),
@@ -534,7 +566,7 @@ class NetAppClient(NetAppClientInterface):
             )
 
             self._error_handler.log_info(
-                "Port created successfully on node %(node_name)s",
+                "Port exists successfully on node %(node_name)s",
                 {
                     "node_name": port_spec.node_name,
                     "uuid": result.uuid,
