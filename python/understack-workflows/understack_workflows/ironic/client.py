@@ -1,5 +1,8 @@
+from typing import cast
+
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from ironicclient.v1.client import Client as IronicV1Client
+from ironicclient.v1.node import Node
 
 from understack_workflows.helpers import setup_logger
 from understack_workflows.openstack.client import get_ironic_client
@@ -28,22 +31,25 @@ class IronicClient:
         self._client = get_ironic_client()
         self.logged_in = True
 
-    def create_node(self, node_data: dict):
+    def create_node(self, node_data: dict) -> Node:
         self._ensure_logged_in()
 
-        return self.client.node.create(**node_data)
+        return cast(Node, self.client.node.create(**node_data))
 
     def list_nodes(self):
         self._ensure_logged_in()
 
         return self.client.node.list()
 
-    def get_node(self, node_ident: str, fields: list[str] | None = None):
+    def get_node(self, node_ident: str, fields: list[str] | None = None) -> Node:
         self._ensure_logged_in()
 
-        return self.client.node.get(
-            node_ident,
-            fields,
+        return cast(
+            Node,
+            self.client.node.get(
+                node_ident,
+                fields,
+            ),
         )
 
     def update_node(self, node_id, patch):
