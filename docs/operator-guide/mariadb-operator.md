@@ -230,7 +230,7 @@ Following several tries I have found out a semi-reliable way to recover from thi
 3. Scale down the `mariadb` statefulset to `0` replicas in order to release the lock.
 
     ```text
-    kubectl scale statefulset mariadb --replicas 0`
+    kubectl scale statefulset mariadb --replicas 0
     ```
 
 4. Obtain the root password:
@@ -242,7 +242,7 @@ Following several tries I have found out a semi-reliable way to recover from thi
 5. Exec into debug pod and start a local mariadb instance and reset the password
 
     ```text
-    kubect exec -it mariadb-pvc-debugger -- bash
+    kubectl exec -it mariadb-pvc-debugger -- bash
     mysql@mariadb-pvc-debugger:/$
     mysql@mariadb-pvc-debugger:/$ mariadb-safe --skip-networking --skip-grant-tables &
     mysql@mariadb-pvc-debugger:/$
