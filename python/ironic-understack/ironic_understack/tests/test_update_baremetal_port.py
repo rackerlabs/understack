@@ -24,7 +24,7 @@ _INVENTORY = {"interfaces": [_INTERFACE_1]}
 def test_with_valid_data(mocker):
     node_uuid = uuidutils.generate_uuid()
     mock_traits = mocker.Mock()
-    mock_node = mocker.Mock(traits=mock_traits)
+    mock_node = mocker.Mock(id=1234, traits=mock_traits)
     mock_task = mocker.Mock(node=mock_node)
     mock_port = mocker.Mock(
         uuid=uuidutils.generate_uuid(),
@@ -52,5 +52,5 @@ def test_with_valid_data(mocker):
 
     mock_traits.get_trait_names.assert_called_once()
     mock_traits.destroy.assert_called_once_with("CUSTOM_NETWORK_SWITCH")
-    mock_traits.create.assert_called_once_with("CUSTOM_STORAGE_SWITCH")
+    mock_traits.create.assert_called_once_with(None, 1234, ["CUSTOM_STORAGE_SWITCH"])
     mock_node.save.assert_called_once()

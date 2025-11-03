@@ -200,22 +200,29 @@ def _set_node_traits(task, vlan_groups: set[str]):
     required_traits = { _trait_name(x) for x in vlan_groups }
     existing_traits = set(task.node.traits.get_trait_names()).intersection(all_traits)
 
-    LOG.debug(f"Existing traits of node {task.node.uuid=} {task.node.traits=} {existing_traits=}")
-
     traits_to_remove = existing_traits.difference(required_traits)
     traits_to_add = required_traits.difference(existing_traits)
 
-    print(f"{task.node.uuid=} {task.node.traits=} {existing_traits=} {all_traits=} {required_traits=} {traits_to_add=} {traits_to_remove=}")
+    LOG.debug(
+        "Checking traits for node %s: existing=%s required=%s",
+        task.node.uuid, existing_traits, required_traits,
+    )
+
     for trait in traits_to_remove:
+        LOG.debug("Removing trait %s from node %s", trait, task.node.uuid)
         try:
             task.node.traits.destroy(trait)
         except openstack.exceptions.NotFoundException:
             pass
 
-    for trait in traits_to_add:
-        task.node.traits = task.node.traits.create(trait)
+    if traits_to_add:
+        LOG.debug("Adding traits %s to node %s", traits_to_add, task.node.uuid)
+        task.node.traits = task.node.traits.create(
+            None, task.node.id, list(traits_to_add)
+        )
 
-    task.node.save()
+    if traits_to_add or traits_to_remove:
+        task.node.save()
 
 def _trait_name(vlan_group_name: str) -> str:
     suffix = vlan_group_name.upper().split("-")[-1]
