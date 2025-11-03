@@ -93,6 +93,7 @@ conf:
       # We override to exclude 'ports' from the default hooks
       default_hooks: "ramdisk-error,validate-interfaces,architecture"
       hooks: "$default_hooks,pci-devices,parse-lldp,resource-class,update-baremetal-port"
+      add_ports: "all"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
     sensor_data:
       send_sensor_data: true
