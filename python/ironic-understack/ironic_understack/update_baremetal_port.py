@@ -82,14 +82,14 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
             local_link_connection = _parse_lldp(lldp_data, node_uuid)
             vlan_group = vlan_group_name(local_link_connection)
 
-            _set_local_link_connection(port, node_uuid, local_link_connection)
-            _update_port_physical_network(port, vlan_group)
+            _set_port_local_link_connection(port, node_uuid, local_link_connection)
+            _set_port_physical_network(port, vlan_group)
             if vlan_group:
                 vlan_groups.add(vlan_group)
-        _update_node_traits(task, vlan_groups)
+        _set_node_traits(task, vlan_groups)
 
 
-def _set_local_link_connection(port: Any, node_uuid: str, local_link_connection: dict):
+def _set_port_local_link_connection(port: Any, node_uuid: str, local_link_connection: dict):
     try:
         LOG.debug(
             "Updating port %s for node %s local_link_connection %s",
@@ -159,7 +159,7 @@ def vlan_group_name(local_link_connection) -> str | None:
     return ironic_understack.vlan_group_name_convention.vlan_group_name(switch_name)
 
 
-def _update_port_physical_network(port, new_physical_network: str | None):
+def _set_port_physical_network(port, new_physical_network: str | None):
     old_physical_network = port.physical_network
 
     if new_physical_network == old_physical_network:
@@ -177,7 +177,7 @@ def _update_port_physical_network(port, new_physical_network: str | None):
     port.save()
 
 
-def _update_node_traits(task, vlan_groups: set[str]):
+def _set_node_traits(task, vlan_groups: set[str]):
     """Add or remove traits to the node.
 
     We manage one trait: "CUSTOM_STORAGE_SWITCH" which is added if the node has
