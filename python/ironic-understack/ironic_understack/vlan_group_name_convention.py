@@ -1,54 +1,39 @@
-def vlan_group_name(switch_name: str) -> str:
+def vlan_group_name(switch_name: str, mapping: dict[str, str]) -> str:
     """The VLAN GROUP name is a function of the switch name.
 
-    Switch hostname convention is site-dependent, but in Rackspace all
-    top-of-rack switch names follow the convention: <cabinet-name>-<suffix>
-    Example switch names include a2-12-1f and a2-12-1.  (These are normally
-    qualified with a site-specific domain name like a2-12-1.iad3.rackspace.net,
-    but we are only considering the unqualified name, ignoring everything after
-    the first dot).
+    Top-of-rack switch hostname is required to follow the convention:
 
-    It easy to parse the switch name into cabinet and suffix.  Convert the
-    switch-name-suffix to vlan-group-suffix using the following mapping:
+      <cabinet-name>-<suffix>
 
-        1 → network
-        2 → network
-        1f → storage
-        2f → storage
-        3f → storage-appliance
-        4f → storage-appliance
-        1d → bmc
+    We only consider the unqualified name, ignoring everything after the first
+    dot.
+
+    The switch name suffix must be one of the keys in the supplied mapping.  The
+    corresponding value is used to name the VLAN Group (aka physical network).
 
     The VLAN GROUP name results from joining the cabinet name to the new suffix
-    with a hyphen. The result is in lower case: <cabinet-name>-<vlan-group-suffix>
+    with a hyphen.
 
-    So for example, switch a2-12-1 is in VLAN GROUP a2-12-network.
+    >>> vlan_group_name("a123-20-1", {"1": "network"})
+    >>> "a123-20-network"
     """
-    # Remove domain suffix if present (everything after first dot)
     switch_name = switch_name.split(".")[0].lower()
 
-    # Split into cabinet and suffix (last component after last hyphen)
     parts = switch_name.rsplit("-", 1)
     if len(parts) != 2:
-        raise ValueError(f"Unknown switch name format: {switch_name}")
+        raise ValueError(
+            f"Unknown switch name format: {switch_name} - this hook requires "
+            f"that switch names follow the convention <cabinet-name>-<suffix>"
+        )
 
     cabinet_name, suffix = parts
 
-    # Map suffix to VLAN group suffix
-    suffix_mapping = {
-        "1": "network",
-        "2": "network",
-        "3": "network",
-        "4": "network",
-        "1f": "storage",
-        "2f": "storage",
-        "3f": "storage-appliance",
-        "4f": "storage-appliance",
-        "1d": "bmc",
-    }
-
-    vlan_suffix = suffix_mapping.get(suffix)
+    vlan_suffix = mapping.get(suffix)
     if vlan_suffix is None:
-        raise ValueError(f"Unknown switch suffix: {suffix}")
+        raise ValueError(
+            f"Switch suffix {suffix} is not present in the mapping configured "
+            f"in ironic_understack.switch_name_vlan_group_mapping.  Recognised "
+            f"suffixes are: {mapping.keys()}"
+        )
 
     return f"{cabinet_name}-{vlan_suffix}"
