@@ -21,6 +21,7 @@ class NetworkEvent:
     network_name: str
     tenant_id: UUID
     external: bool
+    provider_segmentation_id: int
 
     @classmethod
     def from_event_dict(cls, data: dict) -> Self:
@@ -31,6 +32,7 @@ class NetworkEvent:
             network["name"],
             UUID(network["project_id"]),
             bool(network["router:external"]),
+            int(network["provider:segmentation_id"]),
         )
 
 
@@ -66,6 +68,8 @@ def _create_nautobot_ucvni(
         ucvni_group_name = os.getenv("UCVNI_GROUP_NAME")
     if ucvni_group_name is None:
         raise RuntimeError("Please set environment variable UCVNI_GROUP_NAME")
+    if event.provider_segmentation_id is None:
+        raise RuntimeError("Network %s missing provider:segmentation_id", id)
 
     payload = {
         "id": id,
@@ -73,6 +77,7 @@ def _create_nautobot_ucvni(
         "status": {"name": "Active"},
         "tenant": str(event.tenant_id),
         "ucvni_group": {"name": ucvni_group_name},
+        "ucvni_id": event.provider_segmentation_id,
     }
     try:
         response = nautobot.plugins.undercloud_vni.ucvnis.create(payload)
