@@ -23,7 +23,8 @@ _INVENTORY = {"interfaces": [_INTERFACE_1]}
 
 def test_with_valid_data(mocker):
     node_uuid = uuidutils.generate_uuid()
-    mock_node = mocker.Mock()
+    mock_traits = mocker.Mock()
+    mock_node = mocker.Mock(traits=mock_traits)
     mock_task = mocker.Mock(node=mock_node)
     mock_port = mocker.Mock(
         uuid=uuidutils.generate_uuid(),
@@ -37,6 +38,8 @@ def test_with_valid_data(mocker):
         return_value=mock_port,
     )
 
+    mock_traits.get_trait_names.return_value = ["CUSTOM_NETWORK_SWITCH", "bar"]
+
     UpdateBaremetalPortsHook().__call__(mock_task, _INVENTORY, _PLUGIN_DATA)
 
     assert mock_port.local_link_connection == {
@@ -45,8 +48,9 @@ def test_with_valid_data(mocker):
         "switch_info": "f20-3-2f.iad3",
     }
     assert mock_port.physical_network == "f20-3-storage"
-
     mock_port.save.assert_called()
-    mock_node.remove_trait.assert_not_called()
-    mock_node.add_trait.assert_called_once_with("CUSTOM_STORAGE_SWITCH")
+
+    mock_traits.get_trait_names.assert_called_once()
+    mock_traits.destroy.assert_called_once_with("CUSTOM_NETWORK_SWITCH")
+    mock_traits.create.assert_called_once_with("CUSTOM_STORAGE_SWITCH")
     mock_node.save.assert_called_once()

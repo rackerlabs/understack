@@ -39,9 +39,9 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
         Also adds or removes node "traits" based on the inventory data.  We
         control the trait "CUSTOM_STORAGE_SWITCH".
 
-        The IPA image will normally have exactly one inventory.interfaces with
-        an ipv4_address address and has_carrier set to True.  This is our pxe
-        boot interface.  We should clear the pxe interface flag on all other
+        TODO: The IPA image will normally have exactly one inventory.interfaces
+        with an ipv4_address address and has_carrier set to True.  This is our
+        pxe boot interface.  We should clear the pxe interface flag on all other
         baremetal ports.
         """
         LOG.debug(f"{__class__} called with {task=!r} {inventory=!r} {plugin_data=!r}")
@@ -184,22 +184,39 @@ def _set_port_physical_network(port, new_physical_network: str | None):
 def _set_node_traits(task, vlan_groups: set[str]):
     """Add or remove traits to the node.
 
-    We manage one trait: "CUSTOM_STORAGE_SWITCH" which is added if the node has
-    any ports connected to a storage fabric, othwise it is removed from the
+    We manage a traits for each type of VLAN Group that can be connected to a
     node.
+
+    For example, a connection to VLAN Group whose name ends in "-storage" will
+    result in a trait being added to the node called "CUSTOM_STORAGE_SWITCH".
+
+    We remove pre-existing traits if the node does not have the required
+    connections.
     """
-    TRAIT_STORAGE_SWITCH = "CUSTOM_STORAGE_SWITCH"
+    all_possible_suffixes = set(
+        CONF.ironic_understack.switch_name_vlan_group_mapping.values()
+    )
+    all_traits = { _trait_name(x) for x in all_possible_suffixes }
+    required_traits = { _trait_name(x) for x in vlan_groups }
+    existing_traits = set(task.node.traits.get_trait_names()).intersection(all_traits)
 
-    storage_vlan_groups = {x for x in vlan_groups if x.endswith("-storage")}
+    LOG.debug(f"Existing traits of node {task.node.uuid=} {task.node.traits=} {existing_traits=}")
 
-    if storage_vlan_groups:
-        existing_traits = task.node.traits.get_trait_names()
-        LOG.debug(f"Existing traits of node {task.node.uuid=} {task.node.traits=} {existing_traits=}")
-        task.node.traits = existing_traits.create(TRAIT_STORAGE_SWITCH)
-    else:
+    traits_to_remove = existing_traits.difference(required_traits)
+    traits_to_add = required_traits.difference(existing_traits)
+
+    print(f"{task.node.uuid=} {task.node.traits=} {existing_traits=} {all_traits=} {required_traits=} {traits_to_add=} {traits_to_remove=}")
+    for trait in traits_to_remove:
         try:
-            task.node.traits.destroy(TRAIT_STORAGE_SWITCH)
+            task.node.traits.destroy(trait)
         except openstack.exceptions.NotFoundException:
             pass
 
+    for trait in traits_to_add:
+        task.node.traits = task.node.traits.create(trait)
+
     task.node.save()
+
+def _trait_name(vlan_group_name: str) -> str:
+    suffix = vlan_group_name.upper().split("-")[-1]
+    return f"CUSTOM_{suffix}_SWITCH"
