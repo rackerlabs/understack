@@ -11,6 +11,7 @@ from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
 
 import ironic_understack.vlan_group_name_convention
+from ironic_understack.conf import CONF
 
 LOG = logging.getLogger(__name__)
 
@@ -156,7 +157,10 @@ def vlan_group_name(local_link_connection) -> str | None:
     if not switch_name:
         return
 
-    return ironic_understack.vlan_group_name_convention.vlan_group_name(switch_name)
+    return ironic_understack.vlan_group_name_convention.vlan_group_name(
+        switch_name,
+        CONF.ironic_understack.switch_name_vlan_group_mapping
+    )
 
 
 def _set_port_physical_network(port, new_physical_network: str | None):
