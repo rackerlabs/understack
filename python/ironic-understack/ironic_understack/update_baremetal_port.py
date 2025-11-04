@@ -218,7 +218,7 @@ def _set_node_traits(task, vlan_groups: set[str]):
     if traits_to_add:
         LOG.debug("Adding traits %s to node %s", traits_to_add, task.node.uuid)
         task.node.traits = task.node.traits.create(
-            None, task.node.id, list(traits_to_add)
+            task.context, task.node.id, list(traits_to_add)
         )
 
     if traits_to_add or traits_to_remove:
