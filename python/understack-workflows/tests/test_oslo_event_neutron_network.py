@@ -51,6 +51,7 @@ def test_handle_network_create(network_create_event_data):
             "ucvni_group": {
                 "name": "FOO",
             },
+            "ucvni_id": 1862,
         },
     )
     assert result == 0
@@ -78,6 +79,7 @@ def test_handle_network_update(network_update_event_data):
             "ucvni_group": {
                 "name": "FOO",
             },
+            "ucvni_id": 1860,
         },
     )
     assert result == 0
