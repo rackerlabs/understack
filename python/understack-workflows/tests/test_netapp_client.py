@@ -323,7 +323,7 @@ class TestNetAppClient:
             broadcast_domain_name="test-domain",
         )
 
-        result = netapp_client.create_ip_interface(interface_spec)
+        result = netapp_client.get_or_create_ip_interface(interface_spec)
 
         assert isinstance(result, InterfaceResult)
         assert result.name == "test-interface"
@@ -362,7 +362,7 @@ class TestNetAppClient:
         )
 
         with pytest.raises(NetworkOperationError):
-            netapp_client.create_ip_interface(interface_spec)
+            netapp_client.get_or_create_ip_interface(interface_spec)
 
     @patch("understack_workflows.netapp.client.Port")
     def test_create_port_success(self, mock_port_class, netapp_client):
@@ -370,6 +370,7 @@ class TestNetAppClient:
         mock_port_instance = MagicMock()
         mock_port_instance.uuid = "port-uuid-123"
         mock_port_instance.name = "e4a-100"
+        mock_port_class.get_collection.return_value = iter([])
         mock_port_class.return_value = mock_port_instance
 
         port_spec = PortSpec(
@@ -379,7 +380,7 @@ class TestNetAppClient:
             broadcast_domain_name="test-domain",
         )
 
-        result = netapp_client.create_port(port_spec)
+        result = netapp_client.get_or_create_port(port_spec)
 
         assert isinstance(result, PortResult)
         assert result.uuid == "port-uuid-123"
@@ -390,10 +391,37 @@ class TestNetAppClient:
         mock_port_instance.post.assert_called_once_with(hydrate=True)
 
     @patch("understack_workflows.netapp.client.Port")
-    def test_create_port_failure(self, mock_port_class, netapp_client):
+    def test_get_port_success(self, mock_port_class, netapp_client):
+        """Test successful port creation."""
+        mock_port_instance = MagicMock()
+        mock_port_instance.uuid = "port-uuid-123"
+        mock_port_instance.name = "e4a-100"
+        mock_port_class.get_collection.return_value = iter(mock_port_instance)
+        mock_port_class.return_value = mock_port_instance
+
+        port_spec = PortSpec(
+            node_name="node-01",
+            vlan_id=100,
+            base_port_name="e4a",
+            broadcast_domain_name="test-domain",
+        )
+
+        result = netapp_client.get_or_create_port(port_spec)
+
+        assert isinstance(result, PortResult)
+        assert result.uuid == "port-uuid-123"
+        assert result.name == "e4a-100"
+        assert result.node_name == "node-01"
+        assert result.port_type == "vlan"
+
+        mock_port_instance.post.assert_called_once_with(hydrate=True)
+
+    @patch("understack_workflows.netapp.client.Port")
+    def test_get_or_create_port_failure(self, mock_port_class, netapp_client):
         """Test port creation failure."""
         mock_port_instance = MagicMock()
         mock_port_instance.post.side_effect = NetAppRestError("Port creation failed")
+        mock_port_class.get_collection.return_value = iter([])
         mock_port_class.return_value = mock_port_instance
 
         # Configure mock error handler to raise the expected exception
@@ -409,7 +437,7 @@ class TestNetAppClient:
         )
 
         with pytest.raises(NetworkOperationError):
-            netapp_client.create_port(port_spec)
+            netapp_client.get_or_create_port(port_spec)
 
     @patch("understack_workflows.netapp.client.Node")
     def test_get_nodes_success(self, mock_node_class, netapp_client):
@@ -715,8 +743,8 @@ class TestNetAppClientInterface:
             "create_volume",
             "delete_volume",
             "find_volume",
-            "create_ip_interface",
-            "create_port",
+            "get_or_create_ip_interface",
+            "get_or_create_port",
             "get_nodes",
             "get_namespaces",
             "create_route",
