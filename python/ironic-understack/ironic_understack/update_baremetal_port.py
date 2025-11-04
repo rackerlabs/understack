@@ -196,9 +196,9 @@ def _set_node_traits(task, vlan_groups: set[str]):
     all_possible_suffixes = set(
         CONF.ironic_understack.switch_name_vlan_group_mapping.values()
     )
-    all_traits = { _trait_name(x) for x in all_possible_suffixes }
+    our_traits = { _trait_name(x) for x in all_possible_suffixes }
     required_traits = { _trait_name(x) for x in vlan_groups }
-    existing_traits = set(task.node.traits.get_trait_names()).intersection(all_traits)
+    existing_traits = set(task.node.traits.get_trait_names()).intersection(our_traits)
 
     traits_to_remove = existing_traits.difference(required_traits)
     traits_to_add = required_traits.difference(existing_traits)
@@ -218,7 +218,7 @@ def _set_node_traits(task, vlan_groups: set[str]):
     if traits_to_add:
         LOG.debug("Adding traits %s to node %s", traits_to_add, task.node.uuid)
         task.node.traits = task.node.traits.create(
-            None, task.node.id, list(traits_to_add)
+            task.context, task.node.id, list(traits_to_add)
         )
 
     if traits_to_add or traits_to_remove:
