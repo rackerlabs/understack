@@ -1,0 +1,26 @@
+From b41c05ad5c1db61cf7716b0922282dbf55afef81 Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Wed, 5 Nov 2025 10:47:23 -0600
+Subject: [PATCH] ilo: switch iLO iPXE boot to utilize iPXE http boot
+
+Change-Id: Idf6c3dc4805b1e2fed2512959a3bfcb88cd46c84
+Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
+---
+ ironic/drivers/modules/ilo/boot.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ironic/drivers/modules/ilo/boot.py b/ironic/drivers/modules/ilo/boot.py
+index 7239ea8c7..989b745e3 100644
+--- a/ironic/drivers/modules/ilo/boot.py
++++ b/ironic/drivers/modules/ilo/boot.py
+@@ -637,7 +637,7 @@ class IloPXEBoot(pxe.PXEBoot):
+             super(IloPXEBoot, self).clean_up_instance(task)
+ 
+ 
+-class IloiPXEBoot(ipxe.iPXEBoot):
++class IloiPXEBoot(ipxe.iPXEHttpBoot):
+ 
+     @METRICS.timer('IloiPXEBoot.prepare_ramdisk')
+     def prepare_ramdisk(self, task, ramdisk_params):
+-- 
+2.50.1 (Apple Git-155)
