@@ -16,6 +16,7 @@ RUN apt-get update && apt-get -y install \
     pkg-config \
     ca-certificates \
     quilt \
+    ipxe \
     --no-install-recommends
 WORKDIR /src
 RUN apt-get -y build-dep dnsmasq
@@ -42,10 +43,13 @@ COPY --from=builder /src/dnsmasq-base_*_amd64.deb /tmp
 COPY --from=builder /src/dnsmasq_*_all.deb /tmp
 
 RUN apt-get update && \
-    apt-get -y install --no-install-recommends python3-jinja2 && \
+    apt-get -y install --no-install-recommends python3-jinja2 ipxe && \
     apt-get -y --fix-broken install --no-install-recommends /tmp/dnsmasq-base_*_amd64.deb /tmp/dnsmasq_*_all.deb && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/*.deb
+
+RUN mkdir -p /var/lib/openstack-helm/tftpboot && \
+    cp /usr/lib/ipxe/snponly.efi /var/lib/openstack-helm/tftpboot/
 
 COPY common/helpers.sh /helpers.sh
 COPY dnsmasq/entry-point.sh /entry-point.sh
