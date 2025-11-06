@@ -215,8 +215,6 @@ pod:
             mountPath: /etc/dnsmasq.d/
           - name: dnsmasq-dhcp
             mountPath: /var/lib/dnsmasq/
-          - name: understack-data
-            mountPath: /var/lib/understack
           - name: device-types
             mountPath: /var/lib/understack/device-types
           - name: ironic-etc-snippets
@@ -229,9 +227,6 @@ pod:
           - name: dnsmasq-dhcp
             persistentVolumeClaim:
               claimName: dnsmasq-dhcp
-          - name: understack-data
-            persistentVolumeClaim:
-              claimName: understack-data
           - name: device-types
             configMap:
               name: device-types
