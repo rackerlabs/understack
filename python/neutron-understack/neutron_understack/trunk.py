@@ -129,7 +129,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         segment VLAN tags allocated to the subports. Therefore, there is no
         possibility of conflict with the native VLAN.
         """
-        if trunk_id == cfg.CONF.ml2_understack.network_node_trunk_uuid:
+        if trunk_id == utils.fetch_network_node_trunk_id():
             return
 
         ns_ranges = utils.allowed_tenant_vlan_id_ranges()

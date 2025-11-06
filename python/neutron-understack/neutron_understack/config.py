@@ -51,13 +51,6 @@ mech_understack_opts = [
         ),
     ),
     cfg.StrOpt(
-        "network_node_trunk_uuid",
-        help=(
-            "UUID of the trunk that is used to trunk all vlans used by a Neutron"
-            " router."
-        ),
-    ),
-    cfg.StrOpt(
         "network_node_switchport_physnet",
         help=(
             "Name of the physnet configured on a network node's"
