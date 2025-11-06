@@ -1,3 +1,4 @@
 0002_skip_reboot_firmware_update.patch
 0001-storage-controller_mode-update.patch
 0001-pass-along-physical_network-to-neutron-from-the-bare.patch
+0001-Solve-IPMI-call-issue-results-in-UTF-8-format-error-.patch
