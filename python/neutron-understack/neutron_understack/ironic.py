@@ -32,3 +32,17 @@ class IronicClient:
             )
         except StopIteration:
             return None
+
+    def baremetal_node_name(self, node_uuid: str) -> str | None:
+        try:
+            node = self.irclient.get_node(node_uuid)
+            return node.name if node else None
+        except Exception:
+            return None
+
+    def baremetal_node_uuid(self, node_name: str) -> str | None:
+        try:
+            node = self.irclient.get_node(node_name)
+            return node.id if node else None
+        except Exception:
+            return None

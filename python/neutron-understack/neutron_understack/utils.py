@@ -1,7 +1,11 @@
+import logging
+import uuid
 from contextlib import contextmanager
 
+from neutron.common.ovn import constants as ovn_const
 from neutron.db import models_v2
 from neutron.objects import ports as port_obj
+from neutron.objects import trunk as trunk_obj
 from neutron.objects.network import NetworkSegment
 from neutron.objects.network_segment_range import NetworkSegmentRange
 from neutron.plugins.ml2.driver_context import portbindings
@@ -14,9 +18,12 @@ from neutron_lib.plugins import directory
 from neutron_lib.plugins.ml2 import api
 from oslo_config import cfg
 
+from neutron_understack.ironic import IronicClient
 from neutron_understack.ml2_type_annotations import NetworkSegmentDict
 from neutron_understack.ml2_type_annotations import PortContext
 from neutron_understack.ml2_type_annotations import PortDict
+
+LOG = logging.getLogger(__name__)
 
 
 def fetch_port_object(port_id: str) -> port_obj.Port:
@@ -99,6 +106,270 @@ def fetch_trunk_plugin() -> TrunkPlugin:
     if not trunk_plugin:
         raise Exception("unable to obtain trunk plugin")
     return trunk_plugin
+
+
+def _is_uuid(value: str) -> bool:
+    """Check if a string is a UUID."""
+    try:
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        return False
+
+
+def _get_gateway_agent_host(core_plugin, context):
+    """Get the host of an alive OVN Controller Gateway agent.
+
+    Args:
+        core_plugin: Neutron core plugin instance
+        context: Neutron context
+
+    Returns:
+        str: Gateway agent host (may be hostname or UUID)
+
+    Raises:
+        Exception: If no alive gateway agents found
+    """
+    LOG.debug("Looking for OVN Controller Gateway agents")
+    gateway_agents = core_plugin.get_agents(
+        context,
+        filters={"agent_type": [ovn_const.OVN_CONTROLLER_GW_AGENT], "alive": [True]},
+    )
+
+    if not gateway_agents:
+        raise Exception(
+            "No alive OVN Controller Gateway agents found. "
+            "Please ensure the network node is running and the "
+            "OVN gateway agent is active."
+        )
+
+    # Use the first gateway agent's host
+    # TODO: In the future, support multiple gateway agents for HA
+    gateway_host = gateway_agents[0]["host"]
+    LOG.debug(
+        "Found OVN Gateway agent on host: %s (agent_id: %s)",
+        gateway_host,
+        gateway_agents[0]["id"],
+    )
+    return gateway_host
+
+
+def _resolve_gateway_host(gateway_host):
+    """Resolve gateway host to both hostname and UUID.
+
+    This function ensures we have both the hostname and UUID for the gateway host,
+    regardless of which format the OVN agent reports. This is necessary because
+    some ports may be bound using hostname while others use UUID.
+
+    Args:
+        gateway_host: Gateway host (hostname or UUID)
+
+    Returns:
+        tuple: (hostname, uuid) - both values will be populated
+
+    Raises:
+        Exception: If resolution via Ironic fails
+    """
+    ironic_client = IronicClient()
+
+    if _is_uuid(gateway_host):
+        # Input is UUID, resolve to hostname
+        LOG.debug(
+            "Gateway host %s is a baremetal UUID, resolving to hostname via Ironic",
+            gateway_host,
+        )
+        gateway_node_uuid = gateway_host
+        resolved_name = ironic_client.baremetal_node_name(gateway_node_uuid)
+
+        if not resolved_name:
+            raise Exception(
+                f"Failed to resolve baremetal node UUID {gateway_node_uuid} "
+                "to hostname via Ironic"
+            )
+
+        LOG.debug(
+            "Resolved gateway baremetal node %s to hostname %s",
+            gateway_node_uuid,
+            resolved_name,
+        )
+        return resolved_name, gateway_node_uuid
+    else:
+        # Input is hostname, resolve to UUID
+        LOG.debug(
+            "Gateway host %s is a hostname, resolving to UUID via Ironic",
+            gateway_host,
+        )
+        gateway_hostname = gateway_host
+        resolved_uuid = ironic_client.baremetal_node_uuid(gateway_hostname)
+
+        if not resolved_uuid:
+            raise Exception(
+                f"Failed to resolve hostname {gateway_hostname} "
+                "to baremetal node UUID via Ironic"
+            )
+
+        LOG.debug(
+            "Resolved gateway hostname %s to baremetal node UUID %s",
+            gateway_hostname,
+            resolved_uuid,
+        )
+        return gateway_hostname, resolved_uuid
+
+
+def _find_ports_bound_to_hosts(context, host_filters):
+    """Find ports bound to any of the specified hosts.
+
+    Args:
+        context: Neutron context
+        host_filters: List of hostnames/UUIDs to match
+
+    Returns:
+        list: Port objects bound to the specified hosts
+
+    Raises:
+        Exception: If no ports found
+    """
+    LOG.debug("Searching for ports bound to hosts: %s", host_filters)
+
+    # Query PortBinding objects for each host (more efficient than fetching all ports)
+    gateway_port_ids = set()
+    for host in host_filters:
+        bindings = port_obj.PortBinding.get_objects(context, host=host)
+        for binding in bindings:
+            gateway_port_ids.add(binding.port_id)
+            LOG.debug("Found port %s bound to gateway host %s", binding.port_id, host)
+
+    if not gateway_port_ids:
+        raise Exception(
+            f"No ports found bound to gateway hosts (searched for: {host_filters})"
+        )
+
+    # Fetch the actual Port objects for the found port IDs
+    gateway_ports = [
+        port_obj.Port.get_object(context, id=port_id) for port_id in gateway_port_ids
+    ]
+    # Filter out any None values (in case a port was deleted between queries)
+    gateway_ports = [p for p in gateway_ports if p is not None]
+
+    if not gateway_ports:
+        raise Exception(
+            f"No ports found bound to gateway hosts (searched for: {host_filters})"
+        )
+
+    LOG.debug("Found %d port(s) bound to gateway host", len(gateway_ports))
+    return gateway_ports
+
+
+def _find_trunk_by_port_ids(context, port_ids, gateway_host):
+    """Find trunk whose parent port is in the given port IDs.
+
+    Args:
+        context: Neutron context
+        port_ids: List of port IDs to check
+        gateway_host: Gateway hostname for logging
+
+    Returns:
+        str: Trunk UUID
+
+    Raises:
+        Exception: If no matching trunk found
+    """
+    trunks = trunk_obj.Trunk.get_objects(context)
+
+    if not trunks:
+        raise Exception("No trunks found in the system")
+
+    LOG.debug("Checking %d trunk(s) for parent ports in gateway ports", len(trunks))
+
+    for trunk in trunks:
+        if trunk.port_id in port_ids:
+            LOG.info(
+                "Found network node trunk: %s (parent_port: %s, host: %s)",
+                trunk.id,
+                trunk.port_id,
+                gateway_host,
+            )
+            return str(trunk.id)
+
+    # No matching trunk found
+    raise Exception(
+        f"Unable to find network node trunk on gateway host '{gateway_host}'. "
+        f"Found {len(port_ids)} port(s) bound to gateway host and "
+        f"{len(trunks)} trunk(s) in system, but no trunk uses any of the "
+        f"gateway ports as parent port. "
+        "Please ensure a trunk exists with a parent port on the network node."
+    )
+
+
+_cached_network_node_trunk_id = None
+
+
+def fetch_network_node_trunk_id() -> str:
+    """Dynamically discover the network node trunk ID via OVN Gateway agent.
+
+    This function discovers the network node trunk by:
+    1. Finding alive OVN Controller Gateway agents
+    2. Getting the host of the gateway agent
+    3. Resolve to both hostname and UUID via Ironic (handles both directions)
+    4. Query ports bound to either hostname or UUID
+    5. Find trunks that use those ports as parent ports
+
+    The network node trunk is used to connect router networks to the
+    network node (OVN gateway) by adding subports for each VLAN.
+
+    Note: We need both hostname and UUID because some ports may be bound
+    using hostname while others use UUID in their binding_host_id.
+
+    Returns:
+        str: The UUID of the network node trunk
+
+    Raises:
+        Exception: If no gateway agent or suitable trunk is found
+
+    Example:
+        >>> fetch_network_node_trunk_id()
+        '2e558202-0bd0-4971-a9f8-61d1adea0427'
+    """
+    global _cached_network_node_trunk_id
+    if _cached_network_node_trunk_id:
+        LOG.info(
+            "Returning cached network node trunk ID: %s", _cached_network_node_trunk_id
+        )
+        return _cached_network_node_trunk_id
+
+    context = n_context.get_admin_context()
+    core_plugin = directory.get_plugin()
+
+    if not core_plugin:
+        raise Exception("Unable to obtain core plugin")
+
+    # Step 1: Get gateway agent host
+    gateway_host = _get_gateway_agent_host(core_plugin, context)
+
+    # Step 2: Resolve gateway host if it's a UUID (single Ironic call)
+    gateway_host, gateway_node_uuid = _resolve_gateway_host(gateway_host)
+
+    # Step 3: Build host filters (both hostname and UUID if applicable)
+    host_filters = [gateway_host]
+    if gateway_node_uuid:
+        host_filters.append(gateway_node_uuid)
+
+    # Step 4: Find ports bound to gateway host
+    gateway_ports = _find_ports_bound_to_hosts(context, host_filters)
+
+    # Step 5: Find trunk using gateway ports
+    gateway_port_ids = [port.id for port in gateway_ports]
+    _cached_network_node_trunk_id = _find_trunk_by_port_ids(
+        context, gateway_port_ids, gateway_host
+    )
+    LOG.info(
+        "Discovered and cached network node trunk ID: %s "
+        "(gateway_host: %s, gateway_uuid: %s)",
+        _cached_network_node_trunk_id,
+        gateway_host,
+        gateway_node_uuid,
+    )
+    return _cached_network_node_trunk_id
 
 
 def allocate_dynamic_segment(
