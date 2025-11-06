@@ -1,0 +1,26 @@
+From 2f02ca00341d8069292ae9fe2ab3396fe44dac7d Mon Sep 17 00:00:00 2001
+From: Alan Bounds <abounds@rackspace.com>
+Date: Thu, 6 Nov 2025 08:47:08 -0600
+Subject: [PATCH] Solve IPMI call issue results in UTF-8 format error on
+ ipmitool execution response decoding.
+
+---
+ proliantutils/ilo/ipmi.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/proliantutils/ilo/ipmi.py b/proliantutils/ilo/ipmi.py
+index 403ff4b..67176dc 100644
+--- a/proliantutils/ilo/ipmi.py
++++ b/proliantutils/ilo/ipmi.py
+@@ -52,7 +52,8 @@ def _exec_ipmitool(driver_info, command):
+     out = None
+     try:
+         process = subprocess.Popen(ipmi_cmd, stdout=subprocess.PIPE,
+-                                   stderr=subprocess.PIPE, shell=True)
++                                   stderr=subprocess.PIPE, shell=True,
++                                   encoding='utf-8', text=True)
+         out, err = process.communicate()
+         LOG.debug(("IPMI Command output: %(out)s and "
+                    "IPMI Command error: %(err)s and returncode: (code)s"),
+-- 
+2.25.1
