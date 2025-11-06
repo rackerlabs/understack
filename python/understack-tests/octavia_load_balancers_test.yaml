@@ -1,0 +1,15 @@
+---
+Octavia.create_and_delete_loadbalancers:
+  - runner:
+      type: constant
+      times: 1
+      concurrency: 1
+    context:
+      users:
+        tenants: 1
+        users_per_tenant: 1
+      roles:
+      - load-balancer_member
+      network: {}
+    args:
+      provider: "ovn"

@@ -1,6 +1,7 @@
 #!/bin/sh
 set -e
+rally --version
 rally db ensure
 rally deployment create --fromenv --name=main
 rally deployment check
-rally task start "$@"
+rally --debug task start "$@"
