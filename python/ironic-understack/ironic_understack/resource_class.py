@@ -1,5 +1,4 @@
 # from ironic.drivers.modules.inspector.hooks import base
-import re
 from pathlib import Path
 
 from flavor_matcher.device_type import DeviceType
@@ -31,22 +30,18 @@ class ResourceClassHook(base.InspectionHook):
             disk_size_gb = int(int(inventory["disks"][0]["size"]) / 10**9)
             cpu_model_name = inventory["cpu"]["model_name"]
 
-            model_name = re.search(
-                r"ModelName=(.*)\)", inventory["system_vendor"]["product_name"]
-            )
-
-            if not model_name:
-                LOG.warning("No model_name detected. skipping resource class setting.")
-                raise NoMatchError("mode_name not matched")
-            else:
-                model_name = model_name.group(1)
-
             # Extract additional fields for new Machine API
             cpu_cores = inventory.get("cpu", {}).get("count", 0)
             manufacturer = inventory.get("system_vendor", {}).get("manufacturer", "")
+            model_name = inventory.get("system_vendor", {}).get("product_name", "")
 
-            # trim ' Inc.'
-            manufacturer = manufacturer.replace(" Inc.", "")
+            # trim 'Inc.'
+            manufacturer = manufacturer.replace("Inc.", "").strip()
+            # HP -> HPE
+            if manufacturer == "HP":
+                manufacturer = "HPE"
+            # trim model info of SKUs by taking everything before the (
+            model_name = model_name.split("(")[0].strip()
 
             machine = Machine(
                 memory_mb=memory_mb,
