@@ -51,6 +51,10 @@ spec:
           - mountPath: /etc/nb-token/
             name: nb-token
             readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+              optional: false
       volumes:
         - name: nb-token
           secret:
