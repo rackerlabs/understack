@@ -43,6 +43,10 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
         with an ipv4_address address and has_carrier set to True.  This is our
         pxe boot interface.  We should clear the pxe interface flag on all other
         baremetal ports.
+
+        The interface MAC gets passed to us in plugin_data["boot_interface"] if
+        the node was inspected by booting the IPA image.  Not sure what would be
+        set by redfish here.
         """
         LOG.debug(f"{__class__} called with {task=!r} {inventory=!r} {plugin_data=!r}")
 

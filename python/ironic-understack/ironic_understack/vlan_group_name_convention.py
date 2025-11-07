@@ -16,6 +16,11 @@ def vlan_group_name(switch_name: str, mapping: dict[str, str]) -> str:
 
     >>> vlan_group_name("a123-20-1", {"1": "network"})
     >>> "a123-20-network"
+
+    VLAN Groups are currentlty REQUIRED to span a single cabinet.  A VLAN Group
+    that spans multiple cabinets would be named like "a123-20/21-network" but we
+    can't support this because we have no way to determine which switches are
+    paired together.
     """
     switch_name = switch_name.split(".")[0].lower()
 
