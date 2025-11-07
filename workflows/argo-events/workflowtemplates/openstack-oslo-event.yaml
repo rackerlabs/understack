@@ -36,7 +36,7 @@ spec:
             raw:
               data: "{{inputs.parameters.event-json}}"
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1361@sha256:9973c032f320c4f6c9ed5c7121edc5cf44bf93fd9e66e6ba3452a6f76f772a40
         command:
           - openstack-oslo-event
         args:
