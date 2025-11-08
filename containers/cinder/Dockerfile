@@ -1,18 +1,19 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM quay.io/airshipit/cinder:${OPENSTACK_VERSION}-ubuntu_jammy AS builder
+FROM quay.io/airshipit/cinder:${OPENSTACK_VERSION}-ubuntu_jammy AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-COPY python/cinder-understack /tmp/cinder-understack
+COPY python/cinder-understack /src/cinder-understack
 
+ARG OPENSTACK_VERSION="required_argument"
 RUN --mount=type=cache,target=/root/.cache/uv \
-    cd /tmp/cinder-understack && \
-    uv build --wheel --out-dir /tmp/wheels/
+    uv pip install \
+      --constraint https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} \
+        /src/cinder-understack
 
+ARG OPENSTACK_VERSION="required_argument"
 FROM quay.io/airshipit/cinder:${OPENSTACK_VERSION}-ubuntu_jammy AS final
 
-RUN --mount=type=cache,target=/root/.cache/pip \
-    --mount=from=builder,source=/tmp/wheels,target=/tmp/wheels \
-    /var/lib/openstack/bin/python -m pip install --no-input --find-links /tmp/wheels/ cinder-understack
+COPY --from=build --link /var/lib/openstack /var/lib/openstack
