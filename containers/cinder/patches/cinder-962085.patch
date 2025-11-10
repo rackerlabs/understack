@@ -1,0 +1,44 @@
+From d2c0217a5adfa283bae8f1a1189131c4b83de5f4 Mon Sep 17 00:00:00 2001
+From: hemanthc <hemanth.c@netapp.com>
+Date: Tue, 23 Sep 2025 06:24:58 -0400
+Subject: [PATCH] [NetApp] Fixed NVMe over TCP multipath attach path issue
+
+Initially Netapp used to handle a single nvme path.
+With this fix, we have enhanced it to handle multiple
+paths.
+
+Change-Id: If09b206f719645c1358868ae7ae1422982f732f5
+Signed-off-by: hemanthc <hemanthc@netapp.com>
+---
+
+diff --git a/cinder/volume/drivers/netapp/dataontap/nvme_library.py b/cinder/volume/drivers/netapp/dataontap/nvme_library.py
+index 81e0e62..68113a0 100644
+--- a/cinder/volume/drivers/netapp/dataontap/nvme_library.py
++++ b/cinder/volume/drivers/netapp/dataontap/nvme_library.py
+@@ -726,11 +726,12 @@
+             raise exception.VolumeBackendAPIException(
+                 data=msg % name)
+ 
+-        portal = (target_portals[0], self.NVME_PORT, self.NVME_TRANSPORT)
++        portals = [(ip, self.NVME_PORT,
++                    self.NVME_TRANSPORT) for ip in target_portals]
+         data = {
+             "target_nqn": str(target_nqn),
+             "host_nqn": host_nqn,
+-            "portals": [portal],
++            "portals": portals,
+             "vol_uuid": namespace_uuid
+         }
+         conn_info = {"driver_volume_type": "nvmeof", "data": data}
+diff --git a/releasenotes/notes/bug-2121791-fixing-nvme-multipath-issue-389c393b6c4b33fc.yaml b/releasenotes/notes/bug-2121791-fixing-nvme-multipath-issue-389c393b6c4b33fc.yaml
+new file mode 100644
+index 0000000..1ff27fb
+--- /dev/null
++++ b/releasenotes/notes/bug-2121791-fixing-nvme-multipath-issue-389c393b6c4b33fc.yaml
+@@ -0,0 +1,6 @@
++---
++fixes:
++  - |
++    NetApp driver `bug #2121791
++    <https://bugs.launchpad.net/cinder/+bug/2121791>`_: Fixed
++    Fixed NVMe over TCP multipath issue
