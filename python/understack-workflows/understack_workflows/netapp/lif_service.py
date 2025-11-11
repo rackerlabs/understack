@@ -83,7 +83,7 @@ class LifService:
             result = self._client.get_or_create_ip_interface(interface_spec)
 
             self._error_handler.log_info(
-                "LIF exists successfully for project %(project_id)s",
+                "LIF exists for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "interface_name": result.name,
@@ -154,7 +154,7 @@ class LifService:
             result = self._client.get_or_create_port(port_spec)
 
             self._error_handler.log_info(
-                "Home port exists successfully",
+                "Home port exists.",
                 {
                     "interface_name": config.name,
                     "port_uuid": result.uuid,

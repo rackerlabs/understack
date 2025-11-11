@@ -566,7 +566,7 @@ class NetAppClient(NetAppClientInterface):
             )
 
             self._error_handler.log_info(
-                "Port exists successfully on node %(node_name)s",
+                "Port exists on node %(node_name)s",
                 {
                     "node_name": port_spec.node_name,
                     "uuid": result.uuid,
