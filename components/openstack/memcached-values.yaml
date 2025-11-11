@@ -6,6 +6,15 @@ commonAnnotations:
 
 metrics:
   enabled: true
+  image:
+    repository: bitnamilegacy/memcached-exporter
+
+global:
+  security:
+    allowInsecureImages: true
+
+image:
+  repository: bitnamilegacy/memcached
 
 # (nicholas.kuechler) The default memcached presents are 'nano' size which
 # are a bit too small for OpenStack usage and generates 'CPUThrottlingHigh'
