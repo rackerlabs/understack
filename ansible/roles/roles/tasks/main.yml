@@ -33,5 +33,5 @@
     - {"name": "Network Infra", "types": ["ipam.prefix"], "color": "9e9e9e"}
     - {"name": "svi_provisioning", "types": ["dcim.interface", "vni_custom_model.ucvni"], "color": "a30000"}
     - {"name": "svi_vxlan_anycast_gateway", "types": ["dcim.interface", "vni_custom_model.ucvni"], "color": "d9381e"}
-    - {"name": storage-client-leaf", "types": ["dcim.device"], "color": "00ffff"}
-    - {"name": storage-target-leaf", "types": ["dcim.device"], "color": "ff9800"}
+    - {"name": "storage-client-leaf", "types": ["dcim.device"], "color": "00ffff"}
+    - {"name": "storage-target-leaf", "types": ["dcim.device"], "color": "ff9800"}
