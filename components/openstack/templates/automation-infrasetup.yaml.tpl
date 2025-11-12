@@ -7,6 +7,7 @@ spec:
   length: 32
   digits: 6
   symbols: 6
+  symbolCharacters: "~!@#$%^*()_+-={}[]<>?"
 ---
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
