@@ -82,7 +82,12 @@ keystoneServiceUsers:
       - usage: admin
         remoteRef: *keystone_admin
       - usage: user
-        remoteRef: "cinder-keystone-password"
+        remoteRef: &cinder_svc "cinder-keystone-password"
+      - usage: nova
+        remoteRef: *cinder_svc
+      - usage: service
+        remoteRef: *cinder_svc
+        section: service_user
     glance:
       - usage: admin
         remoteRef: *keystone_admin
