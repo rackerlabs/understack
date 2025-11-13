@@ -185,8 +185,14 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         # now set the backend configuration name
         CONF.set_override("volume_backend_name", child_grp, group=child_grp)
         # return an instance of the library scoped to one SVM
+        # netapp_mode=proxy is necessary to quiet the driver from reporting that
+        # its not
         return NetAppMinimalLibrary(
-            self.DRIVER_NAME, "NVMe", configuration=child_cfg, **self._init_kwargs
+            self.DRIVER_NAME,
+            "NVMe",
+            configuration=child_cfg,
+            netapp_mode="proxy",
+            **self._init_kwargs,
         )
 
     @staticmethod
