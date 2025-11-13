@@ -1,0 +1,112 @@
+From 12bd279bddfe2459e33ad925ecb7fd7daf874ec6 Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Tue, 11 Nov 2025 20:11:03 -0600
+Subject: [PATCH] fix(netapp): respect the iniitalize_connection supplied
+ os_type
+
+The user or os-brick can supply the os_type which should be used but
+this was never used. Switch to respecting the value supplied and if no
+value was supplied utilize the existing behavior which uses the config
+file and then a driver coded default. Added some types to the existing
+method and fixed a call to map_namespace() which had an unnecessary
+comma.
+
+Closes-Bug: #2131104
+Change-Id: I4c87d1bdd8a757c7c43ef0b23a4a52c10bda8635
+Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
+---
+ .../drivers/netapp/dataontap/block_base.py    | 18 ++++++++++++++---
+ .../drivers/netapp/dataontap/nvme_library.py  | 20 ++++++++++++++-----
+ 2 files changed, 30 insertions(+), 8 deletions(-)
+
+diff --git a/cinder/volume/drivers/netapp/dataontap/block_base.py b/cinder/volume/drivers/netapp/dataontap/block_base.py
+index fa5cf367e..7912930e7 100644
+--- a/cinder/volume/drivers/netapp/dataontap/block_base.py
++++ b/cinder/volume/drivers/netapp/dataontap/block_base.py
+@@ -438,13 +438,18 @@ class NetAppBlockStorageLibrary(
+             discovered_lun = self._extract_lun_info(lun)
+             self._add_lun_to_table(discovered_lun)
+ 
+-    def _map_lun(self, name, initiator_list, initiator_type, lun_id=None):
++    def _map_lun(self,
++                 name: str,
++                 initiator_list: list,
++                 initiator_type,
++                 os_type: str,
++                 lun_id: str | None = None) -> str:
+         """Maps LUN to the initiator(s) and returns LUN ID assigned."""
+         metadata = self._get_lun_attr(name, 'metadata')
+         path = metadata['Path']
+         igroup_name, ig_host_os, ig_type = self._get_or_create_igroup(
+-            initiator_list, initiator_type, self.host_type)
+-        if ig_host_os != self.host_type:
++            initiator_list, initiator_type, os_type)
++        if ig_host_os != os_type:
+             LOG.warning("LUN misalignment may occur for current"
+                         " initiator group %(ig_nm)s) with host OS type"
+                         " %(ig_os)s. Please configure initiator group"
+@@ -910,6 +915,13 @@ class NetAppBlockStorageLibrary(
+         initiator_name = connector['initiator']
+         lun_path = volume['provider_location'].split(':')[1]
+         name = volume['name']
++
++        os_type = connector.get("os_type") or self.host_type
++        if os_type not in self.ALLOWED_IGROUP_HOST_TYPES:
++            raise exception.VolumeBackendAPIException(
++                data=_("Initialize connection error: invalid os_type supplied")
++            )
++
+         lun_id = self._map_lun(name, [initiator_name], 'iscsi', None)
+ 
+         LOG.debug("Mapped LUN %(name)s to the initiator %(initiator_name)s",
+diff --git a/cinder/volume/drivers/netapp/dataontap/nvme_library.py b/cinder/volume/drivers/netapp/dataontap/nvme_library.py
+index fa969b058..30b74825d 100644
+--- a/cinder/volume/drivers/netapp/dataontap/nvme_library.py
++++ b/cinder/volume/drivers/netapp/dataontap/nvme_library.py
+@@ -653,12 +653,15 @@ class NetAppNVMeStorageLibrary(
+ 
+         return subsystem_name, n_uuid
+ 
+-    def _map_namespace(self, name, host_nqn):
++    def _map_namespace(self,
++                       name: str,
++                       host_nqn: str,
++                       os_type: str) -> tuple[str, str]:
+         """Maps namespace to the host nqn and returns its ID assigned."""
+ 
+         subsystem_name, subsystem_host_os = self._get_or_create_subsystem(
+-            host_nqn, self.host_type)
+-        if subsystem_host_os != self.host_type:
++            host_nqn, os_type)
++        if subsystem_host_os != os_type:
+             LOG.warning("Namespace misalignment may occur for current"
+                         " subsystem %(sub_name)s with host OS type"
+                         " %(sub_os)s. Please configure subsystem manually"
+@@ -670,7 +673,7 @@ class NetAppNVMeStorageLibrary(
+         path = metadata['Path']
+         try:
+             ns_uuid = self.client.map_namespace(
+-                path, subsystem_name,)
++                path, subsystem_name)
+             return subsystem_name, ns_uuid
+         except netapp_api.NaApiError as e:
+             (subsystem_name, ns_uuid) = self._find_mapped_namespace_subsystem(
+@@ -706,8 +709,15 @@ class NetAppNVMeStorageLibrary(
+             raise exception.VolumeBackendAPIException(
+                 data=_("Initialize connection error: no host nqn available!"))
+ 
++        os_type = connector.get("os_type") or self.host_type
++        if os_type not in self.ALLOWED_SUBSYSTEM_HOST_TYPES:
++            raise exception.VolumeBackendAPIException(
++                data=_("Initialize connection error: invalid os_type supplied")
++            )
++
+         name = volume['name']
+-        subsystem, namespace_uuid = self._map_namespace(name, host_nqn)
++        subsystem, namespace_uuid = self._map_namespace(name, host_nqn,
++                                                        os_type)
+ 
+         LOG.debug("Mapped namespace %(name)s to the host NQN %(host_nqn)s",
+                   {'name': name, 'host_nqn': host_nqn})
+-- 
+2.50.1 (Apple Git-155)
