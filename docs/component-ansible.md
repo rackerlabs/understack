@@ -28,5 +28,19 @@ docker run --rm -it ghcr.io/rackerlabs/understack/ansible:latest -- \
   ansible-runner run /runner --playbook debug.yaml
 ```
 
+## Local Development
+
+For local development and testing, see the [Ansible Container Local Usage Guide][local-usage-guide] for detailed instructions on:
+
+- Running playbooks locally with Docker
+- Volume mount configurations
+- Environment-specific inventory setup
+- Debugging and troubleshooting
+
+## Operational Playbooks (undercloud-rackspace Repository)
+
+Ongoing operational playbooks that are not part of the initial Understack setup are maintained in a separate [repository](https://github.com/RSS-Engineering/undercloud-rackspace/tree/main/ansible) and can be executed via Argo Workflows using the [ansible-run workflow template](https://github.com/rackerlabs/understack/blob/main/workflows/argo-events/workflowtemplates/ansible-run.yaml).
+
 [ansible-src]: <https://github.com/rackerlabs/understack/tree/main/ansible>
 [ansible-runner]: <https://ansible.readthedocs.io/projects/runner/en/stable/intro/>
+[local-usage-guide]: <operator-guide/ansible-local-usage.md>
