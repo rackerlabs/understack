@@ -4,8 +4,8 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - https://github.com/argoproj/argo-events/releases/download/v1.9.7/install.yaml
-  - https://github.com/argoproj/argo-events/releases/download/v1.9.7/install-validating-webhook.yaml
+  - https://github.com/argoproj/argo-events/releases/download/v1.9.8/install.yaml
+  - https://github.com/argoproj/argo-events/releases/download/v1.9.8/install-validating-webhook.yaml
 
   # grant the argo-workflows the ability to run workflows in this namespace
   - workflow-controller-rolebinding.yaml
