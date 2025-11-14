@@ -9,7 +9,7 @@ resources:
   # argo events so we need to split up what we install. So
   # we delete the ClusterRoleBinding and instead create RoleBindings
   # to the ClusterRole for just the namespaces we want.
-  - https://github.com/argoproj/argo-workflows/manifests/cluster-install/?ref=v3.7.2
+  - https://github.com/argoproj/argo-workflows/manifests/cluster-install/?ref=v3.7.4
 
   # adds argo-server role so the argo-server has enough permissions to run
   - argo-server-role.yaml
@@ -21,11 +21,11 @@ resources:
 # keep all the images consistent
 images:
   - name: quay.io/argoproj/workflow-controller
-    newTag: v3.7.2
+    newTag: v3.7.4
   - name: quay.io/argoproj/argoexec
-    newTag: v3.7.2
+    newTag: v3.7.4
   - name: quay.io/argoproj/argocli
-    newTag: v3.7.2
+    newTag: v3.7.4
 
 patches:
 - target:
