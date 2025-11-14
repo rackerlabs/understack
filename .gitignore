@@ -1,7 +1,3 @@
-# where helm charts will get downloaded by kustomize
-/charts/
-
-
 # un-encrypted secrets
 /secret-*.yaml
 # sealed secrets
