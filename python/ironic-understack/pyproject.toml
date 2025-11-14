@@ -23,6 +23,9 @@ resource-class = "ironic_understack.resource_class:ResourceClassHook"
 redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
 idrac-redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackDracRedfishInspect"
 
+[project.entry-points."ironic.hardware.interfaces.deploy"]
+noop = "ironic_understack.noop_deploy:NoDeploy"
+
 [dependency-groups]
 test = [
     "pytest>=8.3.2,<9",
