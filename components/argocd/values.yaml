@@ -7,6 +7,12 @@ notifications:
 applicationSet:
   # enable the ApplicationSet controller to auto-generate Applications
   enabled: true
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
 server:
   ingress:
     enabled: true
@@ -15,6 +21,12 @@ server:
     annotations:
       nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
       nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
 configs:
   params:
     server.insecure: true
@@ -32,3 +44,17 @@ configs:
       # members of the ucadmin group get role:ucadmin
       g, ucadmin, role:ucadmin
     policy.default: role:readonly
+controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
+repoServer:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
