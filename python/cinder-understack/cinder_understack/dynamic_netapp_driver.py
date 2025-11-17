@@ -454,6 +454,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         data["filter_function"] = self.get_filter_function()
         data["goodness_function"] = self.get_goodness_function()
         data["pools"] = []
+        data["multiattach"] = True
         return data
 
     def get_volume_stats(self, refresh=False):
