@@ -28,8 +28,8 @@ spec:
                   value: "{{workflow.parameters.node}}"
                 - name: param
                   value: uuid
-          - name: server-start-state
-            # read the current server state
+          - name: server-driver
+            # read the currently used server driver
             depends: "node-id.Succeeded"
             template: openstack-read-param
             arguments:
@@ -39,10 +39,10 @@ spec:
                 - name: object_ref
                   value: "{{tasks.node-id.outputs.result}}"
                 - name: param
-                  value: provision_state
-          - name: server-driver
-            # read the currently used server driver
-            depends: "server-start-state.Succeeded"
+                  value: driver
+          - name: server-start-state
+            # read the current server state
+            depends: "server-driver.Succeeded"
             template: openstack-read-param
             arguments:
               parameters:
@@ -51,10 +51,27 @@ spec:
                 - name: object_ref
                   value: "{{tasks.node-id.outputs.result}}"
                 - name: param
-                  value: driver
+                  value: provision_state
+          - name: fake-server
+            # systems using the fake-hardware driver need to be skipped over
+            depends: "server-start-state.Succeeded"
+            template: openstack-set-cmd
+            arguments:
+              parameters:
+                - name: object
+                  value: node
+                - name: flag
+                  value: "--resource-class"
+                - name: value
+                  value: "fakehw"
+                - name: obj_id
+                  value: "{{tasks.node-id.outputs.result}}"
+            when: >-
+              '{{tasks.server-driver.outputs.result}}' == 'fake-hardware' &&
+              '{{tasks.server-start-state.outputs.result}}' != 'active'
           - name: manage-server
             # move the server into manageable to inspect if needed
-            depends: "server-driver.Succeeded"
+            depends: "server-start-state.Succeeded"
             template: openstack-wait-cmd
             arguments:
               parameters:
@@ -62,10 +79,12 @@ spec:
                   value: "manage"
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
-            when: "{{tasks.server-start-state.outputs.result}} != 'manageable'"
+            when: >-
+              '{{tasks.server-start-state.outputs.result}}' != 'manageable' &&
+              '{{tasks.server-start-state.outputs.result}}' != 'active'
           - name: server-set-inspect-redfish
             # change the server to redfish based inspection
-            depends: "server-driver.Succeeded && (manage-server.Succeeded || manage-server.Skipped)"
+            depends: "server-start-state.Succeeded && (manage-server.Succeeded || manage-server.Skipped)"
             template: openstack-set-cmd
             arguments:
               parameters:
@@ -77,10 +96,12 @@ spec:
                   value: "redfish"
                 - name: obj_id
                   value: "{{tasks.node-id.outputs.result}}"
-            when: "{{tasks.server-driver.outputs.result}} == 'redfish'"
+            when: >-
+              '{{tasks.server-driver.outputs.result}}' == 'redfish' &&
+              '{{tasks.server-start-state.outputs.result}}' != 'active'
           - name: server-set-inspect-idrac-redfish
             # change the server to idrac-redfish based inspection
-            depends: "server-driver.Succeeded && (manage-server.Succeeded || manage-server.Skipped)"
+            depends: "server-start-state.Succeeded && (manage-server.Succeeded || manage-server.Skipped)"
             template: openstack-set-cmd
             arguments:
               parameters:
@@ -92,7 +113,9 @@ spec:
                   value: "idrac-redfish"
                 - name: obj_id
                   value: "{{tasks.node-id.outputs.result}}"
-            when: "{{tasks.server-driver.outputs.result}} == 'idrac'"
+            when: >-
+              '{{tasks.server-driver.outputs.result}}' == 'redfish' &&
+              '{{tasks.server-start-state.outputs.result}}' != 'active'
           - name: inspect-server-redfish
             # run redfish based inspection
             depends: "server-set-inspect-redfish.Succeeded || server-set-inspect-idrac-redfish.Succeeded"
@@ -103,9 +126,10 @@ spec:
                   value: "inspect"
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
+            when: "'{{tasks.server-start-state.outputs.result}}' != 'active'"
           - name: server-set-inspect-agent
             # change the server to agent based inspection
-            depends: "inspect-server-redfish.Succeeded || inspect-server-redfish.Omitted"
+            depends: "server-start-state.Succeeded && (inspect-server-redfish.Succeeded || inspect-server-redfish.Omitted)"
             template: openstack-set-cmd
             arguments:
               parameters:
@@ -117,9 +141,10 @@ spec:
                   value: "agent"
                 - name: obj_id
                   value: "{{tasks.node-id.outputs.result}}"
+            when: "'{{tasks.server-start-state.outputs.result}}' != 'active'"
           - name: inspect-server-agent
             # run agent based inspection
-            depends: "server-set-inspect-agent.Succeeded"
+            depends: "server-start-state.Succeeded && server-set-inspect-agent.Succeeded"
             template: openstack-wait-cmd
             arguments:
               parameters:
@@ -127,9 +152,10 @@ spec:
                   value: "inspect"
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
+            when: "'{{tasks.server-start-state.outputs.result}}' != 'active'"
           - name: return-server
             # returns a server to its previous state if needed
-            depends: "inspect-server-agent.Succeeded"
+            depends: "server-start-state.Succeeded && inspect-server-agent.Succeeded"
             template: openstack-wait-cmd
             arguments:
               parameters:
@@ -137,7 +163,10 @@ spec:
                   value: "{{tasks.server-start-state.outputs.result}}"
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
-            when: "{{tasks.server-start-state.outputs.result}} != 'manageable'"
+            when: >-
+              '{{tasks.server-start-state.outputs.result}}' != 'manageable' &&
+              '{{tasks.server-start-state.outputs.result}}' != 'active' &&
+              '{{tasks.server-start-state.outputs.result}}' != 'enroll'
     - name: openstack-wait-cmd
       inputs:
         parameters:
