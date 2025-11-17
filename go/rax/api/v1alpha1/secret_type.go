@@ -1,15 +1,5 @@
 package v1alpha1
 
-type Secret struct {
-	// Name of this secret in templates
-	Name string `json:"name"`
-
-	// Secret ref to fill in credentials
-	SecretRef SecretKeySelector `json:"secretRef"`
-}
-
-// A reference to a specific 'key' within a Secret resource.
-// In some instances, `key` is a required field.
 type SecretKeySelector struct {
 	// The name of the Secret resource being referred to.
 	// +kubebuilder:validation:MinLength:=1

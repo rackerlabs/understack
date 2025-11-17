@@ -10,14 +10,6 @@ type NautobotClient struct {
 	Client *nb.APIClient
 }
 
-// NautobotYAML defines the structure for loading Nautobot configuration from YAML.
-type NautobotYAML struct {
-	InstanceLocations []Location     `yaml:"instance_locations"`
-	LocationTypes     []LocationType `yaml:"location_types"`
-	RackGroup         []RackGroup    `yaml:"instance_rack_groups"`
-	Rack              []Rack         `yaml:"instance_racks"`
-}
-
 // NewNautobotClient creates and configures a new Nautobot API client.
 // apiURL: The base URL of the Nautobot API (e.g., "http://localhost:8000").
 // authToken: The API token for authentication.

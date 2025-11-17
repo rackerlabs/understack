@@ -25,11 +25,10 @@ import (
 
 // NautobotSpec defines the desired state of Nautobot.
 type NautobotSpec struct {
-	RepoWatcher    string `json:"repoWatcher"`
-	ConfigFilePath string `json:"configFilePath"`
 	// +kubebuilder:default=10
-	SyncIntervalSeconds int      `json:"syncIntervalSeconds,omitempty"`
-	Secrets             []Secret `json:"secrets,omitempty"`
+	SyncIntervalSeconds int               `json:"syncIntervalSeconds,omitempty"`
+	NautobotSecretRef   SecretKeySelector `json:"nautobotSecretRef,omitempty"`
+	DeviceTypesRef      []ConfigMapRef    `json:"deviceTypeRef,omitempty"`
 }
 
 // NautobotStatus defines the observed state of Nautobot.

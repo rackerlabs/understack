@@ -18,14 +18,9 @@ package controller
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"io"
-	"os"
 	"time"
 
-	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,16 +55,9 @@ type NautobotReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
-
 	// Fetch the Nautobot custom resource instance
 	var nautobotCR syncv1alpha1.Nautobot
 	if err := r.Get(ctx, types.NamespacedName{Name: req.Name}, &nautobotCR); err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, client.IgnoreNotFound(err)
-	}
-
-	// Fetch the GitRepoWatcher referenced in the Nautobot CR
-	var gitRepoWatcher syncv1alpha1.GitRepoWatcher
-	if err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.RepoWatcher}, &gitRepoWatcher); err != nil {
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, client.IgnoreNotFound(err)
 	}
 
@@ -80,80 +68,32 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
 
-	// Wait for the GitRepoWatcher to report readiness before proceeding
-	if !gitRepoWatcher.Status.Ready {
-		log.Info("git sync is not ready will retry")
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
-	}
-
 	// Retrieve the Nautobot authentication token from a secret or external source
-	nautobotAuthToken, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR, "NAUTOBOT_TOKEN")
+	nautobotAuthToken, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR, "NAUTOBOT_SUPERUSER_API_TOKEN")
 	if err != nil {
 		log.Error(err, "failed parse find nautoBotAuthToken")
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
 
-	configFilePath := fmt.Sprintf("%s/%s", gitRepoWatcher.Status.RepoClonePath, nautobotCR.Spec.ConfigFilePath)
-
-	fileSha, err := sha(configFilePath)
-	if err != nil {
-		log.Error(err, "failed get sha value of file")
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+	deviceTypeMap := make(map[string]string)
+	for _, ref := range nautobotCR.Spec.DeviceTypesRef {
+		var deviceTypeConfigMap corev1.ConfigMap
+		err = r.Get(ctx, types.NamespacedName{
+			Namespace: *ref.ConfigMapSelector.Namespace,
+			Name:      ref.ConfigMapSelector.Name,
+		}, &deviceTypeConfigMap)
+		if err != nil {
+			log.Error(err, "failed to fetch ConfigMap 'deviceType' in namespace 'nautobot'")
+			return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+		}
+		for k, v := range deviceTypeConfigMap.Data {
+			deviceTypeMap[k] = v
+		}
 	}
 
-	// If last sync file sha value is same as that of current.
-	// That means no changes to file we will skip and retry.
-	if nautobotCR.Status.ConfigFileSHA == fileSha {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
-	}
-
-	// Read and parse the config YAML file from the Git repo
-	file, err := os.ReadFile(configFilePath)
-	if err != nil {
-		log.Error(err, "failed to read file content of config file")
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	// Parse yaml file
-	root, err := parseYAML(file)
-	if err != nil {
-		log.Error(err, "failed parse YAML")
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	for i := range root.InstanceLocations {
-		setDisplayPath(&root.InstanceLocations[i], "")
-	}
-
-	nb := nautobot.NewNautobotClient(fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP), nautobotAuthToken)
-
-	// Sync all instance locations with Nautobot
-	err = nb.SyncAllLocationTypes(ctx, root.LocationTypes)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	// Sync all rack groups with Nautobot
-	err = nb.SyncAllLocations(ctx, root.InstanceLocations)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	// Sync all rack groups with Nautobot
-	err = nb.SyncRackGroup(ctx, root.RackGroup)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
-	// Sync all racks with Nautobot
-	err = nb.SyncRack(ctx, root.Rack)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
-	}
-
+	n := nautobot.NewNautobotClient(fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP), nautobotAuthToken)
+	n.SyncAllDeviceTypes(ctx, deviceTypeMap)
 	// Update status
-	nautobotCR.Status.ConfigFileSHA = fileSha
-	nautobotCR.Status.GitCommitHash = gitRepoWatcher.Status.GitCommitHash
 	nautobotCR.Status.LastSyncedAt = metav1.Now()
 	nautobotCR.Status.Ready = true
 	nautobotCR.Status.Message = "Sync successful"
@@ -166,21 +106,16 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 // getAuthTokenFromSecretRef: this will fetch Nautobot auth token from the given refer.
 func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot, name string) (string, error) {
-	for _, v := range nautobotCR.Spec.Secrets {
-		if v.Name == name {
-			secret := &corev1.Secret{}
-			err := r.Get(ctx, types.NamespacedName{Name: v.SecretRef.Name, Namespace: *v.SecretRef.Namespace}, secret)
-			if err != nil {
-				return "", err
-			}
-			// Read the secret value
-			if valBytes, ok := secret.Data[v.SecretRef.Key]; ok {
-				return string(valBytes), nil
-			}
-			return "", fmt.Errorf("secret key %s not found in secret", v.SecretRef.Key)
-		}
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.NautobotSecretRef.Name, Namespace: *nautobotCR.Spec.NautobotSecretRef.Namespace}, secret)
+	if err != nil {
+		return "", err
 	}
-	return "", fmt.Errorf("failed to find %s", name)
+	// Read the secret value
+	if valBytes, ok := secret.Data[nautobotCR.Spec.NautobotSecretRef.Key]; ok {
+		return string(valBytes), nil
+	}
+	return "", fmt.Errorf("secret key %s not found in secret", nautobotCR.Spec.NautobotSecretRef.Key)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -189,48 +124,4 @@ func (r *NautobotReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&syncv1alpha1.Nautobot{}).
 		Named("nautobot").
 		Complete(r)
-}
-
-func parseYAML(data []byte) (*nautobot.NautobotYAML, error) {
-	var cfg nautobot.NautobotYAML
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
-
-func setDisplayPath(loc *nautobot.Location, parentPath string) {
-	if parentPath == "" {
-		loc.Display = loc.Name
-	} else {
-		loc.Display = parentPath + " → " + loc.Name
-	}
-	for i := range loc.Children {
-		setDisplayPath(&loc.Children[i], loc.Display)
-	}
-}
-
-// IsGitRepoReady checks if the GitRepoWatcher has Ready condition set to True
-func IsGitRepoReady(watcher *syncv1alpha1.GitRepoWatcher) bool {
-	if watcher == nil {
-		return false
-	}
-
-	return watcher.Status.Ready
-}
-
-func sha(filepath string) (string, error) {
-	file, err := os.Open(filepath)
-	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close() //nolint:errcheck
-
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
-	}
-
-	sum := hash.Sum(nil)
-	return hex.EncodeToString(sum), nil
 }

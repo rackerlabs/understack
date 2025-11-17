@@ -7,7 +7,6 @@ rules:
 - apiGroups:
   - sync.rax.io
   resources:
-  - gitrepowatchers
   - nautobots
   verbs:
   - create
@@ -20,14 +19,12 @@ rules:
 - apiGroups:
   - sync.rax.io
   resources:
-  - gitrepowatchers/finalizers
   - nautobots/finalizers
   verbs:
   - update
 - apiGroups:
   - sync.rax.io
   resources:
-  - gitrepowatchers/status
   - nautobots/status
   verbs:
   - get
