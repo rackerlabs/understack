@@ -1,0 +1,640 @@
+From 7df47080dd4326fac79cd6587f0d8caba6ad836c Mon Sep 17 00:00:00 2001
+From: jayaanand borra <jayaanand.borra@netapp.com>
+Date: Sat, 07 Sep 2024 12:57:13 -0400
+Subject: [PATCH] NetApp: NVMe namespace mapping fails during VM live migration
+
+When new Cinder volume is created a new subsystem and
+NVMe namespace created and mapped one-to-one in ONTAP.
+Attach process will continue this one-to-one mapping
+between subsystem and host. This approach limits
+NVMe multi attach workflow and Live migration.
+Single subsystem mapped to single namespace is causing
+this limitation. ONTAP dosn't allow mapping
+multiple subsystems to single namespace. This contrasts
+with iSCSI, where multiple iGroups can be mapped
+to a single LUN. To overcome this limitation,
+the workflow is changed to map multiple hosts to
+a single subsystem. Each subsystem then has a
+one-to-one mapping with a namespace.
+
+Closes-bug: #2078968
+Change-Id: I90b9d74560f128e495b6ccecea2d3aa2ed68171f
+(cherry picked from commit I90b9d74560f128e495b6ccecea2d3aa2ed68171f)
+Signed-off-by: jayaanand borra <jayaanand.borra@netapp.com>
+---
+
+diff --git a/cinder/tests/unit/volume/drivers/netapp/dataontap/client/fakes.py b/cinder/tests/unit/volume/drivers/netapp/dataontap/client/fakes.py
+index d7acc74..49be832 100644
+--- a/cinder/tests/unit/volume/drivers/netapp/dataontap/client/fakes.py
++++ b/cinder/tests/unit/volume/drivers/netapp/dataontap/client/fakes.py
+@@ -3118,7 +3118,9 @@
+ }
+ 
+ SUBSYSTEM = 'openstack-fake_subsystem'
++SUBSYSTEM_UUID = 'fake_subsystem_uuid1'
+ TARGET_NQN = 'nqn.1992-01.example.com:target'
++HOST_NQN = 'nqn.1992-01.example.com:host'
+ GET_SUBSYSTEM_RESPONSE_REST = {
+     "records": [
+         {
+@@ -3138,7 +3140,8 @@
+                 "uuid": FAKE_UUID,
+             },
+             "subsystem": {
+-                "name": SUBSYSTEM
++                "name": SUBSYSTEM,
++                "uuid": FAKE_UUID,
+             },
+             "svm": {
+                 "name": VSERVER_NAME
+diff --git a/cinder/tests/unit/volume/drivers/netapp/dataontap/client/test_client_cmode_rest.py b/cinder/tests/unit/volume/drivers/netapp/dataontap/client/test_client_cmode_rest.py
+index 9e5402c..2405940 100644
+--- a/cinder/tests/unit/volume/drivers/netapp/dataontap/client/test_client_cmode_rest.py
++++ b/cinder/tests/unit/volume/drivers/netapp/dataontap/client/test_client_cmode_rest.py
+@@ -4106,6 +4106,39 @@
+         self.client.send_request.assert_called_once_with(
+             '/protocols/nvme/subsystems', 'get', query=query)
+ 
++    def test_get_subsystem_by_path(self):
++        response = fake_client.GET_SUBSYSTEM_RESPONSE_REST
++        self.mock_object(self.client, 'send_request', return_value=response)
++
++        res = self.client.get_subsystem_by_path(fake_client.NAMESPACE_NAME)
++
++        expected_res = [{'name': fake_client.SUBSYSTEM, 'os_type': 'linux'}]
++        self.assertEqual(expected_res, res)
++        query = {
++            'svm.name': self.client.vserver,
++            'subsystem_maps.namespace.name': fake_client.NAMESPACE_NAME,
++            'fields': 'name,os_type',
++            'name': 'openstack-*',
++        }
++        self.client.send_request.assert_called_once_with(
++            '/protocols/nvme/subsystems', 'get', query=query)
++
++    def test_get_subsystem_by_path_no_records(self):
++        response = fake_client.NO_RECORDS_RESPONSE_REST
++        self.mock_object(self.client, 'send_request', return_value=response)
++
++        res = self.client.get_subsystem_by_path(fake_client.NAMESPACE_NAME)
++
++        self.assertEqual([], res)
++        query = {
++            'svm.name': self.client.vserver,
++            'subsystem_maps.namespace.name': fake_client.NAMESPACE_NAME,
++            'fields': 'name,os_type',
++            'name': 'openstack-*',
++        }
++        self.client.send_request.assert_called_once_with(
++            '/protocols/nvme/subsystems', 'get', query=query)
++
+     def test_create_subsystem(self):
+         self.mock_object(self.client, 'send_request')
+ 
+@@ -4130,12 +4163,14 @@
+ 
+         expected_res = [
+             {'subsystem': fake_client.SUBSYSTEM,
++             'subsystem_uuid': fake_client.FAKE_UUID,
+              'uuid': fake_client.FAKE_UUID,
+              'vserver': fake_client.VSERVER_NAME}]
+         self.assertEqual(expected_res, res)
+         query = {
+             'namespace.name': fake_client.NAMESPACE_NAME,
+-            'fields': 'subsystem.name,namespace.uuid,svm.name',
++            'fields': 'subsystem.name,namespace.uuid,svm.name,'
++                      'subsystem.uuid',
+         }
+         self.client.send_request.assert_called_once_with(
+             '/protocols/nvme/subsystem-maps', 'get', query=query)
+@@ -4216,3 +4251,102 @@
+         }
+         self.client.send_request.assert_called_once_with(
+             '/protocols/nvme/subsystem-maps', 'delete', query=query)
++
++    def test_unmap_host_with_subsystem(self):
++        url = (
++            f'/protocols/nvme/subsystems/{fake_client.SUBSYSTEM_UUID}/'
++            f'hosts/{fake_client.HOST_NQN}'
++        )
++
++        self.mock_object(self.client, 'send_request')
++
++        self.client.unmap_host_with_subsystem(
++            fake_client.HOST_NQN, fake_client.SUBSYSTEM_UUID
++        )
++
++        self.client.send_request.assert_called_once_with(url, 'delete')
++
++    def test_unmap_host_with_subsystem_api_error(self):
++        url = (
++            f'/protocols/nvme/subsystems/{fake_client.SUBSYSTEM_UUID}/'
++            f'hosts/{fake_client.HOST_NQN}'
++        )
++        api_error = netapp_api.NaApiError(code=123, message='fake_error')
++
++        self.mock_object(self.client, 'send_request', side_effect=api_error)
++        mock_log_warning = self.mock_object(client_cmode_rest.LOG, 'warning')
++
++        self.client.unmap_host_with_subsystem(
++            fake_client.HOST_NQN, fake_client.SUBSYSTEM_UUID
++        )
++
++        self.client.send_request.assert_called_once_with(url, 'delete')
++        mock_log_warning.assert_called_once_with(
++            "Failed to unmap host from subsystem. "
++            "Host NQN: %(host_nqn)s, Subsystem UUID: %(subsystem_uuid)s, "
++            "Error Code: %(code)s, Error Message: %(message)s",
++            {'host_nqn': fake_client.HOST_NQN,
++             'subsystem_uuid': fake_client.SUBSYSTEM_UUID,
++             'code': api_error.code, 'message': api_error.message})
++
++    def test_map_host_with_subsystem(self):
++        url = f'/protocols/nvme/subsystems/{fake_client.SUBSYSTEM_UUID}/hosts'
++        body_post = {'nqn': fake_client.HOST_NQN}
++
++        self.mock_object(self.client, 'send_request')
++
++        self.client.map_host_with_subsystem(
++            fake_client.HOST_NQN, fake_client.SUBSYSTEM_UUID
++        )
++
++        self.client.send_request.assert_called_once_with(
++            url, 'post', body=body_post
++        )
++
++    def test_map_host_with_subsystem_already_mapped(self):
++        url = f'/protocols/nvme/subsystems/{fake_client.SUBSYSTEM_UUID}/hosts'
++        body_post = {'nqn': fake_client.HOST_NQN}
++        api_error = (
++            netapp_api.NaApiError(
++                code=netapp_api.REST_HOST_ALREADY_MAPPED_TO_SUBSYSTEM,
++                message='fake_error')
++        )
++
++        self.mock_object(self.client, 'send_request', side_effect=api_error)
++        mock_log_info = self.mock_object(client_cmode_rest.LOG, 'info')
++
++        self.client.map_host_with_subsystem(
++            fake_client.HOST_NQN, fake_client.SUBSYSTEM_UUID
++        )
++
++        self.client.send_request.assert_called_once_with(
++            url, 'post', body=body_post
++        )
++        mock_log_info.assert_called_once_with(
++            "Host %(host_nqn)s is already mapped to subsystem"
++            " %(subsystem_uuid)s ",
++            {'host_nqn': fake_client.HOST_NQN,
++             'subsystem_uuid': fake_client.SUBSYSTEM_UUID
++             }
++        )
++
++    def test_map_host_with_subsystem_api_error(self):
++        url = f'/protocols/nvme/subsystems/{fake_client.SUBSYSTEM_UUID}/hosts'
++        body_post = {'nqn': fake_client.HOST_NQN}
++        api_error = netapp_api.NaApiError(code=123, message='fake_error')
++
++        self.mock_object(self.client, 'send_request', side_effect=api_error)
++        mock_log_error = self.mock_object(client_cmode_rest.LOG, 'error')
++
++        self.assertRaises(netapp_api.NaApiError,
++                          self.client.map_host_with_subsystem,
++                          fake_client.HOST_NQN, fake_client.SUBSYSTEM_UUID
++                          )
++
++        self.client.send_request.assert_called_once_with(
++            url, 'post', body=body_post
++        )
++        mock_log_error.assert_called_once_with(
++            "Error mapping host to subsystem. Code :"
++            "%(code)s, Message: %(message)s",
++            {'code': api_error.code, 'message': api_error.message})
+diff --git a/cinder/tests/unit/volume/drivers/netapp/dataontap/fakes.py b/cinder/tests/unit/volume/drivers/netapp/dataontap/fakes.py
+index a05774a..bc6de6d 100644
+--- a/cinder/tests/unit/volume/drivers/netapp/dataontap/fakes.py
++++ b/cinder/tests/unit/volume/drivers/netapp/dataontap/fakes.py
+@@ -1036,5 +1036,6 @@
+ 
+ REST_FIELDS = 'uuid,name,style'
+ SUBSYSTEM = 'openstack-fake-subsystem'
++MAPPED_SUBSYSTEM = 'openstack-fake-mapped_subsystem'
+ HOST_NQN = 'nqn.1992-01.example.com:string'
+ TARGET_NQN = 'nqn.1992-01.example.com:target'
+diff --git a/cinder/tests/unit/volume/drivers/netapp/dataontap/test_nvme_library.py b/cinder/tests/unit/volume/drivers/netapp/dataontap/test_nvme_library.py
+index 51f3ddc..075389b 100644
+--- a/cinder/tests/unit/volume/drivers/netapp/dataontap/test_nvme_library.py
++++ b/cinder/tests/unit/volume/drivers/netapp/dataontap/test_nvme_library.py
+@@ -16,7 +16,6 @@
+ import copy
+ from unittest import mock
+ from unittest.mock import patch
+-import uuid
+ 
+ import ddt
+ from oslo_utils import units
+@@ -281,12 +280,15 @@
+         self.mock_object(
+             self.library.client, 'get_namespace_map',
+             return_value=[{
++                'subsystem_uuid': fake.UUID1,
+                 'subsystem': fake.SUBSYSTEM,
+                 'uuid': fake.UUID1
+             }])
+ 
+-        subsystem, n_uuid = self.library._find_mapped_namespace_subsystem(
+-            fake.NAMESPACE_NAME, fake.HOST_NQN)
++        subsystem_uuid, subsystem, n_uuid =\
++            self.library._find_mapped_namespace_subsystem(
++                fake.NAMESPACE_NAME, fake.HOST_NQN
++            )
+ 
+         self.assertEqual(fake.SUBSYSTEM, subsystem)
+         self.assertEqual(fake.UUID1, n_uuid)
+@@ -598,7 +600,7 @@
+             'consistent_group_snapshot_enabled': False,
+             'reserved_percentage': 5,
+             'max_over_subscription_ratio': 10,
+-            'multiattach': False,
++            'multiattach': True,
+             'total_capacity_gb': 10.0,
+             'free_capacity_gb': 2.0,
+             'netapp_dedupe_used_percent': 55.0,
+@@ -790,44 +792,31 @@
+         self.library.client.namespace_resize.assert_called_once_with(
+             fake.PATH_NAMESPACE, new_bytes)
+ 
+-    @ddt.data([{'name': fake.SUBSYSTEM, 'os_type': 'linux'}], [])
+-    def test__get_or_create_subsystem(self, subs):
+-        self.mock_object(self.library.client, 'get_subsystem_by_host',
+-                         return_value=subs)
+-        self.mock_object(self.library.client, 'create_subsystem')
+-        self.mock_object(uuid, 'uuid4', return_value='fake_uuid')
+-
+-        sub, os = self.library._get_or_create_subsystem(fake.HOST_NQN, 'linux')
+-
+-        self.library.client.get_subsystem_by_host.assert_called_once_with(
+-            fake.HOST_NQN)
+-        self.assertEqual('linux', os)
+-        if subs:
+-            self.assertEqual(fake.SUBSYSTEM, sub)
+-        else:
+-            self.library.client.create_subsystem.assert_called_once_with(
+-                sub, 'linux', fake.HOST_NQN)
+-            expected_sub = 'openstack-fake_uuid'
+-            self.assertEqual(expected_sub, sub)
+-
+     def test__map_namespace(self):
+         self.library.host_type = 'win'
+-        self.mock_object(self.library, '_get_or_create_subsystem',
+-                         return_value=(fake.SUBSYSTEM, 'linux'))
++        fake_namespace_metadata = [{
++            'subsystem': 'fake_subsystem',
++            'subsystem_uuid': 'fake_subsystem_uuid',
++            'uuid': 'fake_uuid'
++        }]
++
+         self.mock_object(self.library, '_get_namespace_attr',
+                          return_value=fake.NAMESPACE_METADATA)
+         self.mock_object(self.library.client, 'map_namespace',
+                          return_value=fake.UUID1)
++        self.mock_object(self.library.client, 'get_namespace_map',
++                         return_value=fake_namespace_metadata)
+ 
+-        sub, n_uuid = self.library._map_namespace(
+-            fake.NAMESPACE_NAME, fake.HOST_NQN)
++        host_nqn = 'fake_host_nqn'
++        name = 'fake_namespace_name'
+ 
+-        self.assertEqual(fake.SUBSYSTEM, sub)
+-        self.assertEqual(fake.UUID1, n_uuid)
+-        self.library._get_or_create_subsystem.assert_called_once_with(
+-            fake.HOST_NQN, 'win')
+-        self.library.client.map_namespace.assert_called_once_with(
+-            fake.PATH_NAMESPACE, fake.SUBSYSTEM)
++        subsystem_name, ns_uuid = self.library._map_namespace(name, host_nqn)
++
++        self.assertEqual(subsystem_name, 'fake_subsystem')
++        self.assertEqual(ns_uuid, 'fake_uuid')
++        self.library.client.map_host_with_subsystem.assert_called_once_with(
++            host_nqn, 'fake_subsystem_uuid'
++        )
+ 
+     def test_initialize_connection(self):
+         self.mock_object(self.library, '_map_namespace',
+@@ -899,7 +888,7 @@
+     def test__unmap_namespace(self, host_nqn):
+         mock_find = self.mock_object(
+             self.library, '_find_mapped_namespace_subsystem',
+-            return_value=(fake.SUBSYSTEM, 'fake'))
++            return_value=(fake.UUID1, fake.SUBSYSTEM, 'fake'))
+         self.mock_object(self.library.client, 'get_namespace_map',
+                          return_value=[{'subsystem': fake.SUBSYSTEM}])
+         self.mock_object(self.library.client, 'unmap_namespace')
+@@ -912,10 +901,6 @@
+             self.library.client.get_namespace_map.assert_not_called()
+         else:
+             self.library._find_mapped_namespace_subsystem.assert_not_called()
+-            self.library.client.get_namespace_map.assert_called_once_with(
+-                fake.PATH_NAMESPACE)
+-        self.library.client.unmap_namespace.assert_called_once_with(
+-            fake.PATH_NAMESPACE, fake.SUBSYSTEM)
+ 
+     @ddt.data(None, {'nqn': fake.HOST_NQN})
+     def test_terminate_connection(self, connector):
+diff --git a/cinder/volume/drivers/netapp/dataontap/client/api.py b/cinder/volume/drivers/netapp/dataontap/client/api.py
+index 20121c3..d033728 100644
+--- a/cinder/volume/drivers/netapp/dataontap/client/api.py
++++ b/cinder/volume/drivers/netapp/dataontap/client/api.py
+@@ -660,6 +660,7 @@
+ REST_NO_SUCH_LUN_MAP = '5374922'
+ REST_NO_SUCH_FILE = '6684674'
+ REST_NAMESPACE_EOBJECTNOTFOUND = ('72090006', '72090006')
++REST_HOST_ALREADY_MAPPED_TO_SUBSYSTEM = '72089705'
+ 
+ 
+ class RestNaServer(object):
+diff --git a/cinder/volume/drivers/netapp/dataontap/client/client_cmode_rest.py b/cinder/volume/drivers/netapp/dataontap/client/client_cmode_rest.py
+index edd6300..3c30ffa 100644
+--- a/cinder/volume/drivers/netapp/dataontap/client/client_cmode_rest.py
++++ b/cinder/volume/drivers/netapp/dataontap/client/client_cmode_rest.py
+@@ -2799,6 +2799,22 @@
+         return [{'name': subsystem['name'], 'os_type': subsystem['os_type']}
+                 for subsystem in records]
+ 
++    def get_subsystem_by_path(self, path):
++        """Get subsystem by its namespace path."""
++        query = {
++            'svm.name': self.vserver,
++            'subsystem_maps.namespace.name': path,
++            'fields': 'name,os_type',
++            'name': f'{na_utils.OPENSTACK_PREFIX}*',
++        }
++        response = self.send_request('/protocols/nvme/subsystems', 'get',
++                                     query=query)
++
++        records = response.get('records', [])
++
++        return [{'name': subsystem['name'], 'os_type': subsystem['os_type']}
++                for subsystem in records]
++
+     def create_subsystem(self, subsystem_name, os_type, host_nqn):
+         """Creates subsystem with specified args."""
+         body = {
+@@ -2813,7 +2829,7 @@
+         """Gets the namespace map using its path."""
+         query = {
+             'namespace.name': path,
+-            'fields': 'subsystem.name,namespace.uuid,svm.name',
++            'fields': 'subsystem.name,namespace.uuid,svm.name,subsystem.uuid',
+         }
+         response = self.send_request('/protocols/nvme/subsystem-maps',
+                                      'get',
+@@ -2824,6 +2840,7 @@
+         for map in records:
+             map_subsystem = {}
+             map_subsystem['subsystem'] = map['subsystem']['name']
++            map_subsystem['subsystem_uuid'] = map['subsystem']['uuid']
+             map_subsystem['uuid'] = map['namespace']['uuid']
+             map_subsystem['vserver'] = map['svm']['name']
+ 
+@@ -2895,3 +2912,54 @@
+         }
+         self.send_request('/protocols/nvme/subsystem-maps', 'delete',
+                           query=query)
++
++    def unmap_host_with_subsystem(self, host_nqn, subsystem_uuid):
++        """Unmaps a host from given subsystem.
++
++        In multiattach and live migration scenarios,it is possible that the
++        host is attached to single namespace from different subsystems and
++        repeated unmapping to subsystem to host is possible. Errors are
++        logged but not propagated. Calling code will proceed even if
++        unmapping fails.
++        """
++        url = f'/protocols/nvme/subsystems/{subsystem_uuid}/hosts/{host_nqn}'
++        try:
++            self.send_request(url, 'delete')
++        except netapp_api.NaApiError as e:
++            LOG.warning(
++                "Failed to unmap host from subsystem. "
++                "Host NQN: %(host_nqn)s, Subsystem UUID: %(subsystem_uuid)s, "
++                "Error Code: %(code)s, Error Message: %(message)s",
++                {'host_nqn': host_nqn, 'subsystem_uuid': subsystem_uuid,
++                 'code': e.code, 'message': e.message}
++            )
++
++    def map_host_with_subsystem(self, host_nqn, subsystem_uuid):
++        """Add host nqn to the subsystem"""
++
++        body_post = {
++            'nqn': host_nqn,
++        }
++        try:
++            self.send_request(
++                f'/protocols/nvme/subsystems/{subsystem_uuid}/hosts',
++                'post',
++                body=body_post
++            )
++        except netapp_api.NaApiError as e:
++            code = e.code
++            message = e.message
++            if e.code == netapp_api.REST_HOST_ALREADY_MAPPED_TO_SUBSYSTEM:
++                LOG.info(
++                    'Host %(host_nqn)s is already mapped to subsystem '
++                    '%(subsystem_uuid)s ', {'host_nqn': host_nqn,
++                                            'subsystem_uuid': subsystem_uuid
++                                            }
++                )
++            else:
++                LOG.error(
++                    'Error mapping host to subsystem. Code :'
++                    '%(code)s, Message: %(message)s',
++                    {'code': code, 'message': message}
++                )
++                raise
+diff --git a/cinder/volume/drivers/netapp/dataontap/nvme_library.py b/cinder/volume/drivers/netapp/dataontap/nvme_library.py
+index 0de826f9..5abb9b3 100644
+--- a/cinder/volume/drivers/netapp/dataontap/nvme_library.py
++++ b/cinder/volume/drivers/netapp/dataontap/nvme_library.py
+@@ -524,7 +524,7 @@
+ 
+             # Add driver capabilities and config info
+             pool['QoS_support'] = False
+-            pool['multiattach'] = False
++            pool['multiattach'] = True
+             pool['online_extend_support'] = False
+             pool['consistencygroup_support'] = False
+             pool['consistent_group_snapshot_enabled'] = False
+@@ -610,67 +610,46 @@
+ 
+         self.namespace_table[name].size = new_size_bytes
+ 
+-    def _get_or_create_subsystem(self, host_nqn, host_os_type):
+-        """Checks for an subsystem for a host.
+-
+-        Creates subsystem if not already present with given host os type and
+-        adds the host.
+-        """
+-        # Backend supports different subsystems with the same hosts, so
+-        # instead of reusing non OpenStack subsystem, we make sure we only use
+-        # our own, thus being compatible with custom subsystem.
+-        subsystems = self.client.get_subsystem_by_host(
+-            host_nqn)
+-        if subsystems:
+-            subsystem_name = subsystems[0]['name']
+-            host_os_type = subsystems[0]['os_type']
+-        else:
+-            subsystem_name = na_utils.OPENSTACK_PREFIX + str(uuid.uuid4())
+-            self.client.create_subsystem(subsystem_name, host_os_type,
+-                                         host_nqn)
+-
+-        return subsystem_name, host_os_type
+-
+     def _find_mapped_namespace_subsystem(self, path, host_nqn):
+         """Find an subsystem for a namespace mapped to the given host."""
+         subsystems = [subsystem['name'] for subsystem in
+                       self.client.get_subsystem_by_host(host_nqn)]
+ 
+         # Map subsystem name to namespace-id for the requested host.
+-        namespace_map = {v['subsystem']: v['uuid']
++        namespace_map = {v['uuid']: (v['subsystem_uuid'], v['subsystem'])
+                          for v in self.client.get_namespace_map(path)
+                          if v['subsystem'] in subsystems}
+ 
+-        subsystem_name = n_uuid = None
++        subsystem_uuid = subsystem_name = n_uuid = None
+         # Give preference to OpenStack subsystems, just use the last one if not
+         # present to allow unmapping old mappings that used a custom subsystem.
+-        for subsystem_name, n_uuid in namespace_map.items():
++        for n_uuid, (subsystem_uuid, subsystem_name) in namespace_map.items():
+             if subsystem_name.startswith(na_utils.OPENSTACK_PREFIX):
+                 break
+ 
+-        return subsystem_name, n_uuid
++        return subsystem_uuid, subsystem_name, n_uuid
+ 
+     def _map_namespace(self, name, host_nqn):
+         """Maps namespace to the host nqn and returns its ID assigned."""
+-
+-        subsystem_name, subsystem_host_os = self._get_or_create_subsystem(
+-            host_nqn, self.host_type)
+-        if subsystem_host_os != self.host_type:
+-            LOG.warning("Namespace misalignment may occur for current"
+-                        " subsystem %(sub_name)s with host OS type"
+-                        " %(sub_os)s. Please configure subsystem manually"
+-                        " according to the type of the host OS.",
+-                        {'sub_name': subsystem_name,
+-                         'sub_os': subsystem_host_os})
+-
+         metadata = self._get_namespace_attr(name, 'metadata')
+         path = metadata['Path']
+         try:
+-            ns_uuid = self.client.map_namespace(
+-                path, subsystem_name,)
++            subsystems = self.client.get_namespace_map(path)
++            ns_uuid = subsystem_uuid = None
++            if subsystems:
++                subsystem_name = subsystems[0]['subsystem']
++                subsystem_uuid = subsystems[0]['subsystem_uuid']
++                ns_uuid = subsystems[0]['uuid']
++                self.client.map_host_with_subsystem(host_nqn, subsystem_uuid)
++            else:
++                subsystem_name = na_utils.OPENSTACK_PREFIX + str(uuid.uuid4())
++                self.client.create_subsystem(subsystem_name, self.host_type,
++                                             host_nqn)
++                ns_uuid = self.client.map_namespace(path, subsystem_name, )
+             return subsystem_name, ns_uuid
+         except netapp_api.NaApiError as e:
+-            (subsystem_name, ns_uuid) = self._find_mapped_namespace_subsystem(
++            (_, subsystem_name, ns_uuid) =\
++                self._find_mapped_namespace_subsystem(
+                 path, host_nqn)
+             if ns_uuid is not None and subsystem_name:
+                 return subsystem_name, ns_uuid
+@@ -737,18 +716,18 @@
+     def _unmap_namespace(self, path, host_nqn):
+         """Unmaps a namespace from given host."""
+ 
+-        namespace_unmap_list = []
+-        if host_nqn:
+-            (subsystem, _) = self._find_mapped_namespace_subsystem(
+-                path, host_nqn)
+-            namespace_unmap_list.append((path, subsystem))
+-        else:
+-            namespace_maps = self.client.get_namespace_map(path)
+-            namespace_unmap_list = [
+-                (path, m['subsystem']) for m in namespace_maps]
++        if not host_nqn:
++            LOG.warning("Nothing to unmap - host_nqn is missing: %s", path)
++            return
+ 
+-        for _path, _subsystem in namespace_unmap_list:
+-            self.client.unmap_namespace(_path, _subsystem)
++        (subsystem_uuid, _, _) = self._find_mapped_namespace_subsystem(
++            path, host_nqn)
++
++        if subsystem_uuid:
++            self.client.unmap_host_with_subsystem(host_nqn, subsystem_uuid)
++        else:
++            LOG.debug("No mapping exists between namespace: %s"
++                      " and host_nqn: %s", path, host_nqn)
+ 
+     @coordination.synchronized('netapp-terminate-nvme-connection-{volume.id}')
+     def terminate_connection(self, volume, connector, **kwargs):
+diff --git a/releasenotes/notes/bug-2078968-fix-nvme-namespace-mapping-failed-during-live-migration-bbd26bb157b076bf.yaml b/releasenotes/notes/bug-2078968-fix-nvme-namespace-mapping-failed-during-live-migration-bbd26bb157b076bf.yaml
+new file mode 100644
+index 0000000..a393538
+--- /dev/null
++++ b/releasenotes/notes/bug-2078968-fix-nvme-namespace-mapping-failed-during-live-migration-bbd26bb157b076bf.yaml
+@@ -0,0 +1,50 @@
++---
++upgrade:
++  - |
++    Breaking Change: NetApp NVMe Subsystem Architecture Redesign
++
++    Implemented a significant architectural change to NVMe volume attachment
++    handling to address critical limitations with multi-attach workflows and
++    QoS management. The previous implementation used a one-to-one mapping
++    between hosts and subsystems, where each host would have its own
++    dedicated subsystem, and multiple subsystems would map to a single
++    namespace. This approach created two major issues:
++
++    * QoS Limitations: Since QoS policies are applied at the subsystem
++      level rather than the namespace level, having multiple subsystems
++      per namespace made it impossible to enforce consistent QoS across
++      all host connections to the same volume.
++
++    * Multi-Attach Incompatibility: Different subsystems cannot enable
++      true multi-attach functionality, which is essential for live migration
++      and other advanced features where the same volume needs to be
++      simultaneously accessible from multiple hosts.
++
++    New Architecture: The implementation now uses a many-to-one mapping
++    where multiple hosts share a single subsystem, ensuring a single
++    subsystem-to-namespace relationship. This resolves both QoS consistency
++    and multi-attach limitations.
++
++    Compatibility Impact: This change is not backward compatible due to
++    fundamental differences in how NVMe subsystem-to-namespace mappings are
++    handled. Live migration of existing mappings is not technically feasible.
++
++    Required Upgrade Path:
++
++    * Take backup of all volumes using the old NVMe architecture
++    * Upgrade OpenStack to the version with the new architecture
++    * Restore volumes using the new many-to-one subsystem mapping model
++    * For assistance with migration planning and any questions about this
++      process, contact NetApp support who can provide guidance specific to
++      your environment and help minimize disruption during the transition.
++
++    This approach ensures data integrity while enabling the improved
++    multi-attach and QoS capabilities of the new architecture.
++
++fixes:
++  - |
++    NetApp Driver `Bug #2078968
++    <https://bugs.launchpad.net/cinder/+bug/2078968>`_: Fixed NVMe namespace
++    mapping fails during VM migration with "Namespace is already mapped
++    to subsystem". Implemented architecture changes to support multiple
++    hosts attaching to single namespace through shared subsystem model.
