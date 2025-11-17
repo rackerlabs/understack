@@ -1,5 +1,4 @@
 ## Append samples of your project ##
 resources:
 - sync_v1alpha1_nautobot.yaml
-- sync_v1alpha1_gitrepowatcher.yaml
 # +kubebuilder:scaffold:manifestskustomizesamples
