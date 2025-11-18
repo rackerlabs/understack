@@ -10,8 +10,10 @@ argocd_rev=$(cat "${thisdir}/../apps/appsets/argocd/appset-argocd.yaml" | yq -r 
 helm repo add argo "${argocd_repo}"
 helm repo update argo
 
-helm template argo-cd argo-cd \
+kubectl create ns argocd
+
+helm template argo/argo-cd \
   --version "${argocd_rev}" \
-  --create-namespace \
+  --namespace argocd \
   -f "${thisdir}/../components/argocd/values.yaml" \
   | kubectl -n argocd apply -f -
