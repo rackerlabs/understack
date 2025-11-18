@@ -1,0 +1,153 @@
+# -- Defines the UnderStack repository URL
+#    [[ref]](https://rackerlabs.github.io/understack/deploy-guide/requirements/)
+# @default -- https://github.com/rackerlabs/understack.git
+understack_url: https://github.com/rackerlabs/understack.git
+
+# -- Defines the UnderStack repository git reference (commit/branch/tag)
+#    [[ref]](https://rackerlabs.github.io/understack/deploy-guide/requirements/)
+# @default -- HEAD
+understack_ref: HEAD
+
+# -- Defines the deployment repository URL
+#    [[ref]](https://rackerlabs.github.io/understack/deploy-guide/requirements/)
+deploy_url:
+
+# -- Defines the deployment repository git reference (commit/branch/tag)
+#    [[ref]](https://rackerlabs.github.io/understack/deploy-guide/requirements/)
+# @default -- HEAD
+deploy_ref: HEAD
+
+# -- This block is for setting up the UnderStack site specific ArgoCD Applications
+site:
+  # -- Enable/disable deploying the site specific applications
+  # @default -- true
+  enabled: true
+
+  # -- OpenStack service applications configuration
+  openstack:
+    # -- OpenStack Helm chart repository URL
+    # @default -- https://tarballs.opendev.org/openstack/openstack-helm
+    repoUrl: https://tarballs.opendev.org/openstack/openstack-helm
+
+    # -- Dictionary of OpenStack applications to deploy
+    # @default -- See below for default apps
+    apps:
+      # -- Keystone (Identity Service)
+      keystone:
+        # -- Enable/disable deploying Keystone
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering (lower numbers deploy first)
+        # @default -- 1
+        wave: 1
+        # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Keystone
+        chartVersion: 2025.1.5+95bf0bf6e
+
+      # -- Glance (Image Service)
+      glance:
+        # -- Enable/disable deploying Glance
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 2
+        wave: 2
+        # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Glance
+        chartVersion: 2025.1.3+7bcc0b957
+
+      # -- Cinder (Block Storage Service)
+      cinder:
+        # -- Enable/disable deploying Cinder
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 2
+        wave: 2
+        # renovate: datasource=helm depName=cinder registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Cinder
+        chartVersion: 2025.1.3+and55b4a7
+
+      # -- Ironic (Bare Metal Service)
+      ironic:
+        # -- Enable/disable deploying Ironic
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 2
+        wave: 2
+        # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Ironic
+        chartVersion: 2025.1.3+344314dd3
+
+      # -- Neutron (Networking Service)
+      neutron:
+        # -- Enable/disable deploying Neutron
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 2
+        wave: 2
+        # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Neutron
+        chartVersion: 2025.1.9+3225ad74a
+
+      # -- Placement (Placement Service)
+      placement:
+        # -- Enable/disable deploying Placement
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 2
+        wave: 2
+        # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Placement
+        chartVersion: 2025.1.1+062261562
+
+      # -- Nova (Compute Service)
+      nova:
+        # -- Enable/disable deploying Nova
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 3
+        wave: 3
+        # renovate: datasource=helm depName=nova registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Nova
+        chartVersion: 2025.1.19+12458c92d
+
+      # -- Octavia (Load Balancer Service)
+      octavia:
+        # -- Enable/disable deploying Octavia
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 3
+        wave: 3
+        # renovate: datasource=helm depName=octavia registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Octavia
+        chartVersion: 2025.1.12+80041dfbb
+
+      # -- Horizon (Dashboard)
+      horizon:
+        # -- Enable/disable deploying Horizon
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 4
+        wave: 4
+        # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Horizon
+        chartVersion: 2025.1.8+95bf0bf6e
+
+      # -- Skyline (Dashboard)
+      skyline:
+        # -- Enable/disable deploying Skyline
+        # @default -- true
+        enabled: true
+        # -- Sync wave for deployment ordering
+        # @default -- 4
+        wave: 4
+        # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+        # -- Chart version for Skyline
+        chartVersion: 2025.1.3+0161bea65
