@@ -181,10 +181,12 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_profile = parent_port.bindings[0].profile
         binding_host = parent_port.bindings[0].host
 
-        local_link_info = utils.local_link_from_binding_profile(binding_profile)
-        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            local_link_info
-        )
+        vlan_group_name = binding_profile.get("physical_network")
+        if vlan_group_name is None:
+            local_link_info = utils.local_link_from_binding_profile(binding_profile)
+            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+                local_link_info
+            )
 
         self._handle_segment_allocation(subports, vlan_group_name, binding_host)
 
@@ -207,10 +209,13 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             return
         binding_profile = parent_port_obj.bindings[0].profile
         binding_host = parent_port_obj.bindings[0].host
-        local_link_info = utils.local_link_from_binding_profile(binding_profile)
-        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            local_link_info
-        )
+
+        vlan_group_name = binding_profile.get("physical_network")
+        if vlan_group_name is None:
+            local_link_info = utils.local_link_from_binding_profile(binding_profile)
+            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+                local_link_info
+            )
         self._handle_subports_removal(
             binding_profile=binding_profile,
             binding_host=binding_host,
@@ -265,10 +270,12 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
 
         if utils.parent_port_is_bound(parent_port):
             binding_profile = parent_port.bindings[0].profile
-            local_link_info = utils.local_link_from_binding_profile(binding_profile)
-            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                local_link_info
-            )
+            vlan_group_name = binding_profile.get("physical_network")
+            if vlan_group_name is None:
+                local_link_info = utils.local_link_from_binding_profile(binding_profile)
+                vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+                    local_link_info
+                )
             LOG.debug("subports_added_post found vlan_group_name=%s", vlan_group_name)
             self._trigger_undersync(vlan_group_name)
 
