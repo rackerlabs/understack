@@ -1,0 +1,85 @@
+---
+name: argocd-understack release
+
+on:
+  push:
+    tags:
+      - "argocd-understack-v*.*.*"
+  workflow_dispatch:
+    inputs:
+      chart_version:
+        description: "Chart version to release (e.g., 0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.18.4
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Extract version from tag or input
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.chart_version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/argocd-understack-v}
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Helm lint
+        run: |
+          helm lint charts/argocd-understack --strict
+
+      - name: Package chart
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          helm package charts/argocd-understack --version "$VERSION"
+
+      - name: Login to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push chart to GHCR
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CHART_PACKAGE="argocd-understack-${VERSION}.tgz"
+
+          if [[ ! -f "$CHART_PACKAGE" ]]; then
+            echo "::error::Chart package $CHART_PACKAGE not found"
+            ls -la *.tgz
+            exit 1
+          fi
+
+          helm push "$CHART_PACKAGE" oci://ghcr.io/${{ github.repository }}
+
+          echo "::notice::Chart pushed to oci://ghcr.io/${{ github.repository }}/argocd-understack:${VERSION}"
+
+      - name: Sign chart with Cosign
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          cosign sign --yes ghcr.io/${{ github.repository }}/argocd-understack:${VERSION}
+
+          echo "::notice::Chart signed with keyless signature"
+
+      - name: Logout from GHCR
+        if: always()
+        run: |
+          helm registry logout ghcr.io

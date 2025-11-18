@@ -1,0 +1,396 @@
+# -- Target cluster that ArgoCD will deploy these Applications to
+# @default -- https://kubernetes.default.svc
+cluster_server: https://kubernetes.default.svc
+
+# -- Defines the UnderStack repository URL
+#    [[ref]](https://rackerlabs.github.io/understack/deploy-guide/requirements/)
+# @default -- https://github.com/rackerlabs/understack.git
+understack_url: https://github.com/rackerlabs/understack.git
+
+# -- Defines the UnderStack repository git reference (commit/branch/tag)
+#    [[ref]](https://rackerlabs.github.io/understack/deploy-guide/requirements/)
+# @default -- HEAD
+understack_ref: HEAD
+
+# -- Defines the deployment repository URL
+#    [[ref]](https://rackerlabs.github.io/understack/deploy-guide/requirements/)
+deploy_url:
+
+# -- Defines the deployment repository git reference (commit/branch/tag)
+#    [[ref]](https://rackerlabs.github.io/understack/deploy-guide/requirements/)
+# @default -- HEAD
+deploy_ref: HEAD
+
+# -- This block is for setting up the UnderStack global specific ArgoCD Applications
+global:
+  # -- Enable/disable deploying the global specific applications
+  # @default -- true
+  enabled: true
+
+  # -- Cert-Manager
+  cert_manager:
+    # -- Enable/disable deploying Cert-Manager
+    # @default -- true
+    enabled: true
+
+  # Cilium configurations
+  cilium:
+    # -- Enable/disable deploying Cilium configurations
+    # @default -- true
+    enabled: true
+
+  # -- Cloud Native PostgreSQL Operator
+  cnpg_system:
+    # -- Enable/disable deploying CNPG operator
+    # @default -- true
+    enabled: true
+
+  # -- Dex OIDC provider for SSO
+  dex:
+    # -- Enable/disable deploying Dex
+    # @default -- true
+    enabled: true
+
+  # etcd backup
+  etcdbackup:
+    # Enable/disable deploying etcdbackup
+    # @default -- true
+    enabled: true
+
+  # -- External DNS operator
+  external_dns:
+    # -- Enable/disable deploying External DNS
+    # @default -- true
+    enabled: true
+
+  # -- External Secrets operator
+  external_secrets:
+    # -- Enable/disable deploying External Secrets
+    # @default -- true
+    enabled: true
+
+  # -- Global workflows for Argo Events and Workflows
+  global_workflows:
+    # -- Enable/disable deploying global workflows
+    # @default -- true
+    enabled: true
+
+  # -- ingress-nginx
+  ingress_nginx:
+    # -- Enable/disable deploying ingress-nginx
+    # @default -- true
+    enabled: true
+
+  # -- Monitoring via kube-prometheus-stack
+  monitoring:
+    # -- Enable/disable deploying kube-prometheus-stack
+    # @default -- true
+    enabled: true
+
+  # -- Nautobot Network Source of Truth
+  nautobot:
+    # -- Enable/disable deploying Nautobot
+    # @default -- true
+    enabled: true
+
+  # -- OpenTelemetry Operator
+  opentelemetry_operator:
+    # -- Enable/disable deploying opentelemetry-operator
+    # @default -- true
+    enabled: true
+
+  # -- OpenTelemetry collector for observability
+  otel_collector:
+    # -- Enable/disable deploying OTel collector
+    # @default -- true
+    enabled: true
+
+  # -- Rook
+  rook:
+    # -- Enable/disable deploying Rook
+    # @default -- true
+    enabled: true
+
+  # Sealed Secrets operator
+  sealed_secrets:
+    # -- Enable/disable deploying sealed secrets
+    # @default -- true
+    enabled: true
+
+  # -- UnderStack cluster issuer for cert-manager
+  understack_cluster_issuer:
+    # -- Enable/disable deploying cluster issuer
+    # @default -- true
+    enabled: true
+
+# -- This block is for setting up the UnderStack site specific ArgoCD Applications
+site:
+  # -- Enable/disable deploying the site specific applications
+  # @default -- true
+  enabled: true
+
+  # Cilium configurations
+  cilium:
+    # -- Enable/disable deploying Cilium configurations
+    # @default -- true
+    enabled: true
+
+  # etcd backup
+  etcdbackup:
+    # Enable/disable deploying etcdbackup
+    # @default -- true
+    enabled: true
+
+  # -- ingress-nginx
+  ingress_nginx:
+    # -- Enable/disable deploying ingress-nginx
+    # @default -- true
+    enabled: true
+
+  # Sealed Secrets operator
+  sealed_secrets:
+    # -- Enable/disable deploying sealed secrets
+    # @default -- true
+    enabled: true
+
+  # -- OpenStack service applications configuration
+  openstack:
+    # -- Enable/disable deploying the base OpenStack configs
+    # @default -- true
+    enabled: true
+
+    # -- OpenStack Helm chart repository URL
+    # @default -- https://tarballs.opendev.org/openstack/openstack-helm
+    repoUrl: https://tarballs.opendev.org/openstack/openstack-helm
+
+    # -- Namespace to deploy OpenStack Helm into
+    # @default -- openstack
+    namespace: openstack
+
+  # -- Keystone (Identity Service)
+  keystone:
+    # -- Enable/disable deploying Keystone
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering (lower numbers deploy first)
+    # @default -- 1
+    wave: 1
+    # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Keystone
+    chartVersion: 2025.2.6+9b270fe35
+
+  # -- Glance (Image Service)
+  glance:
+    # -- Enable/disable deploying Glance
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 2
+    wave: 2
+    # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Glance
+    chartVersion: 2025.2.6+9b270fe35
+
+  # -- Cinder (Block Storage Service)
+  cinder:
+    # -- Enable/disable deploying Cinder
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 2
+    wave: 2
+    # renovate: datasource=helm depName=cinder registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Cinder
+    chartVersion: 2025.1.3+abd55b4a7
+
+  # -- Ironic (Bare Metal Service)
+  ironic:
+    # -- Enable/disable deploying Ironic
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 2
+    wave: 2
+    # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Ironic
+    chartVersion: 2025.2.5+e61f0342c
+
+  # -- Neutron (Networking Service)
+  neutron:
+    # -- Enable/disable deploying Neutron
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 2
+    wave: 2
+    # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Neutron
+    chartVersion: 2025.2.12+9cc7c1ea9
+
+  # -- Placement (Placement Service)
+  placement:
+    # -- Enable/disable deploying Placement
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 2
+    wave: 2
+    # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Placement
+    chartVersion: 2025.2.4+9b270fe35
+
+  # -- Nova (Compute Service)
+  nova:
+    # -- Enable/disable deploying Nova
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 3
+    wave: 3
+    # renovate: datasource=helm depName=nova registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Nova
+    chartVersion: 2025.1.19+12458c92d
+
+  # -- Octavia (Load Balancer Service)
+  octavia:
+    # -- Enable/disable deploying Octavia
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 3
+    wave: 3
+    # renovate: datasource=helm depName=octavia registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Octavia
+    chartVersion: 2025.2.7+9b270fe35
+
+  # -- Horizon (Dashboard)
+  horizon:
+    # -- Enable/disable deploying Horizon
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 4
+    wave: 4
+    # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Horizon
+    chartVersion: 2025.2.3+9b270fe35
+
+  # -- Skyline (Dashboard)
+  skyline:
+    # -- Enable/disable deploying Skyline
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 4
+    wave: 4
+    # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    # -- Chart version for Skyline
+    chartVersion: 2025.2.3+b6bb28b51
+
+  # -- Argo Events configuration for event-driven workflows
+  argo_events:
+    # -- Enable/disable deploying Argo Events
+    # @default -- true
+    enabled: true
+
+  # -- Argo Workflows configuration
+  argo_workflows:
+    # -- Enable/disable deploying Argo Workflows
+    # @default -- true
+    enabled: true
+
+  # -- Cert-Manager
+  cert_manager:
+    # -- Enable/disable deploying Cert-Manager
+    # @default -- true
+    enabled: true
+
+  # -- Chrony NTP service configuration
+  chrony:
+    # -- Enable/disable deploying Chrony
+    # @default -- true
+    enabled: true
+
+  # -- External DNS operator
+  external_dns:
+    # -- Enable/disable deploying External DNS
+    # @default -- true
+    enabled: true
+
+  # -- External Secrets operator
+  external_secrets:
+    # -- Enable/disable deploying External Secrets
+    # @default -- true
+    enabled: true
+
+  # -- MariaDB Operator
+  mariadb_operator:
+    # -- Enable/disable deploying MariaDB Operator
+    # @default -- true
+    enabled: true
+
+  # -- Monitoring via kube-prometheus-stack
+  monitoring:
+    # -- Enable/disable deploying kube-prometheus-stack
+    # @default -- true
+    enabled: true
+
+  # -- Nautobot site-specific configuration
+  nautobot_site:
+    # -- Enable/disable deploying Nautobot site resources
+    # @default -- true
+    enabled: true
+
+  # -- OpenStack exporter for Prometheus metrics
+  openstack_exporter:
+    # -- Enable/disable deploying OpenStack exporter
+    # @default -- true
+    enabled: true
+
+  # -- Memcached for OpenStack caching
+  openstack_memcached:
+    # -- Enable/disable deploying OpenStack memcached
+    # @default -- true
+    enabled: true
+
+  # -- OpenTelemetry Operator
+  opentelemetry_operator:
+    # -- Enable/disable deploying opentelemetry-operator
+    # @default -- true
+    enabled: true
+
+  # -- OpenTelemetry collector for observability
+  otel_collector:
+    # -- Enable/disable deploying OTel collector
+    # @default -- true
+    enabled: true
+
+  # -- Rook
+  rook:
+    # -- Enable/disable deploying Rook
+    # @default -- true
+    enabled: true
+
+  # -- Site-specific workflows and event handlers
+  site_workflows:
+    # -- Enable/disable deploying site workflows
+    # @default -- true
+    enabled: true
+
+  # -- SNMP exporter for network device monitoring
+  snmp_exporter:
+    # -- Enable/disable deploying SNMP exporter
+    # @default -- true
+    enabled: true
+
+  # -- UnderStack cluster issuer for cert-manager
+  understack_cluster_issuer:
+    # -- Enable/disable deploying cluster issuer
+    # @default -- true
+    enabled: true
+
+  # -- Undersync service for synchronization
+  undersync:
+    # -- Enable/disable deploying undersync
+    # @default -- true
+    enabled: true
