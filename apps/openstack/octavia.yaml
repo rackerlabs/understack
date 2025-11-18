@@ -1,4 +1,4 @@
 ---
 component: octavia
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.1.12+80041dfbb
+chartVersion: 2025.2.3+f6be959ce
