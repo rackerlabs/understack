@@ -29,7 +29,9 @@ class IronicPortEvent:
     @property
     def interface_name(self) -> str:
         try:
-            return self.name.split(":")[1]
+            if self.name:
+                return self.name
+            return self.uuid
         except Exception:
             return self.uuid
 
@@ -62,41 +64,53 @@ class IronicPortEvent:
 def handle_port_create_update(
     _conn: Connection, nautobot: Nautobot, event_data: dict
 ) -> int:
-    """Operates on an Ironic Port create and update event."""
+    """Sync Ironic Port to Nautobot interface."""
     event = IronicPortEvent.from_event_dict(event_data)
 
-    logger.debug("looking up interface in nautobot by UUID: %s", event.uuid)
+    logger.debug("Looking up interface %s in Nautobot", event.uuid)
     intf = nautobot.dcim.interfaces.get(id=event.uuid)
-    if not intf:
-        logger.debug(
-            "looking up interface in nautobot by device %s and name %s",
-            event.node_uuid,
-            event.interface_name,
-        )
-        intf = nautobot.dcim.interfaces.get(
-            device=event.node_uuid, name=event.interface_name
-        )
+
+    # Prepare interface attributes
+    attrs = {
+        "name": event.interface_name,
+        "type": INTERFACE_TYPE,
+        "status": "Active",
+        "mac_address": event.address,
+        "device": event.node_uuid,
+    }
 
     if not intf:
-        logger.info("No interface found in nautobot, creating")
-        attrs = {
-            "id": event.uuid,
-            "name": event.interface_name,
-            "type": INTERFACE_TYPE,
-            "status": "Active",
-            "mac_address": event.address,
-            "device": event.node_uuid,
-        }
-        intf = nautobot.dcim.interfaces.create(**attrs)
-    else:
-        logger.info("Existing interface found in nautobot, updating")
-        intf.name = event.interface_name  # type: ignore
-        intf.type = INTERFACE_TYPE  # type: ignore
-        intf.status = "Active"  # type: ignore
-        intf.mac_address = event.address  # type: ignore
+        # Create new interface
+        logger.info("Creating interface %s in Nautobot", event.uuid)
+        attrs["id"] = event.uuid
+
+        try:
+            intf = nautobot.dcim.interfaces.create(**attrs)
+            logger.info("Created interface %s", event.uuid)
+        except Exception as e:
+            # Handle race condition - another workflow created the interface
+            if "unique set" in str(e).lower():
+                logger.info("Interface %s already exists, fetching", event.uuid)
+                intf = nautobot.dcim.interfaces.get(id=event.uuid)
+                if not intf:
+                    logger.error("Interface %s not found", event.uuid)
+                    return 1
+            else:
+                logger.exception("Failed to create interface %s", event.uuid)
+                return 1
+
+    # Update interface attributes
+    logger.debug("Updating interface %s", event.uuid)
+    for key, value in attrs.items():
+        if key != "id":  # Don't update ID
+            setattr(intf, key, value)
+
+    try:
         cast(Record, intf).save()
-
-    logger.info("Interface %s in sync with nautobot", event.uuid)
+        logger.info("Interface %s synced to Nautobot", event.uuid)
+    except Exception:
+        logger.exception("Failed to update interface %s", event.uuid)
+        return 1
 
     # Handle cable management if we have remote switch connection information
     if event.remote_port_id and event.remote_switch_info:
