@@ -2,7 +2,9 @@ package nautobot
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -73,4 +75,19 @@ func buildNullableBulkWritableRackRequestRackGroup(uuid string) *nb.NullableBulk
 			String: nb.PtrString(uuid),
 		},
 	})
+}
+
+// readResponseBody safely reads and closes the response body.
+// Returns the body content as a string. If resp is nil, returns empty string.
+func readResponseBody(resp *http.Response) string {
+	if resp == nil || resp.Body == nil {
+		return ""
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Sprintf("failed to read response body: %v", err)
+	}
+	return string(bodyBytes)
 }

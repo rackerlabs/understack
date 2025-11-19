@@ -1,6 +1,7 @@
 package nautobot
 
 import (
+	"github.com/charmbracelet/log"
 	nb "github.com/nautobot/go-nautobot/v2"
 	"strings"
 )
@@ -16,6 +17,7 @@ type NautobotClient struct {
 func (n *NautobotClient) AddReport(key string, line ...string) {
 	combined := strings.Join(line, " ")
 	n.Report[key] = append(n.Report[key], combined)
+	log.Error(key, combined)
 }
 
 // NewNautobotClient creates and configures a new Nautobot API client.
