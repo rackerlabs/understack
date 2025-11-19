@@ -25,7 +25,7 @@ def setup_conf():
                 "4f": "storage-appliance",
                 "1d": "bmc",
             },
-        )
+        ),
     ]
     cfg.CONF.register_group(grp)
     cfg.CONF.register_opts(opts, group=grp)

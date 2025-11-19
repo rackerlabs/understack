@@ -1,6 +1,8 @@
 import pytest
 
-from ironic_understack.vlan_group_name_convention import vlan_group_name
+from ironic_understack.inspected_port import InspectedPort
+from ironic_understack.vlan_group_name_convention import TopologyError
+from ironic_understack.vlan_group_name_convention import vlan_group_names
 
 mapping = {
     "1": "network",
@@ -14,43 +16,105 @@ mapping = {
     "1d": "bmc",
 }
 
-def test_vlan_group_name_valid_switches():
-    assert vlan_group_name("a1-1-1", mapping) == "a1-1-network"
-    assert vlan_group_name("a1-2-1", mapping) == "a1-2-network"
-    assert vlan_group_name("b12-1", mapping) == "b12-network"
-    assert vlan_group_name("a2-12-1", mapping) == "a2-12-network"
-    assert vlan_group_name("a2-12-2", mapping) == "a2-12-network"
-    assert vlan_group_name("a2-12-1f", mapping) == "a2-12-storage"
-    assert vlan_group_name("a2-12-2f", mapping) == "a2-12-storage"
-    assert vlan_group_name("a2-12-3f", mapping) == "a2-12-storage-appliance"
-    assert vlan_group_name("a2-12-4f", mapping) == "a2-12-storage-appliance"
-    assert vlan_group_name("a2-12-1d", mapping) == "a2-12-bmc"
+
+def port(switch: str):
+    return InspectedPort(
+        mac_address="",
+        name="",
+        switch_system_name=switch,
+        switch_chassis_id="",
+        switch_port_id="",
+    )
+
+
+def test_vlan_group_name_single_cab():
+    assert vlan_group_names(
+        [
+            port("a1-1-1.abc1"),
+            port("a1-1-2.abc1"),
+            port("a1-1-1f.abc1"),
+            port("a1-1-2f.abc1"),
+        ],
+        mapping,
+    ) == {
+        "a1-1-1.abc1": "a1-1-network",
+        "a1-1-2.abc1": "a1-1-network",
+        "a1-1-1f.abc1": "a1-1-storage",
+        "a1-1-2f.abc1": "a1-1-storage",
+    }
+
+
+def test_vlan_group_name_pair_cab():
+    assert vlan_group_names(
+        [
+            port("a1-1-1.abc1"),
+            port("a1-2-1.abc1"),
+            port("a1-1-1f.abc1"),
+            port("a1-2-1f.abc1"),
+        ],
+        mapping,
+    ) == {
+        "a1-1-1.abc1": "a1-1/a1-2-network",
+        "a1-2-1.abc1": "a1-1/a1-2-network",
+        "a1-1-1f.abc1": "a1-1/a1-2-storage",
+        "a1-2-1f.abc1": "a1-1/a1-2-storage",
+    }
 
 
 def test_vlan_group_name_with_domain():
-    assert vlan_group_name("a2-12-1.iad3.rackspace.net", mapping) == "a2-12-network"
-    assert vlan_group_name("a2-12-1f.lon3.rackspace.net", mapping) == "a2-12-storage"
-
-
-def test_vlan_group_name_case_insensitive():
-    assert vlan_group_name("A2-12-1F", mapping) == "a2-12-storage"
-    assert vlan_group_name("A2-12-1", mapping) == "a2-12-network"
+    assert vlan_group_names(
+        [
+            port("a1-1-1.abc1.domain"),
+            port("a1-1-2.abc1.domain"),
+            port("a1-1-1f.abc1.domain"),
+            port("a1-1-2f.abc1.domain"),
+        ],
+        mapping,
+    ) == {
+        "a1-1-1.abc1.domain": "a1-1-network",
+        "a1-1-2.abc1.domain": "a1-1-network",
+        "a1-1-1f.abc1.domain": "a1-1-storage",
+        "a1-1-2f.abc1.domain": "a1-1-storage",
+    }
 
 
 def test_vlan_group_name_invalid_format():
     with pytest.raises(ValueError, match="Unknown switch name format"):
-        vlan_group_name("invalid", mapping)
+        vlan_group_names([port("invalid.abc1")], mapping)
 
     with pytest.raises(ValueError, match="Unknown switch name format"):
-        vlan_group_name("", mapping)
+        vlan_group_names([port(".abc1")], mapping)
 
 
 def test_vlan_group_name_unknown_suffix():
-    with pytest.raises(ValueError, match="Switch suffix 99 is not present"):
-        vlan_group_name("a2-12-99", mapping)
+    with pytest.raises(TopologyError, match="Switch suffix 99 is not present"):
+        vlan_group_names([port("a1-1-99.abc1")], mapping)
 
-    with pytest.raises(ValueError, match="Switch suffix 5f is not present"):
-        vlan_group_name("a2-12-5f", mapping)
+    with pytest.raises(TopologyError, match="Switch suffix 5f is not present"):
+        vlan_group_names([port("a1-1-5f.abc1")], mapping)
 
-    with pytest.raises(ValueError, match="Switch suffix xyz is not present"):
-        vlan_group_name("a2-12-xyz", mapping)
+    with pytest.raises(TopologyError, match="Switch suffix xyz is not present"):
+        vlan_group_names([port("a1-1-xyz.abc1")], mapping)
+
+
+def test_vlan_group_name_many_dc():
+    with pytest.raises(TopologyError, match="multiple"):
+        vlan_group_names(
+            [
+                port("a1-1-1.abc1.domain"),
+                port("a1-1-1.xyz2.domain"),
+            ],
+            mapping,
+        )
+
+
+def test_vlan_group_name_too_many_racks():
+    with pytest.raises(TopologyError, match="more than two racks"):
+        vlan_group_names(
+            [
+                port("a1-1-1.abc1.domain"),
+                port("a1-2-1.abc1.domain"),
+                port("a1-3-1.abc1.domain"),
+            ],
+            mapping,
+        )

@@ -1,108 +1,130 @@
-import binascii
 from typing import Any
 
-import netaddr
 import openstack
-from construct import core
-from ironic import objects
 from ironic.common import exception
-from ironic.drivers.modules.inspector import lldp_tlvs
 from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
 
 import ironic_understack.vlan_group_name_convention
 from ironic_understack.conf import CONF
+from ironic_understack.inspected_port import InspectedPort
+from ironic_understack.ironic_wrapper import ironic_ports_for_node
 
 LOG = logging.getLogger(__name__)
-
-LldpData = list[tuple[int, str]]
 
 
 class UpdateBaremetalPortsHook(base.InspectionHook):
     """Hook to update ports according to LLDP data."""
 
-    dependencies = ["validate-interfaces"]
+    # "validate-interfaces" provides the all_interfaces field in plugin_data.
+    # "parse-lldp" provides the parsed_lldp field in plugin_data.
+    dependencies = ["validate-interfaces", "parse-lldp"]
 
     def __call__(self, task, inventory, plugin_data):
         """Update Ports' local_link_info and physnet based on LLDP data.
 
-        Process the LLDP packet fields for each NIC in the inventory.
+        Using the parsed_lldp data as discovered by inspection, validate the
+        topology and determine the local_link_connection and vlan group names
+        for each of our connections.
 
-        Updates attributes of the baremetal port:
+        The ports plugin has already created/deleted the ports as appropriate
+        and set their "pxe" flag.
+
+        We update attributes of all baremetal ports for this node:
 
         - local_link_info.port_id (e.g. "Ethernet1/1")
         - local_link_info.switch_id (e.g. "aa:bb:cc:dd:ee:ff")
         - local_link_info.switch_info (e.g. "a1-1-1.ord1")
         - physical_network (e.g. "a1-1-network")
-        - pxe_boot flag?
 
-        Also adds or removes node "traits" based on the inventory data.  We
+        We also add or remove node "traits" based on the inventory data.  We
         control the trait "CUSTOM_STORAGE_SWITCH".
-
-        TODO: The IPA image will normally have exactly one inventory.interfaces
-        with an ipv4_address address and has_carrier set to True.  This is our
-        pxe boot interface.  We should clear the pxe interface flag on all other
-        baremetal ports.
-
-        The interface MAC gets passed to us in plugin_data["boot_interface"] if
-        the node was inspected by booting the IPA image.  Not sure what would be
-        set by redfish here.
         """
         LOG.debug(f"{__class__} called with {task=!r} {inventory=!r} {plugin_data=!r}")
 
-        lldp_raw: dict[str, LldpData] = plugin_data.get("lldp_raw") or {}
         node_uuid: str = task.node.uuid
-        interfaces: list[dict] = inventory["interfaces"]
-        # The all_interfaces field in plugin_data is provided by the
-        # validate-interfaces hook, so it is a dependency for this hook
-        all_interfaces: dict[str, dict] = plugin_data["all_interfaces"]
-        context = task.context
-        vlan_groups: set[str] = set()
+        inspected_ports = _parse_plugin_data(plugin_data)
+        if not inspected_ports:
+            LOG.error("No LLDP data for node %s", task.node.uuid)
+            return
 
-        for iface in interfaces:
-            if iface["name"] not in all_interfaces:
-                # This interface was not "validated" so don't bother with it
-                continue
-
-            mac_address = iface["mac_address"]
-            port = objects.port.Port.get_by_address(context, mac_address)
-            if not port:
-                LOG.debug(
-                    "Skipping LLDP processing for interface %s of node "
-                    "%s: matching port not found in Ironic.",
-                    mac_address,
-                    node_uuid,
-                )
-                continue
-
-            lldp_data = lldp_raw.get(iface["name"]) or iface.get("lldp")
-            if not lldp_data:
-                LOG.warning(
-                    "No LLDP data found for interface %s of node %s",
-                    mac_address,
-                    node_uuid,
-                )
-                continue
-
-            local_link_connection = _parse_lldp(lldp_data, node_uuid)
-            vlan_group = vlan_group_name(local_link_connection)
-
-            _set_port_local_link_connection(port, node_uuid, local_link_connection)
-            _set_port_physical_network(port, vlan_group)
-            if vlan_group:
-                vlan_groups.add(vlan_group)
-        _set_node_traits(task, vlan_groups)
-
-
-def _set_port_local_link_connection(port: Any, node_uuid: str, local_link_connection: dict):
-    try:
-        LOG.debug(
-            "Updating port %s for node %s local_link_connection %s",
-            port.uuid,
-            node_uuid,
-            local_link_connection,
+        ports_by_mac = {p.mac_address: p for p in inspected_ports}
+        vlan_groups = ironic_understack.vlan_group_name_convention.vlan_group_names(
+            inspected_ports,
+            CONF.ironic_understack.switch_name_vlan_group_mapping,
         )
-        port.local_link_connection = local_link_connection
+        LOG.debug(
+            "Node=%(node)s vlan_groups=%(groups)s",
+            {"node": node_uuid, "groups": vlan_groups},
+        )
+
+        for baremetal_port in ironic_ports_for_node(task.context, task.node.id):
+            inspected_port = ports_by_mac.get(baremetal_port.address)
+            if inspected_port:
+                LOG.info(
+                    "Port=%(uuid)s Node=%(node)s is connected %(lldp)s",
+                    {"uuid": baremetal_port.id, "node": node_uuid, "lldp": inspected_port},
+                )
+                vlan_group = vlan_groups.get(inspected_port.switch_system_name)
+                if not vlan_group:
+                    LOG.error("Missing VLAN group for %s", inspected_port)
+                elif vlan_group.endswith("-network"):
+                    _set_port_attributes(baremetal_port, node_uuid, inspected_port, vlan_group)
+                else:
+                    _clear_port_attributes(baremetal_port, node_uuid)
+            else:
+                LOG.info(
+                    "Port=%(uuid)s Node=%(node)s has no LLDP connection",
+                    {"uuid": baremetal_port.id, "node": node_uuid},
+                )
+                _clear_port_attributes(baremetal_port, node_uuid)
+
+
+        _set_node_traits(task, {x for x in vlan_groups.values() if x})
+
+
+def _parse_plugin_data(plugin_data: dict) -> list[InspectedPort]:
+    mac = {
+        interface["name"]: interface["mac_address"]
+        for interface in plugin_data["all_interfaces"].values()
+    }
+
+    return [
+        InspectedPort(
+            mac_address=mac[name],
+            name=name,
+            switch_system_name=str(lldp["switch_system_name"]).lower(),
+            switch_chassis_id=str(lldp["switch_chassis_id"]).lower(),
+            switch_port_id=str(lldp["switch_port_id"]),
+        )
+        for name, lldp in plugin_data["parsed_lldp"].items()
+    ]
+
+
+def _set_port_attributes(
+    port: Any, node_uuid: str, inspected_port: InspectedPort, physical_network: str
+):
+    try:
+        if port.local_link_connection != inspected_port.local_link_connection:
+            LOG.debug(
+                "Updating node %s port %s local_link_connection %s => %s",
+                node_uuid,
+                port.uuid,
+                port.local_link_connection,
+                inspected_port.local_link_connection,
+            )
+            port.local_link_connection = inspected_port.local_link_connection
+
+        if port.physical_network != physical_network:
+            LOG.debug(
+                "Updating node %s port %s physical_network from %s to %s",
+                node_uuid,
+                port.id,
+                port.physical_network,
+                physical_network,
+            )
+            port.physical_network = physical_network
+
         port.save()
     except exception.IronicException as e:
         LOG.warning(
@@ -111,78 +133,16 @@ def _set_port_local_link_connection(port: Any, node_uuid: str, local_link_connec
         )
 
 
-def _parse_lldp(lldp_data: LldpData, node_id: str) -> dict[str, str]:
-    """Convert Ironic's "lldp_raw" format to local_link dict."""
+def _clear_port_attributes(port: Any, node_uuid: str):
     try:
-        decoded = {}
-        for tlv_type, tlv_value in lldp_data:
-            if tlv_type not in decoded:
-                decoded[tlv_type] = []
-            decoded[tlv_type].append(bytearray(binascii.unhexlify(tlv_value)))
-
-        port_id = _extract_port_id(decoded)
-        switch_id = _extract_switch_id(decoded)
-        switch_info = _extract_hostname(decoded)
-        if port_id and switch_id and switch_info:
-            return {
-                "port_id": port_id,
-                "switch_id": switch_id,
-                "switch_info": switch_info,
-            }
-        LOG.warning("Failed to extract local_link_info from LLDP data for %s", node_id)
-    except (binascii.Error, core.MappingError, netaddr.AddrFormatError) as e:
-        LOG.warning("Failed to parse lldp_raw data for Node %s: %s", node_id, e)
-    return {}
-
-
-def _extract_port_id(data: dict) -> str | None:
-    for value in data.get(lldp_tlvs.LLDP_TLV_PORT_ID, []):
-        parsed = lldp_tlvs.PortId.parse(value)
-        if parsed.value:  # pyright: ignore reportAttributeAccessIssue
-            return parsed.value.value  # pyright: ignore reportAttributeAccessIssue
-
-
-def _extract_switch_id(data: dict) -> str | None:
-    for value in data.get(lldp_tlvs.LLDP_TLV_CHASSIS_ID, []):
-        parsed = lldp_tlvs.ChassisId.parse(value)
-        if "mac_address" in parsed.subtype:  # pyright: ignore reportAttributeAccessIssue
-            return str(parsed.value.value)  # pyright: ignore reportAttributeAccessIssue
-
-
-def _extract_hostname(data: dict) -> str | None:
-    for value in data.get(lldp_tlvs.LLDP_TLV_SYS_NAME, []):
-        parsed = lldp_tlvs.SysName.parse(value)
-        if parsed.value:  # pyright: ignore reportAttributeAccessIssue
-            return parsed.value  # pyright: ignore reportAttributeAccessIssue
-
-
-def vlan_group_name(local_link_connection) -> str | None:
-    switch_name = local_link_connection.get("switch_info")
-    if not switch_name:
-        return
-
-    return ironic_understack.vlan_group_name_convention.vlan_group_name(
-        switch_name,
-        CONF.ironic_understack.switch_name_vlan_group_mapping
-    )
-
-
-def _set_port_physical_network(port, new_physical_network: str | None):
-    old_physical_network = port.physical_network
-
-    if new_physical_network == old_physical_network:
-        LOG.debug("Port %s physical_network already set to %s",
-                  port.id, new_physical_network)
-        return
-
-    LOG.debug(
-        "Updating port %s physical_network from %s to %s",
-        port.id,
-        old_physical_network,
-        new_physical_network,
-    )
-    port.physical_network = new_physical_network
-    port.save()
+        port.local_link_connection = {}
+        port.physical_network = None
+        port.save()
+    except exception.IronicException as e:
+        LOG.warning(
+            "Failed to clear port %(uuid)s for node %(node)s. Error: %(error)s",
+            {"uuid": port.id, "node": node_uuid, "error": e},
+        )
 
 
 def _set_node_traits(task, vlan_groups: set[str]):
@@ -200,16 +160,18 @@ def _set_node_traits(task, vlan_groups: set[str]):
     all_possible_suffixes = set(
         CONF.ironic_understack.switch_name_vlan_group_mapping.values()
     )
-    our_traits = { _trait_name(x) for x in all_possible_suffixes }
-    required_traits = { _trait_name(x) for x in vlan_groups }
+    our_traits = {_trait_name(x) for x in all_possible_suffixes if x}
+    required_traits = {_trait_name(x) for x in vlan_groups if x}
     existing_traits = set(task.node.traits.get_trait_names()).intersection(our_traits)
 
-    traits_to_remove = existing_traits.difference(required_traits)
-    traits_to_add = required_traits.difference(existing_traits)
+    traits_to_remove = sorted(existing_traits.difference(required_traits))
+    traits_to_add = sorted(required_traits.difference(existing_traits))
 
     LOG.debug(
         "Checking traits for node %s: existing=%s required=%s",
-        task.node.uuid, existing_traits, required_traits,
+        task.node.uuid,
+        existing_traits,
+        required_traits,
     )
 
     for trait in traits_to_remove:
@@ -227,6 +189,7 @@ def _set_node_traits(task, vlan_groups: set[str]):
 
     if traits_to_add or traits_to_remove:
         task.node.save()
+
 
 def _trait_name(vlan_group_name: str) -> str:
     suffix = vlan_group_name.upper().split("-")[-1]

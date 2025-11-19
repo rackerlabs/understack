@@ -1,44 +1,65 @@
-def vlan_group_name(switch_name: str, mapping: dict[str, str]) -> str:
-    """The VLAN GROUP name is a function of the switch name.
+from ironic_understack.inspected_port import InspectedPort
+from itertools import groupby
 
-    Top-of-rack switch hostname is required to follow the convention:
 
-      <cabinet-name>-<suffix>
+class TopologyError(Exception):
+    pass
 
-    We only consider the unqualified name, ignoring everything after the first
-    dot.
 
-    The switch name suffix must be one of the keys in the supplied mapping.  The
-    corresponding value is used to name the VLAN Group (aka physical network).
+def vlan_group_names(
+    ports: list[InspectedPort], mapping: dict[str, str]
+) -> dict[str, str | None]:
+    """The VLAN GROUP name is a function of the switch names.
 
-    The VLAN GROUP name results from joining the cabinet name to the new suffix
-    with a hyphen.
+    Given the set of all connections to a single baremetal node,
 
-    >>> vlan_group_name("a123-20-1", {"1": "network"})
-    >>> "a123-20-network"
+    Assert that data_center is the same for all switches.
 
-    VLAN Groups are currentlty REQUIRED to span a single cabinet.  A VLAN Group
-    that spans multiple cabinets would be named like "a123-20/21-network" but we
-    can't support this because we have no way to determine which switches are
-    paired together.
+    Assert that the switches are spread accross no more than two racks.
+
+    Assert that there are exactly two connections to each "network" switch.
+
+    If both switches are in the same rack, the vlan_group name looks like this:
+
+    ["a11-12-1", "a11-12-2"] => "a11-12-network"
+
+    If those switches are spread accross a pair of racks, the VLAN name has both
+    racks separated by a slash:
+
+    ["a11-12-1", "a11-13-1"] => "a11-12/a11-13-network"
+
+    Non-network switches have a VLAN Group name of None.
     """
-    switch_name = switch_name.split(".")[0].lower()
+    data_centers = {p.data_center_name for p in ports}
+    if len(data_centers) > 1:
+        raise TopologyError("Connections in multiple data centers: %s", ports)
 
-    parts = switch_name.rsplit("-", 1)
-    if len(parts) != 2:
-        raise ValueError(
-            f"Unknown switch name format: {switch_name} - this hook requires "
-            f"that switch names follow the convention <cabinet-name>-<suffix>"
-        )
+    network_rack_names = {p.rack_name for p in ports}
+    if len(network_rack_names) > 2:
+        raise TopologyError("Connections in more than two racks: %s", ports)
 
-    cabinet_name, suffix = parts
+    for port in ports:
+        if port.switch_suffix not in mapping:
+            raise TopologyError(
+                f"Switch suffix {port.switch_suffix} is not present in the "
+                f"mapping configured in "
+                f"ironic_understack.switch_name_vlan_group_mapping. "
+                f"Recognised suffixes are: {mapping.keys()}"
+            )
 
-    vlan_suffix = mapping.get(suffix)
-    if vlan_suffix is None:
-        raise ValueError(
-            f"Switch suffix {suffix} is not present in the mapping configured "
-            f"in ironic_understack.switch_name_vlan_group_mapping.  Recognised "
-            f"suffixes are: {mapping.keys()}"
-        )
+    vlan_group_names = {}
+    for vlan_group_suffix, ports_in_group in groupby(ports, lambda p: mapping[p.switch_suffix]):
+        ports_in_group = list(ports_in_group)
 
-    return f"{cabinet_name}-{vlan_suffix}"
+        if vlan_group_suffix == "network" and len(ports_in_group) != 2:
+            raise TopologyError(
+                "Expected two connections to network switch, but we have %s",
+                ports_in_group,
+            )
+
+        rack_names = {p.rack_name for p in ports_in_group}
+        vlan_group_name = "/".join(sorted(rack_names)) + "-" + vlan_group_suffix
+
+        for p in ports_in_group:
+            vlan_group_names[p.switch_system_name] = vlan_group_name
+    return vlan_group_names
