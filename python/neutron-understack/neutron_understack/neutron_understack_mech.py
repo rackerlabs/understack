@@ -10,6 +10,8 @@ from neutron_lib.plugins.ml2 import api
 from neutron_lib.plugins.ml2.api import MechanismDriver
 from oslo_config import cfg
 
+from functools import cached_property
+
 from neutron_understack import config
 from neutron_understack import routers
 from neutron_understack import utils
@@ -39,13 +41,15 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
         self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
         LOG.debug("Finished initializing undersync for 'understack'")
-        self.ironic_client = IronicClient()
-        LOG.debug("Finished initializing ironic for 'understack'")
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         LOG.debug("Finished initializing trunks for 'understack'")
         self.subscribe()
         LOG.debug("Finished subscribing for 'understack'")
         LOG.debug("Finished initializing 'understack'")
+
+    @cached_property
+    def ironic_client(self):
+        return IronicClient()
 
     def subscribe(self):
         registry.subscribe(
