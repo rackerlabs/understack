@@ -6,35 +6,38 @@ from openstack.baremetal.baremetal_service import BaremetalService
 from openstack.baremetal.v1.port import Port as BaremetalPort
 from oslo_config import cfg
 
-IRONIC_SESSION = None
+# IRONIC_SESSION = None
 
 LOG = logging.getLogger(__name__)
 
 
 class IronicClient:
     def __init__(self):
-        LOG.debug("creating ironic client")
-        LOG.debug("created ironic client")
+        # LOG.debug("creating ironic client")
+        self._session = None
+        # LOG.debug("created ironic client")
 
     def _get_session(self, group: str) -> ks_loading.session.Session:
         auth = ks_loading.load_auth_from_conf_options(cfg.CONF, group)
         session = ks_loading.load_session_from_conf_options(cfg.CONF, group, auth=auth)
         return session
 
-    def _get_ironic_client(self) -> BaremetalService:
-        global IRONIC_SESSION
-        if not IRONIC_SESSION:
-            IRONIC_SESSION = self._get_session("ironic")
-
-        LOG.debug("got session, making ironic connection")
+    # def _get_ironic_client(self) -> BaremetalService:
+    #     global IRONIC_SESSION
+    #     if not IRONIC_SESSION:
+    #         IRONIC_SESSION = self._get_session("ironic")
+    #
+    #     LOG.debug("got session, making ironic connection")
 
     @property
     def irclient(self):
-        global IRONIC_SESSION
-        if not IRONIC_SESSION:
-            self._get_ironic_client()
+        if not self._session:
+            LOG.debug("creating ironic session")
+            self._session = self._get_session("ironic")
+            LOG.debug("created ironic session")
+
         return connection.Connection(
-            session=IRONIC_SESSION,
+            session=self._session,
             oslo_conf=cfg.CONF,
             connect_retries=cfg.CONF.http_retries,
         ).baremetal
