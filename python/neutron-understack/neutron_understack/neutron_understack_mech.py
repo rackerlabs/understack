@@ -1,4 +1,6 @@
 import logging
+import eventlet
+eventlet.monkey_patch()
 from uuid import UUID
 
 from neutron_lib import constants as p_const
