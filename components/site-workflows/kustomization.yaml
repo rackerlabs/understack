@@ -22,6 +22,7 @@ resources:
   - sensors/sensor-neutron-olso-event.yaml
   - sensors/sensor-ironic-reclean.yaml
   - sensors/sensor-ironic-node-port.yaml
+  - sensors/sensor-ironic-node-portgroup.yaml
   - sensors/sensor-ironic-oslo-event.yaml
 
 helmCharts:
