@@ -7,6 +7,12 @@ from openstack.baremetal.v1.port import Port as BaremetalPort
 from oslo_config import cfg
 
 # IRONIC_SESSION = None
+def _green_socket_modules():
+    from eventlet.green import socket
+    return [('socket', socket)]
+
+import eventlet.patcher
+eventlet.patcher.__dict__['_green_socket_modules'] = _green_socket_modules
 
 LOG = logging.getLogger(__name__)
 
