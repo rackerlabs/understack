@@ -73,6 +73,9 @@ dhcp-option={{ tag }}{{ option_prefix }}{{ option|replace('_', '-')|lower }},{{ 
 {%- endif %}
 {%- endmacro %}
 
+# force broadcast type respone as some dhcp clients need that
+dhcp-broadcast
+
 dhcp-authoritative
 # DHCP ranges to hand out
 {% set dhcp_proxy_list = [] -%}
