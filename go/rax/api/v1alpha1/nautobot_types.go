@@ -33,11 +33,10 @@ type NautobotSpec struct {
 
 // NautobotStatus defines the observed state of Nautobot.
 type NautobotStatus struct {
-	ConfigFileSHA string      `json:"configFileSHA,omitempty"`
-	GitCommitHash string      `json:"gitCommitHash,omitempty"`
-	LastSyncedAt  metav1.Time `json:"lastSyncedAt,omitempty"`
-	Ready         bool        `json:"ready,omitempty"`
-	Message       string      `json:"message,omitempty"`
+	LastSyncedAt         metav1.Time         `json:"lastSyncedAt,omitempty"`
+	Ready                bool                `json:"ready,omitempty"`
+	Message              string              `json:"message,omitempty"`
+	NautobotStatusReport map[string][]string `json:"nautobotStatusReport,omitempty"`
 }
 
 // +kubebuilder:object:root=true

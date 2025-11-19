@@ -8,9 +8,10 @@ import (
 )
 
 func (n *NautobotClient) ListAllInterfaceTemplateByDeviceType(ctx context.Context, deviceTypeID string) []nb.InterfaceTemplate {
-	list, _, err := n.Client.DcimAPI.DcimInterfaceTemplatesList(ctx).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
+	list, _, err := n.Client.DcimAPI.DcimInterfaceTemplatesList(ctx).Limit(10000).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		log.Error("failed to list console port templates", "device_type_id", deviceTypeID, "error", err)
+		n.AddReport("ListAllInterfaceTemplateByDeviceType", "failed to list interface templates", "device_type_id", deviceTypeID, "error", err.Error())
 		return []nb.InterfaceTemplate{}
 	}
 	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
@@ -22,9 +23,10 @@ func (n *NautobotClient) ListAllInterfaceTemplateByDeviceType(ctx context.Contex
 }
 
 func (n *NautobotClient) GetInterfaceTemplateByName(ctx context.Context, name, deviceTypeID string) nb.InterfaceTemplate {
-	list, _, err := n.Client.DcimAPI.DcimInterfaceTemplatesList(ctx).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, _, err := n.Client.DcimAPI.DcimInterfaceTemplatesList(ctx).Limit(10000).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		log.Error("failed to get console port template by name", "name", name, "device_type_id", deviceTypeID, "error", err)
+		n.AddReport("GetInterfaceTemplateByName", "failed to get interface template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error())
 		return nb.InterfaceTemplate{}
 	}
 	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
@@ -39,6 +41,7 @@ func (n *NautobotClient) CreateNewInterfaceTemplate(ctx context.Context, req nb.
 	consolePort, _, err := n.Client.DcimAPI.DcimInterfaceTemplatesCreate(ctx).WritableInterfaceTemplateRequest(req).Execute()
 	if err != nil {
 		log.Error("failed to create console port template", "name", req.Name, "error", err)
+		n.AddReport("CreateNewInterfaceTemplate", "failed to create interface template", "name", req.Name, "error", err.Error())
 		return nil, err
 	}
 	log.Info("successfully created console port template", "name", consolePort.Name, "id", consolePort.Id)
@@ -49,6 +52,7 @@ func (n *NautobotClient) UpdateInterfaceTemplate(ctx context.Context, id string,
 	consolePort, _, err := n.Client.DcimAPI.DcimInterfaceTemplatesUpdate(ctx, id).WritableInterfaceTemplateRequest(req).Execute()
 	if err != nil {
 		log.Error("failed to update console port template", "id", id, "name", req.Name, "error", err)
+		n.AddReport("UpdateInterfaceTemplate", "failed to update interface template", "id", id, "name", req.Name, "error", err.Error())
 		return nil, err
 	}
 	log.Info("successfully updated console port template", "id", id, "name", consolePort.Name)
@@ -59,6 +63,7 @@ func (n *NautobotClient) DestroyInterfaceTemplate(ctx context.Context, id string
 	_, err := n.Client.DcimAPI.DcimInterfaceTemplatesDestroy(ctx, id).Execute()
 	if err != nil {
 		log.Error("failed to destroy console port template", "id", id, "error", err)
+		n.AddReport("DestroyInterfaceTemplate", "failed to destroy interface template", "id", id, "error", err.Error())
 		return err
 	}
 	log.Info("successfully destroyed console port template", "id", id)

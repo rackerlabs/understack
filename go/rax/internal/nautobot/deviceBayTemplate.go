@@ -8,9 +8,10 @@ import (
 )
 
 func (n *NautobotClient) ListAllDeviceBayTemplateByDeviceType(ctx context.Context, deviceTypeID string) []nb.DeviceBayTemplate {
-	list, _, err := n.Client.DcimAPI.DcimDeviceBayTemplatesList(ctx).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
+	list, _, err := n.Client.DcimAPI.DcimDeviceBayTemplatesList(ctx).Limit(10000).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		log.Error("failed to list device bay templates", "device_type_id", deviceTypeID, "error", err)
+		n.AddReport("ListAllDeviceBayTemplateByDeviceType", "failed to list device bay templates", "device_type_id", deviceTypeID, "error", err.Error())
 		return []nb.DeviceBayTemplate{}
 	}
 	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
@@ -22,9 +23,10 @@ func (n *NautobotClient) ListAllDeviceBayTemplateByDeviceType(ctx context.Contex
 }
 
 func (n *NautobotClient) GetDeviceBayTemplateByName(ctx context.Context, name, deviceTypeID string) nb.DeviceBayTemplate {
-	list, _, err := n.Client.DcimAPI.DcimDeviceBayTemplatesList(ctx).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, _, err := n.Client.DcimAPI.DcimDeviceBayTemplatesList(ctx).Limit(10000).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		log.Error("failed to get device bay template by name", "name", name, "device_type_id", deviceTypeID, "error", err)
+		n.AddReport("GetDeviceBayTemplateByName", "failed to get device bay template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error())
 		return nb.DeviceBayTemplate{}
 	}
 	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
@@ -39,6 +41,7 @@ func (n *NautobotClient) CreateNewDeviceBayTemplate(ctx context.Context, req nb.
 	consolePort, _, err := n.Client.DcimAPI.DcimDeviceBayTemplatesCreate(ctx).DeviceBayTemplateRequest(req).Execute()
 	if err != nil {
 		log.Error("failed to create device bay template", "name", req.Name, "error", err)
+		n.AddReport("CreateNewDeviceBayTemplate", "failed to create device bay template", "name", req.Name, "error", err.Error())
 		return nil, err
 	}
 	log.Info("successfully created device bay template", "name", consolePort.Name, "id", consolePort.Id)
@@ -49,6 +52,7 @@ func (n *NautobotClient) UpdateDeviceBayTemplate(ctx context.Context, id string,
 	consolePort, _, err := n.Client.DcimAPI.DcimDeviceBayTemplatesUpdate(ctx, id).DeviceBayTemplateRequest(req).Execute()
 	if err != nil {
 		log.Error("failed to update device bay template", "id", id, "name", req.Name, "error", err)
+		n.AddReport("UpdateDeviceBayTemplate", "failed to update device bay template", "id", id, "name", req.Name, "error", err.Error())
 		return nil, err
 	}
 	log.Info("successfully updated device bay template", "id", id, "name", consolePort.Name)
@@ -59,6 +63,7 @@ func (n *NautobotClient) DestroyDeviceBayTemplate(ctx context.Context, id string
 	_, err := n.Client.DcimAPI.DcimDeviceBayTemplatesDestroy(ctx, id).Execute()
 	if err != nil {
 		log.Error("failed to destroy device bay template", "id", id, "error", err)
+		n.AddReport("DestroyDeviceBayTemplate", "failed to destroy device bay template", "id", id, "error", err.Error())
 		return err
 	}
 	log.Info("successfully destroyed device bay template", "id", id)

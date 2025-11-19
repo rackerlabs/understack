@@ -2,12 +2,20 @@ package nautobot
 
 import (
 	nb "github.com/nautobot/go-nautobot/v2"
+	"strings"
 )
 
 // NautobotClient holds the Nautobot API client and configuration.
 type NautobotClient struct {
 	Config *nb.Configuration
 	Client *nb.APIClient
+	Report map[string][]string
+}
+
+// AddReport appends one or more lines to the current reconciliation report.
+func (n *NautobotClient) AddReport(key string, line ...string) {
+	combined := strings.Join(line, " ")
+	n.Report[key] = append(n.Report[key], combined)
 }
 
 // NewNautobotClient creates and configures a new Nautobot API client.
@@ -37,5 +45,6 @@ func NewNautobotClient(apiURL string, authToken string) *NautobotClient {
 	return &NautobotClient{
 		Config: config,
 		Client: client,
+		Report: make(map[string][]string),
 	}
 }

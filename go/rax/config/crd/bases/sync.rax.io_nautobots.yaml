@@ -69,9 +69,6 @@ spec:
                   type: object
                 type: array
               nautobotSecretRef:
-                description: |-
-                  A reference to a specific 'key' within a Secret resource.
-                  In some instances, `key` is a required field.
                 properties:
                   key:
                     description: |-
@@ -103,15 +100,17 @@ spec:
           status:
             description: NautobotStatus defines the observed state of Nautobot.
             properties:
-              configFileSHA:
-                type: string
-              gitCommitHash:
-                type: string
               lastSyncedAt:
                 format: date-time
                 type: string
               message:
                 type: string
+              nautobotStatusReport:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                type: object
               ready:
                 type: boolean
             type: object

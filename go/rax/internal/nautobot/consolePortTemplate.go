@@ -8,9 +8,10 @@ import (
 )
 
 func (n *NautobotClient) ListAllConsolePortTemplateByDeviceType(ctx context.Context, deviceTypeID string) []nb.ConsolePortTemplate {
-	list, _, err := n.Client.DcimAPI.DcimConsolePortTemplatesList(ctx).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
+	list, _, err := n.Client.DcimAPI.DcimConsolePortTemplatesList(ctx).Limit(10000).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		log.Error("failed to list console port templates", "device_type_id", deviceTypeID, "error", err)
+		n.AddReport("ListAllConsolePortTemplateByDeviceType", "failed to list console port templates", "device_type_id", deviceTypeID, "error", err.Error())
 		return []nb.ConsolePortTemplate{}
 	}
 	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
@@ -22,9 +23,10 @@ func (n *NautobotClient) ListAllConsolePortTemplateByDeviceType(ctx context.Cont
 }
 
 func (n *NautobotClient) GetConsolePortTemplateByName(ctx context.Context, name, deviceTypeID string) nb.ConsolePortTemplate {
-	list, _, err := n.Client.DcimAPI.DcimConsolePortTemplatesList(ctx).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, _, err := n.Client.DcimAPI.DcimConsolePortTemplatesList(ctx).Limit(10000).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		log.Error("failed to get console port template by name", "name", name, "device_type_id", deviceTypeID, "error", err)
+		n.AddReport("GetConsolePortTemplateByName", "failed to get console port template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error())
 		return nb.ConsolePortTemplate{}
 	}
 	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
@@ -39,6 +41,7 @@ func (n *NautobotClient) CreateNewConsolePortTemplate(ctx context.Context, req n
 	consolePort, _, err := n.Client.DcimAPI.DcimConsolePortTemplatesCreate(ctx).WritableConsolePortTemplateRequest(req).Execute()
 	if err != nil {
 		log.Error("failed to create console port template", "name", req.Name, "error", err)
+		n.AddReport("CreateNewConsolePortTemplate", "failed to create console port template", "name", req.Name, "error", err.Error())
 		return nil, err
 	}
 	log.Info("successfully created console port template", "name", consolePort.Name, "id", consolePort.Id)
@@ -49,6 +52,7 @@ func (n *NautobotClient) UpdateConsolePortTemplate(ctx context.Context, id strin
 	consolePort, _, err := n.Client.DcimAPI.DcimConsolePortTemplatesUpdate(ctx, id).WritableConsolePortTemplateRequest(req).Execute()
 	if err != nil {
 		log.Error("failed to update console port template", "id", id, "name", req.Name, "error", err)
+		n.AddReport("UpdateConsolePortTemplate", "failed to update console port template", "id", id, "name", req.Name, "error", err.Error())
 		return nil, err
 	}
 	log.Info("successfully updated console port template", "id", id, "name", consolePort.Name)
@@ -59,6 +63,7 @@ func (n *NautobotClient) DestroyConsolePortTemplate(ctx context.Context, id stri
 	_, err := n.Client.DcimAPI.DcimConsolePortTemplatesDestroy(ctx, id).Execute()
 	if err != nil {
 		log.Error("failed to destroy console port template", "id", id, "error", err)
+		n.AddReport("DestroyConsolePortTemplate", "failed to destroy console port template", "id", id, "error", err.Error())
 		return err
 	}
 	log.Info("successfully destroyed console port template", "id", id)
