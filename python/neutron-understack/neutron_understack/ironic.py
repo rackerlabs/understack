@@ -26,10 +26,13 @@ class IronicClient:
         if not IRONIC_SESSION:
             IRONIC_SESSION = self._get_session("ironic")
 
-        LOG.debug("got session, making connection")
+        LOG.debug("got session, making ironic connection")
 
     @property
     def irclient(self):
+        global IRONIC_SESSION
+        if not IRONIC_SESSION:
+            self._get_ironic_client()
         return connection.Connection(
             session=IRONIC_SESSION,
             oslo_conf=cfg.CONF,
