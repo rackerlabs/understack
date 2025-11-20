@@ -1,0 +1,71 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ironic-node-portgroup
+  annotations:
+    workflows.argoproj.io/title: Validate Portgroup Names from Ironic Events
+    workflows.argoproj.io/description: |+
+      Triggers on the following Ironic Events:
+
+      - baremetal.portgroup.create.end which happens when a baremetal portgroup is created
+
+      This sensor validates that portgroup names are prefixed with the node name.
+      If not, it automatically updates the portgroup name to include the prefix.
+
+      Resulting code should be very similar to:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
+      -p event-json "JSON-payload"
+      ```
+
+      Defined in `workflows/argo-events/sensors/ironic-node-portgroup.yaml`
+spec:
+  dependencies:
+  - eventName: openstack
+    eventSourceName: openstack-ironic
+    name: ironic-dep
+    transform:
+      # the event is a string-ified JSON so we need to decode it
+      # replace the whole event body
+      jq: |
+        .body = (.body["oslo.message"] | fromjson)
+    filters:
+      # applies each of the items in data with 'and' but there's only one
+      dataLogicalOperator: "and"
+      data:
+        - path: "body.event_type"
+          type: "string"
+          value:
+            - "baremetal.portgroup.create.end"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: ironic-node-portgroup
+        # creates workflow object directly via k8s API
+        k8s:
+          operation: create
+          parameters:
+            # first parameter is the parsed oslo.message
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: body
+                dependencyName: ironic-dep
+          source:
+            # create a workflow in argo-events prefixed with ironic-node-portgroup-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: ironic-node-portgroup-
+                namespace: argo-events
+              spec:
+                # defines the parameters being replaced above
+                arguments:
+                  parameters:
+                    - name: event-json
+                # references the workflow
+                workflowTemplateRef:
+                  name: openstack-oslo-event

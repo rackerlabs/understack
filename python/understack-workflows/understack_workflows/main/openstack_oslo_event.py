@@ -15,6 +15,7 @@ from understack_workflows.helpers import setup_logger
 from understack_workflows.openstack.client import get_openstack_client
 from understack_workflows.oslo_event import ironic_node
 from understack_workflows.oslo_event import ironic_port
+from understack_workflows.oslo_event import ironic_portgroup
 from understack_workflows.oslo_event import keystone_project
 from understack_workflows.oslo_event import neutron_network
 from understack_workflows.oslo_event import neutron_subnet
@@ -67,6 +68,7 @@ _event_handlers: dict[str, EventHandler] = {
     "baremetal.port.create.end": ironic_port.handle_port_create_update,
     "baremetal.port.update.end": ironic_port.handle_port_create_update,
     "baremetal.port.delete.end": ironic_port.handle_port_delete,
+    "baremetal.portgroup.create.end": ironic_portgroup.handle_portgroup_create,
     "baremetal.node.provision_set.end": ironic_node.handle_provision_end,
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,

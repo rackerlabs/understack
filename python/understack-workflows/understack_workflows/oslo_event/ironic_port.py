@@ -59,11 +59,63 @@ class IronicPortEvent:
         )
 
 
+def _get_node_name(conn: Connection, node_uuid: str) -> str | None:
+    """Get the node name from Ironic by UUID."""
+    try:
+        node = conn.baremetal.get_node(node_uuid)  # pyright: ignore
+        return node.name if node else None
+    except Exception:
+        logger.exception("Failed to get node %s from Ironic", node_uuid)
+        return None
+
+
+def _should_fix_port_name(name: str, node_name: str) -> bool:
+    """Check if port name needs to be prefixed with node name."""
+    if not name:
+        return False
+    return not name.startswith(f"{node_name}-")
+
+
+def _fix_port_name_if_needed(conn: Connection, event: IronicPortEvent) -> None:
+    """Fix port name by prefixing with node name if needed."""
+    if not event.name:
+        logger.debug("Port %s has no name, skipping name validation", event.uuid)
+        return
+
+    # Get the node name
+    node_name = _get_node_name(conn, event.node_uuid)
+    if not node_name:
+        logger.error("Could not get node name for node %s", event.node_uuid)
+        return
+
+    # Check if name needs fixing
+    if not _should_fix_port_name(event.name, node_name):
+        logger.debug(
+            "Port %s name '%s' already has correct prefix", event.uuid, event.name
+        )
+        return
+
+    # Fix the name by prefixing with node name
+    new_name = f"{node_name}-{event.name}"
+    logger.info(
+        "Updating port %s name from '%s' to '%s'", event.uuid, event.name, new_name
+    )
+
+    try:
+        conn.baremetal.update_port(event.uuid, name=new_name)  # pyright: ignore
+        logger.info("Successfully updated port %s name", event.uuid)
+    except Exception:
+        logger.exception("Failed to update port %s name", event.uuid)
+
+
 def handle_port_create_update(
-    _conn: Connection, nautobot: Nautobot, event_data: dict
+    conn: Connection, nautobot: Nautobot, event_data: dict
 ) -> int:
     """Operates on an Ironic Port create and update event."""
     event = IronicPortEvent.from_event_dict(event_data)
+
+    # Check and fix port name if needed
+    _fix_port_name_if_needed(conn, event)
 
     logger.debug("looking up interface in nautobot by UUID: %s", event.uuid)
     intf = nautobot.dcim.interfaces.get(id=event.uuid)
