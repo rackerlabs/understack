@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 from pprint import pformat
 
@@ -22,6 +23,10 @@ from understack_workflows.helpers import setup_logger
 from understack_workflows.nautobot_device import NautobotDevice
 
 logger = setup_logger(__name__)
+
+# These are extremely verbose by default:
+for name in ["ironicclient", "keystoneauth", "stevedore"]:
+    logging.getLogger(name).setLevel(logging.INFO)
 
 
 def main():
