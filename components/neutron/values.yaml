@@ -171,6 +171,13 @@ pod:
         cpu: "200m"
       limits:
         memory: "4096Mi"
+  probes:
+    server:
+      server:
+        readiness:
+          initialDelaySeconds: 30
+          timeoutSeconds: 20
+
 
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:
