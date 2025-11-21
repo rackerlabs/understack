@@ -83,6 +83,10 @@ spec:
             valueFrom:
               path: /var/run/argo/output.svm_created
               default: "False"
+          - name: server_storage_deleted
+            valueFrom:
+              path: /var/run/argo/output.server_storage_deleted
+              default: "False"
           - name: project_tags
             valueFrom:
               path: /var/run/argo/output.project_tags

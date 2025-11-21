@@ -10,35 +10,35 @@ metadata:
 spec:
   serviceAccountName: workflow
   templates:
-  - name: ansible-run
-    inputs:
-      parameters:
-      - name: playbook
-        default: "initial-setup.yml"
-      - name: extra_vars
-        default: "var=default"
-      - name: inventory_file
-        default: /runner/inventory/hosts.yaml
-      - name: project_path
-        default: /runner/project
-    container:
-      image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
-      command: [ansible-runner]
-      args:
-      - run
-      - /tmp/runner
-      - --project-dir
-      - "{{ inputs.parameters.project_path }}"
-      - --playbook
-      - "{{ inputs.parameters.playbook }}"
-      - --cmdline=-i {{ inputs.parameters.inventory_file }} --extra-vars '{{ inputs.parameters.extra_vars }} env=$(UNDERSTACK_ENV)' -vvv
-      env:
-      - name: NAUTOBOT_TOKEN
-        valueFrom:
-          secretKeyRef:
-            key: token
-            name: nautobot-token
-      envFrom:
-      - configMapRef:
-          name: cluster-metadata
-          optional: false
+    - name: ansible-run
+      inputs:
+        parameters:
+          - name: playbook
+            default: "initial-setup.yml"
+          - name: extra_vars
+            default: "var=default"
+          - name: inventory_file
+            default: /runner/inventory/hosts.yaml
+          - name: project_path
+            default: /runner/project
+      container:
+        image: ghcr.io/rss-engineering/undercloud-nautobot/ansible:latest
+        command: [ansible-runner]
+        args:
+          - run
+          - /tmp/runner
+          - --project-dir
+          - "{{ inputs.parameters.project_path }}"
+          - --playbook
+          - "{{ inputs.parameters.playbook }}"
+          - --cmdline=-i {{ inputs.parameters.inventory_file }} --extra-vars '{{ inputs.parameters.extra_vars }} env=$(UNDERSTACK_ENV)' -vvv
+        env:
+          - name: NAUTOBOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: token
+                name: nautobot-token
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+              optional: false

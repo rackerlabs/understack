@@ -124,3 +124,41 @@ def create_volume_connector(conn: Connection, event: IronicProvisionSetEvent):
 
 def instance_nqn(instance_id: str | None) -> str:
     return f"nqn.2014-08.org.nvmexpress:uuid:{instance_id}"
+
+
+def handle_instance_delete(_conn: Connection, _: Nautobot, event_data: dict) -> int:
+    """Operates on a Nova instance delete event to clean up storage networking."""
+    payload = event_data.get("payload", {})
+    instance_uuid = payload.get("instance_id")
+    project_id = payload.get("tenant_id")
+
+    if not instance_uuid or not project_id:
+        logger.error("No instance_id found in delete event payload")
+        return 1
+
+    logger.info("Processing instance delete for {}, Tenant {}".format(instance_uuid, project_id))
+
+    # Get the server to find the node_uuid
+    try:
+
+        # Check if this server had storage enabled
+        if payload.metadata.get("storage") != "wanted":
+            logger.info("Server %s did not have storage enabled, skipping cleanup", instance_uuid)
+            save_output("server_storage_deleted", "False")
+            return 0
+
+        # Get node_uuid from the server's hypervisor_hostname or other field
+        # The node_uuid might be in server properties
+        node_uuid = payload.get("node")
+
+        logger.info("Marking server storage for deletion: instance=%s, node=%s", instance_uuid, node_uuid)
+        save_output("server_storage_deleted", "True")
+        save_output("node_uuid", str(node_uuid) if node_uuid else "unknown")
+        save_output("instance_uuid", str(instance_uuid))
+        save_output("project_id", project_id)
+
+        return 0
+
+    except Exception as e:
+        logger.exception("Error processing instance delete: %s", e)
+        return 1

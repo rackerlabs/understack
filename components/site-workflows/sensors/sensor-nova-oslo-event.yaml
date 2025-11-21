@@ -1,0 +1,102 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: nova-oslo-event
+  annotations:
+    workflows.argoproj.io/title: Process oslo_events for nova compute
+    workflows.argoproj.io/description: |+
+      Triggers on the following Nova Events:
+
+      - compute.instance.delete.end which happens when a server is deleted
+        AND the server has metadata.storage == "wanted"
+
+      This sensor uses data filters to check the storage metadata and directly
+      triggers the ansible playbook without requiring a Python handler.
+
+      The sensor extracts the following parameters from the event:
+      - device_id: from payload.node (the Ironic/Nova instance UUID)
+      - project_id: from payload.tenant_id (UUID without dashes)
+
+      These are passed directly to the storage_on_server_delete.yml ansible playbook.
+
+      Defined in `components/site-workflows/sensors/sensor-nova-oslo-event.yaml`
+spec:
+  dependencies:
+    - eventName: notifications
+      eventSourceName: openstack-nova
+      name: nova-dep
+      transform:
+        # the event is a string-ified JSON so we need to decode it
+        # replace the whole event body and add a storage_wanted flag
+        jq: |
+          .body = (.body["oslo.message"] | fromjson) |
+          .body.storage_wanted = (.body.payload.metadata.storage // "none")
+      filters:
+        # applies each of the items in data with 'and'
+        dataLogicalOperator: "and"
+        data:
+          - path: "body.event_type"
+            type: "string"
+            value:
+              - "compute.instance.delete.end"
+          # Only process if storage was wanted
+          - path: "body.storage_wanted"
+            type: "string"
+            value:
+              - "wanted"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: nova-instance-delete
+        k8s:
+          operation: create
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: body.payload.node
+                dependencyName: nova-dep
+            - dest: spec.arguments.parameters.1.value
+              src:
+                dataKey: body.payload.tenant_id
+                dependencyName: nova-dep
+          source:
+            # create a workflow in argo-events prefixed with nova-delete-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: nova-delete-
+                namespace: argo-events
+              spec:
+                serviceAccountName: workflow
+                entrypoint: main
+                # defines the parameters extracted from the event
+                arguments:
+                  parameters:
+                    - name: device_id
+                    - name: project_id
+                templates:
+                  - name: main
+                    steps:
+                      - - name: ansible-delete-server-storage
+                          templateRef:
+                            name: ansible-workflow-template
+                            template: ansible-run
+                          arguments:
+                            parameters:
+                              - name: playbook
+                                value: storage_on_server_delete.yml
+                              - name: extra_vars
+                                value: device_id={{workflow.parameters.device_id}} project_id={{workflow.parameters.project_id}}
+                      - - name: ansible-update-switches
+                          templateRef:
+                            name: ansible-workflow-template
+                            template: ansible-run
+                          arguments:
+                            parameters:
+                              - name: playbook
+                                value: storage_update_switches.yml
+                              - name: extra_vars
+                                value: plan_mode=remediation auto_approve=false

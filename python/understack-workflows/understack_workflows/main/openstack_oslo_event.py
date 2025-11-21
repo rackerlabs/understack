@@ -79,6 +79,7 @@ _event_handlers: dict[str, EventHandler | list[EventHandler]] = {
         ironic_node.handle_provision_end,
         nautobot_device_sync.handle_node_event,
     ],
+    "compute.instance.delete.end": ironic_node.handle_instance_delete,
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,
     "identity.project.deleted": keystone_project.handle_project_deleted,
