@@ -128,3 +128,39 @@ spec:
                         parameters:
                         - name: project_id
                           value: "{{workflow.parameters.project_id}}"
+
+                  - - name: ansible-delete-server
+                      when: "{{steps.oslo-events.outputs.parameters.server_storage_deleted}} == True"
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_server_delete.yml
+                        - name: extra_vars
+                          value: device_id={{steps.oslo-events.outputs.parameters.node_uuid}} project_id={{steps.convert-project-id.outputs.result}}
+
+                  - - name: ansible-delete-svm
+                      when: "{{steps.oslo-events.outputs.parameters.svm_deleted}} == True"
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_svm_delete.yml
+                        - name: extra_vars
+                          value: svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}}
+
+                  - - name: ansible-delete-project
+                      when: "{{steps.oslo-events.outputs.parameters.project_deleted}} == True"
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_project_delete.yml
+                        - name: extra_vars
+                          value: project_id={{steps.convert-project-id.outputs.result}} dry_run=false
