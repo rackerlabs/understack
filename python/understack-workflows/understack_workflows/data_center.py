@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 
+# TODO: this should be loaded from some external source
 VLAN_GROUP_SUFFIXES = {
     "-1": "network",
     "-2": "network",
@@ -11,12 +12,15 @@ VLAN_GROUP_SUFFIXES = {
     "-1d": "bmc",
 }
 
+# TODO: this should be loaded from some external source
 SWITCH_NAME_BY_MAC = {
     "C4:7E:E0:E3:EC:2B": "f20-1-1.iad3.rackspace.net",
     "C4:7E:E0:E4:2E:2F": "f20-1-2.iad3.rackspace.net",
     "C4:4D:84:48:7A:00": "f20-1-1d.iad3.rackspace.net",
     "C4:7E:E0:E4:10:7F": "f20-2-1.iad3.rackspace.net",
     "C4:7E:E0:E4:32:DF": "f20-2-2.iad3.rackspace.net",
+    "9C:09:8B:E2:97:AB": "f20-2-1f.iad3.rackspace.net",
+    "D4:7F:35:A0:AE:33": "f20-2-2f.iad3.rackspace.net",
     "C4:4D:84:48:61:80": "f20-2-1d.iad3.rackspace.net",
     "C4:7E:E0:E4:55:3F": "f20-3-1.iad3.rackspace.net",
     "C4:7E:E0:E4:03:37": "f20-3-2.iad3.rackspace.net",
