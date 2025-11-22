@@ -259,6 +259,20 @@ pod:
         min_available: 0
   resources:
     enabled: true
+    api:
+      requests:
+        memory: "1024Mi"
+        cpu: "100m"
+      limits:
+        memory: "2048Mi"
+        cpu: "500m"
+    conductor:
+      requests:
+        memory: "1024Mi"
+        cpu: "100m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
 
 annotations:
   # we need to modify the annotations on OpenStack Helm

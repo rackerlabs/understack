@@ -36,10 +36,9 @@ pod:
     enabled: true
     api:
       requests:
-        memory: "64Mi"
-        cpu: "100m"
+        memory: "512Mi"
       limits:
-        memory: "4096Mi"
+        memory: "2048Mi"
     jobs:
       bootstrap:
         requests:
