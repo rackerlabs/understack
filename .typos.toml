@@ -29,3 +29,5 @@ sme = "sme"
 ist = "ist"
 # upstream OpenStack Helm typo
 retreive = "retreive"
+# Intentionally truncated process names in health probe (15 char limit)
+metadat = "metadat"
