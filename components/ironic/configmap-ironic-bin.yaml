@@ -314,7 +314,7 @@ data:
     lazy-apps = true
     log-x-forwarded-for = true
     master = true
-    processes = 1
+    processes = 4
     procname-prefix-spaced = ironic-api:
     route-user-agent = ^kube-probe.* donotlog:
     thunder-lock = true
