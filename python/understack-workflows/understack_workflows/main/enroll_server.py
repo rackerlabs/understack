@@ -5,8 +5,6 @@ from pprint import pformat
 
 
 from understack_workflows import ironic_node
-from understack_workflows.sync_interfaces import update_ironic_baremetal_ports
-from understack_workflows import topology
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_bios import update_dell_bios_settings
@@ -14,7 +12,6 @@ from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.discover import discover_chassis_info
-from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
@@ -27,26 +24,12 @@ for name in ["ironicclient", "keystoneauth", "stevedore"]:
 def main():
     """On-board new or Refresh existing baremetal node.
 
-    We have been invoked because a baremetal node is available.
-
-    Pre-requisites:
-
-    All connected switches must be known to us via the base MAC address in our
-    data center yaml data.
-
-    The server Device type must exist, with a name that matches the "model" as
-    reported by the BMC.
-
-    This script has the following order of operations:
-
     - connect to the BMC using standard password, if that fails then use
       password supplied in --old-bmc-password option, or factory default
 
     - ensure standard BMC password is set
 
     - if DHCP, set permanent IP address, netmask, default gw
-
-    - if server is off, power it on and wait (otherwise LLDP doesn't work)
 
     - TODO: create and install SSL certificate
 
@@ -56,6 +39,7 @@ def main():
     -  Using BMC, configure our standard BIOS settings
        - set PXE boot device
        - set timezone to UTC
+       - set the hostname
 
     -  from BMC, discover basic hardware info:
        - manufacturer, model number, serial number
@@ -65,11 +49,9 @@ def main():
           - MAC address
           - LLDP connections [{remote_mac, remote_interface_name}]
 
-    - Determine flavor of the server based on the information collected from BMC
-
     - Find or create this baremetal node in Ironic
-       - create baremetal ports for each NIC except BMC. Set one of them to PXE.
-       - set flavor
+      - set the name to "{manufacturer}-{servicetag}"
+      - set the driver as appropriate
     """
     args = argument_parser().parse_args()
 
@@ -99,13 +81,11 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
 
     update_dell_drac_settings(bmc)
 
-    pxe_interface = topology.pxe_interface_name(device_info.interfaces)
-
     bmc_set_hostname(bmc, device_info.bmc_hostname, device_name)
 
     # Note the above may require a restart of the DRAC, which in turn may delete
     # any pending BIOS jobs, so do BIOS settings after the DRAC settings.
-    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
+    update_dell_bios_settings(bmc)
 
     node = ironic_node.create_or_update(
         bmc=bmc,
@@ -113,13 +93,6 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
         manufacturer=device_info.manufacturer,
     )
     logger.info("%s _ironic_provision_state=%s", device_name, node.provision_state)
-
-    update_ironic_baremetal_ports(
-        ironic_node=node,
-        discovered_interfaces=device_info.interfaces,
-        pxe_interface_name=pxe_interface,
-    )
-
     logger.info("%s complete for %s", __file__, bmc.ip_address)
 
     return node.uuid
