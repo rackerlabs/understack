@@ -1,9 +1,10 @@
 package nautobot
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/log"
 	nb "github.com/nautobot/go-nautobot/v2"
-	"strings"
 )
 
 // NautobotClient holds the Nautobot API client and configuration.
