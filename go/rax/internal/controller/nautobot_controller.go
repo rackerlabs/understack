@@ -92,7 +92,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	n := nautobot.NewNautobotClient(fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP), nautobotAuthToken)
-	n.SyncAllDeviceTypes(ctx, deviceTypeMap)
+	_ = n.SyncAllDeviceTypes(ctx, deviceTypeMap)
 	// Update status
 	nautobotCR.Status.LastSyncedAt = metav1.Now()
 	nautobotCR.Status.Ready = true
