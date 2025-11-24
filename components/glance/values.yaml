@@ -99,8 +99,10 @@ pod:
   resources:
     enabled: true
     api:
+      requests:
+        memory: "2560Mi"
       limits:
-        memory: 6144Mi
+        memory: "6144Mi"
   probes:
     api:
       glance-api:

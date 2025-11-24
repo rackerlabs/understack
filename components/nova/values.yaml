@@ -197,6 +197,15 @@ pod:
         min_available: 0
   resources:
     enabled: true
+    api:
+      requests:
+        memory: "256Mi"
+    conductor:
+      requests:
+        memory: "256Mi"
+    compute_ironic:
+      requests:
+        memory: "256Mi"
 
 manifests:
   job_db_init: false

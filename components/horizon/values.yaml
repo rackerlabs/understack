@@ -79,6 +79,9 @@ pod:
         min_available: 0
   resources:
     enabled: true
+    server:
+      requests:
+        memory: "512Mi"
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
