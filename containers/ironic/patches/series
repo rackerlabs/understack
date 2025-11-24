@@ -1,2 +1,3 @@
 0001-pass-along-physical_network-to-neutron-from-the-bare.patch
 0001-Solve-IPMI-call-issue-results-in-UTF-8-format-error-.patch
+0001-fix-use-the-correct-path-to-the-image-when-deep-imag.patch
