@@ -60,6 +60,10 @@ conf:
         vni_ranges: ""
   neutron:
     DEFAULT:
+      # https://docs.openstack.org/neutron/latest/admin/config-wsgi.html
+      # the api_workers set the number of uWSGI processes as well
+      api_workers: 4
+      rpc_workers: 2
       # We enable the following plugins:
       # - 'ovn-router' enables OVN to be our L3 router.
       # - 'trunk' allows for us to create and configure trunk ports to allow
@@ -96,6 +100,9 @@ conf:
     quotas:
       # https://github.com/openstack/neutron/blob/master/neutron/conf/quota.py#L101-L105
       quota_rbac_policy: 100
+  neutron_api_uwsgi:
+    uwsgi:
+      start-time: "%t"
 
 # disable the neutron-ironic-agent from loading a non-existent config
 pod:
@@ -164,6 +171,13 @@ pod:
         cpu: "200m"
       limits:
         memory: "4096Mi"
+  probes:
+    server:
+      server:
+        readiness:
+          initialDelaySeconds: 30
+          timeoutSeconds: 20
+
 
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:

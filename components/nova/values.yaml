@@ -54,6 +54,8 @@ conf:
     # we aren't using this so we don't want to enable this part of the chart
     enabled: false
   DEFAULT:
+    # sets the number of uWSGI processes as well
+    osapi_compute_workers: 4
     # We are not wiring up the network to the nova metadata API so we must use
     # config_drive to pass data. To avoid users having to remember this, just
     # force it on always.
@@ -81,7 +83,7 @@ conf:
       api_max_retries: 90  # number of times to retry. default is 60.
       api_retry_interval: 10  # number of sesconds between retries. default is 2.
 
-    # https://docs.openstack.org/nova/2025.1/admin/scheduling.html#the-filter-scheduler
+    # https://docs.openstack.org/nova/2025.2/admin/scheduling.html#the-filter-scheduler
     filter_scheduler:
       available_filters: nova.scheduler.filters.all_filters
       enabled_filters:

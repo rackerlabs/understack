@@ -302,11 +302,28 @@ data:
     set -ex
     COMMAND="${@:-start}"
 
+    cat <<'EOF' > /etc/ironic/ironic-api-uwsgi.ini
+    [uwsgi]
+    add-header = Connection: close
+    buffer-size = 65535
+    die-on-term = true
+    enable-threads = true
+    exit-on-reload = false
+    hook-master-start = unix_signal:15 gracefully_kill_them_all
+    http-socket = 0.0.0.0:6385
+    lazy-apps = true
+    log-x-forwarded-for = true
+    master = true
+    processes = 4
+    procname-prefix-spaced = ironic-api:
+    route-user-agent = ^kube-probe.* donotlog:
+    thunder-lock = true
+    worker-reload-mercy = 80
+    module = ironic.wsgi:application
+    EOF
+
     function start () {
-      exec ironic-api \
-            --config-file /etc/ironic/ironic.conf \
-            --config-dir /etc/ironic/ironic.conf.d \
-            ${OPTIONS}
+      exec uwsgi --ini /etc/ironic/ironic-api-uwsgi.ini
     }
 
     function stop () {
