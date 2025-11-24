@@ -13,9 +13,9 @@ the following labels:
 
 Possible roles are:
 
-- `tenant-reader` which allows read access to tenant resources
+- `tenant-read` which allows read access to tenant resources
 - `tenant-readwrite` which allows read and write access to tenant resources
-- `infra-reader` which allows read access to infrastructure resources
+- `infra-read` which allows read access to infrastructure resources
 - `infra-readwrite` which allows read and write access to infrastructure resources
 
 Roles can be comma separated.

@@ -88,6 +88,10 @@ conf:
       loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
+      # Agent inspection hooks - ports hook removed to prevent port manipulation during agent inspection
+      # Default hooks include: ramdisk-error,validate-interfaces,ports,architecture
+      # We override to exclude 'ports' from the default hooks
+      default_hooks: "ramdisk-error,validate-interfaces,architecture"
       hooks: "$default_hooks,pci-devices,parse-lldp,local-link-connection,resource-class"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
     sensor_data:
@@ -255,6 +259,20 @@ pod:
         min_available: 0
   resources:
     enabled: true
+    api:
+      requests:
+        memory: "1024Mi"
+        cpu: "100m"
+      limits:
+        memory: "2048Mi"
+        cpu: "500m"
+    conductor:
+      requests:
+        memory: "1024Mi"
+        cpu: "100m"
+      limits:
+        memory: "2048Mi"
+        cpu: "1000m"
 
 annotations:
   # we need to modify the annotations on OpenStack Helm

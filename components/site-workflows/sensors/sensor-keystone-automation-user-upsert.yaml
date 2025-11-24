@@ -55,13 +55,13 @@ spec:
                             IFS=','
                             for svc_role in ${SVC_ROLES}; do
                               case ${svc_role} in
-                              tenant-reader)
+                              tenant-read)
                                 openstack role add --user "${SVC_ID}" --domain default --inherited reader
                                 ;;
                               tenant-readwrite)
                                 openstack role add --user "${SVC_ID}" --domain default --inherited member
                                 ;;
-                              infra-reader)
+                              infra-read)
                                 openstack role add --user "${SVC_ID}" --project-domain infra --project baremetal reader
                                 ;;
                               infra-readwrite)

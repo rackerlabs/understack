@@ -106,7 +106,7 @@ def network(project_id, network_id) -> Network:
 def patch_extend_subnet(mocker) -> None:
     """Ml2 Plugin extend subnet patch.
 
-    This patch is needed as the Ml2Pugin's _make_subnet_dict method is calling
+    This patch is needed as the Ml2Plugin's _make_subnet_dict method is calling
     _ml2_md_extend_subnet_dict static method,that would try to call the real db object
     and we don't have access to db.
 

@@ -158,6 +158,12 @@ pod:
         min_available: 0
   resources:
     enabled: true
+    server:
+      requests:
+        memory: "2048Mi"
+        cpu: "200m"
+      limits:
+        memory: "4096Mi"
 
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
 dependencies:

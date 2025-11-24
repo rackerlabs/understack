@@ -156,6 +156,9 @@ pod:
                     name: octavia-ks-etc
   resources:
     enabled: true
+    api:
+      requests:
+        memory: "512Mi"
 
 manifests:
   job_db_init: false

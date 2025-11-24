@@ -2,8 +2,13 @@
 component: monitoring
 sources:
   - repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-operator-crds
+    targetRevision: 24.0.2
+    helm:
+      releaseName: prometheus-operator-crds
+  - repoURL: https://prometheus-community.github.io/helm-charts
     chart: kube-prometheus-stack
-    targetRevision: 62.6.0
+    targetRevision: 79.5.0
     helm:
       releaseName: kube-prometheus-stack
       valueFiles:
@@ -13,3 +18,4 @@ sources:
   - ref: understack
     path: 'operators/monitoring'
   - ref: deploy
+    path: '{{.name}}/manifests/monitoring'

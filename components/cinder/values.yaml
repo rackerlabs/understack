@@ -164,6 +164,15 @@ pod:
         min_available: 0
   resources:
     enabled: true
+    api:
+      requests:
+        memory: "256Mi"
+    scheduler:
+      requests:
+        memory: "256Mi"
+    volume:
+      requests:
+        memory: "256Mi"
 
 dependencies:
   dynamic:
