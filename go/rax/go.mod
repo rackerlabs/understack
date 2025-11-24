@@ -5,7 +5,7 @@ go 1.23.0
 godebug default=go1.23
 
 require (
-	github.com/go-git/go-git/v5 v5.16.2
+	github.com/go-git/go-git/v5 v5.16.4
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/go-github/v55 v55.0.0
 	github.com/google/go-github/v74 v74.0.0
