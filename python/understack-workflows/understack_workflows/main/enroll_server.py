@@ -11,7 +11,7 @@ from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
-from understack_workflows.discover import discover_chassis_info
+from understack_workflows.bmc_chassis_info import chassis_info
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
@@ -74,7 +74,7 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
         old_password=old_password,
     )
 
-    device_info = discover_chassis_info(bmc)
+    device_info = chassis_info(bmc)
     logger.info("Discovered %s", pformat(device_info))
 
     device_name = f"{device_info.manufacturer}-{device_info.serial_number}"
