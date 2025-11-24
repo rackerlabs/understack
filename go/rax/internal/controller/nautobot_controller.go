@@ -69,7 +69,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Retrieve the Nautobot authentication token from a secret or external source
-	nautobotAuthToken, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR, "NAUTOBOT_SUPERUSER_API_TOKEN")
+	nautobotAuthToken, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
 	if err != nil {
 		log.Error(err, "failed parse find nautoBotAuthToken")
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
@@ -110,7 +110,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 }
 
 // getAuthTokenFromSecretRef: this will fetch Nautobot auth token from the given refer.
-func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot, name string) (string, error) {
+func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (string, error) {
 	secret := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.NautobotSecretRef.Name, Namespace: *nautobotCR.Spec.NautobotSecretRef.Namespace}, secret)
 	if err != nil {
