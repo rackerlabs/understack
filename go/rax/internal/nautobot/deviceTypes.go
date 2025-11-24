@@ -123,7 +123,7 @@ func (n *NautobotClient) SyncAllDeviceTypes(ctx context.Context, data map[string
 	}
 	obsoleteDeviceTypes := lo.OmitByKeys(existingMap, lo.Keys(desiredDeviceTypes))
 	for _, obsoleteDeviceType := range obsoleteDeviceTypes {
-		n.DestroyDeviceType(ctx, obsoleteDeviceType.Id)
+		_ = n.DestroyDeviceType(ctx, obsoleteDeviceType.Id)
 	}
 
 	return nil
@@ -168,15 +168,15 @@ func (n *NautobotClient) syncDeviceTypePowerPortTemplate(ctx context.Context, ym
 		}
 
 		if existingTemplate, exists := existingMap[portName]; exists {
-			n.UpdatePowerPortTemplate(ctx, existingTemplate.Id, templateRequest)
+			_, _ = n.UpdatePowerPortTemplate(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			n.CreateNewPowerPortTemplate(ctx, templateRequest)
+			_, _ = n.CreateNewPowerPortTemplate(ctx, templateRequest)
 		}
 	}
 
 	obsoleteTemplates := lo.OmitByKeys(existingMap, lo.Keys(desiredPorts))
 	for _, obsoleteTemplate := range obsoleteTemplates {
-		n.DestroyPowerPortTemplate(ctx, obsoleteTemplate.Id)
+		_ = n.DestroyPowerPortTemplate(ctx, obsoleteTemplate.Id)
 	}
 }
 
@@ -203,14 +203,14 @@ func (n *NautobotClient) syncDeviceTypeConsolePortTemplate(ctx context.Context, 
 			DeviceType: buildNullableBulkWritableCircuitRequestTenant(deviceType.Id),
 		}
 		if existingTemplate, exists := existingMap[portName]; exists {
-			n.UpdateConsolePortTemplate(ctx, existingTemplate.Id, templateRequest)
+			_, _ = n.UpdateConsolePortTemplate(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			n.CreateNewConsolePortTemplate(ctx, templateRequest)
+			_, _ = n.CreateNewConsolePortTemplate(ctx, templateRequest)
 		}
 	}
 	obsoleteTemplates := lo.OmitByKeys(existingMap, lo.Keys(desiredPorts))
 	for _, obsoleteTemplate := range obsoleteTemplates {
-		n.DestroyConsolePortTemplate(ctx, obsoleteTemplate.Id)
+		_ = n.DestroyConsolePortTemplate(ctx, obsoleteTemplate.Id)
 	}
 }
 
@@ -226,24 +226,24 @@ func (n *NautobotClient) syncDeviceTypeInterfaceTemplate(ctx context.Context, ym
 	for _, template := range existingTemplates {
 		existingMap[template.Display] = template
 	}
-	for portName, intefaceTmpl := range desiredInterfaceTemplate {
-		interfaceTemplateChoice, _ := nb.NewInterfaceTypeChoicesFromValue(intefaceTmpl.Type)
+	for portName, interfaceTmpl := range desiredInterfaceTemplate {
+		interfaceTemplateChoice, _ := nb.NewInterfaceTypeChoicesFromValue(interfaceTmpl.Type)
 
 		templateRequest := nb.WritableInterfaceTemplateRequest{
 			Name:       portName,
 			Type:       *interfaceTemplateChoice,
-			MgmtOnly:   nb.PtrBool(intefaceTmpl.MgmtOnly),
+			MgmtOnly:   nb.PtrBool(interfaceTmpl.MgmtOnly),
 			DeviceType: buildNullableBulkWritableCircuitRequestTenant(deviceType.Id),
 		}
 		if existingTemplate, exists := existingMap[portName]; exists {
-			n.UpdateInterfaceTemplate(ctx, existingTemplate.Id, templateRequest)
+			_, _ = n.UpdateInterfaceTemplate(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			n.CreateNewInterfaceTemplate(ctx, templateRequest)
+			_, _ = n.CreateNewInterfaceTemplate(ctx, templateRequest)
 		}
 	}
 	obsoleteTemplates := lo.OmitByKeys(existingMap, lo.Keys(desiredInterfaceTemplate))
 	for _, obsoleteTemplate := range obsoleteTemplates {
-		n.DestroyInterfaceTemplate(ctx, obsoleteTemplate.Id)
+		_ = n.DestroyInterfaceTemplate(ctx, obsoleteTemplate.Id)
 	}
 }
 
@@ -270,15 +270,15 @@ func (n *NautobotClient) syncDeviceTypeModuleBayTemplate(ctx context.Context, ym
 		}
 
 		if existingTemplate, exists := existingMap[moduleBayName]; exists {
-			n.UpdateModuleBayTemplate(ctx, existingTemplate.Id, templateRequest)
+			_, _ = n.UpdateModuleBayTemplate(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			n.CreateNewModuleBayTemplate(ctx, templateRequest)
+			_, _ = n.CreateNewModuleBayTemplate(ctx, templateRequest)
 		}
 	}
 
 	obsoleteTemplates := lo.OmitByKeys(existingMap, lo.Keys(desiredModuleBays))
 	for _, obsoleteTemplate := range obsoleteTemplates {
-		n.DestroyModuleBayTemplate(ctx, obsoleteTemplate.Id)
+		_ = n.DestroyModuleBayTemplate(ctx, obsoleteTemplate.Id)
 	}
 }
 

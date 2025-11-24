@@ -96,8 +96,12 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Update status
 	nautobotCR.Status.LastSyncedAt = metav1.Now()
 	nautobotCR.Status.Ready = true
-	nautobotCR.Status.Message = "Sync successful"
 	nautobotCR.Status.NautobotStatusReport = n.Report
+	if len(n.Report) > 0 {
+		nautobotCR.Status.Message = "sync completed with some errors"
+	} else {
+		nautobotCR.Status.Message = "Sync Successful"
+	}
 	if err := r.Status().Update(ctx, &nautobotCR); err != nil {
 		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
 	}
