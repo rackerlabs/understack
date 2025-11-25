@@ -61,6 +61,9 @@ spec:
                               tenant-readwrite)
                                 openstack role add --user "${SVC_ID}" --domain default --inherited member
                                 ;;
+                              tenant-admin)
+                                openstack role add --user "${SVC_ID}" --domain default admin
+                                ;;
                               infra-read)
                                 openstack role add --user "${SVC_ID}" --project-domain infra --project baremetal reader
                                 ;;
