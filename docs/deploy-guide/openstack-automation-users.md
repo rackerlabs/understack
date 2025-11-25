@@ -15,6 +15,7 @@ Possible roles are:
 
 - `tenant-read` which allows read access to tenant resources
 - `tenant-readwrite` which allows read and write access to tenant resources
+- `tenant-admin` which has full admin access to tenant resources, including project creation
 - `infra-read` which allows read access to infrastructure resources
 - `infra-readwrite` which allows read and write access to infrastructure resources
 
