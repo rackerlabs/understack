@@ -14,7 +14,7 @@ def vlan_group_names(
 
     Assert that data_center is the same for all switches.
 
-    Assert that the switches are spread accross no more than two racks.
+    Assert that the switches are spread across no more than two racks.
 
     Assert that there are exactly two connections to each "network" switch.
 
@@ -22,7 +22,7 @@ def vlan_group_names(
 
     ["a11-12-1", "a11-12-2"] => "a11-12-network"
 
-    If those switches are spread accross a pair of racks, the VLAN name has both
+    If those switches are spread across a pair of racks, the VLAN name has both
     racks separated by a slash:
 
     ["a11-12-1", "a11-13-1"] => "a11-12/a11-13-network"
