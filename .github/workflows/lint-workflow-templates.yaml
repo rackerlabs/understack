@@ -12,7 +12,7 @@ jobs:
 
     steps:
       - name: Checkout latest changes from the PR branch
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
 
       - name: Set up Kind cluster with Helm
         uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # v1.13.0
