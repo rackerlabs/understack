@@ -1,5 +1,4 @@
 from ironic_understack.inspected_port import InspectedPort
-from itertools import groupby
 
 
 class TopologyError(Exception):
@@ -38,19 +37,23 @@ def vlan_group_names(
     if len(network_rack_names) > 2:
         raise TopologyError("Connections in more than two racks: %s", ports)
 
+    vlan_groups = {}
+
     for port in ports:
-        if port.switch_suffix not in mapping:
+        vlan_group_suffix = mapping.get(port.switch_suffix)
+        if not vlan_group_suffix:
             raise TopologyError(
                 f"Switch suffix {port.switch_suffix} is not present in the "
                 f"mapping configured in "
                 f"ironic_understack.switch_name_vlan_group_mapping. "
                 f"Recognised suffixes are: {mapping.keys()}"
             )
+        if vlan_group_suffix not in vlan_groups:
+            vlan_groups[vlan_group_suffix] = []
+        vlan_groups[vlan_group_suffix].append(port)
 
     vlan_group_names = {}
-    for vlan_group_suffix, ports_in_group in groupby(ports, lambda p: mapping[p.switch_suffix]):
-        ports_in_group = list(ports_in_group)
-
+    for vlan_group_suffix, ports_in_group in vlan_groups.items():
         if vlan_group_suffix == "network" and len(ports_in_group) != 2:
             raise TopologyError(
                 "Expected two connections to network switch, but we have %s",
