@@ -2,11 +2,11 @@ from dataclasses import dataclass
 
 import ironicclient.common.apiclient.exceptions
 from ironicclient.common.utils import args_array_to_patch
+from ironicclient.v1.node import Node
 
 from understack_workflows.bmc import Bmc
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
-from understack_workflows.node_configuration import IronicNodeConfiguration
 
 STATES_ALLOWING_UPDATES = ["enroll", "manageable"]
 
@@ -73,7 +73,7 @@ def create_ironic_node(
     client: IronicClient,
     node_meta: NodeMetadata,
     bmc: Bmc,
-) -> IronicNodeConfiguration:
+) -> Node:
     return client.create_node(
         {
             "uuid": node_meta.uuid,

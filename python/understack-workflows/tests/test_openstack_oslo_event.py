@@ -237,6 +237,7 @@ class TestMainFunction:
 
         # Mock event handler
         mock_handler = Mock(return_value=0)
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"baremetal.port.create.end": mock_handler},
@@ -309,6 +310,7 @@ class TestMainFunction:
 
         # Mock event handler that raises exception
         mock_handler = Mock(side_effect=Exception("Handler error"))
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"baremetal.port.create.end": mock_handler},
@@ -345,6 +347,7 @@ class TestMainFunction:
 
         # Mock event handler
         mock_handler = Mock(return_value=0)
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"baremetal.port.create.end": mock_handler},
@@ -383,6 +386,7 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the port event handler by patching the event handlers dict
         mock_handler = Mock(return_value=0)
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"baremetal.port.create.end": mock_handler},
@@ -421,6 +425,7 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the port event handler by patching the event handlers dict
         mock_handler = Mock(return_value=0)
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"baremetal.port.delete.end": mock_handler},
@@ -459,6 +464,7 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the keystone project event handler by patching the event handlers dict
         mock_handler = Mock(return_value=0)
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"identity.project.created": mock_handler},
@@ -497,6 +503,7 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the keystone project event handler by patching the event handlers dict
         mock_handler = Mock(return_value=0)
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"identity.project.created": mock_handler},
@@ -535,6 +542,7 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the keystone project event handler to raise an exception
         mock_handler = Mock(side_effect=Exception("Handler failed"))
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"identity.project.created": mock_handler},
@@ -580,6 +588,7 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the handler to verify it gets called with correct data
         mock_handler = Mock(return_value=0)
+        mock_handler.__name__ = "mock_handler"
         with patch(
             "understack_workflows.main.openstack_oslo_event._event_handlers",
             {"identity.project.created": mock_handler},
