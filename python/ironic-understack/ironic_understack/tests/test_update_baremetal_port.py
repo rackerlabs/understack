@@ -1,7 +1,13 @@
 import logging
+
+import ironic.objects
 from oslo_utils import uuidutils
 
+import ironic_understack
 from ironic_understack.update_baremetal_port import UpdateBaremetalPortsHook
+
+# load some metaprgramming normally taken care of during Ironic initialization:
+ironic.objects.register_all()
 
 _INVENTORY = {}
 _PLUGIN_DATA = {
@@ -77,6 +83,7 @@ def test_with_valid_data(mocker, caplog):
         "ironic_understack.update_baremetal_port.CONF.ironic_understack.switch_name_vlan_group_mapping",
         MAPPING
     )
+    mocker.patch("ironic_understack.update_baremetal_port.objects.TraitList.create")
 
     mock_traits.get_trait_names.return_value = ["CUSTOM_BMC_SWITCH", "bar"]
 
@@ -92,7 +99,7 @@ def test_with_valid_data(mocker, caplog):
 
     mock_traits.get_trait_names.assert_called_once()
     mock_traits.destroy.assert_called_once_with("CUSTOM_BMC_SWITCH")
-    mock_traits.create.assert_called_once_with(
+    ironic_understack.update_baremetal_port.objects.TraitList.create.assert_called_once_with(
         mock_context, 1234, ["CUSTOM_NETWORK_SWITCH", "CUSTOM_STORAGE_SWITCH"]
     )
     mock_node.save.assert_called_once()
