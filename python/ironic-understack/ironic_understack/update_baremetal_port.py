@@ -63,22 +63,27 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
             if inspected_port:
                 LOG.info(
                     "Port=%(uuid)s Node=%(node)s is connected %(lldp)s",
-                    {"uuid": baremetal_port.id, "node": node_uuid, "lldp": inspected_port},
+                    {
+                        "uuid": baremetal_port.uuid,
+                        "node": node_uuid,
+                        "lldp": inspected_port,
+                    },
                 )
                 vlan_group = vlan_groups.get(inspected_port.switch_system_name)
                 if not vlan_group:
                     LOG.error("Missing VLAN group for %s", inspected_port)
                 elif vlan_group.endswith("-network"):
-                    _set_port_attributes(baremetal_port, node_uuid, inspected_port, vlan_group)
+                    _set_port_attributes(
+                        baremetal_port, node_uuid, inspected_port, vlan_group
+                    )
                 else:
                     _clear_port_attributes(baremetal_port, node_uuid)
             else:
                 LOG.info(
                     "Port=%(uuid)s Node=%(node)s has no LLDP connection",
-                    {"uuid": baremetal_port.id, "node": node_uuid},
+                    {"uuid": baremetal_port.uuid, "node": node_uuid},
                 )
                 _clear_port_attributes(baremetal_port, node_uuid)
-
 
         _set_node_traits(task, {x for x in vlan_groups.values() if x})
 
