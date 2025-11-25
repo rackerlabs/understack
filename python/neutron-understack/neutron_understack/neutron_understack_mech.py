@@ -115,16 +115,18 @@ class UnderstackDriver(MechanismDriver):
         current_vif_other = context.vif_type == portbindings.VIF_TYPE_OTHER
 
         if current_vif_unbound and original_vif_other:
-            local_link_info = utils.local_link_from_binding_profile(
-                context.original[portbindings.PROFILE]
-            )
+            port = context.original
         else:
+            port = context.current
+
+        vlan_group_name = port[portbindings.PROFILE].get("physical_network")
+        if vlan_group_name is None:
             local_link_info = utils.local_link_from_binding_profile(
-                context.current[portbindings.PROFILE]
+                port[portbindings.PROFILE]
             )
-        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            local_link_info
-        )
+            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+                local_link_info
+            )
 
         if current_vif_unbound and original_vif_other:
             self._tenant_network_port_cleanup(context)
@@ -178,14 +180,18 @@ class UnderstackDriver(MechanismDriver):
         # Only clean up provisioning ports. Ports with tenant networks are cleaned
         # up in _tenant_network_port_cleanup
 
-        local_link_info = utils.local_link_from_binding_profile(
-            context.current[portbindings.PROFILE]
-        )
-        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            local_link_info
-        )
+        port = context.current
 
-        if vlan_group_name and is_provisioning_network(context.current["network_id"]):
+        vlan_group_name = port[portbindings.PROFILE].get("physical_network")
+        if vlan_group_name is None:
+            local_link_info = utils.local_link_from_binding_profile(
+                port[portbindings.PROFILE]
+            )
+            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+                local_link_info
+            )
+
+        if vlan_group_name and is_provisioning_network(port["network_id"]):
             # Signals end of the provisioning / cleaning cycle, so we
             # put the port back to its normal tenant mode:
             self.invoke_undersync(vlan_group_name)
@@ -232,12 +238,16 @@ class UnderstackDriver(MechanismDriver):
         network_id = context.current["network_id"]
         mac_address = context.current["mac_address"]
 
-        local_link_info = utils.local_link_from_binding_profile(
-            context.current[portbindings.PROFILE]
-        )
-        vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-            local_link_info
-        )
+        port = context.current
+
+        vlan_group_name = port[portbindings.PROFILE].get("physical_network")
+        if vlan_group_name is None:
+            local_link_info = utils.local_link_from_binding_profile(
+                port[portbindings.PROFILE]
+            )
+            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
+                local_link_info
+            )
 
         if not vlan_group_name:
             LOG.error(
