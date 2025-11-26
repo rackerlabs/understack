@@ -29,9 +29,10 @@ class PortBiosNameHook(base.InspectionHook):
         for baremetal_port in ironic_ports_for_node(task.context, task.node.id):
             mac = baremetal_port.address.upper()
             name = interface_names.get(mac)
-            LOG.info("Port %(mac)s bios_name=%(name)s", {"mac": mac, "name": name})
+            LOG.debug("Port %(mac)s bios_name=%(name)s", {"mac": mac, "name": name})
             if name:
                 baremetal_port.extra["bios_name"] = name
             else:
                 baremetal_port.extra.pop("bios_name", None)
             baremetal_port.save()
+            LOG.debug("Port updated to %s", baremetal_port)
