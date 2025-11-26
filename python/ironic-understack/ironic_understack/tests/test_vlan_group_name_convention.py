@@ -87,13 +87,13 @@ def test_vlan_group_name_invalid_format():
 
 
 def test_vlan_group_name_unknown_suffix():
-    with pytest.raises(TopologyError, match="Switch suffix 99 is not present"):
+    with pytest.raises(TopologyError, match="suffix a1-1-99.abc1 is not present"):
         vlan_group_names([port("a1-1-99.abc1")], mapping)
 
-    with pytest.raises(TopologyError, match="Switch suffix 5f is not present"):
+    with pytest.raises(TopologyError, match="suffix a1-1-5f.abc1 is not present"):
         vlan_group_names([port("a1-1-5f.abc1")], mapping)
 
-    with pytest.raises(TopologyError, match="Switch suffix xyz is not present"):
+    with pytest.raises(TopologyError, match="suffix a1-1-xyz.abc1 is not present"):
         vlan_group_names([port("a1-1-xyz.abc1")], mapping)
 
 
@@ -119,8 +119,9 @@ def test_vlan_group_name_too_many_racks():
             mapping,
         )
 
+
 def test_vlan_group_name_too_many_switches():
-    with pytest.raises(TopologyError, match="to two network switches"):
+    with pytest.raises(TopologyError, match="exactly two network switches"):
         vlan_group_names(
             [
                 port("a1-1-1.abc1.domain"),
@@ -130,8 +131,9 @@ def test_vlan_group_name_too_many_switches():
             mapping,
         )
 
+
 def test_vlan_group_name_not_enough_switches():
-    with pytest.raises(TopologyError, match="to two network switches"):
+    with pytest.raises(TopologyError, match="exactly two network switches"):
         vlan_group_names(
             [
                 port("a1-1-1.abc1.domain"),
