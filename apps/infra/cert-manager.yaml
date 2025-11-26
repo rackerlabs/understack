@@ -3,9 +3,13 @@ component: cert-manager
 sources:
   - repoURL: https://charts.jetstack.io
     chart: cert-manager
-    targetRevision: '1.18.2'
+    targetRevision: '1.19.2'
     helm:
       releaseName: cert-manager
       valuesObject:
         crds:
           enabled: true
+        config:
+          enableGatewayAPI: true
+          apiVersion: controller.config.cert-manager.io/v1alpha1
+          kind: ControllerConfiguration
