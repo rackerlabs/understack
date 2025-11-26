@@ -118,3 +118,24 @@ def test_vlan_group_name_too_many_racks():
             ],
             mapping,
         )
+
+def test_vlan_group_name_too_many_switches():
+    with pytest.raises(TopologyError, match="to two network switches"):
+        vlan_group_names(
+            [
+                port("a1-1-1.abc1.domain"),
+                port("a1-1-2.abc1.domain"),
+                port("a1-1-3.abc1.domain"),
+            ],
+            mapping,
+        )
+
+def test_vlan_group_name_not_enough_switches():
+    with pytest.raises(TopologyError, match="to two network switches"):
+        vlan_group_names(
+            [
+                port("a1-1-1.abc1.domain"),
+                port("a1-1-1.abc1.domain"),
+            ],
+            mapping,
+        )

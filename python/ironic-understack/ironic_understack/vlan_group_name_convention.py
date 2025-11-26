@@ -54,9 +54,10 @@ def vlan_group_names(
 
     vlan_group_names = {}
     for vlan_group_suffix, ports_in_group in vlan_groups.items():
-        if vlan_group_suffix == "network" and len(ports_in_group) != 2:
+        switch_names = {p.switch_system_name for p in ports_in_group}
+        if vlan_group_suffix == "network" and len(switch_names) != 2:
             raise TopologyError(
-                "Expected two connections to network switch, but we have %s",
+                "Expected connections to two network switches, but we have %s",
                 ports_in_group,
             )
 
