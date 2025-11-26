@@ -4,20 +4,13 @@ from oslo_utils import uuidutils
 from ironic_understack.port_bios_name_hook import PortBiosNameHook
 
 _INVENTORY = {
-    "memory": {
-      "physical_mb": 98304
-    },
+    "memory": {"physical_mb": 98304},
     "interfaces": [
-      {
-        "mac_address": "11:11:11:11:11:11",
-        "name": "NIC.Integrated.1-1"
-      },
-      {
-        "mac_address": "22:22:22:22:22:22",
-        "name": "NIC.Integrated.1-2"
-      },
-  ],
+        {"mac_address": "11:11:11:11:11:11", "name": "NIC.Integrated.1-1"},
+        {"mac_address": "22:22:22:22:22:22", "name": "NIC.Integrated.1-2"},
+    ],
 }
+
 
 def test_adding_bios_name(mocker, caplog):
     caplog.set_level(logging.DEBUG)
@@ -29,13 +22,13 @@ def test_adding_bios_name(mocker, caplog):
     mock_port = mocker.Mock(
         uuid=uuidutils.generate_uuid(),
         node_id=node_uuid,
-        address="11:11:11:11:11:11" ,
+        address="11:11:11:11:11:11",
         extra={},
     )
 
     mocker.patch(
         "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
-        return_value=[mock_port]
+        return_value=[mock_port],
     )
 
     PortBiosNameHook().__call__(mock_task, _INVENTORY, {})
@@ -60,7 +53,7 @@ def test_removing_bios_name(mocker, caplog):
 
     mocker.patch(
         "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
-        return_value=[mock_port]
+        return_value=[mock_port],
     )
 
     PortBiosNameHook().__call__(mock_task, _INVENTORY, {})

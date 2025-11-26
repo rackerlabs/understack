@@ -54,10 +54,13 @@ _PLUGIN_DATA = {
 }
 
 MAPPING = {
-    "1": "network", "2": "network",
-    "1f": "storage", "2f": "storage",
+    "1": "network",
+    "2": "network",
+    "1f": "storage",
+    "2f": "storage",
     "-1d": "bmc",
 }
+
 
 def test_with_valid_data(mocker, caplog):
     caplog.set_level(logging.DEBUG)
@@ -77,11 +80,11 @@ def test_with_valid_data(mocker, caplog):
 
     mocker.patch(
         "ironic_understack.update_baremetal_port.ironic_ports_for_node",
-        return_value=[mock_port]
+        return_value=[mock_port],
     )
     mocker.patch(
         "ironic_understack.update_baremetal_port.CONF.ironic_understack.switch_name_vlan_group_mapping",
-        MAPPING
+        MAPPING,
     )
     mocker.patch("ironic_understack.update_baremetal_port.objects.TraitList.create")
 
