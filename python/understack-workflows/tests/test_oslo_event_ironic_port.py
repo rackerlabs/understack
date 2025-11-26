@@ -50,7 +50,8 @@ class TestIronicPortEvent:
 
         assert event.uuid == "63a3c79c-dd84-4569-a398-cc795287300f"
         assert event.name == "1327172-hp1:NIC2-1"
-        assert event.interface_name == "NIC2-1"
+        # interface_name now returns the port name directly (MAC address)
+        assert event.interface_name == "1327172-hp1:NIC2-1"
         assert event.address == "00:11:0a:69:a9:99"
         assert event.node_uuid == "7ca98881-bca5-4c82-9369-66eb36292a95"
         assert event.physical_network == "f20-1-network"
@@ -65,7 +66,8 @@ class TestIronicPortEvent:
 
         assert event.uuid == "438711ba-1bcd-4f19-8b34-53cdc6d61bc4"
         assert event.name == "1327172-hp1:NIC1-1"
-        assert event.interface_name == "NIC1-1"
+        # interface_name now returns the port name directly (MAC address)
+        assert event.interface_name == "1327172-hp1:NIC1-1"
         assert event.address == "00:11:0a:6a:c7:05"
         assert event.node_uuid == "7ca98881-bca5-4c82-9369-66eb36292a95"
         assert event.remote_port_id == "Ethernet1/1"
@@ -78,19 +80,23 @@ class TestIronicPortEvent:
 
         assert event.uuid == "f8888f0b-1451-432e-9ae7-4b77303dd9ef"
         assert event.name == "f8888f0b-1451-432e-9ae7-4b77303dd9ef:NIC.Integrated.1-2"
-        assert event.interface_name == "NIC.Integrated.1-2"
+        # interface_name now returns the port name directly (MAC address)
+        assert (
+            event.interface_name
+            == "f8888f0b-1451-432e-9ae7-4b77303dd9ef:NIC.Integrated.1-2"
+        )
         assert event.address == "d4:04:e6:4f:64:5d"
         assert event.node_uuid == "74feccaf-3aae-401c-bc1f-eeeb26b9f542"
         assert event.remote_port_id == "Ethernet1/14"
         assert event.remote_switch_info == "f20-5-1f.iad3.rackspace.net"
         assert event.remote_switch_id == "f4:ee:31:c0:8c:b3"
 
-    def test_interface_name_parsing(self):
-        """Test interface name parsing from event name."""
+    def test_interface_name_with_mac_address(self):
+        """Test interface name returns MAC address when set."""
         event = IronicPortEvent(
             uuid="test-uuid",
-            name="1327172-hp1:NIC2-1",
-            address="00:11:22:33:44:55",
+            name="00110a69a999",  # MAC address (normalized)
+            address="00:11:0a:69:a9:99",
             node_uuid="node-uuid",
             physical_network="test-network",
             pxe_enabled=True,
@@ -98,13 +104,13 @@ class TestIronicPortEvent:
             remote_switch_info="switch1.example.com",
             remote_switch_id="aa:bb:cc:dd:ee:ff",
         )
-        assert event.interface_name == "NIC2-1"
+        assert event.interface_name == "00110a69a999"
 
-    def test_interface_name_fallback(self):
-        """Test interface name fallback to UUID when parsing fails."""
+    def test_interface_name_fallback_to_uuid(self):
+        """Test interface name falls back to UUID when name is empty."""
         event = IronicPortEvent(
-            uuid="test-uuid",
-            name="no-colon-name",
+            uuid="test-uuid-123",
+            name="",  # Empty name
             address="00:11:22:33:44:55",
             node_uuid="node-uuid",
             physical_network="test-network",
@@ -113,7 +119,7 @@ class TestIronicPortEvent:
             remote_switch_info="switch1.example.com",
             remote_switch_id="aa:bb:cc:dd:ee:ff",
         )
-        assert event.interface_name == "test-uuid"
+        assert event.interface_name == "test-uuid-123"
 
 
 class TestCableManagement:
