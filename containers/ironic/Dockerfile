@@ -20,7 +20,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
       --constraint https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} \
         /src/understack/ironic-understack \
         /src/understack/understack-flavor-matcher \
-        sushy-oem-idrac==6.0.0 \
         proliantutils==2.16.3
 
 COPY containers/ironic/patches /tmp/patches/
