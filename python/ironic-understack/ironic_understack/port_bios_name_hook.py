@@ -22,10 +22,12 @@ class PortBiosNameHook(base.InspectionHook):
             LOG.error("No interfaces in inventory for node %s", task.node.uuid)
             return
 
-        interface_names = {i["mac_address"]: i["name"] for i in inspected_interfaces}
+        interface_names = {
+            i["mac_address"].upper(): i["name"] for i in inspected_interfaces
+        }
 
         for baremetal_port in ironic_ports_for_node(task.context, task.node.id):
-            mac = baremetal_port.address
+            mac = baremetal_port.address.upper()
             name = interface_names.get(mac)
             LOG.info("Port %(mac)s bios_name=%(name)s", {"mac": mac, "name": name})
             if name:
