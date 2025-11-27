@@ -61,6 +61,7 @@ jobs:
           username: '${{ github.actor }}'
           password: '${{ secrets.GITHUB_TOKEN }}'
       - name: Package and push Helm chart
+        working-directory: go/nautobotop
         env:
           PKG_VER: '${{ github.ref_name }}'
         run: |
