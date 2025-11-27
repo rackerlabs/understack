@@ -25,4 +25,3 @@ resources:
 - nautobot_admin_role.yaml
 - nautobot_editor_role.yaml
 - nautobot_viewer_role.yaml
-

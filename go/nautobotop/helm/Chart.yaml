@@ -1,6 +1,6 @@
 apiVersion: v2
 name: nautobotop
-description: kuberntes operator to sync data in nautobot
+description: kubernetes operator to sync data in nautobot
 
 # A chart can be either an 'application' or a 'library' chart.
 #
