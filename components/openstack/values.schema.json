@@ -404,7 +404,7 @@
           },
           "name": {
             "type": "string",
-            "description": "Name identifier for the route"
+            "description": "Name identifier for the route. If not defined, first part of fqdn is used."
           },
           "namespace": {
             "type": "string",
@@ -429,7 +429,7 @@
             "additionalProperties": false
           }
         },
-        "required": ["fqdn", "name", "service"],
+        "required": ["fqdn", "service"],
         "additionalProperties": false
       }
     }

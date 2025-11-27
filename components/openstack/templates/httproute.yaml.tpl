@@ -3,7 +3,12 @@
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
+  {{- if .name }}
   name: {{ .name }}
+  {{- else }}
+  {{- $name := index (splitList "." .fqdn) 0 }}
+  name: {{ $name }}
+  {{- end }}
   namespace: {{ .namespace | default "openstack" }}
 spec:
   parentRefs:
