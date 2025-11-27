@@ -41,6 +41,11 @@ jobs:
           tags: ghcr.io/${{ github.repository }}/nautobotop:latest,ghcr.io/${{ github.repository }}/nautobotop:${{ steps.extract_tag.outputs.tag }}
           labels: |
             org.opencontainers.image.version=${{ steps.extract_tag.outputs.tag }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.title=Nautobot-Operator
+            org.opencontainers.image.vendor=Rackspace
+            org.opencontainers.image.source=https://rackspace.com/
+            org.opencontainers.image.authors=Rackspace
 
     chart:
       runs-on: ubuntu-latest
