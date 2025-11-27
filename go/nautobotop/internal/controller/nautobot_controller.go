@@ -19,8 +19,9 @@ package controller
 import (
 	"context"
 	"fmt"
-	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot"
 	"time"
+
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
