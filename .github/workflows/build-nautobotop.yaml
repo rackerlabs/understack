@@ -47,29 +47,29 @@ jobs:
             org.opencontainers.image.source=https://rackspace.com/
             org.opencontainers.image.authors=Rackspace
 
-    chart:
-      runs-on: ubuntu-latest
-      needs: [build-nautobotop]
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v4
+  chart:
+    runs-on: ubuntu-latest
+    needs:
+      - build-nautobotop
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: '${{ github.actor }}'
+          password: '${{ secrets.GITHUB_TOKEN }}'
+      - name: Package and push Helm chart
+        env:
+          PKG_VER: '${{ github.ref_name }}'
+        run: |
+          PKG_VER=${PKG_VER#nautobotop-v}
+          # update Chart.yaml with tag version
+          yq -i ".version = \"${PKG_VER}\"" charts/Chart.yaml
+          # package chart
+          helm package -u -d ${{ github.workspace }} charts
+          # push chart to ghcr.io
+          helm push ${{ github.workspace }}/nautobotop-${PKG_VER}.tgz \
+            oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts
 
-        - name: Log in to ghcr.io
-          uses: docker/login-action@v3
-          with:
-            registry: ghcr.io
-            username: ${{ github.actor }}
-            password: ${{ secrets.GITHUB_TOKEN }}
-
-        - name: Package and push Helm chart
-          env:
-            PKG_VER: ${{ github.ref_name }}
-          run: |
-            PKG_VER=${PKG_VER#nautobotop-v}
-            # update Chart.yaml with tag version
-            yq -i ".version = \"${PKG_VER}\"" charts/Chart.yaml
-            # package chart
-            helm package -u -d ${{ github.workspace }} charts
-            # push chart to ghcr.io
-            helm push ${{ github.workspace }}/nautobotop-${PKG_VER}.tgz \
-              oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts
