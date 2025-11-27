@@ -40,8 +40,8 @@ type NautobotStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:scope=Cluster
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
 // Nautobot is the Schema for the nautobots API.
 type Nautobot struct {

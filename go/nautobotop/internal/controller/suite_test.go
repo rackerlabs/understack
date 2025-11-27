@@ -32,7 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	syncv1alpha1 "github.com/rackerlabs/understack/go/sync/api/v1alpha1"
+	syncv1alpha1 "github.com/rackerlabs/understack/go/nautobotop/api/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 

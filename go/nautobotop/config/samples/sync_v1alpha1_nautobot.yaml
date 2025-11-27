@@ -2,7 +2,7 @@ apiVersion: sync.rax.io/v1alpha1
 kind: Nautobot
 metadata:
   labels:
-    app.kubernetes.io/name: rax
+    app.kubernetes.io/name: nautobotop
     app.kubernetes.io/managed-by: kustomize
   name: nautobot-sample
 spec:

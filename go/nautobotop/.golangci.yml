@@ -4,46 +4,49 @@ run:
 linters:
   default: none
   enable:
-  - dupl
-  - errcheck
-  - goconst
-  - gocyclo
-  - govet
-  - ineffassign
-  - lll
-  - misspell
-  - nakedret
-  - prealloc
-  - staticcheck
-  - unconvert
-  - unparam
-  - unused
+    - copyloopvar
+    - dupl
+    - errcheck
+    - ginkgolinter
+    - goconst
+    - gocyclo
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - prealloc
+    - revive
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+  settings:
+    revive:
+      rules:
+        - name: comment-spacings
+        - name: import-shadowing
   exclusions:
     generated: lax
     rules:
-    - linters:
-      - lll
-      path: api/*
-    - linters:
-      - dupl
-      - lll
-      path: internal/*
+      - linters:
+          - lll
+        path: api/*
+      - linters:
+          - dupl
+          - lll
+        path: internal/*
     paths:
-    - third_party$
-    - builtin$
-    - examples$
-  settings:
-    staticcheck:
-      dot-import-whitelist:
-      - fmt
-      - github.com/onsi/ginkgo/v2
+      - third_party$
+      - builtin$
+      - examples$
 formatters:
   enable:
-  - gofmt
-  - goimports
+    - gofmt
+    - goimports
   exclusions:
     generated: lax
     paths:
-    - third_party$
-    - builtin$
-    - examples$
+      - third_party$
+      - builtin$
+      - examples$

@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	syncv1alpha1 "github.com/rackerlabs/understack/go/sync/api/v1alpha1"
+	syncv1alpha1 "github.com/rackerlabs/understack/go/nautobotop/api/v1alpha1"
 )
 
 var _ = Describe("Nautobot Controller", func() {

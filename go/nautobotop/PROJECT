@@ -5,16 +5,18 @@
 domain: rax.io
 layout:
 - go.kubebuilder.io/v4
-projectName: rax
-repo: github.com/rackerlabs/understack/go/sync
+plugins:
+  manifests.sdk.operatorframework.io/v2: {}
+  scorecard.sdk.operatorframework.io/v2: {}
+projectName: nautobotop
+repo: github.com/rackerlabs/understack/go/nautobotop
 resources:
 - api:
     crdVersion: v1
-    namespaced: true
   controller: true
   domain: rax.io
   group: sync
   kind: Nautobot
-  path: github.com/rackerlabs/understack/go/sync/api/v1alpha1
+  path: github.com/rackerlabs/understack/go/nautobotop/api/v1alpha1
   version: v1alpha1
 version: "3"

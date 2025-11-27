@@ -27,20 +27,20 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/rackerlabs/understack/go/sync/test/utils"
+	"github.com/rackerlabs/understack/go/nautobotop/test/utils"
 )
 
 // namespace where the project is deployed in
-const namespace = "rax-system"
+const namespace = "nautobotop-system"
 
 // serviceAccountName created for the project
-const serviceAccountName = "rax-controller-manager"
+const serviceAccountName = "nautobotop-controller-manager"
 
 // metricsServiceName is the name of the metrics service of the project
-const metricsServiceName = "rax-controller-manager-metrics-service"
+const metricsServiceName = "nautobotop-controller-manager-metrics-service"
 
 // metricsRoleBindingName is the name of the RBAC that will be created to allow get the metrics data
-const metricsRoleBindingName = "rax-metrics-binding"
+const metricsRoleBindingName = "nautobotop-metrics-binding"
 
 var _ = Describe("Manager", Ordered, func() {
 	var controllerPodName string
@@ -173,7 +173,7 @@ var _ = Describe("Manager", Ordered, func() {
 		It("should ensure the metrics endpoint is serving metrics", func() {
 			By("creating a ClusterRoleBinding for the service account to allow access to metrics")
 			cmd := exec.Command("kubectl", "create", "clusterrolebinding", metricsRoleBindingName,
-				"--clusterrole=rax-metrics-reader",
+				"--clusterrole=nautobotop-metrics-reader",
 				fmt.Sprintf("--serviceaccount=%s:%s", namespace, serviceAccountName),
 			)
 			_, err := utils.Run(cmd)

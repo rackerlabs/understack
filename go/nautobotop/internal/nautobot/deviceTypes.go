@@ -2,12 +2,12 @@ package nautobot
 
 import (
 	"context"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/charmbracelet/log"
 	"github.com/samber/lo"
 
 	nb "github.com/nautobot/go-nautobot/v2"
-	"go.yaml.in/yaml/v3"
 )
 
 type DeviceTypes struct {

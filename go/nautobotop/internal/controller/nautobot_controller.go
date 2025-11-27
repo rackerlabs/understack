@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,8 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
-	syncv1alpha1 "github.com/rackerlabs/understack/go/sync/api/v1alpha1"
-	"github.com/rackerlabs/understack/go/sync/internal/nautobot"
+	syncv1alpha1 "github.com/rackerlabs/understack/go/nautobotop/api/v1alpha1"
 )
 
 // NautobotReconciler reconciles a Nautobot object

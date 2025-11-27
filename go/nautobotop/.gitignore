@@ -24,5 +24,4 @@ go.work
 .vscode
 *.swp
 *.swo
-.DS_Store
 *~
