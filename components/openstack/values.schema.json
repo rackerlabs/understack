@@ -344,6 +344,90 @@
         "required": ["apiVersion", "kind"],
         "additionalProperties": true
       }
+    },
+    "gateways": {
+      "type": "object",
+      "description": "Gateway configurations for external and internal access",
+      "properties": {
+        "external": {
+          "type": "object",
+          "description": "External gateway configuration",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the external gateway"
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Namespace where the external gateway is deployed"
+            },
+            "className": {
+              "type": "string",
+              "description": "Gateway class name (e.g., cilium)"
+            }
+          },
+          "required": ["name", "namespace", "className"],
+          "additionalProperties": false
+        },
+        "internal": {
+          "type": "object",
+          "description": "Internal gateway configuration",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the internal gateway"
+            },
+            "namespace": {
+              "type": "string",
+              "description": "Namespace where the internal gateway is deployed"
+            },
+            "className": {
+              "type": "string",
+              "description": "Gateway class name (e.g., cilium)"
+            }
+          },
+          "required": ["name", "namespace", "className"],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "routes": {
+      "type": "array",
+      "description": "Array of route configurations for OpenStack services",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fqdn": {
+            "type": "string",
+            "description": "Fully qualified domain name for the route"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name identifier for the route"
+          },
+          "service": {
+            "type": "object",
+            "description": "Kubernetes service backend configuration for the route",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the Kubernetes service"
+              },
+              "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "Numeric port of the service (not target port)"
+              }
+            },
+            "required": ["name", "port"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["fqdn", "name", "service"],
+        "additionalProperties": false
+      }
     }
   },
   "required": ["regionName"],
