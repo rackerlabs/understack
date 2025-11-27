@@ -427,6 +427,18 @@
             },
             "required": ["name", "port"],
             "additionalProperties": false
+          },
+          "selector": {
+            "type": "object",
+            "description": "Kubernetes-style label selector (key-value pairs)",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "from": {
+            "type": "string",
+            "enum": ["Same", "All", "Selector"],
+            "description": "Specifies where traffic can originate from"
           }
         },
         "required": ["fqdn", "service"],

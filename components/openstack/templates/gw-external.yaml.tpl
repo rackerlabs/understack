@@ -20,5 +20,14 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: {{ $listenerName }}-gtls
+      allowedRoutes:
+        namespaces:
+          {{- if .selector }}
+          from: Selector
+          selector:
+            {{- .selector | toYaml | nindent 12 }}
+          {{- else }}
+          from: {{ .from | default "All" }}
+          {{- end }}
     {{- end }}
 {{- end }}
