@@ -17,5 +17,8 @@ spec:
             value: {{ .path | default "/" }}
       backendRefs:
         - name: {{ .service.name }}
+          {{- with .namespace }}
+          namespace: {{ . }}
+          {{- end }}
           port: {{ .service.port }}
 {{- end }}
