@@ -175,3 +175,6 @@ extraObjects: []
 #     dataFrom:
 #       - extract:
 #           key: my-secret-id
+
+gateways: {}
+routes: []
