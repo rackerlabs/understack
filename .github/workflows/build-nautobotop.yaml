@@ -66,9 +66,9 @@ jobs:
         run: |
           PKG_VER=${PKG_VER#nautobotop-v}
           # update Chart.yaml with tag version
-          yq -i ".version = \"${PKG_VER}\"" charts/Chart.yaml
+          yq -i ".version = \"${PKG_VER}\"" helm/Chart.yaml
           # package chart
-          helm package -u -d ${{ github.workspace }} charts
+          helm package -u -d ${{ github.workspace }} helm
           # push chart to ghcr.io
           helm push ${{ github.workspace }}/nautobotop-${PKG_VER}.tgz \
             oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts
