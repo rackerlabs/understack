@@ -11,14 +11,14 @@ spec:
   gatewayClassName: {{ .Values.gateways.external.className }}
   listeners:
     {{- range .Values.routes }}
-    - name: {{ .name }}
+    {{- $listenerName := .name | default (index (splitList "." .fqdn) 0) }}
+    - name: {{ $listenerName }}
       port: {{ $.Values.gateways.external.port | default 443 }}
       protocol: HTTPS
       hostname: {{ .fqdn | quote }}
       tls:
         mode: Terminate
         certificateRefs:
-          - name: {{ .name }}-gtls
-
+          - name: {{ $listenerName }}-gtls
     {{- end }}
 {{- end }}
