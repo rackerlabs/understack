@@ -394,7 +394,7 @@
     },
     "routes": {
       "type": "array",
-      "description": "Array of route configurations for OpenStack services",
+      "description": "Array of route configurations for Understack services",
       "items": {
         "type": "object",
         "properties": {
@@ -405,6 +405,10 @@
           "name": {
             "type": "string",
             "description": "Name identifier for the route"
+          },
+          "namespace": {
+            "type": "string",
+            "description": "Namespace where the httproute will be installed (same as backend service)"
           },
           "service": {
             "type": "object",
