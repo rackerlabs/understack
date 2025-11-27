@@ -1,0 +1,19 @@
+---
+component: nautobotop
+sources:
+  - repoURL: https://nautobot.github.io/helm-charts/
+    chart: nautobot
+    targetRevision: 2.5.6
+    helm:
+      releaseName: nautobot
+      valueFiles:
+        - $understack/components/nautobot/values.yaml
+        - $deploy/{{.name}}/helm-configs/nautobot.yaml
+      ignoreMissingValueFiles: true
+      fileParameters:
+        - name: nautobot.config
+          path: $understack/components/nautobot/nautobot_config.py
+  - ref: understack
+    path: 'components/nautobot'
+  - ref: deploy
+    path: '{{.name}}/manifests/nautobot'
