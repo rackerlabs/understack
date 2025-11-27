@@ -3,15 +3,16 @@ import logging
 import os
 from pprint import pformat
 
-
 from understack_workflows import ironic_node
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_bios import update_dell_bios_settings
+from understack_workflows.bmc_chassis_info import ChassisInfo
+from understack_workflows.bmc_chassis_info import InterfaceInfo
+from understack_workflows.bmc_chassis_info import chassis_info
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
-from understack_workflows.bmc_chassis_info import chassis_info
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
@@ -76,26 +77,50 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
 
     device_info = chassis_info(bmc)
     logger.info("Discovered %s", pformat(device_info))
-
     device_name = f"{device_info.manufacturer}-{device_info.serial_number}"
 
     update_dell_drac_settings(bmc)
 
     bmc_set_hostname(bmc, device_info.bmc_hostname, device_name)
 
+    pxe_interface = guess_pxe_interface(device_info)
+    logger.info("Selected %s as PXE interface", pxe_interface)
+
     # Note the above may require a restart of the DRAC, which in turn may delete
     # any pending BIOS jobs, so do BIOS settings after the DRAC settings.
-    update_dell_bios_settings(bmc)
+    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
     node = ironic_node.create_or_update(
         bmc=bmc,
         name=device_name,
         manufacturer=device_info.manufacturer,
     )
-    logger.info("%s _ironic_provision_state=%s", device_name, node.provision_state)
     logger.info("%s complete for %s", __file__, bmc.ip_address)
 
     return node.uuid
+
+
+def guess_pxe_interface(device_info: ChassisInfo) -> str:
+    interface = max(device_info.interfaces, key=_pxe_preference)
+    return interface.name
+
+
+def _pxe_preference(interface: InterfaceInfo) -> int:
+    name = interface.name.upper()
+    if "DRAC" in name or "ILO" in name or "NIC.EMBEDDED" in name:
+        return 0
+
+    NIC_PREFERENCE = {
+        "NIC.Integrated.1-1-1": 100,
+        "NIC.Integrated.1-1": 99,
+        "NIC.Slot.1-1-1": 98,
+        "NIC.Slot.1-1": 97,
+        "NIC.Integrated.1-2-1": 96,
+        "NIC.Integrated.1-2": 95,
+        "NIC.Slot.1-2-1": 94,
+        "NIC.Slot.1-2": 93,
+    }
+    return NIC_PREFERENCE.get(interface.name, 50)
 
 
 def argument_parser():
