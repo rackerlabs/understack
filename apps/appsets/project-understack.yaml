@@ -11,6 +11,8 @@ spec:
   destinations:
   - namespace: 'argo'
     server: '*'
+  - namespace: 'argocd'
+    server: '*'
   - namespace: 'argo-events'
     server: '*'
   - namespace: 'cert-manager'
