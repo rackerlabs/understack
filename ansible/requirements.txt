@@ -1,5 +1,5 @@
 ansible-core==2.19.2
-ansible-runner==2.4.1
+ansible-runner==2.4.2
 openstacksdk==4.7.1
 pynautobot==2.7.2
 jmespath==1.0.1
