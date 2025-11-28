@@ -27,7 +27,6 @@ dependencies = [
     "requests>=2,<3",
     "neutron-lib>=3,<4",
     "neutron>=27,<28",
-    "urllib3==1.26.20",
 ]
 
 [project.entry-points."neutron.ml2.mechanism_drivers"]
