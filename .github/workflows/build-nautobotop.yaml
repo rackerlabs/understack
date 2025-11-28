@@ -73,4 +73,3 @@ jobs:
           # push chart to ghcr.io
           helm push ${{ github.workspace }}/nautobotop-${PKG_VER}.tgz \
             oci://ghcr.io/${GITHUB_REPOSITORY_OWNER}/charts
-
