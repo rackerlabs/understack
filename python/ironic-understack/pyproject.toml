@@ -14,10 +14,12 @@ dependencies = [
     "ironic>=32.0,<33",
     "pyyaml~=6.0",
     "understack-flavor-matcher",
+    "pynautobot~=2.0",
 ]
 
 [project.entry-points."ironic.inspection.hooks"]
 resource-class = "ironic_understack.resource_class:ResourceClassHook"
+nautobot-sync = "ironic_understack.nautobot_sync:NautobotSyncHook"
 
 [project.entry-points."ironic.hardware.interfaces.inspect"]
 redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
@@ -57,4 +59,6 @@ target-version = "py310"
 [tool.ruff.lint.per-file-ignores]
 "ironic_understack/tests/*.py" = [
     "S101",     # allow 'assert' for pytest
+    "S105",     # allow hardcoded passwords in tests
+    "S106",     # allow hardcoded passwords in function arguments in tests
 ]

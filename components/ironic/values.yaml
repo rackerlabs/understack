@@ -86,13 +86,16 @@ conf:
       rabbit_ha_queues: true
     pxe:
       loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
+    redfish:
+      # Redfish inspection hooks - run hooks for redfish-based inspection
+      inspection_hooks: "$default_inspection_hooks,nautobot-sync"
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
       # Agent inspection hooks - ports hook removed to prevent port manipulation during agent inspection
       # Default hooks include: ramdisk-error,validate-interfaces,ports,architecture
       # We override to exclude 'ports' from the default hooks
       default_hooks: "ramdisk-error,validate-interfaces,architecture"
-      hooks: "$default_hooks,pci-devices,parse-lldp,local-link-connection,resource-class"
+      hooks: "$default_hooks,pci-devices,parse-lldp,local-link-connection,resource-class,nautobot-sync"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
     sensor_data:
       send_sensor_data: true
@@ -239,6 +242,9 @@ pod:
               sources:
                 - secret:
                     name: ironic-ks-etc
+                - secret:
+                    name: ironic-nautobot-token
+                    optional: true
     ironic_api:
       ironic_api:
         volumeMounts:
