@@ -1,9 +1,9 @@
 ---
 component: nautobotop
 sources:
-  - repoURL: ghcr.io/rackerlabs/understack
+  - repoURL: ghcr.io/rackerlabs/charts
     chart: nautobotop
-    targetRevision: 0.1.0
+    targetRevision: 0.0.1
     helm:
       releaseName: nautobotop
       ignoreMissingValueFiles: true
