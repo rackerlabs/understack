@@ -800,7 +800,6 @@ dependencies = [
     { name = "neutron" },
     { name = "neutron-lib" },
     { name = "requests" },
-    { name = "urllib3" },
 ]
 
 [package.dev-dependencies]
@@ -815,7 +814,6 @@ requires-dist = [
     { name = "neutron", specifier = ">=27,<28" },
     { name = "neutron-lib", specifier = ">=3,<4" },
     { name = "requests", specifier = ">=2,<3" },
-    { name = "urllib3", specifier = "==1.26.20" },
 ]
 
 [package.metadata.requires-dev]
