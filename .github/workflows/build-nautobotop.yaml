@@ -16,7 +16,14 @@ jobs:
       packages: write
       contents: read
     steps:
-      - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+      - name: Checkout
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU (for cross-platform builds)
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
@@ -36,13 +43,15 @@ jobs:
         with:
           context: go/nautobotop/
           file: go/nautobotop/Dockerfile
-          # push for all main branch commits
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/${{ github.repository }}/nautobotop:latest,ghcr.io/${{ github.repository }}/nautobotop:${{ steps.extract_tag.outputs.tag }}
           labels: |
+            org.opencontainers.image.title=Nautobot-Operator
+            org.opencontainers.image.description=Kubernetes operator for Nautobot data sync
             org.opencontainers.image.version=${{ steps.extract_tag.outputs.tag }}
             org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.title=Nautobot-Operator
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
             org.opencontainers.image.vendor=Rackspace
             org.opencontainers.image.source=https://rackspace.com/
             org.opencontainers.image.authors=Rackspace
