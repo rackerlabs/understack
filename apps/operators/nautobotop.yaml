@@ -6,5 +6,4 @@ sources:
     targetRevision: 0.0.1
     helm:
       releaseName: nautobotop
-      namespace: nautobotop
       ignoreMissingValueFiles: true
