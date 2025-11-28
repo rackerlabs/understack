@@ -49,7 +49,7 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean --skip=publish --clean --snapshot
+          args: release --clean
           workdir: go/nautobotop
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
