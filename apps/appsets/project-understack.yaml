@@ -19,6 +19,8 @@ spec:
     server: '*'
   - namespace: 'nautobot'
     server: '*'
+  - namespace: 'nautobotop'
+    server: '*'
   - namespace: 'undersync'
     server: '*'
   - namespace: 'openstack'
