@@ -27,7 +27,7 @@ Issues = "https://github.com/rackerlabs/understack/issues"
 
 [dependency-groups]
 test = [
-    "pytest<9",
+    "pytest<10",
     "pytest-github-actions-annotate-failures",
     "pytest-cov>=6.1.0",
 ]
