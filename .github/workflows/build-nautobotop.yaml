@@ -46,11 +46,11 @@ jobs:
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
-        working-directory: go/nautobotop
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          args: release --clean --skip=publish --clean --snapshot
+          workdir: go/nautobotop
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
