@@ -44,7 +44,7 @@ Source = "https://github.com/rackerlabs/understack"
 
 [dependency-groups]
 test = [
-    "pytest>=8.3.2,<9",
+    "pytest>=9.0.1,<10",
     "pytest-cov>=7,<8",
     "pytest-mock>=3.14.0,<4",
 ]

@@ -25,7 +25,7 @@ idrac-redfish-understack = "ironic_understack.redfish_inspect_understack:Underst
 
 [dependency-groups]
 test = [
-    "pytest>=8.3.2,<9",
+    "pytest>=9.0.1,<10",
     "pytest-github-actions-annotate-failures",
     "pytest-cov>=7,<8",
 ]
