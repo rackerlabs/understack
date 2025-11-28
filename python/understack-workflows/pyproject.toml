@@ -43,7 +43,7 @@ netapp-configure-interfaces = "understack_workflows.main.netapp_configure_net:ma
 
 [dependency-groups]
 test = [
-    "pytest>=8,<9",
+    "pytest>=9,<10",
     "pytest-github-actions-annotate-failures",
     "pytest-cov>=7,<8",
     "pytest-mock>=3.14.0,<4",
