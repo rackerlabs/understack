@@ -1,0 +1,121 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.18.0
+  name: nautobots.sync.rax.io
+spec:
+  group: sync.rax.io
+  names:
+    kind: Nautobot
+    listKind: NautobotList
+    plural: nautobots
+    singular: nautobot
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: Nautobot is the Schema for the nautobots API.
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: NautobotSpec defines the desired state of Nautobot.
+              properties:
+                deviceTypeRef:
+                  items:
+                    description: ConfigMapRef defines a reference to a specific ConfigMap
+                    properties:
+                      configMapSelector:
+                        description: The name of the ConfigMap resource being referred
+                          to
+                        properties:
+                          key:
+                            description: The key in the ConfigMap data
+                            type: string
+                          name:
+                            description: The name of the ConfigMap
+                            minLength: 1
+                            type: string
+                          namespace:
+                            description: The namespace where the ConfigMap resides
+                            type: string
+                        required:
+                          - name
+                        type: object
+                      name:
+                        description: Name of this config set (logical name)
+                        type: string
+                    required:
+                      - configMapSelector
+                      - name
+                    type: object
+                  type: array
+                nautobotSecretRef:
+                  properties:
+                    key:
+                      description: |-
+                        A key in the referenced Secret.
+                        Some instances of this field may be defaulted, in others it may be required.
+                      maxLength: 253
+                      minLength: 1
+                      pattern: ^[-._a-zA-Z0-9]+$
+                      type: string
+                    name:
+                      description: The name of the Secret resource being referred to.
+                      maxLength: 253
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                      type: string
+                    namespace:
+                      description: |-
+                        The namespace of the Secret resource being referred to.
+                        Ignored if referent is not cluster-scoped, otherwise defaults to the namespace of the referent.
+                      maxLength: 63
+                      minLength: 1
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                      type: string
+                  type: object
+                syncIntervalSeconds:
+                  default: 10
+                  type: integer
+              type: object
+            status:
+              description: NautobotStatus defines the observed state of Nautobot.
+              properties:
+                lastSyncedAt:
+                  format: date-time
+                  type: string
+                message:
+                  type: string
+                nautobotStatusReport:
+                  additionalProperties:
+                    items:
+                      type: string
+                    type: array
+                  type: object
+                ready:
+                  type: boolean
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
