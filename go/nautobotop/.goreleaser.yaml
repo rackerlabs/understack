@@ -47,7 +47,7 @@ dockers:
     use: buildx
     dockerfile: .goreleaser.Dockerfile
     image_templates:
-      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/rackerlabs/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
     build_flag_templates:
       - --platform=linux/amd64
       - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
@@ -64,7 +64,7 @@ dockers:
     use: buildx
     dockerfile: .goreleaser.Dockerfile
     image_templates:
-      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+      - ghcr.io/rackerlabs/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
     build_flag_templates:
       - --platform=linux/arm64
       - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
