@@ -25,6 +25,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.24'
+          cache: true
 
       - name: Install syft
         uses: anchore/sbom-action/download-syft@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
