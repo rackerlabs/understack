@@ -1,10 +1,12 @@
 # Binaries for programs and plugins
 *.exe
+.DS_Store
 *.exe~
 *.dll
 *.so
 *.dylib
 bin/*
+dist/*
 Dockerfile.cross
 
 # Test binary, built with `go test -c`
