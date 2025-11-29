@@ -13,7 +13,7 @@ builds:
     dir: ./cmd
     binary: nautobotop
     goos: ["linux"]
-    goarch: ["386", "amd64", "arm64"]
+    goarch: ["amd64", "arm64"]
     flags:
       - -trimpath
     ldflags:
@@ -23,9 +23,6 @@ builds:
       - -X main.commit={{.ShortCommit}}
     env:
       - CGO_ENABLED=0
-
-universal_binaries:
-  - replace: true
 
 archives:
   - formats: ["tar.gz"]
@@ -80,11 +77,11 @@ dockers:
       - --label=org.opencontainers.image.source=https://rackspace.com/
       - --label=org.opencontainers.image.authors=Rackspace
 docker_manifests:
-  - name_template: ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}
+  - name_template: ghcr.io/rackerlabs/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}
     image_templates:
-      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
-      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
-  - name_template: ghcr.io/abhimanyu003/{{ .ProjectName }}:latest
+      - ghcr.io/rackerlabs/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/rackerlabs/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+  - name_template: ghcr.io/rackerlabs/{{ .ProjectName }}:latest
     image_templates:
-      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
-      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+      - ghcr.io/rackerlabs/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/rackerlabs/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
