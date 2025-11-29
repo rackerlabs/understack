@@ -127,6 +127,7 @@ func (n *NautobotClient) SyncAllDeviceTypes(ctx context.Context, data map[string
 		_ = n.DestroyDeviceType(ctx, obsoleteDeviceType.Id)
 	}
 
+	log.Info("SyncAllDevice Completed")
 	return nil
 }
 

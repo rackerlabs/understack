@@ -19,12 +19,12 @@ package controller
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -56,24 +56,38 @@ type NautobotReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
-	// Fetch the Nautobot custom resource instance
 	var nautobotCR syncv1alpha1.Nautobot
-	if err := r.Get(ctx, types.NamespacedName{Name: req.Name}, &nautobotCR); err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, client.IgnoreNotFound(err)
+	if err := r.Get(ctx, req.NamespacedName, &nautobotCR); err != nil {
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
+	if syncInterval == 0 {
+		syncInterval = 4 * time.Hour // sane default
+	}
+
+	lastSynced := nautobotCR.Status.LastSyncedAt.Time
+	if !lastSynced.IsZero() {
+		sinceLast := time.Since(lastSynced)
+		if sinceLast < syncInterval {
+			remaining := syncInterval - sinceLast
+			log.Info("Last sync was recent skipping and requeuing", "remaining", remaining)
+			return ctrl.Result{RequeueAfter: remaining}, nil
+		}
 	}
 
 	// Fetch the Nautobot nautobotService to get its ClusterIP
 	var nautobotService corev1.Service
 	if err := r.Get(ctx, types.NamespacedName{Namespace: "default", Name: "nautobot-default"}, &nautobotService); err != nil {
 		log.Error(err, "failed to fetch Service nautobot-default")
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+		return ctrl.Result{}, err
 	}
 
 	// Retrieve the Nautobot authentication token from a secret or external source
 	nautobotAuthToken, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
 	if err != nil {
 		log.Error(err, "failed parse find nautoBotAuthToken")
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+		return ctrl.Result{}, err
 	}
 
 	deviceTypeMap := make(map[string]string)
@@ -85,7 +99,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}, &deviceTypeConfigMap)
 		if err != nil {
 			log.Error(err, "failed to fetch ConfigMap 'deviceType' in namespace 'nautobot'")
-			return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+			return ctrl.Result{}, err
 		}
 		for k, v := range deviceTypeConfigMap.Data {
 			deviceTypeMap[k] = v
@@ -93,7 +107,10 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	n := nautobot.NewNautobotClient(fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP), nautobotAuthToken)
-	_ = n.SyncAllDeviceTypes(ctx, deviceTypeMap)
+	if err := n.SyncAllDeviceTypes(ctx, deviceTypeMap); err != nil {
+		log.Error(err, "SyncAllDeviceTypes failed")
+		return ctrl.Result{}, err
+	}
 	// Update status
 	nautobotCR.Status.LastSyncedAt = metav1.Now()
 	nautobotCR.Status.Ready = true
@@ -104,10 +121,12 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		nautobotCR.Status.Message = "Sync Successful"
 	}
 	if err := r.Status().Update(ctx, &nautobotCR); err != nil {
-		return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, err
+		log.Error(err, "failed to update status")
+		return ctrl.Result{}, err
 	}
 	// Successfully completed reconciliation; requeue after configured sync interval
-	return ctrl.Result{RequeueAfter: time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second}, nil
+	log.Info("sync completed successfully")
+	return ctrl.Result{RequeueAfter: syncInterval}, nil
 }
 
 // getAuthTokenFromSecretRef: this will fetch Nautobot auth token from the given refer.
