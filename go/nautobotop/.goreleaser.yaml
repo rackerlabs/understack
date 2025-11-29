@@ -5,6 +5,9 @@ before:
   hooks:
     - go mod tidy
 
+env:
+  - CUSTOM_TAG={{ .Env.CUSTOM_TAG }}
+
 builds:
   - main: main.go
     dir: ./cmd
@@ -38,3 +41,50 @@ archives:
     format_overrides:
       - goos: windows
         formats: ["zip"]
+
+changelog:
+  disable: true
+
+dockers:
+  - skip_push: false
+    use: buildx
+    dockerfile: .goreleaser.Dockerfile
+    image_templates:
+      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
+      - --label=org.opencontainers.image.revision={{ .Commit }}
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.description=Rackspace Cloud DNS support for cert-manager
+      - --label=org.opencontainers.image.vendor=rackspace
+      - --label=org.opencontainers.image.licenses=Apache License 2.0
+      - --label=org.opencontainers.image.source=https://rackspace.com/
+      - --label=org.opencontainers.image.authors=Rackspace
+  - skip_push: false
+    goarch: arm64
+    use: buildx
+    dockerfile: .goreleaser.Dockerfile
+    image_templates:
+      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
+      - --label=org.opencontainers.image.revision={{ .Commit }}
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.description=Rackspace Cloud DNS support for cert-manager
+      - --label=org.opencontainers.image.vendor=rackspace
+      - --label=org.opencontainers.image.licenses=Apache License 2.0
+      - --label=org.opencontainers.image.source=https://rackspace.com/
+      - --label=org.opencontainers.image.authors=Rackspace
+docker_manifests:
+  - name_template: ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}
+    image_templates:
+      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+  - name_template: ghcr.io/abhimanyu003/{{ .ProjectName }}:latest
+    image_templates:
+      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/abhimanyu003/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
