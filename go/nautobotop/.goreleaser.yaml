@@ -70,3 +70,28 @@ docker_manifests:
     image_templates:
       - ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
       - ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+
+
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    output: true
+    artifacts: checksum
+    args:
+      - sign-blob
+      - "--oidc-provider=github-actions"
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - --yes
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - "sign"
+      - "--oidc-provider=github-actions"
+      - "${artifact}@${digest}"
+      - --yes
