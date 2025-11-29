@@ -32,7 +32,6 @@ dependencies = [
 sync-keystone = "understack_workflows.main.sync_keystone:main"
 sync-provision-state = "understack_workflows.main.sync_provision_state:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
-undersync-device = "understack_workflows.main.undersync_device:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
@@ -82,7 +81,6 @@ extend = "../pyproject.toml"
 target-version = "py310"
 
 [tool.ruff.lint.per-file-ignores]
-"understack_workflows/nautobot_device.py" = ["UP031"]
 "tests/test_nautobot_event_parser.py" = ["E501"]
 "tests/test_bmc_credentials.py" = ["B017"]
 "tests/**/*.py" = [

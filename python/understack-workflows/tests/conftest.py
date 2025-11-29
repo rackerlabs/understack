@@ -3,16 +3,9 @@ from unittest.mock import MagicMock
 
 import openstack
 import pytest
-from fixture_nautobot_device import FIXTURE_DELL_NAUTOBOT_DEVICE
 from pynautobot import __version__ as pynautobot_version
 
 from understack_workflows.nautobot import Nautobot
-from understack_workflows.nautobot_device import NautobotDevice
-
-
-@pytest.fixture
-def dell_nautobot_device() -> NautobotDevice:
-    return FIXTURE_DELL_NAUTOBOT_DEVICE
 
 
 @pytest.fixture
