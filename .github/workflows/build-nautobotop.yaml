@@ -55,6 +55,7 @@ jobs:
           distribution: goreleaser
           version: "~> v2"
           args: release --clean --skip=validate
+          workdir: go/nautobotop
         env:
           CUSTOM_TAG: ${{ steps.extract_tag.outputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
