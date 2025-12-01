@@ -1,0 +1,121 @@
+name: Build Container Image
+
+on:
+  workflow_call:
+    inputs:
+      container_name:
+        required: true
+        type: string
+        description: 'Name of the container to build'
+      dockerfile_path:
+        required: false
+        type: string
+        default: 'Dockerfile'
+        description: 'Path to Dockerfile relative to container directory'
+      build_args:
+        required: false
+        type: string
+        default: ''
+        description: 'Build arguments as key=value pairs'
+      target:
+        required: false
+        type: string
+        default: ''
+        description: 'Build target stage'
+      latest_name:
+        required: false
+        type: string
+        default: 'latest'
+        description: 'Tag name to use for latest (e.g., "latest" or "2025.2-ubuntu_jammy")'
+
+jobs:
+  build:
+    if: github.event_name != 'pull_request' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: setup docker buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
+
+      - name: login to ghcr.io
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: image metadata
+        id: meta
+        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        with:
+          images: ghcr.io/${{ github.repository }}/${{ inputs.container_name }}
+          tags: |
+            type=raw,value=${{ inputs.latest_name }},enable={{is_default_branch}}
+            type=raw,value=${{ inputs.latest_name }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=ref,event=tag
+            type=ref,event=pr
+        env:
+          # Create the annotations at the index as well since this
+          # defaults to manifest only and we have to manually merge
+          # the container is multi-arch because of provenance creating
+          # an 'unknown/unknown' arch with data. We've got no annotations
+          # that are arch specific so populate them at the index as well.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+
+      - name: build and push container image
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
+        with:
+          file: ${{ inputs.dockerfile_path }}
+          build-args: ${{ inputs.build_args }}
+          pull: true
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          target: ${{ inputs.target }}
+
+  clean:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    steps:
+      - name: clean up PR container
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          CONTAINER_NAME: '${{ inputs.container_name }}'
+        with:
+          script: |
+            const container_name = `${context.repo.repo}/${process.env.CONTAINER_NAME}`;
+            const response = await github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg({
+              package_type: "container",
+              package_name: container_name,
+              org: context.repo.owner,
+            });
+
+            const target_tag = `pr-${context.payload.pull_request.number}`;
+            console.log(`Looking for tag ${target_tag} for container ${container_name}`);
+
+            const versions = response.data || [];
+            const matchingVersion = versions.find(version =>
+              version.metadata.container.tags.includes(target_tag)
+            );
+
+            if (matchingVersion) {
+              console.log(`Found tag to delete "${target_tag}":`, matchingVersion.html_url);
+              await github.rest.packages.deletePackageVersionForOrg({
+                package_type: "container",
+                package_name: container_name,
+                org: context.repo.owner,
+                package_version_id: matchingVersion.id,
+              });
+              console.log("Tag deleted");
+            } else {
+              console.log(`No package version found with the tag "${target_tag}".`);
+            }

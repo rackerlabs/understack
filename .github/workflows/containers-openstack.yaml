@@ -1,0 +1,43 @@
+name: Build OpenStack containers
+
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - main
+    paths:
+      - "containers/**"
+      - ".github/workflows/containers-openstack.yaml"
+      - ".github/workflows/build-container-reuse.yaml"
+      - "python/**"
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "containers/**"
+      - ".github/workflows/containers-openstack.yaml"
+      - ".github/workflows/build-container-reuse.yaml"
+      - "python/**"
+  workflow_dispatch:
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  openstack:
+    strategy:
+      matrix:
+        project:
+          - cinder
+          - ironic
+          - keystone
+          - neutron
+          - nova
+          - octavia
+          - openstack-client
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: ${{ matrix.project }}
+      dockerfile_path: containers/${{ matrix.project }}/Dockerfile
+      build_args: OPENSTACK_VERSION=2025.2
+      latest_name: 2025.2-ubuntu_jammy

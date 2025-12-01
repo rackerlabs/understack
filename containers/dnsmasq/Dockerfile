@@ -22,7 +22,7 @@ WORKDIR /src
 RUN apt-get -y build-dep dnsmasq
 RUN apt-get -y source dnsmasq
 # copy in our patch
-COPY dnsmasq/dhcp-allowed-srvids.patch /src/
+COPY containers/dnsmasq/dnsmasq/dhcp-allowed-srvids.patch /src/
 # setup the patch to be built into the quilt file
 # set our version number to a local override suffixed by '.uc1'
 RUN cd /src/dnsmasq-* && \
@@ -51,10 +51,10 @@ RUN apt-get update && \
 RUN mkdir -p /var/lib/openstack-helm/tftpboot && \
     cp /usr/lib/ipxe/snponly.efi /var/lib/openstack-helm/tftpboot/
 
-COPY common/helpers.sh /helpers.sh
-COPY dnsmasq/entry-point.sh /entry-point.sh
+COPY containers/dnsmasq/common/helpers.sh /helpers.sh
+COPY containers/dnsmasq/dnsmasq/entry-point.sh /entry-point.sh
 RUN chmod +x /entry-point.sh
-COPY dnsmasq/dnsmasq.conf.j2 /etc/dnsmasq.conf.j2
+COPY containers/dnsmasq/dnsmasq/dnsmasq.conf.j2 /etc/dnsmasq.conf.j2
 # let our entry point write out the script
 RUN ln -sf /etc/dnsmasq.d/dnsmasq.conf /etc/dnsmasq.conf
 
