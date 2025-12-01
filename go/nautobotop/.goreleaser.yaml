@@ -1,0 +1,97 @@
+project_name: "nautobotop"
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+env:
+  - CUSTOM_TAG={{ .Env.CUSTOM_TAG }}
+
+builds:
+  - main: main.go
+    dir: ./cmd
+    binary: nautobotop
+    goos: ["linux"]
+    goarch: ["amd64", "arm64"]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s
+      - -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+    env:
+      - CGO_ENABLED=0
+
+changelog:
+  disable: true
+
+dockers:
+  - skip_push: false
+    use: buildx
+    dockerfile: .goreleaser.Dockerfile
+    image_templates:
+      - ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
+      - --label=org.opencontainers.image.revision={{ .Commit }}
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.description=Rackspace Cloud DNS support for cert-manager
+      - --label=org.opencontainers.image.vendor=rackspace
+      - --label=org.opencontainers.image.licenses=Apache License 2.0
+      - --label=org.opencontainers.image.source=https://rackspace.com/
+      - --label=org.opencontainers.image.authors=Rackspace
+  - skip_push: false
+    goarch: arm64
+    use: buildx
+    dockerfile: .goreleaser.Dockerfile
+    image_templates:
+      - ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
+      - --label=org.opencontainers.image.revision={{ .Commit }}
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.description=Rackspace Cloud DNS support for cert-manager
+      - --label=org.opencontainers.image.vendor=rackspace
+      - --label=org.opencontainers.image.licenses=Apache License 2.0
+      - --label=org.opencontainers.image.source=https://rackspace.com/
+      - --label=org.opencontainers.image.authors=Rackspace
+docker_manifests:
+  - name_template: ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}
+    image_templates:
+      - ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+  - name_template: ghcr.io/rackerlabs/understack/{{ .ProjectName }}:latest
+    image_templates:
+      - ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/rackerlabs/understack/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+
+
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    output: true
+    artifacts: checksum
+    args:
+      - sign-blob
+      - "--oidc-provider=github-actions"
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - --yes
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - "sign"
+      - "--oidc-provider=github-actions"
+      - "${artifact}@${digest}"
+      - --yes
