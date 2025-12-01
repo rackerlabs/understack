@@ -64,8 +64,8 @@ images:
     nova_service_cleaner: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
     # placement
-    placement: "quay.io/airshipit/placement:2025.2-ubuntu_jammy"
-    placement_db_sync: "quay.io/airshipit/placement:2025.2-ubuntu_jammy"
+    placement: "ghcr.io/rackerlabs/understack/placement:2025.2-ubuntu_jammy"
+    placement_db_sync: "ghcr.io/rackerlabs/understack/placement:2025.2-ubuntu_jammy"
 
     # openvswitch
     openvswitch_db_server: "docker.io/openstackhelm/openvswitch:ubuntu_jammy-dpdk-20250127"
@@ -78,13 +78,13 @@ images:
     ovn_controller: "docker.io/openstackhelm/ovn:ubuntu_jammy-20250111"
 
     # horizon
-    horizon: "quay.io/airshipit/horizon:2025.2-ubuntu_jammy"
-    horizon_db_sync: "quay.io/airshipit/horizon:2025.2-ubuntu_jammy"
+    horizon: "ghcr.io/rackerlabs/understack/horizon:2025.2-ubuntu_jammy"
+    horizon_db_sync: "ghcr.io/rackerlabs/understack/horizon:2025.2-ubuntu_jammy"
 
     # glance
-    glance_api: "quay.io/airshipit/glance:2025.2-ubuntu_jammy"
-    glance_db_sync: "quay.io/airshipit/glance:2025.2-ubuntu_jammy"
-    glance_metadefs_load: "quay.io/airshipit/glance:2025.2-ubuntu_jammy"
+    glance_api: "ghcr.io/rackerlabs/understack/glance:2025.2-ubuntu_jammy"
+    glance_db_sync: "ghcr.io/rackerlabs/understack/glance:2025.2-ubuntu_jammy"
+    glance_metadefs_load: "ghcr.io/rackerlabs/understack/glance:2025.2-ubuntu_jammy"
     glance_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
     # skyline

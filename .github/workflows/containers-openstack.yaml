@@ -28,12 +28,15 @@ jobs:
       matrix:
         project:
           - cinder
+          - glance
+          - horizon
           - ironic
           - keystone
           - neutron
           - nova
           - octavia
           - openstack-client
+          - placement
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
