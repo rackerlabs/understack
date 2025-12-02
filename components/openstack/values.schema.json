@@ -40,7 +40,10 @@
               "description": "Whether to generate the password if it doesn't exist"
             }
           },
-          "required": ["name", "key"],
+          "required": [
+            "name",
+            "key"
+          ],
           "additionalProperties": false
         },
         "storage": {
@@ -72,7 +75,11 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "enum": ["ReadWriteOnce", "ReadOnlyMany", "ReadWriteMany"]
+                    "enum": [
+                      "ReadWriteOnce",
+                      "ReadOnlyMany",
+                      "ReadWriteMany"
+                    ]
                   },
                   "description": "Access modes for the volume"
                 },
@@ -132,11 +139,16 @@
                       "description": "Enable Kubernetes authentication for the agent"
                     }
                   },
-                  "required": ["enabled"],
+                  "required": [
+                    "enabled"
+                  ],
                   "additionalProperties": true
                 }
               },
-              "required": ["port", "kubernetesAuth"],
+              "required": [
+                "port",
+                "kubernetesAuth"
+              ],
               "additionalProperties": true
             },
             "recovery": {
@@ -157,7 +169,11 @@
                   "description": "Cluster bootstrap timeout duration (e.g., '10m')"
                 }
               },
-              "required": ["enabled", "clusterHealthyTimeout", "clusterBootstrapTimeout"],
+              "required": [
+                "enabled",
+                "clusterHealthyTimeout",
+                "clusterBootstrapTimeout"
+              ],
               "additionalProperties": true
             },
             "config": {
@@ -188,11 +204,15 @@
                               "description": "Storage request size"
                             }
                           },
-                          "required": ["storage"],
+                          "required": [
+                            "storage"
+                          ],
                           "additionalProperties": true
                         }
                       },
-                      "required": ["requests"],
+                      "required": [
+                        "requests"
+                      ],
                       "additionalProperties": true
                     },
                     "storageClassName": {
@@ -200,17 +220,27 @@
                       "description": "Storage class name for the volume claim"
                     }
                   },
-                  "required": ["accessModes", "resources"],
+                  "required": [
+                    "accessModes",
+                    "resources"
+                  ],
                   "additionalProperties": true
                 }
               },
-              "required": ["reuseStorageVolume", "volumeClaimTemplate"],
+              "required": [
+                "reuseStorageVolume",
+                "volumeClaimTemplate"
+              ],
               "additionalProperties": true
             }
           },
           "required": [
-            "enabled", "sst", "replicaThreads", "agent",
-            "recovery", "config"
+            "enabled",
+            "sst",
+            "replicaThreads",
+            "agent",
+            "recovery",
+            "config"
           ],
           "additionalProperties": true
         },
@@ -248,7 +278,10 @@
           "properties": {
             "kind": {
               "type": "string",
-              "enum": ["ClusterSecretStore", "SecretStore"],
+              "enum": [
+                "ClusterSecretStore",
+                "SecretStore"
+              ],
               "description": "Type of secret store - ClusterSecretStore or SecretStore for namespaced"
             },
             "name": {
@@ -256,7 +289,10 @@
               "description": "Name of the ClusterSecretStore or SecretStore to use"
             }
           },
-          "required": ["kind", "name"],
+          "required": [
+            "kind",
+            "name"
+          ],
           "additionalProperties": false
         },
         "externalLinkAnnotationTemplate": {
@@ -341,7 +377,10 @@
             "additionalProperties": true
           }
         },
-        "required": ["apiVersion", "kind"],
+        "required": [
+          "apiVersion",
+          "kind"
+        ],
         "additionalProperties": true
       }
     },
@@ -366,7 +405,11 @@
               "description": "Gateway class name (e.g., cilium)"
             }
           },
-          "required": ["name", "namespace", "className"],
+          "required": [
+            "name",
+            "namespace",
+            "className"
+          ],
           "additionalProperties": false
         },
         "internal": {
@@ -386,66 +429,149 @@
               "description": "Gateway class name (e.g., cilium)"
             }
           },
-          "required": ["name", "namespace", "className"],
+          "required": [
+            "name",
+            "namespace",
+            "className"
+          ],
           "additionalProperties": false
         }
       },
       "additionalProperties": false
     },
     "routes": {
-      "type": "array",
-      "description": "Array of route configurations for Understack services",
-      "items": {
-        "type": "object",
-        "properties": {
-          "fqdn": {
-            "type": "string",
-            "description": "Fully qualified domain name for the route"
-          },
-          "name": {
-            "type": "string",
-            "description": "Name identifier for the route. If not defined, first part of fqdn is used."
-          },
-          "namespace": {
-            "type": "string",
-            "description": "Namespace where the httproute will be installed (same as backend service)"
-          },
-          "service": {
+      "type": "object",
+      "description": "HTTP and TLS routes configurations for Understack services",
+      "properties": {
+        "http": {
+          "type": "array",
+          "items": {
             "type": "object",
-            "description": "Kubernetes service backend configuration for the route",
             "properties": {
+              "fqdn": {
+                "type": "string",
+                "description": "Fully qualified domain name for the route"
+              },
               "name": {
                 "type": "string",
-                "description": "Name of the Kubernetes service"
+                "description": "Name identifier for the route. If not defined, first part of fqdn is used."
               },
-              "port": {
+              "namespace": {
+                "type": "string",
+                "description": "Namespace where the httproute will be installed (same as backend service)"
+              },
+              "service": {
+                "type": "object",
+                "description": "Kubernetes service backend configuration for the route",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the Kubernetes service"
+                  },
+                  "port": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 65535,
                     "description": "Numeric port of the service (not target port)"
+                  }
+                },
+                "required": [
+                  "name",
+                  "port"
+                ],
+                "additionalProperties": false
+              },
+              "selector": {
+                "type": "object",
+                "description": "Kubernetes-style label selector (key-value pairs)",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "from": {
+                "type": "string",
+                "enum": [
+                  "Same",
+                  "All",
+                  "Selector"
+                ],
+                "description": "Specifies where traffic can originate from"
               }
             },
-            "required": ["name", "port"],
+            "required": [
+              "fqdn",
+              "service"
+            ],
             "additionalProperties": false
-          },
-          "selector": {
-            "type": "object",
-            "description": "Kubernetes-style label selector (key-value pairs)",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "from": {
-            "type": "string",
-            "enum": ["Same", "All", "Selector"],
-            "description": "Specifies where traffic can originate from"
           }
         },
-        "required": ["fqdn", "service"],
-        "additionalProperties": false
+        "tls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fqdn": {
+                "type": "string",
+                "description": "Fully qualified domain name for the route"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name identifier for the route. If not defined, first part of fqdn is used."
+              },
+              "namespace": {
+                "type": "string",
+                "description": "Namespace where the httproute will be installed (same as backend service)"
+              },
+              "service": {
+                "type": "object",
+                "description": "Kubernetes service backend configuration for the route",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the Kubernetes service"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "Numeric port of the service (not target port)"
+                  }
+                },
+                "required": [
+                  "name",
+                  "port"
+                ],
+                "additionalProperties": false
+              },
+              "selector": {
+                "type": "object",
+                "description": "Kubernetes-style label selector (key-value pairs)",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "from": {
+                "type": "string",
+                "enum": [
+                  "Same",
+                  "All",
+                  "Selector"
+                ],
+                "description": "Specifies where traffic can originate from"
+              }
+            },
+            "required": [
+              "fqdn",
+              "service"
+            ],
+            "additionalProperties": false
+          }
+        }
       }
     }
   },
-  "required": ["regionName"],
+  "required": [
+    "regionName"
+  ],
   "additionalProperties": false
 }
