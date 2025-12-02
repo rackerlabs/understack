@@ -18,7 +18,11 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -62,17 +66,24 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// Determine sync interval with a sane default
 	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
 	if syncInterval == 0 {
-		syncInterval = 4 * time.Hour // sane default
+		syncInterval = 4 * time.Hour
 	}
 
+	// Skip reconciliation if we synced recently
 	lastSynced := nautobotCR.Status.LastSyncedAt.Time
 	if !lastSynced.IsZero() {
-		sinceLast := time.Since(lastSynced)
-		if sinceLast < syncInterval {
-			remaining := syncInterval - sinceLast
-			log.Info("Last sync was recent skipping and requeuing", "remaining", remaining)
+		nextSyncTime := lastSynced.Add(syncInterval)
+		now := time.Now()
+
+		if now.Before(nextSyncTime) {
+			remaining := time.Until(nextSyncTime)
+			log.Info("skipping reconciliation, sync interval not elapsed",
+				"lastSynced", lastSynced.Format(time.RFC3339),
+				"nextSync", nextSyncTime.Format(time.RFC3339),
+				"remaining", remaining.Round(time.Second))
 			return ctrl.Result{RequeueAfter: remaining}, nil
 		}
 	}
@@ -91,32 +102,28 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	deviceTypeMap := make(map[string]string)
-	for _, ref := range nautobotCR.Spec.DeviceTypesRef {
-		var deviceTypeConfigMap corev1.ConfigMap
-		err = r.Get(ctx, types.NamespacedName{
-			Namespace: *ref.ConfigMapSelector.Namespace,
-			Name:      ref.ConfigMapSelector.Name,
-		}, &deviceTypeConfigMap)
-		if err != nil {
-			log.Error(err, "failed to fetch ConfigMap 'deviceType' in namespace 'nautobot'")
-			return ctrl.Result{}, err
-		}
-		for k, v := range deviceTypeConfigMap.Data {
-			deviceTypeMap[k] = v
-		}
-	}
-
-	n := nautobot.NewNautobotClient(fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP), nautobotAuthToken)
-	if err := n.SyncAllDeviceTypes(ctx, deviceTypeMap); err != nil {
-		log.Error(err, "SyncAllDeviceTypes failed")
+	// Aggregate device type data from all referenced ConfigMaps
+	deviceTypeMap, err := r.aggregateDeviceTypeDataFromConfigMap(ctx, nautobotCR.Spec.DeviceTypesRef)
+	if err != nil {
+		log.Error(err, "failed to aggregate device type data from ConfigMaps")
 		return ctrl.Result{}, err
 	}
-	// Update status
+
+	// Create Nautobot client
+	nautobotURL := fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP)
+	nautobotClient := nautobot.NewNautobotClient(nautobotURL, nautobotAuthToken)
+
+	// Sync device types if data has changed
+	if err := r.syncDeviceTypes(ctx, nautobotClient, &nautobotCR, deviceTypeMap); err != nil {
+		log.Error(err, "failed to sync device types")
+		return ctrl.Result{}, err
+	}
+
 	nautobotCR.Status.LastSyncedAt = metav1.Now()
 	nautobotCR.Status.Ready = true
-	nautobotCR.Status.NautobotStatusReport = n.Report
-	if len(n.Report) > 0 {
+	nautobotCR.Status.NautobotStatusReport = nautobotClient.Report
+	nautobotCR.SetSyncHash("deviceType", computeMapHas(deviceTypeMap))
+	if len(nautobotClient.Report) > 0 {
 		nautobotCR.Status.Message = "sync completed with some errors"
 	} else {
 		nautobotCR.Status.Message = "Sync Successful"
@@ -128,6 +135,57 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// Successfully completed reconciliation; requeue after configured sync interval
 	log.Info("sync completed successfully")
 	return ctrl.Result{RequeueAfter: syncInterval}, nil
+}
+
+// aggregateDeviceTypeDataFromConfigMap fetches and merges data from all referenced ConfigMaps.
+// It returns a map containing all device type configurations.
+func (r *NautobotReconciler) aggregateDeviceTypeDataFromConfigMap(ctx context.Context, refs []syncv1alpha1.ConfigMapRef) (map[string]string, error) {
+	deviceTypeMap := make(map[string]string)
+
+	for _, ref := range refs {
+		var configMap corev1.ConfigMap
+		namespacedName := types.NamespacedName{
+			Name:      ref.ConfigMapSelector.Name,
+			Namespace: *ref.ConfigMapSelector.Namespace,
+		}
+
+		if err := r.Get(ctx, namespacedName, &configMap); err != nil {
+			return nil, fmt.Errorf("failed to fetch ConfigMap %s/%s: %w",
+				namespacedName.Namespace, namespacedName.Name, err)
+		}
+
+		// Merge ConfigMap data into the aggregate map
+		for k, v := range configMap.Data {
+			deviceTypeMap[k] = v
+		}
+	}
+
+	return deviceTypeMap, nil
+}
+
+// syncDeviceTypes syncs device types to Nautobot only if the data has changed.
+// It compares the hash of the current data with the previously synced hash.
+func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
+	client *nautobot.NautobotClient,
+	nautobotCR *syncv1alpha1.Nautobot,
+	deviceTypeMap map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+
+	currentHash := computeMapHas(deviceTypeMap)
+	previousHash := nautobotCR.GetSyncHash("deviceType")
+
+	if currentHash == previousHash {
+		log.Info("device types already synced, skipping", "hash", currentHash)
+		return nil
+	}
+
+	log.Info("syncing device types", "previousHash", previousHash, "currentHash", currentHash)
+	if err := client.SyncAllDeviceTypes(ctx, deviceTypeMap); err != nil {
+		return fmt.Errorf("failed to sync device types: %w", err)
+	}
+
+	return nil
 }
 
 // getAuthTokenFromSecretRef: this will fetch Nautobot auth token from the given refer.
@@ -150,4 +208,34 @@ func (r *NautobotReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&syncv1alpha1.Nautobot{}).
 		Named("nautobot").
 		Complete(r)
+}
+
+// computeMapHas returns a stable SHA-256 hash of the map contents
+func computeMapHas(m map[string]string) string {
+	if len(m) == 0 {
+		return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // sha256 of empty
+	}
+
+	// Get sorted keys for deterministic order
+	var keys []string
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	// Build canonical string: "key1=value1\nkey2=value2\n..."
+	var sb strings.Builder
+	for i, k := range keys {
+		if i > 0 {
+			sb.WriteByte('\n')
+		}
+		// Escape newlines and backslashes if you want to be extra safe
+		// Or just write raw — usually fine for ConfigMap data
+		sb.WriteString(k)
+		sb.WriteByte('=')
+		sb.WriteString(m[k])
+	}
+
+	hash := sha256.Sum256([]byte(sb.String()))
+	return hex.EncodeToString(hash[:])
 }

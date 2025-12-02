@@ -95,10 +95,12 @@ help: ## Display this help.
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
 	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(MAKE) copy-crds-to-helm
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(MAKE) copy-crds-to-helm
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -360,3 +362,9 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+.PHONY: copy-crds-to-helm
+copy-crds-to-helm: ## Copy generated CRDs into Helm chart
+	@echo "Copying CRDs to Helm chart..."
+	mkdir -p helm/crds
+	cat config/crd/bases/sync.rax.io_nautobots.yaml > helm/crds/clients.yaml

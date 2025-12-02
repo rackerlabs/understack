@@ -36,6 +36,7 @@ type NautobotStatus struct {
 	LastSyncedAt         metav1.Time         `json:"lastSyncedAt,omitempty"`
 	Ready                bool                `json:"ready,omitempty"`
 	Message              string              `json:"message,omitempty"`
+	SyncHash             map[string]string   `json:"syncHash,omitempty"`
 	NautobotStatusReport map[string][]string `json:"nautobotStatusReport,omitempty"`
 }
 
@@ -63,4 +64,22 @@ type NautobotList struct {
 
 func init() {
 	SchemeBuilder.Register(&Nautobot{}, &NautobotList{})
+}
+
+func (r *Nautobot) GetSyncHash(key string) string {
+	if r == nil || r.Status.SyncHash == nil {
+		return ""
+	}
+	return r.Status.SyncHash[key]
+}
+
+func (r *Nautobot) SetSyncHash(key, value string) {
+	if r.Status.SyncHash == nil {
+		r.Status.SyncHash = make(map[string]string)
+	}
+	if value == "" {
+		delete(r.Status.SyncHash, key)
+	} else {
+		r.Status.SyncHash[key] = value
+	}
 }

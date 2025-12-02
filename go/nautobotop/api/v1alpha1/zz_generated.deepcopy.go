@@ -146,6 +146,13 @@ func (in *NautobotSpec) DeepCopy() *NautobotSpec {
 func (in *NautobotStatus) DeepCopyInto(out *NautobotStatus) {
 	*out = *in
 	in.LastSyncedAt.DeepCopyInto(&out.LastSyncedAt)
+	if in.SyncHash != nil {
+		in, out := &in.SyncHash, &out.SyncHash
+		*out = make(map[string]string, len(*in))
+		for key, val := range *in {
+			(*out)[key] = val
+		}
+	}
 	if in.NautobotStatusReport != nil {
 		in, out := &in.NautobotStatusReport, &out.NautobotStatusReport
 		*out = make(map[string][]string, len(*in))
