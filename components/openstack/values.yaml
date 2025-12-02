@@ -177,4 +177,6 @@ extraObjects: []
 #           key: my-secret-id
 
 gateways: {}
-routes: []
+routes:
+  http: []
+  tls: []
