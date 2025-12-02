@@ -88,11 +88,12 @@ conf:
       loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
-      # Agent inspection hooks - ports hook removed to prevent port manipulation during agent inspection
-      # Default hooks include: ramdisk-error,validate-interfaces,ports,architecture
-      # We override to exclude 'ports' from the default hooks
-      default_hooks: "ramdisk-error,validate-interfaces,architecture"
-      hooks: "$default_hooks,pci-devices,parse-lldp,local-link-connection,resource-class"
+      # Agent inspection hooks run after inspecting in-band using the IPA image:
+      hooks: "ramdisk-error,validate-interfaces,architecture,pci-devices,validate-interfaces,parse-lldp,resource-class,update-baremetal-port"
+    redfish:
+      # Redfish inspection hooks run after inspecting out-of-band using the BMC:
+      inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices"
+      add_ports: "all"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
     sensor_data:
       send_sensor_data: true
