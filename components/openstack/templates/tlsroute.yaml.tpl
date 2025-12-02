@@ -1,7 +1,7 @@
-{{- range .Values.routes.http }}
+{{- range .Values.routes.tls }}
 ---
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1alpha2
+kind: TLSRoute
 metadata:
   {{- if .name }}
   name: {{ .name }}
@@ -16,14 +16,11 @@ spec:
       namespace: {{ $.Values.gateways.external.namespace }}
   hostnames: [{{ .fqdn | quote }}]
   rules:
-    - matches:
-        - path:
-            type: {{ .pathType | default "PathPrefix" }}
-            value: {{ .path | default "/" }}
-      backendRefs:
+    - backendRefs:
         - name: {{ .service.name }}
           {{- with .namespace }}
           namespace: {{ . }}
           {{- end }}
           port: {{ .service.port }}
 {{- end }}
+

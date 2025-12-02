@@ -10,7 +10,7 @@ metadata:
 spec:
   gatewayClassName: {{ .Values.gateways.external.className }}
   listeners:
-    {{- range .Values.routes }}
+    {{- range .Values.routes.http }}
     {{- $listenerName := .name | default (index (splitList "." .fqdn) 0) }}
     - name: {{ $listenerName }}
       port: {{ $.Values.gateways.external.port | default 443 }}
@@ -18,6 +18,26 @@ spec:
       hostname: {{ .fqdn | quote }}
       tls:
         mode: Terminate
+        certificateRefs:
+          - name: {{ $listenerName }}-gtls
+      allowedRoutes:
+        namespaces:
+          {{- if .selector }}
+          from: Selector
+          selector:
+            {{- .selector | toYaml | nindent 12 }}
+          {{- else }}
+          from: {{ .from | default "All" }}
+          {{- end }}
+    {{- end }}
+    {{- range .Values.routes.tls }}
+    {{- $listenerName := .name | default (index (splitList "." .fqdn) 0) }}
+    - name: {{ $listenerName }}
+      port: {{ $.Values.gateways.external.port | default 443 }}
+      protocol: TLS
+      hostname: {{ .fqdn | quote }}
+      tls:
+        mode: Passthrough
         certificateRefs:
           - name: {{ $listenerName }}-gtls
       allowedRoutes:
