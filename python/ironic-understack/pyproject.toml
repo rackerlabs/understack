@@ -18,6 +18,8 @@ dependencies = [
 
 [project.entry-points."ironic.inspection.hooks"]
 resource-class = "ironic_understack.resource_class:ResourceClassHook"
+update-baremetal-port = "ironic_understack.update_baremetal_port:UpdateBaremetalPortsHook"
+port-bios-name = "ironic_understack.port_bios_name_hook:PortBiosNameHook"
 
 [project.entry-points."ironic.hardware.interfaces.inspect"]
 redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
@@ -26,8 +28,9 @@ idrac-redfish-understack = "ironic_understack.redfish_inspect_understack:Underst
 [dependency-groups]
 test = [
     "pytest>=9.0.1,<10",
-    "pytest-github-actions-annotate-failures",
     "pytest-cov>=7,<8",
+    "pytest-github-actions-annotate-failures",
+    "pytest-mock>=3.15.1",
 ]
 
 [tool.uv]
