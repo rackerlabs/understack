@@ -2,15 +2,11 @@
 ---
 release_group: null
 
-images:
-  tags:
-    bootstrap: "ghcr.io/rackerlabs/understack/ansible:latest"
-
 bootstrap:
   enabled: true
   ks_user: admin
   script: |
-    ansible-runner run /runner --playbook keystone_bootstrap.yaml -vv
+    ansible-runner run /runner --playbook keystone-post-deploy.yaml -vv
 
 network:
   # configure OpenStack Helm to use Undercloud's ingress

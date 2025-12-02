@@ -5,7 +5,7 @@ images:
 
   tags:
     # these are common across all these OpenStack Helm installations
-    bootstrap: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
+    bootstrap: "ghcr.io/rackerlabs/understack/ansible:latest"
     db_init: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
     db_drop: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
     ks_user: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
