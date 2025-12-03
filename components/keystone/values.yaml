@@ -202,6 +202,7 @@ conf:
     SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
     CustomLog /dev/stdout combined env=!forwarded
     CustomLog /dev/stdout proxy env=forwarded
+    ErrorLogFormat "%{cu}t %M"
     ErrorLog /dev/stderr
 
     <VirtualHost *:{{ $portInt }}>
@@ -210,22 +211,47 @@ conf:
         WSGIScriptAlias / /var/www/cgi-bin/keystone/keystone-wsgi-public
         WSGIApplicationGroup %{GLOBAL}
         WSGIPassAuthorization On
+        ErrorLogFormat "%{cu}t %M"
+        ErrorLog /dev/stdout
 
-        # OIDC
+        SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
+        CustomLog /dev/stdout combined env=!forwarded
+        CustomLog /dev/stdout proxy env=forwarded
+
+        # This is what keystone expects
         OIDCClaimPrefix "OIDC-"
-        OIDCRemoteUserClaim preferred_username
-        OIDCSessionType server-cache
-        OIDCXForwardedHeaders X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
-        OIDCResponseType "code"
-        OIDCScope "openid email profile groups"
-        OIDCProviderMetadataURL {{ tuple "dex" "internal" "dex" $ | include "helm-toolkit.endpoints.keystone_endpoint_uri_lookup" }}
+        # lists need to be string-ified and keystone expects items to be delimited with a ;
+        OIDCClaimDelimiter ;
 
+        # being behind an Ingress or Gateway means we need to utilize these headers
+        OIDCXForwardedHeaders X-Forwarded-Host X-Forwarded-Proto X-Forwarded-Port
+
+        # OIDC provider's .well-known/configuration URL
+        OIDCProviderMetadataURL {{ tuple "dex" "internal" "dex" $ | include "helm-toolkit.endpoints.keystone_endpoint_uri_lookup" }}
+        # Client / Application Identifier and Secret
         OIDCClientID keystone
         OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
+        # use the recommended code flow and not hybrid
+        OIDCResponseType "code"
+        {{- if hasKey $.Values.conf "oidc" }}
+        {{- range $key, $value := .Values.conf.oidc }}
+        OIDC{{ $key | camelcase }} {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+
+        # set the REMOTE_USER to the value of preferred_username
+        OIDCRemoteUserClaim preferred_username
+        # scopes that we want to request
+        OIDCScope "openid email profile groups"
+
+        # key that the JWT is encrypted/signed with, must be the same for
+        # all running keystones
         OIDCCryptoPassphrase "exec:/bin/cat /etc/oidc-secret/password"
+
+        # setup shared caching between multiple keystones by using memcache
+        OIDCSessionType server-cache
         OIDCCacheType memcache
         OIDCMemCacheServers "memcached.openstack.svc.cluster.local:11211"
-        OIDCClaimDelimiter ;
 
         # avoid redirect issues per the following
         # https://review.opendev.org/c/openstack/keystone/+/925553
