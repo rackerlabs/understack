@@ -8,6 +8,15 @@ bootstrap:
   script: |
     ansible-runner run /runner --playbook keystone-post-deploy.yaml -vv
 
+# (nicholas.kuechler) The default openstack-helm backoffLimit is 1000 which can
+# be quite long if the ansible job fails and the pod is stuck in CrashLoopBackoff.
+# Changing this to a more reasonable limit for bootstrap jobs.
+# Reference: https://opendev.org/openstack/openstack-helm/src/branch/master/helm-toolkit/templates/manifests/_job-bootstrap.tpl#L38
+jobs:
+  bootstrap:
+    backoffLimit: 10
+    activeDeadlineSeconds: 1200
+
 network:
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
