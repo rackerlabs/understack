@@ -100,6 +100,7 @@ class TestIronicPortEvent:
             node_uuid="node-uuid",
             physical_network="test-network",
             pxe_enabled=True,
+            bios_name=None,
             remote_port_id="Ethernet1/1",
             remote_switch_info="switch1.example.com",
             remote_switch_id="aa:bb:cc:dd:ee:ff",
@@ -115,11 +116,28 @@ class TestIronicPortEvent:
             node_uuid="node-uuid",
             physical_network="test-network",
             pxe_enabled=True,
+            bios_name=None,
             remote_port_id="Ethernet1/1",
             remote_switch_info="switch1.example.com",
             remote_switch_id="aa:bb:cc:dd:ee:ff",
         )
         assert event.interface_name == "test-uuid-123"
+
+    def test_interface_name_prefers_bios_name(self):
+        """Test interface name prefers bios_name over name."""
+        event = IronicPortEvent(
+            uuid="test-uuid",
+            name="some-name",
+            address="00:11:0a:69:a9:99",
+            node_uuid="node-uuid",
+            physical_network="test-network",
+            pxe_enabled=True,
+            bios_name="NIC.Integrated.1-1-1",
+            remote_port_id="Ethernet1/1",
+            remote_switch_info="switch1.example.com",
+            remote_switch_id="aa:bb:cc:dd:ee:ff",
+        )
+        assert event.interface_name == "NIC.Integrated.1-1-1"
 
 
 class TestCableManagement:
@@ -148,6 +166,7 @@ class TestCableManagement:
             node_uuid="node-uuid",
             physical_network="test-network",
             pxe_enabled=True,
+            bios_name=None,
             remote_port_id="Ethernet1/1",
             remote_switch_info="switch1.example.com",
             remote_switch_id="aa:bb:cc:dd:ee:ff",
