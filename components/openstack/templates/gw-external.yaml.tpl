@@ -71,5 +71,6 @@ spec:
       envoyService:
         annotations:
           {{- .Values.gateways.external.serviceAnnotations | toYaml | nindent 10 }}
+        externalTrafficPolicy: {{ .Values.gateways.external.externalTrafficPolicy | default "Cluster" }}
 {{- end }}
 {{- end }}
