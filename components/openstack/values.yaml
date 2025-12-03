@@ -110,6 +110,8 @@ keystoneServiceUsers:
         remoteRef: *ironic_svc
       - usage: neutron
         remoteRef: *ironic_svc
+      - usage: nova
+        remoteRef: *ironic_svc
     neutron:
       - usage: admin
         remoteRef: *keystone_admin
