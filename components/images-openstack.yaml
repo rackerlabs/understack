@@ -6,11 +6,11 @@ images:
   tags:
     # these are common across all these OpenStack Helm installations
     bootstrap: "ghcr.io/rackerlabs/understack/ansible:latest"
-    db_init: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
-    db_drop: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
-    ks_user: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
-    ks_service: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
-    ks_endpoints: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
+    db_init: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
+    db_drop: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
+    ks_user: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
+    ks_service: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
+    ks_endpoints: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
 
     # keystone
     keystone_api: "ghcr.io/rackerlabs/understack/keystone:2025.2-ubuntu_jammy"
@@ -28,10 +28,10 @@ images:
     ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
     ironic_pxe_http: "docker.io/nginx:1.29.3"
     ironic_db_sync: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
-    # these want curl which apparently is in the heat image
-    ironic_manage_cleaning_network: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
-    ironic_retrive_cleaning_network: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
-    ironic_retrive_swift_config: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
+    # these want curl which apparently is in the openstack-client image
+    ironic_manage_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
+    ironic_retrive_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
+    ironic_retrive_swift_config: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
 
     # neutron
     neutron_db_sync: "ghcr.io/rackerlabs/understack/neutron:2025.2-ubuntu_jammy"
@@ -50,7 +50,7 @@ images:
     # nova
     nova_api: "ghcr.io/rackerlabs/understack/nova:2025.2-ubuntu_jammy"
     nova_cell_setup: "ghcr.io/rackerlabs/understack/nova:2025.2-ubuntu_jammy"
-    nova_cell_setup_init: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
+    nova_cell_setup_init: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
     nova_compute: "ghcr.io/rackerlabs/understack/nova:2025.2-ubuntu_jammy"
     nova_compute_ironic: "ghcr.io/rackerlabs/understack/nova:2025.2-ubuntu_jammy"
     nova_compute_ssh: "ghcr.io/rackerlabs/understack/nova:2025.2-ubuntu_jammy"
@@ -108,5 +108,5 @@ images:
     octavia_worker: "ghcr.io/rackerlabs/understack/octavia:2025.2-ubuntu_jammy"
     octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:2025.2-ubuntu_jammy"
     octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:2025.2-ubuntu_jammy"
-    octavia_health_manager_init: "quay.io/airshipit/heat:2025.2-ubuntu_jammy"
+    octavia_health_manager_init: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
 ...
