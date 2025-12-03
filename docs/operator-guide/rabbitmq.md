@@ -73,4 +73,10 @@ cat /tmp/full-unpacked.json|  kubectl -n openstack exec -it rabbitmq-server-0 -c
 
 ### To dump, print, list-events, and requeue an openstack notifications rabbitmq queue
 
-use [OpenStack RabbitMQ Queue Dump Tool](https://github.com/rackerlabs/understack/tree/main/examples/openstack-notifications)
+Use [OpenStack RabbitMQ Queue Dump Tool](https://github.com/rackerlabs/understack/tree/main/examples/openstack-notifications)
+
+### Purge queue
+
+``` bash
+kubectl -n openstack exec -it rabbitmq-server-0 -c rabbitmq -- rabbitmqadmin --vhost=cinder purge queue name=notifications.info
+```
