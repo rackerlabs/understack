@@ -50,4 +50,26 @@ spec:
           from: {{ .from | default "All" }}
           {{- end }}
     {{- end }}
+  {{- if .Values.gateways.external.serviceAnnotations }}
+  infrastructure:
+    parametersRef:
+          group: gateway.envoyproxy.io
+          kind: EnvoyProxy
+          name: {{ .Values.gateways.external.name }}-proxy
+  {{- end }}
+---
+{{- if .Values.gateways.external.serviceAnnotations }}
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ .Values.gateways.external.name }}-proxy
+  namespace: {{ .Values.gateways.external.namespace }}
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        annotations:
+          {{- .Values.gateways.external.serviceAnnotations | toYaml | nindent 10 }}
+{{- end }}
 {{- end }}
