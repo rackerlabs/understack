@@ -477,6 +477,11 @@
                     "minimum": 1,
                     "maximum": 65535,
                     "description": "Numeric port of the service (not target port)"
+                  },
+                  "backendType": {
+                    "type": "string",
+                    "description": "Type of traffic that service expects - 'http' or 'tls'",
+                    "enum": ["tls", "http"]
                   }
                 },
                 "required": [

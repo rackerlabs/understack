@@ -21,9 +21,34 @@ spec:
             type: {{ .pathType | default "PathPrefix" }}
             value: {{ .path | default "/" }}
       backendRefs:
+        {{- if eq .service.backendType "tls" }}
+        - name: {{ .service.name }}
+          group: gateway.envoyproxy.io
+          kind: Backend
+          {{- with .namespace }}
+          namespace: {{ . }}
+          {{- end }}
+        {{- else }}
         - name: {{ .service.name }}
           {{- with .namespace }}
           namespace: {{ . }}
           {{- end }}
           port: {{ .service.port }}
+        {{- end }}
+{{- if eq .service.backendType "tls" }}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: Backend
+metadata:
+  name: {{ .service.name }}
+  namespace: {{ .namespace | default "openstack" }}
+spec:
+  endpoints:
+    - fqdn:
+        # standard in-cluster DNS name
+        hostname: {{ .service.name }}.{{ .namespace }}.svc.cluster.local
+        port: {{ .service.port }}
+  tls:
+    insecureSkipVerify: true
+{{- end }}
 {{- end }}
