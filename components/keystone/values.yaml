@@ -202,6 +202,7 @@ conf:
     SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
     CustomLog /dev/stdout combined env=!forwarded
     CustomLog /dev/stdout proxy env=forwarded
+    ErrorLogFormat "%{cu}t %M"
     ErrorLog /dev/stderr
 
     <VirtualHost *:{{ $portInt }}>
@@ -210,6 +211,12 @@ conf:
         WSGIScriptAlias / /var/www/cgi-bin/keystone/keystone-wsgi-public
         WSGIApplicationGroup %{GLOBAL}
         WSGIPassAuthorization On
+        ErrorLogFormat "%{cu}t %M"
+        ErrorLog /dev/stdout
+
+        SetEnvIf X-Forwarded-For "^.*\..*\..*\..*" forwarded
+        CustomLog /dev/stdout combined env=!forwarded
+        CustomLog /dev/stdout proxy env=forwarded
 
         # This is what keystone expects
         OIDCClaimPrefix "OIDC-"
