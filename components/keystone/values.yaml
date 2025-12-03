@@ -233,6 +233,11 @@ conf:
         OIDCClientSecret "exec:/bin/cat /etc/keystone-sso/client-secret"
         # use the recommended code flow and not hybrid
         OIDCResponseType "code"
+        {{- if hasKey $.Values.conf "oidc" }}
+        {{- range $key, $value := .Values.conf.oidc }}
+        OIDC{{ $key | camelcase }} {{ $value | quote }}
+        {{- end }}
+        {{- end }}
 
         # set the REMOTE_USER to the value of preferred_username
         OIDCRemoteUserClaim preferred_username
