@@ -9,7 +9,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/rackerlabs/understack/nautobotop
   # This sets the pull policy for images.
-  pullPolicy: Never
+  pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 

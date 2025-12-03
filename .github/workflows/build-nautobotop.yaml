@@ -84,6 +84,7 @@ jobs:
           # update Chart.yaml with tag version
           yq -i ".version = \"${PKG_VER}\"" helm/Chart.yaml
           yq -i ".appVersion = \"${PKG_VER}\"" helm/Chart.yaml
+          yq helm/Chart.yaml
           # package chart
           helm package -u -d ${{ github.workspace }} helm
           # push chart to ghcr.io
