@@ -403,6 +403,10 @@
             "className": {
               "type": "string",
               "description": "Gateway class name (e.g., cilium)"
+            },
+            "serviceAnnotations": {
+              "type": "object",
+              "description": "Annotations to placed on the Service generated for this gateway"
             }
           },
           "required": [
