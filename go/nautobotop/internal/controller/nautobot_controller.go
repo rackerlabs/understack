@@ -88,17 +88,17 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		}
 	}
 
-	// Fetch the Nautobot nautobotService to get its ClusterIP
-	var nautobotService corev1.Service
-	if err := r.Get(ctx, types.NamespacedName{Namespace: "default", Name: "nautobot-default"}, &nautobotService); err != nil {
-		log.Error(err, "failed to fetch Service nautobot-default")
-		return ctrl.Result{}, err
-	}
-
 	// Retrieve the Nautobot authentication token from a secret or external source
 	nautobotAuthToken, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
 	if err != nil {
 		log.Error(err, "failed parse find nautoBotAuthToken")
+		return ctrl.Result{}, err
+	}
+
+	// Fetch the Nautobot service to get its ClusterIP
+	nautobotService, err := r.getServiceFromServiceRef(ctx, nautobotCR)
+	if err != nil {
+		log.Error(err, "failed to fetch Nautobot service")
 		return ctrl.Result{}, err
 	}
 
@@ -200,6 +200,16 @@ func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, naut
 		return string(valBytes), nil
 	}
 	return "", fmt.Errorf("secret key %s not found in secret", nautobotCR.Spec.NautobotSecretRef.Key)
+}
+
+// getServiceFromServiceRef: this will fetch Nautobot service from the given reference.
+func (r *NautobotReconciler) getServiceFromServiceRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (*corev1.Service, error) {
+	service := &corev1.Service{}
+	err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.NautobotServiceRef.Name, Namespace: *nautobotCR.Spec.NautobotServiceRef.Namespace}, service)
+	if err != nil {
+		return nil, err
+	}
+	return service, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

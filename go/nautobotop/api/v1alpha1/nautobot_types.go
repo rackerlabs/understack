@@ -28,6 +28,7 @@ type NautobotSpec struct {
 	// +kubebuilder:default=10
 	SyncIntervalSeconds int               `json:"syncIntervalSeconds,omitempty"`
 	NautobotSecretRef   SecretKeySelector `json:"nautobotSecretRef,omitempty"`
+	NautobotServiceRef  ServiceSelector   `json:"nautobotServiceRef,omitempty"`
 	DeviceTypesRef      []ConfigMapRef    `json:"deviceTypeRef,omitempty"`
 }
 

@@ -93,6 +93,23 @@ spec:
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 type: object
+              nautobotServiceRef:
+                properties:
+                  name:
+                    description: The name of the Service resource being referred to.
+                    maxLength: 253
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    type: string
+                  namespace:
+                    description: |-
+                      The namespace of the Service resource being referred to.
+                      Ignored if referent is not cluster-scoped, otherwise defaults to the namespace of the referent.
+                    maxLength: 63
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+                    type: string
+                type: object
               syncIntervalSeconds:
                 default: 10
                 type: integer
