@@ -22,6 +22,7 @@ class IronicPortEvent:
     node_uuid: str
     physical_network: str
     pxe_enabled: bool
+    bios_name: str | None
     remote_port_id: str | None
     remote_switch_info: str | None
     remote_switch_id: str | None
@@ -29,6 +30,9 @@ class IronicPortEvent:
     @property
     def interface_name(self) -> str:
         try:
+            # Prefer bios_name from extra field, then name, then fall back to UUID
+            if self.bios_name:
+                return self.bios_name
             if self.name:
                 return self.name
             return self.uuid
@@ -47,6 +51,7 @@ class IronicPortEvent:
             raise Exception("Invalid event. No 'ironic_object.data' in payload")
 
         llc = payload_data.get("local_link_connection") or {}
+        extra = payload_data.get("extra") or {}
 
         return IronicPortEvent(
             payload_data["uuid"],
@@ -55,6 +60,7 @@ class IronicPortEvent:
             payload_data["node_uuid"],
             payload_data.get("physical_network") or "",
             payload_data.get("pxe_enabled") or False,
+            extra.get("bios_name"),
             llc.get("port_id"),
             llc.get("switch_info"),
             llc.get("switch_id"),
