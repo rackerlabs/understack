@@ -14,6 +14,11 @@
 # under the License.
 #
 
+- name: Create the role if it does not exist
+  openstack.cloud.identity_role:
+    name: "{{ role_item.role }}"
+    state: present
+
 # role assignment module is lacking inherited and cross domain assignments
 # so need to do this manually
 - name: Assign role to group for domain
