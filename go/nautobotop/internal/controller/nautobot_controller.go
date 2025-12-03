@@ -166,7 +166,7 @@ func (r *NautobotReconciler) aggregateDeviceTypeDataFromConfigMap(ctx context.Co
 // syncDeviceTypes syncs device types to Nautobot only if the data has changed.
 // It compares the hash of the current data with the previously synced hash.
 func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
-	client *nautobot.NautobotClient,
+	nautobotClient *nautobot.NautobotClient,
 	nautobotCR *syncv1alpha1.Nautobot,
 	deviceTypeMap map[string]string,
 ) error {
@@ -181,7 +181,7 @@ func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 	}
 
 	log.Info("syncing device types", "previousHash", previousHash, "currentHash", currentHash)
-	if err := client.SyncAllDeviceTypes(ctx, deviceTypeMap); err != nil {
+	if err := nautobotClient.SyncAllDeviceTypes(ctx, deviceTypeMap); err != nil {
 		return fmt.Errorf("failed to sync device types: %w", err)
 	}
 
@@ -217,7 +217,7 @@ func computeMapHas(m map[string]string) string {
 	}
 
 	// Get sorted keys for deterministic order
-	var keys []string
+	keys := []string{}
 	for k := range m {
 		keys = append(keys, k)
 	}
