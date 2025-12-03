@@ -9,3 +9,6 @@ config:
     extensionApis:
       enableBackend: true
       enableEnvoyPatchPolicy: true
+    logging:
+      level:
+        default: debug
