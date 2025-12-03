@@ -1,0 +1,17 @@
+---
+component: envoy-gateway
+sources:
+  - repoURL: docker.io/envoyproxy
+    chart: gateway-helm
+    path: gateway-helm
+    targetRevision: v1.6.0
+    helm:
+      releaseName: envoy-gateway
+      valueFiles:
+        - $understack/components/envoy-gateway/values.yaml
+        - $deploy/{{.name}}/helm-configs/envoy-gateway.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+    path: 'components/envoy-gateway'
+  - ref: deploy
+    path: '{{.name}}/manifests/envoy-gateway'

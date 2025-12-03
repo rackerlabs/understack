@@ -1,0 +1,6 @@
+deployment:
+  envoyGateway:
+    resources:
+      limits:
+        cpu: 3000m
+        memory: 4096Mi
