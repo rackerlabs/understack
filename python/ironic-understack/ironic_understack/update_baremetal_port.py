@@ -85,23 +85,17 @@ def _update_port_attrs(task, ports_by_mac, vlan_groups, node_uuid):
     for baremetal_port in ironic_ports_for_node(task.context, task.node.id):
         inspected_port = ports_by_mac.get(baremetal_port.address)
         if inspected_port:
+            vlan_group = vlan_groups.get(inspected_port.switch_system_name)
             LOG.info(
-                "Port=%(uuid)s Node=%(node)s is connected %(lldp)s",
+                "Port=%(uuid)s Node=%(node)s is connected " "%(lldp)s, %(vlan_group)s",
                 {
                     "uuid": baremetal_port.uuid,
                     "node": node_uuid,
                     "lldp": inspected_port,
+                    "vlan_group": vlan_group,
                 },
             )
-            vlan_group = vlan_groups.get(inspected_port.switch_system_name)
-            if not vlan_group:
-                LOG.error("Missing VLAN group for %s", inspected_port)
-            elif vlan_group.endswith("-network"):
-                _set_port_attributes(
-                    baremetal_port, node_uuid, inspected_port, vlan_group
-                )
-            else:
-                _clear_port_attributes(baremetal_port, node_uuid)
+            _set_port_attributes(baremetal_port, node_uuid, inspected_port, vlan_group)
         else:
             LOG.info(
                 "Port=%(uuid)s Node=%(node)s has no LLDP connection",
@@ -111,7 +105,10 @@ def _update_port_attrs(task, ports_by_mac, vlan_groups, node_uuid):
 
 
 def _set_port_attributes(
-    port: Any, node_uuid: str, inspected_port: InspectedPort, physical_network: str
+    port: Any,
+    node_uuid: str,
+    inspected_port: InspectedPort,
+    physical_network: str | None,
 ):
     try:
         if port.local_link_connection != inspected_port.local_link_connection:
@@ -123,6 +120,9 @@ def _set_port_attributes(
                 inspected_port.local_link_connection,
             )
             port.local_link_connection = inspected_port.local_link_connection
+
+        if physical_network and not physical_network.endswith("-network"):
+            physical_network = None
 
         if port.physical_network != physical_network:
             LOG.debug(
