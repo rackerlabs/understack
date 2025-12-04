@@ -1,6 +1,11 @@
 ---
 keystone_bootstrap_dex_url: "{{ dex_url | default('https://dex.' + lookup('ansible.builtin.env', 'DNS_ZONE', default='localnet')) }}"
 
+keystone_bootstrap_sso_domain:
+  name: sso
+  description: 'Federated Users'
+
+# these groups live inside the sso domain
 keystone_bootstrap_groups:
   - name: ucadmin
     desc: 'Users Federated with Admin'
