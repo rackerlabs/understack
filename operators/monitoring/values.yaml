@@ -1,3 +1,7 @@
+# Disable crds since they are installed separately
+crds:
+  enabled: false
+
 # Disable the default kube-proxy alert since we don't have it,
 # we have cilium instead.
 # https://github.com/prometheus-community/helm-charts/issues/1718
