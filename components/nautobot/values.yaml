@@ -86,13 +86,7 @@ redis:
     argocd.argoproj.io/sync-options: Delete=false
 
 ingress:
-  enabled: true
-  ingressClassName: "nginx"
-  tls: true
-  secretName: "nautobot-ingress-tls"
-  annotations:
-    cert-manager.io/cluster-issuer: understack-cluster-issuer
-    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+  enabled: false
 
 # (nicholas.kuechler) seeing something unexpected:
 # https://networktocode.slack.com/archives/C01NWPK6WHL/p1736445485521569
