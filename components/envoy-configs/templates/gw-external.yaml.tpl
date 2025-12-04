@@ -7,6 +7,8 @@ metadata:
   namespace: {{ .Values.gateways.external.namespace }}
   annotations:
     cert-manager.io/cluster-issuer: {{ .Values.gateways.external.issuer | default "understack-cluster-issuer"}}
+  labels:
+    {{- include "envoy-configs.labels" . | nindent 4 }}
 spec:
   gatewayClassName: {{ .Values.gateways.external.className }}
   listeners:
@@ -15,11 +17,11 @@ spec:
     - name: {{ $listenerName }}
       port: {{ $.Values.gateways.external.port | default 443 }}
       protocol: HTTPS
-      hostname: {{ .fqdn | quote }}
+      hostname: {{ .fqdn }}
       tls:
         mode: Terminate
         certificateRefs:
-          - name: {{ $listenerName }}-gtls
+          - name: {{ $listenerName }}-tls
       allowedRoutes:
         namespaces:
           {{- if .selector }}
@@ -39,7 +41,7 @@ spec:
       tls:
         mode: Passthrough
         certificateRefs:
-          - name: {{ $listenerName }}-gtls
+          - name: {{ $listenerName }}-tls
       allowedRoutes:
         namespaces:
           {{- if .selector }}
@@ -57,8 +59,8 @@ spec:
           kind: EnvoyProxy
           name: {{ .Values.gateways.external.name }}-proxy
   {{- end }}
----
 {{- if .Values.gateways.external.serviceAnnotations }}
+---
 apiVersion: gateway.envoyproxy.io/v1alpha1
 kind: EnvoyProxy
 metadata:

@@ -11,4 +11,4 @@ config:
       enableEnvoyPatchPolicy: true
     logging:
       level:
-        default: debug
+        default: info

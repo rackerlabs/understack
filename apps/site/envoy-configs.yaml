@@ -1,0 +1,14 @@
+---
+component: envoy-configs
+componentNamespace: envoy-gateway
+sources:
+  - ref: understack
+    path: components/envoy-configs
+    helm:
+      releaseName: envoy-configs
+      valueFiles:
+        - $understack/components/envoy-configs/values.yaml
+        - $deploy/{{.name}}/helm-configs/envoy-configs.yaml
+      ignoreMissingValueFiles: true
+  - ref: deploy
+    path: '{{.name}}/manifests/envoy-configs'

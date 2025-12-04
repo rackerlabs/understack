@@ -33,6 +33,8 @@ spec:
     server: '*'
   - namespace: 'kube-system'
     server: '*'
+  - namespace: 'envoy-gateway'
+    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
