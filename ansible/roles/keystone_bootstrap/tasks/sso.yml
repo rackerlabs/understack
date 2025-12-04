@@ -12,6 +12,13 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+#
+- name: Create project domains
+  openstack.cloud.identity_domain:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('') }}"
+    state: present
+  loop: "{{ keystone_bootstrap_project_domains }}"
 
 - name: Create 'sso' domain
   openstack.cloud.identity_domain:
