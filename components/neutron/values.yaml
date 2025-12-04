@@ -37,12 +37,6 @@ network:
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
   use_external_ingress_controller: true
-  server:
-    ingress:
-      annotations:
-        nginx.ingress.kubernetes.io/rewrite-target: /
-        # set our default issuer
-        cert-manager.io/cluster-issuer: understack-cluster-issuer
 
 conf:
   plugins:
@@ -248,6 +242,7 @@ manifests:
   # hardcodes the config-file flag which then causes oslo.config to prefer
   # that data over the directory which we want to override
   configmap_bin: false
+  ingress_server: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
