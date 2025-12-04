@@ -10,6 +10,8 @@ metadata:
   name: {{ $name }}
   {{- end }}
   namespace: {{ .namespace | default "openstack" }}
+  labels:
+    {{- include "envoy-configs.labels" $ | nindent 4 }}
 spec:
   parentRefs:
     - name: {{ $.Values.gateways.external.name }}
@@ -20,6 +22,10 @@ spec:
         - path:
             type: {{ .pathType | default "PathPrefix" }}
             value: {{ .path | default "/" }}
+      {{- with .filters }}
+      filters:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       backendRefs:
         {{- if eq .service.backendType "tls" }}
         - name: {{ .service.name }}

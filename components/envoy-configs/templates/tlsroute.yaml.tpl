@@ -9,7 +9,7 @@ metadata:
   {{- $name := index (splitList "." .fqdn) 0 }}
   name: {{ $name }}
   {{- end }}
-  namespace: {{ .namespace | default "openstack" }}
+  namespace: {{ .namespace | default "envoy-gateway" }}
 spec:
   parentRefs:
     - name: {{ $.Values.gateways.external.name }}
