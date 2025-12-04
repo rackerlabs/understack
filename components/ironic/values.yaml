@@ -103,6 +103,9 @@ conf:
     ilo:
       # we do not run swift by default so cannot use it by default
       use_web_server_for_images: true
+    nova:
+      auth_type: password
+      auth_url: "http://keystone-api.openstack.svc.cluster.local:5000/v3"
 
 endpoints:
   oslo_messaging:
