@@ -41,14 +41,6 @@ network:
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
   use_external_ingress_controller: true
-  osapi:
-    ingress:
-      classes:
-        namespace: nginx
-      annotations:
-        nginx.ingress.kubernetes.io/rewrite-target: /
-        # set our default issuer
-        cert-manager.io/cluster-issuer: understack-cluster-issuer
 
 conf:
   ceph:
@@ -229,6 +221,11 @@ manifests:
   # that is later consumed via components/openstack helm chart
   secret_keystone: false
   secret_ks_etc: false
+  ingress_metadata: false
+  ingress_novncproxy: false
+  ingress_serialproxy: false
+  ingress_spiceproxy: false
+  ingress_osapi: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
