@@ -609,9 +609,9 @@ class TestRouteSpec:
 
         for ip in test_ips:
             destination = RouteSpec._calculate_destination(ip)
-            assert destination == ipaddress.IPv4Network(
-                "100.126.0.0/17"
-            ), f"Failed for IP: {ip}"
+            assert destination == ipaddress.IPv4Network("100.126.0.0/17"), (
+                f"Failed for IP: {ip}"
+            )
 
     def test_calculate_destination_comprehensive_third_octet_128_to_255(self):
         """Test comprehensive route destination calculation for range 128-255."""
@@ -627,9 +627,9 @@ class TestRouteSpec:
 
         for ip in test_ips:
             destination = RouteSpec._calculate_destination(ip)
-            assert destination == ipaddress.IPv4Network(
-                "100.126.128.0/17"
-            ), f"Failed for IP: {ip}"
+            assert destination == ipaddress.IPv4Network("100.126.128.0/17"), (
+                f"Failed for IP: {ip}"
+            )
 
     def test_calculate_destination_comprehensive_invalid_patterns(self):
         """Test comprehensive error handling for IPs outside carrier-grade NAT range."""
