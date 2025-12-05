@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -64,28 +63,6 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	var nautobotCR syncv1alpha1.Nautobot
 	if err := r.Get(ctx, req.NamespacedName, &nautobotCR); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	// Determine sync interval with a sane default
-	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
-	if syncInterval == 0 {
-		syncInterval = 4 * time.Hour
-	}
-
-	// Skip reconciliation if we synced recently
-	lastSynced := nautobotCR.Status.LastSyncedAt.Time
-	if !lastSynced.IsZero() {
-		nextSyncTime := lastSynced.Add(syncInterval)
-		now := time.Now()
-
-		if now.Before(nextSyncTime) {
-			remaining := time.Until(nextSyncTime)
-			log.Info("skipping reconciliation, sync interval not elapsed",
-				"lastSynced", lastSynced.Format(time.RFC3339),
-				"nextSync", nextSyncTime.Format(time.RFC3339),
-				"remaining", remaining.Round(time.Second))
-			return ctrl.Result{RequeueAfter: remaining}, nil
-		}
 	}
 
 	// Retrieve the Nautobot authentication token from a secret or external source
@@ -134,7 +111,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 	// Successfully completed reconciliation; requeue after configured sync interval
 	log.Info("sync completed successfully")
-	return ctrl.Result{RequeueAfter: syncInterval}, nil
+	return ctrl.Result{}, nil
 }
 
 // aggregateDeviceTypeDataFromConfigMap fetches and merges data from all referenced ConfigMaps.
@@ -174,11 +151,6 @@ func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 
 	currentHash := computeMapHas(deviceTypeMap)
 	previousHash := nautobotCR.GetSyncHash("deviceType")
-
-	if currentHash == previousHash {
-		log.Info("device types already synced, skipping", "hash", currentHash)
-		return nil
-	}
 
 	log.Info("syncing device types", "previousHash", previousHash, "currentHash", currentHash)
 	if err := nautobotClient.SyncAllDeviceTypes(ctx, deviceTypeMap); err != nil {

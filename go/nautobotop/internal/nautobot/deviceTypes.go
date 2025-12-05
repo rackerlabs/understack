@@ -95,15 +95,19 @@ func (n *NautobotClient) SyncAllDeviceTypes(ctx context.Context, data map[string
 		}
 
 		deviceType := n.GetDeviceTypeByName(context.Background(), yml.Model)
+		deviceTypeRequest := nb.WritableDeviceTypeRequest{
+			Model:        yml.Model,
+			PartNumber:   nb.PtrString(yml.PartNumber),
+			UHeight:      nb.PtrInt32(int32(yml.UHeight)),
+			IsFullDepth:  nb.PtrBool(yml.IsFullDepth),
+			Comments:     nb.PtrString(yml.Comments),
+			Manufacturer: *buildBulkWritableCableRequestStatus(manufacturer.Id),
+		}
 		if deviceType.Id == "" {
-			dt, _ := n.CreateNewDeviceType(context.Background(), nb.WritableDeviceTypeRequest{
-				Model:        yml.Model,
-				PartNumber:   nb.PtrString(yml.PartNumber),
-				UHeight:      nb.PtrInt32(int32(yml.UHeight)),
-				IsFullDepth:  nb.PtrBool(yml.IsFullDepth),
-				Comments:     nb.PtrString(yml.Comments),
-				Manufacturer: *buildBulkWritableCableRequestStatus(manufacturer.Id),
-			})
+			dt, _ := n.CreateNewDeviceType(context.Background(), deviceTypeRequest)
+			deviceType = *dt
+		} else {
+			dt, _ := n.UpdateDeviceType(ctx, deviceType.Id, deviceTypeRequest)
 			deviceType = *dt
 		}
 
@@ -309,7 +313,19 @@ func (n *NautobotClient) GetDeviceTypeByName(ctx context.Context, name string) n
 }
 
 func (n *NautobotClient) ListAllDeviceTypes(ctx context.Context) []nb.DeviceType {
-	list, resp, err := n.Client.DcimAPI.DcimDeviceTypesList(ctx).Depth(10).Execute()
+	changeList, resp, err := n.GetCreateChangeList(ctx, "dcim.devicetype", "admin")
+	if err != nil {
+		bodyString := readResponseBody(resp)
+		n.AddReport("ListAllDeviceTypes", "failed to list", "error", err.Error(), "response_body", bodyString)
+		return []nb.DeviceType{}
+	}
+
+	var ids []string
+	for _, change := range changeList {
+		ids = append(ids, change.ChangedObjectID)
+	}
+
+	list, resp, err := n.Client.DcimAPI.DcimDeviceTypesList(ctx).Id(ids).Depth(10).Execute()
 	if err != nil {
 		bodyString := readResponseBody(resp)
 		n.AddReport("ListAllDeviceTypes", "failed to list", "error", err.Error(), "response_body", bodyString)
@@ -318,7 +334,19 @@ func (n *NautobotClient) ListAllDeviceTypes(ctx context.Context) []nb.DeviceType
 	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
 		return []nb.DeviceType{}
 	}
+
 	return list.Results
+}
+
+func (n *NautobotClient) UpdateDeviceType(ctx context.Context, id string, req nb.WritableDeviceTypeRequest) (*nb.DeviceType, error) {
+	deviceType, resp, err := n.Client.DcimAPI.DcimDeviceTypesUpdate(ctx, id).WritableDeviceTypeRequest(req).Execute()
+	if err != nil {
+		bodyString := readResponseBody(resp)
+		n.AddReport("UpdateDeviceType", "failed to update UpdateDeviceType", "id", id, "model", req.GetModel(), "error", err.Error(), "response_body", bodyString)
+		return nil, err
+	}
+	log.Info("successfully updated device type", "id", id, "model", deviceType.GetModel())
+	return deviceType, nil
 }
 
 func (n *NautobotClient) DestroyDeviceType(ctx context.Context, id string) error {
