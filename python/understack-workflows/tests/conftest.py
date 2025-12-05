@@ -59,19 +59,35 @@ def os_conn(project_data: dict) -> openstack.connection.Connection:  # pyright: 
                 **project_data,
                 "id": project_id,
                 "domain_id": project_data["domain_id"].hex,
+                "is_domain": False,
             }
         elif project_id == project_data["domain_id"].hex:
+            # When fetching the domain as a project, mark it as a domain
             data = {
                 **project_data,
                 "id": project_data["domain_id"].hex,
                 "domain_id": "default",
+                "is_domain": True,
             }
         else:
             raise openstack.exceptions.NotFoundException  # pyright: ignore[reportAttributeAccessIssue]
         return openstack.identity.v3.project.Project(**data)  # pyright: ignore[reportAttributeAccessIssue]
 
+    def _get_domain(domain_id):
+        if domain_id == project_data["domain_id"].hex:
+            data = {
+                "id": domain_id,
+                "name": "test domain",
+                "description": "this is a test domain",
+                "enabled": True,
+            }
+        else:
+            raise openstack.exceptions.NotFoundException  # pyright: ignore[reportAttributeAccessIssue]
+        return openstack.identity.v3.domain.Domain(**data)  # pyright: ignore[reportAttributeAccessIssue]
+
     conn = MagicMock(spec_set=openstack.connection.Connection)  # pyright: ignore[reportAttributeAccessIssue]
     conn.identity.get_project.side_effect = _get_project
+    conn.identity.get_domain.side_effect = _get_domain
     return conn
 
 

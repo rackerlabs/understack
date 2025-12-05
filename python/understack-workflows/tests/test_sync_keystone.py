@@ -74,8 +74,8 @@ def test_create_project(
     domain_id: uuid.UUID,
 ):
     ret = do_action(os_conn, mock_pynautobot_api, Event.ProjectCreate, project_id)
-    os_conn.identity.get_project.assert_any_call(domain_id.hex)
     os_conn.identity.get_project.assert_any_call(project_id.hex)
+    os_conn.identity.get_domain.assert_any_call(domain_id.hex)
     assert ret == 0
 
 
@@ -86,8 +86,24 @@ def test_update_project(
     domain_id: uuid.UUID,
 ):
     ret = do_action(os_conn, mock_pynautobot_api, Event.ProjectUpdate, project_id)
-    os_conn.identity.get_project.assert_any_call(domain_id.hex)
     os_conn.identity.get_project.assert_any_call(project_id.hex)
+    os_conn.identity.get_domain.assert_any_call(domain_id.hex)
+    assert ret == 0
+
+
+def test_update_project_domain_skipped(
+    os_conn,
+    mock_pynautobot_api,
+    domain_id: uuid.UUID,
+):
+    """Test that domains are skipped during update events."""
+    ret = do_action(os_conn, mock_pynautobot_api, Event.ProjectUpdate, domain_id)
+    # Should fetch the project to check if it's a domain
+    os_conn.identity.get_project.assert_called_once_with(domain_id.hex)
+    # Should NOT call get_domain or create/update tenant since it's a domain
+    os_conn.identity.get_domain.assert_not_called()
+    mock_pynautobot_api.tenancy.tenants.get.assert_not_called()
+    mock_pynautobot_api.tenancy.tenants.create.assert_not_called()
     assert ret == 0
 
 

@@ -1,0 +1,38 @@
+{
+  "_unique_id": "8924fada50c24c98b329b9b8615d86eb",
+  "event_type": "identity.project.updated",
+  "message_id": "3d15601b-fd77-43fe-b38e-33f83bb2365e",
+  "payload": {
+    "action": "updated.project",
+    "eventTime": "2025-12-09T09:12:12.161053+0000",
+    "eventType": "activity",
+    "id": "b483fc86-a977-5486-8f12-78efb6425ccc",
+    "initiator": {
+      "host": {
+        "address": "10.64.50.136",
+        "agent": "python-keystoneclient"
+      },
+      "id": "8181a4bc4466592d8009fd2874f05756",
+      "name": "xyz@example.com",
+      "project_id": "32e02632f4f04415bab5895d1e7247b7",
+      "request_id": "req-9b49faec-3fe2-48bb-9107-925e094741c3",
+      "typeURI": "service/security/account/user",
+      "user_id": "141aa00793cd2bb035555c44b3097fda07591ead23389027629f05053bad5d7a",
+      "username": "xyz@example.com"
+    },
+    "observer": {
+      "id": "ad1c83a7f5f746d2a04fcc8dda226368",
+      "typeURI": "service/security"
+    },
+    "outcome": "success",
+    "resource_info": "94d23ad2674f46e08259a24bfe2b698e",
+    "target": {
+      "id": "94d23ad2674f46e08259a24bfe2b698e",
+      "typeURI": "data/security/project"
+    },
+    "typeURI": "http://schemas.dmtf.org/cloud/audit/1.0/event"
+  },
+  "priority": "INFO",
+  "publisher_id": "identity.keystone-api-5599bd6d8-vv76f",
+  "timestamp": "2025-12-09 09:12:12.161534"
+}
