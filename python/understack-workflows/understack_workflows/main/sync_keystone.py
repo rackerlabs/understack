@@ -48,16 +48,46 @@ def argument_parser():
     return parser
 
 
-def _tenant_attrs(conn: Connection, project_id: uuid.UUID) -> tuple[str, str]:
-    project = conn.identity.get_project(project_id.hex)  # type: ignore
-    domain_id = project.domain_id
-    is_default_domain = domain_id == "default"
+def _get_project(conn: Connection, project_id: uuid.UUID):
+    """Fetch a project from OpenStack by UUID."""
+    return conn.identity.get_project(project_id.hex)  # type: ignore
 
-    if is_default_domain:
+
+def _get_project_by_id(conn: Connection, project_id: str):
+    """Fetch a project from OpenStack by string ID."""
+    return conn.identity.get_project(project_id)  # type: ignore
+
+
+def _is_domain(project) -> bool:
+    """Check if a project is actually a domain.
+
+    Returns True if the project is a domain, False otherwise.
+    Domains should not be synced to Nautobot.
+    """
+    return getattr(project, "is_domain", False)
+
+
+def _tenant_attrs(conn: Connection, project) -> tuple[str, str]:
+    domain_id = project.domain_id
+    is_domain = _is_domain(project)
+
+    # If this project is itself a domain, use "default" as the domain name
+    # since domains are top-level and don't belong to another domain
+    if is_domain:
         domain_name = "default"
-    else:
-        domain = conn.identity.get_project(domain_id)  # type: ignore
+    elif domain_id == "default":
+        domain_name = "default"
+    elif domain_id:
+        domain = _get_project_by_id(conn, domain_id)
         domain_name = domain.name
+    else:
+        # This shouldn't happen for regular projects
+        logger.error(
+            "Project %s has no domain_id and is_domain=False. "
+            "This indicates a malformed project. Using 'unknown' as domain name.",
+            project.id,
+        )
+        domain_name = "unknown"
 
     tenant_name = f"{domain_name}:{project.name}"
     return tenant_name, str(project.description)
@@ -77,7 +107,15 @@ def handle_project_create(
     conn: Connection, nautobot: pynautobot.api, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to create tenant %s", project_id.hex)
-    tenant_name, tenant_description = _tenant_attrs(conn, project_id)
+
+    project = _get_project(conn, project_id)
+    if _is_domain(project):
+        logger.info(
+            "Skipping domain %s - domains are not synced to Nautobot", project_id.hex
+        )
+        return _EXIT_SUCCESS
+
+    tenant_name, tenant_description = _tenant_attrs(conn, project)
 
     try:
         tenant = nautobot.tenancy.tenants.create(
@@ -97,7 +135,15 @@ def handle_project_update(
     conn: Connection, nautobot: pynautobot.api, project_id: uuid.UUID
 ) -> int:
     logger.info("got request to update tenant %s", project_id.hex)
-    tenant_name, tenant_description = _tenant_attrs(conn, project_id)
+
+    project = _get_project(conn, project_id)
+    if _is_domain(project):
+        logger.info(
+            "Skipping domain %s - domains are not synced to Nautobot", project_id.hex
+        )
+        return _EXIT_SUCCESS
+
+    tenant_name, tenant_description = _tenant_attrs(conn, project)
 
     existing_tenant = nautobot.tenancy.tenants.get(id=project_id)
     logger.info("existing_tenant: %s", existing_tenant)
@@ -132,7 +178,9 @@ def handle_project_delete(
     logger.info("got request to delete tenant %s", project_id)
     tenant = nautobot.tenancy.tenants.get(id=project_id)
     if not tenant:
-        logger.warning("tenant %s does not exist, nothing to delete", project_id)
+        logger.warning(
+            "tenant %s does not exist in Nautobot, nothing to delete", project_id
+        )
         return _EXIT_SUCCESS
 
     _unmap_tenant_from_devices(tenant_id=project_id, nautobot=nautobot)
