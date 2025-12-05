@@ -9,12 +9,12 @@ metadata:
 kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow
-  entrypoint: main
+  entrypoint: inspect-server
   arguments:
     parameters:
       - name: node
   templates:
-    - name: main
+    - name: inspect-server
       dag:
         tasks:
           - name: node-id
