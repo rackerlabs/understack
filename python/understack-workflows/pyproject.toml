@@ -81,7 +81,6 @@ extend = "../pyproject.toml"
 target-version = "py310"
 
 [tool.ruff.lint.per-file-ignores]
-"understack_workflows/nautobot_device.py" = ["UP031"]
 "tests/test_nautobot_event_parser.py" = ["E501"]
 "tests/test_bmc_credentials.py" = ["B017"]
 "tests/**/*.py" = [
