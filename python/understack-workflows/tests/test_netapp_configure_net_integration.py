@@ -513,9 +513,9 @@ class TestIntegrationTests:
                     result = main()
 
             # Verify successful execution
-            assert (
-                result == 0
-            ), f"Test case '{test_case['name']}' failed with exit code {result}"
+            assert result == 0, (
+                f"Test case '{test_case['name']}' failed with exit code {result}"
+            )
 
             # Verify Nautobot client was created with expected parameters
             # Note: logger is created at module import time, so we just verify
@@ -1459,8 +1459,7 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with SVM not found error during route creation
         svm_error = SvmOperationError(
-            "Route creation failed: SVM 'os-12345678123456789abc123456789012'"
-            "not found",
+            "Route creation failed: SVM 'os-12345678123456789abc123456789012'not found",
             svm_name="os-12345678123456789abc123456789012",
             context={
                 "operation": "Route creation",
