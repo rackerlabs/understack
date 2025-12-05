@@ -110,3 +110,5 @@ spec:
                         parameters:
                         - name: playbook
                           value: storage_update_switches.yml
+                        - name: extra_vars
+                          value: "plan_mode=remediation"
