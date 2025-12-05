@@ -12,11 +12,18 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+#
+- name: Create project domains
+  openstack.cloud.identity_domain:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('') }}"
+    state: present
+  loop: "{{ keystone_bootstrap_project_domains }}"
 
 - name: Create 'sso' domain
   openstack.cloud.identity_domain:
-    name: sso
-    description: 'SSO to dex'
+    name: "{{ keystone_bootstrap_sso_domain.name }}"
+    description: "{{ keystone_bootstrap_sso_domain.description }}"
     state: present
   register: _domain_sso
 
@@ -28,28 +35,80 @@
   openstack.cloud.federation_idp:
     name: sso
     domain_id: "{{ _domain_sso.domain.id }}"
-    description: 'Identity Provider to dex'
+    description: 'Identity Provider for Federation'
     is_enabled: true
     remote_ids:
       - "{{ keystone_bootstrap_dex_url }}"
 
+- name: Build group mapping rules
+  ansible.builtin.set_fact:
+    _sso_group_rules: >-
+      {{
+        _sso_group_rules | default([]) + [{
+          'local': [{
+            'group': {
+              'name': item.sso_group,
+              'domain': {'id': _domain_sso.domain.id}
+            }
+          }],
+          'remote': [{
+            'type': 'HTTP_OIDC_GROUPS',
+            'any_one_of': item.federated_groups
+          }]
+        }]
+      }}
+  loop: "{{ keystone_bootstrap_project_domains }}"
+
+- name: Build complete sso mapping rules
+  ansible.builtin.set_fact:
+    _sso_mapping_rules: >-
+      {{
+        [{
+          'local': [{
+            'user': {
+              'id': '{0}',
+              'name': '{1}',
+              'email': '{2}'
+            }
+          }],
+          'remote': [
+            {'type': 'HTTP_OIDC_SUB'},
+            {'type': 'REMOTE_USER'},
+            {'type': 'HTTP_OIDC_EMAIL'}
+          ]
+        }] +
+        [{
+          'local': [{
+            'group': {
+              'name': 'ucadmin',
+              'domain': {
+                'id': _domain_sso.domain.id
+              }
+            }
+          }],
+          'remote': [
+            {'type': 'HTTP_OIDC_GROUPS', 'any_one_of': ['ucadmin']}
+          ]
+        }] +
+        [{
+          'local': [{
+            'group': {
+              'name': 'ucuser',
+              'domain': {
+                'id': _domain_sso.domain.id
+              }
+            }
+          }],
+          'remote': [
+            {'type': 'HTTP_OIDC_GROUPS', 'any_one_of': ['ucuser']}
+          ]
+        }] + _sso_group_rules
+      }}
+
 - name: Create sso mapping
   openstack.cloud.federation_mapping:
     name: sso_mapping
-    rules:
-      - local:
-          - user:
-              id: '{0}'
-              name: '{1}'
-              email: '{2}'
-            groups: '{3}'
-            domain:
-              id: "{{ _domain_sso.domain.id }}"
-        remote:
-          - type: HTTP_OIDC_SUB
-          - type: REMOTE_USER
-          - type: HTTP_OIDC_EMAIL
-          - type: HTTP_OIDC_GROUPS
+    rules: "{{ _sso_mapping_rules }}"
 
 - name: Create openid protocol
   openstack.cloud.keystone_federation_protocol:
