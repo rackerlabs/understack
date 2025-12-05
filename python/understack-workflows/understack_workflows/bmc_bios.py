@@ -31,9 +31,9 @@ def update_dell_bios_settings(bmc: Bmc, pxe_interface="NIC.Integrated.1-1") -> d
     required_settings = required_bios_settings(pxe_interface)
 
     required_changes = {
-        k: v for k, v in required_settings.items() if (
-            k in current_settings and
-            current_settings[k] != v)
+        k: v
+        for k, v in required_settings.items()
+        if (k in current_settings and current_settings[k] != v)
     }
 
     if required_changes:
