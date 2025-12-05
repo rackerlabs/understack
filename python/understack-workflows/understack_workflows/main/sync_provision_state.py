@@ -53,7 +53,12 @@ def main():
     args = argument_parser().parse_args()
 
     device_uuid = args.device_id
-    tenant_id = (lambda lessee: UUID(lessee))(args.lessee) if args.lessee else None
+    tenant_id = None
+    if args.lessee:
+        try:
+            tenant_id = UUID(args.lessee)
+        except ValueError:
+            logger.warning("Invalid UUID format for lessee: %s", args.lessee)
     nb_token = args.nautobot_token or credential("nb-token", "token")
 
     nautobot = Nautobot(args.nautobot_url, nb_token, logger=logger)
