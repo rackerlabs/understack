@@ -31,7 +31,7 @@ spec:
                   spec:
                     containers:
                       - name: openstackcli
-                        image: quay.io/airshipit/heat:2025.2-ubuntu_jammy
+                        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy
                         command: ["sh", "-c"]
                         args:
                           - |
