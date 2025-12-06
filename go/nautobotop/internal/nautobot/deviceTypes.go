@@ -103,12 +103,15 @@ func (n *NautobotClient) SyncAllDeviceTypes(ctx context.Context, data map[string
 			Comments:     nb.PtrString(yml.Comments),
 			Manufacturer: *buildBulkWritableCableRequestStatus(manufacturer.Id),
 		}
+
 		if deviceType.Id == "" {
 			dt, _ := n.CreateNewDeviceType(context.Background(), deviceTypeRequest)
 			deviceType = *dt
-		} else {
+		} else if !CompareJSONFields(deviceType, deviceTypeRequest) {
 			dt, _ := n.UpdateDeviceType(ctx, deviceType.Id, deviceTypeRequest)
 			deviceType = *dt
+		} else {
+			log.Info("device type unchanged, skipping update", "model", yml.Model)
 		}
 
 		n.syncDeviceTypeInterfaceTemplate(ctx, yml, deviceType)
@@ -208,10 +211,12 @@ func (n *NautobotClient) syncDeviceTypeConsolePortTemplate(ctx context.Context, 
 			},
 			DeviceType: buildNullableBulkWritableCircuitRequestTenant(deviceType.Id),
 		}
-		if existingTemplate, exists := existingMap[portName]; exists {
+		if existingTemplate, exists := existingMap[portName]; !exists {
+			_, _ = n.CreateNewConsolePortTemplate(ctx, templateRequest)
+		} else if !CompareJSONFields(existingTemplate, templateRequest) {
 			_, _ = n.UpdateConsolePortTemplate(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			_, _ = n.CreateNewConsolePortTemplate(ctx, templateRequest)
+			log.Info("console port template unchanged, skipping update", "name", templateRequest.Name)
 		}
 	}
 	obsoleteTemplates := lo.OmitByKeys(existingMap, lo.Keys(desiredPorts))
@@ -241,10 +246,13 @@ func (n *NautobotClient) syncDeviceTypeInterfaceTemplate(ctx context.Context, ym
 			MgmtOnly:   nb.PtrBool(interfaceTmpl.MgmtOnly),
 			DeviceType: buildNullableBulkWritableCircuitRequestTenant(deviceType.Id),
 		}
-		if existingTemplate, exists := existingMap[portName]; exists {
+
+		if existingTemplate, exists := existingMap[portName]; !exists {
+			_, _ = n.CreateNewInterfaceTemplate(ctx, templateRequest)
+		} else if !CompareJSONFields(existingTemplate, templateRequest) {
 			_, _ = n.UpdateInterfaceTemplate(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			_, _ = n.CreateNewInterfaceTemplate(ctx, templateRequest)
+			log.Info("interface template unchanged, skipping update", "name", templateRequest.Name)
 		}
 	}
 	obsoleteTemplates := lo.OmitByKeys(existingMap, lo.Keys(desiredInterfaceTemplate))
@@ -300,7 +308,7 @@ func (n *NautobotClient) CreateNewDeviceType(ctx context.Context, req nb.Writabl
 }
 
 func (n *NautobotClient) GetDeviceTypeByName(ctx context.Context, name string) nb.DeviceType {
-	list, resp, err := n.Client.DcimAPI.DcimDeviceTypesList(ctx).Model([]string{name}).Execute()
+	list, resp, err := n.Client.DcimAPI.DcimDeviceTypesList(ctx).Depth(10).Model([]string{name}).Execute()
 	if err != nil {
 		bodyString := readResponseBody(resp)
 		n.AddReport("GetDeviceTypeByName", "failed to get", "name", name, "error", err.Error(), "response_body", bodyString)
