@@ -1,6 +1,7 @@
 # where helm charts will get downloaded by kustomize
 /charts/
 
+
 # un-encrypted secrets
 /secret-*.yaml
 # sealed secrets
@@ -19,6 +20,9 @@ venv/
 __pycache__
 .coverage
 .idea
+.vscode
+.kiro
+.DS_Store
 
 # auto-generated argo-workflows docs
 # see .github/workflows/mkdocs.yaaml

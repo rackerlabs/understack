@@ -1,0 +1,13 @@
+---
+component: nautobotop
+sources:
+  - repoURL: ghcr.io/rackerlabs/charts
+    chart: nautobotop
+    targetRevision: 0.0.1
+    helm:
+      releaseName: nautobotop
+      ignoreMissingValueFiles: true
+      valueFiles:
+        - $deploy/{{.name}}/helm-configs/nautobotop.yaml
+  - ref: deploy
+    path: '{{.name}}/manifests/nautobotop'
