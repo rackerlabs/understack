@@ -203,7 +203,7 @@ conf:
     CustomLog /dev/stdout combined env=!forwarded
     CustomLog /dev/stdout proxy env=forwarded
     ErrorLogFormat "%{cu}t %M"
-    ErrorLog /dev/stderr
+    ErrorLog /dev/stdout
 
     <VirtualHost *:{{ $portInt }}>
         WSGIDaemonProcess keystone-public processes=1 threads=1 user=keystone group=keystone display-name=%{GROUP}
