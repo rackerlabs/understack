@@ -1,6 +1,16 @@
 ---
 keystone_bootstrap_dex_url: "{{ dex_url | default('https://dex.' + lookup('ansible.builtin.env', 'DNS_ZONE', default='localnet')) }}"
 
+keystone_bootstrap_sso_domain:
+  name: sso
+  description: 'Federated Users'
+
+# defines the domains created which will have permissions granted by the federated sso domain
+keystone_bootstrap_project_domains:
+  - name: sandbox
+    description: Sandbox Projects
+
+# these groups live inside the sso domain
 keystone_bootstrap_groups:
   - name: ucadmin
     desc: 'Users Federated with Admin'
@@ -28,6 +38,10 @@ keystone_bootstrap_groups:
     domain_roles:
       # grants member role to the default domain and child projects where normal tenants live
       - domain: default
+        role: member
+        inherited: true
+      # grants member role to the sandbox domain defined above where projects live
+      - domain: sandbox
         role: member
         inherited: true
   - name: ucneteng

@@ -12,11 +12,18 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+#
+- name: Create project domains
+  openstack.cloud.identity_domain:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('') }}"
+    state: present
+  loop: "{{ keystone_bootstrap_project_domains }}"
 
 - name: Create 'sso' domain
   openstack.cloud.identity_domain:
-    name: sso
-    description: 'SSO to dex'
+    name: "{{ keystone_bootstrap_sso_domain.name }}"
+    description: "{{ keystone_bootstrap_sso_domain.description }}"
     state: present
   register: _domain_sso
 
@@ -28,7 +35,7 @@
   openstack.cloud.federation_idp:
     name: sso
     domain_id: "{{ _domain_sso.domain.id }}"
-    description: 'Identity Provider to dex'
+    description: 'Identity Provider for Federation'
     is_enabled: true
     remote_ids:
       - "{{ keystone_bootstrap_dex_url }}"
