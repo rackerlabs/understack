@@ -34,13 +34,19 @@ jobs:
           sudo mv argo-linux-amd64 /usr/local/bin/argo
           argo version
 
+      - name: Deploy Workflow Templates
+        run: |
+          echo "Creating argo-events namespace and deploying workflow templates..."
+          kubectl create namespace argo-events
+          kubectl -n argo-events apply -f workflows/argo-events/workflowtemplates/
+
       - name: Argo Lint Workflow Template
         run: |
           set +e
           FAILED=""
           for file in workflows/argo-events/workflowtemplates/*.yaml; do
             echo "Linting workflow template: $file"
-            if ! argo lint "$file"; then
+            if ! argo lint --namespace argo-events "$file"; then
               echo "::error file=$file, title=argo lint failed"
               FAILED="$FAILED $file"
             fi
