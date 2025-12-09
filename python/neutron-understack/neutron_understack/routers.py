@@ -98,9 +98,11 @@ def add_subport_to_trunk(shared_port: PortDict, segment: NetworkSegmentDict) -> 
             },
         ]
     }
+    trunk_id = utils.fetch_network_node_trunk_id()
+
     utils.fetch_trunk_plugin().add_subports(
         context=n_context.get_admin_context(),
-        trunk_id=cfg.CONF.ml2_understack.network_node_trunk_uuid,
+        trunk_id=trunk_id,
         subports=subports,
     )
 
@@ -251,8 +253,7 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
 
 def handle_subport_removal(port: Port) -> None:
     """Removes router's subport from a network node trunk."""
-    # trunk_id will be discovered dynamically at some point
-    trunk_id = cfg.CONF.ml2_understack.network_node_trunk_uuid
+    trunk_id = utils.fetch_network_node_trunk_id()
     LOG.debug("Router, Removing subport: %s(port)s", {"port": port})
     port_id = port["id"]
     try:
