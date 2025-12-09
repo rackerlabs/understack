@@ -2,6 +2,8 @@ package sync
 
 import (
 	"context"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
+
 	"github.com/charmbracelet/log"
 	nb "github.com/nautobot/go-nautobot/v2"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/dcim"
@@ -12,40 +14,25 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-type ObjectChange struct {
-	ChangedObjectID string
-}
-
 type DeviceTypeSync struct {
+	client                 *client.NautobotClient
 	manufacturerSvc        *dcim.ManufacturerService
 	deviceTypeSvc          *dcim.DeviceTypeService
 	consolePortTemplateSvc *templates.ConsolePortTemplateService
 	powerPortTemplateSvc   *templates.PowerPortTemplateService
 	interfaceTemplateSvc   *templates.InterfaceTemplateService
 	moduleBayTemplateSvc   *templates.ModuleBayTemplateService
-	getCreateChangeList    func(ctx context.Context, objectType string, username string) ([]interface{}, error)
-	report                 func(key string, line ...string)
 }
 
-func NewDeviceTypeSync(
-	manufacturerSvc *dcim.ManufacturerService,
-	deviceTypeSvc *dcim.DeviceTypeService,
-	consolePortTemplateSvc *templates.ConsolePortTemplateService,
-	powerPortTemplateSvc *templates.PowerPortTemplateService,
-	interfaceTemplateSvc *templates.InterfaceTemplateService,
-	moduleBayTemplateSvc *templates.ModuleBayTemplateService,
-	getCreateChangeListFunc func(ctx context.Context, objectType string, username string) ([]interface{}, error),
-	reportFunc func(key string, line ...string),
-) *DeviceTypeSync {
+func NewDeviceTypeSync(client *client.NautobotClient) *DeviceTypeSync {
 	return &DeviceTypeSync{
-		manufacturerSvc:        manufacturerSvc,
-		deviceTypeSvc:          deviceTypeSvc,
-		consolePortTemplateSvc: consolePortTemplateSvc,
-		powerPortTemplateSvc:   powerPortTemplateSvc,
-		interfaceTemplateSvc:   interfaceTemplateSvc,
-		moduleBayTemplateSvc:   moduleBayTemplateSvc,
-		getCreateChangeList:    getCreateChangeListFunc,
-		report:                 reportFunc,
+		client:                 client.GetClient(),
+		manufacturerSvc:        dcim.NewManufacturerService(client.GetClient()),
+		deviceTypeSvc:          dcim.NewDeviceTypeService(client.GetClient()),
+		consolePortTemplateSvc: templates.NewConsolePortTemplateService(client.GetClient()),
+		powerPortTemplateSvc:   templates.NewPowerPortTemplateService(client.GetClient()),
+		interfaceTemplateSvc:   templates.NewInterfaceTemplateService(client.GetClient()),
+		moduleBayTemplateSvc:   templates.NewModuleBayTemplateService(client.GetClient()),
 	}
 }
 
@@ -56,7 +43,7 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 		var yml models.DeviceType
 
 		if err := yaml.Unmarshal([]byte(f), &yml); err != nil {
-			s.report("yamlFailed", err.Error())
+			s.client.AddReport("yamlFailed", err.Error())
 			return err
 		}
 		deviceTypes.DeviceTypes = append(deviceTypes.DeviceTypes, yml)
@@ -83,13 +70,14 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 		var dt *nb.DeviceType
 		if deviceType.Id == "" {
 			dt, _ = s.deviceTypeSvc.Create(context.Background(), deviceTypeRequest)
+			deviceType = *dt
 		} else if !helpers.CompareJSONFields(deviceType, deviceTypeRequest) {
 			dt, _ = s.deviceTypeSvc.Update(ctx, deviceType.Id, deviceTypeRequest)
+			deviceType = *dt
 		} else {
 			log.Info("device type unchanged, skipping update", "model", yml.Model)
 		}
 
-		deviceType = *dt
 		s.syncInterfaceTemplates(ctx, yml, deviceType)
 		s.syncConsolePortTemplates(ctx, yml, deviceType)
 		s.syncPowerPortTemplates(ctx, yml, deviceType)
@@ -101,20 +89,7 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 		desiredDeviceTypes[deviceType.Model] = deviceType
 	}
 
-	changeList, err := s.getCreateChangeList(ctx, "dcim.devicetype", "admin")
-	if err != nil {
-		s.report("ListAllDeviceTypes", "failed to list", "error", err.Error())
-		return err
-	}
-
-	var ids []string
-	for _, change := range changeList {
-		if oc, ok := change.(ObjectChange); ok {
-			ids = append(ids, oc.ChangedObjectID)
-		}
-	}
-
-	existingDeviceTypes := s.deviceTypeSvc.ListAll(ctx, ids)
+	existingDeviceTypes := s.deviceTypeSvc.ListAll(ctx)
 	existingMap := make(map[string]nb.DeviceType, len(existingDeviceTypes))
 	for _, template := range existingDeviceTypes {
 		existingMap[template.Model] = template

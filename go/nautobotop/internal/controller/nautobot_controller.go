@@ -24,9 +24,10 @@ import (
 	"sort"
 	"strings"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	client2 "github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/sync"
 
-	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -88,7 +89,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Create Nautobot client
 	nautobotURL := fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP)
-	nautobotClient := nautobot.NewNautobotClient(nautobotURL, nautobotAuthToken)
+	nautobotClient := client2.NewNautobotClient(nautobotURL, nautobotAuthToken)
 
 	// Sync device types if data has changed
 	if err := r.syncDeviceTypes(ctx, nautobotClient, &nautobotCR, deviceTypeMap); err != nil {
@@ -143,7 +144,7 @@ func (r *NautobotReconciler) aggregateDeviceTypeDataFromConfigMap(ctx context.Co
 // syncDeviceTypes syncs device types to Nautobot only if the data has changed.
 // It compares the hash of the current data with the previously synced hash.
 func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
-	nautobotClient *nautobot.NautobotClient,
+	nautobotClient *client2.NautobotClient,
 	nautobotCR *syncv1alpha1.Nautobot,
 	deviceTypeMap map[string]string,
 ) error {
@@ -153,7 +154,8 @@ func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 	previousHash := nautobotCR.GetSyncHash("deviceType")
 
 	log.Info("syncing device types", "previousHash", previousHash, "currentHash", currentHash)
-	if err := nautobotClient.SyncAllDeviceTypes(ctx, deviceTypeMap); err != nil {
+	syncSvc := sync.NewDeviceTypeSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, deviceTypeMap); err != nil {
 		return fmt.Errorf("failed to sync device types: %w", err)
 	}
 

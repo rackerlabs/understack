@@ -1,4 +1,4 @@
-package nautobot
+package client
 
 import (
 	"context"
@@ -55,11 +55,11 @@ func (n *NautobotClient) GetCreateChangeList(ctx context.Context, objectType str
 				"limit":             limit,
 				"offset":            offset,
 				"userName":          []string{username},
-				"action":            []string{"create"},
+				"action":            []string{"create", "delete"},
 			},
 		}
 
-		_, resp, err := n.Client.GraphqlAPI.GraphqlCreate(ctx).
+		_, resp, err := n.APIClient.GraphqlAPI.GraphqlCreate(ctx).
 			GraphQLAPIRequest(req).
 			Execute()
 		if err != nil {

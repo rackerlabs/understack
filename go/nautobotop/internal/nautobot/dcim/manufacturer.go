@@ -2,6 +2,7 @@ package dcim
 
 import (
 	"context"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 	"log"
 
 	nb "github.com/nautobot/go-nautobot/v2"
@@ -9,22 +10,21 @@ import (
 )
 
 type ManufacturerService struct {
-	client *nb.APIClient
+	client *client.NautobotClient
 	report func(key string, line ...string)
 }
 
-func NewManufacturerService(client *nb.APIClient, reportFunc func(key string, line ...string)) *ManufacturerService {
+func NewManufacturerService(client *client.NautobotClient) *ManufacturerService {
 	return &ManufacturerService{
 		client: client,
-		report: reportFunc,
 	}
 }
 
 func (s *ManufacturerService) GetByName(ctx context.Context, name string) nb.Manufacturer {
-	list, resp, err := s.client.DcimAPI.DcimManufacturersList(ctx).Limit(10000).Depth(10).Name([]string{name}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimManufacturersList(ctx).Limit(10000).Depth(10).Name([]string{name}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
-		s.report("GetManufacturerByName", "failed to get manufacturer by name", "name", name, "error", err.Error(), "response_body", bodyString)
+		s.client.AddReport("GetManufacturerByName", "failed to get manufacturer by name", "name", name, "error", err.Error(), "response_body", bodyString)
 		return nb.Manufacturer{}
 	}
 	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
@@ -34,10 +34,10 @@ func (s *ManufacturerService) GetByName(ctx context.Context, name string) nb.Man
 }
 
 func (s *ManufacturerService) Create(ctx context.Context, req nb.ManufacturerRequest) (*nb.Manufacturer, error) {
-	manufacture, resp, err := s.client.DcimAPI.DcimManufacturersCreate(ctx).ManufacturerRequest(req).Execute()
+	manufacture, resp, err := s.client.APIClient.DcimAPI.DcimManufacturersCreate(ctx).ManufacturerRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
-		s.report("CreateNewManufacturer", "failed to create manufacturer", "name", req.Name, "error", err.Error(), "response_body", bodyString)
+		s.client.AddReport("CreateNewManufacturer", "failed to create manufacturer", "name", req.Name, "error", err.Error(), "response_body", bodyString)
 		return nil, err
 	}
 	log.Printf("Created manufacture: %s", manufacture.Display)
