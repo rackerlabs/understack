@@ -139,8 +139,9 @@ pod:
           - name: oidc-secret
             mountPath: /etc/oidc-secret
             readOnly: true
+          # drop this when https://review.opendev.org/c/openstack/openstack-helm/+/970280 merges
           - name: keystone-bin
-            mountPath: /var/www/cgi-bin/keystone/keystone-wsgi-public
+            mountPath: /var/www/cgi-bin/keystone/wsgi.py
             readOnly: true
             subPath: wsgi.py
         volumes:
@@ -208,7 +209,7 @@ conf:
     <VirtualHost *:{{ $portInt }}>
         WSGIDaemonProcess keystone-public processes=1 threads=1 user=keystone group=keystone display-name=%{GROUP}
         WSGIProcessGroup keystone-public
-        WSGIScriptAlias / /var/www/cgi-bin/keystone/keystone-wsgi-public
+        WSGIScriptAlias / /var/www/cgi-bin/keystone/wsgi.py
         WSGIApplicationGroup %{GLOBAL}
         WSGIPassAuthorization On
         ErrorLogFormat "%{cu}t %M"
