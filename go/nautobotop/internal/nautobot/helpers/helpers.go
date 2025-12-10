@@ -75,7 +75,7 @@ func PaginatedListWithIDs[T any](
 	}
 
 	var allResults []T
-	pageSize := 10
+	pageSize := 20
 
 	// Process IDs in batches
 	for i := 0; i < len(ids); i += pageSize {

@@ -147,7 +147,7 @@ func (s *DeviceTypeSync) syncPowerPortTemplates(ctx context.Context, yml models.
 		} else if !helpers.CompareJSONFields(existingTemplate, templateRequest) {
 			_, _ = s.powerPortTemplateSvc.Update(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			log.Info("power port template unchanged, skipping update", "name", templateRequest.Name)
+			log.Info("power port template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", deviceType.Id, "deviceTypeName", deviceType.Display)
 		}
 	}
 
@@ -184,7 +184,7 @@ func (s *DeviceTypeSync) syncConsolePortTemplates(ctx context.Context, yml model
 		} else if !helpers.CompareJSONFields(existingTemplate, templateRequest) {
 			_, _ = s.consolePortTemplateSvc.Update(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			log.Info("console port template unchanged, skipping update", "name", templateRequest.Name)
+			log.Info("console port template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", deviceType.Id, "deviceTypeName", deviceType.Display)
 		}
 	}
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredPorts))
@@ -220,7 +220,7 @@ func (s *DeviceTypeSync) syncInterfaceTemplates(ctx context.Context, yml models.
 		} else if !helpers.CompareJSONFields(existingTemplate, templateRequest) {
 			_, _ = s.interfaceTemplateSvc.Update(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			log.Info("interface template unchanged, skipping update", "name", templateRequest.Name)
+			log.Info("interface template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", deviceType.Id, "deviceTypeName", deviceType.Display)
 		}
 	}
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredInterfaceTemplate))
@@ -256,7 +256,7 @@ func (s *DeviceTypeSync) syncModuleBayTemplates(ctx context.Context, yml models.
 		} else if !helpers.CompareJSONFields(existingTemplate, templateRequest) {
 			_, _ = s.moduleBayTemplateSvc.Update(ctx, existingTemplate.Id, templateRequest)
 		} else {
-			log.Info("moduleBay unchanged", "skipping update", "name", templateRequest.Name)
+			log.Info("moduleBay unchanged skipping update", "name", templateRequest.Name, "deviceTypeId", deviceType.Id, "deviceTypeName", deviceType.Display)
 		}
 	}
 
