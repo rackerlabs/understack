@@ -14,6 +14,7 @@ import (
 type NautobotClient struct {
 	Config    *nb.Configuration
 	APIClient *nb.APIClient
+	Username  string
 	Report    map[string][]string
 }
 
@@ -41,6 +42,7 @@ func NewNautobotClient(apiURL string, authToken string) *NautobotClient {
 	client := nb.NewAPIClient(config)
 
 	return &NautobotClient{
+		Username:  "admin",
 		Config:    config,
 		APIClient: client,
 		Report:    make(map[string][]string),
@@ -54,8 +56,8 @@ func (n *NautobotClient) GetClient() *NautobotClient {
 
 // GetChangeObjectIDS adapts GetCreateChangeList to the expected signature
 // It filters out changed_object_id values where CREATE count equals DELETE count
-func (n *NautobotClient) GetChangeObjectIDS(ctx context.Context, objectType string, username string) []string {
-	changes, _, err := n.GetCreateChangeList(ctx, objectType, username)
+func (n *NautobotClient) GetChangeObjectIDS(ctx context.Context, objectType string) []string {
+	changes, _, err := n.GetCreateChangeList(ctx, objectType)
 	if err != nil {
 		return []string{}
 	}
@@ -67,8 +69,8 @@ func (n *NautobotClient) GetChangeObjectIDS(ctx context.Context, objectType stri
 
 	// Filter and extract IDs where CREATE > DELETE
 	return lo.FilterMap(lo.Keys(grouped), func(id string, _ int) (string, bool) {
-		creates := lo.CountBy(grouped[id], func(c ObjectChanges) bool { return c.Action == "CREATE" })
-		deletes := lo.CountBy(grouped[id], func(c ObjectChanges) bool { return c.Action == "DELETE" })
-		return id, creates != deletes
+		createCount := lo.CountBy(grouped[id], func(c ObjectChanges) bool { return c.Action == "CREATE" })
+		deleteCount := lo.CountBy(grouped[id], func(c ObjectChanges) bool { return c.Action == "DELETE" })
+		return id, createCount != deleteCount
 	})
 }

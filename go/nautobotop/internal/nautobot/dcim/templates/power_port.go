@@ -2,6 +2,8 @@ package templates
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
@@ -20,22 +22,33 @@ func NewPowerPortTemplateService(client *client.NautobotClient) *PowerPortTempla
 }
 
 func (s *PowerPortTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.PowerPortTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Limit(10000).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllPowerPortTemplate", "failed to list power port templates", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
-		return []nb.PowerPortTemplate{}
+	ids := s.client.GetChangeObjectIDS(ctx, "dcim.powerporttemplate")
+
+	// Define the API call function for this specific endpoint
+	apiCall := func(ctx context.Context, batchIds []string) ([]nb.PowerPortTemplate, *http.Response, error) {
+		list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
+		if err != nil {
+			return nil, resp, err
+		}
+		if list == nil {
+			return []nb.PowerPortTemplate{}, resp, nil
+		}
+		return list.Results, resp, nil
 	}
-	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
-		log.Debug("no power port templates found", "device_type_id", deviceTypeID)
-		return []nb.PowerPortTemplate{}
-	}
-	log.Debug("retrieved power port templates", "device_type_id", deviceTypeID, "count", len(list.Results))
-	return list.Results
+
+	// Use the helper function for pagination
+	return helpers.PaginatedListWithIDs(
+		ctx,
+		ids,
+		apiCall,
+		s.client.AddReport,
+		"ListAllPowerPortTemplate",
+		"device_type_id", deviceTypeID,
+	)
 }
 
 func (s *PowerPortTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.PowerPortTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Limit(10000).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Limit(10000).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetPowerPortTemplateByName", "failed to get power port template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)

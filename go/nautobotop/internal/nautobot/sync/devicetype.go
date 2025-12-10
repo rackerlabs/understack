@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
@@ -202,7 +203,7 @@ func (s *DeviceTypeSync) syncInterfaceTemplates(ctx context.Context, yml models.
 	existingTemplates := s.interfaceTemplateSvc.ListByDeviceType(ctx, deviceType.Id)
 	existingMap := make(map[string]nb.InterfaceTemplate)
 	for _, template := range existingTemplates {
-		existingMap[template.Display] = template
+		existingMap[template.Name] = template
 	}
 	for name, interfaceTmpl := range desiredInterfaceTemplate {
 		interfaceTemplateChoice, _ := nb.NewInterfaceTypeChoicesFromValue(interfaceTmpl.Type)

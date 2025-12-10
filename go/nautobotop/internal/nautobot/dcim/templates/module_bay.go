@@ -2,6 +2,8 @@ package templates
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
@@ -11,7 +13,6 @@ import (
 
 type ModuleBayTemplateService struct {
 	client *client.NautobotClient
-	report func(key string, line ...string)
 }
 
 func NewModuleBayTemplateService(client *client.NautobotClient) *ModuleBayTemplateService {
@@ -21,22 +22,33 @@ func NewModuleBayTemplateService(client *client.NautobotClient) *ModuleBayTempla
 }
 
 func (s *ModuleBayTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.ModuleBayTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Limit(10000).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllModuleBayTemplateByDeviceType", "failed to list module bay templates", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
-		return []nb.ModuleBayTemplate{}
+	ids := s.client.GetChangeObjectIDS(ctx, "dcim.modulebaytemplate")
+
+	// Define the API call function for this specific endpoint
+	apiCall := func(ctx context.Context, batchIds []string) ([]nb.ModuleBayTemplate, *http.Response, error) {
+		list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
+		if err != nil {
+			return nil, resp, err
+		}
+		if list == nil {
+			return []nb.ModuleBayTemplate{}, resp, nil
+		}
+		return list.Results, resp, nil
 	}
-	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
-		log.Info("no module bay templates found", "device_type_id", deviceTypeID)
-		return []nb.ModuleBayTemplate{}
-	}
-	log.Info("retrieved module bay templates", "device_type_id", deviceTypeID, "count", len(list.Results))
-	return list.Results
+
+	// Use the helper function for pagination
+	return helpers.PaginatedListWithIDs(
+		ctx,
+		ids,
+		apiCall,
+		s.client.AddReport,
+		"ListAllModuleBayTemplateByDeviceType",
+		"device_type_id", deviceTypeID,
+	)
 }
 
 func (s *ModuleBayTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.ModuleBayTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Limit(10000).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Limit(10000).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetModuleBayTemplateByName", "failed to get module bay template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)

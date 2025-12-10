@@ -2,6 +2,8 @@ package templates
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
@@ -20,22 +22,33 @@ func NewConsolePortTemplateService(client *client.NautobotClient) *ConsolePortTe
 }
 
 func (s *ConsolePortTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.ConsolePortTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Limit(10000).Depth(10).DeviceType([]string{deviceTypeID}).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllConsolePortTemplateByDeviceType", "failed to list console port templates", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
-		return []nb.ConsolePortTemplate{}
+	ids := s.client.GetChangeObjectIDS(ctx, "dcim.consoleporttemplate")
+
+	// Define the API call function for this specific endpoint
+	apiCall := func(ctx context.Context, batchIds []string) ([]nb.ConsolePortTemplate, *http.Response, error) {
+		list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
+		if err != nil {
+			return nil, resp, err
+		}
+		if list == nil {
+			return []nb.ConsolePortTemplate{}, resp, nil
+		}
+		return list.Results, resp, nil
 	}
-	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
-		log.Info("no console port templates found", "device_type_id", deviceTypeID)
-		return []nb.ConsolePortTemplate{}
-	}
-	log.Info("retrieved console port templates", "device_type_id", deviceTypeID, "count", len(list.Results))
-	return list.Results
+
+	// Use the helper function for pagination
+	return helpers.PaginatedListWithIDs(
+		ctx,
+		ids,
+		apiCall,
+		s.client.AddReport,
+		"ListAllConsolePortTemplateByDeviceType",
+		"device_type_id", deviceTypeID,
+	)
 }
 
 func (s *ConsolePortTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.ConsolePortTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Limit(10000).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Limit(10000).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetConsolePortTemplateByName", "failed to get console port template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)

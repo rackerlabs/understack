@@ -26,11 +26,11 @@ type GraphQLData struct {
 	ObjectChanges []ObjectChanges `json:"object_changes"`
 }
 
-func (n *NautobotClient) GetCreateChangeList(ctx context.Context, objectType string, username string) ([]ObjectChanges, *http.Response, error) {
+func (n *NautobotClient) GetCreateChangeList(ctx context.Context, objectType string) ([]ObjectChanges, *http.Response, error) {
 	var allObjectChanges []ObjectChanges
 	var lastResp *http.Response
 	offset := 0
-	limit := 100000
+	limit := 100
 
 	for {
 		req := nb.GraphQLAPIRequest{
@@ -54,7 +54,7 @@ func (n *NautobotClient) GetCreateChangeList(ctx context.Context, objectType str
 				"changedObjectType": objectType,
 				"limit":             limit,
 				"offset":            offset,
-				"userName":          []string{username},
+				"userName":          []string{n.Username},
 				"action":            []string{"create", "delete"},
 			},
 		}

@@ -2,6 +2,7 @@ package dcim
 
 import (
 	"context"
+
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
@@ -44,7 +45,7 @@ func (s *DeviceTypeService) GetByName(ctx context.Context, name string) nb.Devic
 }
 
 func (s *DeviceTypeService) ListAll(ctx context.Context) []nb.DeviceType {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.devicetype", "admin")
+	ids := s.client.GetChangeObjectIDS(ctx, "dcim.devicetype")
 	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Id(ids).Depth(10).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
