@@ -139,11 +139,6 @@ pod:
           - name: oidc-secret
             mountPath: /etc/oidc-secret
             readOnly: true
-          # drop this when https://review.opendev.org/c/openstack/openstack-helm/+/970280 merges
-          - name: keystone-bin
-            mountPath: /var/www/cgi-bin/keystone/wsgi.py
-            readOnly: true
-            subPath: wsgi.py
         volumes:
           - name: keystone-sso
             secret:
