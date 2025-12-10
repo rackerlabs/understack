@@ -103,6 +103,8 @@ conf:
     ilo:
       # we do not run swift by default so cannot use it by default
       use_web_server_for_images: true
+    nova:
+      auth_type: password
 
 endpoints:
   oslo_messaging:

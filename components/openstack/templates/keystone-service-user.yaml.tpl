@@ -58,6 +58,7 @@ spec:
         {{- $shouldSkip := or (eq $user.usage "test") (eq $user.usage "admin") }}
         {{- if not $shouldSkip }}
           [{{ $section }}]
+          auth_url={{ $.Values.keystoneUrl }}
           project_domain_name={{ include "openstack.serviceuser.project_domain_name" $user }}
           project_name={{ include "openstack.serviceuser.project_name" $user  }}
           user_domain_name={{ include "openstack.serviceuser.user_domain_name" $user }}
