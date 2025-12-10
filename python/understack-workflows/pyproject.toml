@@ -30,7 +30,6 @@ dependencies = [
 
 [project.scripts]
 sync-keystone = "understack_workflows.main.sync_keystone:main"
-sync-provision-state = "understack_workflows.main.sync_provision_state:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
