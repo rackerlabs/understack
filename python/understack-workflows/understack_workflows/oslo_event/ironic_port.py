@@ -105,18 +105,38 @@ def handle_port_create_update(
                 logger.exception("Failed to create interface %s", event.uuid)
                 return 1
 
-    # Update interface attributes
+    # Update interface attributes (only update if value is present and different)
     logger.debug("Updating interface %s", event.uuid)
+    updated = False
     for key, value in attrs.items():
-        if key != "id":  # Don't update ID
-            setattr(intf, key, value)
+        if key == "id":  # Don't update ID
+            continue
 
-    try:
-        cast(Record, intf).save()
-        logger.info("Interface %s synced to Nautobot", event.uuid)
-    except Exception:
-        logger.exception("Failed to update interface %s", event.uuid)
-        return 1
+        current_value = getattr(intf, key, None)
+
+        # Only update if:
+        # 1. Current value is None/empty and we have a value, OR
+        # 2. Values are different
+        if value and (not current_value or current_value != value):
+            logger.debug(
+                "Updating interface %s field '%s': '%s' -> '%s'",
+                event.uuid,
+                key,
+                current_value,
+                value,
+            )
+            setattr(intf, key, value)
+            updated = True
+
+    if updated:
+        try:
+            cast(Record, intf).save()
+            logger.info("Interface %s synced to Nautobot", event.uuid)
+        except Exception:
+            logger.exception("Failed to update interface %s", event.uuid)
+            return 1
+    else:
+        logger.debug("Interface %s already up to date", event.uuid)
 
     # Handle cable management if we have remote switch connection information
     if event.remote_port_id and event.remote_switch_info:
@@ -230,10 +250,18 @@ def handle_port_delete(_conn: Connection, nautobot: Nautobot, event_data: dict) 
         return 0
 
     # Find and delete any existing cable connected to this interface
+    # Check both termination_a and termination_b sides
     existing_cable = nautobot.dcim.cables.get(
         termination_a_type="dcim.interface",
         termination_a_id=intf.id,  # type: ignore
     )
+
+    if not existing_cable:
+        # Try termination_b side if not found on termination_a
+        existing_cable = nautobot.dcim.cables.get(
+            termination_b_type="dcim.interface",
+            termination_b_id=intf.id,  # type: ignore
+        )
 
     if existing_cable:
         logger.info("Deleting cable %s for interface %s", existing_cable.id, event.uuid)  # type: ignore

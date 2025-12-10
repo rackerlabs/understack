@@ -5,10 +5,68 @@ from unittest.mock import patch
 
 import pytest
 
+from understack_workflows.oslo_event.ironic_node import IronicNodeEvent
 from understack_workflows.oslo_event.ironic_node import IronicProvisionSetEvent
 from understack_workflows.oslo_event.ironic_node import create_volume_connector
 from understack_workflows.oslo_event.ironic_node import handle_provision_end
 from understack_workflows.oslo_event.ironic_node import instance_nqn
+
+
+class TestIronicNodeEvent:
+    """Test cases for IronicNodeEvent class."""
+
+    def test_from_event_dict_success(self):
+        """Test successful node event parsing."""
+        event_data = {
+            "payload": {
+                "ironic_object.data": {
+                    "uuid": "test-uuid-123",
+                    "name": "test-node",
+                    "provision_state": "available",
+                }
+            }
+        }
+
+        event = IronicNodeEvent.from_event_dict(event_data)
+
+        assert event.uuid == "test-uuid-123"
+
+    def test_from_event_dict_minimal_data(self):
+        """Test parsing with only required UUID field."""
+        event_data = {"payload": {"ironic_object.data": {"uuid": "minimal-uuid"}}}
+
+        event = IronicNodeEvent.from_event_dict(event_data)
+
+        assert event.uuid == "minimal-uuid"
+
+    def test_from_event_dict_no_payload(self):
+        """Test event parsing with missing payload."""
+        event_data = {}
+
+        with pytest.raises(ValueError, match="Invalid event. No 'payload'"):
+            IronicNodeEvent.from_event_dict(event_data)
+
+    def test_from_event_dict_no_ironic_object_data(self):
+        """Test event parsing with missing ironic_object.data."""
+        event_data = {"payload": {"other_field": "value"}}
+
+        with pytest.raises(
+            ValueError, match="Invalid event. No 'ironic_object.data' in payload"
+        ):
+            IronicNodeEvent.from_event_dict(event_data)
+
+    def test_from_event_dict_missing_uuid(self):
+        """Test event parsing with missing UUID field."""
+        event_data = {"payload": {"ironic_object.data": {"name": "test-node"}}}
+
+        with pytest.raises(ValueError):  # Pydantic will raise validation error
+            IronicNodeEvent.from_event_dict(event_data)
+
+    def test_direct_initialization(self):
+        """Test direct initialization of IronicNodeEvent."""
+        event = IronicNodeEvent(uuid="direct-uuid")
+
+        assert event.uuid == "direct-uuid"
 
 
 class TestIronicProvisionSetEvent:

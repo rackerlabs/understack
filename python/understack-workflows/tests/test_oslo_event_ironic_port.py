@@ -344,6 +344,161 @@ class TestHandlePortCreateUpdate:
         # Verify cable creation was called
         mock_nautobot.dcim.cables.create.assert_called_once()
 
+    def test_handle_port_create_update_without_lldp_data(
+        self, mock_conn, mock_nautobot
+    ):
+        """Test handling port create/update without LLDP data."""
+        # Create event data without local_link_connection
+        event_data = {
+            "event_type": "baremetal.port.create.end",
+            "payload": {
+                "ironic_object.data": {
+                    "uuid": "test-port-uuid",
+                    "name": "test-port",
+                    "address": "aa:bb:cc:dd:ee:ff",
+                    "node_uuid": "test-node-uuid",
+                    "physical_network": "test-network",
+                    "pxe_enabled": True,
+                    "extra": {},
+                    "local_link_connection": {},  # Empty LLDP data
+                }
+            },
+        }
+
+        # Mock interface creation
+        created_interface = Mock()
+        created_interface.id = "test-port-uuid"
+        created_interface.cable = None
+        mock_nautobot.dcim.interfaces.create.return_value = created_interface
+        mock_nautobot.dcim.interfaces.get.return_value = None
+
+        # Test the function
+        result = handle_port_create_update(mock_conn, mock_nautobot, event_data)
+
+        # Verify result
+        assert result == 0
+
+        # Verify interface creation was called
+        mock_nautobot.dcim.interfaces.create.assert_called_once()
+
+        # Verify cable creation was NOT called (no LLDP data)
+        mock_nautobot.dcim.cables.create.assert_not_called()
+
+    def test_handle_port_create_update_with_partial_lldp_data(
+        self, mock_conn, mock_nautobot
+    ):
+        """Test port create/update with partial LLDP data (missing switch_info)."""
+        # Create event data with partial local_link_connection (only port_id)
+        event_data = {
+            "event_type": "baremetal.port.create.end",
+            "payload": {
+                "ironic_object.data": {
+                    "uuid": "test-port-uuid",
+                    "name": "test-port",
+                    "address": "aa:bb:cc:dd:ee:ff",
+                    "node_uuid": "test-node-uuid",
+                    "physical_network": "test-network",
+                    "pxe_enabled": True,
+                    "extra": {},
+                    "local_link_connection": {
+                        "port_id": "Ethernet1/1",
+                        # Missing switch_info
+                    },
+                }
+            },
+        }
+
+        # Mock interface creation
+        created_interface = Mock()
+        created_interface.id = "test-port-uuid"
+        created_interface.cable = None
+        mock_nautobot.dcim.interfaces.create.return_value = created_interface
+        mock_nautobot.dcim.interfaces.get.return_value = None
+
+        # Test the function
+        result = handle_port_create_update(mock_conn, mock_nautobot, event_data)
+
+        # Verify result
+        assert result == 0
+
+        # Verify interface creation was called
+        mock_nautobot.dcim.interfaces.create.assert_called_once()
+
+        # Verify cable creation was NOT called (incomplete LLDP data)
+        mock_nautobot.dcim.cables.create.assert_not_called()
+
+    def test_handle_port_update_merges_data_from_multiple_inspections(
+        self, mock_conn, mock_nautobot
+    ):
+        """Test that port updates merge data from Redfish and Agent inspections."""
+        # Scenario: Redfish inspection creates port with bios_name but no LLDP
+        # Then Agent inspection adds LLDP data
+
+        # Mock existing interface (already created by Redfish inspection)
+        existing_interface = Mock()
+        existing_interface.id = "test-port-uuid"
+        existing_interface.name = "NIC.Integrated.1-1"  # From Redfish
+        existing_interface.type = "25gbase-x-sfp28"
+        existing_interface.status = "Active"
+        existing_interface.mac_address = "aa:bb:cc:dd:ee:ff"
+        existing_interface.device = "test-node-uuid"
+        existing_interface.cable = None
+        mock_nautobot.dcim.interfaces.get.return_value = existing_interface
+
+        # Agent inspection event (adds LLDP data)
+        agent_event = {
+            "event_type": "baremetal.port.update.end",
+            "payload": {
+                "ironic_object.data": {
+                    "uuid": "test-port-uuid",
+                    "name": "port-name",  # Linux name, not bios_name
+                    "address": "aa:bb:cc:dd:ee:ff",
+                    "node_uuid": "test-node-uuid",
+                    "physical_network": "test-network",
+                    "pxe_enabled": True,
+                    "extra": {"bios_name": "NIC.Integrated.1-1"},
+                    "local_link_connection": {
+                        "port_id": "Ethernet1/1",
+                        "switch_info": "switch1.example.com",
+                        "switch_id": "aa:bb:cc:dd:ee:00",
+                    },
+                }
+            },
+        }
+
+        # Mock switch interface for cable creation
+        switch_interface = Mock()
+        switch_interface.id = "switch-interface-123"
+
+        def mock_interface_get(*args, **kwargs):
+            if "id" in kwargs:
+                # Return existing interface
+                return existing_interface
+            elif "device" in kwargs and "name" in kwargs:
+                # Switch interface lookup
+                return switch_interface
+            return None
+
+        mock_nautobot.dcim.interfaces.get.side_effect = mock_interface_get
+
+        # Mock cable creation
+        created_cable = Mock()
+        created_cable.id = "cable-123"
+        mock_nautobot.dcim.cables.create.return_value = created_cable
+
+        # Test the function with agent event (which has LLDP data)
+        result = handle_port_create_update(mock_conn, mock_nautobot, agent_event)
+
+        # Verify result
+        assert result == 0
+
+        # Verify interface name was NOT overwritten (should keep bios_name)
+        # The interface already has the correct name, so it shouldn't be changed
+        assert existing_interface.name == "NIC.Integrated.1-1"
+
+        # Verify cable was created with LLDP data
+        mock_nautobot.dcim.cables.create.assert_called_once()
+
 
 class TestHandlePortDelete:
     """Test handle_port_delete function."""
@@ -401,3 +556,35 @@ class TestHandlePortDelete:
 
         # Verify no cable operations were attempted
         mock_nautobot.dcim.cables.get.assert_not_called()
+
+    def test_handle_port_delete_cable_on_termination_b(
+        self, mock_conn, mock_nautobot, port_delete_event_data
+    ):
+        """Test handling port delete when cable is on termination_b side."""
+        # Mock interface
+        interface = Mock()
+        interface.id = "interface-123"
+        mock_nautobot.dcim.interfaces.get.return_value = interface
+
+        # Mock cable on termination_b side
+        cable_on_b_side = Mock()
+        cable_on_b_side.id = "cable-456"
+
+        # First call (termination_a) returns None,
+        # second call (termination_b) returns cable
+        mock_nautobot.dcim.cables.get.side_effect = [None, cable_on_b_side]
+
+        # Test the function
+        result = handle_port_delete(mock_conn, mock_nautobot, port_delete_event_data)
+
+        # Verify result
+        assert result == 0
+
+        # Verify cable deletion was called
+        cable_on_b_side.delete.assert_called_once()
+
+        # Verify interface deletion was called
+        interface.delete.assert_called_once()
+
+        # Verify both cable queries were made
+        assert mock_nautobot.dcim.cables.get.call_count == 2
