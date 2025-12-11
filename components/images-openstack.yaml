@@ -26,7 +26,7 @@ images:
     ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
     ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
     ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
-    ironic_pxe_http: "docker.io/nginx:1.29.3"
+    ironic_pxe_http: "docker.io/nginx:1.29.4"
     ironic_db_sync: "ghcr.io/rackerlabs/understack/ironic:2025.2-ubuntu_jammy"
     # these want curl which apparently is in the openstack-client image
     ironic_manage_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy"
