@@ -108,6 +108,30 @@ envVars:
         name: oidc-sso
         key: redirect-uri
         optional: true
+  - name: CONNECTOR_SSO_ISSUER
+    valueFrom:
+      secretKeyRef:
+        name: connector-sso
+        key: issuer
+        optional: true
+  - name: CONNECTOR_SSO_CLIENT_ID
+    valueFrom:
+      secretKeyRef:
+        name: connector-sso
+        key: client-id
+        optional: true
+  - name: CONNECTOR_SSO_CLIENT_SECRET
+    valueFrom:
+      secretKeyRef:
+        name: connector-sso
+        key: client-secret
+        optional: true
+  - name: CONNECTOR_SSO_REDIRECT_URI
+    valueFrom:
+      secretKeyRef:
+        name: connector-sso
+        key: redirect-uri
+        optional: true
   - name: GRAFANA_SSO_CLIENT_SECRET
     valueFrom:
       secretKeyRef:
