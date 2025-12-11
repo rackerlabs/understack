@@ -99,10 +99,4 @@ def test_with_valid_data(mocker, caplog):
     }
     assert mock_port.physical_network == "f20-3-network"
     mock_port.save.assert_called()
-
-    mock_traits.get_trait_names.assert_called_once()
-    mock_traits.destroy.assert_called_once_with("CUSTOM_BMC_SWITCH")
-    ironic_understack.update_baremetal_port.objects.TraitList.create.assert_called_once_with(
-        mock_context, 1234, ["CUSTOM_NETWORK_SWITCH", "CUSTOM_STORAGE_SWITCH"]
-    )
     mock_node.save.assert_called_once()

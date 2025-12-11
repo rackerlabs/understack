@@ -1,6 +1,5 @@
 from typing import Any
 
-import openstack
 from ironic import objects
 from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
@@ -174,31 +173,14 @@ def _set_node_traits(task, vlan_groups: set[str]):
     required_traits = {_trait_name(x) for x in vlan_groups if x}
     existing_traits = set(node.traits.get_trait_names()).intersection(our_traits)
 
-    traits_to_remove = sorted(existing_traits.difference(required_traits))
-    traits_to_add = sorted(required_traits.difference(existing_traits))
-
     LOG.debug(
         "Checking traits for node %s: existing=%s required=%s",
         node.uuid,
         existing_traits,
         required_traits,
     )
-
-    for trait in traits_to_remove:
-        LOG.debug("Removing trait %s from node %s", trait, node.uuid)
-        try:
-            node.traits.destroy(trait)
-        except openstack.exceptions.NotFoundException:
-            pass
-
-    if traits_to_add:
-        LOG.debug("Adding traits %s to node %s", traits_to_add, node.uuid)
-
-        node.traits = objects.TraitList.create(
-            task.context, node.id, list(traits_to_add)
-        )
-
-    if traits_to_add or traits_to_remove:
+    if existing_traits != required_traits:
+        objects.TraitList.create(task.context, task.node.id, required_traits)
         node.save()
 
 
