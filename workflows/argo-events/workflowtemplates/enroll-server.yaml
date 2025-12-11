@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 metadata:
   name: enroll-server
   annotations:
-    workflows.argoproj.io/title: Perform server discovery and update Nautobot and Ironic
+    workflows.argoproj.io/title: Perform server discovery and update Ironic
     workflows.argoproj.io/description: |
       Defined in `workflows/argo-events/workflowtemplates/enroll-server.yaml`
 kind: WorkflowTemplate
@@ -75,9 +75,6 @@ spec:
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
-          - mountPath: /etc/nb-token/
-            name: nb-token
-            readOnly: true
           - mountPath: /etc/bmc_master/
             name: bmc-master
             readOnly: true
@@ -92,9 +89,6 @@ spec:
         - name: bmc-master
           secret:
             secretName: bmc-master
-        - name: nb-token
-          secret:
-            secretName: nautobot-token
         - name: baremetal-manage
           secret:
             secretName: baremetal-manage
