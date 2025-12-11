@@ -13,11 +13,11 @@ metadata:
       Resulting code should be very similar to:
 
       ```
-      argo -n argo-events submit --from workflowtemplate/ironic-oslo-event \
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
       -p event-json "JSON-payload" -p device_id=<UUID> -p project_id=<UUID>
       ```
 
-      Defined in `workflows/argo-events/sensors/sensor-ironic-oslo-event.yaml`
+      Defined in `components/site-workflows/sensors/sensor-ironic-oslo-event.yaml`
 spec:
   dependencies:
   - eventName: openstack
@@ -43,6 +43,7 @@ spec:
           type: "string"
           value:
             - "deploying"
+            - "inspecting"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
@@ -64,6 +65,10 @@ spec:
               src:
                 dataKey: body.ironic_object.lessee
                 dependencyName: ironic-dep
+            - dest: spec.arguments.parameters.3.value # previous_provision_state
+              src:
+                dataKey: body.ironic_object.previous_provision_state
+                dependencyName: ironic-dep
           source:
             # create a workflow in argo-events prefixed with ironic-prov-
             resource:
@@ -81,6 +86,7 @@ spec:
                     - name: event-json
                     - name: device_id
                     - name: project_id
+                    - name: previous_provision_state
                 templates:
                 - name: main
                   steps:
@@ -93,6 +99,7 @@ spec:
                         - name: event-json
                           value: "{{workflow.parameters.event-json}}"
                     - name: convert-project-id
+                      when: "\"{{workflow.parameters.previous_provision_state}}\" == deploying"
                       inline:
                         script:
                           image: python:alpine
@@ -102,7 +109,7 @@ spec:
                               project_id_without_dashes = "{{workflow.parameters.project_id}}"
                               print(str(uuid.UUID(project_id_without_dashes)))
                   - - name: ansible-storage-update
-                      when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
+                      when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted && \"{{workflow.parameters.previous_provision_state}}\" == deploying"
                       templateRef:
                         name: ansible-workflow-template
                         template: ansible-run

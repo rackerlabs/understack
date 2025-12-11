@@ -19,6 +19,7 @@ from understack_workflows.oslo_event import ironic_portgroup
 from understack_workflows.oslo_event import keystone_project
 from understack_workflows.oslo_event import neutron_network
 from understack_workflows.oslo_event import neutron_subnet
+from understack_workflows.oslo_event import update_nautobot
 
 logger = setup_logger(__name__)
 
@@ -64,14 +65,17 @@ class NoEventHandlerError(Exception):
 EventHandler = Callable[[Connection, NautobotApi, dict[str, Any]], int]
 
 # add the event_type here and the function that should be called
-_event_handlers: dict[str, EventHandler] = {
+_event_handlers: dict[str, EventHandler | list[EventHandler]] = {
     "baremetal.port.create.end": ironic_port.handle_port_create_update,
     "baremetal.port.update.end": ironic_port.handle_port_create_update,
     "baremetal.port.delete.end": ironic_port.handle_port_delete,
     "baremetal.portgroup.create.end": ironic_portgroup.handle_portgroup_create_update,
     "baremetal.portgroup.update.end": ironic_portgroup.handle_portgroup_create_update,
     "baremetal.portgroup.delete.end": ironic_portgroup.handle_portgroup_delete,
-    "baremetal.node.provision_set.end": ironic_node.handle_provision_end,
+    "baremetal.node.provision_set.end": [
+            ironic_node.handle_provision_end,
+            update_nautobot.handle_provision_end,
+        ],
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,
     "identity.project.deleted": keystone_project.handle_project_deleted,
@@ -183,14 +187,20 @@ def main() -> int:
 
     logger.info("Processing event type: %s", event_type)
 
-    # look up the event handler
-    event_handler = _event_handlers.get(event_type)
-    if event_handler is None:
+    # look up the event handler(s)
+    event_handlers = _event_handlers.get(event_type)
+    if event_handlers is None:
         logger.error("No event handler for event type: %s", event_type)
         logger.debug("Available event handlers: %s", list(_event_handlers.keys()))
         sys.exit(_EXIT_NO_EVENT_HANDLER)
 
-    logger.debug("Found event handler for event type: %s", event_type)
+    # normalize to list for consistent processing
+    if not isinstance(event_handlers, list):
+        event_handlers = [event_handlers]
+
+    logger.debug(
+        "Found %d handler(s) for event type: %s", len(event_handlers), event_type
+    )
 
     # get a connection to OpenStack and to Nautobot
     try:
@@ -199,17 +209,21 @@ def main() -> int:
         logger.exception("Client initialization failed")
         sys.exit(_EXIT_CLIENT_ERROR)
 
-    # execute the event handler
-    logger.info("Executing event handler for event type: %s", event_type)
-    try:
-        ret = event_handler(conn, nautobot, event)
-    except Exception:
-        logger.exception("Event handler failed")
-        sys.exit(_EXIT_HANDLER_ERROR)
+    # execute all event handlers
+    last_ret = _EXIT_SUCCESS
+    for idx, event_handler in enumerate(event_handlers, 1):
+        handler_name = event_handler.__name__
+        logger.info(
+            "Executing handler %d/%d: %s", idx, len(event_handlers), handler_name
+        )
+        try:
+            ret = event_handler(conn, nautobot, event)
+            if isinstance(ret, int):
+                last_ret = ret
+            logger.info("Handler %s completed with return code: %s", handler_name, ret)
+        except Exception:
+            logger.exception("Handler %s failed", handler_name)
+            sys.exit(_EXIT_HANDLER_ERROR)
 
-    logger.info("Event handler completed successfully with return code: %s", ret)
-
-    # exit if the event handler provided a return code or just with success
-    if isinstance(ret, int):
-        return ret
-    return _EXIT_SUCCESS
+    logger.info("All handlers completed successfully")
+    return last_ret
