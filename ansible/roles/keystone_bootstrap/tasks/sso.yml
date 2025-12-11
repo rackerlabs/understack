@@ -64,6 +64,12 @@
     idp: sso
     mapping: sso_mapping
 
+- name: Create mapped protocol
+  openstack.cloud.keystone_federation_protocol:
+    name: mapped
+    idp: sso
+    mapping: sso_mapping
+
 - name: Create federated group mappings
   ansible.builtin.include_tasks: sso_groups.yml
   loop: "{{ keystone_bootstrap_groups }}"
