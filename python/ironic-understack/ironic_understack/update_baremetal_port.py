@@ -34,7 +34,7 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
 
         - local_link_info.port_id (e.g. "Ethernet1/1")
         - local_link_info.switch_id (e.g. "aa:bb:cc:dd:ee:ff")
-        - local_link_info.switch_info (e.g. "a1-1-1.ord1")
+        - local_link_info.switch_info (e.g. "a1-1-1.ord1.rackspace.net")
         - physical_network (e.g. "a1-1-network")
 
         We also add or remove node "traits" based on the inventory data.  We
@@ -72,12 +72,19 @@ def _parse_plugin_data(plugin_data: dict) -> list[InspectedPort]:
         InspectedPort(
             mac_address=mac[name],
             name=name,
-            switch_system_name=str(lldp["switch_system_name"]).lower(),
+            switch_system_name=_normalise_switch_name(lldp["switch_system_name"]),
             switch_chassis_id=str(lldp["switch_chassis_id"]).lower(),
             switch_port_id=str(lldp["switch_port_id"]),
         )
         for name, lldp in plugin_data["parsed_lldp"].items()
     ]
+
+
+def _normalise_switch_name(name: str) -> str:
+    suffix = ".rackspace.net"
+    name = str(name).lower()
+    name = name if name.endswith(suffix) else name + suffix
+    return name
 
 
 def _update_port_attrs(task, ports_by_mac, vlan_groups, node_uuid):

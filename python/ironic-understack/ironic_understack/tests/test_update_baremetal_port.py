@@ -3,7 +3,6 @@ import logging
 import ironic.objects
 from oslo_utils import uuidutils
 
-import ironic_understack
 from ironic_understack.update_baremetal_port import UpdateBaremetalPortsHook
 
 # load some metaprgramming normally taken care of during Ironic initialization:
@@ -95,7 +94,7 @@ def test_with_valid_data(mocker, caplog):
     assert mock_port.local_link_connection == {
         "port_id": "Ethernet1/18",
         "switch_id": "88:5a:92:ec:54:59",
-        "switch_info": "f20-3-1.iad3",
+        "switch_info": "f20-3-1.iad3.rackspace.net",
     }
     assert mock_port.physical_network == "f20-3-network"
     mock_port.save.assert_called()
