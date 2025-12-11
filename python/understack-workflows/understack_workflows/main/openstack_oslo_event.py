@@ -20,6 +20,7 @@ from understack_workflows.oslo_event import keystone_project
 from understack_workflows.oslo_event import nautobot_sync
 from understack_workflows.oslo_event import neutron_network
 from understack_workflows.oslo_event import neutron_subnet
+from understack_workflows.oslo_event import provision_state_sync
 
 logger = setup_logger(__name__)
 
@@ -78,6 +79,7 @@ _event_handlers: dict[str, EventHandler | list[EventHandler]] = {
     "baremetal.node.provision_set.end": [
         ironic_node.handle_provision_end,
         nautobot_sync.handle_provision_end,
+        provision_state_sync.handle_provision_end,
     ],
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,

@@ -10,11 +10,16 @@ metadata:
 
       - baremetal.node.provision_set.end which happens after a state change on the node
 
+      This sensor handles ALL provision state changes. The event handlers internally
+      filter for specific states:
+      - deploying: Sets up storage (volume connectors) for instances with storage enabled
+      - inspecting: Updates Nautobot device with inspection data (inventory, ports)
+
       Resulting code should be very similar to:
 
       ```
       argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
-      -p event-json "JSON-payload" -p device_id=<UUID> -p project_id=<UUID>
+      -p event-json "JSON-payload"
       ```
 
       Defined in `components/site-workflows/sensors/sensor-ironic-oslo-event.yaml`
@@ -39,11 +44,6 @@ spec:
           type: "string"
           value:
             - "baremetal.node.provision_set.end"
-        - path: "body.ironic_object.previous_provision_state"
-          type: "string"
-          value:
-            - "deploying"
-            - "inspecting"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
@@ -57,17 +57,13 @@ spec:
               src:
                 dataKey: body
                 dependencyName: ironic-dep
-            - dest: spec.arguments.parameters.1.value # device_id
+            - dest: spec.arguments.parameters.1.value # previous_provision_state
               src:
-                dataKey: body.ironic_object.uuid
+                dataKey: body.ironic_object.previous_provision_state
                 dependencyName: ironic-dep
             - dest: spec.arguments.parameters.2.value # project_id
               src:
                 dataKey: body.ironic_object.lessee
-                dependencyName: ironic-dep
-            - dest: spec.arguments.parameters.3.value # previous_provision_state
-              src:
-                dataKey: body.ironic_object.previous_provision_state
                 dependencyName: ironic-dep
           source:
             # create a workflow in argo-events prefixed with ironic-prov-
@@ -84,9 +80,8 @@ spec:
                 arguments:
                   parameters:
                     - name: event-json
-                    - name: device_id
-                    - name: project_id
                     - name: previous_provision_state
+                    - name: project_id
                 templates:
                 - name: main
                   steps:

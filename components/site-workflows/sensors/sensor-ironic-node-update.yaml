@@ -11,7 +11,6 @@ metadata:
       - baremetal.node.create.end which happens when a baremetal node is created
       - baremetal.node.update.end which happens when node fields are updated
       - baremetal.node.delete.end which happens when a node is deleted
-      - baremetal.node.provision_set.end which happens after a state change on the node
 
       Resulting code should be very similar to:
 
@@ -41,7 +40,6 @@ spec:
             - "baremetal.node.create.end"
             - "baremetal.node.update.end"
             - "baremetal.node.delete.end"
-            - "baremetal.node.provision_set.end"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
