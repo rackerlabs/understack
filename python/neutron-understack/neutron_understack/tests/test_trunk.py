@@ -334,7 +334,7 @@ class TestCheckSubportsSegmentationId:
     ):
         # Mock fetch_network_node_trunk_id to return the trunk_id
         mocker.patch(
-            "neutron_understack.utils.fetch_network_node_trunk_id",
+            "neutron_understack.trunk.fetch_network_node_trunk_id",
             return_value=str(trunk_id),
         )
         # Mock to ensure the function returns early and doesn't call this
@@ -357,7 +357,7 @@ class TestCheckSubportsSegmentationId:
     ):
         # Mock fetch_network_node_trunk_id to return a different trunk ID
         mocker.patch(
-            "neutron_understack.utils.fetch_network_node_trunk_id",
+            "neutron_understack.trunk.fetch_network_node_trunk_id",
             return_value="different-trunk-id",
         )
         allowed_ranges = mocker.patch(
@@ -380,7 +380,7 @@ class TestCheckSubportsSegmentationId:
     ):
         # Mock fetch_network_node_trunk_id to return a different trunk ID
         mocker.patch(
-            "neutron_understack.utils.fetch_network_node_trunk_id",
+            "neutron_understack.trunk.fetch_network_node_trunk_id",
             return_value="different-trunk-id",
         )
         mocker.patch(
