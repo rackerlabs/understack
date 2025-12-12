@@ -11,7 +11,7 @@ requires-python = "~=3.10.0"
 readme = "README.md"
 license = "MIT"
 dependencies = [
-    "ironic>=32.0,<33",
+    "ironic>=33,<34",
     "pyyaml~=6.0",
     "understack-flavor-matcher",
 ]
