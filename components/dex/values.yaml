@@ -139,8 +139,4 @@ envVars:
         key: client-secret
 
 ingress:
-  enabled: true
-  className: nginx
-  annotations:
-    cert-manager.io/cluster-issuer: understack-cluster-issuer
-    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+  enabled: false
