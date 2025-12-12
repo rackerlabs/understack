@@ -5,10 +5,68 @@ from unittest.mock import patch
 
 import pytest
 
+from understack_workflows.oslo_event.ironic_node import IronicNodeEvent
 from understack_workflows.oslo_event.ironic_node import IronicProvisionSetEvent
 from understack_workflows.oslo_event.ironic_node import create_volume_connector
 from understack_workflows.oslo_event.ironic_node import handle_provision_end
 from understack_workflows.oslo_event.ironic_node import instance_nqn
+
+
+class TestIronicNodeEvent:
+    """Test cases for IronicNodeEvent class."""
+
+    def test_from_event_dict_success(self):
+        """Test successful node event parsing."""
+        event_data = {
+            "payload": {
+                "ironic_object.data": {
+                    "uuid": "test-uuid-123",
+                    "name": "test-node",
+                    "provision_state": "available",
+                }
+            }
+        }
+
+        event = IronicNodeEvent.from_event_dict(event_data)
+
+        assert event.uuid == "test-uuid-123"
+
+    def test_from_event_dict_minimal_data(self):
+        """Test parsing with only required UUID field."""
+        event_data = {"payload": {"ironic_object.data": {"uuid": "minimal-uuid"}}}
+
+        event = IronicNodeEvent.from_event_dict(event_data)
+
+        assert event.uuid == "minimal-uuid"
+
+    def test_from_event_dict_no_payload(self):
+        """Test event parsing with missing payload."""
+        event_data = {}
+
+        with pytest.raises(ValueError, match="Invalid event. No 'payload'"):
+            IronicNodeEvent.from_event_dict(event_data)
+
+    def test_from_event_dict_no_ironic_object_data(self):
+        """Test event parsing with missing ironic_object.data."""
+        event_data = {"payload": {"other_field": "value"}}
+
+        with pytest.raises(
+            ValueError, match="Invalid event. No 'ironic_object.data' in payload"
+        ):
+            IronicNodeEvent.from_event_dict(event_data)
+
+    def test_from_event_dict_missing_uuid(self):
+        """Test event parsing with missing UUID field."""
+        event_data = {"payload": {"ironic_object.data": {"name": "test-node"}}}
+
+        with pytest.raises(KeyError):  # KeyError when uuid is missing
+            IronicNodeEvent.from_event_dict(event_data)
+
+    def test_direct_initialization(self):
+        """Test direct initialization of IronicNodeEvent."""
+        event = IronicNodeEvent(uuid="direct-uuid")
+
+        assert event.uuid == "direct-uuid"
 
 
 class TestIronicProvisionSetEvent:
@@ -124,6 +182,7 @@ class TestHandleProvisionEnd:
                     "lessee": uuid.uuid4(),
                     "event": "provision_end",
                     "uuid": uuid.uuid4(),
+                    "previous_provision_state": "deploying",
                 }
             },
         }
@@ -264,9 +323,26 @@ class TestHandleProvisionEnd:
         mock_server.metadata = {"other_key": "value"}
         mock_conn.get_server_by_id.return_value = mock_server
 
-        # This should raise a KeyError when accessing metadata["storage"]
-        with pytest.raises(KeyError):
-            handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
+        # When storage key is missing, it should treat it as "not-set"
+        result = handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
+
+        assert result == 0
+        ironic_data = valid_event_data["payload"]["ironic_object.data"]
+        instance_uuid = ironic_data["instance_uuid"]
+        node_uuid = ironic_data["uuid"]
+
+        mock_conn.get_server_by_id.assert_called_once_with(instance_uuid)
+
+        # Check save_output calls - storage should be "not-set" when key is missing
+        expected_calls = [
+            ("storage", "not-set"),
+            ("node_uuid", str(node_uuid)),
+            ("instance_uuid", str(instance_uuid)),
+        ]
+        actual_calls = [call.args for call in mock_save_output.call_args_list]
+        assert actual_calls == expected_calls
+
+        mock_create_connector.assert_called_once()
 
     @patch("understack_workflows.oslo_event.ironic_node.is_project_svm_enabled")
     def test_handle_provision_end_invalid_event_data(

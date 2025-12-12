@@ -80,7 +80,7 @@ class IronicPortgroupEvent:
 
 
 def handle_portgroup_create_update(
-    _conn: Connection, nautobot: Nautobot, event_data: dict
+    conn: Connection, nautobot: Nautobot, event_data: dict
 ) -> int:
     """Sync Ironic Portgroup to Nautobot LAG interface."""
     event = IronicPortgroupEvent.from_event_dict(event_data)
@@ -138,11 +138,162 @@ def handle_portgroup_create_update(
         logger.exception("Failed to update LAG interface %s", event.uuid)
         return 1
 
+    # Associate member ports with the LAG interface
+    if _associate_member_ports(conn, nautobot, event, lag_intf) != 0:
+        logger.warning(
+            "Failed to associate member ports with LAG %s, but LAG was created/updated",
+            event.uuid,
+        )
+        # Don't fail the entire operation if member association fails
+        # The LAG interface itself was successfully created/updated
+
     return 0
 
 
+def _associate_member_ports(
+    conn: Connection, nautobot: Nautobot, event: IronicPortgroupEvent, lag_intf
+) -> int:
+    """Associate member ports with the LAG interface in Nautobot.
+
+    Queries Ironic for all ports that belong to this portgroup and updates
+    their corresponding Nautobot interfaces to set the lag field.
+
+    Args:
+        conn: OpenStack connection for querying Ironic
+        nautobot: Nautobot API client
+        event: Portgroup event data
+        lag_intf: The LAG interface in Nautobot
+
+    Returns:
+        0 on success, 1 on failure
+    """
+    logger.debug("Associating member ports with LAG %s", event.uuid)
+
+    try:
+        # Query Ironic for ports belonging to this portgroup
+        # Using the baremetal API from openstacksdk
+        member_ports = list(
+            conn.baremetal.ports(details=True, portgroup_uuid=event.uuid)  # pyright: ignore
+        )
+
+        if not member_ports:
+            logger.debug("No member ports found for portgroup %s", event.uuid)
+            return 0
+
+        logger.info(
+            "Found %d member port(s) for portgroup %s", len(member_ports), event.uuid
+        )
+
+        # Update each member interface in Nautobot
+        for port in member_ports:
+            port_uuid = port.id if hasattr(port, "id") else port.uuid
+            logger.debug("Associating port %s with LAG %s", port_uuid, event.uuid)
+
+            # Find the interface in Nautobot
+            member_intf = nautobot.dcim.interfaces.get(id=port_uuid)
+            if not member_intf:
+                logger.warning(
+                    "Member interface %s not found in Nautobot, skipping", port_uuid
+                )
+                continue
+
+            # Set the lag field to associate with the LAG interface
+            member_intf.lag = lag_intf.id  # type: ignore
+            try:
+                cast(Record, member_intf).save()
+                logger.debug(
+                    "Associated interface %s with LAG %s", port_uuid, event.uuid
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to associate interface %s with LAG %s",
+                    port_uuid,
+                    event.uuid,
+                )
+                # Continue with other ports even if one fails
+
+        logger.info("Successfully associated member ports with LAG %s", event.uuid)
+        return 0
+
+    except Exception:
+        logger.exception(
+            "Failed to query or associate member ports for LAG %s", event.uuid
+        )
+        return 1
+
+
+def _clear_member_port_associations(
+    conn: Connection, nautobot: Nautobot, event: IronicPortgroupEvent
+) -> int:
+    """Clear LAG associations from member ports in Nautobot.
+
+    Queries Ironic for all ports that belong to this portgroup and clears
+    their lag field in Nautobot, preserving the interfaces themselves.
+
+    Args:
+        conn: OpenStack connection for querying Ironic
+        nautobot: Nautobot API client
+        event: Portgroup event data
+
+    Returns:
+        0 on success, 1 on failure
+    """
+    logger.debug("Clearing member port associations for LAG %s", event.uuid)
+
+    try:
+        # Query Ironic for ports belonging to this portgroup
+        member_ports = list(
+            conn.baremetal.ports(details=True, portgroup_uuid=event.uuid)  # pyright: ignore
+        )
+
+        if not member_ports:
+            logger.debug("No member ports found for portgroup %s", event.uuid)
+            return 0
+
+        logger.info(
+            "Found %d member port(s) to disassociate from portgroup %s",
+            len(member_ports),
+            event.uuid,
+        )
+
+        # Clear lag field from each member interface in Nautobot
+        for port in member_ports:
+            port_uuid = port.id if hasattr(port, "id") else port.uuid
+            logger.debug("Clearing LAG association for port %s", port_uuid)
+
+            # Find the interface in Nautobot
+            member_intf = nautobot.dcim.interfaces.get(id=port_uuid)
+            if not member_intf:
+                logger.debug(
+                    "Member interface %s not found in Nautobot, skipping", port_uuid
+                )
+                continue
+
+            # Clear the lag field
+            member_intf.lag = None  # type: ignore
+            try:
+                cast(Record, member_intf).save()
+                logger.debug("Cleared LAG association for interface %s", port_uuid)
+            except Exception:
+                logger.exception(
+                    "Failed to clear LAG association for interface %s", port_uuid
+                )
+                # Continue with other ports even if one fails
+
+        logger.info(
+            "Successfully cleared member port associations for LAG %s", event.uuid
+        )
+        return 0
+
+    except Exception:
+        logger.exception(
+            "Failed to query or clear member port associations for LAG %s", event.uuid
+        )
+        return 1
+
+
 def handle_portgroup_delete(
-    _conn: Connection, nautobot: Nautobot, event_data: dict
+    conn: Connection, nautobot: Nautobot, event_data: dict
 ) -> int:
     """Handle Ironic Portgroup delete event."""
     event = IronicPortgroupEvent.from_event_dict(event_data)
@@ -156,6 +307,15 @@ def handle_portgroup_delete(
             "LAG interface %s not found in Nautobot, nothing to delete", event.uuid
         )
         return 0
+
+    # Clear member port associations before deleting the LAG
+    if _clear_member_port_associations(conn, nautobot, event) != 0:
+        logger.warning(
+            "Failed to clear member port associations for LAG %s, "
+            "continuing with deletion",
+            event.uuid,
+        )
+        # Don't fail the entire operation if clearing associations fails
 
     # Delete the LAG interface
     logger.info("Deleting LAG interface %s from Nautobot", event.uuid)

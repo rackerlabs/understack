@@ -155,6 +155,9 @@ class TestHandlePortgroupCreateUpdate:
         created_lag.id = "629b8821-6c0a-4a6f-9312-109fe8a0931f"
         mock_nautobot.dcim.interfaces.create.return_value = created_lag
 
+        # Mock no member ports
+        mock_conn.baremetal.ports.return_value = []
+
         # Test the function
         result = handle_portgroup_create_update(
             mock_conn, mock_nautobot, portgroup_create_event_data
@@ -180,6 +183,11 @@ class TestHandlePortgroupCreateUpdate:
         assert call_args["mac_address"] == "52:54:00:aa:bb:cc"
         assert call_args["description"] == "Bond mode: active-backup"
 
+        # Verify member ports were queried
+        mock_conn.baremetal.ports.assert_called_once_with(
+            details=True, portgroup_uuid="629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        )
+
     def test_update_portgroup(
         self, mock_conn, mock_nautobot, portgroup_update_event_data
     ):
@@ -188,6 +196,9 @@ class TestHandlePortgroupCreateUpdate:
         existing_lag = Mock()
         existing_lag.id = "629b8821-6c0a-4a6f-9312-109fe8a0931f"
         mock_nautobot.dcim.interfaces.get.return_value = existing_lag
+
+        # Mock no member ports
+        mock_conn.baremetal.ports.return_value = []
 
         # Test the function
         result = handle_portgroup_create_update(
@@ -294,6 +305,9 @@ class TestHandlePortgroupCreateUpdate:
 
         mock_nautobot.dcim.interfaces.create.side_effect = error
 
+        # Mock no member ports
+        mock_conn.baremetal.ports.return_value = []
+
         # Test the function
         result = handle_portgroup_create_update(
             mock_conn, mock_nautobot, portgroup_create_event_data
@@ -310,6 +324,100 @@ class TestHandlePortgroupCreateUpdate:
 
         # Verify the existing interface was updated
         existing_lag.save.assert_called_once()
+
+    def test_create_portgroup_with_member_ports(
+        self, mock_conn, mock_nautobot, portgroup_create_event_data
+    ):
+        """Test creating portgroup with member ports associates them correctly."""
+        # Mock no existing LAG interface
+        mock_nautobot.dcim.interfaces.get.return_value = None
+
+        # Mock LAG interface creation
+        created_lag = Mock()
+        created_lag.id = "629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        mock_nautobot.dcim.interfaces.create.return_value = created_lag
+
+        # Mock member ports from Ironic
+        member_port1 = Mock()
+        member_port1.id = "port-uuid-1"
+        member_port1.uuid = "port-uuid-1"
+        member_port2 = Mock()
+        member_port2.id = "port-uuid-2"
+        member_port2.uuid = "port-uuid-2"
+        mock_conn.baremetal.ports.return_value = [member_port1, member_port2]
+
+        # Mock member interfaces in Nautobot
+        member_intf1 = Mock()
+        member_intf1.id = "port-uuid-1"
+        member_intf2 = Mock()
+        member_intf2.id = "port-uuid-2"
+
+        # Setup get() to return different interfaces based on call
+        def get_interface_side_effect(id):
+            if id == "629b8821-6c0a-4a6f-9312-109fe8a0931f":
+                return None  # LAG doesn't exist yet
+            elif id == "port-uuid-1":
+                return member_intf1
+            elif id == "port-uuid-2":
+                return member_intf2
+            return None
+
+        mock_nautobot.dcim.interfaces.get.side_effect = get_interface_side_effect
+
+        # Test the function
+        result = handle_portgroup_create_update(
+            mock_conn, mock_nautobot, portgroup_create_event_data
+        )
+
+        # Verify result
+        assert result == 0
+
+        # Verify member ports were queried from Ironic
+        mock_conn.baremetal.ports.assert_called_once_with(
+            details=True, portgroup_uuid="629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        )
+
+        # Verify member interfaces were associated with LAG
+        assert member_intf1.lag == "629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        assert member_intf2.lag == "629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        member_intf1.save.assert_called_once()
+        member_intf2.save.assert_called_once()
+
+    def test_create_portgroup_member_port_not_in_nautobot(
+        self, mock_conn, mock_nautobot, portgroup_create_event_data
+    ):
+        """Test creating portgroup when member port doesn't exist in Nautobot."""
+        # Mock no existing LAG interface
+        mock_nautobot.dcim.interfaces.get.return_value = None
+
+        # Mock LAG interface creation
+        created_lag = Mock()
+        created_lag.id = "629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        mock_nautobot.dcim.interfaces.create.return_value = created_lag
+
+        # Mock member port from Ironic
+        member_port = Mock()
+        member_port.id = "port-uuid-1"
+        member_port.uuid = "port-uuid-1"
+        mock_conn.baremetal.ports.return_value = [member_port]
+
+        # Mock member interface not found in Nautobot
+        def get_interface_side_effect(id):
+            if id == "629b8821-6c0a-4a6f-9312-109fe8a0931f":
+                return None  # LAG doesn't exist yet
+            elif id == "port-uuid-1":
+                return None  # Member interface not found
+            return None
+
+        mock_nautobot.dcim.interfaces.get.side_effect = get_interface_side_effect
+
+        # Test the function - should succeed even if member not found
+        result = handle_portgroup_create_update(
+            mock_conn, mock_nautobot, portgroup_create_event_data
+        )
+
+        # Verify result is still success (LAG created, member skipped)
+        assert result == 0
 
 
 class TestHandlePortgroupDelete:
@@ -335,6 +443,9 @@ class TestHandlePortgroupDelete:
         existing_lag.id = "629b8821-6c0a-4a6f-9312-109fe8a0931f"
         mock_nautobot.dcim.interfaces.get.return_value = existing_lag
 
+        # Mock no member ports
+        mock_conn.baremetal.ports.return_value = []
+
         # Test the function
         result = handle_portgroup_delete(
             mock_conn, mock_nautobot, portgroup_delete_event_data
@@ -342,6 +453,11 @@ class TestHandlePortgroupDelete:
 
         # Verify result
         assert result == 0
+
+        # Verify member ports were queried
+        mock_conn.baremetal.ports.assert_called_once_with(
+            details=True, portgroup_uuid="629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        )
 
         # Verify LAG interface was deleted
         existing_lag.delete.assert_called_once()
@@ -361,6 +477,9 @@ class TestHandlePortgroupDelete:
         # Verify result (success - nothing to delete)
         assert result == 0
 
+        # Verify member ports were NOT queried (LAG doesn't exist)
+        mock_conn.baremetal.ports.assert_not_called()
+
     def test_delete_portgroup_nautobot_error(
         self, mock_conn, mock_nautobot, portgroup_delete_event_data
     ):
@@ -370,6 +489,9 @@ class TestHandlePortgroupDelete:
         existing_lag.delete.side_effect = Exception("Nautobot API error")
         mock_nautobot.dcim.interfaces.get.return_value = existing_lag
 
+        # Mock no member ports
+        mock_conn.baremetal.ports.return_value = []
+
         # Test the function
         result = handle_portgroup_delete(
             mock_conn, mock_nautobot, portgroup_delete_event_data
@@ -377,3 +499,63 @@ class TestHandlePortgroupDelete:
 
         # Verify error result
         assert result == 1
+
+    def test_delete_portgroup_with_member_ports(
+        self, mock_conn, mock_nautobot, portgroup_delete_event_data
+    ):
+        """Test deleting portgroup clears member port associations."""
+        # Mock existing LAG interface
+        existing_lag = Mock()
+        existing_lag.id = "629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        mock_nautobot.dcim.interfaces.get.return_value = existing_lag
+
+        # Mock member ports from Ironic
+        member_port1 = Mock()
+        member_port1.id = "port-uuid-1"
+        member_port1.uuid = "port-uuid-1"
+        member_port2 = Mock()
+        member_port2.id = "port-uuid-2"
+        member_port2.uuid = "port-uuid-2"
+        mock_conn.baremetal.ports.return_value = [member_port1, member_port2]
+
+        # Mock member interfaces in Nautobot
+        member_intf1 = Mock()
+        member_intf1.id = "port-uuid-1"
+        member_intf1.lag = "629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        member_intf2 = Mock()
+        member_intf2.id = "port-uuid-2"
+        member_intf2.lag = "629b8821-6c0a-4a6f-9312-109fe8a0931f"
+
+        # Setup get() to return different interfaces based on call
+        def get_interface_side_effect(id):
+            if id == "629b8821-6c0a-4a6f-9312-109fe8a0931f":
+                return existing_lag
+            elif id == "port-uuid-1":
+                return member_intf1
+            elif id == "port-uuid-2":
+                return member_intf2
+            return None
+
+        mock_nautobot.dcim.interfaces.get.side_effect = get_interface_side_effect
+
+        # Test the function
+        result = handle_portgroup_delete(
+            mock_conn, mock_nautobot, portgroup_delete_event_data
+        )
+
+        # Verify result
+        assert result == 0
+
+        # Verify member ports were queried from Ironic
+        mock_conn.baremetal.ports.assert_called_once_with(
+            details=True, portgroup_uuid="629b8821-6c0a-4a6f-9312-109fe8a0931f"
+        )
+
+        # Verify member interfaces had LAG association cleared
+        assert member_intf1.lag is None
+        assert member_intf2.lag is None
+        member_intf1.save.assert_called_once()
+        member_intf2.save.assert_called_once()
+
+        # Verify LAG interface was deleted
+        existing_lag.delete.assert_called_once()
