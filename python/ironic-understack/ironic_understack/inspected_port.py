@@ -21,12 +21,12 @@ class InspectedPort:
 
     @property
     def parsed_name(self) -> dict[str, str]:
-        parts = self.switch_system_name.split(".", maxsplit=1)
-        if len(parts) != 2:
+        parts = self.switch_system_name.split(".")
+        if len(parts) < 2:
             raise ValueError(
                 "Failed to parse switch hostname - expecting name.dc in %s", self
             )
-        switch_name, data_center_name = parts
+        switch_name, data_center_name = parts[0:2]
 
         parts = switch_name.rsplit("-", maxsplit=1)
         if len(parts) != 2:

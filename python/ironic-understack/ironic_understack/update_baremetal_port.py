@@ -1,6 +1,5 @@
 from typing import Any
 
-import openstack
 from ironic import objects
 from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
@@ -35,7 +34,7 @@ class UpdateBaremetalPortsHook(base.InspectionHook):
 
         - local_link_info.port_id (e.g. "Ethernet1/1")
         - local_link_info.switch_id (e.g. "aa:bb:cc:dd:ee:ff")
-        - local_link_info.switch_info (e.g. "a1-1-1.ord1")
+        - local_link_info.switch_info (e.g. "a1-1-1.ord1.rackspace.net")
         - physical_network (e.g. "a1-1-network")
 
         We also add or remove node "traits" based on the inventory data.  We
@@ -73,12 +72,19 @@ def _parse_plugin_data(plugin_data: dict) -> list[InspectedPort]:
         InspectedPort(
             mac_address=mac[name],
             name=name,
-            switch_system_name=str(lldp["switch_system_name"]).lower(),
+            switch_system_name=_normalise_switch_name(lldp["switch_system_name"]),
             switch_chassis_id=str(lldp["switch_chassis_id"]).lower(),
             switch_port_id=str(lldp["switch_port_id"]),
         )
         for name, lldp in plugin_data["parsed_lldp"].items()
     ]
+
+
+def _normalise_switch_name(name: str) -> str:
+    suffix = ".rackspace.net"
+    name = str(name).lower()
+    name = name if name.endswith(suffix) else name + suffix
+    return name
 
 
 def _update_port_attrs(task, ports_by_mac, vlan_groups, node_uuid):
@@ -174,31 +180,14 @@ def _set_node_traits(task, vlan_groups: set[str]):
     required_traits = {_trait_name(x) for x in vlan_groups if x}
     existing_traits = set(node.traits.get_trait_names()).intersection(our_traits)
 
-    traits_to_remove = sorted(existing_traits.difference(required_traits))
-    traits_to_add = sorted(required_traits.difference(existing_traits))
-
     LOG.debug(
         "Checking traits for node %s: existing=%s required=%s",
         node.uuid,
         existing_traits,
         required_traits,
     )
-
-    for trait in traits_to_remove:
-        LOG.debug("Removing trait %s from node %s", trait, node.uuid)
-        try:
-            node.traits.destroy(trait)
-        except openstack.exceptions.NotFoundException:
-            pass
-
-    if traits_to_add:
-        LOG.debug("Adding traits %s to node %s", traits_to_add, node.uuid)
-
-        node.traits = objects.TraitList.create(
-            task.context, node.id, list(traits_to_add)
-        )
-
-    if traits_to_add or traits_to_remove:
+    if existing_traits != required_traits:
+        objects.TraitList.create(task.context, task.node.id, required_traits)
         node.save()
 
 
