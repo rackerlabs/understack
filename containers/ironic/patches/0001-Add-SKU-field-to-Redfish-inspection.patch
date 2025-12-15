@@ -1,0 +1,87 @@
+From 217030928bccd1ea08e81dc2a97b27c98c721d70 Mon Sep 17 00:00:00 2001
+From: Nidhi Rai <nidhi.rai94@gmail.com>
+Date: Thu, 11 Sep 2025 17:05:22 +0530
+Subject: [PATCH] Add SKU field to Redfish inspection
+
+Collect SKU (Service Tag) from Redfish ComputerSystem
+and include it in system_vendor inventory data.
+
+This enables downstream tools like Nautobot to access
+the Dell Service Tag or other vendor SKU information
+during hardware inspection.
+
+The change:
+- Safely checks for SKU attribute existence
+- Adds SKU to system_vendor dictionary
+- Handles missing SKU gracefully
+- Includes unit test coverage
+
+Change-Id: I6623fd33b356d6149001c43a7179297a7c8568d8
+Signed-off-by: Nidhi Rai <nidhi.rai94@gmail.com>
+---
+ ironic/drivers/modules/redfish/inspect.py            |  6 ++++++
+ .../unit/drivers/modules/redfish/test_inspect.py     | 12 ++++++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/ironic/drivers/modules/redfish/inspect.py b/ironic/drivers/modules/redfish/inspect.py
+index eb0345fd0..59c3ce2b0 100644
+--- a/ironic/drivers/modules/redfish/inspect.py
++++ b/ironic/drivers/modules/redfish/inspect.py
+@@ -158,6 +158,12 @@ class RedfishInspect(base.InspectInterface):
+         if system.manufacturer:
+             system_vendor['manufacturer'] = str(system.manufacturer)
+ 
++        if system.sku:
++            system_vendor['sku'] = str(system.sku)
++
++        if system.uuid:
++            system_vendor['system_uuid'] = str(system.uuid)
++
+         if system_vendor:
+             inventory['system_vendor'] = system_vendor
+ 
+diff --git a/ironic/tests/unit/drivers/modules/redfish/test_inspect.py b/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
+index 798e4fe87..c81fb3934 100644
+--- a/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
++++ b/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
+@@ -139,6 +139,10 @@ class RedfishInspectTestCase(db_base.DbTestCase):
+ 
+         system_mock.manufacturer = 'Sushy Emulator'
+ 
++        system_mock.sku = 'DELL123456'
++
++        system_mock.uuid = '12345678-1234-1234-1234-12345'
++
+         return system_mock
+ 
+     def test_get_properties(self):
+@@ -185,12 +189,18 @@ class RedfishInspectTestCase(db_base.DbTestCase):
+         expected_product_name = 'System1'
+         expected_serial_number = '123456'
+         expected_manufacturer = 'Sushy Emulator'
++        expected_sku = 'DELL123456'
++        expected_system_uuid = '12345678-1234-1234-1234-12345'
+         self.assertEqual(expected_product_name,
+                          system_vendor['product_name'])
+         self.assertEqual(expected_serial_number,
+                          system_vendor['serial_number'])
+         self.assertEqual(expected_manufacturer,
+                          system_vendor['manufacturer'])
++        self.assertEqual(expected_sku,
++                         system_vendor['sku'])
++        self.assertEqual(expected_system_uuid,
++                         system_vendor['system_uuid'])
+ 
+         expected_interfaces = [{'mac_address': '00:11:22:33:44:55',
+                                 'name': 'NIC.Integrated.1-1'},
+@@ -700,6 +710,8 @@ class RedfishInspectTestCase(db_base.DbTestCase):
+         system_mock.name = None
+         system_mock.serial_number = None
+         system_mock.manufacturer = None
++        system_mock.sku = None
++        system_mock.uuid = None
+ 
+         with task_manager.acquire(self.context, self.node.uuid,
+                                   shared=True) as task:
+-- 
+2.50.1 (Apple Git-155)
