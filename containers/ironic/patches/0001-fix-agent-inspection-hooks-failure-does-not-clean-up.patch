@@ -1,0 +1,57 @@
+From 30113a4c23e0aab9c108b0875f5a9099650a7552 Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Fri, 12 Dec 2025 15:23:57 -0600
+Subject: [PATCH] fix: agent inspection hooks failure does not clean up
+
+When the using the agent inspector interface and an exception happens
+during execution of the hook, the node is not cleaned up resulting in
+stale Neutron ports and ramdisk files.
+
+Closes-Bug: 2135265
+Change-Id: I69ceec12fc0beea586176a768d864a22261cdb93
+Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
+---
+ ironic/drivers/modules/inspector/agent.py           | 13 ++++++++++---
+ ...nspect-hooks-cleanup-error-c8901a7f8ad0dfd3.yaml |  7 +++++++
+ 2 files changed, 17 insertions(+), 3 deletions(-)
+ create mode 100644 releasenotes/notes/agent-inspect-hooks-cleanup-error-c8901a7f8ad0dfd3.yaml
+
+diff --git a/ironic/drivers/modules/inspector/agent.py b/ironic/drivers/modules/inspector/agent.py
+index 6f6555648..d14247d98 100644
+--- a/ironic/drivers/modules/inspector/agent.py
++++ b/ironic/drivers/modules/inspector/agent.py
+@@ -84,9 +84,16 @@ class AgentInspect(common.Common):
+         :param inventory: hardware inventory from the node.
+         :param plugin_data: optional plugin-specific data.
+         """
+-        # Run the inspection hooks
+-        inspect_utils.run_inspection_hooks(task, inventory, plugin_data,
+-                                           self.hooks, _store_logs)
++
++        try:
++            # Run the inspection hooks
++            inspect_utils.run_inspection_hooks(task, inventory, plugin_data,
++                                               self.hooks, _store_logs)
++        except Exception as exc:
++            error = _("failed to run inspection hooks: %s") % exc
++            common.inspection_error_handler(task, error, raise_exc=True,
++                                            clean_up=True)
++
+         if CONF.agent.deploy_logs_collect == 'always':
+             _store_logs(plugin_data, task.node)
+         common.clean_up(task, finish=False, always_power_off=True)
+diff --git a/releasenotes/notes/agent-inspect-hooks-cleanup-error-c8901a7f8ad0dfd3.yaml b/releasenotes/notes/agent-inspect-hooks-cleanup-error-c8901a7f8ad0dfd3.yaml
+new file mode 100644
+index 000000000..7ec3e2dd4
+--- /dev/null
++++ b/releasenotes/notes/agent-inspect-hooks-cleanup-error-c8901a7f8ad0dfd3.yaml
+@@ -0,0 +1,7 @@
++---
++fixes:
++  - |
++    [`Bug 2135265 <https://bugs.launchpad.net/ironic/+bug/2135265>`_]
++    Fixes an issue where an exception in one of the inspection hooks when
++    using the agent inspector interface would result in the node not being
++    cleaned up.
+-- 
+2.51.2
