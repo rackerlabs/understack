@@ -7,7 +7,7 @@ spec:
   restartPolicy: Always
   containers:
     - name: "image-ks-service-registration"
-      image: ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy
+      image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
       imagePullPolicy: IfNotPresent
       command:
         - sleep

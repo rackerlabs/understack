@@ -7,7 +7,7 @@ name = "ironic-understack"
 version = "0.0.0"
 description = "Ironic hooks for Understack"
 authors = [{ name = "Marek Skrobacki", email = "marek.skrobacki@rackspace.co.uk" }]
-requires-python = "~=3.10.0"
+requires-python = "~=3.12.0"
 readme = "README.md"
 license = "MIT"
 dependencies = [
@@ -55,7 +55,7 @@ testpaths = [
 [tool.ruff]
 # use our default and override anything we need specifically
 extend = "../pyproject.toml"
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 "ironic_understack/tests/*.py" = [

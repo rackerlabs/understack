@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM quay.io/airshipit/octavia:${OPENSTACK_VERSION}-ubuntu_jammy AS build
+FROM quay.io/airshipit/octavia:${OPENSTACK_VERSION}-ubuntu_noble AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         ovsdbapp
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM quay.io/airshipit/octavia:${OPENSTACK_VERSION}-ubuntu_jammy AS final
+FROM quay.io/airshipit/octavia:${OPENSTACK_VERSION}-ubuntu_noble AS final
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
