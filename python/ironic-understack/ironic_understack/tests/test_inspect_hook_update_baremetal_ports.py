@@ -3,7 +3,9 @@ import logging
 import ironic.objects
 from oslo_utils import uuidutils
 
-from ironic_understack.update_baremetal_port import UpdateBaremetalPortsHook
+from ironic_understack.inspect_hook_update_baremetal_ports import (
+    InspectHookUpdateBaremetalPorts,
+)
 
 # load some metaprgramming normally taken care of during Ironic initialization:
 ironic.objects.register_all()
@@ -78,18 +80,20 @@ def test_with_valid_data(mocker, caplog):
     )
 
     mocker.patch(
-        "ironic_understack.update_baremetal_port.ironic_ports_for_node",
+        "ironic_understack.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
         return_value=[mock_port],
     )
     mocker.patch(
-        "ironic_understack.update_baremetal_port.CONF.ironic_understack.switch_name_vlan_group_mapping",
+        "ironic_understack.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
         MAPPING,
     )
-    mocker.patch("ironic_understack.update_baremetal_port.objects.TraitList.create")
+    mocker.patch(
+        "ironic_understack.inspect_hook_update_baremetal_ports.objects.TraitList.create"
+    )
 
     mock_traits.get_trait_names.return_value = ["CUSTOM_BMC_SWITCH", "bar"]
 
-    UpdateBaremetalPortsHook().__call__(mock_task, _INVENTORY, _PLUGIN_DATA)
+    InspectHookUpdateBaremetalPorts().__call__(mock_task, _INVENTORY, _PLUGIN_DATA)
 
     assert mock_port.local_link_connection == {
         "port_id": "Ethernet1/18",

@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from ironic import objects
@@ -13,7 +14,7 @@ from ironic_understack.ironic_wrapper import ironic_ports_for_node
 LOG = logging.getLogger(__name__)
 
 
-class UpdateBaremetalPortsHook(base.InspectionHook):
+class InspectHookUpdateBaremetalPorts(base.InspectionHook):
     """Hook to update ports according to LLDP data."""
 
     # "validate-interfaces" provides the all_interfaces field in plugin_data.
@@ -93,7 +94,7 @@ def _update_port_attrs(task, ports_by_mac, vlan_groups, node_uuid):
         if inspected_port:
             vlan_group = vlan_groups.get(inspected_port.switch_system_name)
             LOG.info(
-                "Port=%(uuid)s Node=%(node)s is connected " "%(lldp)s, %(vlan_group)s",
+                "Port=%(uuid)s Node=%(node)s is connected %(lldp)s, %(vlan_group)s",
                 {
                     "uuid": baremetal_port.uuid,
                     "node": node_uuid,
@@ -173,20 +174,24 @@ def _set_node_traits(task, vlan_groups: set[str]):
     connections.
     """
     node = task.node
-    all_possible_suffixes = set(
-        CONF.ironic_understack.switch_name_vlan_group_mapping.values()
-    )
-    our_traits = {_trait_name(x) for x in all_possible_suffixes if x}
-    required_traits = {_trait_name(x) for x in vlan_groups if x}
-    existing_traits = set(node.traits.get_trait_names()).intersection(our_traits)
+    existing_traits = set(node.traits.get_trait_names())
+    vlan_group_traits = {_trait_name(x) for x in vlan_groups if x}
+    irrelevant_existing_traits = {x for x in existing_traits if not _is_our_trait(x)}
+    required_traits = irrelevant_existing_traits.intersection(vlan_group_traits)
 
-    LOG.debug(
-        "Checking traits for node %s: existing=%s required=%s",
-        node.uuid,
-        existing_traits,
-        required_traits,
-    )
-    if existing_traits != required_traits:
+    if existing_traits == required_traits:
+        LOG.debug(
+            "Node %s traits %s are all present and correct",
+            node.uuid,
+            vlan_group_traits,
+        )
+    else:
+        LOG.info(
+            "Updating traits for node %s from %s to %s",
+            node.uuid,
+            existing_traits,
+            required_traits,
+        )
         objects.TraitList.create(task.context, task.node.id, required_traits)
         node.save()
 
@@ -194,3 +199,7 @@ def _set_node_traits(task, vlan_groups: set[str]):
 def _trait_name(vlan_group_name: str) -> str:
     suffix = vlan_group_name.upper().split("-")[-1]
     return f"CUSTOM_{suffix}_SWITCH"
+
+
+def _is_our_trait(name: str) -> bool:
+    return bool(re.match(r"^CUSTOM_[A-Z0-9]+_SWITCH$", name))
