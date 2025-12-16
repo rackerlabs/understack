@@ -7,7 +7,7 @@ name = "neutron-understack"
 version = "0.1.0"
 description = "Undercloud's ML2 driver for neutron"
 authors = [{ name = "Understack Developers" }]
-requires-python = "~=3.10.0"
+requires-python = "~=3.12.0"
 readme = "README.rst"
 license = "Apache-2.0"
 classifiers = [
@@ -21,7 +21,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
     "requests>=2,<3",
@@ -59,7 +59,7 @@ filterwarnings = "ignore::DeprecationWarning"
 [tool.ruff]
 # use our default and override anything we need specifically
 extend = "../pyproject.toml"
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 "neutron_understack/tests/*.py" = [

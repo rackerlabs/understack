@@ -50,7 +50,7 @@ Now install or upgrade Keystone.
 helm --namespace openstack \
   install \
   keystone osh/keystone \
-  -f components/openstack-2024.1-jammy.yaml \
+  -f components/images-openstack.yaml \
   -f components/keystone/values.yaml \
   -f secret-openstack.yaml
 ```

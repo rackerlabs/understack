@@ -22,7 +22,7 @@ conductor:
     # it is only necessary because the above pxe is disabled, its init
     # creates this path
     - name: create-tftpboot
-      image: ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy
+      image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
       imagePullPolicy: IfNotPresent
       command: [bash]
       args:

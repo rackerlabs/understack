@@ -38,7 +38,7 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: ks-user-baremetal
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2-ubuntu_jammy
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
         imagePullPolicy: Always
         command:
         - /bin/bash

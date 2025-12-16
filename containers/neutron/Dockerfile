@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM quay.io/airshipit/neutron:${OPENSTACK_VERSION}-ubuntu_jammy AS build
+FROM quay.io/airshipit/neutron:${OPENSTACK_VERSION}-ubuntu_noble AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -14,6 +14,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         /src/neutron-understack
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM quay.io/airshipit/neutron:${OPENSTACK_VERSION}-ubuntu_jammy AS final
+FROM quay.io/airshipit/neutron:${OPENSTACK_VERSION}-ubuntu_noble AS final
 
 COPY --from=build --link /var/lib/openstack /var/lib/openstack

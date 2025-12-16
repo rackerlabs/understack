@@ -26,7 +26,7 @@ on:
         required: false
         type: string
         default: 'latest'
-        description: 'Tag name to use for latest (e.g., "latest" or "2025.2-ubuntu_jammy")'
+        description: 'Tag name to use for latest (e.g., "latest" or "2025.2")'
 
 jobs:
   build:

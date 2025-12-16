@@ -43,4 +43,4 @@ jobs:
       container_name: ${{ matrix.project }}
       dockerfile_path: containers/${{ matrix.project }}/Dockerfile
       build_args: OPENSTACK_VERSION=2025.2
-      latest_name: 2025.2-ubuntu_jammy
+      latest_name: "2025.2"

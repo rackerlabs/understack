@@ -173,7 +173,7 @@ spec:
           - name: operation
           - name: node_id
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.1-ubuntu_jammy
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
         command:
           - openstack
         args:
@@ -204,7 +204,7 @@ spec:
           - name: value
           - name: obj_id
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.1-ubuntu_jammy
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
         command:
           - openstack
         args:
@@ -234,7 +234,7 @@ spec:
           - name: object_ref
           - name: param
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.1-ubuntu_jammy
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
         command:
           - openstack
         args:
