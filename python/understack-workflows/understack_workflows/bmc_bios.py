@@ -20,7 +20,7 @@ def required_bios_settings(pxe_interface: str) -> dict:
     }
 
 
-def update_dell_bios_settings(bmc: Bmc, pxe_interface="NIC.Slot.1-1") -> dict:
+def update_dell_bios_settings(bmc: Bmc, pxe_interface="NIC.Integrated.1-1") -> dict:
     """Check and update BIOS settings to standard as required.
 
     Any changes take effect on next server reboot.
@@ -31,7 +31,9 @@ def update_dell_bios_settings(bmc: Bmc, pxe_interface="NIC.Slot.1-1") -> dict:
     required_settings = required_bios_settings(pxe_interface)
 
     required_changes = {
-        k: v for k, v in required_settings.items() if current_settings[k] != v
+        k: v
+        for k, v in required_settings.items()
+        if (k in current_settings and current_settings[k] != v)
     }
 
     if required_changes:

@@ -11,6 +11,7 @@ STANDARD = {
     "SNMP.1.SNMPProtocol": {"expect": "All", "new_value": "0"},
     "SNMP.1.AgentCommunity": {"expect": "public", "new_value": "public"},
     "SNMP.1.AlertPort": {"expect": 161, "new_value": 161},
+    "SwitchConnectionView.1.Enable": {"expect": "Enabled", "new_value": "Enabled"},
 }
 
 REDFISH_PATH = "/redfish/v1/Managers/iDRAC.Embedded.1/Attributes"
