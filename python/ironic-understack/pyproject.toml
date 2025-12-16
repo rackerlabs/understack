@@ -18,7 +18,7 @@ dependencies = [
 
 [project.entry-points."ironic.inspection.hooks"]
 resource-class = "ironic_understack.resource_class:ResourceClassHook"
-update-baremetal-port = "ironic_understack.update_baremetal_port:UpdateBaremetalPortsHook"
+update-baremetal-port = "ironic_understack.inspect_hook_update_baremetal_ports:InspectHookUpdateBaremetalPorts"
 port-bios-name = "ironic_understack.port_bios_name_hook:PortBiosNameHook"
 
 [project.entry-points."ironic.hardware.interfaces.inspect"]

@@ -14,7 +14,7 @@ from ironic_understack.ironic_wrapper import ironic_ports_for_node
 LOG = logging.getLogger(__name__)
 
 
-class UpdateBaremetalPortsHook(base.InspectionHook):
+class InspectHookUpdateBaremetalPorts(base.InspectionHook):
     """Hook to update ports according to LLDP data."""
 
     # "validate-interfaces" provides the all_interfaces field in plugin_data.
@@ -182,12 +182,15 @@ def _set_node_traits(task, vlan_groups: set[str]):
     if existing_traits == required_traits:
         LOG.debug(
             "Node %s traits %s are all present and correct",
-            node.uuid, vlan_group_traits
+            node.uuid,
+            vlan_group_traits,
         )
     else:
         LOG.info(
             "Updating traits for node %s from %s to %s",
-            node.uuid, existing_traits, required_traits,
+            node.uuid,
+            existing_traits,
+            required_traits,
         )
         objects.TraitList.create(task.context, task.node.id, required_traits)
         node.save()
@@ -196,6 +199,7 @@ def _set_node_traits(task, vlan_groups: set[str]):
 def _trait_name(vlan_group_name: str) -> str:
     suffix = vlan_group_name.upper().split("-")[-1]
     return f"CUSTOM_{suffix}_SWITCH"
+
 
 def _is_our_trait(name: str) -> bool:
     return bool(re.match(r"^CUSTOM_[A-Z0-9]+_SWITCH$", name))
