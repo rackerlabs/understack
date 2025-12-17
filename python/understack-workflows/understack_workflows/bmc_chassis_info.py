@@ -1,3 +1,5 @@
+# pylint: disable=E1131,C0103
+
 import re
 from dataclasses import dataclass
 from ipaddress import IPv4Address
@@ -12,6 +14,8 @@ logger = setup_logger(__name__)
 
 @dataclass(frozen=True)
 class InterfaceInfo:
+    """Interface Information Data Class."""
+
     name: str
     description: str
     mac_address: str
@@ -26,6 +30,8 @@ class InterfaceInfo:
 
 @dataclass(frozen=True)
 class ChassisInfo:
+    """Chassis Information Data Class."""
+
     manufacturer: str
     model_number: str
     serial_number: str
@@ -38,10 +44,12 @@ class ChassisInfo:
 
     @property
     def bmc_interface(self) -> InterfaceInfo:
+        """BMC Interface response."""
         return self.interfaces[0]
 
     @property
     def bmc_hostname(self) -> str:
+        """BMC Hostname response."""
         return str(self.bmc_interface.hostname)
 
     @property
@@ -54,16 +62,6 @@ class ChassisInfo:
         }
 
 
-REDFISH_SYSTEM_ENDPOINT = "/redfish/v1/Systems/System.Embedded.1/"
-REDFISH_ETHERNET_ENDPOINT = f"{REDFISH_SYSTEM_ENDPOINT}EthernetInterfaces/"
-REDFISH_CONNECTION_ENDPOINT = (
-    f"{REDFISH_SYSTEM_ENDPOINT}NetworkPorts/Oem/Dell/DellSwitchConnections/"
-)
-REDFISH_DRAC_NIC_ENDPOINT = (
-    "/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces/NIC.1"
-)
-
-
 def chassis_info(bmc: Bmc) -> ChassisInfo:
     """Query DRAC for basic system info via redfish.
 
@@ -72,7 +70,7 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
         MemorySummary.TotalSystemMemoryGiB
 
     """
-    chassis_data = bmc.redfish_request(REDFISH_SYSTEM_ENDPOINT)
+    chassis_data = bmc.redfish_request(bmc.system_path)
     interfaces = interface_data(bmc)
 
     return ChassisInfo(
@@ -89,18 +87,25 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
 
 
 def interface_data(bmc: Bmc) -> list[InterfaceInfo]:
-    interfaces = [bmc_interface(bmc)] + in_band_interfaces(bmc)
-    lldp = lldp_data_by_name(bmc)
-    return [combine_lldp(lldp, interface) for interface in interfaces]
+    """Interface parsed from BMC outputs."""
+    bmc_interface_info = bmc_interface(bmc)
+    interfaces = [bmc_interface_info] + in_band_interfaces(bmc)
+    if get_system_vendor(bmc) == "Dell":
+        lldp = lldp_data_by_name(bmc)
+        return [combine_lldp(lldp, interface) for interface in interfaces]
+    else:
+        return [combine_lldp({}, interface) for interface in interfaces]
 
 
 def combine_lldp(lldp, interface) -> InterfaceInfo:
+    """Combined response, LLDP and Interface data."""
     name = interface["name"]
     alternate_name = f"{name}-1"
     lldp_entry = lldp.get(name, lldp.get(alternate_name, {}))
     if not lldp_entry:
         logger.info(
-            "LLDP info from BMC is missing for %s or %s, we only have LLDP info for %s",
+            "LLDP info from BMC is missing for %s or %s,"
+            "we only have LLDP info for %s",
             name,
             alternate_name,
             list(lldp.keys()),
@@ -110,13 +115,25 @@ def combine_lldp(lldp, interface) -> InterfaceInfo:
 
 def bmc_interface(bmc) -> dict:
     """Retrieve DRAC BMC interface info via redfish API."""
-    data = bmc.redfish_request(REDFISH_DRAC_NIC_ENDPOINT)
-    ipv4_address, ipv4_gateway, dhcp = parse_ipv4(data["IPv4Addresses"])
+    _interface = bmc.redfish_request(bmc.manager_path + "/EthernetInterfaces/")[
+        "Members"
+    ][0]["@odata.id"]
+    _data = bmc.redfish_request(_interface)
+    ipv4_address, ipv4_gateway, dhcp = parse_ipv4(_data["IPv4Addresses"])
+    data = {k.lower(): v for k, v in _data.items()}
+    host_name = data.get("hostname")
+    bmc_name = "iDRAC" if get_system_vendor(bmc) == "Dell" else "iLO"
+    bmc_description = (
+        "Dedicated iDRAC interface" if (bmc_name == "iDRAC") else data.get("name")
+    )
+    bmc_mac = data.get("macaddress")
     return {
-        "name": "iDRAC",
-        "description": "Dedicated iDRAC interface",
-        "mac_address": data["MACAddress"].upper(),
-        "hostname": data["HostName"],
+        "name": bmc_name,
+        "description": bmc_description,
+        "mac_address": normalise_mac(bmc_mac)
+        if (bmc_mac and bmc_mac != "")
+        else bmc_mac,
+        "hostname": host_name,
         "ipv4_address": ipv4_address,
         "ipv4_gateway": ipv4_gateway,
         "dhcp": dhcp,
@@ -156,20 +173,21 @@ def parse_ipv4(
 def in_band_interfaces(bmc: Bmc) -> list[dict]:
     """A Collection of Ethernet Interfaces for this System.
 
-    If the redfish list of Ethernet Interfaces includes "foo" as well as "foo-1"
-    then we disregard the latter.   The -1 suffix is used for "partitions" of a
+    If the redfish list of Ethernet Interfaces includes "foo" and also "foo-1"
+    then we disregard the latter.  The -1 suffix is used for "partitions" of a
     physical interface.  It seems to vary by device whether these are included
     in redfish output at all, and if they are, whether the mac address
     information is present in the base interface, the partition, or both.
+    Excludes removal of devices where no reference of -1 exists.
     """
-    index_data = bmc.redfish_request(REDFISH_ETHERNET_ENDPOINT)
+    index_data = bmc.redfish_request(bmc.system_path + "/EthernetInterfaces/")
     urls = [member["@odata.id"] for member in index_data["Members"]]
-
-    return [
+    interface_results = [
         interface_detail(bmc, url)
         for url in urls
-        if re.sub(r"-\d$", "", url) not in urls
+        if (not re.search(r"-\d$", url)) or (re.sub(r"-\d$", "", url) not in urls)
     ]
+    return [interface for interface in interface_results]
 
 
 def interface_detail(bmc, path) -> dict:
@@ -184,11 +202,16 @@ def interface_detail(bmc, path) -> dict:
     InterfaceEnabled, LinkStatus, Status.Health, State.Enabled, SpeedMbps
     """
     data = bmc.redfish_request(path)
+    _data = {k.lower(): v for k, v in data.items()}
+    name = _data.get("name")
+    hostname = _data.get("hostname", "")
+    description = _data.get("description", "")
+    mac_addr = _data.get("macaddress", "")
     return {
         "name": server_interface_name(data["Id"]),
-        "description": data["Description"],
-        "mac_address": data["MACAddress"].upper(),
-        "hostname": data["HostName"],
+        "description": description if description != "" else name,
+        "mac_address": normalise_mac(mac_addr) if mac_addr != "" else mac_addr,
+        "hostname": hostname,
     }
 
 
@@ -213,7 +236,7 @@ def lldp_data_by_name(bmc) -> dict:
     The MAC address is from the remote switch - it matches the base MAC that is
     found in `show version` output on a 2960, on N9k it is one of two things:
 
-    1) on a switch configured with `lldp chassis-id switch` this will be the the
+    1) On a switch configured with `lldp chassis-id switch` this will be the
     mac you see in `show mac address-table static | in Lo0` or `sho vdc detail`
     commands.  Note that this lldp configuration option is only available
     starting in Nexus version 10.2(3)F
@@ -223,8 +246,10 @@ def lldp_data_by_name(bmc) -> dict:
     11:11:11:11:11:00 then the LLDP mac address seen on port e1/2 would be
     11:11:11:11:11:02
     """
-    ports = bmc.redfish_request(REDFISH_CONNECTION_ENDPOINT)["Members"]
-
+    _data = bmc.redfish_request(
+        bmc.system_path + "/NetworkPorts/Oem/Dell/DellSwitchConnections/"
+    )
+    ports = _data["Members"]
     return {server_interface_name(port["Id"]): parse_lldp_port(port) for port in ports}
 
 
@@ -251,15 +276,27 @@ def parse_lldp_port(port_data: dict[str, str]) -> dict:
         }
 
 
+def get_system_vendor(bmc: Bmc) -> str:
+    """Read Vendor name from Oem reference."""
+    _data = bmc.redfish_request(bmc.system_path)
+    vendor = [key for key in _data["Oem"]][0]
+    return normalise_manufacturer(vendor)
+
+
 def normalise_mac(mac: str) -> str:
+    """Format mac address to match standard."""
     return ":".join(f"{int(n, 16):02X}" for n in mac.split(":"))
 
 
 def server_interface_name(name: str) -> str:
+    """Return 'iDRAC' in place of embedded name."""
     return "iDRAC" if name.startswith("iDRAC.Embedded") else name
 
 
 def normalise_manufacturer(name: str) -> str:
+    """Return a standard name for Manufacturer."""
     if "DELL" in name.upper():
         return "Dell"
+    elif "HP" in name.upper():
+        return "HP"
     raise ValueError(f"Server manufacturer {name} not supported")

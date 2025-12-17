@@ -2,8 +2,6 @@ from understack_workflows.bmc import Bmc
 from understack_workflows.bmc_chassis_info import InterfaceInfo
 from understack_workflows.helpers import setup_logger
 
-REDFISH_PATH = "/redfish/v1/Managers/iDRAC.Embedded.1/Attributes"
-
 logger = setup_logger(__name__)
 
 
@@ -30,4 +28,5 @@ def bmc_set_permanent_ip_addr(bmc: Bmc, interface_info: InterfaceInfo):
     logger.info(
         "BMC was DHCP IP %s, making this permanent", interface_info.ipv4_address
     )
-    bmc.redfish_request(REDFISH_PATH, method="PATCH", payload=payload)
+    attribute_path = bmc.manager_path + "/Attributes"
+    bmc.redfish_request(attribute_path, method="PATCH", payload=payload)

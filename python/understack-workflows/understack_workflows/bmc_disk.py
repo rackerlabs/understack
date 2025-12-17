@@ -2,17 +2,16 @@ import math
 from dataclasses import dataclass
 
 from understack_workflows.bmc import Bmc
-from understack_workflows.bmc import RedfishError
+from understack_workflows.bmc import RedfishRequestError
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
 
 
-REDFISH_DISKS_PATH = "/redfish/v1/Systems/System.Embedded.1/Storage/RAID.SL.1-1"
-
-
 @dataclass(frozen=True)
 class Disk:
+    """Disk Data Class."""
+
     media_type: str
     model: str
     name: str
@@ -25,10 +24,12 @@ class Disk:
 
     @property
     def capacity_gb(self) -> int:
+        """Capacity Math."""
         return math.ceil(self.capacity_bytes / 10**9)
 
     @staticmethod
     def from_path(bmc: Bmc, path: str):
+        """Disk path request."""
         disk_data = bmc.redfish_request(path)
 
         return Disk(
@@ -43,11 +44,19 @@ class Disk:
 def physical_disks(bmc: Bmc) -> list[Disk]:
     """Retrieve list of physical physical_disks."""
     try:
-        disks = bmc.redfish_request(REDFISH_DISKS_PATH)["Drives"]
-        disk_list = [Disk.from_path(bmc, path=disk["@odata.id"]) for disk in disks]
+        storage_member_paths = [
+            member["@odata.id"]
+            for member in bmc.redfish_request(bmc.system_path + "/Storage")["Members"]
+        ]
+        disks = [
+            bmc.redfish_request(drive_path)["Drives"]
+            for drive_path in storage_member_paths
+        ]
+        disk_paths = [disk for sublist in disks for disk in sublist]
+        disk_list = [Disk.from_path(bmc, path=disk["@odata.id"]) for disk in disk_paths]
         logger.debug("Retrieved %d disks.", len(disk_list))
         return disk_list
-    except RedfishError as err:
+    except RedfishRequestError as err:
         logger.error("Failed retrieving disk info: %s", err)
         raise (err) from err
 

@@ -14,7 +14,9 @@ STANDARD = {
     "SwitchConnectionView.1.Enable": {"expect": "Enabled", "new_value": "Enabled"},
 }
 
-REDFISH_PATH = "/redfish/v1/Managers/iDRAC.Embedded.1/Attributes"
+
+class BiosSettingException(Exception):
+    """Exception when a required key are not present."""
 
 
 def update_dell_drac_settings(bmc: Bmc) -> dict:
@@ -22,11 +24,12 @@ def update_dell_drac_settings(bmc: Bmc) -> dict:
 
     Returns the changes that were made
     """
-    current_values = bmc.redfish_request(REDFISH_PATH)["Attributes"]
+    attribute_path = bmc.manager_path + "/Attributes"
+    current_values = bmc.redfish_request(attribute_path)["Attributes"]
 
-    for key in STANDARD.keys():
+    for key, _value in STANDARD.items():
         if key not in current_values:
-            raise Exception(f"{bmc} has no BMC attribute {key}")
+            raise BiosSettingException(f"{bmc} has no BMC attribute {key}")
 
     required_changes = {
         k: x["new_value"]
@@ -40,7 +43,7 @@ def update_dell_drac_settings(bmc: Bmc) -> dict:
             logger.info("  %s: %s->%s", k, current_values[k], STANDARD[k]["expect"])
 
         payload = {"Attributes": required_changes}
-        bmc.redfish_request(REDFISH_PATH, payload=payload, method="PATCH")
+        bmc.redfish_request(attribute_path, payload=payload, method="PATCH")
 
         logger.info("%s DRAC settings have been updated", bmc)
     else:

@@ -1,9 +1,14 @@
 from understack_workflows.bmc import Bmc
 from understack_workflows.helpers import setup_logger
 
-REDFISH_PATH = "/redfish/v1/Managers/iDRAC.Embedded.1/EthernetInterfaces/NIC.1"
-
 logger = setup_logger(__name__)
+
+
+def bmc_get_mgmt_interface(bmc: Bmc) -> str:
+    """Read BMC interface."""
+    return bmc.redfish_request(bmc.manager_path + "/EthernetInterfaces")["Members"][0][
+        "@odata.id"
+    ]
 
 
 def bmc_set_hostname(bmc: Bmc, current_name: str, new_name: str):
@@ -17,4 +22,5 @@ def bmc_set_hostname(bmc: Bmc, current_name: str, new_name: str):
 
     logger.info("Changing BMC hostname from %s to %s", current_name, new_name)
     payload = {"HostName": new_name}
-    bmc.redfish_request(REDFISH_PATH, method="PATCH", payload=payload)
+    interface_path = bmc_get_mgmt_interface(bmc)
+    bmc.redfish_request(interface_path, method="PATCH", payload=payload)
