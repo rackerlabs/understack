@@ -138,15 +138,94 @@ def _build_interface_map_from_inventory(inventory: dict) -> dict[str, dict]:
     return interface_map
 
 
+def _assign_ip_to_interface(
+    nautobot_client: Nautobot,
+    interface_id: str,
+    ip_address: str,
+) -> None:
+    """Assign an IP address to an interface in Nautobot.
+
+    Creates the IP address if it doesn't exist, then associates it with
+    the interface.
+
+    Args:
+        nautobot_client: Nautobot API client
+        interface_id: Nautobot interface ID
+        ip_address: IP address string (e.g., "10.46.96.157")
+    """
+    if not ip_address:
+        return
+
+    # Check if IP already exists
+    existing_ip = nautobot_client.ipam.ip_addresses.get(address=ip_address)
+
+    if existing_ip and not isinstance(existing_ip, list) and hasattr(existing_ip, "id"):
+        ip_id = existing_ip.id  # type: ignore[union-attr]
+        logger.debug("IP address %s already exists: %s", ip_address, ip_id)
+    else:
+        # Create new IP address
+        # Note: We don't specify parent prefix - Nautobot will auto-assign
+        # based on existing prefixes if configured
+        try:
+            new_ip = nautobot_client.ipam.ip_addresses.create(
+                address=ip_address,
+                status="Active",
+            )
+            ip_id = getattr(new_ip, "id", None)
+            if not ip_id:
+                logger.warning("Failed to get ID for created IP address %s", ip_address)
+                return
+            logger.info("Created IP address %s: %s", ip_address, ip_id)
+        except Exception as e:
+            logger.warning("Failed to create IP address %s: %s", ip_address, e)
+            return
+
+    # Check if IP is already associated with this interface
+    existing_assoc = nautobot_client.ipam.ip_address_to_interface.get(ip_address=ip_id)
+
+    if existing_assoc and not isinstance(existing_assoc, list):
+        assoc_interface = getattr(existing_assoc, "interface", None)
+        assoc_interface_id = (
+            getattr(assoc_interface, "id", None) if assoc_interface else None
+        )
+        if assoc_interface_id == interface_id:
+            logger.debug(
+                "IP %s already associated with interface %s", ip_address, interface_id
+            )
+            return
+        else:
+            # IP is associated with a different interface
+            logger.warning(
+                "IP %s is already associated with interface %s, not %s",
+                ip_address,
+                assoc_interface_id,
+                interface_id,
+            )
+            return
+
+    # Associate IP with interface
+    try:
+        nautobot_client.ipam.ip_address_to_interface.create(
+            ip_address=ip_id,
+            interface=interface_id,
+            is_primary=True,
+        )
+        logger.info("Associated IP %s with interface %s", ip_address, interface_id)
+    except Exception as e:
+        logger.warning("Failed to associate IP %s with interface: %s", ip_address, e)
+
+
 def sync_idrac_interface(
     device_uuid: str,
     bmc_mac: str,
     nautobot_client: Nautobot,
+    bmc_ip: str | None = None,
 ) -> None:
     """Sync iDRAC interface to Nautobot.
 
     Creates or updates the iDRAC management interface for a device.
     Looks up existing interface by name + device_id.
+    Optionally assigns the BMC IP address to the interface.
 
     TODO: Add cable management for iDRAC. Currently not implemented because
     LLDP data for iDRAC switch connection is not available in Ironic inventory.
@@ -156,12 +235,14 @@ def sync_idrac_interface(
         device_uuid: Nautobot device UUID
         bmc_mac: BMC MAC address from inventory
         nautobot_client: Nautobot API client
+        bmc_ip: Optional BMC IP address from inventory (bmc_address)
     """
     if not bmc_mac:
         logger.debug("No bmc_mac provided for device %s", device_uuid)
         return
 
     mac_address = bmc_mac.upper()
+    idrac_interface = None
 
     # Check if iDRAC interface already exists
     existing = nautobot_client.dcim.interfaces.get(
@@ -184,9 +265,10 @@ def sync_idrac_interface(
             logger.debug(
                 "iDRAC interface already up to date for device %s", device_uuid
             )
+        idrac_interface = existing
     else:
         # Create new iDRAC interface
-        nautobot_client.dcim.interfaces.create(
+        idrac_interface = nautobot_client.dcim.interfaces.create(
             device=device_uuid,
             name="iDRAC",
             type="1000base-t",
@@ -199,6 +281,12 @@ def sync_idrac_interface(
         logger.info(
             "Created iDRAC interface for device %s: %s", device_uuid, mac_address
         )
+
+    # Assign BMC IP address to iDRAC interface
+    if idrac_interface and bmc_ip:
+        idrac_id = getattr(idrac_interface, "id", None)
+        if idrac_id:
+            _assign_ip_to_interface(nautobot_client, idrac_id, bmc_ip)
 
 
 def _build_interfaces_from_ports(
@@ -538,9 +626,11 @@ def sync_interfaces_from_data(
                 _handle_cable_management(interface, nautobot_intf, nautobot_client)
 
         # Sync iDRAC interface separately (not part of Ironic ports)
-        bmc_mac = inventory.get("inventory", {}).get("bmc_mac")
+        inv = inventory.get("inventory", {})
+        bmc_mac = inv.get("bmc_mac")
+        bmc_ip = inv.get("bmc_address")
         if bmc_mac:
-            sync_idrac_interface(node_uuid, bmc_mac, nautobot_client)
+            sync_idrac_interface(node_uuid, bmc_mac, nautobot_client, bmc_ip)
 
         logger.info(
             "Synced %d interfaces for node %s to Nautobot",
