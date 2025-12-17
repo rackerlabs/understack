@@ -1,0 +1,14 @@
+deployment:
+  envoyGateway:
+    resources:
+      limits:
+        cpu: 3000m
+        memory: 4096Mi
+config:
+  envoyGateway:
+    extensionApis:
+      enableBackend: true
+      enableEnvoyPatchPolicy: true
+    logging:
+      level:
+        default: info
