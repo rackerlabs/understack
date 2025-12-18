@@ -1,0 +1,27 @@
+# Allows Ironic conductor to appropriately manage resources required to provide
+# graphical console functionality.
+# At the moment, these are console container Pods and Secrets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ironic-openstack-console-provider
+  namespace: openstack
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - create
+      - delete
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - create
+      - delete
+      - list
+      - get
+      - patch

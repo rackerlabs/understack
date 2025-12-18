@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ironic-openstack-graphical-console
+  namespace: openstack
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ironic-openstack-console-provider
+subjects:
+  - kind: ServiceAccount
+    name: ironic-conductor
+    namespace: namespace
