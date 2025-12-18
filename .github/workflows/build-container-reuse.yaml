@@ -32,6 +32,14 @@ on:
         type: string
         default: '{{ defaultContext }}'
         description: 'Path to docker context'
+      prebuild_script:
+        required: false
+        type: string
+        description: 'path to shell script to run before building the containers'
+      prebuild_script_working_dir:
+        type: string
+        default: "."
+        description: 'directory which the prebuild_script will run'
 
 jobs:
   build:
@@ -70,6 +78,12 @@ jobs:
           # an 'unknown/unknown' arch with data. We've got no annotations
           # that are arch specific so populate them at the index as well.
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
+
+      - uses: actions/checkout@v4
+      - name: Run prebuild script
+        if: ${{ inputs.prebuild_script != '' }}
+        run: "${{ inputs.prebuild_script }}"
+        working-directory: ${{ inputs.prebuild_script_working_dir }}
 
       - name: build and push container image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6

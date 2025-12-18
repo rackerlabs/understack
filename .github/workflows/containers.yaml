@@ -38,8 +38,10 @@ jobs:
             target: prod
           - name: ironic-vnc-container
             target: ''
-            dockerfile_path: Dockerfile
-            context_path: "{{defaultContext}}:containers/ironic-vnc-container/"
+            dockerfile_path: ./containers/ironic-vnc-container/Dockerfile
+            context_path: "./containers/ironic-vnc-container/"
+            prebuild_script: ./sync_from_upstream.sh
+            prebuild_script_working_dir: containers/ironic-vnc-container/
           - name: shell-operator-ironic
             target: prod
           - name: nautobot
@@ -51,3 +53,5 @@ jobs:
       dockerfile_path: ${{ matrix.container.dockerfile_path || format('containers/{0}/Dockerfile', matrix.container.name) }}
       target: ${{ matrix.container.target }}
       context_path: ${{ matrix.container.context_path || '{{defaultContext}}' }}
+      prebuild_script: ${{ matrix.container.prebuild_script }}
+      prebuild_script_working_dir: ${{ matrix.container.prebuild_script_working_dir }}
