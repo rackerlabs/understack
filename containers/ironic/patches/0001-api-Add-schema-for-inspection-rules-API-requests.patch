@@ -1,0 +1,478 @@
+From a2f37c5c714f65b17cdad395c51fc838f986de95 Mon Sep 17 00:00:00 2001
+From: Stephen Finucane <stephenfin@redhat.com>
+Date: Thu, 3 Jul 2025 14:21:56 +0100
+Subject: [PATCH] api: Add schema for inspection rules API (requests)
+
+Much of the validation already exists here. We're just shuffling it
+about. We do end up with some validation, particularly with regards to
+the code in ironic.common.inspection_rules.validation, but we can clean
+that up in future changes once we've decided whether we're okay with
+error message content changing or not (hopefully yes).
+
+Change-Id: Id97b6d524913188cec557e0df64ebc1a2fc3eccd
+Signed-off-by: Stephen Finucane <stephenfin@redhat.com>
+---
+ ironic/api/controllers/v1/inspection_rule.py |  35 +++-
+ ironic/api/controllers/v1/utils.py           |   4 +
+ ironic/api/schemas/common/__init__.py        |   0
+ ironic/api/schemas/common/request_types.py   |   2 +
+ ironic/api/schemas/v1/inspection_rule.py     | 184 +++++++++++++++++++
+ ironic/common/inspection_rules/validation.py | 102 +---------
+ 6 files changed, 220 insertions(+), 107 deletions(-)
+ create mode 100644 ironic/api/schemas/common/__init__.py
+ create mode 100644 ironic/api/schemas/v1/inspection_rule.py
+
+diff --git a/ironic/api/controllers/v1/inspection_rule.py b/ironic/api/controllers/v1/inspection_rule.py
+index a4df1d0ba..02cba6d66 100644
+--- a/ironic/api/controllers/v1/inspection_rule.py
++++ b/ironic/api/controllers/v1/inspection_rule.py
+@@ -25,6 +25,7 @@ from ironic.api.controllers.v1 import notification_utils as notify
+ from ironic.api.controllers.v1 import utils as api_utils
+ from ironic.api.controllers.v1 import versions
+ from ironic.api import method
++from ironic.api.schemas.v1 import inspection_rule as schema
+ from ironic.api import validation
+ from ironic.common import args
+ from ironic.common import exception
+@@ -132,9 +133,13 @@ class InspectionRuleController(rest.RestController):
+         min_version=versions.MINOR_96_INSPECTION_RULES,
+         message=_('The API version does not allow inspection rules'),
+     )
+-    @args.validate(marker=args.name, limit=args.integer, sort_key=args.string,
+-                   sort_dir=args.string, fields=args.string_list,
+-                   detail=args.boolean)
++    # TODO(stephenfin): We are currently using this for side-effects to e.g.
++    # convert a CSV string to an array or a string to an integer. We should
++    # probably rename this decorator or provide a separate, simpler decorator.
++    @args.validate(
++        limit=args.integer, fields=args.string_list, detail=args.boolean
++    )
++    @validation.request_query_schema(schema.index_request_query)
+     def get_all(self, marker=None, limit=None, sort_key='id', sort_dir='asc',
+                 fields=None, detail=None, phase=None):
+         """Retrieve a list of inspection rules.
+@@ -193,7 +198,12 @@ class InspectionRuleController(rest.RestController):
+         min_version=versions.MINOR_96_INSPECTION_RULES,
+         message=_('The API version does not allow inspection rules'),
+     )
+-    @args.validate(inspection_rule_uuid=args.uuid, fields=args.string_list)
++    # TODO(stephenfin): We are currently using this for side-effects to e.g.
++    # convert a CSV string to an array or a string to an integer. We should
++    # probably rename this decorator or provide a separate, simpler decorator.
++    @args.validate(fields=args.string_list)
++    @validation.request_parameter_schema(schema.show_request_parameter)
++    @validation.request_query_schema(schema.show_request_query)
+     def get_one(self, inspection_rule_uuid, fields=None):
+         """Retrieve information about the given inspection rule.
+ 
+@@ -216,7 +226,7 @@ class InspectionRuleController(rest.RestController):
+         message=_('The API version does not allow inspection rules'),
+         exception_class=webob_exc.HTTPMethodNotAllowed,
+     )
+-    @args.validate(inspection_rule=ir_validation.VALIDATOR)
++    @validation.request_body_schema(schema.create_request_body)
+     def post(self, inspection_rule):
+         """Create a new inspection rule.
+ 
+@@ -248,7 +258,12 @@ class InspectionRuleController(rest.RestController):
+         message=_('The API version does not allow inspection rules'),
+         exception_class=webob_exc.HTTPMethodNotAllowed,
+     )
++    # TODO(stephenfin): We are currently using this for side-effects to e.g.
++    # convert a CSV string to an array or a string to an integer. We should
++    # probably rename this decorator or provide a separate, simpler decorator.
+     @args.validate(inspection_rule_uuid=args.uuid, patch=args.patch)
++    @validation.request_parameter_schema(schema.update_request_parameter)
++    @validation.request_body_schema(schema.update_request_body)
+     def patch(self, inspection_rule_uuid, patch=None):
+         """Update an existing inspection rule.
+ 
+@@ -272,15 +287,17 @@ class InspectionRuleController(rest.RestController):
+ 
+         rule = api_utils.apply_jsonpatch(rule, patch)
+ 
++        validator = args.and_valid(
++            args.schema(schema.create_request_body),
++            args.dict_valid(uuid=args.uuid))
+         api_utils.patched_validate_with_schema(
+-            rule, ir_validation.SCHEMA,
+-            ir_validation.VALIDATOR)
++            rule, schema.create_request_body, validator)
+ 
+         ir_validation.validate_rule(rule)
+ 
+         api_utils.patch_update_changed_fields(
+             rule, rpc_rule, fields=objects.InspectionRule.fields,
+-            schema=ir_validation.SCHEMA
++            schema=schema.create_request_body
+         )
+ 
+         notify.emit_start_notification(context, rpc_rule, 'update')
+@@ -299,7 +316,7 @@ class InspectionRuleController(rest.RestController):
+         message=_('The API version does not allow inspection rules'),
+         exception_class=webob_exc.HTTPMethodNotAllowed,
+     )
+-    @args.validate(inspection_rule_uuid=args.uuid)
++    @validation.request_parameter_schema(schema.delete_request_parameter)
+     def delete(self, inspection_rule_uuid):
+         """Delete an inspection rule.
+ 
+diff --git a/ironic/api/controllers/v1/utils.py b/ironic/api/controllers/v1/utils.py
+index c657b4030..3a3355957 100644
+--- a/ironic/api/controllers/v1/utils.py
++++ b/ironic/api/controllers/v1/utils.py
+@@ -452,6 +452,8 @@ def sanitize_dict(to_sanitize, fields):
+             to_sanitize.pop(key, None)
+ 
+ 
++# TODO(stephenfin): We can repurpose this check to only set a default for limit
++# when all APIs use jsonschema validation
+ def validate_limit(limit):
+     if limit is None:
+         return CONF.api.max_limit
+@@ -462,6 +464,8 @@ def validate_limit(limit):
+     return min(CONF.api.max_limit, limit)
+ 
+ 
++# TODO(stephenfin): We can remove this check when all APIs use jsonschema
++# validation
+ def validate_sort_dir(sort_dir):
+     if sort_dir not in ['asc', 'desc']:
+         raise exception.ClientSideError(_("Invalid sort direction: %s. "
+diff --git a/ironic/api/schemas/common/__init__.py b/ironic/api/schemas/common/__init__.py
+new file mode 100644
+index 000000000..e69de29bb
+diff --git a/ironic/api/schemas/common/request_types.py b/ironic/api/schemas/common/request_types.py
+index 717b9da0b..9fe4254da 100644
+--- a/ironic/api/schemas/common/request_types.py
++++ b/ironic/api/schemas/common/request_types.py
+@@ -26,4 +26,6 @@ detail = {
+     'format': '(?i)^(1|t|true|on|y|yes|0|f|false|off|n|no)$',
+ }
+ 
++limit = {'type': 'integer', 'min': 0}
++
+ sort_dir = {'type': 'string', 'enum': ['asc', 'desc'], 'default': 'asc'}
+diff --git a/ironic/api/schemas/v1/inspection_rule.py b/ironic/api/schemas/v1/inspection_rule.py
+new file mode 100644
+index 000000000..95d9b56f8
+--- /dev/null
++++ b/ironic/api/schemas/v1/inspection_rule.py
+@@ -0,0 +1,184 @@
++# Licensed under the Apache License, Version 2.0 (the "License"); you may
++# not use this file except in compliance with the License. You may obtain
++# a copy of the License at
++#
++#     http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
++# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
++# License for the specific language governing permissions and limitations
++# under the License.
++
++import copy
++
++from ironic.api.schemas.common import request_types
++from ironic.common.inspection_rules import actions
++from ironic.common.inspection_rules import operators
++
++# request parameter schemas
++
++_inspection_rule_request_parameter = {
++    'type': 'object',
++    'properties': {
++        'inspection_rule_uuid': {'type': 'string', 'format': 'uuid'},
++    },
++    'required': ['inspection_rule_uuid'],
++    'additionalProperties': False,
++}
++
++
++show_request_parameter = copy.deepcopy(_inspection_rule_request_parameter)
++update_request_parameter = copy.deepcopy(_inspection_rule_request_parameter)
++delete_request_parameter = copy.deepcopy(_inspection_rule_request_parameter)
++
++# request query string schemas
++
++index_request_query = {
++    'type': 'object',
++    'properties': {
++        'detail': {'type': 'boolean'},
++        # TODO(stephenfin): This should be much stricter. We allow anything
++        # except versioned fields, which are irrelevant here since all
++        # versioned fields require API microversions older than this API does.
++        # As things stand, this will fail at the DB layer.
++        'fields': {
++            'type': 'array',
++            'items': {
++                'type': 'string',
++            },
++            # OpenAPI-specific properties
++            # https://swagger.io/docs/specification/v3_0/serialization/#query-parameters
++            'style': 'form',
++            'explode': False,
++        },
++        # TODO(stephenfin): We should restrict this to uuid_or_name, since that
++        # would filter out obviously bad requests.
++        'marker': {'type': 'string'},
++        'limit': request_types.limit,
++        # TODO(stephenfin): This should be much stricter. As things stand, this
++        # will fail at the DB layer.
++        'phase': {'type': 'string'},
++        'sort_dir': request_types.sort_dir,
++        # TODO(stephenfin): This is a bad check. We allow everything *except*
++        # these fields. This includes invalid fields and versioned fields. We
++        # should instead allowlist the ones we want to support.
++        'sort_key': {
++            'not': {
++                'type': 'string',
++                'enum': ['actions', 'conditions'],
++            },
++        },
++    },
++    'required': [],
++    'additionalProperties': False,
++}
++
++show_request_query = {
++    'type': 'object',
++    'properties': {
++        # TODO(stephenfin): This should be much stricter. We allow anything
++        # except versioned fields, which are irrelevant here since all
++        # versioned fields require API microversions older than this API does.
++        # As things stand, this will fail at the DB layer.
++        'fields': {
++            'type': 'array',
++            'items': {
++                'type': 'string',
++            },
++            # OpenAPI-specific properties
++            # https://swagger.io/docs/specification/v3_0/serialization/#query-parameters
++            'style': 'form',
++            'explode': False,
++        },
++    },
++    'required': [],
++    'additionalProperties': False,
++}
++
++# request body schemas
++
++create_request_body = {
++    'type': 'object',
++    'properties': {
++        'actions': {
++            'type': 'array',
++            'minItems': 1,
++            'items': {
++                'type': 'object',
++                'required': ['op', 'args'],
++                'properties': {
++                    'op': {
++                        'description': 'action operator',
++                        'enum': list(actions.ACTIONS.keys())
++                    },
++                    'args': {
++                        'description': 'Arguments for the action',
++                        'type': ['array', 'object']
++                    },
++                    'loop': {
++                        'description': 'Loop behavior for actions',
++                        'type': ['array', 'object']
++                    },
++                },
++                'additionalProperties': True
++            },
++        },
++        'conditions': {
++            'type': 'array',
++            'minItems': 0,
++            'items': {
++                'type': 'object',
++                'required': ['op', 'args'],
++                'properties': {
++                    'op': {
++                        'description': 'Condition operator',
++                        'enum': list(operators.OPERATORS) + [
++                            f'!{op}' for op in list(operators.OPERATORS)
++                        ],
++                    },
++                    'args': {
++                        'description': 'Arguments for the condition',
++                        'type': ['array', 'object'],
++                    },
++                    'multiple': {
++                        'description': 'How to treat multiple values',
++                        'enum': ['any', 'all', 'first', 'last'],
++                    },
++                    'loop': {
++                        'description': 'Loop behavior for conditions',
++                        'type': ['array', 'object'],
++                    },
++                },
++                # other properties are validated by plugins
++                'additionalProperties': True,
++            },
++        },
++        'description': {'type': ['string', 'null'], 'maxLength': 255},
++        # TODO(stephenfin): We should move validation of this value here. It's
++        # currently handled in validate_rule
++        'phase': {'type': ['string', 'null'], 'maxLength': 16},
++        'priority': {'type': 'integer', 'minimum': 0},
++        'sensitive': {'type': ['boolean', 'null']},
++        'uuid': {'type': ['string', 'null']},
++    },
++    'required': ['actions'],
++    'additionalProperties': False
++}
++
++# TODO(stephenfin): This needs to be completed. We probably want a helper to
++# generate these since they are superficially identical, with only the allowed
++# patch fields changing
++update_request_body = {
++    'type': 'array',
++    'items': {
++        'type': 'object',
++        'properties': {
++            'op': {'enum': ['add', 'replace', 'remove']},
++            'path': {'type': 'string'},
++            'value': {},
++        },
++        'required': ['op', 'path'],
++        'additionalProperties': False,
++    },
++}
+diff --git a/ironic/common/inspection_rules/validation.py b/ironic/common/inspection_rules/validation.py
+index 54ef72196..347075ef1 100644
+--- a/ironic/common/inspection_rules/validation.py
++++ b/ironic/common/inspection_rules/validation.py
+@@ -14,7 +14,7 @@ import enum
+ 
+ import jsonschema
+ 
+-from ironic.common import args
++from ironic.api.schemas.v1 import inspection_rule as schema
+ from ironic.common import exception
+ from ironic.common.i18n import _
+ from ironic.common.inspection_rules import actions
+@@ -22,106 +22,12 @@ from ironic.common.inspection_rules import operators
+ from ironic.common.inspection_rules import utils
+ 
+ 
+-_CONDITIONS_SCHEMA = None
+-_ACTIONS_SCHEMA = None
+-
+-
+ class InspectionPhase(enum.Enum):
+     MAIN = 'main'
+ 
+ 
+-def conditions_schema():
+-    global _CONDITIONS_SCHEMA
+-    if _CONDITIONS_SCHEMA is None:
+-        condition_plugins = list(operators.OPERATORS.keys())
+-        condition_plugins.extend(
+-            ["!%s" % op for op in list(condition_plugins)])
+-        _CONDITIONS_SCHEMA = {
+-            "title": "Inspection rule conditions schema",
+-            "type": "array",
+-            "minItems": 0,
+-            "items": {
+-                "type": "object",
+-                "required": ["op", "args"],
+-                "properties": {
+-                    "op": {
+-                        "description": "Condition operator",
+-                        "enum": condition_plugins
+-                    },
+-                    "args": {
+-                        "description": "Arguments for the condition",
+-                        "type": ["array", "object"]
+-                    },
+-                    "multiple": {
+-                        "description": "How to treat multiple values",
+-                        "enum": ["any", "all", "first", "last"]
+-                    },
+-                    "loop": {
+-                        "description": "Loop behavior for conditions",
+-                        "type": ["array", "object"]
+-                    },
+-                },
+-                # other properties are validated by plugins
+-                "additionalProperties": True
+-            }
+-        }
+-
+-    return _CONDITIONS_SCHEMA
+-
+-
+-def actions_schema():
+-    global _ACTIONS_SCHEMA
+-    if _ACTIONS_SCHEMA is None:
+-        action_plugins = list(actions.ACTIONS.keys())
+-        _ACTIONS_SCHEMA = {
+-            "title": "Inspection rule actions schema",
+-            "type": "array",
+-            "minItems": 1,
+-            "items": {
+-                "type": "object",
+-                "required": ["op", "args"],
+-                "properties": {
+-                    "op": {
+-                        "description": "action operator",
+-                        "enum": action_plugins
+-                    },
+-                    "args": {
+-                        "description": "Arguments for the action",
+-                        "type": ["array", "object"]
+-                    },
+-                    "loop": {
+-                        "description": "Loop behavior for actions",
+-                        "type": ["array", "object"]
+-                    },
+-                },
+-                "additionalProperties": True
+-            }
+-        }
+-
+-    return _ACTIONS_SCHEMA
+-
+-
+-SCHEMA = {
+-    'type': 'object',
+-    'properties': {
+-        'uuid': {'type': ['string', 'null']},
+-        'priority': {'type': 'integer', "minimum": 0},
+-        'description': {'type': ['string', 'null'], 'maxLength': 255},
+-        'sensitive': {'type': ['boolean', 'null']},
+-        'phase': {'type': ['string', 'null'], 'maxLength': 16},
+-        "conditions": conditions_schema(),
+-        "actions": actions_schema()
+-    },
+-    'required': ['actions'],
+-    "additionalProperties": False
+-}
+-
+-VALIDATOR = args.and_valid(
+-    args.schema(SCHEMA),
+-    args.dict_valid(uuid=args.uuid)
+-)
+-
+-
++# TODO(stephenfin): Everything here can and should be moved to the jsonschema
++# schemas, but doing so will change responses.
+ def validate_rule(rule):
+     """Validate an inspection rule using the JSON schema.
+ 
+@@ -129,7 +35,7 @@ def validate_rule(rule):
+     :raises: Invalid if the rule is invalid.
+     """
+     try:
+-        jsonschema.validate(rule, SCHEMA)
++        jsonschema.validate(rule, schema.create_request_body)
+     except jsonschema.ValidationError as e:
+         raise exception.Invalid(
+             _('Validation failed for inspection rule: %s') % e)
+-- 
+2.39.1
