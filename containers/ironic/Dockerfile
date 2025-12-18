@@ -29,10 +29,17 @@ RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
 ARG OPENSTACK_VERSION="required_argument"
 FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS final
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+RUN wget -qO- https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
+    chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
+    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' > /etc/apt/sources.list.d/kubernetes.list && \
+    chmod 644 /etc/apt/sources.list.d/kubernetes.list
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         genisoimage \
         isolinux \
+        kubectl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build --link /var/lib/openstack /var/lib/openstack
