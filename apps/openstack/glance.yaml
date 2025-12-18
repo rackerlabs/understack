@@ -1,4 +1,4 @@
 ---
 component: glance
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.2.5+9629a4692
+chartVersion: 2025.2.6+9b270fe35
