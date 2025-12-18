@@ -6,18 +6,23 @@ on:
       - v*
     branches:
       - main
-    paths:
-      - "containers/**"
+    paths: &triggerpaths
+      - "containers/cinder/**"
+      - "containers/glance/**"
+      - "containers/horizon/**"
+      - "containers/ironic/**"
+      - "containers/keystone/**"
+      - "containers/neutron/**"
+      - "containers/nova/**"
+      - "containers/octavia/**"
+      - "containers/openstack-client/**"
+      - "containers/placement/**"
       - ".github/workflows/containers-openstack.yaml"
       - ".github/workflows/build-container-reuse.yaml"
       - "python/**"
   pull_request:
     types: [opened, synchronize, reopened, closed]
-    paths:
-      - "containers/**"
-      - ".github/workflows/containers-openstack.yaml"
-      - ".github/workflows/build-container-reuse.yaml"
-      - "python/**"
+    paths: *triggerpaths
   workflow_dispatch:
   merge_group:
     types: [checks_requested]

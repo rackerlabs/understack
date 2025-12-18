@@ -6,20 +6,19 @@ on:
       - v*
     branches:
       - main
-    paths:
+    paths: &triggerpaths
       - "ansible/**"
-      - "containers/**"
+      - "containers/ansible/**"
+      - "containers/dnsmasq/**"
+      - "containers/ironic-nautobot-client/**"
+      - "containers/ironic-vnc-client/**"
+      - "containers/understack-tests/**"
       - "python/**"
       - ".github/workflows/containers.yaml"
       - ".github/workflows/build-container-reuse.yaml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
-    paths:
-      - "ansible/**"
-      - "containers/**"
-      - "python/**"
-      - ".github/workflows/containers.yaml"
-      - ".github/workflows/build-container-reuse.yaml"
+    paths: *triggerpaths
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
@@ -29,15 +28,26 @@ jobs:
     strategy:
       matrix:
         container:
-          - ansible
-          - dnsmasq
-          - ironic-nautobot-client
-          - understack-tests
-          - shell-operator-ironic
-          - nautobot
+          - name: ansible
+            target: prod
+          - name: dnsmasq
+            target: prod
+          - name: ironic-nautobot-client
+            target: prod
+          - name: understack-tests
+            target: prod
+          - name: ironic-vnc-container
+            target: ''
+            dockerfile_path: Dockerfile
+            context_path: "{{defaultContext}}:containers/ironic-vnc-container/"
+          - name: shell-operator-ironic
+            target: prod
+          - name: nautobot
+            target: prod
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
-      container_name: ${{ matrix.container }}
-      dockerfile_path: containers/${{ matrix.container }}/Dockerfile
-      target: prod
+      container_name: ${{ matrix.container.name }}
+      dockerfile_path: ${{ matrix.container.dockerfile_path || format('containers/{0}/Dockerfile', matrix.container.name) }}
+      target: ${{ matrix.container.target }}
+      context_path: ${{ matrix.container.context_path || '{{defaultContext}}' }}

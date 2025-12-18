@@ -27,6 +27,11 @@ on:
         type: string
         default: 'latest'
         description: 'Tag name to use for latest (e.g., "latest" or "2025.2")'
+      context_path:
+        required: false
+        type: string
+        default: '{{ defaultContext }}'
+        description: 'Path to docker context'
 
 jobs:
   build:
@@ -71,6 +76,7 @@ jobs:
         with:
           file: ${{ inputs.dockerfile_path }}
           build-args: ${{ inputs.build_args }}
+          context: ${{ inputs.context_path }}
           pull: true
           push: true
           tags: ${{ steps.meta.outputs.tags }}

@@ -105,6 +105,11 @@ conf:
       use_web_server_for_images: true
     nova:
       auth_type: password
+    vnc:
+      enable: true
+      container_provider: kubernetes
+      console_image: ghcr.io/rackerlabs/understack/ironic-vnc-container:latest
+      #  kubernetes_container_template: $pybasedir/console/container/ironic-console-pod.yaml.template
 
 endpoints:
   oslo_messaging:
