@@ -42,6 +42,9 @@ nautobot_permissions_permissions:
       - extras.note
       - tenancy.tenantgroup
       - vni_custom_model.ucvnigroup
+      - dcim.softwareimagefile
+      - dcim.devicetypetosoftwareimagefile
+      - dcim.softwareversion
   - name: all-users-api-tokens
     description: allow users to manage their own API tokens
     enabled: true
