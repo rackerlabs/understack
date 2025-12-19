@@ -21,30 +21,30 @@ nautobot_permissions_permissions:
     object_types:
       - dcim.cable
       - dcim.device
-      - dcim.rack
-      - ipam.ipaddress
-      - ipam.prefix
-      - dcim.interface
-      - dcim.location
-      - extras.role
       - dcim.deviceredundancygroup
       - dcim.devicetype
-      - vni_custom_model.ucvni
-      - tenancy.tenant
+      - dcim.devicetypetosoftwareimagefile
       - dcim.frontport
+      - dcim.interface
+      - dcim.location
+      - dcim.locationtype
       - dcim.manufacturer
       - dcim.platform
+      - dcim.rack
       - dcim.rackgroup
-      - dcim.locationtype
-      - extras.tag
-      - extras.status
-      - extras.objectchange
-      - extras.note
-      - tenancy.tenantgroup
-      - vni_custom_model.ucvnigroup
       - dcim.softwareimagefile
-      - dcim.devicetypetosoftwareimagefile
       - dcim.softwareversion
+      - extras.note
+      - extras.objectchange
+      - extras.role
+      - extras.status
+      - extras.tag
+      - ipam.ipaddress
+      - ipam.prefix
+      - tenancy.tenant
+      - tenancy.tenantgroup
+      - vni_custom_model.ucvni
+      - vni_custom_model.ucvnigroup
   - name: all-users-api-tokens
     description: allow users to manage their own API tokens
     enabled: true
