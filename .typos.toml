@@ -19,6 +19,9 @@ extend-exclude = [
 extend-ignore-identifiers-re = [
     "ironic_retrive_*",
 ]
+extend-ignore-re = [
+    "chartVersion:.*",
+]
 
 [default.extend-words]
 # Don't correct "HPE"
