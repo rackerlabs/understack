@@ -6,7 +6,7 @@
     token: "{{ nautobot_token }}"
     name: "{{ item.name }}"
     state: present
-  loop: "{{ permissions_groups }}"
+  loop: "{{ nautobot_permissions_groups }}"
   loop_control:
     label: "{{ item.name }}"
 
@@ -22,6 +22,6 @@
     groups: "{{ item.groups }}"
     constraints: "{{ item.constraints | default('') }}"
     state: present
-  loop: "{{ permissions_permissions }}"
+  loop: "{{ nautobot_permissions_permissions }}"
   loop_control:
     label: "{{ item.name }}"

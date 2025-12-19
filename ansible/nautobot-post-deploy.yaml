@@ -37,8 +37,7 @@
       check_mode: false
 
   roles:
-    - role: permissions
-      tags: permissions
+    - role: nautobot_permissions
     - role: jobs
     - role: secrets
     - role: git_repos

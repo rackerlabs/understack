@@ -1,11 +1,11 @@
 ---
-permissions_groups:
+nautobot_permissions_groups:
   - name: ucadmin
   - name: ucdctech
   - name: ucneteng
   - name: ucuser
 
-permissions_permissions:
+nautobot_permissions_permissions:
   # escape hatch permission allowing ucadmin members
   # to edit their own user to grant themselves superuser
   - name: all-user-defaults
