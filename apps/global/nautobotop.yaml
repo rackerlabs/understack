@@ -1,0 +1,5 @@
+---
+component: nautobotop
+sources:
+  - ref: deploy
+    path: '{{.name}}/manifests/nautobotop'
