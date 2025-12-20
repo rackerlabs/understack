@@ -1,3 +1,5 @@
+# pylint: disable=E1131,C0103
+
 import argparse
 import logging
 import os
@@ -69,6 +71,7 @@ def main():
 
 
 def enroll_server(bmc: Bmc, old_password: str | None) -> str:
+    """Enroll BMC to Undercloud Ironic."""
     set_bmc_password(
         ip_address=bmc.ip_address,
         new_password=bmc.password,
@@ -86,7 +89,7 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
     pxe_interface = guess_pxe_interface(device_info)
     logger.info("Selected %s as PXE interface", pxe_interface)
 
-    # Note the above may require a restart of the DRAC, which in turn may delete
+    # Note the above may require a restart of the DRAC, which also may delete
     # any pending BIOS jobs, so do BIOS settings after the DRAC settings.
     update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
@@ -101,13 +104,15 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
 
 
 def guess_pxe_interface(device_info: ChassisInfo) -> str:
+    """Determine most probable PXE interface for BMC."""
     interface = max(device_info.interfaces, key=_pxe_preference)
     return interface.name
 
 
 def _pxe_preference(interface: InterfaceInfo) -> int:
-    name = interface.name.upper()
-    if "DRAC" in name or "ILO" in name or "NIC.EMBEDDED" in name:
+    """Restrict BMC interfaces from PXE selection."""
+    _name = interface.name.upper()
+    if "DRAC" in _name or "ILO" in _name or "NIC.EMBEDDED" in _name:
         return 0
 
     NIC_PREFERENCE = {
@@ -124,6 +129,7 @@ def _pxe_preference(interface: InterfaceInfo) -> int:
 
 
 def argument_parser():
+    """Parse runtime arguments."""
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__), description="Ingest Baremetal Node"
     )

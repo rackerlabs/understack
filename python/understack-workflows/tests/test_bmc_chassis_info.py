@@ -12,6 +12,7 @@ class FakeBmc(Bmc):
     def __init__(self, fixtures):
         self.fixtures = fixtures
         self.ip_address = "1.2.3.4"
+        super().__init__(ip_address=self.ip_address)
 
     def redfish_request(self, path: str, *_args, **_kw) -> dict:
         path = path.replace("/", "_") + ".json"
