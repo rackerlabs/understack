@@ -19,6 +19,7 @@ def test_adding_bios_name(mocker, caplog):
     node_uuid = uuidutils.generate_uuid()
     mock_context = mocker.Mock()
     mock_node = mocker.Mock(id=1234)
+    mock_node.name = "Dell-CR1MB0"
     mock_task = mocker.Mock(node=mock_node, context=mock_context)
     mock_port = mocker.Mock(
         uuid=uuidutils.generate_uuid(),
@@ -26,6 +27,7 @@ def test_adding_bios_name(mocker, caplog):
         address="11:11:11:11:11:11",
         extra={},
     )
+    mock_port.name = "some-arbitrary-name"
 
     mocker.patch(
         "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
@@ -35,6 +37,7 @@ def test_adding_bios_name(mocker, caplog):
     PortBiosNameHook().__call__(mock_task, _INVENTORY, {})
 
     assert mock_port.extra == {"bios_name": "NIC.Integrated.1-1"}
+    assert mock_port.name == "Dell-CR1MB0:NIC.Integrated.1-1"
     mock_port.save.assert_called()
 
 
@@ -44,6 +47,7 @@ def test_removing_bios_name(mocker, caplog):
     node_uuid = uuidutils.generate_uuid()
     mock_context = mocker.Mock()
     mock_node = mocker.Mock(id=1234)
+    mock_node.name = "Dell-CR1MB0"
     mock_task = mocker.Mock(node=mock_node, context=mock_context)
     mock_port = mocker.Mock(
         uuid=uuidutils.generate_uuid(),
@@ -51,6 +55,7 @@ def test_removing_bios_name(mocker, caplog):
         address="33:33:33:33:33:33",
         extra={"bios_name": "old_name_no_longer_valid"},
     )
+    mock_port.name = "original-name"
 
     mocker.patch(
         "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
@@ -59,5 +64,6 @@ def test_removing_bios_name(mocker, caplog):
 
     PortBiosNameHook().__call__(mock_task, _INVENTORY, {})
 
+    assert mock_port.name == "original-name"
     assert "bios_name" not in mock_port.extra
     mock_port.save.assert_called()

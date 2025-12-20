@@ -52,6 +52,17 @@ class PortBiosNameHook(base.InspectionHook):
                 baremetal_port.pxe_enabled = required_pxe
                 baremetal_port.save()
 
+            if required_bios_name:
+                required_port_name = task.node.name + ":" + required_bios_name
+                if baremetal_port.name != required_port_name:
+                    LOG.info(
+                        "Port %s changing name from %s to %s",
+                        mac,
+                        baremetal_port.name,
+                        required_port_name,
+                    )
+                    baremetal_port.name = required_port_name
+
 
 def _pxe_interface_name(inspected_interfaces: list[dict]) -> str:
     """Use a heuristic to determine our default interface for PXE."""
