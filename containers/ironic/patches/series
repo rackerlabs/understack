@@ -3,3 +3,4 @@
 0001-fix-iPXE-boot-interface-neutron-logic-detection.patch
 0001-Add-SKU-field-to-Redfish-inspection.patch
 0001-fix-redfish-inspect-system-product-name.patch
+0001-kubernetes-console-provider.patch
