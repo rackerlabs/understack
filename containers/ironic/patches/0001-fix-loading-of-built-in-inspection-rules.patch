@@ -1,0 +1,189 @@
+From 555c019bb7405131a4a5ebbcc52a561a0816069b Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Tue, 16 Dec 2025 17:47:06 -0600
+Subject: [PATCH] fix loading of built-in inspection rules
+
+The built-in inspection rules cannot be loaded because the jsonschema
+validates them against the expected API however the built-in rules had a
+'built-in' key that is not part of the schema and included the 'scope'
+key which was ultimately dropped before inspection rules support landed.
+The built-in rules also did not validate that the data was a list of
+rules before attempting to utilize it giving an incorrect error.
+
+Closes-Bug: 2136776
+Change-Id: I36c290c9f92189281e11633e9a587918b0699ae3
+Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
+---
+ ironic/common/inspection_rules/engine.py      | 26 +++++++++++--------
+ ironic/common/inspection_rules/validation.py  |  7 ++---
+ .../tests/unit/common/test_inspection_rule.py | 23 ++++++++++++++++
+ ...-rules-built-in-load-00958e99e3ab7ecb.yaml |  5 ++++
+ 4 files changed, 47 insertions(+), 14 deletions(-)
+ create mode 100644 releasenotes/notes/inspection-rules-built-in-load-00958e99e3ab7ecb.yaml
+
+diff --git a/ironic/common/inspection_rules/engine.py b/ironic/common/inspection_rules/engine.py
+index c4ca4864e..6b86182f9 100644
+--- a/ironic/common/inspection_rules/engine.py
++++ b/ironic/common/inspection_rules/engine.py
+@@ -27,47 +27,51 @@ LOG = log.getLogger(__name__)
+ SENSITIVE_FIELDS = ['password', 'auth_token', 'bmc_password']
+ 
+ 
+-def get_built_in_rules():
++def get_built_in_rules(rules_file):
+     """Load built-in inspection rules."""
+     built_in_rules = []
+-    built_in_rules_dir = CONF.inspection_rules.built_in_rules
+ 
+-    if not built_in_rules_dir:
++    if not rules_file:
+         return built_in_rules
+ 
+     try:
+-        with open(built_in_rules_dir, 'r') as f:
++        with open(rules_file, 'r') as f:
+             rules_data = yaml.safe_load(f)
+ 
++        if not isinstance(rules_data, list):
++            msg = (
++                _("Built-in rules file (%s) should contain a list of rules") %
++                  rules_file)
++            LOG.error(msg)
++            raise exception.IronicException(msg)
++
+         for rule_data in rules_data:
+             try:
+                 rule = {
+                     'uuid': rule_data.get('uuid'),
+                     'priority': rule_data.get('priority', 0),
+                     'description': rule_data.get('description'),
+-                    'scope': rule_data.get('scope'),
+                     'sensitive': rule_data.get('sensitive', False),
+                     'phase': rule_data.get('phase', 'main'),
+                     'actions': rule_data.get('actions', []),
+                     'conditions': rule_data.get('conditions', []),
+-                    'built_in': True
+                 }
+-                validation.validate_rule(rule)
++                validation.validate_rule(rule, built_in=True)
+                 built_in_rules.append(rule)
+             except Exception as e:
+                 LOG.error(_("Error parsing built-in rule: %s"), e)
+                 raise
+     except FileNotFoundError:
+         LOG.error(_("Built-in rules file not found: %s"),
+-                  built_in_rules_dir)
++                  rules_file)
+         raise
+     except yaml.YAMLError as e:
+         LOG.error(_("Error parsing YAML in built-in rules file %s: %s"),
+-                  built_in_rules_dir, e)
++                  rules_file, e)
+         raise
+     except Exception as e:
+         LOG.error(_("Error loading built-in rules from %s: %s"),
+-                  built_in_rules_dir, e)
++                  rules_file, e)
+         raise
+ 
+     return built_in_rules
+@@ -148,7 +152,7 @@ def apply_rules(task, inventory, plugin_data, inspection_phase):
+         context=task.context,
+         filters={'phase': inspection_phase})
+ 
+-    built_in_rules = get_built_in_rules()
++    built_in_rules = get_built_in_rules(CONF.inspection_rules.built_in_rules)
+     rules = all_rules + built_in_rules
+ 
+     if not rules:
+diff --git a/ironic/common/inspection_rules/validation.py b/ironic/common/inspection_rules/validation.py
+index 347075ef1..7e15d6780 100644
+--- a/ironic/common/inspection_rules/validation.py
++++ b/ironic/common/inspection_rules/validation.py
+@@ -28,10 +28,11 @@ class InspectionPhase(enum.Enum):
+ 
+ # TODO(stephenfin): Everything here can and should be moved to the jsonschema
+ # schemas, but doing so will change responses.
+-def validate_rule(rule):
++def validate_rule(rule, built_in=False):
+     """Validate an inspection rule using the JSON schema.
+ 
+     :param rule: The inspection rule to validate.
++    :param built_in: Should this rule be treated as built in for validation
+     :raises: Invalid if the rule is invalid.
+     """
+     try:
+@@ -51,10 +52,10 @@ def validate_rule(rule):
+             })
+ 
+     priority = rule.get('priority', 0)
+-    if priority < 0 and not rule.get('built_in'):
++    if priority < 0 and not built_in:
+         errors.append(
+             _("Priority cannot be negative for user-defined rules."))
+-    if priority > 9999 and not rule.get('built_in'):
++    if priority > 9999 and not built_in:
+         errors.append(
+             _("Priority must be between 0 and 9999 for user-defined rules."))
+ 
+diff --git a/ironic/tests/unit/common/test_inspection_rule.py b/ironic/tests/unit/common/test_inspection_rule.py
+index 81299073c..450b5f886 100644
+--- a/ironic/tests/unit/common/test_inspection_rule.py
++++ b/ironic/tests/unit/common/test_inspection_rule.py
+@@ -11,6 +11,7 @@
+ #    under the License.
+ 
+ from unittest import mock
++import yaml
+ 
+ from oslo_utils import uuidutils
+ 
+@@ -22,6 +23,7 @@ from ironic.common.inspection_rules import utils
+ from ironic.common.inspection_rules import validation
+ from ironic.conductor import task_manager
+ from ironic.tests.unit.db import base as db_base
++from ironic.tests.unit.db import utils as db_utils
+ from ironic.tests.unit.objects import utils as obj_utils
+ 
+ 
+@@ -71,6 +73,27 @@ class TestInspectionRules(db_base.DbTestCase):
+             self.context, sensitive=True)
+ 
+ 
++class TestLoadRules(TestInspectionRules):
++    def test_load_rules(self):
++        test_rules = [db_utils.get_test_inspection_rule()]
++        test_rules_yaml = yaml.safe_dump(test_rules)
++        with mock.patch('builtins.open', mock.mock_open(
++                read_data=test_rules_yaml)):
++            loaded_rules = engine.get_built_in_rules("fake_file")
++            for rule in test_rules:
++                del rule["version"]
++            self.assertEqual(test_rules, loaded_rules)
++
++    def test_load_rules_not_list(self):
++        test_rule = db_utils.get_test_inspection_rule()
++        test_rule_yaml = yaml.safe_dump(test_rule)
++        with mock.patch('builtins.open', mock.mock_open(
++                read_data=test_rule_yaml)):
++            self.assertRaises(exception.IronicException,
++                              engine.get_built_in_rules,
++                              "fake_file")
++
++
+ @mock.patch('ironic.objects.InspectionRule.list', autospec=True)
+ class TestApplyRules(TestInspectionRules):
+     def setUp(self):
+diff --git a/releasenotes/notes/inspection-rules-built-in-load-00958e99e3ab7ecb.yaml b/releasenotes/notes/inspection-rules-built-in-load-00958e99e3ab7ecb.yaml
+new file mode 100644
+index 000000000..7b11559e0
+--- /dev/null
++++ b/releasenotes/notes/inspection-rules-built-in-load-00958e99e3ab7ecb.yaml
+@@ -0,0 +1,5 @@
++---
++fixes:
++  - |
++    Fix the loading of built-in inspection rules which are supplied via a file
++    on the conductor. See `bug 2136776 <https://bugs.launchpad.net/ironic/+bug/2136776>`_
+-- 
+2.39.1
