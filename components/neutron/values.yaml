@@ -59,9 +59,10 @@ conf:
         # to configure this instead
         vni_ranges: ""
       ovn:
-        # remove this when fix goes into openstack helm
-        ovn_nb_connection: "tcp:$OVN_OVSDB_NB_SERVICE_HOST:$OVN_OVSDB_NB_SERVICE_PORT_OVSDB"
-        ovn_sb_connection: "tcp:$OVN_OVSDB_SB_SERVICE_HOST:$OVN_OVSDB_SB_SERVICE_PORT_OVSDB"
+        # remove this when we upgrade to a chart with
+        # https://review.opendev.org/c/openstack/openstack-helm/+/971656
+        ovn_nb_connection: "tcp:ovn-ovsdb-nb.openstack.svc:6641"
+        ovn_sb_connection: "tcp:ovn-ovsdb-sb.openstack.svc:6642"
   neutron:
     DEFAULT:
       # https://docs.openstack.org/neutron/latest/admin/config-wsgi.html
