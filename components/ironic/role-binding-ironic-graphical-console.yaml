@@ -10,4 +10,4 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: ironic-conductor
-    namespace: namespace
+    namespace: openstack
