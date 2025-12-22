@@ -9,3 +9,4 @@
 0006-Add-Redfish-LLDP-data-collection-support-to-the-Redf.patch
 0007-Add-LLDP-collect-for-DRAC-Redfish-inspection.patch
 0008-fix-port-endpoints-did-not-return-vendor-and-categor.patch
+0009-kubernetes-console-provider.patch
