@@ -58,6 +58,10 @@ conf:
         # OSH sets a default range here but we want to use network_segment_range plugin
         # to configure this instead
         vni_ranges: ""
+      ovn:
+        # remove this when fix goes into openstack helm
+        ovn_nb_connection: "tcp:$OVN_OVSDB_NB_SERVICE_HOST:$OVN_OVSDB_NB_SERVICE_PORT_OVSDB"
+        ovn_sb_connection: "tcp:$OVN_OVSDB_SB_SERVICE_HOST:$OVN_OVSDB_SB_SERVICE_PORT_OVSDB"
   neutron:
     DEFAULT:
       # https://docs.openstack.org/neutron/latest/admin/config-wsgi.html
@@ -106,54 +110,27 @@ conf:
 
 # disable the neutron-ironic-agent from loading a non-existent config
 pod:
-  mounts:
+  etcSources:
     neutron_db_sync:
-      neutron_db_sync:
-        volumeMounts:
-          # this is upstream but since we're making a list it gets replaced
-          - name: db-sync-conf
-            mountPath: /etc/neutron/plugins/ml2/ml2_conf.ini
-            subPath: ml2_conf.ini
-            readOnly: true
-          - name: neutron-etc-snippets
-            mountPath: /etc/neutron/neutron.conf.d/
-            readOnly: true
-        volumes:
-          - name: neutron-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: neutron-ks-etc
+      - secret:
+          name: neutron-ks-etc
     neutron_ironic_agent:
-      neutron_ironic_agent:
-        volumeMounts:
-          - name: neutron-etc-snippets
-            mountPath: /etc/neutron/neutron.conf.d/
-            readOnly: true
-        volumes:
-          - name: neutron-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: neutron-ks-etc
+      - secret:
+          name: neutron-ks-etc
+    neutron_server:
+      - secret:
+          name: neutron-ks-etc
+  mounts:
     neutron_server:
       neutron_server:
         volumeMounts:
           - mountPath: /etc/undersync/
             name: undersync-token
             readOnly: true
-          - name: neutron-etc-snippets
-            mountPath: /etc/neutron/neutron.conf.d/
-            readOnly: true
         volumes:
           - name: undersync-token
             secret:
               secretName: undersync-token
-          - name: neutron-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: neutron-ks-etc
 
   use_fqdn:
     neutron_agent: false
@@ -244,10 +221,6 @@ manifests:
   # that is later consumed via components/openstack helm chart
   secret_keystone: false
   secret_ks_etc: false
-  # less than ideal but currently necessary due to the way the chart
-  # hardcodes the config-file flag which then causes oslo.config to prefer
-  # that data over the directory which we want to override
-  configmap_bin: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
