@@ -58,11 +58,13 @@ conf:
         # OSH sets a default range here but we want to use network_segment_range plugin
         # to configure this instead
         vni_ranges: ""
-      ovn:
+      ovn: {}
         # remove this when we upgrade to a chart with
         # https://review.opendev.org/c/openstack/openstack-helm/+/971656
-        ovn_nb_connection: "tcp:ovn-ovsdb-nb.openstack.svc:6641"
-        ovn_sb_connection: "tcp:ovn-ovsdb-sb.openstack.svc:6642"
+        # DNS resolution does not work in OVS prior to 3.4.0 and noble
+        # uses 3.3.4. This is just a problem for the ovsdb-client CLI calls
+        #ovn_nb_connection: "tcp:ovn-ovsdb-nb.openstack.svc:6641"
+        #ovn_sb_connection: "tcp:ovn-ovsdb-sb.openstack.svc:6642"
   neutron:
     DEFAULT:
       # https://docs.openstack.org/neutron/latest/admin/config-wsgi.html
