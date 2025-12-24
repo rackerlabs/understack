@@ -10,14 +10,19 @@ metadata:
 
       - baremetal.node.provision_set.end which happens after a state change on the node
 
+      This sensor handles ALL provision state changes. The event handlers internally
+      filter for specific states:
+      - deploying: Sets up storage (volume connectors) for instances with storage enabled
+      - inspecting: Updates Nautobot device with inspection data (inventory, ports)
+
       Resulting code should be very similar to:
 
       ```
-      argo -n argo-events submit --from workflowtemplate/ironic-oslo-event \
-      -p event-json "JSON-payload" -p device_id=<UUID> -p project_id=<UUID>
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
+      -p event-json "JSON-payload"
       ```
 
-      Defined in `workflows/argo-events/sensors/sensor-ironic-oslo-event.yaml`
+      Defined in `components/site-workflows/sensors/sensor-ironic-oslo-event.yaml`
 spec:
   dependencies:
   - eventName: openstack
@@ -39,10 +44,6 @@ spec:
           type: "string"
           value:
             - "baremetal.node.provision_set.end"
-        - path: "body.ironic_object.previous_provision_state"
-          type: "string"
-          value:
-            - "deploying"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
@@ -56,9 +57,9 @@ spec:
               src:
                 dataKey: body
                 dependencyName: ironic-dep
-            - dest: spec.arguments.parameters.1.value # device_id
+            - dest: spec.arguments.parameters.1.value # previous_provision_state
               src:
-                dataKey: body.ironic_object.uuid
+                dataKey: body.ironic_object.previous_provision_state
                 dependencyName: ironic-dep
             - dest: spec.arguments.parameters.2.value # project_id
               src:
@@ -79,7 +80,7 @@ spec:
                 arguments:
                   parameters:
                     - name: event-json
-                    - name: device_id
+                    - name: previous_provision_state
                     - name: project_id
                 templates:
                 - name: main
@@ -93,6 +94,7 @@ spec:
                         - name: event-json
                           value: "{{workflow.parameters.event-json}}"
                     - name: convert-project-id
+                      when: "\"{{workflow.parameters.previous_provision_state}}\" == deploying"
                       inline:
                         script:
                           image: python:alpine
@@ -102,7 +104,7 @@ spec:
                               project_id_without_dashes = "{{workflow.parameters.project_id}}"
                               print(str(uuid.UUID(project_id_without_dashes)))
                   - - name: ansible-storage-update
-                      when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted"
+                      when: "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted && \"{{workflow.parameters.previous_provision_state}}\" == deploying"
                       templateRef:
                         name: ansible-workflow-template
                         template: ansible-run

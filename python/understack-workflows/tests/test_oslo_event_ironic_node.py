@@ -27,33 +27,31 @@ class TestIronicProvisionSetEvent:
         oslo_message = json.loads(sample_data["oslomessage"])
 
         # Create event data in the format expected by from_event_dict
-        ironic_data = oslo_message["payload"]["ironic_object.data"]
         event_data = {
-            "instance_uuid": ironic_data["instance_uuid"],
             "payload": oslo_message["payload"],
         }
 
         event = IronicProvisionSetEvent.from_event_dict(event_data)
 
-        # Verify the parsed values match the real data
-        # UUIDs are formatted with hyphens when converted to UUID objects
-        assert str(event.owner) == "32e02632-f4f0-4415-bab5-895d1e7247b7"
-        assert str(event.lessee) == "5f5955bc-89e1-48e5-9a12-110a3945e4d7"
-        assert str(event.instance_uuid) == "5027885e-52a8-48f9-adf4-14d8f5f4ccb8"
-        assert str(event.node_uuid) == "461737c4-037c-41bf-9c17-f4f33ff20dd7"
+        # Verify the parsed values match the real data (strings as stored in JSON)
+        # owner and lessee are undashed UUIDs in the sample
+        assert event.owner == "32e02632f4f04415bab5895d1e7247b7"
+        assert event.lessee == "5f5955bc89e148e59a12110a3945e4d7"
+        # instance_uuid and node_uuid have dashes in the sample
+        assert event.instance_uuid == "5027885e-52a8-48f9-adf4-14d8f5f4ccb8"
+        assert event.node_uuid == "461737c4-037c-41bf-9c17-f4f33ff20dd7"
         assert event.event == "done"
 
     def test_from_event_dict_no_payload(self):
         """Test event parsing with missing payload."""
-        event_data = {"instance_uuid": uuid.uuid4()}
+        event_data = {"instance_uuid": str(uuid.uuid4())}
 
-        with pytest.raises(ValueError, match="invalid event"):
+        with pytest.raises(ValueError, match="Invalid event. No 'payload'"):
             IronicProvisionSetEvent.from_event_dict(event_data)
 
     def test_from_event_dict_no_ironic_object_data(self):
         """Test event parsing with missing ironic_object.data."""
         event_data = {
-            "instance_uuid": uuid.uuid4(),
             "payload": {"other_field": "value"},
         }
 
@@ -65,10 +63,9 @@ class TestIronicProvisionSetEvent:
     def test_from_event_dict_missing_required_fields(self):
         """Test event parsing with missing required fields in ironic_object.data."""
         event_data = {
-            "instance_uuid": uuid.uuid4(),
             "payload": {
                 "ironic_object.data": {
-                    "owner": uuid.uuid4(),
+                    "owner": str(uuid.uuid4()),
                     # Missing lessee, event, uuid
                 }
             },
@@ -79,10 +76,10 @@ class TestIronicProvisionSetEvent:
 
     def test_direct_initialization(self):
         """Test direct initialization of IronicProvisionSetEvent."""
-        owner_uuid = uuid.uuid4()
-        lessee_uuid = uuid.uuid4()
-        instance_uuid = uuid.uuid4()
-        node_uuid = uuid.uuid4()
+        owner_uuid = str(uuid.uuid4())
+        lessee_uuid = str(uuid.uuid4())
+        instance_uuid = str(uuid.uuid4())
+        node_uuid = str(uuid.uuid4())
         event_type = "provision_end"
 
         event = IronicProvisionSetEvent(
@@ -119,14 +116,58 @@ class TestHandleProvisionEnd:
         return {
             "payload": {
                 "ironic_object.data": {
-                    "instance_uuid": uuid.uuid4(),
-                    "owner": uuid.uuid4(),
-                    "lessee": uuid.uuid4(),
+                    "instance_uuid": str(uuid.uuid4()),
+                    "owner": str(uuid.uuid4()),
+                    "lessee": str(uuid.uuid4()),
                     "event": "provision_end",
-                    "uuid": uuid.uuid4(),
+                    "uuid": str(uuid.uuid4()),
                 }
             },
         }
+
+    def test_handle_provision_end_no_payload_data(self, mock_conn, mock_nautobot):
+        """Test handling when payload data cannot be extracted."""
+        invalid_event_data = {"payload": None}
+
+        result = handle_provision_end(mock_conn, mock_nautobot, invalid_event_data)
+
+        assert result == 1
+
+    def test_handle_provision_end_no_lessee(self, mock_conn, mock_nautobot):
+        """Test handling when lessee is missing (not an instance deployment)."""
+        event_data = {
+            "payload": {
+                "ironic_object.data": {
+                    "instance_uuid": str(uuid.uuid4()),
+                    "owner": str(uuid.uuid4()),
+                    "lessee": None,
+                    "event": "done",
+                    "uuid": str(uuid.uuid4()),
+                }
+            },
+        }
+
+        result = handle_provision_end(mock_conn, mock_nautobot, event_data)
+
+        assert result == 0
+
+    def test_handle_provision_end_no_instance_uuid(self, mock_conn, mock_nautobot):
+        """Test handling when instance_uuid is missing (not an instance deployment)."""
+        event_data = {
+            "payload": {
+                "ironic_object.data": {
+                    "instance_uuid": None,
+                    "owner": str(uuid.uuid4()),
+                    "lessee": str(uuid.uuid4()),
+                    "event": "done",
+                    "uuid": str(uuid.uuid4()),
+                }
+            },
+        }
+
+        result = handle_provision_end(mock_conn, mock_nautobot, event_data)
+
+        assert result == 0
 
     @patch("understack_workflows.oslo_event.ironic_node.is_project_svm_enabled")
     def test_handle_provision_end_project_not_svm_enabled(
@@ -138,8 +179,9 @@ class TestHandleProvisionEnd:
         result = handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
 
         assert result == 0
-        lessee_uuid = valid_event_data["payload"]["ironic_object.data"]["lessee"]
-        mock_is_svm_enabled.assert_called_once_with(mock_conn, str(lessee_uuid.hex))
+        lessee = valid_event_data["payload"]["ironic_object.data"]["lessee"]
+        lessee_undashed = uuid.UUID(lessee).hex
+        mock_is_svm_enabled.assert_called_once_with(mock_conn, lessee_undashed)
 
     @patch("understack_workflows.oslo_event.ironic_node.create_volume_connector")
     @patch("understack_workflows.oslo_event.ironic_node.save_output")
@@ -198,8 +240,8 @@ class TestHandleProvisionEnd:
         # Check save_output calls
         expected_calls = [
             ("storage", "wanted"),
-            ("node_uuid", str(node_uuid)),
-            ("instance_uuid", str(instance_uuid)),
+            ("node_uuid", node_uuid),
+            ("instance_uuid", instance_uuid),
         ]
         actual_calls = [call.args for call in mock_save_output.call_args_list]
         assert actual_calls == expected_calls
@@ -237,8 +279,8 @@ class TestHandleProvisionEnd:
         # Check save_output calls
         expected_calls = [
             ("storage", "not-set"),
-            ("node_uuid", str(node_uuid)),
-            ("instance_uuid", str(instance_uuid)),
+            ("node_uuid", node_uuid),
+            ("instance_uuid", instance_uuid),
         ]
         actual_calls = [call.args for call in mock_save_output.call_args_list]
         assert actual_calls == expected_calls
@@ -264,23 +306,21 @@ class TestHandleProvisionEnd:
         mock_server.metadata = {"other_key": "value"}
         mock_conn.get_server_by_id.return_value = mock_server
 
-        # This should raise a KeyError when accessing metadata["storage"]
-        with pytest.raises(KeyError):
-            handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
+        result = handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
 
-    @patch("understack_workflows.oslo_event.ironic_node.is_project_svm_enabled")
-    def test_handle_provision_end_invalid_event_data(
-        self, mock_is_svm_enabled, mock_conn, mock_nautobot
-    ):
-        """Test handling with invalid event data."""
-        invalid_event_data = {"instance_uuid": uuid.uuid4(), "payload": {}}
+        # Should return 0 and set storage to "not-set" (uses .get())
+        assert result == 0
+        ironic_data = valid_event_data["payload"]["ironic_object.data"]
+        instance_uuid = ironic_data["instance_uuid"]
+        node_uuid = ironic_data["uuid"]
 
-        with pytest.raises(
-            ValueError, match="Invalid event. No 'ironic_object.data' in payload"
-        ):
-            handle_provision_end(mock_conn, mock_nautobot, invalid_event_data)
-
-        mock_is_svm_enabled.assert_not_called()
+        expected_calls = [
+            ("storage", "not-set"),
+            ("node_uuid", node_uuid),
+            ("instance_uuid", instance_uuid),
+        ]
+        actual_calls = [call.args for call in mock_save_output.call_args_list]
+        assert actual_calls == expected_calls
 
 
 class TestCreateVolumeConnector:
@@ -295,10 +335,10 @@ class TestCreateVolumeConnector:
     def sample_event(self):
         """Create a sample IronicProvisionSetEvent."""
         return IronicProvisionSetEvent(
-            owner=uuid.uuid4(),
-            lessee=uuid.uuid4(),
-            instance_uuid=uuid.uuid4(),
-            node_uuid=uuid.uuid4(),
+            owner=str(uuid.uuid4()),
+            lessee=str(uuid.uuid4()),
+            instance_uuid=str(uuid.uuid4()),
+            node_uuid=str(uuid.uuid4()),
             event="provision_end",
         )
 
@@ -321,7 +361,7 @@ class TestCreateVolumeConnector:
         self, mock_conn, sample_event
     ):
         """Test volume connector creation with different instance UUID."""
-        different_instance_uuid = uuid.uuid4()
+        different_instance_uuid = str(uuid.uuid4())
         sample_event.instance_uuid = different_instance_uuid
 
         mock_connector = MagicMock()
@@ -354,7 +394,7 @@ class TestInstanceNqn:
 
     def test_instance_nqn_format(self):
         """Test NQN format generation."""
-        test_uuid = uuid.uuid4()
+        test_uuid = str(uuid.uuid4())
         expected_nqn = f"nqn.2014-08.org.nvmexpress:uuid:{test_uuid}"
 
         result = instance_nqn(test_uuid)
@@ -363,8 +403,8 @@ class TestInstanceNqn:
 
     def test_instance_nqn_different_uuids(self):
         """Test NQN generation with different UUIDs."""
-        uuid1 = uuid.uuid4()
-        uuid2 = uuid.uuid4()
+        uuid1 = str(uuid.uuid4())
+        uuid2 = str(uuid.uuid4())
 
         nqn1 = instance_nqn(uuid1)
         nqn2 = instance_nqn(uuid2)
@@ -375,18 +415,17 @@ class TestInstanceNqn:
 
     def test_instance_nqn_prefix_constant(self):
         """Test that NQN prefix is consistent."""
-        test_uuid = uuid.uuid4()
+        test_uuid = str(uuid.uuid4())
         result = instance_nqn(test_uuid)
 
         assert result.startswith("nqn.2014-08.org.nvmexpress:uuid:")
-        assert str(test_uuid) in result
+        assert test_uuid in result
 
     def test_instance_nqn_with_known_uuid(self):
         """Test NQN generation with a known UUID string."""
         known_uuid_str = "12345678-1234-5678-9abc-123456789abc"
-        known_uuid = uuid.UUID(known_uuid_str)
         expected_nqn = f"nqn.2014-08.org.nvmexpress:uuid:{known_uuid_str}"
 
-        result = instance_nqn(known_uuid)
+        result = instance_nqn(known_uuid_str)
 
         assert result == expected_nqn

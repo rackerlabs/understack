@@ -8,18 +8,15 @@ metadata:
     workflows.argoproj.io/description: |+
       Triggers on the following Ironic Events:
 
-      - baremetal.node.provision_set.end which happens after a state change on the node
-      - baremetal.node.update.end which happens when node fields are updated.
-
-      Currently parses out the following fields:
-
-      - provision_state
+      - baremetal.node.create.end which happens when a baremetal node is created
+      - baremetal.node.update.end which happens when node fields are updated
+      - baremetal.node.delete.end which happens when a node is deleted
 
       Resulting code should be very similar to:
 
       ```
-      argo -n argo-events submit --from workflowtemplate/sync-provision-state-to-nautobot \
-      -p device_uuid=00000000-0000-0000-0000-000000000000 -p provision_state=available
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
+      -p event-json "JSON-payload"
       ```
 
       Defined in `workflows/argo-events/sensors/ironic-node-update.yaml`
@@ -30,16 +27,19 @@ spec:
     name: ironic-dep
     transform:
       # the event is a string-ified JSON so we need to decode it
-      jq: ".body[\"oslo.message\"] | fromjson"
+      # replace the whole event body
+      jq: |
+        .body = (.body["oslo.message"] | fromjson)
     filters:
       # applies each of the items in data with 'and' but there's only one
       dataLogicalOperator: "and"
       data:
-        - path: "event_type"
+        - path: "body.event_type"
           type: "string"
           value:
+            - "baremetal.node.create.end"
             - "baremetal.node.update.end"
-            - "baremetal.node.provision_set.end"
+            - "baremetal.node.delete.end"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
@@ -49,25 +49,10 @@ spec:
         k8s:
           operation: create
           parameters:
-            # first parameter's value is replaced with the uuid
+            # first parameter is the parsed oslo.message
             - dest: spec.arguments.parameters.0.value
               src:
-                dataKey: payload.ironic_object\.data.uuid
-                dependencyName: ironic-dep
-            # second parameter's value is replaced with the provision_state
-            - dest: spec.arguments.parameters.1.value
-              src:
-                dataKey: payload.ironic_object\.data.provision_state
-                dependencyName: ironic-dep
-            # third parameter's value is replaced with the lessee
-            - dest: spec.arguments.parameters.2.value
-              src:
-                dataKey: payload.ironic_object\.data.lessee
-                dependencyName: ironic-dep
-            # fourth parameter's value is replaced with the resource_class
-            - dest: spec.arguments.parameters.3.value
-              src:
-                dataKey: payload.ironic_object\.data.resource_class
+                dataKey: body
                 dependencyName: ironic-dep
           source:
             # create a workflow in argo-events prefixed with ironic-node-update-
@@ -81,10 +66,7 @@ spec:
                 # defines the parameters being replaced above
                 arguments:
                   parameters:
-                    - name: device_uuid
-                    - name: provision_state
-                    - name: lessee
-                    - name: resource_class
+                    - name: event-json
                 # references the workflow
                 workflowTemplateRef:
-                  name: sync-provision-state-to-nautobot
+                  name: openstack-oslo-event
