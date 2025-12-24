@@ -1,4 +1,4 @@
 ---
 component: neutron
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.2.11+9b270fe35
+chartVersion: 2025.2.12+9cc7c1ea9
