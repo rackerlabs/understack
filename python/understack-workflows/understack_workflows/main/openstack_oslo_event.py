@@ -72,6 +72,7 @@ _event_handlers: dict[str, EventHandler] = {
     "baremetal.portgroup.update.end": ironic_portgroup.handle_portgroup_create_update,
     "baremetal.portgroup.delete.end": ironic_portgroup.handle_portgroup_delete,
     "baremetal.node.provision_set.end": ironic_node.handle_provision_end,
+    "compute.instance.delete.end": ironic_node.handle_instance_delete,
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,
     "identity.project.deleted": keystone_project.handle_project_deleted,
