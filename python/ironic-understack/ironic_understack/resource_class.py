@@ -25,6 +25,9 @@ class ResourceClassHook(base.InspectionHook):
 
     def __call__(self, task, inventory, plugin_data):
         """Update node resource_class with matched resource class."""
+        # clear the existing resource_class
+        task.node.resource_class = None
+
         try:
             memory_mb = inventory["memory"]["physical_mb"]
             disk_size_gb = int(int(inventory["disks"][0]["size"]) / 10**9)
@@ -60,7 +63,6 @@ class ResourceClassHook(base.InspectionHook):
                 task.node.uuid,
             )
             task.node.resource_class = resource_class_name
-            task.node.save()
         except (KeyError, ValueError, TypeError):
             msg = (
                 f"Inventory has missing hardware information for node {task.node.uuid}."
@@ -72,6 +74,9 @@ class ResourceClassHook(base.InspectionHook):
         except NoMatchError:
             msg = f"No matching resource class found for {task.node.uuid}"
             LOG.error(msg)
+
+        # always save so that we clear it if we failed to find a match
+        task.node.save()
 
     def classify(self, machine):
         matcher = Matcher(device_types=DEVICE_TYPES)
