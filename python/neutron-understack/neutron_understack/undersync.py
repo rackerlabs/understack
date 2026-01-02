@@ -1,4 +1,5 @@
 import pathlib
+import urllib.parse
 from functools import cached_property
 
 import requests
@@ -57,6 +58,7 @@ class Undersync:
         return session
 
     def _undersync_post(self, action: str, vlan_group: str) -> requests.Response:
+        vlan_group = urllib.parse.quote(vlan_group, safe="")
         response = self.client.post(
             f"{self.api_url}/v1/vlan-group/{vlan_group}/{action}", timeout=self.timeout
         )
