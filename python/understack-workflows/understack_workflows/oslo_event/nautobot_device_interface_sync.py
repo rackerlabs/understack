@@ -30,7 +30,7 @@ INTERFACE_TYPE_MAP = {
     "embedded": "25gbase-x-sfp28",  # Embedded NICs
     "integrated": "25gbase-x-sfp28",  # Integrated NICs
 }
-DEFAULT_INTERFACE_TYPE = "25gbase-x-sfp28"
+DEFAULT_INTERFACE_TYPE = "unknown"
 
 
 @dataclass
@@ -336,41 +336,6 @@ def _build_interfaces_from_ports(
         interfaces.append(interface)
 
     return interfaces
-
-
-def fetch_device_interfaces(
-    node_uuid: str,
-    ironic_client: IronicClient,
-) -> tuple[DeviceInterfacesInfo, dict]:
-    """Fetch all interface info for a device from Ironic.
-
-    Args:
-        node_uuid: Ironic node UUID
-        ironic_client: Ironic API client
-
-    Returns:
-        Tuple of (DeviceInterfacesInfo with all interfaces, inventory dict)
-    """
-    result = DeviceInterfacesInfo(device_uuid=node_uuid)
-
-    # Fetch inventory for interface names
-    try:
-        inventory = ironic_client.get_node_inventory(node_ident=node_uuid)
-    except Exception as e:
-        logger.warning("Could not fetch inventory for node %s: %s", node_uuid, e)
-        inventory = {}
-
-    # Build MAC -> interface info map from inventory
-    inventory_map = _build_interface_map_from_inventory(inventory)
-
-    # Fetch ports (these have the UUIDs we need)
-    ports = ironic_client.list_ports(node_id=node_uuid)
-
-    # Build interface list
-    result.interfaces = _build_interfaces_from_ports(node_uuid, ports, inventory_map)
-
-    logger.info("Fetched %d interfaces for node %s", len(result.interfaces), node_uuid)
-    return result, inventory
 
 
 def _get_record_value(record, attr: str = "value") -> str | None:
