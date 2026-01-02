@@ -92,7 +92,7 @@ conf:
       hooks: "ramdisk-error,validate-interfaces,architecture,pci-devices,validate-interfaces,parse-lldp,resource-class,update-baremetal-port"
     redfish:
       # Redfish inspection hooks run after inspecting out-of-band using the BMC:
-      inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices"
+      inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class"
       add_ports: "all"
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
     sensor_data:
