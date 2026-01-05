@@ -9,6 +9,7 @@ on:
     paths:
       - "ansible/**"
       - "containers/**"
+      - "python/**"
       - ".github/workflows/containers.yaml"
       - ".github/workflows/build-container-reuse.yaml"
   pull_request:
@@ -16,6 +17,7 @@ on:
     paths:
       - "ansible/**"
       - "containers/**"
+      - "python/**"
       - ".github/workflows/containers.yaml"
       - ".github/workflows/build-container-reuse.yaml"
   workflow_dispatch:
