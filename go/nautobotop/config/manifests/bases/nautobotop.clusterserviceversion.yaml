@@ -1,0 +1,45 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: nautobotop.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Nautobot is the Schema for the nautobots API.
+      displayName: Nautobot
+      kind: Nautobot
+      name: nautobots.sync.rax.io
+      version: v1alpha1
+  description: d
+  displayName: d
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - d
+  links:
+  - name: Nautobotop
+    url: https://nautobotop.domain
+  maturity: alpha
+  provider:
+    name: d
+    url: d
+  version: 0.0.0
