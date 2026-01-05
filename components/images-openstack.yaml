@@ -88,8 +88,9 @@ images:
     glance_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
     # skyline
-    skyline: "quay.io/airshipit/skyline:latest"
-    skyline_db_sync: "quay.io/airshipit/skyline:latest"
+    skyline: "quay.io/airshipit/skyline:2025.2-ubuntu_noble"
+    skyline_db_sync: "quay.io/airshipit/skyline:2025.2-ubuntu_noble"
+    skyline_nginx: "quay.io/airshipit/skyline:2025.2-ubuntu_noble"
 
     # cinder
     cinder_api: "ghcr.io/rackerlabs/understack/cinder:2025.2"
