@@ -24,6 +24,9 @@ from understack_workflows.ironic.client import IronicClient
 
 logger = setup_logger(__name__)
 
+EXIT_STATUS_SUCCESS = 0
+EXIT_STATUS_FAILURE = 1
+
 # Interface type mapping based on NIC naming conventions
 INTERFACE_TYPE_MAP = {
     "slot": "25gbase-x-sfp28",  # PCIe slot NICs typically 25GbE
@@ -75,67 +78,54 @@ def _get_interface_description(name: str) -> str:
     """Generate human-readable description from interface name.
 
     Examples:
+        NIC.Embedded.1-1 -> "Embedded NIC 1 Port 1"
         NIC.Embedded.1-1-1 -> "Embedded NIC 1 Port 1 Partition 1"
-        NIC.Embedded.2-1-1 -> "Embedded NIC 2 Port 1 Partition 1"
         NIC.Integrated.1-1 -> "Integrated NIC 1 Port 1"
-        NIC.Integrated.1-2 -> "Integrated NIC 1 Port 2"
+        NIC.Integrated.1-1-1 -> "Integrated NIC 1 Port 1 Partition 1"
         NIC.Slot.1-1 -> "NIC in Slot 1 Port 1"
         NIC.Slot.1-2 -> "NIC in Slot 1 Port 2"
     """
-    name_lower = name.lower()
-
-    if "idrac" in name_lower:
+    if "idrac" in name.lower():
         return "Dedicated iDRAC interface"
 
-    # Extract the suffix part (e.g., "1-1-1", "2-1-1", "1-1", "1-2")
-    parts = name.split(".")
-    if len(parts) < 3:
+    parts = name.rsplit(".", 1)
+    if len(parts) != 2:
         return ""
 
-    suffix = parts[2]  # e.g., "1-1-1" or "1-2"
-    suffix_parts = suffix.split("-")
+    [prefix, suffix] = parts
+    prefix = {
+        "nic.integrated": "Integrated NIC",
+        "nic.embedded": "Embedded NIC",
+        "nic.slot": "NIC in Slot",
+    }.get(prefix.lower())
 
-    if "embedded" in name_lower:
-        # NIC.Embedded.X-Y-Z -> Embedded NIC X Port Y Partition Z
-        if len(suffix_parts) >= 3:
-            nic, port, part = suffix_parts[0], suffix_parts[1], suffix_parts[2]
-            return f"Embedded NIC {nic} Port {port} Partition {part}"
-        elif len(suffix_parts) >= 2:
-            return f"Embedded NIC {suffix_parts[0]} Port {suffix_parts[1]}"
+    if prefix is None:
+        return ""
 
-    if "integrated" in name_lower:
-        # NIC.Integrated.X-Y -> Integrated NIC X Port Y
-        if len(suffix_parts) >= 2:
-            return f"Integrated NIC {suffix_parts[0]} Port {suffix_parts[1]}"
-
-    if "slot" in name_lower:
-        # NIC.Slot.X-Y -> NIC in Slot X Port Y
-        if len(suffix_parts) >= 2:
-            return f"NIC in Slot {suffix_parts[0]} Port {suffix_parts[1]}"
-
-    return ""
+    match suffix.split("-"):
+        case [nic, port]:
+            return f"{prefix} {nic} Port {port}"
+        case [nic, port, partition]:
+            return f"{prefix} {nic} Port {port} Partition {partition}"
+        case _:
+            return ""
 
 
-def _build_interface_map_from_inventory(inventory: dict) -> dict[str, dict]:
-    """Build a map of MAC address -> interface info from inventory.
+def _build_interface_map_from_inventory(inventory: dict) -> dict[str, str]:
+    """Build a map of MAC address -> interface name from inventory.
 
     Args:
         inventory: Ironic node inventory dict
 
     Returns:
-        Dict mapping MAC address (lowercase) to interface details
+        Dict mapping MAC address (lowercase) to interface name
     """
-    interface_map = {}
-    inv = inventory.get("inventory", {})
-
-    for iface in inv.get("interfaces", []):
-        mac = iface.get("mac_address", "").lower()
-        if mac:
-            interface_map[mac] = {
-                "name": iface.get("name", ""),
-            }
-
-    return interface_map
+    interfaces = inventory.get("inventory", {}).get("interfaces", [])
+    return {
+        interface["mac_address"].lower(): interface["name"]
+        for interface in interfaces
+        if "mac_address" in interface and "name" in interface
+    }
 
 
 def _assign_ip_to_interface(
@@ -292,7 +282,7 @@ def sync_idrac_interface(
 def _build_interfaces_from_ports(
     node_uuid: str,
     ports: list,
-    inventory_map: dict[str, dict],
+    inventory_map: dict[str, str],
 ) -> list[InterfaceInfo]:
     """Build InterfaceInfo list from Ironic ports and inventory.
 
@@ -314,8 +304,7 @@ def _build_interfaces_from_ports(
         # Get interface name: prefer bios_name from extra, then inventory,
         # then port name
         bios_name = extra.get("bios_name")
-        inv_info = inventory_map.get(mac, {})
-        inv_name = inv_info.get("name", "")
+        inv_name = inventory_map.get(mac, "")
 
         # Priority: bios_name > inventory name > port name > port UUID
         name = bios_name or inv_name or port.name or port.uuid
@@ -336,15 +325,6 @@ def _build_interfaces_from_ports(
         interfaces.append(interface)
 
     return interfaces
-
-
-def _get_record_value(record, attr: str = "value") -> str | None:
-    """Extract value from pynautobot Record object."""
-    if record is None:
-        return None
-    if hasattr(record, attr):
-        return getattr(record, attr)
-    return str(record) if record else None
 
 
 def _create_nautobot_interface(
@@ -397,6 +377,35 @@ def _delete_nautobot_interface(nautobot_intf, nautobot_client: Nautobot) -> None
     logger.info("Deleted interface %s from Nautobot", intf_id)
 
 
+def _cleanup_stale_interfaces(
+    node_uuid: str,
+    valid_interface_ids: set[str],
+    nautobot_client: Nautobot,
+) -> None:
+    """Remove interfaces from Nautobot that no longer exist in Ironic.
+
+    Args:
+        node_uuid: Device UUID
+        valid_interface_ids: Set of interface UUIDs that should exist
+        nautobot_client: Nautobot API client
+    """
+    existing_interfaces = nautobot_client.dcim.interfaces.filter(device_id=node_uuid)
+
+    for intf in existing_interfaces:
+        intf_name = getattr(intf, "name", None)
+        intf_id = getattr(intf, "id", None)
+
+        # Skip iDRAC - it's managed separately and not in Ironic ports
+        if intf_name == "iDRAC":
+            continue
+
+        if intf_id not in valid_interface_ids:
+            try:
+                _delete_nautobot_interface(intf, nautobot_client)
+            except Exception as e:
+                logger.warning("Failed to delete stale interface %s: %s", intf_id, e)
+
+
 def _update_nautobot_interface(
     interface: InterfaceInfo,
     nautobot_intf,
@@ -437,14 +446,13 @@ def _update_nautobot_interface(
         logger.debug("Updating interface name: %s", interface.name)
 
     # MAC address
-    current_mac = _get_record_value(nautobot_intf.mac_address)
-    if interface.mac_address and current_mac != interface.mac_address:
+    if interface.mac_address and nautobot_intf.mac_address != interface.mac_address:
         nautobot_intf.mac_address = interface.mac_address
         updated = True
         logger.debug("Updating interface MAC: %s", interface.mac_address)
 
     # Type
-    current_type = _get_record_value(nautobot_intf.type, "value")
+    current_type = getattr(nautobot_intf.type, "value", None)
     if interface.interface_type and current_type != interface.interface_type:
         nautobot_intf.type = interface.interface_type
         updated = True
@@ -504,13 +512,9 @@ def _handle_cable_management(
     if nautobot_intf.cable:
         cable = nautobot_intf.cable
         # Verify cable connects to correct switch port
-        if (
-            cable.termination_a_id == interface.uuid
-            and cable.termination_b_id == switch_intf_id
-        ) or (
-            cable.termination_b_id == interface.uuid
-            and cable.termination_a_id == switch_intf_id
-        ):
+        actual_terminations = {cable.termination_a_id, cable.termination_b_id}
+        required_terminations = {interface.uuid, switch_intf_id}
+        if actual_terminations == required_terminations:
             logger.debug(
                 "Cable already exists correctly for interface %s", interface.uuid
             )
@@ -564,11 +568,11 @@ def sync_interfaces_from_data(
         nautobot_client: Nautobot API client
 
     Returns:
-        0 on success, 1 on failure
+        EXIT_STATUS_SUCCESS on success, EXIT_STATUS_FAILURE on failure
     """
     if not node_uuid:
         logger.error("Missing node UUID")
-        return 1
+        return EXIT_STATUS_FAILURE
 
     try:
         # Build MAC -> interface info map from inventory
@@ -597,16 +601,20 @@ def sync_interfaces_from_data(
         if bmc_mac:
             sync_idrac_interface(node_uuid, bmc_mac, nautobot_client, bmc_ip)
 
+        # Cleanup stale interfaces no longer in Ironic
+        valid_ids = {intf.uuid for intf in interfaces}
+        _cleanup_stale_interfaces(node_uuid, valid_ids, nautobot_client)
+
         logger.info(
             "Synced %d interfaces for node %s to Nautobot",
             len(interfaces),
             node_uuid,
         )
-        return 0
+        return EXIT_STATUS_SUCCESS
 
     except Exception:
         logger.exception("Failed to sync interfaces for node %s to Nautobot", node_uuid)
-        return 1
+        return EXIT_STATUS_FAILURE
 
 
 def sync_interfaces_to_nautobot(
@@ -626,12 +634,8 @@ def sync_interfaces_to_nautobot(
         ironic_client: Optional Ironic client (created if not provided)
 
     Returns:
-        0 on success, 1 on failure
+        EXIT_STATUS_SUCCESS on success, EXIT_STATUS_FAILURE on failure
     """
-    if not node_uuid:
-        logger.error("Missing node UUID")
-        return 1
-
     try:
         if ironic_client is None:
             ironic_client = IronicClient()
@@ -651,7 +655,7 @@ def sync_interfaces_to_nautobot(
 
     except Exception:
         logger.exception("Failed to sync interfaces for node %s to Nautobot", node_uuid)
-        return 1
+        return EXIT_STATUS_FAILURE
 
 
 def _extract_node_uuid_from_event(event_data: dict[str, Any]) -> str | None:
@@ -687,12 +691,12 @@ def handle_interface_sync_event(
         event_data: Raw event data dict
 
     Returns:
-        0 on success, 1 on failure
+        EXIT_STATUS_SUCCESS on success, EXIT_STATUS_FAILURE on failure
     """
     node_uuid = _extract_node_uuid_from_event(event_data)
     if not node_uuid:
         logger.error("Could not extract node UUID from event: %s", event_data)
-        return 1
+        return EXIT_STATUS_FAILURE
 
     event_type = event_data.get("event_type", "unknown")
     logger.info("Handling %s - syncing interfaces for node %s", event_type, node_uuid)

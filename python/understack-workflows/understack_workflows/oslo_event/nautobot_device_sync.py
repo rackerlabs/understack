@@ -26,6 +26,9 @@ from understack_workflows.oslo_event.nautobot_device_interface_sync import (
 
 logger = setup_logger(__name__)
 
+EXIT_STATUS_SUCCESS = 0
+EXIT_STATUS_FAILURE = 1
+
 
 @dataclass
 class DeviceInfo:
@@ -76,23 +79,18 @@ class RackLocationError(Exception):
     pass
 
 
-def _parse_manufacturer(name: str) -> str:
-    """Parse manufacturer name to Nautobot-friendly format."""
+def _normalise_manufacturer(name: str) -> str:
+    """Return a standard name for Manufacturer."""
     if "DELL" in name.upper():
         return "Dell"
-    # Add more manufacturers as needed
+    elif "HP" in name.upper():
+        return "HP"
     raise ValueError(f"Server manufacturer {name} not supported")
 
 
 def _populate_from_node(device_info: DeviceInfo, node) -> None:
     """Populate device info from Ironic node object."""
-    # Properties
     props = node.properties or {}
-
-    # Manufacturer from properties.vendor
-    vendor = props.get("vendor")
-    if vendor:
-        device_info.manufacturer = _parse_manufacturer(vendor)
 
     # Hardware specs
     if props.get("memory_mb"):
@@ -131,11 +129,10 @@ def _populate_from_inventory(device_info: DeviceInfo, inventory: dict | None) ->
     inv = inventory.get("inventory", {})
     system_vendor = inv.get("system_vendor", {})
 
-    # Manufacturer (fallback if not in properties)
-    if not device_info.manufacturer:
-        vendor = system_vendor.get("manufacturer")
-        if vendor:
-            device_info.manufacturer = _parse_manufacturer(vendor)
+    # Manufacturer from inventory
+    vendor = system_vendor.get("manufacturer")
+    if vendor:
+        device_info.manufacturer = _normalise_manufacturer(vendor)
 
     # Model - extract base model name, strip SKU/extra info in parentheses
     # e.g., "PowerEdge R7615 (SKU=0AF7;ModelName=PowerEdge R7615)" -> "PowerEdge R7615"
@@ -178,23 +175,12 @@ def _set_location_from_switches(
         for port in ports:
             llc = port.local_link_connection or {}
             switch_info = llc.get("switch_info")
-            switch_id = llc.get("switch_id")  # MAC address
 
             if not switch_info:
                 continue
 
-            # Find switch in Nautobot
+            # Find switch in Nautobot by name
             device = nautobot_client.dcim.devices.get(name=switch_info)
-
-            # Fallback: try MAC address
-            if not device and switch_id:
-                interfaces = list(
-                    nautobot_client.dcim.interfaces.filter(mac_address=switch_id)
-                )
-                if interfaces and interfaces[0].device:
-                    device = nautobot_client.dcim.devices.get(
-                        id=interfaces[0].device.id
-                    )
 
             if (
                 device
@@ -411,11 +397,11 @@ def sync_device_to_nautobot(
         sync_interfaces: Whether to also sync interfaces (default: True)
 
     Returns:
-        0 on success, 1 on failure
+        EXIT_STATUS_SUCCESS on success, EXIT_STATUS_FAILURE on failure
     """
     if not node_uuid:
         logger.error("Missing node UUID")
-        return 1
+        return EXIT_STATUS_FAILURE
 
     try:
         ironic_client = IronicClient()
@@ -432,7 +418,7 @@ def sync_device_to_nautobot(
             # Create new device with minimal fields
             if not device_info.location_id:
                 logger.error("Cannot create device %s: no location found", node_uuid)
-                return 1
+                return EXIT_STATUS_FAILURE
             nautobot_device = _create_nautobot_device(device_info, nautobot_client)
 
         # Update device with all fields (works for both new and existing)
@@ -443,7 +429,7 @@ def sync_device_to_nautobot(
             interface_result = sync_interfaces_from_data(
                 node_uuid, inventory, ports, nautobot_client
             )
-            if interface_result != 0:
+            if interface_result != EXIT_STATUS_SUCCESS:
                 logger.warning(
                     "Interface sync failed for node %s, device sync succeeded",
                     node_uuid,
@@ -451,11 +437,11 @@ def sync_device_to_nautobot(
                 # Don't fail the whole operation if interface sync fails
                 # Device is already synced successfully
 
-        return 0
+        return EXIT_STATUS_SUCCESS
 
     except Exception:
         logger.exception("Failed to sync device %s to Nautobot", node_uuid)
-        return 1
+        return EXIT_STATUS_FAILURE
 
 
 def _extract_node_uuid_from_event(event_data: dict[str, Any]) -> str | None:
@@ -504,12 +490,12 @@ def handle_node_event(
         event_data: Raw event data dict
 
     Returns:
-        0 on success, 1 on failure
+        EXIT_STATUS_SUCCESS on success, EXIT_STATUS_FAILURE on failure
     """
     node_uuid = _extract_node_uuid_from_event(event_data)
     if not node_uuid:
         logger.error("Could not extract node UUID from event: %s", event_data)
-        return 1
+        return EXIT_STATUS_FAILURE
 
     event_type = event_data.get("event_type", "unknown")
     logger.info("Handling %s for node %s", event_type, node_uuid)
@@ -525,26 +511,26 @@ def delete_device_from_nautobot(node_uuid: str, nautobot_client: Nautobot) -> in
         nautobot_client: Nautobot API client
 
     Returns:
-        0 on success, 1 on failure
+        EXIT_STATUS_SUCCESS on success, EXIT_STATUS_FAILURE on failure
     """
     if not node_uuid:
         logger.error("Missing node UUID for delete")
-        return 1
+        return EXIT_STATUS_FAILURE
 
     try:
         nautobot_device = nautobot_client.dcim.devices.get(id=node_uuid)
 
         if not nautobot_device or isinstance(nautobot_device, list):
             logger.info("Device %s not found in Nautobot, nothing to delete", node_uuid)
-            return 0
+            return EXIT_STATUS_SUCCESS
 
         nautobot_device.delete()
         logger.info("Deleted device %s from Nautobot", node_uuid)
-        return 0
+        return EXIT_STATUS_SUCCESS
 
     except Exception:
         logger.exception("Failed to delete device %s from Nautobot", node_uuid)
-        return 1
+        return EXIT_STATUS_FAILURE
 
 
 def handle_node_delete_event(
@@ -558,12 +544,12 @@ def handle_node_delete_event(
         event_data: Raw event data dict
 
     Returns:
-        0 on success, 1 on failure
+        EXIT_STATUS_SUCCESS on success, EXIT_STATUS_FAILURE on failure
     """
     node_uuid = _extract_node_uuid_from_event(event_data)
     if not node_uuid:
         logger.error("Could not extract node UUID from delete event: %s", event_data)
-        return 1
+        return EXIT_STATUS_FAILURE
 
     logger.info("Handling node delete for %s", node_uuid)
     return delete_device_from_nautobot(node_uuid, nautobot_client)

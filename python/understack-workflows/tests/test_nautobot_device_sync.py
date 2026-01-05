@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
+from understack_workflows.oslo_event.nautobot_device_sync import EXIT_STATUS_FAILURE
+from understack_workflows.oslo_event.nautobot_device_sync import EXIT_STATUS_SUCCESS
 from understack_workflows.oslo_event.nautobot_device_sync import DeviceInfo
 from understack_workflows.oslo_event.nautobot_device_sync import _create_nautobot_device
 from understack_workflows.oslo_event.nautobot_device_sync import (
@@ -13,7 +15,7 @@ from understack_workflows.oslo_event.nautobot_device_sync import (
 )
 from understack_workflows.oslo_event.nautobot_device_sync import _generate_device_name
 from understack_workflows.oslo_event.nautobot_device_sync import _get_record_value
-from understack_workflows.oslo_event.nautobot_device_sync import _parse_manufacturer
+from understack_workflows.oslo_event.nautobot_device_sync import _normalise_manufacturer
 from understack_workflows.oslo_event.nautobot_device_sync import (
     _populate_from_inventory,
 )
@@ -32,21 +34,24 @@ from understack_workflows.oslo_event.nautobot_device_sync import handle_node_eve
 from understack_workflows.oslo_event.nautobot_device_sync import sync_device_to_nautobot
 
 
-class TestParseManufacturer:
-    """Test cases for _parse_manufacturer function."""
+class TestNormaliseManufacturer:
+    """Test cases for _normalise_manufacturer function."""
 
-    def test_parse_dell_uppercase(self):
-        assert _parse_manufacturer("DELL INC.") == "Dell"
+    def test_normalise_dell_uppercase(self):
+        assert _normalise_manufacturer("DELL INC.") == "Dell"
 
-    def test_parse_dell_lowercase(self):
-        assert _parse_manufacturer("dell") == "Dell"
+    def test_normalise_dell_lowercase(self):
+        assert _normalise_manufacturer("dell") == "Dell"
 
-    def test_parse_dell_mixed_case(self):
-        assert _parse_manufacturer("Dell Inc.") == "Dell"
+    def test_normalise_dell_mixed_case(self):
+        assert _normalise_manufacturer("Dell Inc.") == "Dell"
+
+    def test_normalise_hp(self):
+        assert _normalise_manufacturer("HP") == "HP"
 
     def test_unsupported_manufacturer_raises(self):
         with pytest.raises(ValueError, match="not supported"):
-            _parse_manufacturer("HP")
+            _normalise_manufacturer("Lenovo")
 
 
 class TestPopulateFromNode:
@@ -60,7 +65,6 @@ class TestPopulateFromNode:
     def mock_node(self):
         node = MagicMock()
         node.properties = {
-            "vendor": "Dell Inc.",
             "memory_mb": 65536,
             "cpus": 32,
             "cpu_arch": "x86_64",
@@ -74,7 +78,6 @@ class TestPopulateFromNode:
     def test_populate_all_fields(self, device_info, mock_node):
         _populate_from_node(device_info, mock_node)
 
-        assert device_info.manufacturer == "Dell"
         assert device_info.memory_mb == 65536
         assert device_info.cpus == 32
         assert device_info.cpu_arch == "x86_64"
@@ -174,7 +177,7 @@ class TestPopulateFromInventory:
         assert device_info.model is None
 
     def test_manufacturer_fallback(self, device_info):
-        """Test manufacturer is set from inventory if not already set."""
+        """Test manufacturer is set from inventory."""
         device_info.manufacturer = "Dell"  # Already set
         inventory = {
             "inventory": {
@@ -186,8 +189,8 @@ class TestPopulateFromInventory:
 
         _populate_from_inventory(device_info, inventory)
 
-        # Should not override existing manufacturer
-        assert device_info.manufacturer == "Dell"
+        # Inventory always sets manufacturer
+        assert device_info.manufacturer == "HP"
 
 
 class TestGenerateDeviceName:
@@ -459,11 +462,11 @@ class TestSyncDeviceToNautobot:
         mock_fetch.return_value = (device_info, {}, [])
         mock_nautobot.dcim.devices.get.return_value = None
         mock_nautobot.dcim.devices.create.return_value = MagicMock()
-        mock_sync_interfaces.return_value = 0
+        mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
 
         result = sync_device_to_nautobot(node_uuid, mock_nautobot)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
         mock_nautobot.dcim.devices.create.assert_called_once()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
@@ -491,17 +494,17 @@ class TestSyncDeviceToNautobot:
         existing_device.tenant = None
         existing_device.custom_fields = {}
         mock_nautobot.dcim.devices.get.return_value = existing_device
-        mock_sync_interfaces.return_value = 0
+        mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
 
         result = sync_device_to_nautobot(node_uuid, mock_nautobot)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
         mock_nautobot.dcim.devices.create.assert_not_called()
 
     def test_sync_with_empty_uuid_returns_error(self, mock_nautobot):
         result = sync_device_to_nautobot("", mock_nautobot)
 
-        assert result == 1
+        assert result == EXIT_STATUS_FAILURE
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
     @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
@@ -515,7 +518,7 @@ class TestSyncDeviceToNautobot:
 
         result = sync_device_to_nautobot(node_uuid, mock_nautobot)
 
-        assert result == 1
+        assert result == EXIT_STATUS_FAILURE
 
 
 class TestDeleteDeviceFromNautobot:
@@ -532,7 +535,7 @@ class TestDeleteDeviceFromNautobot:
 
         result = delete_device_from_nautobot(node_uuid, mock_nautobot)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
         mock_device.delete.assert_called_once()
 
     def test_delete_nonexistent_device(self, mock_nautobot):
@@ -541,12 +544,12 @@ class TestDeleteDeviceFromNautobot:
 
         result = delete_device_from_nautobot(node_uuid, mock_nautobot)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
 
     def test_delete_with_empty_uuid(self, mock_nautobot):
         result = delete_device_from_nautobot("", mock_nautobot)
 
-        assert result == 1
+        assert result == EXIT_STATUS_FAILURE
 
 
 class TestHandleNodeEvent:
@@ -573,11 +576,11 @@ class TestHandleNodeEvent:
                 }
             },
         }
-        mock_sync.return_value = 0
+        mock_sync.return_value = EXIT_STATUS_SUCCESS
 
         result = handle_node_event(mock_conn, mock_nautobot, event_data)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
         mock_sync.assert_called_once_with(node_uuid, mock_nautobot)
 
     def test_handle_node_event_no_uuid(self, mock_conn, mock_nautobot):
@@ -585,7 +588,7 @@ class TestHandleNodeEvent:
 
         result = handle_node_event(mock_conn, mock_nautobot, event_data)
 
-        assert result == 1
+        assert result == EXIT_STATUS_FAILURE
 
 
 class TestHandleNodeDeleteEvent:
@@ -611,9 +614,9 @@ class TestHandleNodeDeleteEvent:
                 }
             },
         }
-        mock_delete.return_value = 0
+        mock_delete.return_value = EXIT_STATUS_SUCCESS
 
         result = handle_node_delete_event(mock_conn, mock_nautobot, event_data)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
         mock_delete.assert_called_once_with(node_uuid, mock_nautobot)

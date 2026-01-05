@@ -6,6 +6,12 @@ from unittest.mock import patch
 
 import pytest
 
+from understack_workflows.oslo_event.nautobot_device_interface_sync import (
+    EXIT_STATUS_FAILURE,
+)
+from understack_workflows.oslo_event.nautobot_device_interface_sync import (
+    EXIT_STATUS_SUCCESS,
+)
 from understack_workflows.oslo_event.nautobot_device_interface_sync import InterfaceInfo
 from understack_workflows.oslo_event.nautobot_device_interface_sync import (
     _assign_ip_to_interface,
@@ -15,6 +21,9 @@ from understack_workflows.oslo_event.nautobot_device_interface_sync import (
 )
 from understack_workflows.oslo_event.nautobot_device_interface_sync import (
     _build_interfaces_from_ports,
+)
+from understack_workflows.oslo_event.nautobot_device_interface_sync import (
+    _cleanup_stale_interfaces,
 )
 from understack_workflows.oslo_event.nautobot_device_interface_sync import (
     _create_nautobot_interface,
@@ -111,19 +120,19 @@ class TestBuildInterfaceMapFromInventory:
         result = _build_interface_map_from_inventory(inventory)
 
         assert len(result) == 2
-        assert result["aa:bb:cc:dd:ee:01"]["name"] == "NIC.Slot.1-1"
-        assert result["aa:bb:cc:dd:ee:02"]["name"] == "NIC.Slot.1-2"
+        assert result["aa:bb:cc:dd:ee:01"] == "NIC.Slot.1-1"
+        assert result["aa:bb:cc:dd:ee:02"] == "NIC.Slot.1-2"
 
     def test_build_map_empty_inventory(self):
         result = _build_interface_map_from_inventory({})
 
         assert result == {}
 
-    def test_build_map_skips_empty_mac(self):
+    def test_build_map_skips_missing_mac(self):
         inventory = {
             "inventory": {
                 "interfaces": [
-                    {"mac_address": "", "name": "NIC.Slot.1-1"},
+                    {"name": "NIC.Slot.1-1"},  # Missing mac_address key
                     {"mac_address": "AA:BB:CC:DD:EE:02", "name": "NIC.Slot.1-2"},
                 ]
             }
@@ -181,7 +190,7 @@ class TestBuildInterfacesFromPorts:
         port.physical_network = None
         port.name = None
 
-        inventory_map = {"aa:bb:cc:dd:ee:ff": {"name": "NIC.Embedded.1-1-1"}}
+        inventory_map = {"aa:bb:cc:dd:ee:ff": "NIC.Embedded.1-1-1"}
 
         result = _build_interfaces_from_ports(node_uuid, [port], inventory_map)
 
@@ -554,15 +563,18 @@ class TestSyncInterfacesFromData:
 
         mock_nautobot.dcim.interfaces.get.return_value = None
         mock_nautobot.dcim.interfaces.create.return_value = MagicMock()
+        mock_nautobot.dcim.interfaces.filter.return_value = []
 
         result = sync_interfaces_from_data(node_uuid, inventory, [port], mock_nautobot)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
+        # Verify cleanup was called
+        mock_nautobot.dcim.interfaces.filter.assert_called_with(device_id=node_uuid)
 
     def test_sync_interfaces_empty_uuid(self, mock_nautobot):
         result = sync_interfaces_from_data("", {}, [], mock_nautobot)
 
-        assert result == 1
+        assert result == EXIT_STATUS_FAILURE
 
 
 class TestSyncInterfacesToNautobot:
@@ -586,17 +598,17 @@ class TestSyncInterfacesToNautobot:
         mock_ironic_class.return_value = mock_ironic
         mock_ironic.get_node_inventory.return_value = {}
         mock_ironic.list_ports.return_value = []
-        mock_sync_from_data.return_value = 0
+        mock_sync_from_data.return_value = EXIT_STATUS_SUCCESS
 
         result = sync_interfaces_to_nautobot(node_uuid, mock_nautobot)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
         mock_sync_from_data.assert_called_once()
 
     def test_sync_interfaces_empty_uuid(self, mock_nautobot):
         result = sync_interfaces_to_nautobot("", mock_nautobot)
 
-        assert result == 1
+        assert result == EXIT_STATUS_FAILURE
 
 
 class TestExtractNodeUuidFromEvent:
@@ -658,11 +670,11 @@ class TestHandleInterfaceSyncEvent:
                 }
             },
         }
-        mock_sync.return_value = 0
+        mock_sync.return_value = EXIT_STATUS_SUCCESS
 
         result = handle_interface_sync_event(mock_conn, mock_nautobot, event_data)
 
-        assert result == 0
+        assert result == EXIT_STATUS_SUCCESS
         mock_sync.assert_called_once_with(node_uuid, mock_nautobot)
 
     def test_handle_event_no_uuid(self, mock_conn, mock_nautobot):
@@ -670,7 +682,7 @@ class TestHandleInterfaceSyncEvent:
 
         result = handle_interface_sync_event(mock_conn, mock_nautobot, event_data)
 
-        assert result == 1
+        assert result == EXIT_STATUS_FAILURE
 
 
 class TestDeleteNautobotInterface:
@@ -698,3 +710,79 @@ class TestDeleteNautobotInterface:
         _delete_nautobot_interface(nautobot_intf, mock_nautobot)
 
         nautobot_intf.delete.assert_called_once()
+
+
+class TestCleanupStaleInterfaces:
+    """Test cases for _cleanup_stale_interfaces function."""
+
+    @pytest.fixture
+    def mock_nautobot(self):
+        return MagicMock()
+
+    def test_delete_stale_interface(self, mock_nautobot):
+        node_uuid = str(uuid.uuid4())
+        valid_ids = {"valid-intf-1", "valid-intf-2"}
+
+        stale_intf = MagicMock()
+        stale_intf.id = "stale-intf"
+        stale_intf.name = "NIC.Slot.1-1"
+        stale_intf.cable = None
+
+        valid_intf = MagicMock()
+        valid_intf.id = "valid-intf-1"
+        valid_intf.name = "NIC.Slot.1-2"
+
+        mock_nautobot.dcim.interfaces.filter.return_value = [stale_intf, valid_intf]
+
+        _cleanup_stale_interfaces(node_uuid, valid_ids, mock_nautobot)
+
+        stale_intf.delete.assert_called_once()
+        valid_intf.delete.assert_not_called()
+
+    def test_skip_idrac_interface(self, mock_nautobot):
+        node_uuid = str(uuid.uuid4())
+        valid_ids = set()
+
+        idrac_intf = MagicMock()
+        idrac_intf.id = "idrac-intf"
+        idrac_intf.name = "iDRAC"
+
+        mock_nautobot.dcim.interfaces.filter.return_value = [idrac_intf]
+
+        _cleanup_stale_interfaces(node_uuid, valid_ids, mock_nautobot)
+
+        idrac_intf.delete.assert_not_called()
+
+    def test_no_stale_interfaces(self, mock_nautobot):
+        node_uuid = str(uuid.uuid4())
+        valid_ids = {"intf-1", "intf-2"}
+
+        intf1 = MagicMock()
+        intf1.id = "intf-1"
+        intf1.name = "NIC.Slot.1-1"
+
+        intf2 = MagicMock()
+        intf2.id = "intf-2"
+        intf2.name = "NIC.Slot.1-2"
+
+        mock_nautobot.dcim.interfaces.filter.return_value = [intf1, intf2]
+
+        _cleanup_stale_interfaces(node_uuid, valid_ids, mock_nautobot)
+
+        intf1.delete.assert_not_called()
+        intf2.delete.assert_not_called()
+
+    def test_handles_delete_failure(self, mock_nautobot):
+        node_uuid = str(uuid.uuid4())
+        valid_ids = set()
+
+        stale_intf = MagicMock()
+        stale_intf.id = "stale-intf"
+        stale_intf.name = "NIC.Slot.1-1"
+        stale_intf.cable = None
+        stale_intf.delete.side_effect = Exception("Delete failed")
+
+        mock_nautobot.dcim.interfaces.filter.return_value = [stale_intf]
+
+        # Should not raise, just log warning
+        _cleanup_stale_interfaces(node_uuid, valid_ids, mock_nautobot)

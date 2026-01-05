@@ -17,10 +17,6 @@ class IronicClient:
         self.client: IronicV1Client = get_ironic_client(cloud=cloud)
         self.logged_in = True
 
-    def login(self):
-        """Deprecated: client is initialized in __init__."""
-        pass
-
     def create_node(self, node_data: dict) -> Node:
         return cast(Node, self.client.node.create(**node_data))
 
@@ -104,7 +100,3 @@ class IronicClient:
 
     def list_ports(self, node_id: str):
         return self.client.port.list(node=node_id, detail=True)
-
-    def _ensure_logged_in(self):
-        """Deprecated: client is initialized in __init__."""
-        pass
