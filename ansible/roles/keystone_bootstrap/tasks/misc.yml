@@ -42,23 +42,3 @@
     project: baremetal
     role: admin
     state: present
-
-- name: Create 'flavorsync' user
-  openstack.cloud.identity_user:
-    name: flavorsync
-    password: abcd1234
-    domain: service
-    state: present
-  register: _flavor_sync_user
-
-- name: Create 'flavorsync' role
-  openstack.cloud.identity_role:
-    name: flavorsync
-    state: present
-
-- name: Set 'flavorsync' role
-  openstack.cloud.role_assignment:
-    user: "{{ _flavor_sync_user.user.id }}"
-    domain: service
-    role: flavorsync
-    state: present
