@@ -22,7 +22,8 @@ def create_or_update(bmc: Bmc, name: str, manufacturer: str) -> IronicNodeConfig
             "Using existing baremetal node %s with name %s", ironic_node.uuid, name
         )
         update_ironic_node(client, bmc, ironic_node, name, driver)
-        return ironic_node
+        # Return node as IronicNodeConfiguration (duck typing - Node has same attrs)
+        return ironic_node  # type: ignore[return-value]
     except ironicclient.common.apiclient.exceptions.NotFound:
         logger.debug("Baremetal Node with name %s not found in Ironic, creating.", name)
         return create_ironic_node(client, bmc, name, driver)
@@ -61,7 +62,8 @@ def create_ironic_node(
     name: str,
     driver: str,
 ) -> IronicNodeConfiguration:
-    return client.create_node(
+    # Return node as IronicNodeConfiguration (duck typing - Node has same attrs)
+    return client.create_node(  # type: ignore[return-value]
         {
             "name": name,
             "driver": driver,
