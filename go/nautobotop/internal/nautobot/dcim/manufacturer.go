@@ -2,9 +2,9 @@ package dcim
 
 import (
 	"context"
-	"log"
 	"net/http"
 
+	"github.com/charmbracelet/log"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	nb "github.com/nautobot/go-nautobot/v2"
@@ -66,6 +66,6 @@ func (s *ManufacturerService) Create(ctx context.Context, req nb.ManufacturerReq
 		s.client.AddReport("CreateNewManufacturer", "failed to create manufacturer", "name", req.Name, "error", err.Error(), "response_body", bodyString)
 		return nil, err
 	}
-	log.Printf("Created manufacture: %s", manufacture.Display)
+	log.Info("Created manufacture: %s", manufacture.Display)
 	return manufacture, nil
 }

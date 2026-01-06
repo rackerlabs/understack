@@ -118,8 +118,11 @@ spec:
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 type: object
+              requeueAfter:
+                default: 600
+                type: integer
               syncIntervalSeconds:
-                default: 10
+                default: 172800
                 type: integer
             type: object
           status:

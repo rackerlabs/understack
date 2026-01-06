@@ -68,35 +68,6 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Check if sync interval has elapsed
-	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
-	if !nautobotCR.Status.LastSyncedAt.IsZero() {
-		timeSinceLastSync := time.Since(nautobotCR.Status.LastSyncedAt.Time)
-		if timeSinceLastSync < syncInterval {
-			log.Info("sync interval not elapsed, skipping sync", "timeSinceLastSync", timeSinceLastSync, "syncInterval", syncInterval)
-			remainingTime := syncInterval - timeSinceLastSync
-			return ctrl.Result{RequeueAfter: remainingTime}, nil
-		}
-	}
-
-	// Retrieve the Nautobot authentication token from a secret or external source
-	username, token, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
-	if err != nil {
-		log.Error(err, "failed parse find nautoBotAuthToken")
-		return ctrl.Result{}, err
-	}
-
-	// Fetch the Nautobot service to get its ClusterIP
-	nautobotService, err := r.getServiceFromServiceRef(ctx, nautobotCR)
-	if err != nil {
-		log.Error(err, "failed to fetch Nautobot service")
-		return ctrl.Result{}, err
-	}
-
-	// Create Nautobot client
-	nautobotURL := fmt.Sprintf("http://%s/api", nautobotService.Spec.ClusterIP)
-	nautobotClient := nbClient.NewNautobotClient(nautobotURL, username, token)
-
 	// Aggregate device type data from all referenced ConfigMaps
 	deviceTypeMap, err := r.aggregateDeviceTypeDataFromConfigMap(ctx, nautobotCR.Spec.DeviceTypesRef)
 	if err != nil {
@@ -104,22 +75,35 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, err
 	}
 
-	// Check if data has changed before syncing
-	currentHash := computeMapHas(deviceTypeMap)
+	// Check if sync should proceed based on time interval and data changes
+	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
+	requestTimeAfter := time.Duration(nautobotCR.Spec.RequeueAfter) * time.Second
+	currentHash := computeHash(deviceTypeMap)
 	previousHash := nautobotCR.GetSyncHash("deviceType")
 
-	if currentHash == previousHash {
-		log.Info("device type data unchanged, skipping sync",
-			"hash", currentHash)
-		// Update LastSyncedAt to reset the interval timer
-		nautobotCR.Status.LastSyncedAt = metav1.Now()
-		nautobotCR.Status.Message = "Sync skipped - no changes detected"
+	syncDecision := r.shouldSync(nautobotCR.Status.LastSyncedAt, syncInterval, currentHash, previousHash)
+	if !syncDecision.ShouldSync {
+		log.Info("skipping sync", "reason", syncDecision.Reason, "hash", currentHash)
+		nautobotCR.Status.Message = syncDecision.StatusMessage
 		if err := r.Status().Update(ctx, &nautobotCR); err != nil {
 			log.Error(err, "failed to update status")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{RequeueAfter: syncInterval}, nil
+		return ctrl.Result{RequeueAfter: requestTimeAfter}, nil
 	}
+
+	log.Info("proceeding with sync", "reason", syncDecision.Reason, "hash", currentHash)
+
+	// Retrieve the Nautobot authentication token from a secret or external source
+	username, token, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
+	if err != nil {
+		log.Error(err, "failed parse find nautobot auth token")
+		return ctrl.Result{}, err
+	}
+
+	// Create Nautobot client
+	nautobotURL := fmt.Sprintf("http://%s.%s.svc.cluster.local/api", nautobotCR.Spec.NautobotServiceRef.Name, nautobotCR.Spec.NautobotServiceRef.Namespace)
+	nautobotClient := nbClient.NewNautobotClient(nautobotURL, username, token)
 
 	if err := r.syncDeviceTypes(ctx, nautobotClient, deviceTypeMap); err != nil {
 		log.Error(err, "failed to sync device types")
@@ -141,7 +125,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 	// Successfully completed reconciliation; requeue after configured sync interval
 	log.Info("sync completed successfully")
-	return ctrl.Result{RequeueAfter: syncInterval}, nil
+	return ctrl.Result{RequeueAfter: requestTimeAfter}, nil
 }
 
 // aggregateDeviceTypeDataFromConfigMap fetches and merges data from all referenced ConfigMaps.
@@ -208,16 +192,6 @@ func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, naut
 	return "", "", fmt.Errorf("secret keys not found in provide secret")
 }
 
-// getServiceFromServiceRef: this will fetch Nautobot service from the given reference.
-func (r *NautobotReconciler) getServiceFromServiceRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (*corev1.Service, error) {
-	service := &corev1.Service{}
-	err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.NautobotServiceRef.Name, Namespace: *nautobotCR.Spec.NautobotServiceRef.Namespace}, service)
-	if err != nil {
-		return nil, err
-	}
-	return service, nil
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *NautobotReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -226,8 +200,63 @@ func (r *NautobotReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// computeMapHas returns a stable SHA-256 hash of the map contents
-func computeMapHas(m map[string]string) string {
+// SyncDecision represents the result of evaluating whether a sync should proceed
+type SyncDecision struct {
+	ShouldSync         bool
+	Reason             string
+	StatusMessage      string
+	RequeueAfter       time.Duration
+	UpdateLastSyncTime bool
+}
+
+// shouldSync determines whether a sync operation should proceed based on time interval and data changes.
+// It returns a SyncDecision with the recommendation and associated metadata.
+//
+// Logic:
+// - If data has changed (hash mismatch), sync immediately regardless of time interval
+// - If data hasn't changed and time interval hasn't elapsed, skip sync
+// - If data hasn't changed but time interval has elapsed, proceed with sync
+func (r *NautobotReconciler) shouldSync(lastSyncedAt metav1.Time, syncInterval time.Duration, currentHash, previousHash string) SyncDecision {
+	dataChanged := currentHash != previousHash
+
+	// If data has changed, always sync regardless of time interval
+	if dataChanged {
+		return SyncDecision{
+			ShouldSync:         true,
+			Reason:             "data changed",
+			StatusMessage:      "Syncing due to data changes",
+			RequeueAfter:       syncInterval,
+			UpdateLastSyncTime: false,
+		}
+	}
+
+	// Data hasn't changed, check time interval
+	if !lastSyncedAt.IsZero() {
+		timeSinceLastSync := time.Since(lastSyncedAt.Time)
+		if timeSinceLastSync < syncInterval {
+			remainingTime := syncInterval - timeSinceLastSync
+			return SyncDecision{
+				ShouldSync:         false,
+				Reason:             "sync interval not elapsed",
+				StatusMessage:      "Sync skipped - interval not elapsed",
+				RequeueAfter:       remainingTime,
+				UpdateLastSyncTime: false,
+			}
+		}
+	}
+
+	// Data hasn't changed but time interval has elapsed (or this is first sync)
+	return SyncDecision{
+		ShouldSync:         true,
+		Reason:             "sync interval elapsed",
+		StatusMessage:      "Syncing due to elapsed interval",
+		RequeueAfter:       syncInterval,
+		UpdateLastSyncTime: false,
+	}
+}
+
+// computeHash returns a stable SHA-256 hash of the map contents
+func computeHash(m map[string]string) string {
 	if len(m) == 0 {
 		return "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // sha256 of empty
 	}

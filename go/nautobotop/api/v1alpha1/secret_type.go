@@ -41,9 +41,8 @@ type ServiceSelector struct {
 
 	// The namespace of the Service resource being referred to.
 	// Ignored if referent is not cluster-scoped, otherwise defaults to the namespace of the referent.
-	// +optional
 	// +kubebuilder:validation:MinLength:=1
 	// +kubebuilder:validation:MaxLength:=63
 	// +kubebuilder:validation:Pattern:=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
-	Namespace *string `json:"namespace,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 }

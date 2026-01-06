@@ -27,7 +27,7 @@ func (s *DeviceTypeService) Create(ctx context.Context, req nb.WritableDeviceTyp
 		s.client.AddReport("createNewDeviceType", "failed to create", "model", req.Model, "error", err.Error(), "response_body", bodyString)
 		return nil, err
 	}
-	log.Printf("Created manufacture: %s", deviceType.Display)
+	log.Info("CreateDeviceType", "created device type", deviceType.Display)
 	return deviceType, nil
 }
 

@@ -25,7 +25,9 @@ import (
 
 // NautobotSpec defines the desired state of Nautobot.
 type NautobotSpec struct {
-	// +kubebuilder:default=10
+	// +kubebuilder:default=600
+	RequeueAfter int `json:"requeueAfter,omitempty"`
+	// +kubebuilder:default=172800
 	SyncIntervalSeconds int               `json:"syncIntervalSeconds,omitempty"`
 	NautobotSecretRef   SecretKeySelector `json:"nautobotSecretRef,omitempty"`
 	NautobotServiceRef  ServiceSelector   `json:"nautobotServiceRef,omitempty"`
