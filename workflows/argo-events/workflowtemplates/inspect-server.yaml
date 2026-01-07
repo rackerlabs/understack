@@ -15,6 +15,9 @@ spec:
       - name: node
   templates:
     - name: inspect-server
+      inputs:
+        parameters:
+          - name: node
       dag:
         tasks:
           - name: node-id
@@ -25,7 +28,7 @@ spec:
                 - name: object
                   value: node
                 - name: object_ref
-                  value: "{{workflow.parameters.node}}"
+                  value: "{{inputs.parameters.node}}"
                 - name: param
                   value: uuid
           - name: server-driver
