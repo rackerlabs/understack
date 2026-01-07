@@ -1,4 +1,4 @@
 ---
 component: horizon
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.2.3+9b270fe35
+chartVersion: 2025.2.4+01c93d867
