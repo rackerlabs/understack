@@ -13,6 +13,8 @@ spec:
   arguments:
     parameters:
       - name: ip_address
+      - name: firmware_update
+        value: "false"
   templates:
     - name: main
       steps:
@@ -54,6 +56,13 @@ spec:
                 - name: node
                   value: "{{steps.enroll-server.outputs.result}}"
             when: "{{steps.server-manage-state.outputs.result}} == manageable"
+        - - name: firmware-update
+            template: openstack-firmware-update
+            arguments:
+              parameters:
+                - name: device_id
+                  value: "{{steps.enroll-server.outputs.result}}"
+            when: "{{steps.server-manage-state.outputs.result}} == 'manageable' && {{workflow.parameters.ip_address}} == true"
         - - name: avail-server
             template: openstack-wait-cmd
             arguments:
@@ -197,6 +206,45 @@ spec:
           - "-c"
           - provision_state
           - "{{inputs.parameters.device_id}}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+      volumes:
+        - name: baremetal-manage
+          secret:
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
+    - name: openstack-firmware-update
+      inputs:
+        parameters:
+          - name: device_id
+      script:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        command: [sh]
+        source: |
+          # Check for firmware update traits, sorted to allow runbook prioritization such as:
+          # CUSTOM_FIRMWARE_UPDATE_001_R740XD
+          # CUSTOM_FIRMWARE_UPDATE_002_INTEL_NIC_R740XD
+          echo "Identifying firmware update traits for node: {{inputs.parameters.device_id}}"
+          UPDATES=$(openstack baremetal trait list -c traits -f value {{inputs.parameters.device_id}} | grep -e '^CUSTOM_FIRMWARE_UPDATE_' | sort -t '_' -k 4n)
+
+          # Run matching runbooks for each trait found
+          if [ -z "$UPDATES" ]; then
+            echo "No firmware update traits found"
+            exit 0
+          else
+            echo "Firmware updates available:"
+            echo "$UPDATES" | while read -r RUNBOOK; do
+              echo "Running firmware update runbook: $RUNBOOK"
+              RUNBOOK_ID=$(openstack baremetal runbook show $RUNBOOK -c uuid -f value)
+              openstack baremetal node clean --runbook $RUNBOOK_ID {{inputs.parameters.device_id}}
+            done
+          fi
         env:
           - name: OS_CLOUD
             value: understack
