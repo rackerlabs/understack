@@ -1,21 +1,18 @@
 ---
+# mapping of each permission and the groups that will have that permission
 nautobot_permissions_groups:
-  - name: ucadmin
-  - name: ucdctech
-  - name: ucneteng
-  - name: ucuser
+  read-all:
+    - ucadmin
+    - ucuser
+  user-api-tokens:
+    - ucadmin
+    - ucuser
 
+# definition of a permission and the various settings on that permission
 nautobot_permissions_permissions:
-  # escape hatch permission allowing ucadmin members
-  # to edit their own user to grant themselves superuser
-  - name: all-user-defaults
-    description: permissions granted to all users by default
+  read-all:
+    description: Read/View for all used objects
     enabled: true
-    groups:
-      - ucadmin
-      - ucdctech
-      - ucneteng
-      - ucuser
     actions:
       - view
     object_types:
@@ -45,11 +42,9 @@ nautobot_permissions_permissions:
       - tenancy.tenantgroup
       - vni_custom_model.ucvni
       - vni_custom_model.ucvnigroup
-  - name: all-users-api-tokens
+  user-api-tokens:
     description: allow users to manage their own API tokens
     enabled: true
-    groups:
-      - ucuser
     actions:
       - add
       - change
@@ -58,71 +53,3 @@ nautobot_permissions_permissions:
       - users.token
     constraints:
       - user: "$user"
-  - name: ucadmin-defaults
-    description: default ucadmin permissions
-    actions:
-      - view
-    enabled: true
-    groups:
-      - ucadmin
-    object_types:
-      - circuits.circuit
-      - dcim.powerfeed
-      - ipam.vlan
-      - dcim.interfaceredundancygroup
-      - dcim.inventoryitem
-      - circuits.circuittermination
-      - circuits.circuittype
-      - circuits.provider
-      - circuits.providernetwork
-      - dcim.cablepath
-      - dcim.consoleport
-      - dcim.devicebay
-      - dcim.poweroutlet
-      - dcim.powerpanel
-      - dcim.powerport
-      - dcim.rearport
-      - dcim.virtualchassis
-      - ipam.rir
-      - ipam.routetarget
-      - ipam.vrf
-      - ipam.vlangroup
-      - ipam.service
-      - ipam.ipaddresstointerface
-      - ipam.vrfprefixassignment
-      - ipam.vrfdeviceassignment
-      - ipam.namespace
-  - name: ucdctech-defaults
-    description: default ucdctech permissions
-    actions:
-      - view
-    enabled: true
-    groups:
-      - ucdctech
-    object_types:
-      - circuits.circuit
-      - dcim.powerfeed
-      - ipam.vlan
-      - dcim.interfaceredundancygroup
-      - dcim.inventoryitem
-      - circuits.circuittermination
-      - circuits.circuittype
-      - circuits.provider
-      - circuits.providernetwork
-      - dcim.cablepath
-      - dcim.consoleport
-      - dcim.devicebay
-      - dcim.poweroutlet
-      - dcim.powerpanel
-      - dcim.powerport
-      - dcim.rearport
-      - dcim.virtualchassis
-      - ipam.rir
-      - ipam.routetarget
-      - ipam.vrf
-      - ipam.vlangroup
-      - ipam.service
-      - ipam.ipaddresstointerface
-      - ipam.vrfprefixassignment
-      - ipam.vrfdeviceassignment
-      - ipam.namespace
