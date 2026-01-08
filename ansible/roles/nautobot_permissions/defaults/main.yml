@@ -31,15 +31,37 @@ nautobot_permissions_permissions:
       - dcim.rackgroup
       - dcim.softwareimagefile
       - dcim.softwareversion
+      - dcim.virtualchassis
+      - extras.customfield
+      - extras.dynamicgroup
+      - extras.job
+      - extras.jobresult
       - extras.note
       - extras.objectchange
+      - extras.relationship
+      - extras.relationshipassociation
       - extras.role
+      - extras.secret
+      - extras.secretsgroup
+      - extras.secretsgroupassociation
       - extras.status
       - extras.tag
       - ipam.ipaddress
+      - ipam.ipaddresstointerface
+      - ipam.namespace
       - ipam.prefix
+      - ipam.vlan
+      - ipam.vlangroup
+      - ipam.vlanlocationassignment
+      - ipam.vrf
+      - ipam.vrfdeviceassignment
+      - nautobot_golden_config.configplan
       - tenancy.tenant
       - tenancy.tenantgroup
+      - virtualization.cluster
+      - virtualization.clustertype
+      - virtualization.virtualmachine
+      - virtualization.vminterface
       - vni_custom_model.ucvni
       - vni_custom_model.ucvnigroup
   user-api-tokens:
