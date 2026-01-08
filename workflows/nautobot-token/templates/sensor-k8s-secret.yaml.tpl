@@ -37,6 +37,7 @@ spec:
                 generateName: nautobot-create-token-
                 namespace: nautobot
               spec:
+                ttlSecondsAfterFinished: 300
                 template:
                   spec:
                     containers:
