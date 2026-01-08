@@ -1,4 +1,4 @@
 ---
 component: cinder
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.1.3+abd55b4a7
+chartVersion: 2025.2.6+01c93d867
