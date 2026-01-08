@@ -1,0 +1,31 @@
+---
+
+- name: Extract all unique groups from permissions mapping
+  ansible.builtin.set_fact:
+    all_nautobot_groups: "{{ nautobot_permissions_groups.values() | flatten | unique | sort }}"
+
+- name: Set up nautobot groups
+  networktocode.nautobot.admin_group:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item }}"
+    state: present
+  loop: "{{ all_nautobot_groups }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Set up nautobot permissions
+  networktocode.nautobot.admin_permission:
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    name: "{{ item.key }}"
+    description: "{{ item.value.description }}"
+    enabled: "{{ item.value.enabled }}"
+    actions: "{{ item.value.actions }}"
+    object_types: "{{ item.value.object_types }}"
+    groups: "{{ nautobot_permissions_groups[item.key] | default(list) }}"
+    constraints: "{{ item.value.constraints | default('') }}"
+    state: present
+  loop: "{{ nautobot_permissions_permissions | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"

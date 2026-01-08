@@ -1,0 +1,55 @@
+---
+# mapping of each permission and the groups that will have that permission
+nautobot_permissions_groups:
+  read-all:
+    - ucadmin
+    - ucuser
+  user-api-tokens:
+    - ucadmin
+    - ucuser
+
+# definition of a permission and the various settings on that permission
+nautobot_permissions_permissions:
+  read-all:
+    description: Read/View for all used objects
+    enabled: true
+    actions:
+      - view
+    object_types:
+      - dcim.cable
+      - dcim.device
+      - dcim.deviceredundancygroup
+      - dcim.devicetype
+      - dcim.devicetypetosoftwareimagefile
+      - dcim.frontport
+      - dcim.interface
+      - dcim.location
+      - dcim.locationtype
+      - dcim.manufacturer
+      - dcim.platform
+      - dcim.rack
+      - dcim.rackgroup
+      - dcim.softwareimagefile
+      - dcim.softwareversion
+      - extras.note
+      - extras.objectchange
+      - extras.role
+      - extras.status
+      - extras.tag
+      - ipam.ipaddress
+      - ipam.prefix
+      - tenancy.tenant
+      - tenancy.tenantgroup
+      - vni_custom_model.ucvni
+      - vni_custom_model.ucvnigroup
+  user-api-tokens:
+    description: allow users to manage their own API tokens
+    enabled: true
+    actions:
+      - add
+      - change
+      - delete
+    object_types:
+      - users.token
+    constraints:
+      - user: "$user"
