@@ -141,8 +141,7 @@ network:
     ingress:
       public: true
       classes:
-        namespace: "nginx"
-        cluster: "nginx-openstack"
+        namespace: nginx
       annotations:
         nginx.ingress.kubernetes.io/rewrite-target: /
         # set our default issuer
