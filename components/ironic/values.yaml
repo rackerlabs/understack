@@ -240,6 +240,8 @@ pod:
               sources:
                 - secret:
                     name: ironic-ks-etc
+          - name: pod-usr-share-novnc
+            emptyDir: {}
     ironic_api:
       ironic_api:
         volumeMounts:
