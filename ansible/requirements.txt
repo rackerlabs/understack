@@ -1,7 +1,7 @@
 ansible-core==2.19.2
 ansible-runner==2.4.2
 openstacksdk==4.8.0
-pynautobot==2.7.2
+pynautobot==3.0.0
 jmespath==1.0.1
 # remove me after the inherited roles workaround can be dropped
 python-openstackclient
