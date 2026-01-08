@@ -43,6 +43,8 @@ network:
   use_external_ingress_controller: true
   osapi:
     ingress:
+      classes:
+        namespace: nginx
       annotations:
         nginx.ingress.kubernetes.io/rewrite-target: /
         # set our default issuer
