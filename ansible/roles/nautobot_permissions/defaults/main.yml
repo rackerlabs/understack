@@ -32,8 +32,10 @@ nautobot_permissions_permissions:
       - dcim.softwareimagefile
       - dcim.softwareversion
       - dcim.virtualchassis
+      - extras.configcontext
       - extras.customfield
       - extras.dynamicgroup
+      - extras.gitrepository
       - extras.job
       - extras.jobresult
       - extras.note
@@ -55,7 +57,12 @@ nautobot_permissions_permissions:
       - ipam.vlanlocationassignment
       - ipam.vrf
       - ipam.vrfdeviceassignment
+      - nautobot_golden_config.goldenconfig
+      - nautobot_golden_config.configcompliance
       - nautobot_golden_config.configplan
+      - nautobot_golden_config.goldenconfig
+      - nautobot_golden_config.goldenconfigsetting
+      - nautobot_golden_config.remediationsetting
       - tenancy.tenant
       - tenancy.tenantgroup
       - virtualization.cluster
