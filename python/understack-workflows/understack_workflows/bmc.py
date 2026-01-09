@@ -32,10 +32,6 @@ class AuthException(Exception):
     """Authentication Exception."""
 
 
-class AccountServiceException(Exception):
-    """AccountService Query Exception."""
-
-
 @dataclass
 class Bmc:
     """Represent DRAC/iLo and know how to perform low-level query on it."""
@@ -79,7 +75,7 @@ class Bmc:
 
     def get_base_path(self):
         """Get Base Path."""
-        _result = "/redfish/v1/"
+        _result = "/redfish/v1"
         return _result
 
     def get_system_path(self):
@@ -94,38 +90,10 @@ class Bmc:
 
     def get_user_accounts(self, token: str | None = None) -> list[dict]:
         """A vendor agnostic approach to crawling the API for BMC accounts."""
-        try:
-            # get account service
-            r = (
-                self.redfish_request(path=self.base_path, token=token)
-                if token
-                else self.redfish_request(path=self.base_path)
-            )
-            account_service_uri = r["AccountService"]["@odata.id"]
-            logger.debug("account_service_url: %s", account_service_uri)
-
-            # get account collection uri
-            r = (
-                self.redfish_request(path=account_service_uri, token=token)
-                if token
-                else self.redfish_request(path=account_service_uri)
-            )
-            accounts_uri = r["Accounts"]["@odata.id"]
-            logger.debug("accounts_url: %s", accounts_uri)
-
-            # get accounts
-            r = (
-                self.redfish_request(path=accounts_uri, token=token)
-                if token
-                else self.redfish_request(path=accounts_uri)
-            )
-            accounts = r["Members"]
-            logger.debug("accounts: %s", accounts)
-
-            return accounts
-        except AccountServiceException:
-            logger.exception("Can't fetch accounts from Redfish account service.")
-            raise
+        path = self.base_path
+        path = self.redfish_request(path, token=token)["AccountService"]["@odata.id"]
+        path = self.redfish_request(path, token=token)["Accounts"]["@odata.id"]
+        return self.redfish_request(path, token=token)["Members"]
 
     def set_bmc_creds(self, password: str, token: str | None = None):
         """Change password for the account associated with the bmc."""
@@ -133,26 +101,20 @@ class Bmc:
         matched_account = None
         for account in accounts:
             account_url = account["@odata.id"]
-            if token:
-                a = self.redfish_request(path=account_url, token=token)
-            else:
-                a = self.redfish_request(path=account_url)
+            a = self.redfish_request(path=account_url, token=token)
             if self.username == a["UserName"]:
                 logger.debug("found account: %s", a)
                 matched_account = a
                 break
-            if not matched_account:
-                raise AuthException(f"Unable to find BMC account for {self.username}")
-            account_uri = matched_account["@odata.id"]
-            _payload = {"Password": password}
-            if token:
-                self.redfish_request(
-                    method="PATCH", path=account_uri, token=token, payload=_payload
-                )
-            else:
-                self.redfish_request(method="PATCH", path=account_uri, payload=_payload)
+        if not matched_account:
+            raise AuthException(f"Unable to find BMC account for {self.username}")
+        account_uri = matched_account["@odata.id"]
+        _payload = {"Password": password}
+        self.redfish_request(
+            method="PATCH", path=account_uri, token=token, payload=_payload
+        )
 
-    def get_session(self, password: str) -> tuple[str | None, str | None]:
+    def get_session(self, password: str) -> tuple[str, str] | tuple[None, None]:
         """Request a new session."""
         _payload = {"UserName": self.username, "Password": password}
         token, session = self.session_request(
@@ -167,10 +129,7 @@ class Bmc:
 
     def close_session(self, session: str, token: str | None = None) -> None:
         """Close BMC token session."""
-        if token:
-            self.redfish_request(method="DELETE", path=session, token=token)
-        else:
-            self.redfish_request(method="DELETE", path=session)
+        self.redfish_request(method="DELETE", path=session, token=token)
 
     def session_request(
         self,
@@ -179,7 +138,7 @@ class Bmc:
         payload: dict | None = None,
         verify: bool = False,
         timeout: int = 30,
-    ) -> tuple[str | None, str | None]:
+    ) -> tuple[str, str] | tuple[None, None]:
         """Request a session via Redfish against the Bmc."""
         _headers = copy.copy(HEADERS)
         url = f"{self.url()}{path}"
