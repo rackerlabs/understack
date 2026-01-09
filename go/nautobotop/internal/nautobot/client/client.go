@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/log"
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 	"github.com/samber/lo"
 )
 
