@@ -7,7 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/json"
 
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 )
 
 type GraphQL struct {
@@ -56,7 +56,6 @@ func (n *NautobotClient) GetCreateChangeList(ctx context.Context, objectType str
 				"changedObjectType": objectType,
 				"limit":             limit,
 				"offset":            offset,
-				"userName":          []string{n.Username},
 				"action":            []string{"create", "delete"},
 			},
 		}

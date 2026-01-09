@@ -7,7 +7,7 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/helpers"
 )
 
@@ -54,11 +54,15 @@ func (s *PowerPortTemplateService) GetByName(ctx context.Context, name, deviceTy
 		s.client.AddReport("GetPowerPortTemplateByName", "failed to get power port template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
 		return nb.PowerPortTemplate{}
 	}
-	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
+	if list == nil || len(list.Results) == 0 {
 		log.Debug("power port template not found", "name", name, "device_type_id", deviceTypeID)
 		return nb.PowerPortTemplate{}
 	}
-	log.Debug("found power port template", "name", name, "device_type_id", deviceTypeID, "id", list.Results[0].Id)
+	if list.Results[0].Id == nil {
+		log.Debug("power port template not found", "name", name, "device_type_id", deviceTypeID)
+		return nb.PowerPortTemplate{}
+	}
+	log.Debug("found power port template", "name", name, "device_type_id", deviceTypeID, "id", *list.Results[0].Id)
 	return list.Results[0]
 }
 

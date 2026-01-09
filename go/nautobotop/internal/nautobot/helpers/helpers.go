@@ -6,23 +6,24 @@ import (
 	"net/http"
 
 	"github.com/charmbracelet/log"
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 )
 
-func BuildBulkWritableCableRequestStatus(uuid string) *nb.BulkWritableCableRequestStatus {
-	return &nb.BulkWritableCableRequestStatus{
-		Id: &nb.BulkWritableCableRequestStatusId{
-			String: nb.PtrString(uuid),
+func BuildApprovalWorkflowStageResponseApprovalWorkflowStage(id string) nb.ApprovalWorkflowStageResponseApprovalWorkflowStage {
+	return nb.ApprovalWorkflowStageResponseApprovalWorkflowStage{
+		Id: &nb.ApprovalWorkflowApprovalWorkflowDefinitionId{
+			String: &id,
 		},
 	}
 }
 
-func BuildNullableBulkWritableCircuitRequestTenant(uuid string) nb.NullableBulkWritableCircuitRequestTenant {
-	return *nb.NewNullableBulkWritableCircuitRequestTenant(&nb.BulkWritableCircuitRequestTenant{
-		Id: &nb.BulkWritableCableRequestStatusId{
-			String: nb.PtrString(uuid),
+func BuildNullableApprovalWorkflowUser(id string) nb.NullableApprovalWorkflowUser {
+	user := nb.ApprovalWorkflowUser{
+		Id: &nb.ApprovalWorkflowApprovalWorkflowDefinitionId{
+			String: &id,
 		},
-	})
+	}
+	return *nb.NewNullableApprovalWorkflowUser(&user)
 }
 
 // ReadResponseBody safely reads and closes the response body.
