@@ -29,6 +29,9 @@ spec:
     server: '*'
   - namespace: 'opentelemetry-operator'
     server: '*'
+  # orc-system is openstack resource controller
+  - namespace: 'orc-system'
+    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'

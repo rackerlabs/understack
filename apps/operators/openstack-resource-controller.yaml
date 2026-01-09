@@ -1,0 +1,6 @@
+---
+component: openstack-resource-controller
+componentNamespace: orc-system
+sources:
+  - ref: understack
+    path: 'operators/openstack-resource-controller'
