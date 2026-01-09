@@ -1,4 +1,5 @@
 import base64
+from time import sleep
 
 from understack_workflows.bmc import AuthException
 from understack_workflows.bmc import Bmc
@@ -47,6 +48,9 @@ def set_bmc_password(
         token, session = bmc.get_session(test_password)
         if token and session:
             break
+        # Go Slow, or else the BMC will lock us out for a
+        # few mins if we try too may "incorrect passwords"
+        sleep(30)
     if not token:
         raise AuthException(
             f"Unable to log in to BMC {ip_address} with any known password!"
