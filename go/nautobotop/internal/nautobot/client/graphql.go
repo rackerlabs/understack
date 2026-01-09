@@ -56,6 +56,7 @@ func (n *NautobotClient) GetCreateChangeList(ctx context.Context, objectType str
 				"changedObjectType": objectType,
 				"limit":             limit,
 				"offset":            offset,
+				"userName":          []string{n.Username},
 				"action":            []string{"create", "delete"},
 			},
 		}
