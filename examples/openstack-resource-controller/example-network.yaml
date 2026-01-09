@@ -1,0 +1,14 @@
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Network
+metadata:
+  name: example-network
+spec:
+  cloudCredentialsRef:
+    cloudName: understack
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    description: Example ORC network
+    metadata:
+      created-by: k-orc-example

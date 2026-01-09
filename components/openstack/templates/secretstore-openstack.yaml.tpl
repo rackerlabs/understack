@@ -38,6 +38,7 @@ rules:
   - octavia-keystone-password
   - placement-keystone-password
   - skyline-keystone-password
+  - openstack-resource-controller
 - apiGroups:
   - authorization.k8s.io
   resources:
