@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/helpers"
 )
 
@@ -53,7 +53,10 @@ func (s *ManufacturerService) GetByName(ctx context.Context, name string) nb.Man
 		s.client.AddReport("GetManufacturerByName", "failed to get manufacturer by name", "name", name, "error", err.Error(), "response_body", bodyString)
 		return nb.Manufacturer{}
 	}
-	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
+	if list == nil || len(list.Results) == 0 {
+		return nb.Manufacturer{}
+	}
+	if list.Results[0].Id == nil {
 		return nb.Manufacturer{}
 	}
 	return list.Results[0]

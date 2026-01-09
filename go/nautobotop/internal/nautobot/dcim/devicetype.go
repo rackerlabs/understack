@@ -6,7 +6,7 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/helpers"
 )
 
@@ -38,7 +38,10 @@ func (s *DeviceTypeService) GetByName(ctx context.Context, name string) nb.Devic
 		s.client.AddReport("GetDeviceTypeByName", "failed to get", "name", name, "error", err.Error(), "response_body", bodyString)
 		return nb.DeviceType{}
 	}
-	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
+	if list == nil || len(list.Results) == 0 {
+		return nb.DeviceType{}
+	}
+	if list.Results[0].Id == nil {
 		return nb.DeviceType{}
 	}
 	return list.Results[0]
@@ -52,7 +55,10 @@ func (s *DeviceTypeService) ListAll(ctx context.Context) []nb.DeviceType {
 		s.client.AddReport("ListAllDeviceTypes", "failed to list", "error", err.Error(), "response_body", bodyString)
 		return []nb.DeviceType{}
 	}
-	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
+	if list == nil || len(list.Results) == 0 {
+		return []nb.DeviceType{}
+	}
+	if list.Results[0].Id == nil {
 		return []nb.DeviceType{}
 	}
 
