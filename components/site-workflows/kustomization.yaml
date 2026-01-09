@@ -29,9 +29,6 @@ helmCharts:
   - name: nautobot-token
     namespace: openstack
     valuesFile: nautobot-token-values.yaml
-  - name: nautobot-token
-    namespace: nautobotop
-    valuesFile: nautobot-token-values.yaml
 
 helmGlobals:
   chartHome: ../../workflows/
