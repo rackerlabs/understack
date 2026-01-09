@@ -34,3 +34,5 @@ ist = "ist"
 retreive = "retreive"
 # Intentionally truncated process names in health probe (15 char limit)
 metadat = "metadat"
+# operators/rook/values-cluster.yaml mentions "ceph-blockpool-ecoded"
+ecoded = "ecoded"
