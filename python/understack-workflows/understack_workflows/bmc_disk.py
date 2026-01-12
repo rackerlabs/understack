@@ -28,30 +28,62 @@ class Disk:
         return math.ceil(self.capacity_bytes / 10**9)
 
     @staticmethod
+    def get_capacity_bytes(number) -> int:
+        """Calculate capacity_bytes."""
+        return math.ceil(number * 10**9)
+
+    @staticmethod
     def from_path(bmc: Bmc, path: str):
         """Disk path request."""
         disk_data = bmc.redfish_request(path)
-
+        bmc_type = bmc.get_manufacturer()
+        if "dell" in bmc_type:
+            _bytes = disk_data["CapacityBytes"]
+            _name = disk_data["Name"]
+        else:
+            _bytes = Disk.get_capacity_bytes(disk_data["CapacityGB"])
+            _name = disk_data["Location"]
         return Disk(
             media_type=disk_data["MediaType"],
             model=disk_data["Model"],
-            name=disk_data["Name"],
+            name=_name,
             health=disk_data.get("Status", {}).get("Health", "Unknown"),
-            capacity_bytes=disk_data["CapacityBytes"],
+            capacity_bytes=_bytes,
         )
 
 
 def physical_disks(bmc: Bmc) -> list[Disk]:
     """Retrieve list of physical physical_disks."""
     try:
-        storage_member_paths = [
-            member["@odata.id"]
-            for member in bmc.redfish_request(bmc.system_path + "/Storage")["Members"]
-        ]
-        disks = [
-            bmc.redfish_request(drive_path)["Drives"]
-            for drive_path in storage_member_paths
-        ]
+        bmc_type = bmc.get_manufacturer()
+        if "dell" in bmc_type:
+            path = "/Storage"
+            storage_member_paths = [
+                member["@odata.id"]
+                for member in bmc.redfish_request(bmc.system_path + path)["Members"]
+            ]
+            disks = [
+                bmc.redfish_request(drive_path)["Drives"]
+                for drive_path in storage_member_paths
+            ]
+            disk_paths = [disk for sublist in disks for disk in sublist]
+            disk_list = [
+                Disk.from_path(bmc, path=disk["@odata.id"]) for disk in disk_paths
+            ]
+        else:
+            path = "/SmartStorage/ArrayControllers"
+            storage_controller_paths = [
+                member["@odata.id"]
+                for member in bmc.redfish_request(bmc.system_path + path)["Members"]
+            ]
+            storage_member_paths = [
+                bmc.redfish_request(drive_path)["links"]["PhysicalDrives"]["href"]
+                for drive_path in storage_controller_paths
+            ]
+            disks = [
+                bmc.redfish_request(drive_path)["Members"]
+                for drive_path in storage_member_paths
+            ]
         disk_paths = [disk for sublist in disks for disk in sublist]
         disk_list = [Disk.from_path(bmc, path=disk["@odata.id"]) for disk in disk_paths]
         logger.debug("Retrieved %d disks.", len(disk_list))

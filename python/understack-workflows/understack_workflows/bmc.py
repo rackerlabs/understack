@@ -88,6 +88,10 @@ class Bmc:
         _result = self.redfish_request("/redfish/v1/Managers/")
         return _result["Members"][0]["@odata.id"].rstrip("/")
 
+    def get_manufacturer(self) -> str:
+        """Read and return Manufacturer."""
+        return self.redfish_request(self.system_path)["Manufacturer"].lower()
+
     def get_user_accounts(self, token: str | None = None) -> list[dict]:
         """A vendor agnostic approach to crawling the API for BMC accounts."""
         path = self.base_path
