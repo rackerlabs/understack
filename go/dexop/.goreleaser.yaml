@@ -1,4 +1,4 @@
-project_name: "nautobotop"
+project_name: "dexop"
 version: 2
 
 before:
@@ -12,7 +12,7 @@ env:
 builds:
   - main: main.go
     dir: ./cmd
-    binary: nautobotop
+    binary: dexop
     goos: ["linux"]
     goarch: ["amd64", "arm64"]
     flags:
@@ -75,15 +75,12 @@ docker_manifests:
 
 signs:
   - cmd: cosign
-    signature: "${artifact}.sig"
-    certificate: "${artifact}.pem"
+    signature: "${artifact}.sigstore.json"
     output: true
     artifacts: checksum
     args:
       - sign-blob
-      - "--oidc-provider=github-actions"
-      - "--output-certificate=${certificate}"
-      - "--output-signature=${signature}"
+      - "--bundle=${signature}"
       - "${artifact}"
       - --yes
 
