@@ -37,7 +37,7 @@ class TestAddSubportToTrunk:
         port = {"id": "port-123"}
         segment = {"segmentation_id": 42}
         mocker.patch(
-            "neutron_understack.utils.fetch_network_node_trunk_id",
+            "neutron_understack.network_node_trunk.fetch_network_node_trunk_id",
             return_value=trunk_id,
         )
         mocker.patch(
@@ -70,7 +70,7 @@ class TestAddSubportToTrunk:
 class TestHandleSubportRemoval:
     def test_when_successful(self, mocker, port_id, trunk_id):
         mocker.patch(
-            "neutron_understack.utils.fetch_network_node_trunk_id",
+            "neutron_understack.network_node_trunk.fetch_network_node_trunk_id",
             return_value=str(trunk_id),
         )
         mock_remove = mocker.patch("neutron_understack.utils.remove_subport_from_trunk")

@@ -13,6 +13,7 @@ from neutron_lib.plugins import directory
 from oslo_config import cfg
 
 from neutron_understack import utils
+from neutron_understack.network_node_trunk import fetch_network_node_trunk_id
 
 from .ml2_type_annotations import NetworkSegmentDict
 from .ml2_type_annotations import PortContext
@@ -98,7 +99,7 @@ def add_subport_to_trunk(shared_port: PortDict, segment: NetworkSegmentDict) -> 
             },
         ]
     }
-    trunk_id = utils.fetch_network_node_trunk_id()
+    trunk_id = fetch_network_node_trunk_id()
 
     utils.fetch_trunk_plugin().add_subports(
         context=n_context.get_admin_context(),
@@ -253,7 +254,7 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
 
 def handle_subport_removal(port: Port) -> None:
     """Removes router's subport from a network node trunk."""
-    trunk_id = utils.fetch_network_node_trunk_id()
+    trunk_id = fetch_network_node_trunk_id()
     LOG.debug("Router, Removing subport: %s(port)s", {"port": port})
     port_id = port["id"]
     try:
