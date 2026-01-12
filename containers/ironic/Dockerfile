@@ -15,6 +15,7 @@ RUN apt-get update && \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG OPENSTACK_VERSION="required_argument"
+ARG NOVNC_VERSION=1.6.0
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
       --constraint https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} \
@@ -25,6 +26,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY containers/ironic/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
     QUILT_PATCHES=/tmp/patches quilt push -a
+
+# download and unpack novnc
+RUN \
+   export URL=https://github.com/novnc/noVNC/archive/refs/tags/v${NOVNC_VERSION}.tar.gz && \
+   export DEST_FILE=novnc-${NOVNC_VERSION}.tar.gz && \
+   export PFX=noVNC-${NOVNC_VERSION} && \
+   rm -rf /usr/share/novnc/ && \
+   mkdir -p /usr/share/novnc/ && \
+   wget -q -O "$DEST_FILE" "$URL" && \
+   tar -C /usr/share/novnc/ --strip-components=1 -zxvf "${DEST_FILE}" "$PFX/app" "$PFX/core" "$PFX/vendor" "$PFX/vnc.html"
 
 ARG OPENSTACK_VERSION="required_argument"
 FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS final
@@ -43,3 +54,4 @@ RUN apt-get update && \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build --link /var/lib/openstack /var/lib/openstack
+COPY --from=build /usr/share/novnc /usr/share/novnc
