@@ -172,12 +172,14 @@ def _set_node_traits(task, vlan_groups: set[str]):
 
     We remove pre-existing traits if the node does not have the required
     connections.
+
+    Traits other than CUSTOM_*_SWITCH are left alone.
     """
     node = task.node
     existing_traits = set(node.traits.get_trait_names())
     vlan_group_traits = {_trait_name(x) for x in vlan_groups if x}
     irrelevant_existing_traits = {x for x in existing_traits if not _is_our_trait(x)}
-    required_traits = irrelevant_existing_traits.intersection(vlan_group_traits)
+    required_traits = irrelevant_existing_traits.union(vlan_group_traits)
 
     if existing_traits == required_traits:
         LOG.debug(

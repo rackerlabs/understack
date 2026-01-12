@@ -87,7 +87,7 @@ def test_with_valid_data(mocker, caplog):
         "ironic_understack.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
         MAPPING,
     )
-    mocker.patch(
+    trait_create = mocker.patch(
         "ironic_understack.inspect_hook_update_baremetal_ports.objects.TraitList.create"
     )
 
@@ -103,3 +103,7 @@ def test_with_valid_data(mocker, caplog):
     assert mock_port.physical_network == "f20-3-network"
     mock_port.save.assert_called()
     mock_node.save.assert_called_once()
+
+    trait_create.assert_called_once_with(
+        mock_context, 1234, {"CUSTOM_STORAGE_SWITCH", "CUSTOM_NETWORK_SWITCH", "bar"}
+    )
