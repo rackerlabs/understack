@@ -7,7 +7,7 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/helpers"
 )
 
@@ -52,11 +52,15 @@ func (s *InterfaceTemplateService) GetByName(ctx context.Context, name, deviceTy
 		s.client.AddReport("GetInterfaceTemplateByName", "failed to get interface template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
 		return nb.InterfaceTemplate{}
 	}
-	if list == nil || len(list.Results) == 0 || list.Results[0].Id == "" {
+	if list == nil || len(list.Results) == 0 {
 		log.Info("interface template not found", "name", name, "device_type_id", deviceTypeID)
 		return nb.InterfaceTemplate{}
 	}
-	log.Info("found interface template", "name", name, "device_type_id", deviceTypeID, "id", list.Results[0].Id)
+	if list.Results[0].Id == nil {
+		log.Info("interface template not found", "name", name, "device_type_id", deviceTypeID)
+		return nb.InterfaceTemplate{}
+	}
+	log.Info("found interface template", "name", name, "device_type_id", deviceTypeID, "id", *list.Results[0].Id)
 	return list.Results[0]
 }
 

@@ -7,7 +7,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/json"
 
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 )
 
 type GraphQL struct {

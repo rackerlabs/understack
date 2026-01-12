@@ -7,7 +7,7 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
-	nb "github.com/nautobot/go-nautobot/v2"
+	nb "github.com/nautobot/go-nautobot/v3"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/dcim"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/dcim/templates"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/helpers"
@@ -51,7 +51,7 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 		deviceTypes.DeviceTypes = append(deviceTypes.DeviceTypes, yml)
 
 		manufacturer := s.manufacturerSvc.GetByName(context.Background(), yml.Manufacturer)
-		if manufacturer.Id == "" {
+		if manufacturer.Id == nil {
 			cm, err := s.manufacturerSvc.Create(context.Background(), nb.ManufacturerRequest{
 				Name:        yml.Manufacturer,
 				Description: nb.PtrString(yml.Manufacturer),
@@ -69,17 +69,17 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 			UHeight:      nb.PtrInt32(int32(yml.UHeight)),
 			IsFullDepth:  nb.PtrBool(yml.IsFullDepth),
 			Comments:     nb.PtrString(yml.Comments),
-			Manufacturer: *helpers.BuildBulkWritableCableRequestStatus(manufacturer.Id),
+			Manufacturer: helpers.BuildApprovalWorkflowStageResponseApprovalWorkflowStage(*manufacturer.Id),
 		}
 
-		if deviceType.Id == "" {
+		if deviceType.Id == nil {
 			createdDt, err := s.deviceTypeSvc.Create(context.Background(), deviceTypeRequest)
 			if err != nil || createdDt == nil {
 				return fmt.Errorf("failed to create device type %s: %w", yml.Model, err)
 			}
 			deviceType = *createdDt
 		} else if !helpers.CompareJSONFields(deviceType, deviceTypeRequest) {
-			updatedDt, err := s.deviceTypeSvc.Update(ctx, deviceType.Id, deviceTypeRequest)
+			updatedDt, err := s.deviceTypeSvc.Update(ctx, *deviceType.Id, deviceTypeRequest)
 			if err != nil || updatedDt == nil {
 				return fmt.Errorf("failed to update device type %s: %w", yml.Model, err)
 			}
@@ -106,7 +106,7 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 	}
 	obsoleteDeviceTypes := lo.OmitByKeys(existingMap, lo.Keys(desiredDeviceTypes))
 	for _, obsoleteDeviceType := range obsoleteDeviceTypes {
-		_ = s.deviceTypeSvc.Destroy(ctx, obsoleteDeviceType.Id)
+		_ = s.deviceTypeSvc.Destroy(ctx, *obsoleteDeviceType.Id)
 	}
 
 	log.Info("SyncAllDevice Completed")
@@ -121,7 +121,7 @@ func (s *DeviceTypeSync) syncPowerPortTemplates(ctx context.Context, yml models.
 	}
 
 	// Build map of existing power port templates from Nautobot
-	existingTemplates := s.powerPortTemplateSvc.ListByDeviceType(ctx, deviceType.Id)
+	existingTemplates := s.powerPortTemplateSvc.ListByDeviceType(ctx, *deviceType.Id)
 	existingMap := make(map[string]nb.PowerPortTemplate)
 	for _, template := range existingTemplates {
 		existingMap[template.Name] = template
@@ -141,28 +141,28 @@ func (s *DeviceTypeSync) syncPowerPortTemplates(ctx context.Context, yml models.
 			allocatedDraw = *nb.NewNullableInt32(nb.PtrInt32(int32(desiredPort.AllocatedDraw)))
 		}
 
+		powerPortType, _ := nb.NewPatchedWritablePowerPortTemplateRequestTypeFromValue(string(*powerPortTypeChoice))
+
 		templateRequest := nb.WritablePowerPortTemplateRequest{
-			Name: desiredPort.Name,
-			Type: &nb.PatchedWritablePowerPortTemplateRequestType{
-				PowerPortTypeChoices: powerPortTypeChoice,
-			},
+			Name:          desiredPort.Name,
+			Type:          powerPortType,
 			MaximumDraw:   maximumDraw,
 			AllocatedDraw: allocatedDraw,
-			DeviceType:    helpers.BuildNullableBulkWritableCircuitRequestTenant(deviceType.Id),
+			DeviceType:    helpers.BuildNullableApprovalWorkflowUser(*deviceType.Id),
 		}
 
 		if existingTemplate, exists := existingMap[name]; !exists {
 			_, _ = s.powerPortTemplateSvc.Create(ctx, templateRequest)
 		} else if !helpers.CompareJSONFields(existingTemplate, templateRequest) {
-			_, _ = s.powerPortTemplateSvc.Update(ctx, existingTemplate.Id, templateRequest)
+			_, _ = s.powerPortTemplateSvc.Update(ctx, *existingTemplate.Id, templateRequest)
 		} else {
-			log.Info("power port template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", deviceType.Id, "deviceTypeName", deviceType.Display)
+			log.Info("power port template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", *deviceType.Id, "deviceTypeName", deviceType.Display)
 		}
 	}
 
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredPorts))
 	for _, obsolete := range obsoletes {
-		_ = s.powerPortTemplateSvc.Destroy(ctx, obsolete.Id)
+		_ = s.powerPortTemplateSvc.Destroy(ctx, *obsolete.Id)
 	}
 }
 
@@ -173,7 +173,7 @@ func (s *DeviceTypeSync) syncConsolePortTemplates(ctx context.Context, yml model
 		desiredPorts[port.Name] = port
 	}
 
-	existingTemplates := s.consolePortTemplateSvc.ListByDeviceType(ctx, deviceType.Id)
+	existingTemplates := s.consolePortTemplateSvc.ListByDeviceType(ctx, *deviceType.Id)
 	existingMap := make(map[string]nb.ConsolePortTemplate)
 	for _, template := range existingTemplates {
 		existingMap[template.Name] = template
@@ -181,24 +181,24 @@ func (s *DeviceTypeSync) syncConsolePortTemplates(ctx context.Context, yml model
 
 	for name, desiredPort := range desiredPorts {
 		consolePortTypeChoice, _ := nb.NewConsolePortTypeChoicesFromValue(desiredPort.Type)
+		consolePortType, _ := nb.NewPatchedWritableConsolePortTemplateRequestTypeFromValue(string(*consolePortTypeChoice))
+
 		templateRequest := nb.WritableConsolePortTemplateRequest{
-			Name: name,
-			Type: &nb.PatchedWritableConsolePortTemplateRequestType{
-				ConsolePortTypeChoices: consolePortTypeChoice,
-			},
-			DeviceType: helpers.BuildNullableBulkWritableCircuitRequestTenant(deviceType.Id),
+			Name:       name,
+			Type:       consolePortType,
+			DeviceType: helpers.BuildNullableApprovalWorkflowUser(*deviceType.Id),
 		}
 		if existingTemplate, exists := existingMap[name]; !exists {
 			_, _ = s.consolePortTemplateSvc.Create(ctx, templateRequest)
 		} else if !helpers.CompareJSONFields(existingTemplate, templateRequest) {
-			_, _ = s.consolePortTemplateSvc.Update(ctx, existingTemplate.Id, templateRequest)
+			_, _ = s.consolePortTemplateSvc.Update(ctx, *existingTemplate.Id, templateRequest)
 		} else {
-			log.Info("console port template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", deviceType.Id, "deviceTypeName", deviceType.Display)
+			log.Info("console port template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", *deviceType.Id, "deviceTypeName", deviceType.Display)
 		}
 	}
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredPorts))
 	for _, obsolete := range obsoletes {
-		_ = s.consolePortTemplateSvc.Destroy(ctx, obsolete.Id)
+		_ = s.consolePortTemplateSvc.Destroy(ctx, *obsolete.Id)
 	}
 }
 
@@ -209,7 +209,7 @@ func (s *DeviceTypeSync) syncInterfaceTemplates(ctx context.Context, yml models.
 		desiredInterfaceTemplate[interfaceTmpl.Name] = interfaceTmpl
 	}
 
-	existingTemplates := s.interfaceTemplateSvc.ListByDeviceType(ctx, deviceType.Id)
+	existingTemplates := s.interfaceTemplateSvc.ListByDeviceType(ctx, *deviceType.Id)
 	existingMap := make(map[string]nb.InterfaceTemplate)
 	for _, template := range existingTemplates {
 		existingMap[template.Name] = template
@@ -221,20 +221,20 @@ func (s *DeviceTypeSync) syncInterfaceTemplates(ctx context.Context, yml models.
 			Name:       name,
 			Type:       *interfaceTemplateChoice,
 			MgmtOnly:   nb.PtrBool(interfaceTmpl.MgmtOnly),
-			DeviceType: helpers.BuildNullableBulkWritableCircuitRequestTenant(deviceType.Id),
+			DeviceType: helpers.BuildNullableApprovalWorkflowUser(*deviceType.Id),
 		}
 
 		if existingTemplate, exists := existingMap[name]; !exists {
 			_, _ = s.interfaceTemplateSvc.Create(ctx, templateRequest)
 		} else if !helpers.CompareJSONFields(existingTemplate, templateRequest) {
-			_, _ = s.interfaceTemplateSvc.Update(ctx, existingTemplate.Id, templateRequest)
+			_, _ = s.interfaceTemplateSvc.Update(ctx, *existingTemplate.Id, templateRequest)
 		} else {
-			log.Info("interface template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", deviceType.Id, "deviceTypeName", deviceType.Display)
+			log.Info("interface template unchanged, skipping update", "name", templateRequest.Name, "deviceTypeId", *deviceType.Id, "deviceTypeName", deviceType.Display)
 		}
 	}
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredInterfaceTemplate))
 	for _, obsolete := range obsoletes {
-		_ = s.interfaceTemplateSvc.Destroy(ctx, obsolete.Id)
+		_ = s.interfaceTemplateSvc.Destroy(ctx, *obsolete.Id)
 	}
 }
 
@@ -246,7 +246,7 @@ func (s *DeviceTypeSync) syncModuleBayTemplates(ctx context.Context, yml models.
 	}
 
 	// Build map of existing power port templates from Nautobot
-	existingTemplates := s.moduleBayTemplateSvc.ListByDeviceType(ctx, deviceType.Id)
+	existingTemplates := s.moduleBayTemplateSvc.ListByDeviceType(ctx, *deviceType.Id)
 	existingMap := make(map[string]nb.ModuleBayTemplate)
 	for _, template := range existingTemplates {
 		existingMap[template.Name] = template
@@ -257,20 +257,20 @@ func (s *DeviceTypeSync) syncModuleBayTemplates(ctx context.Context, yml models.
 		templateRequest := nb.ModuleBayTemplateRequest{
 			Name:       moduleBay.Name,
 			Label:      nb.PtrString(moduleBay.Label),
-			DeviceType: helpers.BuildNullableBulkWritableCircuitRequestTenant(deviceType.Id),
+			DeviceType: helpers.BuildNullableApprovalWorkflowUser(*deviceType.Id),
 		}
 
 		if existingTemplate, exists := existingMap[name]; !exists {
 			_, _ = s.moduleBayTemplateSvc.Create(ctx, templateRequest)
 		} else if !helpers.CompareJSONFields(existingTemplate, templateRequest) {
-			_, _ = s.moduleBayTemplateSvc.Update(ctx, existingTemplate.Id, templateRequest)
+			_, _ = s.moduleBayTemplateSvc.Update(ctx, *existingTemplate.Id, templateRequest)
 		} else {
-			log.Info("moduleBay unchanged skipping update", "name", templateRequest.Name, "deviceTypeId", deviceType.Id, "deviceTypeName", deviceType.Display)
+			log.Info("moduleBay unchanged skipping update", "name", templateRequest.Name, "deviceTypeId", *deviceType.Id, "deviceTypeName", deviceType.Display)
 		}
 	}
 
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredModuleBays))
 	for _, obsolete := range obsoletes {
-		_ = s.moduleBayTemplateSvc.Destroy(ctx, obsolete.Id)
+		_ = s.moduleBayTemplateSvc.Destroy(ctx, *obsolete.Id)
 	}
 }
