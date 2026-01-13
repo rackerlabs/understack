@@ -161,10 +161,26 @@ class Bmc:
             )
         if r.text:
             token = r.headers["X-Auth-Token"]
-            if "Location" in r.headers:
-                location = r.headers["Location"].split(self.ip_address)[1]
+            data = r.json()
+
+            if not token:
+                raise RedfishRequestError("No token from BMC: %s", r.text)
+
+            if "@odata.id" in data:
+                location = data["@odata.id"]
+            elif "Location" in r.headers:
+                location_header = r.headers["Location"]
+                _parts = location_header.split(self.ip_address)
+                if len(_parts) < 2:
+                    raise RedfishRequestError(
+                        "Can't parse Location Header %s HTTP %s: %s",
+                        url,
+                        r.status_code,
+                        location_header,
+                    )
+                location = _parts[1]
             else:
-                location = r.json()["@odata.id"]
+                raise RedfishRequestError("No location from BMC: %s", r.text)
 
             return (token, location)
         else:
