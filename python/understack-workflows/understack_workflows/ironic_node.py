@@ -14,22 +14,22 @@ logger = setup_logger(__name__)
 def create_or_update(bmc: Bmc, name: str, manufacturer: str) -> IronicNodeConfiguration:
     """Note interfaces/ports are not synced here, that happens elsewhere."""
     client = IronicClient()
-    driver = _driver_for(manufacturer)
+    driver, inspect_interface = _driver_for(manufacturer)
 
     try:
         ironic_node = client.get_node(name)
         logger.debug(
             "Using existing baremetal node %s with name %s", ironic_node.uuid, name
         )
-        update_ironic_node(client, bmc, ironic_node, name, driver)
+        update_ironic_node(client, bmc, ironic_node, name, driver, inspect_interface)
         # Return node as IronicNodeConfiguration (duck typing - Node has same attrs)
         return ironic_node  # type: ignore[return-value]
     except ironicclient.common.apiclient.exceptions.NotFound:
         logger.debug("Baremetal Node with name %s not found in Ironic, creating.", name)
-        return create_ironic_node(client, bmc, name, driver)
+        return create_ironic_node(client, bmc, name, driver, inspect_interface)
 
 
-def update_ironic_node(client, bmc, ironic_node, name, driver):
+def update_ironic_node(client, bmc, ironic_node, name, driver, inspect_interface):
     if ironic_node.provision_state not in STATES_ALLOWING_UPDATES:
         logger.info(
             "Baremetal node %s is in %s provision_state, so no updates are allowed",
@@ -46,7 +46,7 @@ def update_ironic_node(client, bmc, ironic_node, name, driver):
         f"driver_info/redfish_username={bmc.username}",
         f"driver_info/redfish_password={bmc.password}",
         "boot_interface=http-ipxe",
-        "inspect_interface=agent",
+        f"inspect_interface={inspect_interface}",
     ]
 
     patches = args_array_to_patch("add", updates)
@@ -61,6 +61,7 @@ def create_ironic_node(
     bmc: Bmc,
     name: str,
     driver: str,
+    inspect_interface: str,
 ) -> IronicNodeConfiguration:
     # Return node as IronicNodeConfiguration (duck typing - Node has same attrs)
     return client.create_node(  # type: ignore[return-value]
@@ -74,13 +75,14 @@ def create_ironic_node(
                 "redfish_password": bmc.password,
             },
             "boot_interface": "http-ipxe",
-            "inspect_interface": "agent",
+            "inspect_interface": inspect_interface,
         }
     )
 
 
-def _driver_for(manufacturer: str) -> str:
+def _driver_for(manufacturer: str) -> tuple[str, str]:
+    """Answer the (driver, inspect_interface) for this server."""
     if manufacturer.startswith("Dell"):
-        return "idrac"
+        return ("idrac", "idrac-redfish")
     else:
-        return "redfish"
+        return ("redfish", "redfish")
