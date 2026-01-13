@@ -175,8 +175,8 @@ site:
     # -- Sync wave for deployment ordering (lower numbers deploy first)
     # @default -- 1
     wave: 1
-    # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Keystone
+    # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.6+9b270fe35
 
   # -- Glance (Image Service)
@@ -187,8 +187,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
-    # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Glance
+    # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.6+9b270fe35
 
   # -- Cinder (Block Storage Service)
@@ -199,8 +199,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
-    # renovate: datasource=helm depName=cinder registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Cinder
+    # renovate: datasource=helm depName=cinder registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.1.3+abd55b4a7
 
   # -- Ironic (Bare Metal Service)
@@ -211,8 +211,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
-    # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Ironic
+    # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.5+e61f0342c
 
   # -- Neutron (Networking Service)
@@ -223,8 +223,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
-    # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Neutron
+    # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.12+9cc7c1ea9
 
   # -- Placement (Placement Service)
@@ -235,8 +235,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
-    # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Placement
+    # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.4+9b270fe35
 
   # -- Nova (Compute Service)
@@ -247,8 +247,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 3
     wave: 3
-    # renovate: datasource=helm depName=nova registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Nova
+    # renovate: datasource=helm depName=nova registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.1.19+12458c92d
 
   # -- Octavia (Load Balancer Service)
@@ -259,8 +259,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 3
     wave: 3
-    # renovate: datasource=helm depName=octavia registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Octavia
+    # renovate: datasource=helm depName=octavia registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.7+9b270fe35
 
   # -- Horizon (Dashboard)
@@ -271,8 +271,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 4
     wave: 4
-    # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Horizon
+    # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.3+9b270fe35
 
   # -- Skyline (Dashboard)
@@ -283,8 +283,8 @@ site:
     # -- Sync wave for deployment ordering
     # @default -- 4
     wave: 4
-    # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     # -- Chart version for Skyline
+    # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.3+b6bb28b51
 
   # -- Argo Events configuration for event-driven workflows
