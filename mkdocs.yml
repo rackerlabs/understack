@@ -172,6 +172,7 @@ nav:
       - operator-guide/rabbitmq.md
       - operator-guide/rook-ceph.md
       - operator-guide/nautobot.md
+      - operator-guide/nautobotop.md
       - operator-guide/troubleshooting-osh.md
       - operator-guide/logging.md
       - operator-guide/ansible-local-usage.md
