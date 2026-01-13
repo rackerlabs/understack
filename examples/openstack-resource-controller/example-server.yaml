@@ -1,0 +1,20 @@
+---
+apiVersion: openstack.k-orc.cloud/v1alpha1
+kind: Server
+metadata:
+  name: example-server
+spec:
+  cloudCredentialsRef:
+    cloudName: understack
+    secretName: openstack-clouds
+  managementPolicy: managed
+  resource:
+    name: example-server
+    flavorRef: m1.small
+    imageRef: ubuntu-22.04
+    networks:
+      - networkRef: example-network
+    securityGroups:
+      - default
+    metadata:
+      created-by: k-orc-example

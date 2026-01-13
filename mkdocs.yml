@@ -184,4 +184,5 @@ nav:
     - user-guide/index.md
     - user-guide/openstack-cli.md
     - user-guide/openstack-image.md
+    - user-guide/openstack-resource-controller.md
   - Workflows: workflows/
