@@ -15,12 +15,7 @@ applicationSet:
       interval: 30s
 server:
   ingress:
-    enabled: true
-    ingressClassName: nginx
-    tls: true
-    annotations:
-      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
-      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    enabled: false
   metrics:
     enabled: true
     serviceMonitor:

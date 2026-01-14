@@ -11,6 +11,8 @@ spec:
   destinations:
   - namespace: 'argo'
     server: '*'
+  - namespace: 'argocd'
+    server: '*'
   - namespace: 'argo-events'
     server: '*'
   - namespace: 'cert-manager'
@@ -30,6 +32,8 @@ spec:
   - namespace: 'otel-collector'
     server: '*'
   - namespace: 'kube-system'
+    server: '*'
+  - namespace: 'envoy-gateway'
     server: '*'
   clusterResourceWhitelist:
   - group: '*'

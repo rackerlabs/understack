@@ -54,14 +54,6 @@ network:
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
   use_external_ingress_controller: true
-  api:
-    ingress:
-      classes:
-        namespace: nginx
-      annotations:
-        nginx.ingress.kubernetes.io/rewrite-target: /
-        # set our default issuer
-        cert-manager.io/cluster-issuer: understack-cluster-issuer
 
 pod:
   mounts:
@@ -234,6 +226,7 @@ manifests:
   secret_rabbitmq: false
   secret_registry: false
   service_ingress_api: false
+  ingress_api: false
   deployment_backup: false
   # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
   # Kubernetes section generation in OpenStack Helm, because we want those

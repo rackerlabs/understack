@@ -6,14 +6,6 @@ network:
   # instead of expecting the ingress controller provided
   # by OpenStack Helm
   use_external_ingress_controller: true
-  api:
-    ingress:
-      classes:
-        namespace: nginx
-      annotations:
-        nginx.ingress.kubernetes.io/rewrite-target: /
-        # set our default issuer
-        cert-manager.io/cluster-issuer: understack-cluster-issuer
 
 # (nicholas.kuechler) updating the jobs list to remove the 'placement-db-init' job.
 dependencies:
@@ -85,6 +77,7 @@ manifests:
   # that is later consumed via components/openstack helm chart
   secret_keystone: false
   secret_ks_etc: false
+  ingress: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
