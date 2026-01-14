@@ -1,0 +1,32 @@
+From 3c5765088cb7469892214692b26175bc1668f4b6 Mon Sep 17 00:00:00 2001
+From: Doug Goldstein <cardoe@cardoe.com>
+Date: Tue, 13 Jan 2026 13:44:42 -0600
+Subject: [PATCH 8/8] fix: port endpoints did not return vendor and category
+ and fix docs
+
+The port API endpoints were not returning the vendor and category fields
+when they should have been. A number of places the api-ref was incorrect
+and missed adding information about the vendor and category fields but
+other fields were omitted as well.
+
+Change-Id: Iaa19c384556b4c7453141c14ea76700c6ecae05d
+Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
+---
+ ironic/api/controllers/v1/port.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/ironic/api/controllers/v1/port.py b/ironic/api/controllers/v1/port.py
+index 1480e836b..5b1e8cc44 100644
+--- a/ironic/api/controllers/v1/port.py
++++ b/ironic/api/controllers/v1/port.py
+@@ -166,6 +166,8 @@ def convert_with_links(rpc_port, fields=None, sanitize=True):
+             'node_uuid',
+             'name',
+             'description',
++            'vendor',
++            'category',
+         )
+     )
+     if rpc_port.portgroup_id:
+-- 
+2.50.1 (Apple Git-155)

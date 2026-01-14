@@ -1,7 +1,7 @@
-From 217030928bccd1ea08e81dc2a97b27c98c721d70 Mon Sep 17 00:00:00 2001
+From 2ce4304ad46bd37c526740d3a05544aa8cdd2937 Mon Sep 17 00:00:00 2001
 From: Nidhi Rai <nidhi.rai94@gmail.com>
 Date: Thu, 11 Sep 2025 17:05:22 +0530
-Subject: [PATCH] Add SKU field to Redfish inspection
+Subject: [PATCH 2/8] Add SKU field to Redfish inspection
 
 Collect SKU (Service Tag) from Redfish ComputerSystem
 and include it in system_vendor inventory data.

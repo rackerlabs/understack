@@ -1,7 +1,7 @@
-From 60cc94d4c3271efcfd787c6276e306ee14cdce72 Mon Sep 17 00:00:00 2001
+From 0d800dfef4ab8516406c068835de2e4e52905dd9 Mon Sep 17 00:00:00 2001
 From: Doug Goldstein <cardoe@cardoe.com>
 Date: Tue, 13 Jan 2026 11:08:04 -0600
-Subject: [PATCH] hack: for scheduling purposes ignore ports with category
+Subject: [PATCH 4/8] hack: for scheduling purposes ignore ports with category
  storage
 
 We want to ignore ports that are in category storage for being eligible
@@ -15,7 +15,7 @@ Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
  1 file changed, 17 insertions(+)
 
 diff --git a/ironic/drivers/modules/network/common.py b/ironic/drivers/modules/network/common.py
-index 04413663c..1ab3e4dbe 100644
+index 0e3b9b0b0..d19d6b0a1 100644
 --- a/ironic/drivers/modules/network/common.py
 +++ b/ironic/drivers/modules/network/common.py
 @@ -34,6 +34,21 @@ LOG = log.getLogger(__name__)
