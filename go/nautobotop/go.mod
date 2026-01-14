@@ -114,4 +114,4 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/nautobot/go-nautobot/v3 => github.com/abhimanyu003/go-nautobot/v3 v3.0.0-beta
+replace github.com/nautobot/go-nautobot/v3 => github.com/abhimanyu003/go-nautobot/v3 v3.0.1
