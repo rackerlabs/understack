@@ -117,6 +117,10 @@ def _set_port_attributes(
     inspected_port: InspectedPort,
     physical_network: str | None,
 ):
+    category = None
+    if physical_network:
+        category = physical_network.split("-")[-1]
+
     try:
         if port.local_link_connection != inspected_port.local_link_connection:
             LOG.debug(
@@ -130,6 +134,7 @@ def _set_port_attributes(
 
         if physical_network and not physical_network.endswith("-network"):
             physical_network = None
+            category = "storage"
 
         if port.physical_network != physical_network:
             LOG.debug(
@@ -140,6 +145,9 @@ def _set_port_attributes(
                 physical_network,
             )
             port.physical_network = physical_network
+
+        if port.category != category:
+            port.category = category
 
         port.save()
     except exception.IronicException as e:
@@ -153,6 +161,7 @@ def _clear_port_attributes(port: Any, node_uuid: str):
     try:
         port.local_link_connection = {}
         port.physical_network = None
+        port.category = None
         port.save()
     except exception.IronicException as e:
         LOG.warning(

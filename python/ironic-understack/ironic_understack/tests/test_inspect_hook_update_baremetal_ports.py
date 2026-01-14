@@ -77,6 +77,7 @@ def test_with_valid_data(mocker, caplog):
         address="11:11:11:11:11:11",
         local_link_connection={},
         physical_network="original_value",
+        category=None,
     )
 
     mocker.patch(
@@ -101,6 +102,7 @@ def test_with_valid_data(mocker, caplog):
         "switch_info": "f20-3-1.iad3.rackspace.net",
     }
     assert mock_port.physical_network == "f20-3-network"
+    assert mock_port.category == "network"
     mock_port.save.assert_called()
     mock_node.save.assert_called_once()
 
