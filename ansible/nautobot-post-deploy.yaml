@@ -47,6 +47,6 @@
     - role: statuses
     - role: custom_fields
     - role: computed_fields
-    - role: platforms
+    - role: device_types  # Moved BEFORE platforms (creates manufacturers)
+    - role: platforms     # platforms creates platforms that reference those manufacturers
     - role: relationships
-    - role: device_types
