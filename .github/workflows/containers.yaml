@@ -34,6 +34,7 @@ jobs:
           - ironic-nautobot-client
           - understack-tests
           - shell-operator-ironic
+          - nautobot
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
