@@ -1,8 +1,8 @@
-From 3220a0cc6617dfa026ff3febc0bdd4a227320759 Mon Sep 17 00:00:00 2001
+From da011a985fce208c3ad4eeb13d635323b1cbfc8d Mon Sep 17 00:00:00 2001
 From: Doug Goldstein <cardoe@cardoe.com>
 Date: Tue, 13 Jan 2026 11:49:05 -0600
-Subject: [PATCH] feat: skip invalid mac addr interfaces in redfish inspect add
- speed
+Subject: [PATCH 5/8] feat: skip invalid mac addr interfaces in redfish inspect
+ add speed
 
 Refactor the redfish interfaces inspection by moving it to its own
 function, but preserving the behavior of not having an interfaces key in
@@ -18,7 +18,7 @@ Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
  2 files changed, 35 insertions(+), 8 deletions(-)
 
 diff --git a/ironic/drivers/modules/redfish/inspect.py b/ironic/drivers/modules/redfish/inspect.py
-index 6f951f237..5ee052713 100644
+index 69f0f0c09..9786c9f46 100644
 --- a/ironic/drivers/modules/redfish/inspect.py
 +++ b/ironic/drivers/modules/redfish/inspect.py
 @@ -14,6 +14,7 @@ Redfish Inspect Interface
@@ -41,9 +41,9 @@ index 6f951f237..5ee052713 100644
 -                inventory['interfaces'].append(iface)
 +        inventory['interfaces'] = self._get_interface_info(task, system)
  
-         pcie_devices = self._get_pcie_devices(system.pcie_devices)
-         if pcie_devices:
-@@ -310,6 +306,33 @@ class RedfishInspect(base.InspectInterface):
+         system_vendor = {}
+         if system.model:
+@@ -297,6 +293,33 @@ class RedfishInspect(base.InspectInterface):
          """
          return None
  
@@ -78,7 +78,7 @@ index 6f951f237..5ee052713 100644
          # NOTE(JayF): Checking truthiness here is better than checking for None
          #             because if we have an empty list, we'll raise a
 diff --git a/ironic/tests/unit/drivers/modules/redfish/test_inspect.py b/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
-index fd9c9e398..b3ba67c9f 100644
+index c81fb3934..4b8d08217 100644
 --- a/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
 +++ b/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
 @@ -108,6 +108,7 @@ class RedfishInspectTestCase(db_base.DbTestCase):
@@ -97,7 +97,7 @@ index fd9c9e398..b3ba67c9f 100644
          eth_interface_mock2.status.state = sushy.STATE_DISABLED
          eth_interface_mock2.status.health = sushy.HEALTH_OK
  
-@@ -235,9 +237,11 @@ class RedfishInspectTestCase(db_base.DbTestCase):
+@@ -203,9 +205,11 @@ class RedfishInspectTestCase(db_base.DbTestCase):
                           system_vendor['system_uuid'])
  
          expected_interfaces = [{'mac_address': '00:11:22:33:44:55',

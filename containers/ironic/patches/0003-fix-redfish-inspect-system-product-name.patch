@@ -1,7 +1,7 @@
-From c9c21eda6fd91f74266d623496d0a0558a40bf0d Mon Sep 17 00:00:00 2001
+From 7b1a65925b9462b0a84fe6e840ff0c90b3b19bfc Mon Sep 17 00:00:00 2001
 From: Doug Goldstein <cardoe@cardoe.com>
 Date: Mon, 15 Dec 2025 16:35:57 -0600
-Subject: [PATCH] fix redfish inspect system product name
+Subject: [PATCH 3/8] fix redfish inspect system product name
 
 The intention of this code is to read the system product name which is
 stored in the model field per the Redfish spec and not in the name field
@@ -18,11 +18,11 @@ Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
  create mode 100644 releasenotes/notes/redfish-inspect-product-name-bd537f417d35b254.yaml
 
 diff --git a/ironic/drivers/modules/redfish/inspect.py b/ironic/drivers/modules/redfish/inspect.py
-index 3e269a8a9..cfafc62b5 100644
+index 59c3ce2b0..69f0f0c09 100644
 --- a/ironic/drivers/modules/redfish/inspect.py
 +++ b/ironic/drivers/modules/redfish/inspect.py
-@@ -153,8 +153,8 @@ class RedfishInspect(base.InspectInterface):
-             inventory['pci_devices'] = pcie_devices
+@@ -149,8 +149,8 @@ class RedfishInspect(base.InspectInterface):
+                 inventory['interfaces'].append(iface)
  
          system_vendor = {}
 -        if system.name:

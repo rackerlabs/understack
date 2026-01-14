@@ -1,7 +1,7 @@
-From f7d06492fe30357ec3bc09d319f050adbf18aced Mon Sep 17 00:00:00 2001
+From 386faaeaf4a900c4c4591fae4e735164a0f38b45 Mon Sep 17 00:00:00 2001
 From: Doug Goldstein <cardoe@cardoe.com>
 Date: Wed, 22 Oct 2025 12:58:41 -0500
-Subject: [PATCH] pass along physical_network to neutron from the baremetal
+Subject: [PATCH 1/8] pass along physical_network to neutron from the baremetal
  port
 
 When plugging a baremetal port in using the 'neutron' interface, send
@@ -29,7 +29,7 @@ Signed-off-by: Doug Goldstein <cardoe@cardoe.com>
  create mode 100644 releasenotes/notes/neutron-port-binding-include-physical-network-8d8cbe17716d341a.yaml
 
 diff --git a/ironic/common/neutron.py b/ironic/common/neutron.py
-index 7d4ce2db9..9f95073b7 100644
+index b53c2c7e8..b2ba7749b 100644
 --- a/ironic/common/neutron.py
 +++ b/ironic/common/neutron.py
 @@ -371,6 +371,10 @@ def add_ports_to_network(task, network_uuid, security_groups=None):
@@ -44,7 +44,7 @@ index 7d4ce2db9..9f95073b7 100644
  
          if not ironic_port.pxe_enabled:
 diff --git a/ironic/drivers/modules/network/common.py b/ironic/drivers/modules/network/common.py
-index 19c30a4dd..8d033984d 100644
+index 04413663c..0e3b9b0b0 100644
 --- a/ironic/drivers/modules/network/common.py
 +++ b/ironic/drivers/modules/network/common.py
 @@ -272,6 +272,17 @@ def plug_port_to_tenant_network(task, port_like_obj, client=None):
@@ -115,7 +115,7 @@ index 406e42a7e..4bc0140b9 100644
      def test__add_ip_addresses_for_ipv6_stateful(self, mock_update):
          subnet_id = uuidutils.generate_uuid()
 diff --git a/ironic/tests/unit/drivers/modules/network/test_common.py b/ironic/tests/unit/drivers/modules/network/test_common.py
-index 286ac35d3..0e01d43c7 100644
+index 3c78a3ca1..2365dbcdd 100644
 --- a/ironic/tests/unit/drivers/modules/network/test_common.py
 +++ b/ironic/tests/unit/drivers/modules/network/test_common.py
 @@ -489,6 +489,77 @@ class TestCommonFunctions(db_base.DbTestCase):

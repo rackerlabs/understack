@@ -1,7 +1,7 @@
-From 813fb13714889a1997db52d48712dac2ab2dfb22 Mon Sep 17 00:00:00 2001
+From 9b08080ef4676d4700d14b3ee44f1b10cdd320df Mon Sep 17 00:00:00 2001
 From: Nidhi Rai <nidhi.rai94@gmail.com>
 Date: Thu, 11 Dec 2025 19:59:04 +0530
-Subject: [PATCH] Add LLDP collect for DRAC Redfish inspection
+Subject: [PATCH 7/8] Add LLDP collect for DRAC Redfish inspection
 
 The implementation collects LLDP data from Dell OEM SwitchConnection endpoints and falls back to standard Redfish LLDP collection when Dell specific data is unavailable.
 
