@@ -1,0 +1,183 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: ironicrunbooks.baremetal.ironicproject.org
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+spec:
+  group: baremetal.ironicproject.org
+  names:
+    kind: IronicRunbook
+    listKind: IronicRunbookList
+    plural: ironicrunbooks
+    singular: ironicrunbook
+    shortNames:
+      - rb
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          description: IronicRunbook represents a collection of ordered steps that define automated operations on baremetal nodes
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              type: string
+            kind:
+              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: IronicRunbookSpec defines the desired state of IronicRunbook
+              type: object
+              required:
+                - runbookName
+                - steps
+              properties:
+                runbookName:
+                  description: 'RunbookName is the unique name of the runbook (REQUIRED). Must match trait naming convention, typically CUSTOM_*. This name is used to match runbooks to nodes via traits.'
+                  type: string
+                  pattern: '^CUSTOM_[A-Z0-9_]+$'
+                  minLength: 1
+                  maxLength: 255
+                steps:
+                  description: 'Steps is an ordered list of operations to execute (REQUIRED). Minimum 1 step required.'
+                  type: array
+                  minItems: 1
+                  items:
+                    description: RunbookStep defines a single step in the runbook
+                    type: object
+                    required:
+                      - interface
+                      - step
+                      - order
+                    properties:
+                      interface:
+                        description: 'Interface specifies which hardware interface handles this step (REQUIRED). Must be one of the valid Ironic cleaning interfaces.'
+                        type: string
+                        enum:
+                          - bios
+                          - raid
+                          - deploy
+                          - management
+                          - power
+                          - storage
+                          - vendor
+                          - rescue
+                          - console
+                          - boot
+                          - inspect
+                          - network
+                          - firmware
+                      step:
+                        description: 'Step is the name of the step to execute (REQUIRED). Must be a valid step name for the specified interface.'
+                        type: string
+                        minLength: 1
+                        maxLength: 255
+                      order:
+                        description: 'Order defines the execution sequence (REQUIRED). Must be >= 0 and unique within the runbook. Lower numbers execute first.'
+                        type: integer
+                        minimum: 0
+                      args:
+                        description: 'Args contains step-specific arguments (OPTIONAL). Structure depends on the interface and step. Default: {}'
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                disableRamdisk:
+                  description: 'DisableRamdisk skips booting the ramdisk for cleaning operations (OPTIONAL). Use when steps can run without IPA (Ironic Python Agent). Default: false'
+                  type: boolean
+                  default: false
+                public:
+                  description: 'Public makes the runbook accessible to all projects/tenants (OPTIONAL). Cannot be true if owner is set. Default: false'
+                  type: boolean
+                  default: false
+                owner:
+                  description: 'Owner identifies the project/tenant that owns this runbook (OPTIONAL). Cannot be set if public is true. Default: null'
+                  type: string
+                  nullable: true
+                  maxLength: 255
+                extra:
+                  description: 'Extra contains additional metadata (OPTIONAL). Use for descriptions, versions, maintainer info, etc. Default: {}'
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+            status:
+              description: RunbookStatus defines the observed state of Runbook
+              type: object
+              properties:
+                ironicUUID:
+                  description: IronicUUID is the UUID of this runbook in the Ironic API
+                  type: string
+                syncStatus:
+                  description: SyncStatus indicates the synchronization state with Ironic
+                  type: string
+                  enum:
+                    - Synced
+                    - Pending
+                    - Failed
+                    - Unknown
+                lastSyncTime:
+                  description: LastSyncTime is the timestamp of the last successful sync with Ironic
+                  type: string
+                  format: date-time
+                observedGeneration:
+                  description: ObservedGeneration reflects the generation of the most recently observed Runbook
+                  type: integer
+                  format: int64
+                conditions:
+                  description: Conditions represent the latest available observations of the runbook's state
+                  type: array
+                  items:
+                    description: Condition contains details for one aspect of the current state of this API Resource
+                    type: object
+                    required:
+                      - type
+                      - status
+                      - lastTransitionTime
+                    properties:
+                      type:
+                        description: Type of condition (e.g., Ready, Validated, Synced)
+                        type: string
+                      status:
+                        description: Status of the condition (True, False, Unknown)
+                        type: string
+                        enum:
+                          - "True"
+                          - "False"
+                          - Unknown
+                      lastTransitionTime:
+                        description: LastTransitionTime is the last time the condition transitioned from one status to another
+                        type: string
+                        format: date-time
+                      reason:
+                        description: Reason contains a programmatic identifier indicating the reason for the condition's last transition
+                        type: string
+                      message:
+                        description: Message is a human readable message indicating details about the transition
+                        type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Runbook Name
+          type: string
+          description: The runbook name used for trait matching
+          jsonPath: .spec.runbookName
+        - name: Steps
+          type: integer
+          description: Number of steps in the runbook
+          jsonPath: .spec.steps[*]
+        - name: Public
+          type: boolean
+          description: Whether the runbook is public
+          jsonPath: .spec.public
+        - name: Sync Status
+          type: string
+          description: Synchronization status with Ironic
+          jsonPath: .status.syncStatus
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
