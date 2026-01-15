@@ -41,6 +41,15 @@ spec:
           {{- end }}
           port: {{ .service.port }}
         {{- end }}
+      {{- if .timeouts }}
+      timeouts:
+        {{- if hasKey .timeouts "backendRequest" }}
+        backendRequest: {{ .timeouts.backendRequest | default "15s"}}
+        {{- end }}
+        {{- if hasKey .timeouts "request" }}
+        request: {{ .timeouts.request | default "15s"}}
+        {{- end }}
+      {{- end }}
 {{- if eq .service.backendType "tls" }}
 ---
 apiVersion: gateway.envoyproxy.io/v1alpha1
