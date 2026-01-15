@@ -66,7 +66,7 @@ markdown_extensions:
           format: !!python/name:markdown_exec.formatter
         - name: mermaid
           class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+          format: !!python/name:pymdownx.superfences.fence_div_format
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
@@ -77,12 +77,16 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.mark
   - pymdownx.snippets
-  - pymdownx.superfences
+  - nl2br
+  - admonition
+  - pymdownx.details
   - pymdownx.tabbed:
       alternate_style: true
 
 extra_css:
   - stylesheets/rackspace-theme.css
+extra_javascript:
+  - assets/mermaid.min.js
 
 plugins:
   - search
@@ -90,6 +94,8 @@ plugins:
       sort_file: true
       sort_directory: true
   - macros
+  - callouts
+  - mermaid-zoom
 
 validation:
   omitted_files: warn
