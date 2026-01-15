@@ -105,7 +105,10 @@
                   "backendType": {
                     "type": "string",
                     "description": "Type of traffic that service expects - 'http' or 'tls'",
-                    "enum": ["tls", "http"]
+                    "enum": [
+                      "tls",
+                      "http"
+                    ]
                   }
                 },
                 "required": [
@@ -133,6 +136,20 @@
               "filters": {
                 "type": "object",
                 "description": "Route filters."
+              },
+              "timeouts": {
+                "type": "object",
+                "description": "Rule timeouts",
+                "properties": {
+                  "request": {
+                    "type": "string",
+                    "description": "Request specifies the maximum duration for a gateway to respond to an HTTP request."
+                  },
+                  "backendRequest": {
+                    "type": "string",
+                    "description": "BackendRequest specifies a timeout for an individual request from the gateway to a backend. This covers the time from when the request first starts being sent from the gateway to when the full response has been received from the backend."
+                  }
+                }
               }
             },
             "required": [
