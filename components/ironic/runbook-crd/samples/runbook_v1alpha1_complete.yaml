@@ -1,0 +1,83 @@
+# Complete Runbook Example - All Fields
+#
+# This example demonstrates all available fields in a runbook,
+# including both required and optional fields.
+#
+# Required fields (✅): runbookName, steps, interface, step, order
+# Optional fields (❌): disableRamdisk, public, owner, extra, args
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: complete-runbook
+  namespace: baremetal-system
+  labels:
+    environment: production
+    hardware-type: compute
+    version: v1.0.0
+  annotations:
+    description: "Complete example showing all available fields"
+spec:
+  # ✅ REQUIRED: Runbook name (must match CUSTOM_* pattern)
+  runbookName: CUSTOM_COMPLETE
+
+  # ✅ REQUIRED: Ordered list of steps (minimum 1 step)
+  steps:
+    # Step 1: BIOS Configuration
+    - interface: bios           # ✅ REQUIRED
+      step: apply_configuration # ✅ REQUIRED
+      order: 1                  # ✅ REQUIRED
+      args:                     # ❌ OPTIONAL
+        settings:
+          - name: LogicalProc
+            value: Enabled
+          - name: VirtualizationTechnology
+            value: Enabled
+          - name: SRIOV
+            value: Enabled
+
+    # Step 2: RAID Configuration
+    - interface: raid           # ✅ REQUIRED
+      step: create_configuration # ✅ REQUIRED
+      order: 2                  # ✅ REQUIRED
+      args:                     # ❌ OPTIONAL
+        logical_disks:
+          - size_gb: 100
+            raid_level: "1"
+            is_root_volume: true
+          - size_gb: 500
+            raid_level: "5"
+            is_root_volume: false
+
+    # Step 3: Disk Cleaning
+    - interface: deploy         # ✅ REQUIRED
+      step: erase_devices       # ✅ REQUIRED
+      order: 3                  # ✅ REQUIRED
+      args:                     # ❌ OPTIONAL
+        erase_skip_list: []
+
+  # ❌ OPTIONAL: Skip ramdisk booting (default: false)
+  disableRamdisk: false
+
+  # ❌ OPTIONAL: Make runbook public (default: false)
+  # Note: Cannot be true if owner is set
+  public: false
+
+  # ❌ OPTIONAL: Project/tenant owner (default: null)
+  # Note: Cannot be set if public is true
+  owner: "project-123"
+
+  # ❌ OPTIONAL: Additional metadata (default: {})
+  extra:
+    description: "Complete example runbook with all fields"
+    version: "1.0.0"
+    maintainer: "ops-team@example.com"
+    documentation: "https://docs.example.com/runbooks/complete"
+    tags:
+      - production
+      - compute
+      - complete-example
+    changelog:
+      - version: "1.0.0"
+        date: "2024-01-14"
+        changes: "Initial version"

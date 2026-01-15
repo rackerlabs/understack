@@ -1,0 +1,26 @@
+# Minimal Runbook Example - Required Fields Only
+#
+# This example shows the absolute minimum required to create a valid runbook.
+# It includes only the 5 required fields:
+#   1. spec.runbookName
+#   2. spec.steps (array with min 1 step)
+#   3. steps[].interface
+#   4. steps[].step
+#   5. steps[].order
+#
+# Use this as a starting point and add optional fields as needed.
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: minimal-runbook
+  namespace: default
+spec:
+  # ✅ REQUIRED: Runbook name matching trait convention
+  runbookName: CUSTOM_MINIMAL
+
+  # ✅ REQUIRED: At least one step
+  steps:
+    - interface: deploy      # ✅ REQUIRED: Hardware interface
+      step: erase_devices    # ✅ REQUIRED: Step name
+      order: 1               # ✅ REQUIRED: Execution order (unique)

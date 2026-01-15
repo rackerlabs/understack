@@ -1,0 +1,21 @@
+# RoleBinding for Runbook Controller
+#
+# This binds the runbook-controller-role to a service account.
+# Modify the subjects section to bind to your desired users or service accounts.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: runbook-controller-role-rolebinding
+  labels:
+    app.kubernetes.io/name: ironicrunbook
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: runbook-controller-role
+subjects:
+  # Example: Bind to a service account (for controller)
+  - kind: ServiceAccount
+    name: runbook-controller
+    namespace: baremetal-system

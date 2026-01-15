@@ -1,0 +1,65 @@
+# RAID Configuration Runbook
+#
+# This runbook configures RAID arrays for storage nodes.
+# Common use case: Setting up RAID 1 for OS and RAID 6 for data.
+#
+# Matches nodes with trait: CUSTOM_STORAGE_RAID
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: storage-raid-config
+  namespace: baremetal-system
+  labels:
+    use-case: raid-configuration
+    hardware-type: storage
+spec:
+  runbookName: CUSTOM_STORAGE_RAID
+
+  steps:
+    # Step 1: Delete existing RAID configuration
+    - interface: raid
+      step: delete_configuration
+      order: 1
+      args: {}
+
+    # Step 2: Create new RAID configuration
+    - interface: raid
+      step: create_configuration
+      order: 2
+      args:
+        logical_disks:
+          # RAID 1 for OS (root volume)
+          - size_gb: 500
+            raid_level: "1"
+            is_root_volume: true
+            controller: "RAID.Integrated.1-1"
+            disk_type: "ssd"
+            interface_type: "sata"
+            volume_name: "OS"
+
+          # RAID 6 for data storage
+          - size_gb: MAX
+            raid_level: "6"
+            is_root_volume: false
+            controller: "RAID.Integrated.1-1"
+            disk_type: "hdd"
+            interface_type: "sas"
+            volume_name: "DATA"
+            number_of_physical_disks: 8
+
+  extra:
+    description: "RAID configuration for storage nodes with OS and data volumes"
+    version: "1.0.0"
+    use_case: "Storage node RAID setup"
+    hardware_compatibility:
+      - "Dell PowerEdge R740xd"
+      - "Dell PowerEdge R7525"
+    raid_layout: |
+      - RAID 1 (500GB): Operating system on 2x SSDs
+      - RAID 6 (remaining): Data storage on 8x HDDs
+    notes: |
+      This configuration provides:
+      - High availability for OS with RAID 1 mirroring
+      - Large capacity with redundancy for data with RAID 6
+      - Optimal performance by separating OS (SSD) and data (HDD)
