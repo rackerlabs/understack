@@ -36,6 +36,7 @@ RUN \
    mkdir -p /usr/share/novnc/ && \
    wget -q -O "$DEST_FILE" "$URL" && \
    tar -C /usr/share/novnc/ --strip-components=1 -zxvf "${DEST_FILE}" "$PFX/app" "$PFX/core" "$PFX/vendor" "$PFX/vnc.html"
+COPY containers/ironic/ironic-console-pod.yaml.template /var/lib/openstack/lib/python3.12/site-packages/ironic/console/container/
 
 ARG OPENSTACK_VERSION="required_argument"
 FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS final
