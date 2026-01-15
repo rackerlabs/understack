@@ -163,6 +163,7 @@ nav:
       - operator-guide/openstack-ironic.md
       - operator-guide/openstack-ironic-inspection-guide.md
       - operator-guide/openstack-ironic-change-boot-interface.md
+      - operator-guide/openstack-ironic-console.md
       - operator-guide/openstack-neutron.md
       - operator-guide/openstack-placement.md
     - 'Networking':
@@ -193,4 +194,5 @@ nav:
     - user-guide/openstack-cli.md
     - user-guide/openstack-image.md
     - user-guide/openstack-resource-controller.md
+    - user-guide/openstack-console.md
   - Workflows: workflows/
