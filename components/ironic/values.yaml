@@ -89,7 +89,7 @@ conf:
     inspector:
       extra_kernel_params: ipa-collect-lldp=1
       # Agent inspection hooks run after inspecting in-band using the IPA image:
-      hooks: "ramdisk-error,validate-interfaces,architecture,pci-devices,validate-interfaces,parse-lldp,resource-class,update-baremetal-port"
+      hooks: "ramdisk-error,validate-interfaces,architecture,pci-devices,validate-interfaces,parse-lldp,update-baremetal-port"
     redfish:
       # Redfish inspection hooks run after inspecting out-of-band using the BMC:
       inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class"
