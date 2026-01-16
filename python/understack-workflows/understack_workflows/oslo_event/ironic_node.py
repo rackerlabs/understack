@@ -127,7 +127,19 @@ def instance_nqn(instance_id: str | None) -> str:
 
 
 def handle_instance_delete(_conn: Connection, _: Nautobot, event_data: dict) -> int:
-    """Operates on a Nova instance delete event to clean up storage networking."""
+    """DEPRECATED: This handler is no longer used.
+
+    Instance delete events are now handled directly by the sensor using data filters.
+    See: components/site-workflows/sensors/sensor-nova-oslo-event.yaml
+
+    This function is kept for reference but should not be called.
+
+    Original purpose: Operated on a Nova instance delete event to clean up storage networking.
+    """
+    logger.warning(
+        "handle_instance_delete called but is deprecated. "
+        "This event should be handled by the sensor directly."
+    )
     payload = event_data.get("payload", {})
     instance_uuid = payload.get("instance_id")
     project_id = payload.get("tenant_id")

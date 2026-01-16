@@ -15,7 +15,7 @@ metadata:
       triggers the ansible playbook without requiring a Python handler.
 
       The sensor extracts the following parameters from the event:
-      - device_id: from payload.node (the Ironic/Nova instance UUID)
+      - device_id: from payload.node (the Baremetal Node ID)
       - project_id: from payload.tenant_id (UUID without dashes)
 
       These are passed directly to the storage_on_server_delete.yml ansible playbook.
