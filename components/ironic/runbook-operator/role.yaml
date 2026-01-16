@@ -1,0 +1,25 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: runbook-controller-role
+  labels:
+    app.kubernetes.io/name: ironicrunbook
+    app.kubernetes.io/component: rbac
+rules:
+  # Read-only runbook permissions
+  - apiGroups:
+      - baremetal.ironicproject.org
+    resources:
+      - ironicrunbooks
+    verbs:
+      - get
+      - list
+      - watch
+
+  # Read-only status permissions
+  - apiGroups:
+      - baremetal.ironicproject.org
+    resources:
+      - ironicrunbooks/status
+    verbs:
+      - get

@@ -1,0 +1,82 @@
+# Firmware Update Runbook
+#
+# This runbook updates firmware components on baremetal nodes.
+# Common use case: Updating BIOS, BMC, and NIC firmware.
+#
+# Matches nodes with trait: CUSTOM_FIRMWARE_UPDATE
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: firmware-update
+  namespace: baremetal-system
+  labels:
+    use-case: firmware-update
+    hardware-type: general
+spec:
+  runbookName: CUSTOM_FIRMWARE_UPDATE
+
+  steps:
+    # Step 1: Update BIOS firmware
+    - interface: management
+      step: update_firmware
+      order: 1
+      args:
+        component: bios
+        firmware_images:
+          - url: "http://firmware-repo.example.com/bios/R740_BIOS_2.15.0.bin"
+            checksum: "sha256:abc123..."
+            version: "2.15.0"
+
+    # Step 2: Update BMC (iDRAC/iLO) firmware
+    - interface: management
+      step: update_firmware
+      order: 2
+      args:
+        component: bmc
+        firmware_images:
+          - url: "http://firmware-repo.example.com/idrac/iDRAC9_4.40.00.00.bin"
+            checksum: "sha256:def456..."
+            version: "4.40.00.00"
+
+    # Step 3: Update NIC firmware
+    - interface: management
+      step: update_firmware
+      order: 3
+      args:
+        component: nic
+        firmware_images:
+          - url: "http://firmware-repo.example.com/nic/BCM5720_7.14.76.bin"
+            checksum: "sha256:ghi789..."
+            version: "7.14.76"
+            device_id: "14e4:165f"  # Broadcom BCM5720
+
+  # Firmware updates typically don't need ramdisk
+  disableRamdisk: false
+
+  extra:
+    description: "Firmware update runbook for BIOS, BMC, and NIC components"
+    version: "1.0.0"
+    use_case: "Firmware maintenance and security updates"
+    hardware_compatibility:
+      - "Dell PowerEdge R740"
+      - "Dell PowerEdge R640"
+    firmware_versions:
+      bios: "2.15.0"
+      bmc: "4.40.00.00"
+      nic: "7.14.76"
+    notes: |
+      This runbook updates critical firmware components:
+      1. BIOS - System firmware
+      2. BMC (iDRAC/iLO) - Management controller
+      3. NIC - Network interface card
+
+      Important:
+      - Ensure firmware images are accessible from the nodes
+      - Verify checksums match the official firmware releases
+      - Test on a single node before rolling out to production
+      - Some updates may require a reboot
+    warnings:
+      - "Firmware updates can take 10-30 minutes per component"
+      - "Do not power off nodes during firmware updates"
+      - "Verify hardware compatibility before applying updates"

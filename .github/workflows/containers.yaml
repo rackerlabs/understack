@@ -33,6 +33,7 @@ jobs:
           - dnsmasq
           - ironic-nautobot-client
           - understack-tests
+          - shell-operator-ironic
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
