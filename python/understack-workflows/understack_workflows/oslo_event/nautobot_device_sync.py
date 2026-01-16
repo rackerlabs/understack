@@ -415,6 +415,31 @@ def sync_device_to_nautobot(
         nautobot_device = nautobot_client.dcim.devices.get(id=device_info.uuid)
 
         if not nautobot_device:
+            # Try finding by name (handles re-enrollment scenarios)
+            if device_info.name:
+                nautobot_device = nautobot_client.dcim.devices.get(
+                    name=device_info.name
+                )
+                if nautobot_device and not isinstance(nautobot_device, list):
+                    logger.info(
+                        "Found existing device by name %s with ID %s, "
+                        "will recreate with UUID %s",
+                        device_info.name,
+                        nautobot_device.id,
+                        device_info.uuid,
+                    )
+                    if str(nautobot_device.id) != device_info.uuid:
+                        logger.warning(
+                            "Device %s has mismatched UUID (Nautobot: %s, Ironic: %s), "
+                            "recreating",
+                            device_info.name,
+                            nautobot_device.id,
+                            device_info.uuid,
+                        )
+                        nautobot_device.delete()
+                        nautobot_device = None  # Will trigger creation below
+
+        if not nautobot_device:
             # Create new device with minimal fields
             if not device_info.location_id:
                 logger.error("Cannot create device %s: no location found", node_uuid)
