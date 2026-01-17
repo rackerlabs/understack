@@ -520,6 +520,119 @@ class TestSyncDeviceToNautobot:
 
         assert result == EXIT_STATUS_FAILURE
 
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
+    @patch(
+        "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
+    )
+    def test_sync_finds_device_by_name_with_matching_uuid(
+        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+    ):
+        """Test that device found by name with matching UUID is updated."""
+        node_uuid = str(uuid.uuid4())
+        device_info = DeviceInfo(
+            uuid=node_uuid,
+            name="Dell-ABC123",
+            manufacturer="Dell",
+            model="PowerEdge R640",
+            location_id="location-uuid",
+            status="Active",
+        )
+        mock_fetch.return_value = (device_info, {}, [])
+
+        # First get by ID returns None
+        # Second get by name returns device with same UUID
+        existing_device = MagicMock()
+        existing_device.id = node_uuid  # Same UUID
+        existing_device.status = MagicMock(name="Planned")
+        existing_device.name = "Dell-ABC123"
+        existing_device.serial = None
+        existing_device.location = None
+        existing_device.rack = None
+        existing_device.tenant = None
+        existing_device.custom_fields = {}
+
+        mock_nautobot.dcim.devices.get.side_effect = [None, existing_device]
+        mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
+
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+
+        assert result == EXIT_STATUS_SUCCESS
+        # Should NOT delete since UUIDs match
+        existing_device.delete.assert_not_called()
+        # Should NOT create new device
+        mock_nautobot.dcim.devices.create.assert_not_called()
+
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
+    @patch(
+        "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
+    )
+    def test_sync_recreates_device_with_mismatched_uuid(
+        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+    ):
+        """Test device with mismatched UUID is deleted and recreated."""
+        node_uuid = str(uuid.uuid4())
+        old_uuid = str(uuid.uuid4())  # Different UUID
+        device_info = DeviceInfo(
+            uuid=node_uuid,
+            name="Dell-ABC123",
+            manufacturer="Dell",
+            model="PowerEdge R640",
+            location_id="location-uuid",
+            status="Active",
+        )
+        mock_fetch.return_value = (device_info, {}, [])
+
+        # First get by ID returns None
+        # Second get by name returns device with different UUID
+        existing_device = MagicMock()
+        existing_device.id = old_uuid  # Different UUID
+        existing_device.status = MagicMock(name="Planned")
+        existing_device.name = "Dell-ABC123"
+
+        mock_nautobot.dcim.devices.get.side_effect = [None, existing_device]
+        mock_nautobot.dcim.devices.create.return_value = MagicMock()
+        mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
+
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+
+        assert result == EXIT_STATUS_SUCCESS
+        # Should delete old device
+        existing_device.delete.assert_called_once()
+        # Should create new device with correct UUID
+        mock_nautobot.dcim.devices.create.assert_called_once()
+
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
+    @patch(
+        "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
+    )
+    def test_sync_device_not_found_by_name_creates_new(
+        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+    ):
+        """Test that device not found by UUID or name is created."""
+        node_uuid = str(uuid.uuid4())
+        device_info = DeviceInfo(
+            uuid=node_uuid,
+            name="Dell-ABC123",
+            manufacturer="Dell",
+            model="PowerEdge R640",
+            location_id="location-uuid",
+            status="Active",
+        )
+        mock_fetch.return_value = (device_info, {}, [])
+
+        # Both lookups return None
+        mock_nautobot.dcim.devices.get.side_effect = [None, None]
+        mock_nautobot.dcim.devices.create.return_value = MagicMock()
+        mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
+
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+
+        assert result == EXIT_STATUS_SUCCESS
+        mock_nautobot.dcim.devices.create.assert_called_once()
+
 
 class TestDeleteDeviceFromNautobot:
     """Test cases for delete_device_from_nautobot function."""
