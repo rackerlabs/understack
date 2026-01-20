@@ -1,0 +1,91 @@
+# GPU Node Setup Runbook
+#
+# This runbook configures nodes for GPU workloads.
+# Common use case: Preparing nodes for ML/AI or GPU compute workloads.
+#
+# Matches nodes with trait: CUSTOM_GPU_SETUP
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: gpu-node-setup
+  namespace: baremetal-system
+  labels:
+    use-case: gpu-configuration
+    hardware-type: gpu-compute
+spec:
+  runbookName: CUSTOM_GPU_SETUP
+
+  steps:
+    # Step 1: Configure BIOS for GPU support
+    - interface: bios
+      step: apply_configuration
+      order: 1
+      args:
+        settings:
+          # Enable virtualization for GPU passthrough
+          - name: VirtualizationTechnology
+            value: Enabled
+
+          # Enable VT-d for IOMMU
+          - name: VtForDirectIo
+            value: Enabled
+
+          # Enable SR-IOV for GPU virtualization
+          - name: SRIOV
+            value: Enabled
+
+          # Enable Above 4G Decoding for large GPU memory
+          - name: Above4GDecoding
+            value: Enabled
+
+          # Set PCIe speed to maximum
+          - name: PcieSpeed
+            value: Auto
+
+          # Enable NUMA for optimal GPU-CPU affinity
+          - name: NumaMode
+            value: Enabled
+
+    # Step 2: Update GPU firmware (optional)
+    - interface: management
+      step: update_firmware
+      order: 2
+      args:
+        component: gpu
+        firmware_images:
+          - url: "http://firmware-repo.example.com/gpu/nvidia-vbios-latest.bin"
+            checksum: "sha256:xyz123..."
+            version: "latest"
+
+  extra:
+    description: "GPU node BIOS and firmware configuration"
+    version: "1.0.0"
+    use_case: "Preparing nodes for GPU compute workloads"
+    hardware_compatibility:
+      - "Dell PowerEdge R740 with NVIDIA GPUs"
+      - "HPE ProLiant DL380 Gen10 with NVIDIA GPUs"
+    gpu_support:
+      - "NVIDIA Tesla V100"
+      - "NVIDIA A100"
+      - "NVIDIA H100"
+    features_enabled:
+      - "GPU passthrough (VT-d)"
+      - "SR-IOV for GPU virtualization"
+      - "NUMA for optimal performance"
+      - "Above 4G decoding for large GPU memory"
+    notes: |
+      This runbook prepares nodes for GPU workloads by:
+      1. Enabling virtualization features for GPU passthrough
+      2. Configuring IOMMU (VT-d) for device assignment
+      3. Enabling SR-IOV for GPU virtualization
+      4. Optimizing PCIe and NUMA settings
+
+      After running this runbook:
+      - Verify GPU visibility with 'lspci | grep -i nvidia'
+      - Install GPU drivers appropriate for your workload
+      - Configure GPU device plugins for Kubernetes
+    recommended_next_steps:
+      - "Install NVIDIA drivers"
+      - "Install NVIDIA Container Toolkit"
+      - "Deploy NVIDIA GPU Operator (for Kubernetes)"

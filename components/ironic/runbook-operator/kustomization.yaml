@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Namespace for runbook resources
+namespace: openstack
+
+# Create namespace if it doesn't exist
+resources:
+  - service_account.yaml
+  - role.yaml
+  - role_binding.yaml
+  - shell-operator-ironic.yaml

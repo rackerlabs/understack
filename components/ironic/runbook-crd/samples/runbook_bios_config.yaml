@@ -1,0 +1,60 @@
+# BIOS Configuration Runbook
+#
+# This runbook configures BIOS settings for compute nodes.
+# Common use case: Enabling virtualization features for hypervisor nodes.
+#
+# Matches nodes with trait: CUSTOM_COMPUTE_BIOS
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: compute-bios-config
+  namespace: baremetal-system
+  labels:
+    use-case: bios-configuration
+    hardware-type: compute
+spec:
+  runbookName: CUSTOM_COMPUTE_BIOS
+
+  steps:
+    - interface: bios
+      step: apply_configuration
+      order: 1
+      args:
+        settings:
+          # Enable logical processors (hyperthreading)
+          - name: LogicalProc
+            value: Enabled
+
+          # Enable virtualization technology
+          - name: VirtualizationTechnology
+            value: Enabled
+
+          # Enable Intel VT-d (IOMMU)
+          - name: VtForDirectIo
+            value: Enabled
+
+          # Enable SR-IOV support
+          - name: SRIOV
+            value: Enabled
+
+          # Set boot mode to UEFI
+          - name: BootMode
+            value: Uefi
+
+          # Enable secure boot
+          - name: SecureBoot
+            value: Enabled
+
+  extra:
+    description: "BIOS configuration for compute nodes with virtualization support"
+    version: "1.0.0"
+    use_case: "Hypervisor node preparation"
+    hardware_compatibility:
+      - "Dell PowerEdge R740"
+      - "Dell PowerEdge R640"
+      - "HPE ProLiant DL380 Gen10"
+    notes: |
+      This runbook enables common virtualization features required for
+      running KVM/QEMU workloads. Adjust settings based on your specific
+      hardware and requirements.

@@ -1,0 +1,45 @@
+# Disk Cleaning Runbook
+#
+# This runbook performs secure disk erasure for node reuse.
+# Common use case: Preparing nodes for redeployment or decommissioning.
+#
+# Matches nodes with trait: CUSTOM_DISK_CLEAN
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: disk-cleaning
+  namespace: baremetal-system
+  labels:
+    use-case: disk-cleaning
+    security-level: standard
+spec:
+  runbookName: CUSTOM_DISK_CLEAN
+
+  steps:
+    # Step 1: Erase all devices
+    - interface: deploy
+      step: erase_devices
+      order: 1
+      args:
+        # Empty list means erase all devices
+        erase_skip_list: []
+
+  extra:
+    description: "Standard disk cleaning for node reuse"
+    version: "1.0.0"
+    use_case: "Secure disk erasure before redeployment"
+    security_level: "standard"
+    notes: |
+      This runbook performs a standard disk erase on all storage devices.
+
+      Erase method depends on Ironic configuration:
+      - ATA Secure Erase (if supported by drive)
+      - NVMe Format (for NVMe drives)
+      - Software-based shred (fallback)
+
+      For high-security environments, consider:
+      - Multiple pass overwrite
+      - DoD 5220.22-M standard
+      - Physical destruction for decommissioning
+    estimated_duration: "30-120 minutes depending on disk size and method"
