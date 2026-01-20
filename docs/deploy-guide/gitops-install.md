@@ -192,10 +192,58 @@ Label the node(s) to allow OpenStack control plane installation:
 kubectl label node $(kubectl get nodes -o 'jsonpath={.items[*].metadata.name}') openstack-control-plane=enabled
 ```
 
-Finally run the following to have ArgoCD deploy the system:
+Finally run the following to have ArgoCD deploy the system. We will create our
+[App of Apps][app-of-apps] configuration here:
+
+```yaml title="app-of-apps.yaml"
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: understack  # name for your app-of-apps app
+spec:
+  destination:
+    namespace: argocd # where ArgoCD will read sources from
+    server: https://kubernetes.default.svc # local cluster where ArgoCD is running
+  project: default
+  source:
+    repoURL: https://github.com/rackerlabs/understack.git
+    targetRevision: HEAD
+    path: apps
+    kustomize:
+      # enables updating ArgoCD as well, remove it if you'd like
+      components:
+      - appsets/argocd
+      # optional patch to apply deployment overrides
+      patches:
+        - target:
+            group: argoproj.io
+            version: v1alpha1
+            kind: ApplicationSet
+          patch: |
+            - op: add
+              path: /spec/generators/0/matrix/generators/0/merge/generators/1
+              value:
+                git:
+                  repoURL: URL_TO_YOUR_DEPLOY_REPO
+                  revision: HEAD
+                  files:
+                    - path: "*/deploy.yaml"
+                  values:
+                    {%- raw %}
+                    understack_url: '{{ get . "understack_url" }}'
+                    understack_ref: '{{ get . "understack_ref" }}'
+                    deploy_url: '{{ get . "deploy_url" }}'
+                    deploy_ref: '{{ get . "deploy_ref" }}'
+                    {%- endraw %}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
+```
 
 ```bash
-kubectl -n argocd apply -f apps/aio-app-of-apps.yaml
+kubectl -n argocd apply -f app-of-apps.yaml
 ```
 
 At this point ArgoCD will work to deploy UnderStack.
