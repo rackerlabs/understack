@@ -14,6 +14,7 @@ resources:
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
   - serviceaccounts/serviceaccount-k8s-openstack-events-secrets.yaml
   - sensors/sensor-ironic-node-update.yaml
+  - sensors/sensor-ironic-node-create.yaml
   - sensors/sensor-keystone-event-project.yaml
   - sensors/sensor-keystone-oslo-event.yaml
   - sensors/sensor-keystone-automation-user-upsert.yaml

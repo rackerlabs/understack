@@ -1,0 +1,54 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ironic-node-create
+  annotations:
+    workflows.argoproj.io/title: Trigger inspection when Ironic node is created
+    workflows.argoproj.io/description: |+
+      Triggers on baremetal.node.create.end event and starts the inspect-server
+      workflow to perform Ironic inspection on the newly created node.
+
+      Once inspection completes, the provision_set.end event will trigger
+      Nautobot sync with full inventory data.
+
+      Defined in `components/site-workflows/sensors/sensor-ironic-node-create.yaml`
+spec:
+  dependencies:
+    - eventName: openstack
+      eventSourceName: openstack-ironic
+      name: ironic-create-dep
+      transform:
+        jq: |
+          .body = (.body["oslo.message"] | fromjson)
+      filters:
+        data:
+          - path: "body.event_type"
+            type: "string"
+            value:
+              - "baremetal.node.create.end"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: ironic-node-create-inspect
+        k8s:
+          operation: create
+          parameters:
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: body.payload.ironic_object\.data.uuid
+                dependencyName: ironic-create-dep
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: inspect-server-
+                namespace: argo-events
+              spec:
+                arguments:
+                  parameters:
+                    - name: node
+                workflowTemplateRef:
+                  name: inspect-server
