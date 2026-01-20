@@ -44,7 +44,10 @@ def get_ironic_client(cloud=None, region_name="") -> IronicClient:  # type: igno
     """Returns our Ironic Client wrapper configured from our clouds.yaml."""
     cloud_region = _get_os_cloud_region(cloud, region_name)
     client = _get_ironic_client(
-        "1", session=cloud_region.get_session(), os_ironic_api_version="latest"
+        api_version="1",
+        session=cloud_region.get_session(),
+        os_ironic_api_version="latest",
+        region_name=cloud_region.region_name,
     )
     client.negotiate_api_version()
     return client
