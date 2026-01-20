@@ -8,7 +8,6 @@ metadata:
     workflows.argoproj.io/description: |+
       Triggers on the following Ironic Events:
 
-      - baremetal.node.create.end which happens when a baremetal node is created
       - baremetal.node.update.end which happens when node fields are updated
       - baremetal.node.delete.end which happens when a node is deleted
 
@@ -37,7 +36,6 @@ spec:
         - path: "body.event_type"
           type: "string"
           value:
-            - "baremetal.node.create.end"
             - "baremetal.node.update.end"
             - "baremetal.node.delete.end"
   template:

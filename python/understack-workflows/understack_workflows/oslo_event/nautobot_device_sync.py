@@ -14,6 +14,7 @@ from dataclasses import field
 from typing import Any
 from uuid import UUID
 
+from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 
@@ -231,7 +232,14 @@ def fetch_device_info(
     device_info = DeviceInfo(uuid=node_uuid)
 
     node = ironic_client.get_node(node_uuid)
-    inventory = ironic_client.get_node_inventory(node_ident=node_uuid)
+
+    # Inventory may not exist yet for newly created nodes (pre-inspection)
+    try:
+        inventory = ironic_client.get_node_inventory(node_ident=node_uuid)
+    except ironic_exceptions.NotFound:
+        logger.info("No inventory yet for node %s (not inspected)", node_uuid)
+        inventory = {}
+
     ports = ironic_client.list_ports(node_id=node_uuid)
 
     # Populate in order
@@ -441,9 +449,13 @@ def sync_device_to_nautobot(
                         nautobot_device = None  # Will trigger creation below
 
         if not nautobot_device:
-            # Create new device with minimal fields
+            # Skip sync for uninspected nodes - no location means we can't create
+            # the device yet. The inspection event will trigger sync with full data.
             if not device_info.location_id:
-                logger.error("Cannot create device %s: no location found", node_uuid)
+                logger.info(
+                    "Skipping sync for node %s - no location yet (awaiting inspection)",
+                    node_uuid,
+                )
                 return EXIT_STATUS_FAILURE
             nautobot_device = _create_nautobot_device(device_info, nautobot_client)
 
@@ -504,7 +516,6 @@ def handle_node_event(
 
     This is a generic handler that works with:
     - baremetal.node.provision_set.end
-    - baremetal.node.create.end
     - baremetal.node.update.end
     - baremetal.node.power_set.end
     - baremetal.node.power_state_corrected.success

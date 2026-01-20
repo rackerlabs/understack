@@ -527,9 +527,10 @@ class TestSyncDeviceToNautobot:
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
     @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
-    def test_sync_without_location_returns_error(
+    def test_sync_without_location_skips_for_uninspected_node(
         self, mock_fetch, mock_ironic_class, mock_nautobot
     ):
+        """Test that sync skips gracefully for uninspected nodes without location."""
         node_uuid = str(uuid.uuid4())
         device_info = DeviceInfo(uuid=node_uuid)  # No location
         mock_fetch.return_value = (device_info, {}, [])
@@ -537,7 +538,10 @@ class TestSyncDeviceToNautobot:
 
         result = sync_device_to_nautobot(node_uuid, mock_nautobot)
 
+        # Should fail since no location available
         assert result == EXIT_STATUS_FAILURE
+        # Should not attempt to create device
+        mock_nautobot.dcim.devices.create.assert_not_called()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
     @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
