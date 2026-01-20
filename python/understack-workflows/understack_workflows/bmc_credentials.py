@@ -3,6 +3,7 @@ from time import sleep
 
 from understack_workflows.bmc import AuthException
 from understack_workflows.bmc import Bmc
+from understack_workflows.bmc import RedfishRequestError
 from understack_workflows.helpers import setup_logger
 
 FACTORY_B64 = b"Y2FsdmluLGNhbHZpbmNhbHZpbixjYWx2aW4xLGNhbHZpbmNhbHZpbjE="
@@ -33,7 +34,11 @@ def set_bmc_password(
     """
     bmc = Bmc(ip_address=ip_address, username=username, password=new_password)
 
-    token, session = bmc.get_session(new_password)
+    try:
+        token, session = bmc.get_session(new_password)
+    except RedfishRequestError as e:
+        logger.debug("Password test for %s failed. %s", ip_address, e)
+        token, session = None, None
     if token and session:
         logger.info("Production BMC credentials are working on this BMC.")
         bmc.close_session(session=session, token=token)
@@ -45,7 +50,11 @@ def set_bmc_password(
     )
 
     for test_password in filter(None, [old_password, *FACTORY_PASSWORDS]):
-        token, session = bmc.get_session(test_password)
+        try:
+            token, session = bmc.get_session(test_password)
+        except RedfishRequestError as e:
+            logger.debug("Password test for %s failed. %s", ip_address, e)
+            token, session = None, None
         if token and session:
             break
         # Go Slow, or else the BMC will lock us out for a
