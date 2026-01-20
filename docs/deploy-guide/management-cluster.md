@@ -165,12 +165,12 @@ To switch to an External ArgoCD for an existing deployment you must first
 disable your existing ArgoCD from deleting or updating any applications.
 
 ```bash
-cat << EOF | kubectl -n argocd patch --type json --patch-file /dev/stdin appset app-of-apps
+cat << EOF | kubectl -n argocd patch --type json --patch-file /dev/stdin app understack
 - op: replace
-  path: "/spec/template/spec/syncPolicy/automated/prune"
+  path: "/spec/syncPolicy/automated/prune"
   value: false
 - op: replace
-  path: "/spec/template/spec/syncPolicy/automated/selfHeal"
+  path: "/spec/syncPolicy/automated/selfHeal"
   value: false
 EOF
 ```
