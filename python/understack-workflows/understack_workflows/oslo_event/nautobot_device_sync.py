@@ -176,7 +176,8 @@ def _set_location_from_switches(
             llc = port.local_link_connection or {}
             switch_info = llc.get("switch_info")
 
-            if not switch_info:
+            # Skip if switch_info is missing, empty, or placeholder "None" string
+            if not switch_info or switch_info == "None":
                 continue
 
             # Find switch in Nautobot by name
