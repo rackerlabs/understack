@@ -99,9 +99,3 @@ spec:
             valueFrom:
               path: /var/run/argo/output.instance_uuid
               default: "undefined"
-          # server_storage_deleted is deprecated - now handled by sensor filters
-          # Kept for backward compatibility but should not be used
-          - name: server_storage_deleted
-            valueFrom:
-              path: /var/run/argo/output.server_storage_deleted
-              default: "False"
