@@ -267,6 +267,25 @@ class TestSetLocationFromSwitches:
         assert device_info.location_id is None
         assert device_info.rack_id is None
 
+    def test_set_location_switch_info_is_string_none(self, device_info, mock_nautobot):
+        """Test that literal string 'None' in switch_info is skipped."""
+        ports = [
+            MagicMock(
+                local_link_connection={
+                    "switch_info": "None",
+                    "switch_id": "00:00:00:00:00:00",
+                    "port_id": "None",
+                }
+            )
+        ]
+
+        _set_location_from_switches(device_info, ports, mock_nautobot)
+
+        # Should not make any API calls
+        mock_nautobot.dcim.devices.get.assert_not_called()
+        assert device_info.location_id is None
+        assert device_info.rack_id is None
+
     def test_set_location_switch_not_found(self, device_info, mock_nautobot):
         ports = [
             MagicMock(
