@@ -134,7 +134,6 @@ def _set_port_attributes(
 
         if physical_network and not physical_network.endswith("-network"):
             physical_network = None
-            category = "storage"
 
         if port.physical_network != physical_network:
             LOG.debug(
