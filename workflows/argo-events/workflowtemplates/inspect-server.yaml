@@ -117,7 +117,7 @@ spec:
                 - name: obj_id
                   value: "{{tasks.node-id.outputs.result}}"
             when: >-
-              '{{tasks.server-driver.outputs.result}}' == 'redfish' &&
+              '{{tasks.server-driver.outputs.result}}' == 'idrac' &&
               '{{tasks.server-start-state.outputs.result}}' != 'active'
           - name: inspect-server-redfish
             # run redfish based inspection
