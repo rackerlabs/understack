@@ -231,7 +231,7 @@ site:
     wave: 1
     # -- Chart version for Keystone
     # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.6+9b270fe35
+    chartVersion: 2025.2.7+01c93d867
 
   # -- Glance (Image Service)
   glance:
@@ -243,7 +243,7 @@ site:
     wave: 2
     # -- Chart version for Glance
     # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.6+9b270fe35
+    chartVersion: 2025.2.7+01c93d867
 
   # -- Cinder (Block Storage Service)
   cinder:
@@ -267,7 +267,7 @@ site:
     wave: 2
     # -- Chart version for Ironic
     # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.5+e61f0342c
+    chartVersion: 2025.2.8+01c93d867
 
   # -- Neutron (Networking Service)
   neutron:
@@ -279,7 +279,7 @@ site:
     wave: 2
     # -- Chart version for Neutron
     # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.12+9cc7c1ea9
+    chartVersion: 2025.2.15+01c93d867
 
   # -- Placement (Placement Service)
   placement:
@@ -291,7 +291,7 @@ site:
     wave: 2
     # -- Chart version for Placement
     # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.4+9b270fe35
+    chartVersion: 2025.2.5+01c93d867
 
   # -- Nova (Compute Service)
   nova:
@@ -315,7 +315,7 @@ site:
     wave: 3
     # -- Chart version for Octavia
     # renovate: datasource=helm depName=octavia registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.7+9b270fe35
+    chartVersion: 2025.2.8+01c93d867
 
   # -- Horizon (Dashboard)
   horizon:
@@ -327,7 +327,7 @@ site:
     wave: 4
     # -- Chart version for Horizon
     # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.3+9b270fe35
+    chartVersion: 2025.2.4+01c93d867
 
   # -- Skyline (Dashboard)
   skyline:
@@ -338,8 +338,8 @@ site:
     # @default -- 4
     wave: 4
     # -- Chart version for Skyline
-    # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.3+b6bb28b51
+    # renovate: datasource=helm depName=skyline registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    chartVersion: 2025.2.5+01c93d867
 
   # -- Open vSwitch (Networking)
   openvswitch:
