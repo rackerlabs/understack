@@ -51,6 +51,12 @@ global:
     # @default -- true
     enabled: true
 
+  # -- Envoy Gateway API gateway
+  envoy_gateway:
+    # -- Enable/disable deploying Envoy Gateway
+    # @default -- true
+    enabled: true
+
   # etcd backup
   etcdbackup:
     # Enable/disable deploying etcdbackup
@@ -93,6 +99,18 @@ global:
     # @default -- true
     enabled: true
 
+  # -- Nautobot Operator for Kubernetes
+  nautobotop:
+    # -- Enable/disable deploying Nautobot Operator
+    # @default -- true
+    enabled: true
+
+  # -- OpenStack Resource Controller operator
+  openstack_resource_controller:
+    # -- Enable/disable deploying OpenStack Resource Controller
+    # @default -- true
+    enabled: true
+
   # -- OpenTelemetry Operator
   opentelemetry_operator:
     # -- Enable/disable deploying opentelemetry-operator
@@ -102,6 +120,12 @@ global:
   # -- OpenTelemetry collector for observability
   otel_collector:
     # -- Enable/disable deploying OTel collector
+    # @default -- true
+    enabled: true
+
+  # -- RabbitMQ Cluster Operator
+  rabbitmq_system:
+    # -- Enable/disable deploying RabbitMQ operator
     # @default -- true
     enabled: true
 
@@ -141,6 +165,18 @@ site:
     # @default -- true
     enabled: true
 
+  # -- Envoy Gateway configurations (site-level routes and policies)
+  envoy_configs:
+    # -- Enable/disable deploying Envoy Gateway configs
+    # @default -- true
+    enabled: true
+
+  # -- Envoy Gateway API gateway (site deployment)
+  envoy_gateway:
+    # -- Enable/disable deploying Envoy Gateway
+    # @default -- true
+    enabled: true
+
   # etcd backup
   etcdbackup:
     # Enable/disable deploying etcdbackup
@@ -150,6 +186,18 @@ site:
   # -- ingress-nginx
   ingress_nginx:
     # -- Enable/disable deploying ingress-nginx
+    # @default -- true
+    enabled: true
+
+  # -- OpenStack Resource Controller operator (site deployment)
+  openstack_resource_controller:
+    # -- Enable/disable deploying OpenStack Resource Controller
+    # @default -- true
+    enabled: true
+
+  # -- RabbitMQ Cluster Operator (site deployment)
+  rabbitmq_system:
+    # -- Enable/disable deploying RabbitMQ operator
     # @default -- true
     enabled: true
 
@@ -292,6 +340,24 @@ site:
     # -- Chart version for Skyline
     # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.3+b6bb28b51
+
+  # -- Open vSwitch (Networking)
+  openvswitch:
+    # -- Enable/disable deploying Open vSwitch
+    # @default -- true
+    enabled: true
+    # -- Chart version for Open vSwitch
+    # renovate: datasource=helm depName=openvswitch registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    chartVersion: "2025.1.0"
+
+  # -- OVN (Open Virtual Network)
+  ovn:
+    # -- Enable/disable deploying OVN
+    # @default -- true
+    enabled: true
+    # -- Chart version for OVN
+    # renovate: datasource=helm depName=ovn registryUrl=https://tarballs.opendev.org/openstack/openstack-helm-infra
+    chartVersion: "2024.2.0"
 
   # -- Argo Events configuration for event-driven workflows
   argo_events:
