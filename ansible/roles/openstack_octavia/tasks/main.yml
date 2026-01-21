@@ -91,7 +91,7 @@
 
 - name: Build octavia_port_names (override or hostname)
   ansible.builtin.set_fact:
-    octavia_port_names: "{{ octavia_port_names | default([]) + [ (hostvars[item].octavia_host_override | default(item)) ] }}"
+    octavia_port_names: "{{ octavia_port_names | default([]) + [hostvars[item].octavia_host_override | default(item)] }}"
   loop: "{{ groups['all'] }}"
   when:
     - hostvars[item].ovs_enabled is defined

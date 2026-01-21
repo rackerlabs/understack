@@ -1,0 +1,5 @@
+# Commit versions below are needed for some packages as the latest version of
+# them are not running on python 3.12 yet.
+nautobot[sso]==3.0.2
+nautobot-golden-config==3.0.0
+nautobot-plugin-nornir==3.0.0
