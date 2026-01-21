@@ -170,6 +170,7 @@ nav:
       - operator-guide/openstack-neutron.md
       - operator-guide/ovs-ovn.md
     - 'Infrastructure':
+      - operator-guide/argocd-helm-chart.md
       - operator-guide/workflows.md
       - operator-guide/monitoring.md
       - operator-guide/gateway-api.md
