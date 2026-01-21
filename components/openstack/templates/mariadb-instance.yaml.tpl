@@ -43,7 +43,8 @@ spec:
 
   galera:
 {{ toYaml .Values.mariadb.galera | indent 4 }}
-
+  affinity:
+    antiAffinityEnabled: {{ .Values.mariadb.antiAffinityEnabled | default true  }}
 ---
 # mariadb-operator backups for openstack
 # https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/BACKUP.md
