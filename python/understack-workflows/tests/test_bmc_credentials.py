@@ -1,8 +1,6 @@
-from unittest.mock import MagicMock
-
 import pytest
 
-from understack_workflows.bmc import RedfishRequestError
+from understack_workflows.bmc import AuthException
 from understack_workflows.bmc_credentials import set_bmc_password
 
 
@@ -14,17 +12,28 @@ def mock_getsession(mocker):
 
 
 @pytest.fixture
-def mock_close(mocker):
-    mock = mocker.patch("understack_workflows.bmc_credentials.Bmc.close_session")
+def mock_sleep(mocker):
+    mock = mocker.patch("understack_workflows.bmc_credentials.sleep", return_value=None)
     return mock
 
 
 @pytest.fixture
-def mock_fail_auth(mocker):
-    mock_response = MagicMock()
-    mock_response.status_code = 402
-    mock_response.json.return_value = {"message": "Failure"}
-    mock = mocker.patch("requests.request", return_value=mock_response)
+def mock_getsession_failed(mocker):
+    mock = mocker.patch("understack_workflows.bmc_credentials.Bmc.get_session")
+    mock.side_effect = [
+        (None, None),
+        (None, None),
+        (None, None),
+        (None, None),
+        (None, None),
+    ]  # patching 5 requests for session attempts.
+    return mock
+
+
+@pytest.fixture
+def mock_close(mocker):
+    mock = mocker.patch("understack_workflows.bmc_credentials.Bmc.close_session")
+    mock.return_value = None
     return mock
 
 
@@ -34,6 +43,6 @@ def test_set_bmc_password_noop(mock_getsession, mock_close):
     mock_close.assert_called_with(session="/path/to/session/1234", token="tOkEn")
 
 
-def test_set_bmc_password_failed(mock_fail_auth):
-    with pytest.raises(RedfishRequestError):
+def test_set_bmc_password_failed(mock_getsession_failed, mock_sleep):
+    with pytest.raises(AuthException):
         set_bmc_password("1.2.3.4", "qwertyuiop")
