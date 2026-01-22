@@ -1,7 +1,7 @@
 cel.dev/expr v0.19.1 h1:NciYrtDRIR0lNCnH1LFJegdjspNx9fI59O7TWcua/W4=
 cel.dev/expr v0.19.1/go.mod h1:MrpN08Q+lEBs+bGYdLxxHkZoUSsCp0nSKTs0nTymJgw=
-github.com/abhimanyu003/go-nautobot/v3 v3.0.0-beta h1:lsRCn6JkSKHfedSpqt7MOgSkJHwEmjISSb2dg5Zs/ks=
-github.com/abhimanyu003/go-nautobot/v3 v3.0.0-beta/go.mod h1:syPUSxlp3KXMTLetxOBvWPz2+JHfQFaQUxYWmvw9Ljo=
+github.com/abhimanyu003/go-nautobot/v3 v3.0.1 h1:ajG1GbYKSa91Mk+3EP6ucsN4+jctAE/cYCIQgqKl4tY=
+github.com/abhimanyu003/go-nautobot/v3 v3.0.1/go.mod h1:syPUSxlp3KXMTLetxOBvWPz2+JHfQFaQUxYWmvw9Ljo=
 github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=

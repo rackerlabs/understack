@@ -26,7 +26,7 @@ func (s *PowerPortTemplateService) ListByDeviceType(ctx context.Context, deviceT
 
 	// Define the API call function for this specific endpoint
 	apiCall := func(ctx context.Context, batchIds []string) ([]nb.PowerPortTemplate, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
+		list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Id(batchIds).Depth(1).DeviceType([]string{deviceTypeID}).Execute()
 		if err != nil {
 			return nil, resp, err
 		}
