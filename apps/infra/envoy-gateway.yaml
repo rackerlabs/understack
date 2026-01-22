@@ -3,7 +3,6 @@ component: envoy-gateway
 sources:
   - repoURL: docker.io/envoyproxy
     chart: gateway-helm
-    path: gateway-helm
     targetRevision: v1.6.0
     helm:
       releaseName: envoy-gateway
