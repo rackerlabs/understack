@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/charmbracelet/log v0.4.2
-	github.com/nautobot/go-nautobot/v3 802218866be0
+	github.com/nautobot/go-nautobot/v3 v3.0.0-20241004125816-802218866be0
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
 	github.com/samber/lo v1.52.0
@@ -114,4 +114,4 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/nautobot/go-nautobot/v3 => github.com/abhimanyu003/go-nautobot/v3 v3.0.0-beta
+replace github.com/nautobot/go-nautobot/v3 => github.com/abhimanyu003/go-nautobot/v3 v3.0.1

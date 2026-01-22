@@ -69,6 +69,13 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Aggregate device type data from all referenced ConfigMaps
+	locationTypeMap, err := r.aggregateDeviceTypeDataFromConfigMap(ctx, nautobotCR.Spec.LocationTypesRef)
+	if err != nil {
+		log.Error(err, "failed to aggregate device type data from ConfigMaps")
+		return ctrl.Result{}, err
+	}
+
+	// Aggregate device type data from all referenced ConfigMaps
 	deviceTypeMap, err := r.aggregateDeviceTypeDataFromConfigMap(ctx, nautobotCR.Spec.DeviceTypesRef)
 	if err != nil {
 		log.Error(err, "failed to aggregate device type data from ConfigMaps")
@@ -105,6 +112,10 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	nautobotURL := fmt.Sprintf("http://%s.%s.svc.cluster.local/api", nautobotCR.Spec.NautobotServiceRef.Name, nautobotCR.Spec.NautobotServiceRef.Namespace)
 	nautobotClient := nbClient.NewNautobotClient(nautobotURL, username, token)
 
+	if err := r.syncLocationTypes(ctx, nautobotClient, locationTypeMap); err != nil {
+		log.Error(err, "failed to sync device types")
+		return ctrl.Result{}, err
+	}
 	if err := r.syncDeviceTypes(ctx, nautobotClient, deviceTypeMap); err != nil {
 		log.Error(err, "failed to sync device types")
 		return ctrl.Result{}, err
@@ -164,6 +175,21 @@ func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 	syncSvc := sync.NewDeviceTypeSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, deviceTypeMap); err != nil {
 		return fmt.Errorf("failed to sync device types: %w", err)
+	}
+
+	return nil
+}
+
+func (r *NautobotReconciler) syncLocationTypes(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	locationType map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+
+	log.Info("syncing location types", "locationTypeCount", len(locationType))
+	syncSvc := sync.NewLocationTypeSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
+		return fmt.Errorf("failed to sync location types: %w", err)
 	}
 
 	return nil

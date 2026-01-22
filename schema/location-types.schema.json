@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rackerlabs.github.io/understack/schema/location-types.schema.json",
+  "title": "UnderStack Location Types",
+  "description": "Hierarchical location type configuration schema for Nautobot location organization",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/locationType"
+  },
+  "minItems": 1,
+  "$defs": {
+    "locationType": {
+      "type": "object",
+      "description": "A location type definition with optional nested children",
+      "properties": {
+        "name": {
+          "description": "Name of the location type",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "description": "Human-readable description of the location type",
+          "type": "string"
+        },
+        "content_types": {
+          "description": "List of Nautobot content types that can be associated with this location type (e.g., 'dcim.device', 'ipam.vlan', 'ipam.namespace')",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z_]+\\.[a-z_]+$"
+          },
+          "uniqueItems": true
+        },
+        "nestable": {
+          "description": "Whether this location type can contain nested locations of the same type",
+          "type": "boolean"
+        },
+        "children": {
+          "description": "Child location types nested under this location type",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/locationType"
+          }
+        }
+      },
+      "required": ["name", "description", "content_types", "nestable"],
+      "additionalProperties": false
+    }
+  }
+}
