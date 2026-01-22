@@ -61,6 +61,8 @@ class DeviceInfo:
     # Location
     location_id: str | None = None
     rack_id: str | None = None
+    position: int | None = None
+    face: str | None = None
 
     # Status
     status: str | None = None
@@ -72,12 +74,6 @@ class DeviceInfo:
 
     # Custom fields for Nautobot
     custom_fields: dict[str, str] = field(default_factory=dict)
-
-
-class RackLocationError(Exception):
-    """Raised when node rack location cannot be determined."""
-
-    pass
 
 
 def _normalise_manufacturer(name: str) -> str:
@@ -214,7 +210,7 @@ def _set_location_from_switches(
         )
 
 
-def fetch_device_info(
+def fetch_ironic_node(
     node_uuid: str,
     ironic_client: IronicClient,
     nautobot_client: Nautobot,
@@ -255,6 +251,7 @@ def _create_nautobot_device(device_info: DeviceInfo, nautobot_client: Nautobot):
     """Create a new device in Nautobot with minimal required fields.
 
     Returns the created device object for subsequent updates.
+    Rack, position, and face are handled by _update_nautobot_device.
     """
     if not device_info.location_id:
         raise ValueError(f"Cannot create device {device_info.uuid} without location")
@@ -351,6 +348,20 @@ def _update_nautobot_device(
             updated = True
             logger.debug("Updating rack: %s", device_info.rack_id)
 
+    # Position (preserved from old device on recreate)
+    if device_info.position is not None:
+        if nautobot_device.position != device_info.position:
+            nautobot_device.position = device_info.position
+            updated = True
+            logger.debug("Updating position: %s", device_info.position)
+        # Face is required when position is set
+        target_face = device_info.face or "front"
+        current_face = _get_record_value(nautobot_device.face, "value")
+        if current_face != target_face:
+            nautobot_device.face = target_face
+            updated = True
+            logger.debug("Updating face: %s", target_face)
+
     # Tenant (Record with .id attribute, from Ironic lessee)
     if device_info.tenant_id:
         current_tenant = _get_record_value(nautobot_device.tenant, "id")
@@ -386,6 +397,108 @@ def _update_nautobot_device(
     return updated
 
 
+def _preserve_location_from_device(device_info: DeviceInfo, nautobot_device) -> None:
+    """Preserve location, rack, position and face from existing Nautobot device."""
+    if nautobot_device.location:
+        old_location_id = _get_record_value(nautobot_device.location, "id")
+        if old_location_id and not device_info.location_id:
+            device_info.location_id = old_location_id
+            logger.info("Preserving location %s from old device", old_location_id)
+
+    if nautobot_device.rack:
+        old_rack_id = _get_record_value(nautobot_device.rack, "id")
+        if old_rack_id and not device_info.rack_id:
+            device_info.rack_id = old_rack_id
+            logger.info("Preserving rack %s from old device", old_rack_id)
+
+    if nautobot_device.position is not None:
+        device_info.position = nautobot_device.position
+        logger.info("Preserving position %s from old device", nautobot_device.position)
+
+    if nautobot_device.face:
+        device_info.face = _get_record_value(nautobot_device.face, "value")
+        logger.info("Preserving face %s from old device", device_info.face)
+
+
+class DeviceNotReadyError(Exception):
+    """Raised when device cannot be synced yet (e.g., awaiting inspection)."""
+
+    pass
+
+
+def _handle_device_uuid_mismatch(
+    ironic_node_info: DeviceInfo, nautobot_client: Nautobot
+):
+    """Handle re-enrollment scenario where device exists with different UUID.
+
+    When a device is found by name but has a different UUID (re-enrollment),
+    preserves location data and deletes the old device.
+
+    Returns the device if found with matching UUID, None otherwise.
+    """
+    if not ironic_node_info.name:
+        return None
+
+    nautobot_device = nautobot_client.dcim.devices.get(name=ironic_node_info.name)
+    if not nautobot_device or isinstance(nautobot_device, list):
+        return None
+
+    logger.info(
+        "Found existing device by name %s with ID %s",
+        ironic_node_info.name,
+        nautobot_device.id,
+    )
+
+    # If UUIDs match, return the device
+    if str(nautobot_device.id) == ironic_node_info.uuid:
+        return nautobot_device
+
+    # UUID mismatch - need to recreate
+    # Preserve location, rack, position, face from old device
+    _preserve_location_from_device(ironic_node_info, nautobot_device)
+
+    # Now safe to delete old device (location preserved from old device)
+    logger.warning(
+        "Device %s has mismatched UUID (Nautobot: %s, Ironic: %s), recreating",
+        ironic_node_info.name,
+        nautobot_device.id,
+        ironic_node_info.uuid,
+    )
+    nautobot_device.delete()
+    return None
+
+
+def _find_or_recreate_nautobot_device(
+    ironic_node_info: DeviceInfo, nautobot_client: Nautobot
+):
+    """Find existing device in Nautobot, handling UUID mismatches.
+
+    Returns the existing device if found with matching UUID, or None if:
+    - No device exists (will be created)
+    - Device was deleted due to UUID mismatch (will be recreated)
+
+    Raises:
+        DeviceNotReadyError: If device doesn't exist and can't be created yet
+    """
+    # First try by UUID
+    nautobot_device = nautobot_client.dcim.devices.get(id=ironic_node_info.uuid)
+    if nautobot_device:
+        return nautobot_device
+
+    # Try finding by name (handles re-enrollment scenarios)
+    nautobot_device = _handle_device_uuid_mismatch(ironic_node_info, nautobot_client)
+    if nautobot_device:
+        return nautobot_device
+
+    # No existing device - check if we have enough data to create one
+    if not ironic_node_info.location_id:
+        raise DeviceNotReadyError(
+            f"No location yet for node {ironic_node_info.uuid} (awaiting inspection)"
+        )
+
+    return None
+
+
 def sync_device_to_nautobot(
     node_uuid: str,
     nautobot_client: Nautobot,
@@ -415,54 +528,19 @@ def sync_device_to_nautobot(
     try:
         ironic_client = IronicClient()
 
-        # Fetch all device info from Ironic (returns inventory and ports too)
-        device_info, inventory, ports = fetch_device_info(
+        ironic_node_info, inventory, ports = fetch_ironic_node(
             node_uuid, ironic_client, nautobot_client
         )
 
-        # Check if device exists in Nautobot
-        nautobot_device = nautobot_client.dcim.devices.get(id=device_info.uuid)
+        nautobot_device = _find_or_recreate_nautobot_device(
+            ironic_node_info, nautobot_client
+        )
 
         if not nautobot_device:
-            # Try finding by name (handles re-enrollment scenarios)
-            if device_info.name:
-                nautobot_device = nautobot_client.dcim.devices.get(
-                    name=device_info.name
-                )
-                if nautobot_device and not isinstance(nautobot_device, list):
-                    logger.info(
-                        "Found existing device by name %s with ID %s, "
-                        "will recreate with UUID %s",
-                        device_info.name,
-                        nautobot_device.id,
-                        device_info.uuid,
-                    )
-                    if str(nautobot_device.id) != device_info.uuid:
-                        logger.warning(
-                            "Device %s has mismatched UUID (Nautobot: %s, Ironic: %s), "
-                            "recreating",
-                            device_info.name,
-                            nautobot_device.id,
-                            device_info.uuid,
-                        )
-                        nautobot_device.delete()
-                        nautobot_device = None  # Will trigger creation below
+            nautobot_device = _create_nautobot_device(ironic_node_info, nautobot_client)
 
-        if not nautobot_device:
-            # Skip sync for uninspected nodes - no location means we can't create
-            # the device yet. The inspection event will trigger sync with full data.
-            if not device_info.location_id:
-                logger.info(
-                    "Skipping sync for node %s - no location yet (awaiting inspection)",
-                    node_uuid,
-                )
-                return EXIT_STATUS_FAILURE
-            nautobot_device = _create_nautobot_device(device_info, nautobot_client)
+        _update_nautobot_device(ironic_node_info, nautobot_device)
 
-        # Update device with all fields (works for both new and existing)
-        _update_nautobot_device(device_info, nautobot_device)
-
-        # Sync interfaces using already-fetched inventory and ports
         if sync_interfaces:
             interface_result = sync_interfaces_from_data(
                 node_uuid, inventory, ports, nautobot_client
@@ -472,10 +550,12 @@ def sync_device_to_nautobot(
                     "Interface sync failed for node %s, device sync succeeded",
                     node_uuid,
                 )
-                # Don't fail the whole operation if interface sync fails
-                # Device is already synced successfully
 
         return EXIT_STATUS_SUCCESS
+
+    except DeviceNotReadyError as e:
+        logger.info(str(e))
+        return EXIT_STATUS_FAILURE
 
     except Exception:
         logger.exception("Failed to sync device %s to Nautobot", node_uuid)

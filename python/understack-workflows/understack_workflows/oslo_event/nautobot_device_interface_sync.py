@@ -483,7 +483,13 @@ def _handle_cable_management(
     nautobot_client: Nautobot,
 ) -> None:
     """Handle cable creation/update for interface with switch connection info."""
-    if not interface.switch_info or not interface.switch_port_id:
+    # Skip if switch info is missing or placeholder "None" string
+    if (
+        not interface.switch_info
+        or not interface.switch_port_id
+        or interface.switch_info == "None"
+        or interface.switch_port_id == "None"
+    ):
         return
 
     logger.debug(
