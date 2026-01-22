@@ -510,7 +510,7 @@ class TestSyncDeviceToNautobot:
         return MagicMock()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_ironic_node")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
@@ -537,7 +537,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.assert_called_once()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_ironic_node")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
@@ -574,7 +574,7 @@ class TestSyncDeviceToNautobot:
         assert result == EXIT_STATUS_FAILURE
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_ironic_node")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     def test_sync_without_location_skips_for_uninspected_node(
         self, mock_fetch, mock_ironic_class, mock_nautobot
     ):
@@ -592,50 +592,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.assert_not_called()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_ironic_node")
-    @patch(
-        "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
-    )
-    def test_sync_finds_device_by_name_with_matching_uuid(
-        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
-    ):
-        """Test that device found by name with matching UUID is updated."""
-        node_uuid = str(uuid.uuid4())
-        device_info = DeviceInfo(
-            uuid=node_uuid,
-            name="Dell-ABC123",
-            manufacturer="Dell",
-            model="PowerEdge R640",
-            location_id="location-uuid",
-            status="Active",
-        )
-        mock_fetch.return_value = (device_info, {}, [])
-
-        # First get by ID returns None
-        # Second get by name returns device with same UUID
-        existing_device = MagicMock()
-        existing_device.id = node_uuid  # Same UUID
-        existing_device.status = MagicMock(name="Planned")
-        existing_device.name = "Dell-ABC123"
-        existing_device.serial = None
-        existing_device.location = None
-        existing_device.rack = None
-        existing_device.tenant = None
-        existing_device.custom_fields = {}
-
-        mock_nautobot.dcim.devices.get.side_effect = [None, existing_device]
-        mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
-
-        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
-
-        assert result == EXIT_STATUS_SUCCESS
-        # Should NOT delete since UUIDs match
-        existing_device.delete.assert_not_called()
-        # Should NOT create new device
-        mock_nautobot.dcim.devices.create.assert_not_called()
-
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_ironic_node")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
@@ -675,7 +632,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.assert_called_once()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_ironic_node")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
@@ -705,7 +662,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.assert_called_once()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_ironic_node")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )

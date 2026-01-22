@@ -210,7 +210,7 @@ def _set_location_from_switches(
         )
 
 
-def fetch_ironic_node(
+def fetch_node_details(
     node_uuid: str,
     ironic_client: IronicClient,
     nautobot_client: Nautobot,
@@ -426,32 +426,18 @@ class DeviceNotReadyError(Exception):
     pass
 
 
-def _handle_device_uuid_mismatch(
-    ironic_node_info: DeviceInfo, nautobot_client: Nautobot
-):
+def _delete_old_device_by_name(ironic_node_info: DeviceInfo, nautobot_client: Nautobot):
     """Handle re-enrollment scenario where device exists with different UUID.
 
     When a device is found by name but has a different UUID (re-enrollment),
     preserves location data and deletes the old device.
-
-    Returns the device if found with matching UUID, None otherwise.
     """
     if not ironic_node_info.name:
-        return None
+        return
 
     nautobot_device = nautobot_client.dcim.devices.get(name=ironic_node_info.name)
     if not nautobot_device or isinstance(nautobot_device, list):
-        return None
-
-    logger.info(
-        "Found existing device by name %s with ID %s",
-        ironic_node_info.name,
-        nautobot_device.id,
-    )
-
-    # If UUIDs match, return the device
-    if str(nautobot_device.id) == ironic_node_info.uuid:
-        return nautobot_device
+        return
 
     # UUID mismatch - need to recreate
     # Preserve location, rack, position, face from old device
@@ -459,23 +445,23 @@ def _handle_device_uuid_mismatch(
 
     # Now safe to delete old device (location preserved from old device)
     logger.warning(
-        "Device %s has mismatched UUID (Nautobot: %s, Ironic: %s), recreating",
+        "Device %s has mismatched UUID (Nautobot: %s, Ironic: %s), deleting old device",
         ironic_node_info.name,
         nautobot_device.id,
         ironic_node_info.uuid,
     )
     nautobot_device.delete()
-    return None
 
 
-def _find_or_recreate_nautobot_device(
+def _find_or_create_nautobot_device(
     ironic_node_info: DeviceInfo, nautobot_client: Nautobot
 ):
-    """Find existing device in Nautobot, handling UUID mismatches.
+    """Find existing device in Nautobot or create a new one.
 
-    Returns the existing device if found with matching UUID, or None if:
-    - No device exists (will be created)
-    - Device was deleted due to UUID mismatch (will be recreated)
+    Handles UUID mismatches during re-enrollment by preserving location
+    data from the old device before deleting it.
+
+    Returns the existing or newly created device.
 
     Raises:
         DeviceNotReadyError: If device doesn't exist and can't be created yet
@@ -485,10 +471,8 @@ def _find_or_recreate_nautobot_device(
     if nautobot_device:
         return nautobot_device
 
-    # Try finding by name (handles re-enrollment scenarios)
-    nautobot_device = _handle_device_uuid_mismatch(ironic_node_info, nautobot_client)
-    if nautobot_device:
-        return nautobot_device
+    # Handle re-enrollment: delete old device by name if exists with different UUID
+    _delete_old_device_by_name(ironic_node_info, nautobot_client)
 
     # No existing device - check if we have enough data to create one
     if not ironic_node_info.location_id:
@@ -496,7 +480,8 @@ def _find_or_recreate_nautobot_device(
             f"No location yet for node {ironic_node_info.uuid} (awaiting inspection)"
         )
 
-    return None
+    # Create new device
+    return _create_nautobot_device(ironic_node_info, nautobot_client)
 
 
 def sync_device_to_nautobot(
@@ -528,16 +513,13 @@ def sync_device_to_nautobot(
     try:
         ironic_client = IronicClient()
 
-        ironic_node_info, inventory, ports = fetch_ironic_node(
+        ironic_node_info, inventory, ports = fetch_node_details(
             node_uuid, ironic_client, nautobot_client
         )
 
-        nautobot_device = _find_or_recreate_nautobot_device(
+        nautobot_device = _find_or_create_nautobot_device(
             ironic_node_info, nautobot_client
         )
-
-        if not nautobot_device:
-            nautobot_device = _create_nautobot_device(ironic_node_info, nautobot_client)
 
         _update_nautobot_device(ironic_node_info, nautobot_device)
 
