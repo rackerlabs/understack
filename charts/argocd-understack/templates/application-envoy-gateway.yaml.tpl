@@ -18,14 +18,14 @@ spec:
       releaseName: gateway-helm
       valueFiles:
       - $understack/components/envoy-gateway/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/envoy-gateway.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/envoy-gateway.yaml
     repoURL: docker.io/envoyproxy
     targetRevision: v1.6.0
   - path: components/envoy-gateway
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ $.Release.Name }}/manifests/envoy-gateway
+  - path: {{ include "understack.deploy_path" $ }}/manifests/envoy-gateway
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

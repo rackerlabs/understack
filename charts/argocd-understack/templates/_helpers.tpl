@@ -99,6 +99,29 @@ Get the deployment repository git reference
 {{- end }}
 
 {{/*
+Get the base path within the deploy repository.
+Always includes Release.Name, with an optional prefix from deploy_path_prefix.
+
+Examples:
+  deploy_path_prefix: ""        -> "uc-iad3-prod"
+  deploy_path_prefix: "sites"   -> "sites/uc-iad3-prod"
+  deploy_path_prefix: "us/east" -> "us/east/uc-iad3-prod"
+
+Usage in valueFiles:
+  - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/dex.yaml
+
+Usage in source path:
+  path: {{ include "understack.deploy_path" $ }}/manifests/dex
+*/}}
+{{- define "understack.deploy_path" -}}
+{{- if .Values.deploy_path_prefix -}}
+{{- printf "%s/%s" .Values.deploy_path_prefix .Release.Name -}}
+{{- else -}}
+{{- .Release.Name -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Check if a component is enabled by walking the configuration hierarchy.
 Supports both "global" and "site" scopes with appropriate kill switches.
 

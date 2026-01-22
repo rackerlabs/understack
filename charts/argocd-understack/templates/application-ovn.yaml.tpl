@@ -20,14 +20,14 @@ spec:
       valueFiles:
       - $understack/components/images-openstack.yaml
       - $understack/components/ovn/values.yaml
-      - $deploy/{{ $.Release.Name }}/manifests/secret-openstack.yaml
-      - $deploy/{{ $.Release.Name }}/manifests/images-openstack.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/ovn.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/manifests/secret-openstack.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/manifests/images-openstack.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/ovn.yaml
   - path: components/ovn/
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ $.Release.Name }}/manifests/ovn
+  - path: {{ include "understack.deploy_path" $ }}/manifests/ovn
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

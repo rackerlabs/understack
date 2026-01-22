@@ -28,7 +28,7 @@ spec:
   - ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
-    path: '{{.name}}/manifests/openebs'
+    path: {{ include "understack.deploy_path" $ }}/manifests/openebs
   syncPolicy:
     automated:
       prune: true

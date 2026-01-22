@@ -18,7 +18,7 @@ spec:
       releaseName: opentelemetry-operator
       valueFiles:
       - $understack/operators/opentelemetry-operator/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/opentelemetry-operator.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/opentelemetry-operator.yaml
     repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
     targetRevision: 0.95.1
   - path: operators/opentelemetry-operator

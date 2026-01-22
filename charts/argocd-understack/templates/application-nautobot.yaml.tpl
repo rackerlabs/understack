@@ -21,14 +21,14 @@ spec:
       releaseName: nautobot
       valueFiles:
       - $understack/components/nautobot/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/nautobot.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/nautobot.yaml
     repoURL: https://nautobot.github.io/helm-charts/
     targetRevision: 2.5.6
   - path: components/nautobot
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ $.Release.Name }}/manifests/nautobot
+  - path: {{ include "understack.deploy_path" $ }}/manifests/nautobot
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

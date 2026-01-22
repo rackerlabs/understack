@@ -18,7 +18,7 @@ spec:
       releaseName: prometheus-openstack-exporter
       valueFiles:
       - $understack/components/openstack-exporter/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/openstack-exporter.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/openstack-exporter.yaml
     repoURL: registry.scs.community/openstack-exporter
     targetRevision: 0.4.5
   - ref: understack

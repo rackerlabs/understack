@@ -12,7 +12,7 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - path: {{ $.Release.Name }}/manifests/cert-manager
+  - path: {{ include "understack.deploy_path" $ }}/manifests/cert-manager
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

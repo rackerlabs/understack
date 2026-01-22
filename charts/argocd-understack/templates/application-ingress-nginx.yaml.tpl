@@ -17,7 +17,7 @@ spec:
       ignoreMissingValueFiles: true
       releaseName: ingress-nginx
       valueFiles:
-      - $deploy/{{ $.Release.Name }}/helm-configs/ingress-nginx.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/ingress-nginx.yaml
     repoURL: https://kubernetes.github.io/ingress-nginx
     targetRevision: 4.12.1
   - ref: deploy

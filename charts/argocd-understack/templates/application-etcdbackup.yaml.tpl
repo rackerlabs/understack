@@ -16,7 +16,7 @@ spec:
       ignoreMissingValueFiles: true
       valueFiles:
       - $understack/components/etcdbackup/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/etcdbackup.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/etcdbackup.yaml
     path: components/etcdbackup
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}

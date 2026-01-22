@@ -12,7 +12,7 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - path: {{ $.Release.Name }}/manifests/otel-collector
+  - path: {{ include "understack.deploy_path" $ }}/manifests/otel-collector
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

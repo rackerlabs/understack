@@ -17,11 +17,11 @@ spec:
       ignoreMissingValueFiles: true
       valueFiles:
       - $understack/components/envoy-configs/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/envoy-configs.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/envoy-configs.yaml
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ $.Release.Name }}/manifests/envoy-configs
+  - path: {{ include "understack.deploy_path" $ }}/manifests/envoy-configs
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
