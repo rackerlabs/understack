@@ -1,0 +1,182 @@
+---
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: server-firmware-update
+  annotations:
+    workflows.argoproj.io/title: Execute firmware update runbooks on a node/server
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/server-firmware-update.yaml`
+kind: WorkflowTemplate
+spec:
+  serviceAccountName: workflow
+  entrypoint: server-firmware-update
+  arguments:
+    parameters:
+      - name: node
+  templates:
+    - name: server-firmware-update
+      inputs:
+        parameters:
+          - name: node
+      dag:
+        tasks:
+          - name: node-id
+            # convert a name to a UUID if needed
+            template: openstack-read-param
+            arguments:
+              parameters:
+                - name: object
+                  value: node
+                - name: object_ref
+                  value: "{{inputs.parameters.node}}"
+                - name: param
+                  value: uuid
+          - name: server-start-state
+            # read the current server state
+            depends: "node-id.Succeeded"
+            template: openstack-read-param
+            arguments:
+              parameters:
+                - name: object
+                  value: node
+                - name: object_ref
+                  value: "{{tasks.node-id.outputs.result}}"
+                - name: param
+                  value: provision_state
+          - name: manage-server
+            # move the server from available into manageable state
+            depends: "server-start-state.Succeeded"
+            template: openstack-wait-cmd
+            arguments:
+              parameters:
+                - name: operation
+                  value: "manage"
+                - name: node_id
+                  value: "{{tasks.node-id.outputs.result}}"
+            when: "'{{tasks.server-start-state.outputs.result}}' == 'available'"
+          - name: firmware-update
+            # update server firmware via runbooks
+            depends: "(manage-server.Succeeded || manage-server.Skipped)"
+            template: firmware-update
+            arguments:
+              parameters:
+                - name: node_id
+                  value: "{{tasks.node-id.outputs.result}}"
+            # nodes with a server-start-state of 'available' should have been moved to manageable in the previous step.
+            # we explicitly check for the state of manageable here to prevent this from running against nodes that skipped
+            # this previous step while in something like 'active', etc. server-start-state.
+            when: >-
+              '{{tasks.server-start-state.outputs.result}}' == 'manageable' ||
+              '{{tasks.server-start-state.outputs.result}}' == 'available'
+          - name: return-server
+            # returns a server to available state if it was previously moved to manageable
+            depends: "firmware-update"
+            template: openstack-wait-cmd
+            arguments:
+              parameters:
+                - name: operation
+                  value: "provide"
+                - name: node_id
+                  value: "{{tasks.node-id.outputs.result}}"
+            when: "'{{tasks.server-start-state.outputs.result}}' == 'available'"
+    - name: openstack-wait-cmd
+      inputs:
+        parameters:
+          - name: operation
+          - name: node_id
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        command:
+          - openstack
+        args:
+          - baremetal
+          - node
+          - "{{inputs.parameters.operation}}"
+          - --wait
+          - "0"
+          - "{{inputs.parameters.node_id}}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+      volumes:
+        - name: baremetal-manage
+          secret:
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
+    - name: openstack-read-param
+      inputs:
+        parameters:
+          - name: object
+          - name: object_ref
+          - name: param
+      container:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        command:
+          - openstack
+        args:
+          - baremetal
+          - "{{inputs.parameters.object}}"
+          - show
+          - "-f"
+          - "value"
+          - "-c"
+          - "{{inputs.parameters.param}}"
+          - "{{inputs.parameters.object_ref}}"
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+      volumes:
+        - name: baremetal-manage
+          secret:
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
+    - name: firmware-update
+      inputs:
+        parameters:
+          - name: node_id
+      script:
+        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        command: [sh]
+        source: |
+          # Check for firmware update traits, sorted to allow runbook prioritization such as:
+          # CUSTOM_FIRMWARE_UPDATE_001_R740XD
+          # CUSTOM_FIRMWARE_UPDATE_002_INTEL_NIC_R740XD
+          echo "Identifying firmware update traits for node: {{inputs.parameters.node_id}}"
+          UPDATES=$(openstack baremetal node trait list -c traits -f value {{inputs.parameters.node_id}} | grep -e '^CUSTOM_FIRMWARE_UPDATE_' | sort -t '_' -k 4n)
+
+          # Run matching runbooks for each trait found
+          if [ -z "$UPDATES" ]; then
+            echo "No firmware update traits found"
+            exit 0
+          else
+            echo "Firmware updates found: $UPDATES"
+            echo "$UPDATES" | while read -r RUNBOOK; do
+              RUNBOOK_ID=$(openstack baremetal runbook show $RUNBOOK -c uuid -f value)
+              CMD="openstack baremetal node clean --runbook $RUNBOOK_ID --wait 0 {{inputs.parameters.node_id}}"
+              echo "Running Runbook $RUNBOOK: $CMD"
+              $CMD
+            done
+          fi
+        env:
+          - name: OS_CLOUD
+            value: understack
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+      volumes:
+        - name: baremetal-manage
+          secret:
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
