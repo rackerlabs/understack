@@ -111,6 +111,12 @@ global:
     # @default -- true
     enabled: true
 
+  # -- OpenEBS
+  openebs:
+    # -- Enable/disable deploying OpenEBS
+    # @default -- true
+    enabled: true
+
   # Sealed Secrets operator
   sealed_secrets:
     # -- Enable/disable deploying sealed secrets
