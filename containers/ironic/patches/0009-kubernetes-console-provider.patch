@@ -1,0 +1,1246 @@
+commit 5d44ecd6e39588d509129efd26f6eaafba5c5bb4
+Author: Steve Baker <sbaker@redhat.com>
+Date:   Fri Oct 3 11:16:53 2025 +1300
+
+    Add a kubernetes provider for console container
+
+    A new ``ironic.console.container`` provider is added called
+    ``kubernetes`` which allows Ironic conductor to manage console
+    containers as Kubernetes pods. The kubernetes resources are defined in
+    the template file configured by ``[vnc]kubernetes_container_template``
+    and the default template creates one secret to store the app info, and
+    one pod to run the console container.
+
+    It is expected that Ironic conductor is deployed inside the kubernetes
+    cluster. The associated service account will need roles and bindings
+    which allow it to manage the required resources (with the default
+    template this will be secrets and pods).
+
+    This provider holds the assumption that ironic-novnc will be deployed in
+    the same kubernetes cluster, and so can connect to the VNC servers via
+    the pod's ``status.hostIP``.
+
+    Assisted-By: gemini
+    Change-Id: Ib91f7d7c15be51d68ebf886e44efaf191a14437b
+    Signed-off-by: Steve Baker <sbaker@redhat.com>
+
+    Updated to apply cleanly on 2025.2 (marek.skrobacki)
+
+diff --git a/ironic/conf/vnc.py b/ironic/conf/vnc.py
+index 6a7c27900..41365e5f8 100644
+--- a/ironic/conf/vnc.py
++++ b/ironic/conf/vnc.py
+@@ -99,11 +99,14 @@ opts = [
+              '"systemd" manages containers as systemd units via podman '
+              'Quadlet support. The default is "fake" which returns an '
+              'unusable VNC host and port. This needs to be changed if enabled '
+-             'is True'),
++             'is True. '
++             '"kubernetes" manages containers as pods using template driven '
++             'resource creation.'),
+     cfg.StrOpt(
+         'console_image',
+         mutable=True,
+-        help='Container image reference for the "systemd" console container '
++        help='Container image reference for the "systemd" and '
++             '"kubernetes" console container '
+              'provider, and any other out-of-tree provider which requires a '
+              'configurable image reference.'),
+     cfg.StrOpt(
+@@ -127,6 +130,22 @@ opts = [
+              'have no authentication or encryption so they also should not '
+              'be exposed to public access. Additionally, the containers '
+              'need to be able to access BMC management endpoints. '),
++    cfg.StrOpt(
++        'kubernetes_container_template',
++        default=os.path.join(
++            '$pybasedir',
++            'console/container/ironic-console-pod.yaml.template'),
++        mutable=True,
++        help='For the kubernetes provider, path to the template for defining '
++             'the console resources. The default template creates one Secret '
++             'to store the app info, and one Pod to run a console '
++             'container. A custom template must include namespace metadata, '
++             'and must define labels which can be used as a delete-all '
++             'selector.'),
++    cfg.IntOpt('kubernetes_pod_timeout',
++               default=120,
++               help='For the kubernetes provider, the time (in seconds) to '
++                    'wait for the console pod to start.'),
+     cfg.StrOpt(
+         'ssl_cert_file',
+         help="Certificate file to use when starting the server securely."),
+diff --git a/ironic/console/container/ironic-console-pod.yaml.template b/ironic/console/container/ironic-console-pod.yaml.template
+new file mode 100644
+index 000000000..05770bcf6
+--- /dev/null
++++ b/ironic/console/container/ironic-console-pod.yaml.template
+@@ -0,0 +1,45 @@
++apiVersion: v1
++kind: Secret
++metadata:
++  name: "ironic-console-{{ uuid }}"
++  namespace: openstack
++  labels:
++    app: ironic
++    component: ironic-console
++    conductor: "{{ conductor }}"
++stringData:
++  app-info: '{{ app_info }}'
++---
++apiVersion: v1
++kind: Pod
++metadata:
++  name: "ironic-console-{{ uuid }}"
++  namespace: openstack
++  labels:
++    app: ironic
++    component: ironic-console
++    conductor: "{{ conductor }}"
++spec:
++  containers:
++    - name: x11vnc
++      image: "{{ image }}"
++      imagePullPolicy: Always
++      ports:
++        - containerPort: 5900
++      resources:
++        requests:
++          cpu: 250m
++          memory: 256Mi
++        limits:
++          cpu: 500m
++          memory: 1024Mi
++      env:
++        - name: APP
++          value: "{{ app }}"
++        - name: READ_ONLY
++          value: "{{ read_only }}"
++        - name: APP_INFO
++          valueFrom:
++            secretKeyRef:
++              name: "ironic-console-{{ uuid }}"
++              key: app-info
+\ No newline at end of file
+diff --git a/ironic/console/container/kubernetes.py b/ironic/console/container/kubernetes.py
+new file mode 100644
+index 000000000..35dfab261
+--- /dev/null
++++ b/ironic/console/container/kubernetes.py
+@@ -0,0 +1,307 @@
++#
++#    Licensed under the Apache License, Version 2.0 (the "License"); you may
++#    not use this file except in compliance with the License. You may obtain
++#    a copy of the License at
++#
++#         http://www.apache.org/licenses/LICENSE-2.0
++#
++#    Unless required by applicable law or agreed to in writing, software
++#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
++#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
++#    License for the specific language governing permissions and limitations
++#    under the License.
++
++"""
++Kubernetes pod console container provider.
++"""
++import json
++import re
++import time
++import yaml
++
++from oslo_concurrency import processutils
++from oslo_log import log as logging
++
++from ironic.common import exception
++from ironic.common import utils
++from ironic.conf import CONF
++from ironic.console.container import base
++
++LOG = logging.getLogger(__name__)
++
++# How often to check pod status
++POD_READY_POLL_INTERVAL = 2
++
++
++class KubernetesConsoleContainer(base.BaseConsoleContainer):
++    """Console container provider which uses kubernetes pods."""
++
++    def __init__(self):
++        # confirm kubectl is available
++        try:
++            utils.execute("kubectl", "version")
++        except processutils.ProcessExecutionError as e:
++            LOG.exception(
++                "kubectl not available, " "this provider cannot be used."
++            )
++            raise exception.ConsoleContainerError(
++                provider="kubernetes", reason=e
++            )
++        if not CONF.vnc.console_image:
++            raise exception.ConsoleContainerError(
++                provider="kubernetes",
++                reason="[vnc]console_image must be set.",
++            )
++        try:
++            self._render_template()
++        except Exception as e:
++            raise exception.ConsoleContainerError(
++                provider="kubernetes",
++                reason=f"Parsing {CONF.vnc.kubernetes_container_template} "
++                f"failed: {e}",
++            )
++
++    def _render_template(self, uuid="", app_name=None, app_info=None):
++        """Render the Kubernetes manifest template.
++
++        :param uuid: Unique identifier for the node.
++        :param app_name: Name of the application to run in the container.
++        :param app_info: Dictionary of application-specific information.
++        :returns: A string containing the rendered Kubernetes YAML manifest.
++        """
++
++        # TODO(stevebaker) Support bind-mounting certificate files to
++        # handle verified BMC certificates
++
++        if not uuid:
++            uuid = ""
++        if not app_name:
++            app_name = "fake"
++        if not app_info:
++            app_info = {}
++
++        params = {
++            "uuid": uuid,
++            "image": CONF.vnc.console_image,
++            "app": app_name,
++            "app_info": json.dumps(app_info).strip(),
++            "read_only": CONF.vnc.read_only,
++            "conductor": CONF.host,
++        }
++        return utils.render_template(
++            CONF.vnc.kubernetes_container_template, params=params
++        )
++
++    def _apply(self, manifest):
++        try:
++            utils.execute(
++                "kubectl", "apply", "-f", "-", process_input=manifest
++            )
++        except processutils.ProcessExecutionError as e:
++            LOG.exception("Problem calling kubectl apply")
++            raise exception.ConsoleContainerError(
++                provider="kubernetes", reason=e
++            )
++
++    def _delete(
++        self, resource_type, namespace, resource_name=None, selector=None
++    ):
++        args = [
++            "kubectl",
++            "delete",
++            "-n",
++            namespace,
++            resource_type,
++            "--ignore-not-found=true",
++        ]
++        if resource_name:
++            args.append(resource_name)
++        elif selector:
++            args.append("-l")
++            args.append(selector)
++        else:
++            raise exception.ConsoleContainerError(
++                provider="kubernetes",
++                reason="Delete must be called with either a resource name "
++                "or selector.",
++            )
++        try:
++            utils.execute(*args)
++        except processutils.ProcessExecutionError as e:
++            LOG.exception("Problem calling kubectl delete")
++            raise exception.ConsoleContainerError(
++                provider="kubernetes", reason=e
++            )
++
++    def _get_pod_node_ip(self, pod_name, namespace):
++        try:
++            out, _ = utils.execute(
++                "kubectl",
++                "get",
++                "pod",
++                pod_name,
++                "-n",
++                namespace,
++                "-o",
++                "jsonpath={.status.podIP}",
++            )
++            return out.strip()
++        except processutils.ProcessExecutionError as e:
++            LOG.exception("Problem getting pod host IP for %s", pod_name)
++            raise exception.ConsoleContainerError(
++                provider="kubernetes", reason=e
++            )
++
++    def _wait_for_pod_ready(self, pod_name, namespace):
++        end_time = time.time() + CONF.vnc.kubernetes_pod_timeout
++        while time.time() < end_time:
++            try:
++                out, _ = utils.execute(
++                    "kubectl",
++                    "get",
++                    "pod",
++                    pod_name,
++                    "-n",
++                    namespace,
++                    "-o",
++                    "json",
++                )
++                pod_status = json.loads(out)
++                if (
++                    "status" in pod_status
++                    and "conditions" in pod_status["status"]
++                ):
++                    for condition in pod_status["status"]["conditions"]:
++                        if (
++                            condition["type"] == "Ready"
++                            and condition["status"] == "True"
++                        ):
++                            LOG.debug("Pod %s is ready.", pod_name)
++                            return
++            except (
++                processutils.ProcessExecutionError,
++                json.JSONDecodeError,
++            ) as e:
++                LOG.warning(
++                    "Could not get pod status for %s: %s", pod_name, e
++                )
++
++            time.sleep(POD_READY_POLL_INTERVAL)
++
++        msg = (
++            f"Pod {pod_name} did not become ready in "
++            f"{CONF.vnc.kubernetes_pod_timeout}s"
++        )
++
++        raise exception.ConsoleContainerError(
++            provider="kubernetes", reason=msg
++        )
++
++    def _get_resources_from_yaml(self, rendered, kind=None):
++        """Extracts Kubernetes resources from a YAML manifest.
++
++        This method parses a multi-document YAML string and yields each
++        Kubernetes resource (dictionary) found. If `kind` is specified,
++        only resources of that specific kind are yielded.
++
++        :param rendered: A string containing the rendered Kubernetes YAML
++                         manifest.
++        :param kind: Optional string, the 'kind' of Kubernetes resource to
++                     filter by (e.g., 'Pod', 'Service'). If None, all
++                     resources are yielded.
++        :returns: A generator yielding Kubernetes resource dictionaries.
++        """
++        # Split the YAML into individual documents
++        documents = re.split(r"^---\s*$", rendered, flags=re.MULTILINE)
++        for doc in documents:
++            if not doc.strip():
++                continue
++            data = yaml.safe_load(doc)
++            if not data:
++                continue
++            if not kind or data.get("kind") == kind:
++                yield data
++
++    def start_container(self, task, app_name, app_info):
++        """Start a console container for a node.
++
++        Any existing running container for this node will be stopped.
++
++        :param task: A TaskManager instance.
++        :raises: ConsoleContainerError
++        """
++        node = task.node
++        uuid = node.uuid
++
++        LOG.debug("Starting console container for node %s", uuid)
++
++        rendered = self._render_template(uuid, app_name, app_info)
++        self._apply(rendered)
++
++        pod = list(self._get_resources_from_yaml(rendered, kind="Pod"))[0]
++        pod_name = pod["metadata"]["name"]
++        namespace = pod["metadata"]["namespace"]
++
++        try:
++            self._wait_for_pod_ready(pod_name, namespace)
++            host_ip = self._get_pod_node_ip(pod_name, namespace)
++        except Exception as e:
++            LOG.error(
++                "Failed to start container for node %s, cleaning up.", uuid
++            )
++            try:
++                self._stop_container(uuid)
++            except Exception:
++                LOG.exception(
++                    "Could not clean up resources for node %s", uuid
++                )
++            raise e
++
++        return host_ip, 5900
++
++    def _stop_container(self, uuid):
++        rendered = self._render_template(uuid)
++        resources = list(self._get_resources_from_yaml(rendered))
++        resources.reverse()
++        for resource in resources:
++            kind = resource["kind"]
++            name = resource["metadata"]["name"]
++            namespace = resource["metadata"]["namespace"]
++            self._delete(kind, namespace, resource_name=name)
++
++    def stop_container(self, task):
++        """Stop a console container for a node.
++
++        Any existing running container for this node will be stopped.
++
++        :param task: A TaskManager instance.
++        :raises: ConsoleContainerError
++        """
++        node = task.node
++        uuid = node.uuid
++        self._stop_container(uuid)
++
++    def _labels_to_selector(self, labels):
++        selector = []
++        for key, value in labels.items():
++            selector.append(f"{key}={value}")
++        return ",".join(selector)
++
++    def stop_all_containers(self):
++        """Stops all running console containers
++
++        This is run on conductor startup and graceful shutdown to ensure
++        no console containers are running.
++        :raises: ConsoleContainerError
++        """
++        LOG.debug("Stopping all console containers")
++        rendered = self._render_template()
++        resources = list(self._get_resources_from_yaml(rendered))
++        resources.reverse()
++
++        for resource in resources:
++            kind = resource["kind"]
++            namespace = resource["metadata"]["namespace"]
++            labels = resource["metadata"]["labels"]
++            selector = self._labels_to_selector(labels)
++            self._delete(kind, namespace, selector=selector)
+diff --git a/ironic/tests/unit/console/container/test_console_container.py b/ironic/tests/unit/console/container/test_console_container.py
+index 64c85870e..229b1df12 100644
+--- a/ironic/tests/unit/console/container/test_console_container.py
++++ b/ironic/tests/unit/console/container/test_console_container.py
+@@ -11,9 +11,12 @@
+ # License for the specific language governing permissions and limitations
+ # under the License.
+
++import json
+ import os
+ import tempfile
++import time
+ from unittest import mock
++import yaml
+
+ from oslo_concurrency import processutils
+ from oslo_config import cfg
+@@ -22,6 +25,8 @@ from ironic.common import console_factory
+ from ironic.common import exception
+ from ironic.common import utils
+ from ironic.console.container import fake
++from ironic.console.container import kubernetes
++from ironic.console.container import systemd
+ from ironic.tests import base
+
+ CONF = cfg.CONF
+@@ -146,8 +151,8 @@ class TestSystemdConsoleContainer(base.TestCase):
+     @mock.patch.object(utils, 'execute', autospec=True)
+     def test__host_port(self, mock_exec):
+
+-        mock_exec.return_value = ('5900/tcp -> 192.0.2.1:33819', None)
+-        container = self.provider._container_name('1234')
++        mock_exec.return_value = ("5900/tcp -> 192.0.2.1:33819", None)
++        container = self.provider._container_name("1234")
+         self.assertEqual(
+             ('192.0.2.1', 33819),
+             self.provider._host_port(container)
+@@ -323,3 +328,759 @@ WantedBy=default.target""", f.read())
+         mock_exec.reset_mock()
+         self.provider.stop_all_containers()
+         mock_exec.assert_not_called()
++
++
++class TestKubernetesConsoleContainer(base.TestCase):
++
++    def setUp(self):
++        super(TestKubernetesConsoleContainer, self).setUp()
++        _reset_provider("kubernetes")
++        self.addCleanup(_reset_provider, "fake")
++
++        CONF.set_override("console_image", "test-image", "vnc")
++
++        # The __init__ of the provider calls _render_template, so we need to
++        # mock it here.
++        with mock.patch.object(utils, "render_template", autospec=True):
++            with mock.patch.object(
++                utils, "execute", autospec=True
++            ) as mock_exec:
++                self.provider = (
++                    console_factory.ConsoleContainerFactory().provider
++                )
++                mock_exec.assert_has_calls(
++                    [
++                        mock.call("kubectl", "version"),
++                    ]
++                )
++
++    def test__render_template(self):
++        CONF.set_override("read_only", True, group="vnc")
++
++        uuid = "1234"
++        app_name = "fake-app"
++        app_info = {"foo": "bar"}
++
++        rendered = self.provider._render_template(
++            uuid=uuid, app_name=app_name, app_info=app_info
++        )
++
++        self.assertEqual(
++            """apiVersion: v1
++kind: Secret
++metadata:
++  name: "ironic-console-1234"
++  namespace: openstack
++  labels:
++    app: ironic
++    component: ironic-console
++    conductor: "fake-mini"
++stringData:
++  app-info: '{"foo": "bar"}'
++---
++apiVersion: v1
++kind: Pod
++metadata:
++  name: "ironic-console-1234"
++  namespace: openstack
++  labels:
++    app: ironic
++    component: ironic-console
++    conductor: "fake-mini"
++spec:
++  containers:
++    - name: x11vnc
++      image: "test-image"
++      imagePullPolicy: Always
++      ports:
++        - containerPort: 5900
++      resources:
++        requests:
++          cpu: 250m
++          memory: 256Mi
++        limits:
++          cpu: 500m
++          memory: 1024Mi
++      env:
++        - name: APP
++          value: "fake-app"
++        - name: READ_ONLY
++          value: "True"
++        - name: APP_INFO
++          valueFrom:
++            secretKeyRef:
++              name: "ironic-console-1234"
++              key: app-info""",
++            rendered,
++        )
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__apply(self, mock_exec):
++        manifest = "fake-manifest"
++        self.provider._apply(manifest)
++
++        mock_exec.assert_called_once_with(
++            "kubectl", "apply", "-f", "-", process_input=manifest
++        )
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__apply_failure(self, mock_exec):
++        manifest = "fake-manifest"
++        mock_exec.side_effect = processutils.ProcessExecutionError(
++            stderr="ouch"
++        )
++
++        self.assertRaisesRegex(
++            exception.ConsoleContainerError,
++            "ouch",
++            self.provider._apply,
++            manifest,
++        )
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__delete_by_name(self, mock_exec):
++        self.provider._delete(
++            "pod", "test-namespace", resource_name="test-pod"
++        )
++        mock_exec.assert_called_once_with(
++            "kubectl",
++            "delete",
++            "-n",
++            "test-namespace",
++            "pod",
++            "--ignore-not-found=true",
++            "test-pod",
++        )
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__delete_by_selector(self, mock_exec):
++        self.provider._delete("pod", "test-namespace", selector="app=ironic")
++        mock_exec.assert_called_once_with(
++            "kubectl",
++            "delete",
++            "-n",
++            "test-namespace",
++            "pod",
++            "--ignore-not-found=true",
++            "-l",
++            "app=ironic",
++        )
++
++    def test__delete_no_name_or_selector(self):
++        self.assertRaisesRegex(
++            exception.ConsoleContainerError,
++            "Delete must be called with either a resource name or selector",
++            self.provider._delete,
++            "pod",
++            "test-namespace",
++        )
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__delete_failure(self, mock_exec):
++        mock_exec.side_effect = processutils.ProcessExecutionError(
++            stderr="ouch"
++        )
++        self.assertRaisesRegex(
++            exception.ConsoleContainerError,
++            "ouch",
++            self.provider._delete,
++            "pod",
++            "test-namespace",
++            resource_name="test-pod",
++        )
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__get_pod_node_ip(self, mock_exec):
++        mock_exec.return_value = ("192.168.1.100", "")
++        ip = self.provider._get_pod_node_ip("test-pod", "test-namespace")
++        self.assertEqual("192.168.1.100", ip)
++        mock_exec.assert_called_once_with(
++            "kubectl",
++            "get",
++            "pod",
++            "test-pod",
++            "-n",
++            "test-namespace",
++            "-o",
++            "jsonpath={.status.podIP}",
++        )
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__get_pod_node_ip_failure(self, mock_exec):
++        mock_exec.side_effect = processutils.ProcessExecutionError(
++            stderr="ouch"
++        )
++        self.assertRaisesRegex(
++            exception.ConsoleContainerError,
++            "ouch",
++            self.provider._get_pod_node_ip,
++            "test-pod",
++            "test-namespace",
++        )
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    @mock.patch.object(time, "sleep", autospec=True)
++    def test__wait_for_pod_ready(self, mock_sleep, mock_exec):
++        pod_ready_status = {
++            "status": {"conditions": [{"type": "Ready", "status": "True"}]}
++        }
++        mock_exec.return_value = (json.dumps(pod_ready_status), "")
++
++        self.provider._wait_for_pod_ready("test-pod", "test-namespace")
++
++        mock_exec.assert_called_once_with(
++            "kubectl",
++            "get",
++            "pod",
++            "test-pod",
++            "-n",
++            "test-namespace",
++            "-o",
++            "json",
++        )
++        mock_sleep.assert_not_called()
++
++    @mock.patch.object(utils, "execute", autospec=True)
++    @mock.patch.object(time, "sleep", autospec=True)
++    @mock.patch.object(time, "time", autospec=True, side_effect=[1, 2, 3, 4])
++    def test__wait_for_pod_ready_polling(
++        self, mock_time, mock_sleep, mock_exec
++    ):
++        pod_not_ready_status = {
++            "status": {"conditions": [{"type": "Ready", "status": "False"}]}
++        }
++        pod_ready_status = {
++            "status": {"conditions": [{"type": "Ready", "status": "True"}]}
++        }
++        mock_exec.side_effect = [
++            (json.dumps(pod_not_ready_status), ""),
++            (json.dumps(pod_ready_status), ""),
++        ]
++
++        self.provider._wait_for_pod_ready("test-pod", "test-namespace")
++
++        self.assertEqual(2, mock_exec.call_count)
++        mock_sleep.assert_called_once_with(kubernetes.POD_READY_POLL_INTERVAL)
++
++    @mock.patch.object(time, "time", autospec=True, side_effect=[0, 121])
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__wait_for_pod_ready_timeout(self, mock_exec, mock_time):
++        pod_not_ready_status = {
++            "status": {"conditions": [{"type": "Ready", "status": "False"}]}
++        }
++        mock_exec.return_value = (json.dumps(pod_not_ready_status), "")
++
++        self.assertRaisesRegex(
++            exception.ConsoleContainerError,
++            "did not become ready",
++            self.provider._wait_for_pod_ready,
++            "test-pod",
++            "test-namespace",
++        )
++
++    @mock.patch.object(time, "time", autospec=True, side_effect=[0, 121])
++    @mock.patch.object(utils, "execute", autospec=True)
++    def test__wait_for_pod_ready_exec_error(self, mock_exec, mock_time):
++        mock_exec.side_effect = processutils.ProcessExecutionError()
++        self.assertRaisesRegex(
++            exception.ConsoleContainerError,
++            "did not become ready",
++            self.provider._wait_for_pod_ready,
++            "test-pod",
++            "test-namespace",
++        )
++
++    def test__get_resources_from_yaml_single_doc_no_kind(self):
++        rendered_yaml = """
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++spec:
++  containers:
++    - name: my-container
++      image: nginx
++"""
++        resources = list(
++            self.provider._get_resources_from_yaml(rendered_yaml)
++        )
++        self.assertEqual(
++            [
++                {
++                    "apiVersion": "v1",
++                    "kind": "Pod",
++                    "metadata": {"name": "my-pod"},
++                    "spec": {
++                        "containers": [
++                            {"image": "nginx", "name": "my-container"}
++                        ]
++                    },
++                }
++            ],
++            resources,
++        )
++
++    def test__get_resources_from_yaml_multi_doc_no_kind(self):
++        rendered_yaml = """
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++---
++apiVersion: v1
++kind: Service
++metadata:
++  name: my-service
++"""
++        resources = list(
++            self.provider._get_resources_from_yaml(rendered_yaml)
++        )
++        self.assertEqual(
++            [
++                {
++                    "apiVersion": "v1",
++                    "kind": "Pod",
++                    "metadata": {"name": "my-pod"},
++                },
++                {
++                    "apiVersion": "v1",
++                    "kind": "Service",
++                    "metadata": {"name": "my-service"},
++                },
++            ],
++            resources,
++        )
++
++    def test__get_resources_from_yaml_single_doc_with_kind_match(self):
++        rendered_yaml = """
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++"""
++        resources = list(
++            self.provider._get_resources_from_yaml(rendered_yaml, kind="Pod")
++        )
++        self.assertEqual(
++            [
++                {
++                    "apiVersion": "v1",
++                    "kind": "Pod",
++                    "metadata": {"name": "my-pod"},
++                }
++            ],
++            resources,
++        )
++
++    def test__get_resources_from_yaml_single_doc_with_kind_no_match(self):
++        rendered_yaml = """
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++"""
++        resources = list(
++            self.provider._get_resources_from_yaml(
++                rendered_yaml, kind="Service"
++            )
++        )
++        self.assertEqual(0, len(resources))
++
++    def test__get_resources_from_yaml_multi_doc_with_kind_match_some(self):
++        rendered_yaml = """
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++---
++apiVersion: v1
++kind: Service
++metadata:
++  name: my-service
++---
++apiVersion: v1
++kind: Pod
++metadata:
++  name: another-pod
++"""
++        resources = list(
++            self.provider._get_resources_from_yaml(rendered_yaml, kind="Pod")
++        )
++        self.assertEqual(
++            [
++                {
++                    "apiVersion": "v1",
++                    "kind": "Pod",
++                    "metadata": {"name": "my-pod"},
++                },
++                {
++                    "apiVersion": "v1",
++                    "kind": "Pod",
++                    "metadata": {"name": "another-pod"},
++                },
++            ],
++            resources,
++        )
++
++    def test__get_resources_from_yaml_multi_doc_with_kind_no_match_all(self):
++        rendered_yaml = """
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++---
++apiVersion: v1
++kind: Service
++metadata:
++  name: my-service
++"""
++        resources = list(
++            self.provider._get_resources_from_yaml(
++                rendered_yaml, kind="Deployment"
++            )
++        )
++        self.assertEqual(0, len(resources))
++
++    def test__get_resources_from_yaml_empty_documents(self):
++        rendered_yaml = """
++---
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++---
++
++---
++apiVersion: v1
++kind: Service
++metadata:
++  name: my-service
++---
++"""
++        resources = list(
++            self.provider._get_resources_from_yaml(rendered_yaml)
++        )
++        self.assertEqual(
++            [
++                {
++                    "apiVersion": "v1",
++                    "kind": "Pod",
++                    "metadata": {"name": "my-pod"},
++                },
++                {
++                    "apiVersion": "v1",
++                    "kind": "Service",
++                    "metadata": {"name": "my-service"},
++                },
++            ],
++            resources,
++        )
++
++    def test__get_resources_from_yaml_invalid_yaml(self):
++        rendered_yaml = """
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++---
++   - bad: indent
++  - invalid: yaml
++
++"""
++        try:
++            list(self.provider._get_resources_from_yaml(rendered_yaml))
++            raise Exception("Expected YAMLError")
++        except yaml.YAMLError:
++            pass
++
++    def test__get_resources_from_yaml_document_safe_load_none(self):
++        # This can happen if a document is just whitespace or comments
++        rendered_yaml = """
++# This is a comment
++---
++apiVersion: v1
++kind: Pod
++metadata:
++  name: my-pod
++"""
++        resources = list(
++            self.provider._get_resources_from_yaml(rendered_yaml)
++        )
++        self.assertEqual(
++            [
++                {
++                    "apiVersion": "v1",
++                    "kind": "Pod",
++                    "metadata": {"name": "my-pod"},
++                }
++            ],
++            resources,
++        )
++
++    def test__get_resources_from_yaml_empty_string(self):
++        rendered_yaml = ""
++        resources = list(
++            self.provider._get_resources_from_yaml(rendered_yaml)
++        )
++        self.assertEqual(0, len(resources))
++
++    def test__get_resources_from_yaml_whitespace_string(self):
++        rendered_yaml = "   \n\n"
++        resources = list(
++            self.provider._get_resources_from_yaml(rendered_yaml)
++        )
++        self.assertEqual(0, len(resources))
++
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_get_pod_node_ip",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_wait_for_pod_ready",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_get_resources_from_yaml",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer, "_apply", autospec=True
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_render_template",
++        autospec=True,
++    )
++    def test_start_container(
++        self,
++        mock_render,
++        mock_apply,
++        mock_get_resources,
++        mock_wait,
++        mock_get_ip,
++    ):
++        task = mock.Mock(node=mock.Mock(uuid="1234"))
++        app_name = "test-app"
++        app_info = {"foo": "bar"}
++
++        mock_render.return_value = "fake-manifest"
++        mock_get_resources.return_value = [
++            {
++                "kind": "Pod",
++                "metadata": {
++                    "name": "test-pod",
++                    "namespace": "test-namespace",
++                },
++            }
++        ]
++        mock_get_ip.return_value = "192.168.1.100"
++
++        host, port = self.provider.start_container(task, app_name, app_info)
++
++        self.assertEqual(("192.168.1.100", 5900), (host, port))
++        mock_render.assert_called_once_with(
++            self.provider, "1234", app_name, app_info
++        )
++        mock_apply.assert_called_once_with(self.provider, "fake-manifest")
++        mock_get_resources.assert_called_once_with(
++            self.provider, "fake-manifest", kind="Pod"
++        )
++        mock_wait.assert_called_once_with(
++            self.provider, "test-pod", "test-namespace"
++        )
++        mock_get_ip.assert_called_once_with(
++            self.provider, "test-pod", "test-namespace"
++        )
++
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_stop_container",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_get_pod_node_ip",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_wait_for_pod_ready",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_get_resources_from_yaml",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer, "_apply", autospec=True
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_render_template",
++        autospec=True,
++    )
++    def test_start_container_failure(
++        self,
++        mock_render,
++        mock_apply,
++        mock_get_resources,
++        mock_wait,
++        mock_get_ip,
++        mock_stop,
++    ):
++        task = mock.Mock(node=mock.Mock(uuid="1234"))
++        mock_render.return_value = "fake-manifest"
++        mock_get_resources.return_value = [
++            {"metadata": {"name": "test-pod", "namespace": "test-ns"}}
++        ]
++        mock_wait.side_effect = exception.ConsoleContainerError(reason="boom")
++
++        self.assertRaises(
++            exception.ConsoleContainerError,
++            self.provider.start_container,
++            task,
++            "app",
++            {},
++        )
++        mock_stop.assert_called_once_with(self.provider, "1234")
++        mock_get_ip.assert_not_called()
++
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_stop_container",
++        autospec=True,
++    )
++    def test_stop_container(self, mock_stop_container):
++        task = mock.Mock(node=mock.Mock(uuid="1234"))
++        self.provider.stop_container(task)
++        mock_stop_container.assert_called_once_with(self.provider, "1234")
++
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer, "_delete", autospec=True
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_get_resources_from_yaml",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_render_template",
++        autospec=True,
++    )
++    def test__stop_container(
++        self, mock_render, mock_get_resources, mock_delete
++    ):
++        uuid = "1234"
++        mock_render.return_value = "fake-manifest"
++        mock_get_resources.return_value = [
++            {
++                "kind": "Secret",
++                "metadata": {
++                    "name": "ironic-console-1234",
++                    "namespace": "test-namespace",
++                },
++            },
++            {
++                "kind": "Pod",
++                "metadata": {
++                    "name": "ironic-console-1234",
++                    "namespace": "test-namespace",
++                },
++            },
++        ]
++
++        self.provider._stop_container(uuid)
++
++        mock_render.assert_called_once_with(self.provider, uuid)
++        mock_get_resources.assert_called_once_with(
++            self.provider, "fake-manifest"
++        )
++        mock_delete.assert_has_calls(
++            [
++                mock.call(
++                    self.provider,
++                    "Pod",
++                    "test-namespace",
++                    resource_name="ironic-console-1234",
++                ),
++                mock.call(
++                    self.provider,
++                    "Secret",
++                    "test-namespace",
++                    resource_name="ironic-console-1234",
++                ),
++            ]
++        )
++        self.assertEqual(2, mock_delete.call_count)
++
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer, "_delete", autospec=True
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_labels_to_selector",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_get_resources_from_yaml",
++        autospec=True,
++    )
++    @mock.patch.object(
++        kubernetes.KubernetesConsoleContainer,
++        "_render_template",
++        autospec=True,
++    )
++    def test_stop_all_containers(
++        self,
++        mock_render,
++        mock_get_resources,
++        mock_labels_to_selector,
++        mock_delete,
++    ):
++        mock_render.return_value = "fake-manifest"
++        mock_get_resources.return_value = [
++            {
++                "kind": "Secret",
++                "metadata": {
++                    "namespace": "test-ns",
++                    "labels": {"app": "ironic"},
++                },
++            },
++            {
++                "kind": "Pod",
++                "metadata": {
++                    "namespace": "test-ns",
++                    "labels": {"app": "ironic"},
++                },
++            },
++        ]
++        mock_labels_to_selector.return_value = "app=ironic"
++
++        self.provider.stop_all_containers()
++
++        mock_render.assert_called_once_with(self.provider)
++        mock_get_resources.assert_called_once_with(
++            self.provider, "fake-manifest"
++        )
++        mock_labels_to_selector.assert_has_calls(
++            [
++                mock.call(self.provider, {"app": "ironic"}),
++                mock.call(self.provider, {"app": "ironic"}),
++            ]
++        )
++        mock_delete.assert_has_calls(
++            [
++                mock.call(
++                    self.provider, "Pod", "test-ns", selector="app=ironic"
++                ),
++                mock.call(
++                    self.provider, "Secret", "test-ns", selector="app=ironic"
++                ),
++            ]
++        )
+diff --git ironic-32.0.1.dev54.dist-info/entry_points.txt ironic-32.0.1.dev54.dist-info/entry_points.txt
+index 29c3decfc..4c886a0f6 100644
+--- a/ironic-32.0.1.dev54.dist-info/entry_points.txt
++++ b/ironic-32.0.1.dev54.dist-info/entry_points.txt
+@@ -10,6 +10,7 @@
+ [ironic.console.container]
+ fake = ironic.console.container.fake:FakeConsoleContainer
+ systemd = ironic.console.container.systemd:SystemdConsoleContainer
++kubernetes = ironic.console.container.kubernetes:KubernetesConsoleContainer
+
+ [ironic.database.migration_backend]
+ sqlalchemy = ironic.db.sqlalchemy.migration

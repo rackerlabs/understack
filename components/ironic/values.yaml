@@ -42,6 +42,10 @@ conf:
   # https://docs.openstack.org/ironic/latest/configuration/sample-policy.html
   policy:
     "baremetal:node:get:last_error": "role:service or role:admin or (project_id:%(node.owner)s or project_id:%(node.lessee)s)"
+    # allow node lessee to set console state
+    "baremetal:node:set_console_state": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s) "
+    # allow node lessee to get console
+    "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
   ironic:
     DEFAULT:
       # We only want to default to direct, otherwise defaults interfere with hardware
@@ -105,6 +109,11 @@ conf:
       use_web_server_for_images: true
     nova:
       auth_type: password
+    vnc:
+      enable: true
+      container_provider: kubernetes
+      console_image: ghcr.io/rackerlabs/understack/ironic-vnc-container:latest
+      #  kubernetes_container_template: $pybasedir/console/container/ironic-console-pod.yaml.template
 
 endpoints:
   oslo_messaging:
@@ -235,6 +244,8 @@ pod:
               sources:
                 - secret:
                     name: ironic-ks-etc
+          - name: pod-usr-share-novnc
+            emptyDir: {}
     ironic_api:
       ironic_api:
         volumeMounts:
