@@ -114,6 +114,7 @@ def _pxe_preference(interface: InterfaceInfo) -> int:
     _name = interface.name.upper()
     if "DRAC" in _name or "ILO" in _name or "NIC.EMBEDDED" in _name:
         return 0
+    enabled_result = 100 if (interface.remote_switch_port_name is not None) else 0
 
     NIC_PREFERENCE = {
         "NIC.Integrated.1-1-1": 100,
@@ -124,8 +125,22 @@ def _pxe_preference(interface: InterfaceInfo) -> int:
         "NIC.Integrated.1-2": 95,
         "NIC.Slot.1-2-1": 94,
         "NIC.Slot.1-2": 93,
+        "NIC.Slot.1-3-1": 92,
+        "NIC.Slot.1-3": 91,
+        "NIC.Slot.2-1-1": 90,
+        "NIC.Slot.2-1": 89,
+        "NIC.Integrated.2-1-1": 88,
+        "NIC.Integrated.2-1": 87,
+        "NIC.Slot.2-2-1": 86,
+        "NIC.Slot.2-2": 85,
+        "NIC.Integrated.2-2-1": 84,
+        "NIC.Integrated.2-2": 83,
+        "NIC.Slot.3-1-1": 82,
+        "NIC.Slot.3-1": 81,
+        "NIC.Slot.3-2-1": 80,
+        "NIC.Slot.3-2": 79,
     }
-    return NIC_PREFERENCE.get(interface.name, 50)
+    return NIC_PREFERENCE.get(interface.name, 50) + enabled_result
 
 
 def argument_parser():
