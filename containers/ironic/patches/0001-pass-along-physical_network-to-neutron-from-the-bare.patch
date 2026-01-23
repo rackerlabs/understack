@@ -1,7 +1,7 @@
-From 386faaeaf4a900c4c4591fae4e735164a0f38b45 Mon Sep 17 00:00:00 2001
+From 1b26fa5dad6ce2ad8ac959188e98cd951aee099d Mon Sep 17 00:00:00 2001
 From: Doug Goldstein <cardoe@cardoe.com>
 Date: Wed, 22 Oct 2025 12:58:41 -0500
-Subject: [PATCH 1/8] pass along physical_network to neutron from the baremetal
+Subject: [PATCH 1/7] pass along physical_network to neutron from the baremetal
  port
 
 When plugging a baremetal port in using the 'neutron' interface, send
