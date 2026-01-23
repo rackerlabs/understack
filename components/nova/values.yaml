@@ -93,6 +93,14 @@ conf:
     uwsgi:
       processes: 2
 
+    # Enable oslo.messaging notifications for Argo Events integration
+    oslo_messaging_notifications:
+      driver: messagingv2
+
+    # Configure which state changes trigger notifications
+    notifications:
+      notify_on_state_change: vm_and_task_state
+
 console:
   # we are working with baremetal nodes and not QEMU so we don't need novnc or spice
   # connected to QEMU

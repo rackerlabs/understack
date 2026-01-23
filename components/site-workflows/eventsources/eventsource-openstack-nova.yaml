@@ -5,7 +5,7 @@ metadata:
 spec:
   amqp:
     # this is our eventName
-    openstack:
+    notifications:
       # amqp server url
       url: amqp://rabbitmq-server-0.rabbitmq-nodes.openstack.svc.cluster.local:5672/nova
       # jsonBody specifies that all event body payload coming from this
@@ -15,7 +15,7 @@ spec:
       exchangeName: nova
       exchangeType: topic
       exchangeDeclare:
-        durable: false
+        durable: true
       # routing key for messages within the exchange
       routingKey: 'notifications.info'
       # optional consume settings
