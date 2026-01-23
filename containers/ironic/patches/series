@@ -3,10 +3,8 @@
 #ironic
 0001-pass-along-physical_network-to-neutron-from-the-bare.patch
 0002-Add-SKU-field-to-Redfish-inspection.patch
-0003-fix-redfish-inspect-system-product-name.patch
-0004-hack-for-scheduling-purposes-ignore-ports-with-categ.patch
-0005-feat-skip-invalid-mac-addr-interfaces-in-redfish-ins.patch
-0006-Add-Redfish-LLDP-data-collection-support-to-the-Redf.patch
-0007-Add-LLDP-collect-for-DRAC-Redfish-inspection.patch
-0008-fix-port-endpoints-did-not-return-vendor-and-categor.patch
-0009-kubernetes-console-provider.patch
+0003-hack-for-scheduling-purposes-ignore-ports-with-categ.patch
+0004-feat-skip-invalid-mac-addr-interfaces-in-redfish-ins.patch
+0005-Add-Redfish-LLDP-data-collection-support-to-the-Redf.patch
+0006-Add-LLDP-collect-for-DRAC-Redfish-inspection.patch
+0007-Add-a-kubernetes-provider-for-console-container.patch

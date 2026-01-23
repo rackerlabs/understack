@@ -1,7 +1,7 @@
-From da011a985fce208c3ad4eeb13d635323b1cbfc8d Mon Sep 17 00:00:00 2001
+From 5fde08ae5631dfeb078ae40838b91c416a422f0f Mon Sep 17 00:00:00 2001
 From: Doug Goldstein <cardoe@cardoe.com>
 Date: Tue, 13 Jan 2026 11:49:05 -0600
-Subject: [PATCH 5/8] feat: skip invalid mac addr interfaces in redfish inspect
+Subject: [PATCH 4/7] feat: skip invalid mac addr interfaces in redfish inspect
  add speed
 
 Refactor the redfish interfaces inspection by moving it to its own
@@ -78,7 +78,7 @@ index 69f0f0c09..9786c9f46 100644
          # NOTE(JayF): Checking truthiness here is better than checking for None
          #             because if we have an empty list, we'll raise a
 diff --git a/ironic/tests/unit/drivers/modules/redfish/test_inspect.py b/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
-index c81fb3934..4b8d08217 100644
+index 162998e33..e8c3e01d7 100644
 --- a/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
 +++ b/ironic/tests/unit/drivers/modules/redfish/test_inspect.py
 @@ -108,6 +108,7 @@ class RedfishInspectTestCase(db_base.DbTestCase):
@@ -97,7 +97,7 @@ index c81fb3934..4b8d08217 100644
          eth_interface_mock2.status.state = sushy.STATE_DISABLED
          eth_interface_mock2.status.health = sushy.HEALTH_OK
  
-@@ -203,9 +205,11 @@ class RedfishInspectTestCase(db_base.DbTestCase):
+@@ -204,9 +206,11 @@ class RedfishInspectTestCase(db_base.DbTestCase):
                           system_vendor['system_uuid'])
  
          expected_interfaces = [{'mac_address': '00:11:22:33:44:55',

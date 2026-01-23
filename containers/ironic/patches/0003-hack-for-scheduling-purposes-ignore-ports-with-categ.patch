@@ -1,7 +1,7 @@
-From 0d800dfef4ab8516406c068835de2e4e52905dd9 Mon Sep 17 00:00:00 2001
+From 0812e66dd4b52cfb917d2593a8f3efd67922b98a Mon Sep 17 00:00:00 2001
 From: Doug Goldstein <cardoe@cardoe.com>
 Date: Tue, 13 Jan 2026 11:08:04 -0600
-Subject: [PATCH 4/8] hack: for scheduling purposes ignore ports with category
+Subject: [PATCH 3/7] hack: for scheduling purposes ignore ports with category
  storage
 
 We want to ignore ports that are in category storage for being eligible

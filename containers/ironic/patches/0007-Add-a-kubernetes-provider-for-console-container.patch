@@ -1,75 +1,40 @@
-commit 5d44ecd6e39588d509129efd26f6eaafba5c5bb4
-Author: Steve Baker <sbaker@redhat.com>
-Date:   Fri Oct 3 11:16:53 2025 +1300
+From 3856f2183a4e568eb4f05aa561c8626eb80241c0 Mon Sep 17 00:00:00 2001
+From: Steve Baker <sbaker@redhat.com>
+Date: Fri, 3 Oct 2025 11:16:53 +1300
+Subject: [PATCH 7/7] Add a kubernetes provider for console container
 
-    Add a kubernetes provider for console container
+A new ``ironic.console.container`` provider is added called
+``kubernetes`` which allows Ironic conductor to manage console
+containers as Kubernetes pods. The kubernetes resources are defined in
+the template file configured by ``[vnc]kubernetes_container_template``
+and the default template creates one secret to store the app info, and
+one pod to run the console container.
 
-    A new ``ironic.console.container`` provider is added called
-    ``kubernetes`` which allows Ironic conductor to manage console
-    containers as Kubernetes pods. The kubernetes resources are defined in
-    the template file configured by ``[vnc]kubernetes_container_template``
-    and the default template creates one secret to store the app info, and
-    one pod to run the console container.
+It is expected that Ironic conductor is deployed inside the kubernetes
+cluster. The associated service account will need roles and bindings
+which allow it to manage the required resources (with the default
+template this will be secrets and pods).
 
-    It is expected that Ironic conductor is deployed inside the kubernetes
-    cluster. The associated service account will need roles and bindings
-    which allow it to manage the required resources (with the default
-    template this will be secrets and pods).
+This provider holds the assumption that ironic-novnc will be deployed in
+the same kubernetes cluster, and so can connect to the VNC servers via
+the pod's ``status.hostIP``.
 
-    This provider holds the assumption that ironic-novnc will be deployed in
-    the same kubernetes cluster, and so can connect to the VNC servers via
-    the pod's ``status.hostIP``.
+Assisted-By: gemini
+Change-Id: Ib91f7d7c15be51d68ebf886e44efaf191a14437b
+Signed-off-by: Steve Baker <sbaker@redhat.com>
+---
+ doc/source/install/graphical-console.rst      |  67 +-
+ ironic/conf/vnc.py                            |  23 +-
+ .../ironic-console-pod.yaml.template          |  45 ++
+ ironic/console/container/kubernetes.py        | 307 +++++++
+ .../container/test_console_container.py       | 764 +++++++++++++++++-
+ .../notes/console-k8s-b4aee1bb1d3d0a65.yaml   |  18 +
+ setup.cfg                                     |   1 +
+ 7 files changed, 1216 insertions(+), 9 deletions(-)
+ create mode 100644 ironic/console/container/ironic-console-pod.yaml.template
+ create mode 100644 ironic/console/container/kubernetes.py
+ create mode 100644 releasenotes/notes/console-k8s-b4aee1bb1d3d0a65.yaml
 
-    Assisted-By: gemini
-    Change-Id: Ib91f7d7c15be51d68ebf886e44efaf191a14437b
-    Signed-off-by: Steve Baker <sbaker@redhat.com>
-
-    Updated to apply cleanly on 2025.2 (marek.skrobacki)
-
-diff --git a/ironic/conf/vnc.py b/ironic/conf/vnc.py
-index 6a7c27900..41365e5f8 100644
---- a/ironic/conf/vnc.py
-+++ b/ironic/conf/vnc.py
-@@ -99,11 +99,14 @@ opts = [
-              '"systemd" manages containers as systemd units via podman '
-              'Quadlet support. The default is "fake" which returns an '
-              'unusable VNC host and port. This needs to be changed if enabled '
--             'is True'),
-+             'is True. '
-+             '"kubernetes" manages containers as pods using template driven '
-+             'resource creation.'),
-     cfg.StrOpt(
-         'console_image',
-         mutable=True,
--        help='Container image reference for the "systemd" console container '
-+        help='Container image reference for the "systemd" and '
-+             '"kubernetes" console container '
-              'provider, and any other out-of-tree provider which requires a '
-              'configurable image reference.'),
-     cfg.StrOpt(
-@@ -127,6 +130,22 @@ opts = [
-              'have no authentication or encryption so they also should not '
-              'be exposed to public access. Additionally, the containers '
-              'need to be able to access BMC management endpoints. '),
-+    cfg.StrOpt(
-+        'kubernetes_container_template',
-+        default=os.path.join(
-+            '$pybasedir',
-+            'console/container/ironic-console-pod.yaml.template'),
-+        mutable=True,
-+        help='For the kubernetes provider, path to the template for defining '
-+             'the console resources. The default template creates one Secret '
-+             'to store the app info, and one Pod to run a console '
-+             'container. A custom template must include namespace metadata, '
-+             'and must define labels which can be used as a delete-all '
-+             'selector.'),
-+    cfg.IntOpt('kubernetes_pod_timeout',
-+               default=120,
-+               help='For the kubernetes provider, the time (in seconds) to '
-+                    'wait for the console pod to start.'),
-     cfg.StrOpt(
-         'ssl_cert_file',
-         help="Certificate file to use when starting the server securely."),
 diff --git a/ironic/console/container/ironic-console-pod.yaml.template b/ironic/console/container/ironic-console-pod.yaml.template
 new file mode 100644
 index 000000000..05770bcf6
@@ -436,7 +401,7 @@ index 000000000..35dfab261
 +            selector = self._labels_to_selector(labels)
 +            self._delete(kind, namespace, selector=selector)
 diff --git a/ironic/tests/unit/console/container/test_console_container.py b/ironic/tests/unit/console/container/test_console_container.py
-index 64c85870e..229b1df12 100644
+index 64c85870e..62c5c6f31 100644
 --- a/ironic/tests/unit/console/container/test_console_container.py
 +++ b/ironic/tests/unit/console/container/test_console_container.py
 @@ -11,9 +11,12 @@
@@ -452,16 +417,15 @@ index 64c85870e..229b1df12 100644
 
  from oslo_concurrency import processutils
  from oslo_config import cfg
-@@ -22,6 +25,8 @@ from ironic.common import console_factory
+@@ -22,6 +25,7 @@ from ironic.common import console_factory
  from ironic.common import exception
  from ironic.common import utils
  from ironic.console.container import fake
 +from ironic.console.container import kubernetes
-+from ironic.console.container import systemd
  from ironic.tests import base
 
  CONF = cfg.CONF
-@@ -146,8 +151,8 @@ class TestSystemdConsoleContainer(base.TestCase):
+@@ -146,8 +150,8 @@ class TestSystemdConsoleContainer(base.TestCase):
      @mock.patch.object(utils, 'execute', autospec=True)
      def test__host_port(self, mock_exec):
 
@@ -472,7 +436,7 @@ index 64c85870e..229b1df12 100644
          self.assertEqual(
              ('192.0.2.1', 33819),
              self.provider._host_port(container)
-@@ -323,3 +328,759 @@ WantedBy=default.target""", f.read())
+@@ -323,3 +327,759 @@ WantedBy=default.target""", f.read())
          mock_exec.reset_mock()
          self.provider.stop_all_containers()
          mock_exec.assert_not_called()
@@ -1232,15 +1196,5 @@ index 64c85870e..229b1df12 100644
 +                ),
 +            ]
 +        )
-diff --git ironic-32.0.1.dev54.dist-info/entry_points.txt ironic-32.0.1.dev54.dist-info/entry_points.txt
-index 29c3decfc..4c886a0f6 100644
---- a/ironic-32.0.1.dev54.dist-info/entry_points.txt
-+++ b/ironic-32.0.1.dev54.dist-info/entry_points.txt
-@@ -10,6 +10,7 @@
- [ironic.console.container]
- fake = ironic.console.container.fake:FakeConsoleContainer
- systemd = ironic.console.container.systemd:SystemdConsoleContainer
-+kubernetes = ironic.console.container.kubernetes:KubernetesConsoleContainer
-
- [ironic.database.migration_backend]
- sqlalchemy = ironic.db.sqlalchemy.migration
+--
+2.50.1 (Apple Git-155)

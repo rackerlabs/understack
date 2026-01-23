@@ -16,6 +16,10 @@ dependencies = [
     "understack-flavor-matcher",
 ]
 
+# REMOVE ME: delete this once we move away from patching a venv or we upgrade to a newer ironic base version
+[project.entry-points."ironic.console.container"]
+kubernetes = "ironic.console.container.kubernetes:KubernetesConsoleContainer"
+
 [project.entry-points."ironic.inspection.hooks"]
 resource-class = "ironic_understack.resource_class:ResourceClassHook"
 update-baremetal-port = "ironic_understack.inspect_hook_update_baremetal_ports:InspectHookUpdateBaremetalPorts"
