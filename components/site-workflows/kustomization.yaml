@@ -5,9 +5,11 @@ resources:
   - eventbus/eventbus-default.yaml
   - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
   - eventsources/eventsource-openstack-ironic.yaml
+  - eventsources/eventsource-openstack-nova.yaml
   - eventsources/eventsource-openstack-keystone.yaml
   - eventsources/eventsource-openstack-neutron.yaml
   - eventsources/rabbitmq-user-argo-ironic.yaml
+  - eventsources/rabbitmq-user-argo-nova.yaml
   - eventsources/rabbitmq-user-argo-keystone.yaml
   - eventsources/rabbitmq-user-argo-neutron.yaml
   - eventsources/eventsource-k8s-openstack-secrets.yaml
