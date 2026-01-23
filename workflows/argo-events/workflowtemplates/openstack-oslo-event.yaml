@@ -47,7 +47,7 @@ spec:
             name: nb-token
             readOnly: true
           - mountPath: /etc/openstack
-            name: openstack-svc-acct
+            name: baremetal-manage
             readOnly: true
           - mountPath: /etc/netapp
             name: netapp-ini
@@ -60,9 +60,12 @@ spec:
         - name: nb-token
           secret:
             secretName: nautobot-token
-        - name: openstack-svc-acct
+        - name: baremetal-manage
           secret:
-            secretName: openstack-svc-acct
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
         - name: netapp-ini
           secret:
             secretName: netapp-config
