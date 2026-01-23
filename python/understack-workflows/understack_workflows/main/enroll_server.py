@@ -114,7 +114,7 @@ def _pxe_preference(interface: InterfaceInfo) -> int:
     _name = interface.name.upper()
     if "DRAC" in _name or "ILO" in _name or "NIC.EMBEDDED" in _name:
         return 0
-    enabled_result = 50 if (interface.remote_switch_port_name is not None) else 0
+    enabled_result = 100 if (interface.remote_switch_port_name is not None) else 0
 
     NIC_PREFERENCE = {
         "NIC.Integrated.1-1-1": 100,
