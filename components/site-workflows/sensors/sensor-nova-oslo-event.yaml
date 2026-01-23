@@ -33,7 +33,7 @@ spec:
         .body = (.body["oslo.message"] | fromjson)
     filters:
       # applies each of the items in data with 'and'
-#      dataLogicalOperator: "and"
+      dataLogicalOperator: "and"
       data:
         - path: "body.event_type"
           type: "string"
