@@ -33,17 +33,17 @@ spec:
         .body = (.body["oslo.message"] | fromjson)
     filters:
       # applies each of the items in data with 'and'
-      dataLogicalOperator: "and"
+#      dataLogicalOperator: "and"
       data:
         - path: "body.event_type"
           type: "string"
           value:
             - "compute.instance.delete.end"
         # Only process if storage was wanted
-        - path: "body.payload.metadata.storage"
-          type: "string"
-          value:
-            - "wanted"
+#        - path: "body.payload.metadata.storage"
+#          type: "string"
+#          value:
+#            - "wanted"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
