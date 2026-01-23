@@ -5,27 +5,35 @@ FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-COPY python/ironic-understack /src/understack/ironic-understack
-COPY python/understack-flavor-matcher /src/understack/understack-flavor-matcher
-
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        git \
         patch \
-        quilt \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# clone source and patch it
+# renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2025.2
+ARG IRONIC_GIT_REF=095c3bcaede90095a639ec154b4c3783f1ea75a8
+ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
+RUN git -C /src/ironic fetch --unshallow --tags
+
+COPY python/ironic-understack /src/understack/ironic-understack
+COPY python/understack-flavor-matcher /src/understack/understack-flavor-matcher
 
 ARG OPENSTACK_VERSION="required_argument"
 ARG NOVNC_VERSION=1.6.0
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
+      --upgrade \
       --constraint https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} \
+        /src/ironic \
         /src/understack/ironic-understack \
         /src/understack/understack-flavor-matcher \
         proliantutils==2.16.3
 
 COPY containers/ironic/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
-    QUILT_PATCHES=/tmp/patches quilt push -a
+    patch -p1 < /tmp/patches/0001-Solve-IPMI-call-issue-results-in-UTF-8-format-error-.patch
 
 # download and unpack novnc
 RUN \
