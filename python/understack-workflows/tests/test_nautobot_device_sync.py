@@ -267,6 +267,25 @@ class TestSetLocationFromSwitches:
         assert device_info.location_id is None
         assert device_info.rack_id is None
 
+    def test_set_location_switch_info_is_string_none(self, device_info, mock_nautobot):
+        """Test that literal string 'None' in switch_info is skipped."""
+        ports = [
+            MagicMock(
+                local_link_connection={
+                    "switch_info": "None",
+                    "switch_id": "00:00:00:00:00:00",
+                    "port_id": "None",
+                }
+            )
+        ]
+
+        _set_location_from_switches(device_info, ports, mock_nautobot)
+
+        # Should not make any API calls
+        mock_nautobot.dcim.devices.get.assert_not_called()
+        assert device_info.location_id is None
+        assert device_info.rack_id is None
+
     def test_set_location_switch_not_found(self, device_info, mock_nautobot):
         ports = [
             MagicMock(
@@ -405,6 +424,54 @@ class TestUpdateNautobotDevice:
         assert result is False
         mock_nautobot_device.save.assert_not_called()
 
+    def test_update_position_and_face(self, mock_nautobot_device):
+        """Test that position and face are updated when preserved from old device."""
+        mock_nautobot_device.position = None
+        mock_nautobot_device.face = None
+        device_info = DeviceInfo(
+            uuid="test-uuid",
+            position=42,
+            face="front",
+        )
+
+        result = _update_nautobot_device(device_info, mock_nautobot_device)
+
+        assert result is True
+        assert mock_nautobot_device.position == 42
+        assert mock_nautobot_device.face == "front"
+        mock_nautobot_device.save.assert_called_once()
+
+    def test_update_position_defaults_face_to_front(self, mock_nautobot_device):
+        """Test that face defaults to 'front' when position is set but face is not."""
+        mock_nautobot_device.position = None
+        mock_nautobot_device.face = None
+        device_info = DeviceInfo(
+            uuid="test-uuid",
+            position=10,
+            # face is None
+        )
+
+        result = _update_nautobot_device(device_info, mock_nautobot_device)
+
+        assert result is True
+        assert mock_nautobot_device.position == 10
+        assert mock_nautobot_device.face == "front"
+
+    def test_update_position_no_change_when_same(self, mock_nautobot_device):
+        """Test that no update occurs when position/face are already set correctly."""
+        mock_nautobot_device.position = 42
+        mock_nautobot_device.face = MagicMock(value="front")
+        device_info = DeviceInfo(
+            uuid="test-uuid",
+            position=42,
+            face="front",
+        )
+
+        result = _update_nautobot_device(device_info, mock_nautobot_device)
+
+        assert result is False
+        mock_nautobot_device.save.assert_not_called()
+
 
 class TestExtractNodeUuidFromEvent:
     """Test cases for _extract_node_uuid_from_event function."""
@@ -443,7 +510,7 @@ class TestSyncDeviceToNautobot:
         return MagicMock()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
@@ -470,7 +537,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.assert_called_once()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
@@ -507,10 +574,11 @@ class TestSyncDeviceToNautobot:
         assert result == EXIT_STATUS_FAILURE
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
-    def test_sync_without_location_returns_error(
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
+    def test_sync_without_location_skips_for_uninspected_node(
         self, mock_fetch, mock_ironic_class, mock_nautobot
     ):
+        """Test that sync skips gracefully for uninspected nodes without location."""
         node_uuid = str(uuid.uuid4())
         device_info = DeviceInfo(uuid=node_uuid)  # No location
         mock_fetch.return_value = (device_info, {}, [])
@@ -518,53 +586,13 @@ class TestSyncDeviceToNautobot:
 
         result = sync_device_to_nautobot(node_uuid, mock_nautobot)
 
+        # Should fail since no location available
         assert result == EXIT_STATUS_FAILURE
-
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
-    @patch(
-        "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
-    )
-    def test_sync_finds_device_by_name_with_matching_uuid(
-        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
-    ):
-        """Test that device found by name with matching UUID is updated."""
-        node_uuid = str(uuid.uuid4())
-        device_info = DeviceInfo(
-            uuid=node_uuid,
-            name="Dell-ABC123",
-            manufacturer="Dell",
-            model="PowerEdge R640",
-            location_id="location-uuid",
-            status="Active",
-        )
-        mock_fetch.return_value = (device_info, {}, [])
-
-        # First get by ID returns None
-        # Second get by name returns device with same UUID
-        existing_device = MagicMock()
-        existing_device.id = node_uuid  # Same UUID
-        existing_device.status = MagicMock(name="Planned")
-        existing_device.name = "Dell-ABC123"
-        existing_device.serial = None
-        existing_device.location = None
-        existing_device.rack = None
-        existing_device.tenant = None
-        existing_device.custom_fields = {}
-
-        mock_nautobot.dcim.devices.get.side_effect = [None, existing_device]
-        mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
-
-        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
-
-        assert result == EXIT_STATUS_SUCCESS
-        # Should NOT delete since UUIDs match
-        existing_device.delete.assert_not_called()
-        # Should NOT create new device
+        # Should not attempt to create device
         mock_nautobot.dcim.devices.create.assert_not_called()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
@@ -604,7 +632,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.assert_called_once()
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
-    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_device_info")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
@@ -631,6 +659,52 @@ class TestSyncDeviceToNautobot:
         result = sync_device_to_nautobot(node_uuid, mock_nautobot)
 
         assert result == EXIT_STATUS_SUCCESS
+        mock_nautobot.dcim.devices.create.assert_called_once()
+
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
+    @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
+    @patch(
+        "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
+    )
+    def test_sync_uuid_mismatch_uses_old_device_location(
+        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+    ):
+        """Test that location is preserved from old device when new node has none.
+
+        When re-enrolling a node that hasn't been inspected yet, we should use
+        the location from the old Nautobot device to create the new one.
+        """
+        node_uuid = str(uuid.uuid4())
+        old_uuid = str(uuid.uuid4())
+        device_info = DeviceInfo(
+            uuid=node_uuid,
+            name="Dell-ABC123",
+            manufacturer="Dell",
+            model="PowerEdge R640",
+            # No location_id from switch lookup
+            status="Active",
+        )
+        mock_fetch.return_value = (device_info, {}, [])
+
+        # Old device has location
+        existing_device = MagicMock()
+        existing_device.id = old_uuid
+        existing_device.name = "Dell-ABC123"
+        existing_device.location = MagicMock(id="old-location-uuid")
+        existing_device.rack = MagicMock(id="old-rack-uuid")
+        existing_device.position = 42
+        existing_device.face = MagicMock(value="front")
+
+        mock_nautobot.dcim.devices.get.side_effect = [None, existing_device]
+        mock_nautobot.dcim.devices.create.return_value = MagicMock()
+        mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
+
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+
+        assert result == EXIT_STATUS_SUCCESS
+        # Should delete old device after preserving location
+        existing_device.delete.assert_called_once()
+        # Should create new device
         mock_nautobot.dcim.devices.create.assert_called_once()
 
 

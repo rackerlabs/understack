@@ -72,7 +72,6 @@ _event_handlers: dict[str, EventHandler | list[EventHandler]] = {
     "baremetal.portgroup.create.end": ironic_portgroup.handle_portgroup_create_update,
     "baremetal.portgroup.update.end": ironic_portgroup.handle_portgroup_create_update,
     "baremetal.portgroup.delete.end": ironic_portgroup.handle_portgroup_delete,
-    "baremetal.node.create.end": nautobot_device_sync.handle_node_event,
     "baremetal.node.update.end": nautobot_device_sync.handle_node_event,
     "baremetal.node.delete.end": nautobot_device_sync.handle_node_delete_event,
     "baremetal.node.provision_set.end": [
