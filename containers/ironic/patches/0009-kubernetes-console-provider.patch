@@ -1232,15 +1232,3 @@ index 64c85870e..229b1df12 100644
 +                ),
 +            ]
 +        )
-diff --git ironic-32.0.1.dev54.dist-info/entry_points.txt ironic-32.0.1.dev54.dist-info/entry_points.txt
-index 29c3decfc..4c886a0f6 100644
---- a/ironic-32.0.1.dev54.dist-info/entry_points.txt
-+++ b/ironic-32.0.1.dev54.dist-info/entry_points.txt
-@@ -10,6 +10,7 @@
- [ironic.console.container]
- fake = ironic.console.container.fake:FakeConsoleContainer
- systemd = ironic.console.container.systemd:SystemdConsoleContainer
-+kubernetes = ironic.console.container.kubernetes:KubernetesConsoleContainer
-
- [ironic.database.migration_backend]
- sqlalchemy = ironic.db.sqlalchemy.migration
