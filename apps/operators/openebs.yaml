@@ -1,0 +1,17 @@
+---
+component: openebs
+componentNamespace: openebs
+sources:
+  - repoURL: https://openebs.github.io/openebs
+    chart: openebs
+    targetRevision: 4.4.0
+    helm:
+      releaseName: openebs
+      valueFiles:
+        - $understack/operators/openebs/values.yaml
+        - $deploy/{{.name}}/helm-configs/openebs.yaml
+      ignoreMissingValueFiles: true
+  - ref: understack
+    path: 'operators/openebs'
+  - ref: deploy
+    path: '{{.name}}/manifests/openebs'

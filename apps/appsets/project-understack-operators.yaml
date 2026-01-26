@@ -20,6 +20,8 @@ spec:
     server: '*'
   - namespace: 'external-secrets'
     server: '*'
+  - namespace: 'openebs'
+    server: '*'
   - namespace: 'rook-ceph'
     server: '*'
   - namespace: 'monitoring'
