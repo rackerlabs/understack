@@ -1,0 +1,409 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://undersync.rackspace.net/schemas/push-payload-v1.json",
+  "title": "Undersync Push Payload v1",
+  "description": "Schema for push-based sync payloads from Neutron ML2 driver to Undersync",
+  "type": "object",
+  "required": ["vlan_group", "resources"],
+  "properties": {
+    "vlan_group": {
+      "type": "string",
+      "pattern": "^[\\w+/-]+$",
+      "description": "VLAN group name (physical_network) being synced"
+    },
+    "trigger": {
+      "type": "object",
+      "description": "What triggered this sync (for debugging and auditing)",
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": ["port_create", "port_update", "port_delete", "trunk_subport_add", "trunk_subport_remove", "manual"],
+          "description": "The event type that triggered this sync"
+        },
+        "port_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "UUID of the port that triggered the sync"
+        },
+        "network_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "UUID of the network involved"
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "description": "Sync options",
+      "properties": {
+        "dry_run": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, calculate diff but don't apply changes"
+        },
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, apply changes even if they fail safety checks"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "All Neutron resources needed to generate switch configuration",
+      "required": ["networks", "ports", "segments", "subnets"],
+      "properties": {
+        "networks": {
+          "type": "array",
+          "description": "Neutron networks",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "tags"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Network UUID"
+              },
+              "name": {
+                "type": "string",
+                "description": "Network name (used for VLAN naming)"
+              },
+              "tags": {
+                "type": "array",
+                "description": "Network tags. Special tags: UNDERSYNC_PROVISIONING, UNDERSYNC_DHCP_RELAY:<ip>",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "ports": {
+          "type": "array",
+          "description": "Neutron ports",
+          "items": {
+            "type": "object",
+            "required": ["id", "network_id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Port UUID"
+              },
+              "mac_address": {
+                "type": "string",
+                "pattern": "^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$",
+                "description": "MAC address"
+              },
+              "network_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Network UUID (determines native/untagged VLAN)"
+              },
+              "trunk_details": {
+                "type": ["object", "null"],
+                "description": "Trunk configuration if this is a trunk parent port",
+                "properties": {
+                  "sub_ports": {
+                    "type": "array",
+                    "description": "Trunk sub-ports (tagged VLANs)",
+                    "items": {
+                      "type": "object",
+                      "required": ["port_id", "segmentation_type"],
+                      "properties": {
+                        "port_id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "Sub-port UUID"
+                        },
+                        "segmentation_type": {
+                          "type": "string",
+                          "enum": ["vlan"],
+                          "description": "Segmentation type (only 'vlan' is supported)"
+                        },
+                        "segmentation_id": {
+                          "type": ["integer", "null"],
+                          "minimum": 1,
+                          "maximum": 4094,
+                          "description": "Tenant VLAN ID for VLAN translation"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              },
+              "binding_profile": {
+                "type": "object",
+                "description": "Port binding profile",
+                "properties": {
+                  "physical_network": {
+                    "type": ["string", "null"],
+                    "description": "VLAN group/physnet for this port binding"
+                  },
+                  "local_link_information": {
+                    "type": "array",
+                    "description": "Physical switch connections for this port",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "switch_info": {
+                          "type": "string",
+                          "description": "Switch hostname"
+                        },
+                        "port_id": {
+                          "type": "string",
+                          "description": "Switch port name"
+                        },
+                        "switch_id": {
+                          "type": "string",
+                          "description": "Switch MAC or identifier"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "device_owner": {
+                "type": "string",
+                "description": "Device owner (e.g., compute:nova, network:router_interface)"
+              },
+              "device_id": {
+                "type": "string",
+                "description": "Device UUID (instance or router)"
+              },
+              "fixed_ips": {
+                "type": "array",
+                "description": "IP addresses assigned to this port",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "subnet_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "ip_address": {
+                      "type": "string",
+                      "format": "ipv4"
+                    }
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "connected_ports": {
+          "type": "array",
+          "description": "Ports physically connected on this VLAN group",
+          "items": {
+            "type": "object",
+            "required": ["id", "network_id", "physical_network", "local_link_information"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "network_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "physical_network": {
+                "type": "string",
+                "description": "VLAN group this port is connected to"
+              },
+              "local_link_information": {
+                "type": "array",
+                "description": "Physical switch connections for this port",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "switch_info": {
+                      "type": "string"
+                    },
+                    "port_id": {
+                      "type": "string"
+                    },
+                    "switch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "segments": {
+          "type": "array",
+          "description": "Neutron network segments",
+          "items": {
+            "type": "object",
+            "required": ["uuid", "network_id", "network_type"],
+            "properties": {
+              "uuid": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Segment UUID"
+              },
+              "network_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Parent network UUID"
+              },
+              "network_type": {
+                "type": "string",
+                "enum": ["vlan", "vxlan", "flat"],
+                "description": "Segment type"
+              },
+              "physical_network": {
+                "type": ["string", "null"],
+                "description": "VLAN group name (for vlan segments)"
+              },
+              "segmentation_id": {
+                "type": ["integer", "null"],
+                "description": "VLAN ID (for vlan) or VNI (for vxlan)"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "subnets": {
+          "type": "array",
+          "description": "Neutron subnets",
+          "items": {
+            "type": "object",
+            "required": ["id", "network_id", "cidr"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Subnet UUID"
+              },
+              "network_id": {
+                "type": "string",
+                "format": "uuid",
+                "description": "Parent network UUID"
+              },
+              "cidr": {
+                "type": "string",
+                "description": "Subnet CIDR (e.g., 10.0.0.0/24)"
+              },
+              "gateway_ip": {
+                "type": ["string", "null"],
+                "format": "ipv4",
+                "description": "Gateway IP (becomes SVI primary IP)"
+              },
+              "router_external": {
+                "type": "boolean",
+                "default": false,
+                "description": "Whether this is an external subnet (triggers SVI creation)"
+              },
+              "tags": {
+                "type": "array",
+                "description": "Subnet tags. Special tag: UNDERSYNC_BGP",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "subnetpool_id": {
+                "type": ["string", "null"],
+                "format": "uuid",
+                "description": "Subnet pool UUID (for VRF determination)"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "network_flavors": {
+          "type": "array",
+          "description": "Neutron network flavors (for SVI router matching)",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "service_type", "enabled"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "service_type": {
+                "type": "string",
+                "description": "Must be L3_ROUTER_NAT for SVI flavors"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "routers": {
+          "type": "array",
+          "description": "Neutron routers",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "flavor_id": {
+                "type": ["string", "null"],
+                "format": "uuid",
+                "description": "Network flavor UUID (for SVI creation rules)"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "address_scopes": {
+          "type": "array",
+          "description": "Neutron address scopes (for VRF determination)",
+          "items": {
+            "type": "object",
+            "required": ["id", "name"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "description": "Scope name (matched against servicenet_address_scope_name setting)"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "subnetpools": {
+          "type": "array",
+          "description": "Neutron subnet pools (for VRF lookup chain)",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "address_scope_id": {
+                "type": ["string", "null"],
+                "format": "uuid",
+                "description": "Parent address scope UUID"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
