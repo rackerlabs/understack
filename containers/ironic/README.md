@@ -16,15 +16,6 @@ git fetch rackerlabs
 git checkout --track rackerlabs/understack/2025.2
 ```
 
-## So to generate this series of patches for 2025.2 for example:
-
-```bash
-git checkout understack/2025.2
-git format-patch stable/2025.2 -o PATH/TO/THIS/DIR
-```
-
-Now update the `series` file for any new patches.
-
 ## Adding patches is done via `git cherry-pick`
 
 ```bash
@@ -48,4 +39,12 @@ git pull -p
 git checkout understack/2025.2
 git rebase stable/2025.2
 git push rackerlabs understack/2025.2
+```
+
+## Updating the container
+
+```bash
+git checkout understack/2025.2
+git show
+# ensure the git-ish in the Dockerfile matches
 ```
