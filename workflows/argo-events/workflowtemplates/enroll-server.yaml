@@ -13,6 +13,8 @@ spec:
   arguments:
     parameters:
       - name: ip_address
+      - name: firmware_update
+        value: "false"
   templates:
     - name: main
       steps:
@@ -54,6 +56,15 @@ spec:
                 - name: node
                   value: "{{steps.enroll-server.outputs.result}}"
             when: "{{steps.server-manage-state.outputs.result}} == manageable"
+        - - name: firmware-update
+            templateRef:
+              name: server-firmware-update
+              template: server-firmware-update
+            arguments:
+              parameters:
+                - name: node
+                  value: "{{steps.enroll-server.outputs.result}}"
+            when: "{{workflow.parameters.firmware_update}} == true"
         - - name: avail-server
             template: openstack-wait-cmd
             arguments:
