@@ -419,6 +419,12 @@ site:
     # @default -- true
     enabled: true
 
+  # -- OpenEBS
+  openebs:
+    # -- Enable/disable deploying OpenEBS
+    # @default -- true
+    enabled: true
+
   # -- OpenStack exporter for Prometheus metrics
   openstack_exporter:
     # -- Enable/disable deploying OpenStack exporter
