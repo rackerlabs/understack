@@ -21,6 +21,7 @@ resources:
   - workflowtemplates/ansible-run.yaml
   - workflowtemplates/inspect-server.yaml
   - workflowtemplates/bmc-password.yaml
+  - workflowtemplates/server-firmware-update.yaml
   # Alert automation
   - sensors/alertmanager-webhook-sensor.yaml
   - eventsources/alertmanager-webhook-eventsource.yaml
