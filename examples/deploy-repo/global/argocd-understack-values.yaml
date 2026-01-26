@@ -1,0 +1,12 @@
+global:
+  cilium:
+    enabled: false
+
+  openebs:
+    enabled: false
+
+  rook:
+    enabled: false
+
+site:
+  enabled: false

@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: understack
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - clusters:
+      selector:
+        matchExpressions:
+          - key: understack.rackspace.com/role
+            operator: In
+            values:
+              - "global"
+              - "site"
+              - "aio"
+  template:
+    metadata:
+      name: '{{.name}}-understack'
+    spec:
+      project: default
+      sources:
+        - repoURL: https://github.com/rackerlabs/understack.git
+          targetRevision: HEAD
+          path: charts/argocd-understack
+          helm:
+            releaseName: '{{.name}}'
+            valueFiles:
+              - /examples/deploy-repo/{{.name}}/argocd-understack-values.yaml
+            valuesObject:
+              cluster_server: '{{.server}}'
+              deploy_url: https://github.com/rackerlabs/understack.git
+              deploy_ref: HEAD
+              deploy_path_prefix: 'examples/deploy-repo'
+      destination:
+        name: "in-cluster"
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: false
