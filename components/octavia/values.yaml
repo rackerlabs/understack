@@ -116,24 +116,37 @@ pod:
           - name: octavia-etc-snippets
             mountPath: /etc/octavia/octavia.conf.d/
             readOnly: true
+          - name: octavia-driver-socket
+            mountPath: /var/run/octavia
         volumes:
           - name: octavia-etc-snippets
             projected:
               sources:
                 - secret:
                     name: octavia-ks-etc
+          - name: octavia-driver-sockets
+            hostPath:
+              path: /var/run/octavia
+              type: DirectoryOrCreate
+
     octavia_api:
       octavia_api:
         volumeMounts:
           - name: octavia-etc-snippets
             mountPath: /etc/octavia/octavia.conf.d/
             readOnly: true
+          - name: octavia-driver-sockets
+            mountPath: /var/run/octavia
         volumes:
           - name: octavia-etc-snippets
             projected:
               sources:
                 - secret:
                     name: octavia-ks-etc
+          - name: octavia-driver-sockets
+            hostPath:
+              path: /var/run/octavia
+              type: DirectoryOrCreate
     octavia_housekeeping:
       octavia_housekeeping:
         volumeMounts:
