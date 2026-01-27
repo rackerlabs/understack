@@ -1,2 +1,2 @@
-diskimage-builder==3.40.0
+diskimage-builder==3.40.1
 ironic-python-agent-builder==6.2.0
