@@ -42,6 +42,7 @@ conf:
       default_provider_driver: ovn
     driver_agent:
       enabled_provider_agents: ovn
+      enabled_provider_drivers: "ovn:OVN provider"
     ovn:
       ovn_nb_connection: tcp:ovn-ovsdb-nb.openstack.svc.cluster.local:6641
       ovn_sb_connection: tcp:ovn-ovsdb-sb.openstack.svc.cluster.local:6642
