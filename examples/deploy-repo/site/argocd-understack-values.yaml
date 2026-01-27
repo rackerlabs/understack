@@ -1,4 +1,7 @@
 site:
+  ingress_nginx:
+    enabled: false
+
   rook:
     enabled: false
 
