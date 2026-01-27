@@ -17,10 +17,10 @@ spec:
       ignoreMissingValueFiles: true
       releaseName: external-dns-rackspace
       valueFiles:
-      - $deploy/{{ $.Release.Name }}/helm-configs/external-dns.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/external-dns.yaml
     repoURL: ghcr.io/rackerlabs/charts
-    targetRevision: 0.1.0
-  - path: {{ $.Release.Name }}/manifests/external-dns
+    targetRevision: 0.2.0
+  - path: {{ include "understack.deploy_path" $ }}/manifests/external-dns
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

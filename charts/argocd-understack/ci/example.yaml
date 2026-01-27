@@ -1,2 +1,30 @@
 ---
-deploy_url: https://github.com/example/example
+# Example values file for a site cluster
+# This file demonstrates the configuration options available
+
+# Target cluster server URL
+cluster_server: https://kubernetes.default.svc
+
+# UnderStack repository settings
+understack_url: https://github.com/rackerlabs/understack.git
+understack_ref: HEAD  # Can be a tag like v1.0.0, branch, or commit SHA
+
+# Deployment repository settings (required)
+deploy_url: https://github.com/example/deploy.git
+deploy_ref: HEAD
+
+# Global cluster configuration (disable for site-only clusters)
+global:
+  enabled: false
+
+# Site cluster configuration
+site:
+  enabled: true
+
+  # Example: Disable components not needed for this site
+  octavia:
+    enabled: false
+
+  # Example: Pin specific chart versions
+  # keystone:
+  #   chartVersion: "2025.2.6+9b270fe35"

@@ -16,7 +16,7 @@ spec:
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ $.Release.Name }}/manifests/site-workflows
+  - path: {{ include "understack.deploy_path" $ }}/manifests/site-workflows
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

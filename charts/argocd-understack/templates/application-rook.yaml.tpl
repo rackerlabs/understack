@@ -18,7 +18,7 @@ spec:
       releaseName: rook-ceph
       valueFiles:
       - $understack/operators/rook/values-operator.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/rook-operator.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/rook-operator.yaml
     repoURL: https://charts.rook.io/release
     targetRevision: v1.16.4
   - chart: rook-ceph-cluster
@@ -27,7 +27,7 @@ spec:
       releaseName: rook-ceph-cluster
       valueFiles:
       - $understack/operators/rook/values-cluster.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/rook-cluster.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/rook-cluster.yaml
     repoURL: https://charts.rook.io/release
     targetRevision: v1.16.4
   - path: operators/rook

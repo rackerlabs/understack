@@ -1,34 +1,34 @@
-{{- if or (eq (include "understack.isEnabled" (list $.Values.global "openebs")) "true") (eq (include "understack.isEnabled" (list $.Values.site "openebs")) "true") }}
+{{- if or (eq (include "understack.isEnabled" (list $.Values.global "envoy_gateway")) "true") (eq (include "understack.isEnabled" (list $.Values.site "envoy_gateway")) "true") }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ printf "%s-%s" $.Release.Name "openebs" }}
+  name: {{ printf "%s-%s" $.Release.Name "envoy-gateway" }}
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
 spec:
   destination:
-    namespace: openebs
+    namespace: envoy-gateway
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack-infra
   sources:
-  - chart: openebs
+  - chart: gateway-helm
     helm:
       ignoreMissingValueFiles: true
-      releaseName: openebs
+      releaseName: gateway-helm
       valueFiles:
-      - $understack/operators/openebs/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/openebs.yaml
-    repoURL: https://openebs.github.io/openebs
-    targetRevision: 4.4.0
-  - path: operators/openebs
+      - $understack/components/envoy-gateway/values.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/envoy-gateway.yaml
+    repoURL: docker.io/envoyproxy
+    targetRevision: v1.6.0
+  - path: components/envoy-gateway
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - ref: deploy
+  - path: {{ include "understack.deploy_path" $ }}/manifests/envoy-gateway
+    ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
-    path: {{ include "understack.deploy_path" $ }}/manifests/openebs
   syncPolicy:
     automated:
       prune: true

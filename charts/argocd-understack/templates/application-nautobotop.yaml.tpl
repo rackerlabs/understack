@@ -1,34 +1,37 @@
-{{- if or (eq (include "understack.isEnabled" (list $.Values.global "openebs")) "true") (eq (include "understack.isEnabled" (list $.Values.site "openebs")) "true") }}
+{{- if eq (include "understack.isEnabled" (list $.Values.global "nautobotop")) "true" }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ printf "%s-%s" $.Release.Name "openebs" }}
+  name: {{ printf "%s-%s" $.Release.Name "nautobotop" }}
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
 spec:
   destination:
-    namespace: openebs
+    namespace: nautobotop
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack
   sources:
-  - chart: openebs
+  - chart: nautobotop
     helm:
       ignoreMissingValueFiles: true
-      releaseName: openebs
+      releaseName: nautobotop
       valueFiles:
-      - $understack/operators/openebs/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/openebs.yaml
-    repoURL: https://openebs.github.io/openebs
-    targetRevision: 4.4.0
-  - path: operators/openebs
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/nautobotop.yaml
+    repoURL: ghcr.io/rackerlabs/charts
+    targetRevision: 0.0.1
+  - path: {{ include "understack.deploy_path" $ }}/manifests/nautobotop
+    ref: deploy
+    repoURL: {{ include "understack.deploy_url" $ }}
+    targetRevision: {{ include "understack.deploy_ref" $ }}
+  - path: workflows/nautobot-token
+    helm:
+      ignoreMissingValueFiles: true
+      valueFiles:
+      - $understack/workflows/nautobot-token/values.yaml
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - ref: deploy
-    repoURL: {{ include "understack.deploy_url" $ }}
-    targetRevision: {{ include "understack.deploy_ref" $ }}
-    path: {{ include "understack.deploy_path" $ }}/manifests/openebs
   syncPolicy:
     automated:
       prune: true

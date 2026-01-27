@@ -16,10 +16,14 @@ spec:
     helm:
       releaseName: cert-manager
       valuesObject:
+        config:
+          apiVersion: controller.config.cert-manager.io/v1alpha1
+          enableGatewayAPI: true
+          kind: ControllerConfiguration
         crds:
           enabled: true
     repoURL: https://charts.jetstack.io
-    targetRevision: 1.18.2
+    targetRevision: 1.19.2
   syncPolicy:
     automated:
       prune: true

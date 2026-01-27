@@ -1,18 +1,27 @@
-{{- if or (eq (include "understack.isEnabled" (list $.Values.global "understack_cluster_issuer")) "true") (eq (include "understack.isEnabled" (list $.Values.site "understack_cluster_issuer")) "true") }}
+{{- if eq (include "understack.isEnabled" (list $.Values.site "envoy_configs")) "true" }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ printf "%s-%s" $.Release.Name "understack-cluster-issuer" }}
+  name: {{ printf "%s-%s" $.Release.Name "envoy-configs" }}
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
 spec:
   destination:
-    namespace: cert-manager
+    namespace: envoy-gateway
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - path: {{ include "understack.deploy_path" $ }}/manifests/cert-manager
+  - path: components/envoy-configs
+    helm:
+      ignoreMissingValueFiles: true
+      valueFiles:
+      - $understack/components/envoy-configs/values.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/envoy-configs.yaml
+    ref: understack
+    repoURL: {{ include "understack.understack_url" $ }}
+    targetRevision: {{ include "understack.understack_ref" $ }}
+  - path: {{ include "understack.deploy_path" $ }}/manifests/envoy-configs
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

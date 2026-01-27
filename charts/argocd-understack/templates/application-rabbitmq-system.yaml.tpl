@@ -1,21 +1,21 @@
-{{- if or (eq (include "understack.isEnabled" (list $.Values.global "understack_cluster_issuer")) "true") (eq (include "understack.isEnabled" (list $.Values.site "understack_cluster_issuer")) "true") }}
+{{- if or (eq (include "understack.isEnabled" (list $.Values.global "rabbitmq_system")) "true") (eq (include "understack.isEnabled" (list $.Values.site "rabbitmq_system")) "true") }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ printf "%s-%s" $.Release.Name "understack-cluster-issuer" }}
+  name: {{ printf "%s-%s" $.Release.Name "rabbitmq-system" }}
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
 spec:
   destination:
-    namespace: cert-manager
+    namespace: rabbitmq-system
     server: {{ $.Values.cluster_server }}
-  project: understack
+  project: understack-operators
   sources:
-  - path: {{ include "understack.deploy_path" $ }}/manifests/cert-manager
-    ref: deploy
-    repoURL: {{ include "understack.deploy_url" $ }}
-    targetRevision: {{ include "understack.deploy_ref" $ }}
+  - path: operators/rabbitmq-system
+    ref: understack
+    repoURL: {{ include "understack.understack_url" $ }}
+    targetRevision: {{ include "understack.understack_ref" $ }}
   syncPolicy:
     automated:
       prune: true

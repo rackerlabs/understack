@@ -1,0 +1,6 @@
+site:
+  rook:
+    enabled: false
+
+global:
+  enabled: false

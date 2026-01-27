@@ -12,7 +12,7 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack-infra
   sources:
-  - path: {{ $.Release.Name }}/manifests/cilium
+  - path: {{ include "understack.deploy_path" $ }}/manifests/cilium
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
