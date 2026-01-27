@@ -65,6 +65,19 @@ dependencies:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: identity
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
     worker:
       jobs:
         - octavia-db-sync
