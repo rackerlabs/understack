@@ -116,15 +116,13 @@ pod:
           - name: octavia-etc-snippets
             mountPath: /etc/octavia/octavia.conf.d/
             readOnly: true
-          - name: octavia-driver-socket
-            mountPath: /var/run/octavia
         volumes:
           - name: octavia-etc-snippets
             projected:
               sources:
                 - secret:
                     name: octavia-ks-etc
-          - name: octavia-driver-sockets
+          - name: octavia-driver-agents
             hostPath:
               path: /var/run/octavia
               type: DirectoryOrCreate
