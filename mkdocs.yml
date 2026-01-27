@@ -188,6 +188,7 @@ nav:
     - 'Hardware':
       - operator-guide/device-types.md
       - operator-guide/flavors.md
+      - operator-guide/server-firmware-update.md
     - 'Scripts and Tools':
       - operator-guide/scripts.md
   - 'User Guide':
@@ -196,4 +197,5 @@ nav:
     - user-guide/openstack-image.md
     - user-guide/openstack-resource-controller.md
     - user-guide/openstack-console.md
+    - user-guide/server-firmware-update.md
   - Workflows: workflows/
