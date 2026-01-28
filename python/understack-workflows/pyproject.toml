@@ -30,6 +30,7 @@ dependencies = [
 ]
 
 [project.scripts]
+bios-settings = "understack_workflows.main.bios_settings:main"
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
