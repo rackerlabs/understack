@@ -55,6 +55,8 @@ spec:
               parameters:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
+        - - name: bios-settings
+            template: bios-settings
         - - name: inspect-server
             templateRef:
               name: inspect-server
@@ -114,6 +116,32 @@ spec:
             items:
               - key: clouds.yaml
                 path: clouds.yaml
+    - name: bios-settings
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - bios-settings
+        args:
+          - --bmc-ip-address
+          - "{{workflow.parameters.ip_address}}"
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+          - mountPath: /etc/bmc_master/
+            name: bmc-master
+            readOnly: true
+        env:
+        - name: WF_NS
+          value: "{{workflow.namespace}}"
+        - name: WF_NAME
+          value: "{{workflow.name}}"
+        - name: WF_UID
+          value: "{{workflow.uid}}"
+      volumes:
+        - name: bmc-master
+          secret:
+            secretName: bmc-master
     - name: openstack-wait-cmd
       inputs:
         parameters:
