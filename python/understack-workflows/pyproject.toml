@@ -32,6 +32,7 @@ dependencies = [
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
+bios-settings = "understack_workflows.main.bios_settings:main"
 netapp-configure-interfaces = "understack_workflows.main.netapp_configure_net:main"
 netapp-create-svm = "understack_workflows.main.netapp_create_svm:main"
 openstack-oslo-event = "understack_workflows.main.openstack_oslo_event:main"
