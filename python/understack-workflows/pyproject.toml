@@ -30,16 +30,16 @@ dependencies = [
 ]
 
 [project.scripts]
-sync-keystone = "understack_workflows.main.sync_keystone:main"
-undersync-switch = "understack_workflows.main.undersync_switch:main"
+bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
+bmc-password = "understack_workflows.main.print_bmc_password:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
 get-raid-devices = "understack_workflows.main.get_raid_devices:main"
-bmc-password = "understack_workflows.main.print_bmc_password:main"
-bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
-sync-network-segment-range = "understack_workflows.main.sync_ucvni_group_range:main"
-openstack-oslo-event = "understack_workflows.main.openstack_oslo_event:main"
-netapp-create-svm = "understack_workflows.main.netapp_create_svm:main"
 netapp-configure-interfaces = "understack_workflows.main.netapp_configure_net:main"
+netapp-create-svm = "understack_workflows.main.netapp_create_svm:main"
+openstack-oslo-event = "understack_workflows.main.openstack_oslo_event:main"
+sync-keystone = "understack_workflows.main.sync_keystone:main"
+sync-network-segment-range = "understack_workflows.main.sync_ucvni_group_range:main"
+undersync-switch = "understack_workflows.main.undersync_switch:main"
 
 [dependency-groups]
 test = [
