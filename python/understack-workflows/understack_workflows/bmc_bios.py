@@ -35,12 +35,16 @@ def update_dell_bios_settings(bmc: Bmc, pxe_interface: str) -> dict:
         if (k in current_settings and current_settings[k] != v)
     }
 
+    missing_keys = {k for k in required_settings.keys() if k not in current_settings}
+    if missing_keys:
+        logger.info("%s Has no BIOS setting for %s, ignoring.", bmc, missing_keys)
+
     if required_changes:
         logger.info("%s Updating BIOS settings: %s", bmc, required_changes)
         patch_bios_settings(bmc, required_changes)
         logger.info("%s BIOS settings will be updated on next server boot.", bmc)
     else:
-        logger.info("%s all required BIOS settings present and correct.", bmc)
+        logger.info("%s No BIOS settings need to be changed.", bmc)
 
     return required_changes
 
