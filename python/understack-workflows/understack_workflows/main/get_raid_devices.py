@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging.config
 import logging
 import os
 
@@ -11,17 +12,19 @@ from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
 
-logs = [
-    "__main__",
-    "sushy.main",
-    "sushy.resources.base",
-    "sushy.connector",
-    "urllib3.connectionpool",
-]
-for log_name in logs:
-    log = logging.getLogger(log_name)
-    log.setLevel("INFO")
+log_config = {
+  'version': 1,
+  'disable_existing_loggers': False,
+  'loggers': {
+    "__main__": {'level': 'INFO'},
+    "sushy.main": {'level': 'INFO'},
+    "sushy.resources.base": {'level': 'INFO'},
+    "sushy.connector": {'level': 'INFO'},
+    "urllib3.connectionpool": {'level': 'INFO'},
+  }
+}
 
+logging.config.dictConfig(log_config)
 
 def main():
     """Export RAID details for a BMC using Sushy.
