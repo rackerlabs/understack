@@ -59,3 +59,23 @@ spec:
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: cinder-ha-mode
+  namespace: openstack
+spec:
+  name: cinder-ha-mode
+  vhost: "cinder"  # default to '/' if not provided
+  pattern: "^(?!(amq\\.)|(.*_fanout_)|(reply_)).*"
+  applyTo: "queues"  # set to 'queues', 'exchanges', or 'all'
+  priority: 1  # defaults to 0
+  definition:  # policy definition
+    ha-mode: all
+    ha-promote-on-failure: always
+    ha-promote-on-shutdown: always
+    ha-sync-mode: manual
+  rabbitmqClusterReference:
+    name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
+    namespace: openstack
