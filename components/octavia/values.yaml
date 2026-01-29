@@ -47,6 +47,8 @@ conf:
       ovn_sb_connection: tcp:ovn-ovsdb-sb.openstack.svc.cluster.local:6642
     task_flow:
       jobboard_enabled: false
+  oslo_messaging_rabbit:
+    amqp_durable_queues: true
 
 dependencies:
   dynamic:

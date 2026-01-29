@@ -68,7 +68,7 @@ metadata:
 spec:
   name: keystone-ha-mode
   vhost: "keystone"  # default to '/' if not provided
-  pattern: ".*"
+  pattern: "^(?!(amq\\.)|(.*_fanout_)|(reply_)).*"
   applyTo: "queues"  # set to 'queues', 'exchanges', or 'all'
   priority: 1  # defaults to 0
   definition:  # policy definition
