@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ironic-prometheus-exporter
+  namespace: openstack
+spec:
+  selector:
+    matchLabels:
+      app: ironic-prometheus-exporter
+  namespaceSelector:
+    matchNames:
+      - openstack
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics

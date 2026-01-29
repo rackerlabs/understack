@@ -305,6 +305,15 @@ site:
     # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: 2025.2.8+01c93d867
 
+  # -- ironic-prometheus-exporter
+  ironic_prometheus_exporter:
+    # -- Enable/disable deploying ironic-prometheus-exporter
+    # @default -- true
+    enabled: true
+    # -- Sync wave for deployment ordering
+    # @default -- 4
+    wave: 4
+
   # -- Neutron (Networking Service)
   neutron:
     # -- Enable/disable deploying Neutron

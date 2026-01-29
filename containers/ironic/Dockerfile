@@ -29,7 +29,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         /src/ironic \
         /src/understack/ironic-understack \
         /src/understack/understack-flavor-matcher \
-        proliantutils==2.16.3
+        proliantutils==2.16.3 \
+        ironic-prometheus-exporter==4.7.0
 
 COPY containers/ironic/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \

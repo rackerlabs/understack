@@ -1,0 +1,6 @@
+---
+component: ironic-prometheus-exporter
+componentNamespace: openstack
+sources:
+  - ref: understack
+    path: 'components/ironic-prometheus-exporter'

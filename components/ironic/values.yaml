@@ -230,6 +230,8 @@ pod:
           - name: ironic-etc-snippets
             mountPath: /etc/ironic/ironic.conf.d
             readOnly: true
+          - name: ironic-prometheus-exporter
+            mountPath: /opt/stack/node_metrics
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -247,6 +249,9 @@ pod:
                     name: ironic-ks-etc
           - name: pod-usr-share-novnc
             emptyDir: {}
+          - name: ironic-prometheus-exporter
+            persistentVolumeClaim:
+              claimName: pvc-ironic-prometheus-exporter
     ironic_api:
       ironic_api:
         volumeMounts:

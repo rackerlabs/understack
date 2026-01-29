@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ironic-prometheus-exporter
+  namespace: openstack
+  labels:
+    app: ironic-prometheus-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ironic-prometheus-exporter
+  template:
+    metadata:
+      labels:
+        app: ironic-prometheus-exporter
+    spec:
+      containers:
+        - name: ironic-prometheus-exporter
+          image: ghcr.io/rackerlabs/understack/ironic-prometheus-exporter:pr-1673
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - name: ironic-prometheus-exporter
+              mountPath: /opt/stack/node_metrics
+              readOnly: true
+          # Uncomment and adjust if your container requires explicit arguments
+          # args:
+          #   - --metrics-path
+          #   - /opt/stack/node_metrics
+          #   - --port
+          #   - "8000"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+      volumes:
+        - name: ironic-prometheus-exporter
+          persistentVolumeClaim:
+            claimName: pvc-ironic-prometheus-exporter
