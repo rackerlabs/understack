@@ -150,7 +150,7 @@ Defaults to false if any path segment is missing.
 {{- $scopeEnabled := get $scope "enabled" -}}
 {{- $result = and $result $scopeEnabled -}}
 {{/* Check component level: scope.component.enabled */}}
-{{- $component := get $scope $component -}}
+{{- $component := default (dict "enabled" false) (get $scope $component) -}}
 {{- $componentEnabled := get $component "enabled" -}}
 {{- $result = and $result $componentEnabled -}}
 {{- ternary "true" "false" $result -}}
