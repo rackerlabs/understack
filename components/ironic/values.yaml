@@ -87,7 +87,7 @@ conf:
     dhcp:
       dhcp_provider: dnsmasq
     oslo_messaging_rabbit:
-      rabbit_ha_queues: true
+      amqp_durable_queues: true
     pxe:
       loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
     inspector:

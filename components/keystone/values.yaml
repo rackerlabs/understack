@@ -189,6 +189,8 @@ conf:
       backend_argument: memcached_expire_time:3600
     DEFAULT:
       max_token_size: 512
+    oslo_messaging_rabbit:
+      amqp_durable_queues: true
 
   wsgi_keystone: |
     {{- $portInt := tuple "identity" "service" "api" $ | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
