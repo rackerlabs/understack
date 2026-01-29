@@ -85,6 +85,8 @@ conf:
       global_physnet_mtu: 9050
     oslo_messaging_rabbit:
       amqp_durable_queues: true
+      # https://docs.openstack.org/large-scale/journey/configure/rabbitmq.html#rabbit-transient-queues-ttl
+      rabbit_transient_queues_ttl: 300
     service_providers:
       service_provider:
         type: multistring
