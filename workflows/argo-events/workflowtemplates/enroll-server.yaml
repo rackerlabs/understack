@@ -15,6 +15,8 @@ spec:
       - name: ip_address
       - name: firmware_update
         value: "false"
+      - name: raid_configure
+        value: "true"
   templates:
     - name: main
       steps:
@@ -37,6 +39,7 @@ spec:
             when: "{{steps.server-enroll-state.outputs.result}} == enroll"
         - - name: get-raid-config
             template: get-raid-config
+            when: "{{workflow.parameters.raid_configure}} == true"
         - - name: openstack-set-baremetal-node-raid-config
             template: openstack-set-baremetal-node-raid-config
             arguments:
@@ -47,6 +50,7 @@ spec:
                   value: "{{=jsonpath(steps.['get-raid-config'].outputs.result, $.controller)}}"
                 - name: physical_disks
                   value: "{{=jsonpath(steps.['get-raid-config'].outputs.result, $.physical_disks)}}"
+            when: "{{workflow.parameters.raid_configure}} == true"
         - - name: server-manage-state
             template: openstack-state-cmd
             arguments:
