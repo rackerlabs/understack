@@ -33,6 +33,7 @@ nautobot_permissions_permissions:
       - dcim.softwareversion
       - dcim.virtualchassis
       - extras.configcontext
+      - extras.computedfield
       - extras.customfield
       - extras.dynamicgroup
       - extras.gitrepository
