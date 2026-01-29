@@ -17,3 +17,4 @@ resources:
   # Graphical consoles
   - role-ironic-graphical-console.yaml
   - role-binding-ironic-graphical-console.yaml
+  - ironic-prometheus-exporter-pvc.yaml
