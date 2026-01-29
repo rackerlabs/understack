@@ -33,6 +33,10 @@ spec:
                           values:
                             - "global"
                             - "aio"
+                        - key: understack.rackspace.com/env
+                          operator: In
+                          values:
+                            - "dev"
                     values:
                       # these should always be replaced by further rules below but provide
                       # a default for the merge operations below
