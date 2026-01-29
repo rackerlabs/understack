@@ -59,3 +59,20 @@ spec:
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: keystone-ha-mode
+  namespace: openstack
+spec:
+  name: keystone-ha-mode
+  vhost: "keystone"  # default to '/' if not provided
+  pattern: ".*"
+  applyTo: "queues"  # set to 'queues', 'exchanges', or 'all'
+  priority: 1  # defaults to 0
+  definition:  # policy definition
+    ha-mode: all
+  rabbitmqClusterReference:
+    name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
+    namespace: openstack

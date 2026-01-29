@@ -59,3 +59,20 @@ spec:
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: neutron-ha-mode
+  namespace: openstack
+spec:
+  name: neutron-ha-mode
+  vhost: "neutron"  # default to '/' if not provided
+  pattern: "^(?!(amq\\.)|(.*_fanout_)|(reply_)).*"
+  applyTo: "queues"  # set to 'queues', 'exchanges', or 'all'
+  priority: 1  # defaults to 0
+  definition:  # policy definition
+    ha-mode: all
+  rabbitmqClusterReference:
+    name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
+    namespace: openstack
