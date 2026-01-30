@@ -1,30 +1,30 @@
 import argparse
 import json
-import logging.config
 import logging
+import logging.config
 import os
 
-import sushy
+from sushy import Sushy
 
-from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.helpers import setup_logger
 
 logger = setup_logger(__name__)
 
 log_config = {
-  'version': 1,
-  'disable_existing_loggers': False,
-  'loggers': {
-    "__main__": {'level': 'INFO'},
-    "sushy.main": {'level': 'INFO'},
-    "sushy.resources.base": {'level': 'INFO'},
-    "sushy.connector": {'level': 'INFO'},
-    "urllib3.connectionpool": {'level': 'INFO'},
-  }
+    "version": 1,
+    "disable_existing_loggers": False,
+    "loggers": {
+        "__main__": {"level": "INFO"},
+        "sushy.main": {"level": "INFO"},
+        "sushy.resources.base": {"level": "INFO"},
+        "sushy.connector": {"level": "INFO"},
+        "urllib3.connectionpool": {"level": "INFO"},
+    },
 }
 
 logging.config.dictConfig(log_config)
+
 
 def main():
     """Export RAID details for a BMC using Sushy.
@@ -57,11 +57,13 @@ def argument_parser():
         prog=os.path.basename(__file__), description="Gather RAID Device info."
     )
     parser.add_argument("--ip-address", type=str, required=True, help="BMC IP")
-    parser.add_argument("--password", type=str, required=False, help="Password", default=None)
+    parser.add_argument(
+        "--password", type=str, required=False, help="Custom Password", default=None
+    )
     return parser
 
 
-def parse_controller_details(client) -> dict:
+def parse_controller_details(client: Sushy) -> dict:
     """Parse available RAID controller details for execution."""
     result = {"controller": None, "physical_disks": []}
     system_objects = client.get_system_collection().get_members()
