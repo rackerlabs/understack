@@ -32,6 +32,8 @@ conf:
             "enable_net_ports": True,
             "default_availability_zone": "Any",
         }
+    oslo_messaging_rabbit:
+      amqp_durable_queues: true
 
 endpoints:
   dashboard:

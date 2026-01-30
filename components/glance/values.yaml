@@ -115,6 +115,9 @@ pod:
             failureThreshold: 6
 
 conf:
+  glance:
+    oslo_messaging_rabbit:
+      amqp_durable_queues: true
   glance_api_uwsgi:
     uwsgi:
       # This should be set to anything larger than 1.
