@@ -55,9 +55,21 @@ spec:
                   value: "{{tasks.node-id.outputs.result}}"
                 - name: param
                   value: provision_state
+          - name: server-start-inspect-interface
+            # read the current inspection interface
+            depends: "server-start-state.Succeeded"
+            template: openstack-read-param
+            arguments:
+              parameters:
+                - name: object
+                  value: node
+                - name: object_ref
+                  value: "{{tasks.node-id.outputs.result}}"
+                - name: param
+                  value: inspect_interface
           - name: fake-server
             # systems using the fake-hardware driver need to be skipped over
-            depends: "server-start-state.Succeeded"
+            depends: "server-start-inspect-interface.Succeeded"
             template: openstack-set-cmd
             arguments:
               parameters:
@@ -74,7 +86,7 @@ spec:
               '{{tasks.server-start-state.outputs.result}}' != 'active'
           - name: manage-server
             # move the server into manageable to inspect if needed
-            depends: "server-start-state.Succeeded"
+            depends: "server-start-inspect-interface.Succeeded"
             template: openstack-wait-cmd
             arguments:
               parameters:
@@ -156,9 +168,24 @@ spec:
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
             when: "'{{tasks.server-start-state.outputs.result}}' != 'active'"
+          - name: server-reset-inspect-interface
+            # reset the server back to its original inspection interface
+            depends: "inspect-server-agent.Succeeded"
+            template: openstack-set-cmd
+            arguments:
+              parameters:
+                - name: object
+                  value: node
+                - name: flag
+                  value: "--inspect-interface"
+                - name: value
+                  value: "{{tasks.server-start-inspect-interface.outputs.result}}"
+                - name: obj_id
+                  value: "{{tasks.node-id.outputs.result}}"
+            when: "'{{tasks.server-start-state.outputs.result}}' != 'active'"
           - name: return-server
             # returns a server to its previous state if needed
-            depends: "server-start-state.Succeeded && inspect-server-agent.Succeeded"
+            depends: "inspect-server-agent.Succeeded && server-reset-inspect-interface.Succeeded"
             template: openstack-wait-cmd
             arguments:
               parameters:
