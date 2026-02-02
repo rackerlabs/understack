@@ -111,6 +111,13 @@ global:
     # @default -- true
     enabled: true
 
+  # -- OpenEBS
+  openebs:
+    # -- Enable/disable deploying OpenEBS
+    # @default -- true
+    enabled: true
+
+
   # -- OpenStack Resource Controller operator
   openstack_resource_controller:
     # -- Enable/disable deploying OpenStack Resource Controller
@@ -138,12 +145,6 @@ global:
   # -- Rook
   rook:
     # -- Enable/disable deploying Rook
-    # @default -- true
-    enabled: true
-
-  # -- OpenEBS
-  openebs:
-    # -- Enable/disable deploying OpenEBS
     # @default -- true
     enabled: true
 
