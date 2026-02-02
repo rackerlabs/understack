@@ -31,7 +31,7 @@ $(ACTIVATE): requirements-docs.txt
 .PHONY: wftmpls
 wftmpls: $(WFTMPLS) $(ACTIVATE)
 	@mkdir -p docs/workflows
-	@rm docs/workflows/*.md
+	@rm -f docs/workflows/*.md
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py components/global-workflows docs/workflows
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py components/site-workflows docs/workflows
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py workflows docs/workflows
