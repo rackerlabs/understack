@@ -57,6 +57,12 @@ global:
     # @default -- true
     enabled: true
 
+  # -- Envoy configs for Envoy Gateway API
+  envoy_configs:
+    # -- Enable/disable deploy Envoy Configs
+    # @default -- true
+    enabled: true
+
   # -- Envoy Gateway API gateway
   envoy_gateway:
     # -- Enable/disable deploying Envoy Gateway
