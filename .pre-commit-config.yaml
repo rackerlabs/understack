@@ -106,6 +106,7 @@ repos:
         - "sushy"
         - "types-requests"
         - "netapp-ontap==9.17.1.0"
+        - "tenacity"
 
   - repo: local
     hooks:

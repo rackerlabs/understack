@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
+import requests
 
 from understack_workflows.oslo_event.nautobot_device_sync import EXIT_STATUS_FAILURE
 from understack_workflows.oslo_event.nautobot_device_sync import EXIT_STATUS_SUCCESS
@@ -15,6 +16,7 @@ from understack_workflows.oslo_event.nautobot_device_sync import (
 )
 from understack_workflows.oslo_event.nautobot_device_sync import _generate_device_name
 from understack_workflows.oslo_event.nautobot_device_sync import _get_record_value
+from understack_workflows.oslo_event.nautobot_device_sync import _is_retryable_error
 from understack_workflows.oslo_event.nautobot_device_sync import _normalise_manufacturer
 from understack_workflows.oslo_event.nautobot_device_sync import (
     _populate_from_inventory,
@@ -807,3 +809,85 @@ class TestHandleNodeDeleteEvent:
 
         assert result == EXIT_STATUS_SUCCESS
         mock_delete.assert_called_once_with(node_uuid, mock_nautobot)
+
+
+class TestIsRetryableError:
+    """Test cases for _is_retryable_error function."""
+
+    def test_connection_error_is_retryable(self):
+        exc = requests.exceptions.ConnectionError("Connection refused")
+        assert _is_retryable_error(exc) is True
+
+    def test_503_service_unavailable_is_retryable(self):
+        from pynautobot import RequestError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 503
+        mock_response.reason = "Service Unavailable"
+        mock_response.json.return_value = {"detail": "Service temporarily unavailable"}
+        mock_response.request.body = None
+        mock_response.url = "http://nautobot/api/dcim/devices/"
+        mock_response.text = "Service Unavailable"
+
+        exc = RequestError(mock_response)
+        assert _is_retryable_error(exc) is True
+
+    def test_502_bad_gateway_is_retryable(self):
+        from pynautobot import RequestError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 502
+        mock_response.reason = "Bad Gateway"
+        mock_response.json.return_value = {}
+        mock_response.request.body = None
+        mock_response.url = "http://nautobot/api/dcim/devices/"
+        mock_response.text = "Bad Gateway"
+
+        exc = RequestError(mock_response)
+        assert _is_retryable_error(exc) is True
+
+    def test_504_gateway_timeout_is_retryable(self):
+        from pynautobot import RequestError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 504
+        mock_response.reason = "Gateway Timeout"
+        mock_response.json.return_value = {}
+        mock_response.request.body = None
+        mock_response.url = "http://nautobot/api/dcim/devices/"
+        mock_response.text = "Gateway Timeout"
+
+        exc = RequestError(mock_response)
+        assert _is_retryable_error(exc) is True
+
+    def test_400_bad_request_is_not_retryable(self):
+        from pynautobot import RequestError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.reason = "Bad Request"
+        mock_response.json.return_value = {"device_type": ["Not found"]}
+        mock_response.request.body = None
+        mock_response.url = "http://nautobot/api/dcim/devices/"
+        mock_response.text = "Bad Request"
+
+        exc = RequestError(mock_response)
+        assert _is_retryable_error(exc) is False
+
+    def test_404_not_found_is_not_retryable(self):
+        from pynautobot import RequestError
+
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.reason = "Not Found"
+        mock_response.json.return_value = {}
+        mock_response.request.body = None
+        mock_response.url = "http://nautobot/api/dcim/devices/123/"
+        mock_response.text = "Not Found"
+
+        exc = RequestError(mock_response)
+        assert _is_retryable_error(exc) is False
+
+    def test_value_error_is_not_retryable(self):
+        exc = ValueError("Invalid value")
+        assert _is_retryable_error(exc) is False
