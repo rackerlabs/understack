@@ -47,7 +47,7 @@ class TestNormaliseManufacturer:
         assert _normalise_manufacturer("Dell Inc.") == "Dell"
 
     def test_normalise_hp(self):
-        assert _normalise_manufacturer("HP") == "HP"
+        assert _normalise_manufacturer("HP") == "HPE"
 
     def test_unsupported_manufacturer_raises(self):
         with pytest.raises(ValueError, match="not supported"):
@@ -182,15 +182,15 @@ class TestPopulateFromInventory:
         inventory = {
             "inventory": {
                 "system_vendor": {
-                    "manufacturer": "HP",  # Different
+                    "manufacturer": "HP",  # Different - normalised to HPE
                 }
             }
         }
 
         _populate_from_inventory(device_info, inventory)
 
-        # Inventory always sets manufacturer
-        assert device_info.manufacturer == "HP"
+        # Inventory always sets manufacturer (HP normalised to HPE)
+        assert device_info.manufacturer == "HPE"
 
 
 class TestGenerateDeviceName:
