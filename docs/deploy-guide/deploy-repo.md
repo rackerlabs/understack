@@ -22,20 +22,30 @@ mkdir -p my-site/{manifests,helm-configs,inventory}
 
 cat <<- EOF > my-global/deploy.yaml
 ---
-name: my-global
 understack_url: https://github.com/rackerlabs/understack.git
 understack_ref: v0.0.5  # replace with the tag or git reference you want to use
 deploy_url: git@github.com:my-org/my-deploy.git
 deploy_ref: HEAD
+
+global:
+  enabled: false
+
+site:
+  enabled: false
 EOF
 
 cat <<- EOF > my-site/deploy.yaml
 ---
-name: my-site
 understack_url: https://github.com/rackerlabs/understack.git
 understack_ref: v0.0.5
 deploy_url: git@github.com:my-org/my-deploy.git
 deploy_ref: HEAD
+
+global:
+  enabled: false
+
+site:
+  enabled: false
 EOF
 ```
 
