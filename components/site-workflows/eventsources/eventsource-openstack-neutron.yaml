@@ -16,7 +16,7 @@ spec:
       exchangeName: neutron
       exchangeType: topic
       exchangeDeclare:
-        durable: false
+        durable: true
       # routing key for messages within the exchange
       routingKey: 'notifications.info'
       # optional consume settings
