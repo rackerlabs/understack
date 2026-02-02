@@ -150,6 +150,8 @@ nav:
       - deploy-guide/config-argo-workflows.md
     - Starting the Deployment:
       - deploy-guide/management-cluster.md
+      - deploy-guide/global-cluster.md
+      - deploy-guide/site-cluster.md
     - Post Deployment:
       - deploy-guide/load-balancers.md
       - deploy-guide/testing-verification.md
