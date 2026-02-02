@@ -32,6 +32,7 @@ dependencies = [
 sync-keystone = "understack_workflows.main.sync_keystone:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
+get-raid-devices = "understack_workflows.main.get_raid_devices:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 sync-network-segment-range = "understack_workflows.main.sync_ucvni_group_range:main"
