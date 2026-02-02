@@ -2,8 +2,8 @@ import urllib3
 from netapp_ontap import config
 from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
-from netapp_ontap.resources import NvmeNamespace
-from netapp_ontap.resources import Svm
+from netapp_ontap.resources.nvme_namespace import NvmeNamespace
+from netapp_ontap.resources.svm import Svm
 
 from understack_workflows.helpers import setup_logger
 from understack_workflows.netapp.client import NetAppClient
