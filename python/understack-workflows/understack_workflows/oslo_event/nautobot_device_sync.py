@@ -81,7 +81,7 @@ def _normalise_manufacturer(name: str) -> str:
     if "DELL" in name.upper():
         return "Dell"
     elif "HP" in name.upper():
-        return "HP"
+        return "HPE"
     raise ValueError(f"Server manufacturer {name} not supported")
 
 
