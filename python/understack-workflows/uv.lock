@@ -1135,7 +1135,7 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "kubernetes", specifier = "==33.1.0" },
-    { name = "netapp-ontap", specifier = ">=9.17.1.0" },
+    { name = "netapp-ontap", specifier = "==9.17.1.0" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pynautobot", specifier = ">=3,<4" },
     { name = "python-ironicclient", specifier = ">=5,<6" },
