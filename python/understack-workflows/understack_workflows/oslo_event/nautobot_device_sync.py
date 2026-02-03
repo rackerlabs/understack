@@ -8,14 +8,18 @@ This module provides a simple, robust sync function that:
 Can be called from any event handler - provision, inspect, CRUD, etc.
 """
 
+import logging
 import re
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
 from uuid import UUID
 
+import requests
+import tenacity
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from openstack.connection import Connection
+from pynautobot import RequestError
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import setup_logger
@@ -29,6 +33,28 @@ logger = setup_logger(__name__)
 
 EXIT_STATUS_SUCCESS = 0
 EXIT_STATUS_FAILURE = 1
+
+# Retry configuration for transient failures
+RETRY_ATTEMPTS = 5
+RETRY_WAIT_MIN = 2
+RETRY_WAIT_MAX = 30
+
+
+def _is_retryable_error(exc: BaseException) -> bool:
+    """Determine if an exception is retryable.
+
+    Retries on:
+    - Connection errors (network issues, DNS failures)
+    - 503 Service Unavailable (Nautobot temporarily down)
+    - 502 Bad Gateway (proxy/load balancer issues)
+    - 504 Gateway Timeout
+    """
+    if isinstance(exc, requests.exceptions.ConnectionError):
+        return True
+    if isinstance(exc, RequestError):
+        status_code = getattr(exc.req, "status_code", None)
+        return status_code in (502, 503, 504)
+    return False
 
 
 @dataclass
@@ -205,6 +231,9 @@ def _set_location_from_switches(
         device_info.rack_id = rack_id
 
     except Exception as e:
+        # Re-raise retryable errors (503, connection issues) to trigger retry
+        if _is_retryable_error(e):
+            raise
         logger.error(
             "Failed to determine location for node %s: %s", device_info.uuid, e
         )
@@ -484,6 +513,15 @@ def _find_or_create_nautobot_device(
     return _create_nautobot_device(ironic_node_info, nautobot_client)
 
 
+@tenacity.retry(
+    retry=tenacity.retry_if_exception(_is_retryable_error),
+    wait=tenacity.wait_random_exponential(
+        multiplier=1, min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX
+    ),
+    stop=tenacity.stop_after_attempt(RETRY_ATTEMPTS),
+    before_sleep=tenacity.before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
 def sync_device_to_nautobot(
     node_uuid: str,
     nautobot_client: Nautobot,
@@ -496,7 +534,8 @@ def sync_device_to_nautobot(
     2. Creates or updates the device in Nautobot
     3. Optionally syncs interfaces (ports) to Nautobot
 
-    Can be called from any event handler.
+    Can be called from any event handler. Automatically retries on transient
+    failures (503, connection errors) with exponential backoff.
 
     Args:
         node_uuid: Ironic node UUID
@@ -539,7 +578,10 @@ def sync_device_to_nautobot(
         logger.info(str(e))
         return EXIT_STATUS_FAILURE
 
-    except Exception:
+    except Exception as e:
+        # Re-raise retryable errors to trigger tenacity retry
+        if _is_retryable_error(e):
+            raise
         logger.exception("Failed to sync device %s to Nautobot", node_uuid)
         return EXIT_STATUS_FAILURE
 
