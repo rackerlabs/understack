@@ -48,7 +48,10 @@ def main():
 
     # argo workflows captures stdout as the results which we can use
     # to return the device UUID
-    print(json.dumps(parse_controller_details(client)))
+    raid_config = parse_controller_details(client)
+    json_details = build_raid_config(raid_config)
+    print(json.dumps(json_details))
+    return json.dumps(json_details)
 
 
 def argument_parser():
@@ -74,6 +77,22 @@ def parse_controller_details(client: Sushy) -> dict:
             for d in c.drives:
                 result["physical_disks"].append(d.identity)
             break
+    return result
+
+
+def build_raid_config(raid_config: dict):
+    """Return a raid config supported by ironic for cleanup tasks."""
+    result = {
+        "logical_disks": [
+            {
+                "controller": raid_config["controller"],
+                "is_root_volume": True,
+                "physical_disks": raid_config["physical_disks"],
+                "raid_level": "1",
+                "size_gb": "MAX",
+            }
+        ]
+    }
     return result
 
 
