@@ -17,6 +17,7 @@ on:
       - "containers/octavia/**"
       - "containers/openstack-client/**"
       - "containers/placement/**"
+      - "containers/skyline/**"
       - ".github/workflows/containers-openstack.yaml"
       - ".github/workflows/build-container-reuse.yaml"
       - "python/**"
@@ -42,6 +43,7 @@ jobs:
           - octavia
           - openstack-client
           - placement
+          - skyline
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
