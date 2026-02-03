@@ -47,9 +47,11 @@ spec:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
                 - name: controller_id
-                  value: "{{=jsonpath(steps.['get-raid-config'].outputs.result, $.controller)}}"
-                - name: physical_disks
-                  value: "{{=jsonpath(steps.['get-raid-config'].outputs.result, $.physical_disks[*])}}"
+                  value: "{{steps.get-raid-config.outputs.result.controller}}"
+                - name: physical_disk_0
+                  value: "{{steps.get-raid-config.outputs.result.physical_disks.0}}"
+                - name: physical_disk_1
+                  value: "{{steps.get-raid-config.outputs.result.physical_disks.1}}"
             when: "{{workflow.parameters.raid_configure}} == true"
         - - name: server-manage-state
             template: openstack-state-cmd
@@ -182,7 +184,8 @@ spec:
         parameters:
           - name: device_id
           - name: controller_id
-          - name: physical_disks
+          - name: physical_disk_0
+          - name: physical_disk_1
       # https://rackerlabs.github.io/understack/user-guide/openstack-ironic/#setting-baremetal-node-flavor
       script:
         image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
@@ -195,7 +198,10 @@ spec:
           { "logical_disks":
             [ { "controller": {{ inputs.parameters.controller_id }},
                 "is_root_volume": true,
-                "physical_disks": {{ inputs.parameters.physical_disks }},
+                "physical_disks": [
+                  {{ inputs.parameters.physical_disk_0 }},
+                  {{ inputs.parameters.physical_disk_1 }}
+                ],
                 "raid_level": "1",
                 "size_gb": "MAX"
               }
