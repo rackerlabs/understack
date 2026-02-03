@@ -17,6 +17,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ printf "%s-%s" $.Release.Name $appName }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
   {{/*
   {{- with $app.wave }}
   annotations:
