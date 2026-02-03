@@ -48,7 +48,9 @@ def main():
 
     # argo workflows captures stdout as the results which we can use
     # to return the device UUID
-    print(json.dumps(parse_controller_details(client)))
+    json_details = parse_controller_details(client)
+    print(json.dumps(json_details))
+    return json.dumps(json_details)
 
 
 def argument_parser():
