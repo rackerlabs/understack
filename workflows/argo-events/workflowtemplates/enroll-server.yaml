@@ -46,7 +46,7 @@ spec:
               parameters:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
-                - name: raid_configure
+                - name: raid_config
                   value: "{{steps.get-raid-config.outputs.result}}"
             when: "{{workflow.parameters.raid_configure}} == true"
         - - name: server-manage-state
@@ -179,8 +179,7 @@ spec:
       inputs:
         parameters:
           - name: device_id
-          - name: controller_id
-          - name: physical_disks
+          - name: raid_config
       # https://rackerlabs.github.io/understack/user-guide/openstack-ironic/#setting-baremetal-node-flavor
       script:
         image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
@@ -190,7 +189,7 @@ spec:
           # create the raid1-config.json file. I find this easier to read
           # than passing a big json string on command line
           cat <<'EOF' >> raid1-config.json
-          {{inputs.parameters.raid_configure}}
+          {{inputs.parameters.raid_config}}
           EOF
           # create the initial clean steps which will create a raid config
           cat <<'EOF' >> raid-clean-steps.json
