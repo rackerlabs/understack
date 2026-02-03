@@ -89,7 +89,7 @@ def build_raid_config(raid_config: dict):
                 "is_root_volume": True,
                 "physical_disks": raid_config["physical_disks"],
                 "raid_level": "1",
-                "size_gb": "MAX"
+                "size_gb": "MAX",
             }
         ]
     }
