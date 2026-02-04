@@ -86,7 +86,7 @@ func (s *LocationSync) syncSingleLocation(ctx context.Context, location models.L
 	}
 
 	if !helpers.CompareJSONFields(existingLocation, locationRequest) {
-		return s.updateLocationType(ctx, *existingLocation.Id, locationRequest)
+		return s.updateLocation(ctx, *existingLocation.Id, locationRequest)
 	}
 
 	log.Info("location  unchanged, skipping update", "name", locationRequest.Name)
@@ -103,8 +103,8 @@ func (s *LocationSync) createLocation(ctx context.Context, request nb.LocationRe
 	return createdLocationType.Id, nil
 }
 
-// updateLocationType updates an existing location  in Nautobot
-func (s *LocationSync) updateLocationType(ctx context.Context, id string, request nb.LocationRequest) (*string, error) {
+// updateLocation updates an existing location in Nautobot
+func (s *LocationSync) updateLocation(ctx context.Context, id string, request nb.LocationRequest) (*string, error) {
 	updatedLocationType, err := s.locationSvc.Update(ctx, id, request)
 	if err != nil || updatedLocationType == nil {
 		return nil, fmt.Errorf("failed to update location  %s: %w", request.Name, err)
