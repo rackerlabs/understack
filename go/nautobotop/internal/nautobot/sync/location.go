@@ -72,8 +72,9 @@ func (s *LocationSync) syncLocationRecursive(ctx context.Context, location model
 func (s *LocationSync) syncSingleLocation(ctx context.Context, location models.Location, parentID *string) (*string, error) {
 	existingLocation := s.locationSvc.GetByName(ctx, location.Name)
 
-	locationTypeRequest := nb.LocationRequest{
-		Name:         location.Name,
+	locationRequest := nb.LocationRequest{
+		Name: location.Name,
+
 		Description:  nb.PtrString(location.Description),
 		Parent:       buildParentReference(parentID),
 		LocationType: s.buildLocationTypeReference(ctx, location.LocationType),
@@ -81,14 +82,14 @@ func (s *LocationSync) syncSingleLocation(ctx context.Context, location models.L
 	}
 
 	if existingLocation.Id == nil {
-		return s.createLocation(ctx, locationTypeRequest)
+		return s.createLocation(ctx, locationRequest)
 	}
 
-	if !helpers.CompareJSONFields(existingLocation, locationTypeRequest) {
-		return s.updateLocationType(ctx, *existingLocation.Id, locationTypeRequest)
+	if !helpers.CompareJSONFields(existingLocation, locationRequest) {
+		return s.updateLocationType(ctx, *existingLocation.Id, locationRequest)
 	}
 
-	log.Info("location  unchanged, skipping update", "name", locationTypeRequest.Name)
+	log.Info("location  unchanged, skipping update", "name", locationRequest.Name)
 	return existingLocation.Id, nil
 }
 

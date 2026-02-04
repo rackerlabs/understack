@@ -27,7 +27,7 @@ func (s *LocationService) Create(ctx context.Context, req nb.LocationRequest) (*
 		s.client.AddReport("createNewLocation", "failed to create", "model", req.Name, "error", err.Error(), "response_body", bodyString)
 		return nil, err
 	}
-	log.Info("CreateLocation", "created device type", locationType.Name)
+	log.Info("CreateLocation", "created location", locationType.Name)
 	return locationType, nil
 }
 
@@ -72,7 +72,7 @@ func (s *LocationService) Update(ctx context.Context, id string, req nb.Location
 		s.client.AddReport("UpdateLocation", "failed to update UpdateLocation", "id", id, "model", req.Name, "error", err.Error(), "response_body", bodyString)
 		return nil, err
 	}
-	log.Info("successfully updated device type", "id", id, "model", locationType.GetName())
+	log.Info("successfully updated location", "id", id, "model", locationType.GetName())
 	return locationType, nil
 }
 

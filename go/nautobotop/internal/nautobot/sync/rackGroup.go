@@ -41,7 +41,7 @@ func (s *RackGroupSync) SyncAll(ctx context.Context, data map[string]string) err
 	}
 
 	for _, l := range rackGroups.RackGroup {
-		if err := s.syncLocationRecursive(ctx, l, nil); err != nil {
+		if err := s.syncRackGroupRecursive(ctx, l, nil); err != nil {
 			return err
 		}
 	}
@@ -50,15 +50,15 @@ func (s *RackGroupSync) SyncAll(ctx context.Context, data map[string]string) err
 	return nil
 }
 
-// syncLocationRecursive processes a location  and all its children recursively
-func (s *RackGroupSync) syncLocationRecursive(ctx context.Context, rackGroup models.RackGroup, parentID *string) error {
+// syncRackGroupRecursive processes a rackGroups and all its children recursively
+func (s *RackGroupSync) syncRackGroupRecursive(ctx context.Context, rackGroup models.RackGroup, parentID *string) error {
 	currentID, err := s.syncSingleRackGroup(ctx, rackGroup, parentID)
 	if err != nil {
 		return err
 	}
 
 	for _, child := range rackGroup.Children {
-		if err := s.syncLocationRecursive(ctx, child, currentID); err != nil {
+		if err := s.syncRackGroupRecursive(ctx, child, currentID); err != nil {
 			return err
 		}
 	}
@@ -85,7 +85,7 @@ func (s *RackGroupSync) syncSingleRackGroup(ctx context.Context, rackGroup model
 		return s.updateRackGroup(ctx, *existingRackGroup.Id, rackGroupRequest)
 	}
 
-	log.Info("location  unchanged, skipping update", "name", rackGroupRequest.Name)
+	log.Info("rackGroup is unchanged, skipping update", "name", rackGroupRequest.Name)
 	return rackGroupRequest.Id, nil
 }
 
@@ -95,7 +95,7 @@ func (s *RackGroupSync) createRackGroup(ctx context.Context, request nb.RackGrou
 	if err != nil || createdRackGroup == nil {
 		return nil, fmt.Errorf("failed to create rackgroup  %s: %w", request.Name, err)
 	}
-	log.Info("location  created", "name", request.Name)
+	log.Info("rackGroup created", "name", request.Name)
 	return createdRackGroup.Id, nil
 }
 
@@ -103,13 +103,13 @@ func (s *RackGroupSync) createRackGroup(ctx context.Context, request nb.RackGrou
 func (s *RackGroupSync) updateRackGroup(ctx context.Context, id string, request nb.RackGroupRequest) (*string, error) {
 	updatedRackGroup, err := s.rackGroupSvc.Update(ctx, id, request)
 	if err != nil || updatedRackGroup == nil {
-		return nil, fmt.Errorf("failed to update location  %s: %w", request.Name, err)
+		return nil, fmt.Errorf("failed to update rackGroup  %s: %w", request.Name, err)
 	}
-	log.Info("location  updated", "name", request.Name)
+	log.Info("rackGroup  updated", "name", request.Name)
 	return updatedRackGroup.Id, nil
 }
 
-// deleteObsoleteRackGroup removes location that are not defined in YAML
+// deleteObsoleteRackGroup removes rackGroup that are not defined in YAML
 func (s *RackGroupSync) deleteObsoleteRackGroup(ctx context.Context, rackGroups models.RackGroups) {
 	desiredRackGroups := make(map[string]models.RackGroup)
 	for _, rackGroup := range rackGroups.RackGroup {
@@ -123,10 +123,10 @@ func (s *RackGroupSync) deleteObsoleteRackGroup(ctx context.Context, rackGroups 
 	}
 
 	obsoleteRackGroup := lo.OmitByKeys(existingMap, lo.Keys(desiredRackGroups))
-	s.deleteLocationWithDependencies(ctx, obsoleteRackGroup)
+	s.deleteRackGroupWithDependencies(ctx, obsoleteRackGroup)
 }
 
-// collectAllRackGroups recursively collects all location including nested children
+// collectAllRackGroups recursively collects all rackGroups including nested children
 func (s *RackGroupSync) collectAllRackGroups(rackGroup models.RackGroup, result map[string]models.RackGroup) {
 	result[rackGroup.Name] = rackGroup
 	for _, child := range rackGroup.Children {
@@ -134,8 +134,8 @@ func (s *RackGroupSync) collectAllRackGroups(rackGroup models.RackGroup, result 
 	}
 }
 
-// deleteLocationWithDependencies deletes location in correct order
-func (s *RackGroupSync) deleteLocationWithDependencies(ctx context.Context, obsoleteRackGroup map[string]nb.RackGroup) {
+// deleteRackGroupWithDependencies deletes rackGroups in correct order
+func (s *RackGroupSync) deleteRackGroupWithDependencies(ctx context.Context, obsoleteRackGroup map[string]nb.RackGroup) {
 	idToName := make(map[string]string)
 	for name, rackGroup := range obsoleteRackGroup {
 		if rackGroup.Id != nil {
@@ -159,7 +159,7 @@ func (s *RackGroupSync) deleteLocationWithDependencies(ctx context.Context, obso
 	}
 }
 
-// deleteRackGroupRecursive deletes a location  and all its children recursively
+// deleteRackGroupRecursive deletes a rackGroup  and all its children recursively
 func (s *RackGroupSync) deleteRackGroupRecursive(ctx context.Context, name string, obsoleteRackGroup map[string]nb.RackGroup, childrenMap map[string][]string, deleted map[string]bool) {
 	if deleted[name] {
 		return
