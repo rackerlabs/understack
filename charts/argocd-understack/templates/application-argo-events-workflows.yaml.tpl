@@ -16,7 +16,7 @@ spec:
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ include "understack.deploy_path" $ }}/manifests/argo-events-workflows
+  - path: {{ include "understack.deploy_path" $ }}/argo-events-workflows
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

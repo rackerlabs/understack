@@ -51,7 +51,7 @@ the value `understack` or `deploy` respectively.
 - component: argo
   sources:
     - ref: deploy
-      path: deploy_name/manifests/argo-workflows
+      path: deploy_name/argo-workflows
 ```
 
 The above would replace the default behavior to only source from your
@@ -66,7 +66,7 @@ Another example would be:
       path: component/openstack
       helm:
         valueFiles:
-          - $deploy/deploy_name/helm-configs/openstack.yaml
+          - $deploy/deploy_name/openstack/values.yaml
     - ref: deploy
 ```
 
@@ -85,12 +85,12 @@ first determine if it's being deployed with Helm or Kustomize.
 ### Helm
 
 Most of the applications can have their Helm values overridden by adding
-or modifying `$DEPLOY_NAME/helm-configs/$COMPONENT.yaml` in your deployment
+or modifying `$DEPLOY_NAME/$COMPONENT/values.yaml` in your deployment
 repo.
 
 ### Kustomize
 
-To make changes you will need to add or modify files in `$DEPLOY_NAME/manifests/$COMPONENT/`
+To make changes you will need to add or modify files in `$DEPLOY_NAME/$COMPONENT/`
 in your deployment repo.
 
 ## Modifying Environment State

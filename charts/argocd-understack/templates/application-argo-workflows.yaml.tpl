@@ -12,7 +12,7 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - path: {{ include "understack.deploy_path" $ }}/manifests/argo-workflows
+  - path: {{ include "understack.deploy_path" $ }}/argo-workflows
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

@@ -34,32 +34,31 @@ The layout of this repo will be something like:
 ```shell
 .
 ├── management # (1)
-│   ├── helm-configs # (2)
-│   └── manifests # (3)
-├── iad3-prod # (4)
-│   ├── flavors -> ../flavors/prod # (5)
-│   ├── helm-configs
-│   └── manifests
-├── iad3-staging # (6)
-│   ├── flavors -> ../flavors/nonprod # (7)
-│   ├── helm-configs
-│   └── manifests
-├── global-prod # (8)
-│   ├── helm-configs
-│   └── manifests
+│   ├── argocd # (2)
+│   └── dex
+├── iad3-prod # (3)
+│   ├── flavors -> ../flavors/prod # (4)
+│   ├── keystone
+│   └── ironic
+├── iad3-staging # (5)
+│   ├── flavors -> ../flavors/nonprod # (6)
+│   ├── keystone
+│   └── neutron
+├── global-prod # (7)
+│   ├── nautobot
+│   └── dex
 └── flavors
-    ├── nonprod
-    └── prod
+    ├── nonprod
+    └── prod
 ```
 
 1. This contains data which the cluster labeled as `management` will consume.
-2. helm `values.yaml` files per application/component will be here for `management`.
-3. Any Kubernetes manifests per application/component will be here for `management`.
-4. This contains data which the cluster labeled as `iad3-prod` will consume.
-5. The definitions of the hardware flavors that this cluster, which later you will see maps to a site.
-6. This contains data which the cluster labeled as `iad3-staging` will consume.
-7. The definitions of the hardware flavors that this cluster, which later you will see maps to a site. Notice it is different than staging.
-8. The cluster labeled as `global-prod` will have resources consumed here.
+2. Per-component directories with Kubernetes manifests and Helm `values.yaml` overrides.
+3. This contains data which the cluster labeled as `iad3-prod` will consume.
+4. The definitions of the hardware flavors that this cluster, which later you will see maps to a site.
+5. This contains data which the cluster labeled as `iad3-staging` will consume.
+6. The definitions of the hardware flavors that this cluster, which later you will see maps to a site. Notice it is different than staging.
+7. The cluster labeled as `global-prod` will have resources consumed here.
 
 ### Creation and Access
 

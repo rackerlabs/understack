@@ -17,7 +17,7 @@ spec:
       ignoreMissingValueFiles: true
       releaseName: prometheus-snmp-exporter
       valueFiles:
-      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/prometheus-snmp-exporter.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/prometheus-snmp-exporter/values.yaml
     repoURL: https://prometheus-community.github.io/helm-charts
     targetRevision: 5.6.0
   - ref: understack

@@ -19,37 +19,45 @@ Before starting, ensure:
 - Your target Kubernetes cluster has a **storage provisioner** configured
   and operational
 
-## Create the Cluster Directory
+## Create the Initial Configuration
 
-In your deployment repository, create a directory named after your cluster.
-This name must match the cluster name registered in ArgoCD.
+Initialize your global cluster configuration using `understackctl`:
 
-```bash title="From the deploy repo root"
-mkdir -p my-global/{manifests,helm-configs}
+```bash
+cd /path/to/deploy-repo
+understackctl deploy init my-global --type global
 ```
 
-## Create the Initial deploy.yaml
-
-Create a `deploy.yaml` in your cluster directory. This file combines the
-repository metadata and the Helm values for the
-[argocd-understack][argocd-helm-chart] chart into a single
-file.
-
-Start with **everything disabled** so you can verify ArgoCD connectivity
-before deploying any workloads.
+This creates `my-global/deploy.yaml` with all global components enabled:
 
 ```yaml title="my-global/deploy.yaml"
----
 understack_url: https://github.com/rackerlabs/understack.git
-understack_ref: v0.1.0  # replace with the tag or git reference you want to use
 deploy_url: https://github.com/my-org/my-deploy.git
-deploy_ref: HEAD
+global:
+  enabled: true
+  cert_manager:
+    enabled: true
+  cilium:
+    enabled: true
+  dex:
+    enabled: true
+  external_secrets:
+    enabled: true
+  # ... additional global components
+```
 
+To start with everything disabled for initial ArgoCD connectivity testing,
+edit the file to set `enabled: false`:
+
+```yaml
 global:
   enabled: false
+```
 
-site:
-  enabled: false
+Create the manifest directories:
+
+```bash
+understackctl deploy update my-global
 ```
 
 ## Register the Cluster with ArgoCD
@@ -103,14 +111,10 @@ global:
     enabled: true
 ```
 
-Create a directory for your cluster issuer manifests:
-
-```bash
-mkdir -p my-global/manifests/cert-manager
-```
-
-Place your `ClusterIssuer` resource(s) in this directory. These define how
-certificates will be issued for services in your cluster.
+After enabling, run `understackctl deploy update my-global` to create the
+directory. Place your `ClusterIssuer` resource(s) in
+`my-global/cert-manager/`. These define how certificates will be
+issued for services in your cluster.
 
 ### External DNS
 
@@ -135,15 +139,13 @@ global:
     enabled: true
 ```
 
-Create the manifests directory and Helm values file:
+Create the component directories and Helm values file:
 
 ```bash
-mkdir -p my-global/manifests/dex
-```
+After enabling, run `understackctl deploy update my-global` to create the
+directory. Configure your authentication in the Helm values file:
 
-Configure your authentication in the Helm values file:
-
-```yaml title="my-global/helm-configs/dex.yaml"
+```yaml title="my-global/dex/values.yaml"
 # See the Dex configuration guide for details on what goes here
 ```
 
@@ -187,8 +189,8 @@ following:
 For each component that requires environment-specific configuration, you
 can provide:
 
-- **Helm value overrides** in `my-global/helm-configs/<component>.yaml`
-- **Kustomize manifests** in `my-global/manifests/<component>/`
+- **Helm value overrides** in `my-global/<component>/values.yaml`
+- **Kustomize manifests** in `my-global/<component>/`
 
 See [Configuring Components](./component-config.md) for details on these
 customization methods.
@@ -197,5 +199,4 @@ customization methods.
 [dex]: <https://dexidp.io/>
 [cert-manager]: <https://cert-manager.io/>
 [external-dns]: <https://kubernetes-sigs.github.io/external-dns/>
-[argocd-helm-chart]: <../operator-guide/argocd-helm-chart.md>
 [values]: <https://github.com/rackerlabs/understack/blob/main/charts/argocd-understack/values.yaml>

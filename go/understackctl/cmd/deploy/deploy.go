@@ -29,6 +29,12 @@ func NewCmdDeploy() *cobra.Command {
 	}
 
 	addDeployRepoFlag(cmd)
+
+	cmd.AddCommand(newCmdDeployInit())
+	cmd.AddCommand(newCmdDeployCheck())
+	cmd.AddCommand(newCmdDeployUpdate())
+	cmd.AddCommand(newCmdDeployRender())
+
 	return cmd
 }
 

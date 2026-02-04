@@ -65,8 +65,8 @@ func dex() error {
 
 	filePath := filepath.Join(
 		envutil.Getenv("DEPLOY_NAME"),
-		"helm",
-		"dex.yaml",
+		"dex",
+		"values.yaml",
 	)
 
 	if err := fsutil.WriteFile(filePath, data, os.ModePerm); err != nil {
@@ -82,8 +82,8 @@ func glance() error {
 
 	filePath := filepath.Join(
 		envutil.Getenv("DEPLOY_NAME"),
-		"helm",
-		"glance.yaml",
+		"glance",
+		"values.yaml",
 	)
 
 	if err := fsutil.WriteFile(filePath, template, os.ModePerm); err != nil {
@@ -114,8 +114,8 @@ func ironic() error {
 
 	filePath := filepath.Join(
 		envutil.Getenv("DEPLOY_NAME"),
-		"helm",
-		"ironic.yaml",
+		"ironic",
+		"values.yaml",
 	)
 
 	if err := fsutil.WriteFile(filePath, template, os.ModePerm); err != nil {
@@ -210,8 +210,8 @@ func rook() error {
 
 	filePath := filepath.Join(
 		envutil.Getenv("DEPLOY_NAME"),
-		"helm",
-		"rook-cluster.yaml",
+		"rook-cluster",
+		"values.yaml",
 	)
 
 	if err := fsutil.WriteFile(filePath, template, os.ModePerm); err != nil {

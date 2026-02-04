@@ -23,7 +23,7 @@ deploy_ref: HEAD
 
 # -- Optional prefix for the deployment repository path. When set, the path
 #    becomes "<prefix>/<Release.Name>" instead of just "<Release.Name>".
-#    Example: "sites" would result in "sites/uc-iad3-prod/helm-configs/..."
+#    Example: "sites" would result in "sites/uc-iad3-prod/manifests/..."
 # @default -- "" (no prefix, just Release.Name)
 deploy_path_prefix:
 

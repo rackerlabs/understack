@@ -16,7 +16,7 @@ spec:
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ include "understack.deploy_path" $ }}/manifests/global-workflows
+  - path: {{ include "understack.deploy_path" $ }}/global-workflows
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

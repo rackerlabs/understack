@@ -190,7 +190,7 @@ In your `apps.yaml`, add ingress-nginx to the skip list:
 
 #### 2. Create GatewayClass Resource
 
-Create `manifests/envoy-gateway/gateway-class.yaml`:
+Create `envoy-gateway/gateway-class.yaml`:
 
 ```yaml
 ---
@@ -202,7 +202,7 @@ spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
 ```
 
-And `manifests/envoy-gateway/kustomization.yaml`:
+And `envoy-gateway/kustomization.yaml`:
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -213,7 +213,7 @@ resources:
 
 #### 3. Configure Gateway and Routes
 
-Create `helm-configs/envoy-configs.yaml` with your Gateway and route definitions:
+Create `envoy-configs/values.yaml` with your Gateway and route definitions:
 
 ```yaml
 # yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/component-envoy-configs.schema.json
@@ -268,7 +268,7 @@ routes:
         backendType: tls
 ```
 
-Create empty `manifests/envoy-configs/kustomization.yaml`:
+Create empty `envoy-configs/kustomization.yaml`:
 
 ```yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -282,13 +282,13 @@ Delete any standalone Ingress manifests:
 
 ```bash
 # Example
-rm manifests/argo-workflows/ingress.yaml
+rm argo-workflows/ingress.yaml
 ```
 
 Update kustomization files to remove ingress references:
 
 ```yaml
-# manifests/argo-workflows/kustomization.yaml
+# argo-workflows/kustomization.yaml
 resources:
   - https://github.com/rackerlabs/understack.git//components/argo-workflows/?ref=v0.0.43
   # Remove: - ingress.yaml
@@ -296,10 +296,10 @@ resources:
 
 #### 5. Disable Ingress in Helm Charts
 
-For components that generate their own Ingress resources (like monitoring stack), disable them in helm-configs:
+For components that generate their own Ingress resources (like monitoring stack), disable them in their values:
 
 ```yaml
-# helm-configs/monitoring.yaml
+# monitoring/values.yaml
 grafana:
   ingress:
     enabled: false
@@ -318,7 +318,7 @@ alertmanager:
 If using Cilium L2 announcements, update the service selector to match Envoy Gateway:
 
 ```yaml
-# manifests/cilium/c-l2policies.yaml
+# cilium/c-l2policies.yaml
 spec:
   serviceSelector:
     matchLabels:
@@ -330,7 +330,7 @@ spec:
 Update any services that share IPs with the ingress controller:
 
 ```yaml
-# manifests/ironic/services-ironic.yaml
+# ironic/services-ironic.yaml
 metadata:
   annotations:
     lbipam.cilium.io/sharing-cross-namespace: envoy-gateway  # Changed from: ingress-nginx
@@ -338,7 +338,7 @@ metadata:
 
 #### 8. Update cert-manager Configuration
 
-If not already done, ensure cert-manager has Gateway API support enabled in `helm-configs/cert-manager.yaml`:
+If not already done, ensure cert-manager has Gateway API support enabled in `cert-manager/values.yaml`:
 
 ```yaml
 config:
@@ -362,7 +362,7 @@ Commit and push your changes. ArgoCD will automatically:
 
 When adding a new application that needs external access:
 
-1. **Add route configuration** to your site's `helm-configs/envoy-configs.yaml`:
+1. **Add route configuration** to your site's `envoy-configs/values.yaml`:
 
    ```yaml
    routes:
@@ -487,7 +487,7 @@ The `envoy-configs` chart is deployed via ArgoCD and generates Gateway and Route
 
 **Deployment**: `apps/site/envoy-configs.yaml`
 
-**Site-specific values**: `deploy/<site>/helm-configs/envoy-configs.yaml`
+**Site-specific values**: `deploy/<site>/envoy-configs/values.yaml`
 
 ### Route Schema
 

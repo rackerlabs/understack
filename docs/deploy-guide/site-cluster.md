@@ -22,37 +22,45 @@ Before starting, ensure:
 - Your target Kubernetes cluster has a **storage provisioner** configured
   and operational
 
-## Create the Cluster Directory
+## Create the Initial Configuration
 
-In your deployment repository, create a directory named after your cluster.
-This name must match the cluster name registered in ArgoCD.
+Initialize your site cluster configuration using `understackctl`:
 
-```bash title="From the deploy repo root"
-mkdir -p my-site/{manifests,helm-configs}
+```bash
+cd /path/to/deploy-repo
+understackctl deploy init my-site --type site
 ```
 
-## Create the Initial deploy.yaml
-
-Create a `deploy.yaml` in your cluster directory. This file combines the
-repository metadata and the Helm values for the
-[argocd-understack][argocd-helm-chart] chart into a single
-file.
-
-Start with **everything disabled** so you can verify ArgoCD connectivity
-before deploying any workloads.
+This creates `my-site/deploy.yaml` with all site components enabled:
 
 ```yaml title="my-site/deploy.yaml"
----
 understack_url: https://github.com/rackerlabs/understack.git
-understack_ref: v0.1.0  # replace with the tag or git reference you want to use
 deploy_url: https://github.com/my-org/my-deploy.git
-deploy_ref: HEAD
+site:
+  enabled: true
+  keystone:
+    enabled: true
+  nova:
+    enabled: true
+  neutron:
+    enabled: true
+  ironic:
+    enabled: true
+  # ... additional site components
+```
 
-global:
-  enabled: false
+To start with everything disabled for initial ArgoCD connectivity testing,
+edit the file to set `enabled: false`:
 
+```yaml
 site:
   enabled: false
+```
+
+Create the manifest directories:
+
+```bash
+understackctl deploy update my-site
 ```
 
 ## Register the Cluster with ArgoCD
@@ -112,13 +120,9 @@ site:
     enabled: true
 ```
 
-Create a directory for your cluster issuer manifests:
-
-```bash
-mkdir -p my-site/manifests/cert-manager
-```
-
-Place your `ClusterIssuer` resource(s) in this directory.
+After enabling, run `understackctl deploy update my-site` to create the
+component directory. Then place your `ClusterIssuer` resource(s) in
+`my-site/cert-manager/`.
 
 #### External DNS
 
@@ -194,11 +198,9 @@ site:
     enabled: true
 ```
 
-Configure the shared OpenStack infrastructure in your Helm values:
-
-```bash title="Create the values file"
-touch my-site/helm-configs/openstack.yaml
-```
+Configure the shared OpenStack infrastructure in your Helm values.
+After enabling the component, run `understackctl deploy update my-site` to
+create the directory, then edit `my-site/openstack/values.yaml`.
 
 See [Configuring OpenStack (Shared)](./config-openstack.md) for details on
 MariaDB, RabbitMQ, and service account configuration.
@@ -226,11 +228,9 @@ site:
     enabled: true
 ```
 
-Provide any Helm value overrides:
-
-```bash
-touch my-site/helm-configs/keystone.yaml
-```
+After enabling, run `understackctl deploy update my-site` to create the
+directory. Provide any Helm value overrides in
+`my-site/keystone/values.yaml`.
 
 ### OpenStack Services - Wave 2 (Core Services)
 
@@ -399,8 +399,8 @@ Enable these as needed for your deployment.
 For each component that requires environment-specific configuration, you
 can provide:
 
-- **Helm value overrides** in `my-site/helm-configs/<component>.yaml`
-- **Kustomize manifests** in `my-site/manifests/<component>/`
+- **Helm value overrides** in `my-site/<component>/values.yaml`
+- **Kustomize manifests** in `my-site/<component>/`
 
 See [Configuring Components](./component-config.md) for details on these
 customization methods.
@@ -418,6 +418,5 @@ customization methods.
 - [Override OpenStack Service Config](./override-openstack-svc-config.md) -
   Per-service configuration overrides
 
-[argocd-helm-chart]: <../operator-guide/argocd-helm-chart.md>
 [nautobot]: <https://docs.nautobot.com/>
 [dex]: <https://dexidp.io/>

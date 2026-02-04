@@ -189,8 +189,8 @@ The nautobotop component is defined in the UnderStack repository at `apps/global
 
 UnderStack allows environment-specific customization through:
 
-- **Helm Values Override**: Create `$DEPLOY_NAME/helm-configs/nautobotop.yaml` in deployment repository
-- **Manifest Overlays**: Add Kustomize overlays in `$DEPLOY_NAME/manifests/nautobotop/`
+- **Helm Values Override**: Create `$DEPLOY_NAME/nautobotop/values.yaml` in deployment repository
+- **Manifest Overlays**: Add Kustomize overlays in `$DEPLOY_NAME/nautobotop/`
 - **Component Control**: Disable or modify sources in your `$DEPLOY_NAME/apps.yaml`
 
 ## Local Development

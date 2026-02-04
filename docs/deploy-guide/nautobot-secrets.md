@@ -134,7 +134,7 @@ The Nautobot service account automation is deployed and managed through **Argo C
     - This token is stored securely as a Kubernetes Secret in the `nautobot` namespace of the global cluster.
     - Another responsibility of global cluster is to create superuser token of site clusters which is used by site cluster to bootstrap other tokens.
       - example: global cluster (staging) creates site cluster super-user (rxdb-lab) secret and creates user and token in nautobot.
-    - In deploy repo create sites cluster superuser secrets in `"&#123;&#123;.name&#125;&#125;/manifests/nautobot-site` directory as defined in [`apps/site/nautobot-site.yaml`](https://github.com/rackerlabs/understack/blob/main/apps/site/nautobot-site.yaml).
+    - In deploy repo create sites cluster superuser secrets in `"&#123;&#123;.name&#125;&#125;/nautobot-site` directory as defined in [`apps/site/nautobot-site.yaml`](https://github.com/rackerlabs/understack/blob/main/apps/site/nautobot-site.yaml).
 
 2. **Site Nautobot Deployment**
     - Each site’s Argo CD application (`nautobot-site.yaml`) only creates secrets.
@@ -142,7 +142,7 @@ The Nautobot service account automation is deployed and managed through **Argo C
     - The site retrieves the **superuser token** and uses it to authenticate against Nautobot.
     - Site-specific **service accounts and tokens** are then created through Argo Events and Ansible workflows.
     - Global cluster's superuser token is not used anywhere in site cluster.
-    - In deploy repo define superuser bootstrap secret in `"&#123;&#123;.name&#125;&#125;/manifests/nautobot-site` directory as defined in [`apps/site/nautobot-site.yaml`](https://github.com/rackerlabs/understack/blob/main/apps/site/nautobot-site.yaml).
+    - In deploy repo define superuser bootstrap secret in `"&#123;&#123;.name&#125;&#125;/nautobot-site` directory as defined in [`apps/site/nautobot-site.yaml`](https://github.com/rackerlabs/understack/blob/main/apps/site/nautobot-site.yaml).
 
 3. **Automation Integration**
     - When new site credentials are created in Secret Management Backend, the change triggers the site-level automation flow.

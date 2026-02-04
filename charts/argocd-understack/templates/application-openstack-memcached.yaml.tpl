@@ -18,7 +18,7 @@ spec:
       releaseName: memcached
       valueFiles:
       - $understack/components/openstack/memcached-values.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/openstack-memcached.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/openstack-memcached/values.yaml
     repoURL: https://charts.bitnami.com/bitnami
     targetRevision: 7.8.6
   - ref: understack
