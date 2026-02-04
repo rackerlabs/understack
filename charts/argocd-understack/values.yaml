@@ -33,6 +33,18 @@ global:
   # @default -- true
   enabled: true
 
+  # -- Argo Events configuration for event-driven workflows
+  argo_events:
+    # -- Enable/disable deploying Argo Events
+    # @default -- true
+    enabled: true
+
+  # -- Argo Workflows configuration
+  argo_workflows:
+    # -- Enable/disable deploying Argo Workflows
+    # @default -- true
+    enabled: true
+
   # -- Cert-Manager
   cert_manager:
     # -- Enable/disable deploying Cert-Manager
@@ -123,7 +135,6 @@ global:
     # @default -- true
     enabled: true
 
-
   # -- OpenStack Resource Controller operator
   openstack_resource_controller:
     # -- Enable/disable deploying OpenStack Resource Controller
@@ -171,6 +182,18 @@ site:
   # -- Enable/disable deploying the site specific applications
   # @default -- true
   enabled: true
+
+  # -- Argo Events configuration for event-driven workflows
+  argo_events:
+    # -- Enable/disable deploying Argo Events
+    # @default -- true
+    enabled: true
+
+  # -- Argo Workflows configuration
+  argo_workflows:
+    # -- Enable/disable deploying Argo Workflows
+    # @default -- true
+    enabled: true
 
   # Cilium configurations
   cilium:
@@ -371,18 +394,6 @@ site:
     # -- Chart version for OVN
     # renovate: datasource=helm depName=ovn registryUrl=https://tarballs.opendev.org/openstack/openstack-helm-infra
     chartVersion: "2024.2.0"
-
-  # -- Argo Events configuration for event-driven workflows
-  argo_events:
-    # -- Enable/disable deploying Argo Events
-    # @default -- true
-    enabled: true
-
-  # -- Argo Workflows configuration
-  argo_workflows:
-    # -- Enable/disable deploying Argo Workflows
-    # @default -- true
-    enabled: true
 
   # -- Cert-Manager
   cert_manager:

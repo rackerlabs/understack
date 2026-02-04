@@ -1,4 +1,4 @@
-{{- if eq (include "understack.isEnabled" (list $.Values.site "argo_events")) "true" }}
+{{- if or (eq (include "understack.isEnabled" (list $.Values.global "argo_events")) "true") (eq (include "understack.isEnabled" (list $.Values.site "argo_events")) "true") }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
