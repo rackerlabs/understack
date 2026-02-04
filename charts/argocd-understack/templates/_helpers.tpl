@@ -108,7 +108,7 @@ Examples:
   deploy_path_prefix: "us/east" -> "us/east/uc-iad3-prod"
 
 Usage in valueFiles:
-  - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/dex.yaml
+  - $deploy/{{ include "understack.deploy_path" $ }}/manifests/dex/values.yaml
 
 Usage in source path:
   path: {{ include "understack.deploy_path" $ }}/manifests/dex

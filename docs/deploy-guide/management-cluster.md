@@ -15,11 +15,11 @@ can skip this section.
 
 ### Configuring ArgoCD
 
-To configure ArgoCD you'll need to create a `$DEPLOY_NAME/helm-configs/argocd.yaml`
+To configure ArgoCD you'll need to create a `$DEPLOY_NAME/argocd/values.yaml`
 in your deploy repo. In there you can configure the DNS name that will be used
 for the Ingress as well as the authentication. An example of which can be:
 
-```yaml title="$DEPLOY_NAME/helm-configs/argocd.yaml"
+```yaml title="$DEPLOY_NAME/argocd/values.yaml"
 global:
   domain: argocd.your.dns.zone
 
@@ -47,7 +47,7 @@ for authentication.
 
 You can also include the following:
 
-```yaml ttile="$DEPLOY_NAME/helm-configs/argocd.yaml"
+```yaml title="$DEPLOY_NAME/argocd/values.yaml"
 extraObjects:
   - # k8s object like a secret definition
 ```
@@ -76,9 +76,9 @@ DEPLOY_NAME=my-site # this should match one of your top-level directories in you
 DNS_ZONE="zone.where.all.dns.entries.will.live" # all services will have DNS entries under here
 
 # assuming you are in the top-level of your deploy repo checkout
-mkdir -p management/manifests/argocd/
+mkdir -p management/argocd/
 
-cat << EOF > management/manifests/argocd/${DEPLOY_NAME}-cluster.yaml
+cat << EOF > management/argocd/${DEPLOY_NAME}-cluster.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -142,7 +142,7 @@ Once you have the Kubernetes secret which defines your cluster config ready
 you must commit it to your deploy repo and then deploy it to your ArgoCD.
 
 In your deploy repo you should commit your cluster config at
-`management/manifests/argocd/secret-${DEPLOY_NAME}-cluster.yaml`. It is
+`management/argocd/secret-${DEPLOY_NAME}-cluster.yaml`. It is
 highly advised to use a secure method to store your secrets. There are many
 ways in ArgoCD to achieve this. For more details see their
 [Secrets Management][argocd-secrets-mgmt] guide.
@@ -151,7 +151,7 @@ Lastly ensure that you've added this secret to your `kustomization.yaml` with
 the following:
 
 ```bash
-cd management/manifests/argocd/
+cd management/argocd/
 [ ! -f kustomization.yaml ] && kustomize create
 kustomize edit add resource secret-${DEPLOY_NAME}-cluster.yaml
 ```

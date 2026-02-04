@@ -69,11 +69,11 @@ site:
 
 ### Deploy Repository Path Prefix
 
-By default, the chart looks for cluster configs at `<Release.Name>/helm-configs/`
-and `<Release.Name>/manifests/`. Use `deploy_path_prefix` to add a prefix:
+By default, the chart looks for cluster configs at `<Release.Name>/`.
+Use `deploy_path_prefix` to add a prefix:
 
 ```yaml
-deploy_path_prefix: sites  # Results in "sites/my-cluster/helm-configs/..."
+deploy_path_prefix: sites  # Results in "sites/my-cluster/..."
 ```
 
 **Default structure:**
@@ -81,11 +81,13 @@ deploy_path_prefix: sites  # Results in "sites/my-cluster/helm-configs/..."
 ```text
 deploy-repo/
 ├── uc-iad3-prod/
-│   ├── helm-configs/
-│   │   ├── keystone.yaml
-│   │   └── ...
-│   └── manifests/
-│       └── ...
+│   ├── keystone/
+│   │   ├── values.yaml
+│   │   └── kustomization.yaml
+│   ├── dex/
+│   │   ├── values.yaml
+│   │   └── kustomization.yaml
+│   └── ...
 └── uc-ord1-staging/
     └── ...
 ```
@@ -96,8 +98,8 @@ deploy-repo/
 deploy-repo/
 ├── sites/
 │   ├── uc-iad3-prod/
-│   │   ├── helm-configs/
-│   │   └── manifests/
+│   │   ├── keystone/
+│   │   └── dex/
 │   └── uc-ord1-staging/
 │       └── ...
 └── other-stuff/

@@ -14,7 +14,7 @@ The OpenStack component is a Helm chart that creates:
 
 ## Configuration
 
-Configure the OpenStack component by editing `$DEPLOY_NAME/helm-configs/openstack.yaml` in your deployment repository.
+Configure the OpenStack component by editing `$DEPLOY_NAME/openstack/values.yaml` in your deployment repository.
 
 ### Basic Configuration
 

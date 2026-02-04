@@ -18,7 +18,7 @@ spec:
       releaseName: openebs
       valueFiles:
       - $understack/operators/openebs/values.yaml
-      - $deploy/{{ $.Release.Name }}/helm-configs/openebs.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/openebs/values.yaml
     repoURL: https://openebs.github.io/openebs
     targetRevision: 4.4.0
   - path: operators/openebs
@@ -28,7 +28,7 @@ spec:
   - ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
-    path: {{ include "understack.deploy_path" $ }}/manifests/openebs
+    path: {{ include "understack.deploy_path" $ }}/openebs
   syncPolicy:
     automated:
       prune: true

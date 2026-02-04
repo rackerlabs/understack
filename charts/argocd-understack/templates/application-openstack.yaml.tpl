@@ -24,8 +24,8 @@ spec:
     helm:
       ignoreMissingValueFiles: true
       valueFiles:
-      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/openstack.yaml
-  - path: {{ include "understack.deploy_path" $ }}/manifests/openstack
+      - $deploy/{{ include "understack.deploy_path" $ }}/openstack/values.yaml
+  - path: {{ include "understack.deploy_path" $ }}/openstack
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

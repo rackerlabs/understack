@@ -3,7 +3,7 @@
 ## UI and API access
 
 To allow UI and API access to Argo Workflows you must configure SSO and
-the Ingress. To start, in your deployment repo under `$ENV_NAME/manifests/`
+the Ingress. To start, in your deployment repo under `$ENV_NAME/`
 you must have a `argo-workflows` directory.
 
 You can download the SSO configuration template and Ingress template from:

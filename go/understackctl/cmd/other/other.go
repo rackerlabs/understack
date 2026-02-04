@@ -99,7 +99,6 @@ func updateOpenStackSecretsFile() error {
 
 	secretFilePath := filepath.Join(
 		envutil.Getenv("DEPLOY_NAME"),
-		"manifests",
 		"secret-openstack.yaml",
 	)
 	log.Info("updating secret-openstack.yaml", "path", secretFilePath)

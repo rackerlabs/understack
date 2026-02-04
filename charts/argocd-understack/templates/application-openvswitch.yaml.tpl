@@ -20,14 +20,14 @@ spec:
       valueFiles:
       - $understack/components/images-openstack.yaml
       - $understack/components/openvswitch/values.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/manifests/secret-openstack.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/manifests/images-openstack.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/openvswitch.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/secret-openstack.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/images-openstack.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/openvswitch/values.yaml
   - path: components/openvswitch/
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ include "understack.deploy_path" $ }}/manifests/openvswitch
+  - path: {{ include "understack.deploy_path" $ }}/openvswitch
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

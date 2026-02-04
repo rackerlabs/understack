@@ -14,7 +14,7 @@ somevalue = 1
 Firstly you would create either a `Secret` or a `ConfigMap` and ensure that it is
 being loaded by `${DEPLOY_NAME}/manifest/neutron/kustomize.yaml`
 
-Then you would edit `${DEPLOY_NAME}/helm-configs/neutron.yaml` and add something
+Then you would edit `${DEPLOY_NAME}/neutron/values.yaml` and add something
 like:
 
 ```yaml

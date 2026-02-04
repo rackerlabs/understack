@@ -1,36 +1,34 @@
 # understackctl
 
-understackctl is a CLI that helps quickly generate a deployment repository.
+understackctl is a CLI tool for managing UnderStack deployments.
 
-## How to use
+## Commands
 
-> Please make sure that you have kubeseal binary installed your system https://github.com/bitnami-labs/sealed-secrets
+### deploy
 
-* Export all these env
+Manage deployment repository structure and configuration.
 
-```sh
-export UC_DEPLOY="<full_local_path_to_undercloud_deploy_repo>"
-export DEPLOY_NAME="<cluster_name>"
-export UC_DEPLOY_GIT_URL=git@github.com:RSS-Engineering/undercloud-deploy.git
-export UC_DEPLOY_SSH_FILE=<path_to_ssh_private_key_file>
-export DNS_ZONE=<cluster_name>.dev.undercloud.rackspace.net
-export UC_DEPLOY_EMAIL="<your_email>"
-export UC_AIO=yes
+```bash
+# Initialize a new cluster configuration
+understackctl deploy init <cluster-name> --type <global|site|aio>
+
+# Sync manifest directories with deploy.yaml
+understackctl deploy update <cluster-name>
+
+# Validate configuration
+understackctl deploy check <cluster-name>
 ```
 
-* Quick Run
+See the [Deploy Guide](https://rackerlabs.github.io/understack/deploy-guide/deploy-repo/) for details.
 
-```
-go run *.go quickstart
-go run *.go help
-```
+### Other Commands
 
-* Commit all changes to the undercloud-deploy repo in your branch
+Run `understackctl --help` to see all available commands.
 
 ## Build
 
-* Local build `make build` ( this will only build binary for you local os ).
-* Cross-Platform build `make build-all` ( build for linux-mac-windows )
+* Local build: `make build` (builds for your local OS)
+* Cross-platform build: `make build-all` (builds for Linux, macOS, Windows)
 
 ## Development
 

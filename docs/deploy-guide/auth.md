@@ -8,7 +8,7 @@ services and a connector must be configured to provide authentication.
     Unfortunately we need to use the domain ID (UUID) and not the domain name in the
     Dex configuration. This is not known before hand. So at this time you must copy
     the `config.connectors` section from `values-generic.yaml` or `values-azure.yaml`
-    into `${DEPLOY_NAME}/helm-configs/dexidp.yaml` and change the value of the
+    into `${DEPLOY_NAME}/dex/values.yaml` and change the value of the
     `domain` key in the `keystone_internal` section to the UUID of the `operator`
     domain.
 
@@ -41,11 +41,11 @@ You will then make a note of the following pieces of information for your applic
 
 #### Azure Dex Configuration
 
-In `${DEPLOY_NAME}/helm-configs/dexidp.yaml` under the `valuesFiles` key
+In `${DEPLOY_NAME}/dex/values.yaml` under the `valuesFiles` key
 add `$values/components/dexidp/values-azure.yaml` beneath  `values-generic.yaml`
 like:
 
-```yaml title="${DEPLOY_NAME}/helm-configs/dexidp.yaml"
+```yaml title="${DEPLOY_NAME}/dex/values.yaml"
 spec:
   sources:
     - chart: dex
@@ -55,7 +55,7 @@ spec:
         valuesFiles:
             - $understack/components/dexidp/values-generic.yaml
             - $understack/components/dexidp/values-azure.yaml
-            - $deploy/YOUR_CLUSTER/helm-configs/dexidp.yaml
+            - $deploy/YOUR_CLUSTER/dex/values.yaml
 # rest omitted
 ```
 
@@ -68,7 +68,7 @@ kubectl --namespace dex \
     --from-literal=client-id={client_id} \
     --from-literal=client-secret={client_secret} \
     --from-literal=redirect-uri=https://dex.${DNS_ZONE}/callback \
-    -o yaml > ${UC_DEPLOY}/${DEPLOY_NAME}/manifests/secret-oidc-sso-dex.yaml
+    -o yaml > ${UC_DEPLOY}/${DEPLOY_NAME}/secret-oidc-sso-dex.yaml
 ```
 
 You must remember to add this secret to your secret storage (e.g. for
@@ -92,9 +92,9 @@ to different parts of the system. The default groups through the system are:
 ### Nautobot
 
 To customize the administrator group set the following in your
-`${DEPLOY_NAME}/helm-configs/nautobot.yaml`
+`${DEPLOY_NAME}/nautobot/values.yaml`
 
-```yaml title="${DEPLOY_NAME}/helm-configs/nautobot.yaml"
+```yaml title="${DEPLOY_NAME}/nautobot/values.yaml"
 nautobot:
   extraEnvVars:
     # ignoring existing values here, don't remove

@@ -26,8 +26,8 @@ helm template \
     --namespace openstack \
     -f understack/components/images-openstack.yaml \  # the version we are deploying
     -f understack/components/ironic/values.yaml \  # common configs
-    -f your-deploy/$YOUR_ENV/manifests/secret-openstack.yaml \  # credentials
-    -f your-deploy/$YOUR_ENV/helm-configs/ironic.yaml  # your specific overrides
+    -f your-deploy/$YOUR_ENV/secret-openstack.yaml \  # credentials
+    -f your-deploy/$YOUR_ENV/ironic/values.yaml  # your specific overrides
 ```
 
 For another component change all instances of `ironic` to the one you want to target.
@@ -41,7 +41,7 @@ helm template \
     --namespace openstack \
     -f understack/components/images-openstack.yaml \  # the version we are deploying
     -f understack/components/ironic/values.yaml \  # common configs
-    -f your-deploy/$YOUR_ENV/manifests/secret-openstack.yaml \  # credentials
-    -f your-deploy/$YOUR_ENV/helm-configs/ironic.yaml \  # your specific overrides
+    -f your-deploy/$YOUR_ENV/secret-openstack.yaml \  # credentials
+    -f your-deploy/$YOUR_ENV/ironic/values.yaml \  # your specific overrides
     | kubectl -n openstack diff -f -
 ```

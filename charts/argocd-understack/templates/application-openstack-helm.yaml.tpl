@@ -38,14 +38,14 @@ spec:
       valueFiles:
       - $understack/components/images-openstack.yaml
       - $understack/components/{{ $appName }}/values.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/manifests/secret-openstack.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/manifests/images-openstack.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/{{ $appName }}.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/secret-openstack.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/images-openstack.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/{{ $appName }}/values.yaml
   - path: components/{{ $appName }}/
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ include "understack.deploy_path" $ }}/manifests/{{ $appName }}
+  - path: {{ include "understack.deploy_path" $ }}/{{ $appName }}
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

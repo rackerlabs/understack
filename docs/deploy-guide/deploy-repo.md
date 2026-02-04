@@ -12,60 +12,96 @@ a [Site cluster](./welcome.md#system-division).
 
 ## Initial Structure
 
-To begin we will create our directory structure inside our Deployment Repository.
+To begin we will create our directory structure inside our Deployment Repository
+using the `understackctl` CLI tool.
 
 ```bash title="From the Deployment Repo"
-# where 'my-global' is the environment name you've used for your global cluster
-mkdir -p my-global/{manifests,helm-configs,inventory}
-# where 'my-site' is the environment name you've used for your site cluster
-mkdir -p my-site/{manifests,helm-configs,inventory}
+# For a global cluster
+understackctl deploy init my-global --type global
 
-cat <<- EOF > my-global/deploy.yaml
----
-understack_url: https://github.com/rackerlabs/understack.git
-understack_ref: v0.0.5  # replace with the tag or git reference you want to use
-deploy_url: git@github.com:my-org/my-deploy.git
-deploy_ref: HEAD
+# For a site cluster
+understackctl deploy init my-site --type site
 
-global:
-  enabled: false
-
-site:
-  enabled: false
-EOF
-
-cat <<- EOF > my-site/deploy.yaml
----
-understack_url: https://github.com/rackerlabs/understack.git
-understack_ref: v0.0.5
-deploy_url: git@github.com:my-org/my-deploy.git
-deploy_ref: HEAD
-
-global:
-  enabled: false
-
-site:
-  enabled: false
-EOF
+# For an all-in-one (AIO) cluster
+understackctl deploy init my-aio --type aio
 ```
 
-For `dev` focused deployments, you do not need to specify the refs directly
-as they can be set on the ArgoCD cluster secret to allow more flexibility
-during testing.
+This creates a `deploy.yaml` configuration file with the component list for your
+cluster type. The `deploy_url` will be auto-detected from your git remote if available.
 
-### manifests directory
+Example `deploy.yaml` for a site cluster:
 
-Inside of the `manifests` directory you'll create child directories that will
-be named after each application that we will deploy. These directories are
-expected to hold a `kustomization.yaml` as `kustomize` will be used to apply
-these manifests to your cluster.
+```yaml
+understack_url: https://github.com/rackerlabs/understack.git
+deploy_url: git@github.com:my-org/my-deploy.git
+site:
+  enabled: true
+  keystone:
+    enabled: true
+  nova:
+    enabled: true
+  neutron:
+    enabled: true
+  ironic:
+    enabled: true
+  glance:
+    enabled: true
+  # ... additional site components
+```
 
-### helm-configs directory
+After initialization, create the manifest directories:
 
-The `helm-configs` directory holds YAML files which are Helm `values.yaml`
-files that are used as additional values files that will be merged together
-by Helm. These yaml files will be named after each application with the `.yaml`
-file extension.
+```bash
+understackctl deploy update my-site
+```
+
+This creates `<component>/` directories with `kustomization.yaml` and
+`values.yaml` files for each enabled component.
+
+### component directories
+
+Inside of the `manifests` directory you'll have child directories named after
+each component (using hyphens, e.g., `cert-manager`, `argo-workflows`). These
+directories contain:
+
+- `kustomization.yaml` - Kustomize configuration for the component
+- `values.yaml` - Helm value overrides for the component
+
+You can verify all required files exist with:
+
+```bash
+understackctl deploy check my-site
+```
+
+### Managing Components
+
+To enable or disable components, edit the component sections in `deploy.yaml`:
+
+```yaml
+site:
+  enabled: true
+  keystone:
+    enabled: true
+  nova:
+    enabled: true
+  neutron:
+    enabled: false  # Disable by setting to false
+```
+
+Then sync the filesystem:
+
+```bash
+understackctl deploy update my-site
+```
+
+This will create directories for enabled components and remove directories for
+disabled components.
+
+!!! note "Component Naming"
+    Component names in `deploy.yaml` use underscores (e.g., `cert_manager`,
+    `argo_workflows`) but the corresponding directories use hyphens
+    (e.g., `cert-manager`, `argo-workflows`). The `understackctl` tool
+    handles this conversion automatically.
 
 ### inventory directory
 

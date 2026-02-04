@@ -38,14 +38,14 @@ sources:
         # pulls defaults from the understack repo
         - $understack/components/dex/values.yaml
         # pulls overrides from your deploy repo
-        - $deploy/{{.name}}/helm-configs/dex.yaml
+        - $deploy/{{.name}}/dex/values.yaml
       ignoreMissingValueFiles: true
   - ref: understack
     # path should only be here if you have manifests to load
     path: 'components/dex'
   - ref: deploy
     # only needed if manifests should be here
-    path: '{{.name}}/manifests/dex'
+    path: '{{.name}}/dex'
 ```
 
 {% endraw %}

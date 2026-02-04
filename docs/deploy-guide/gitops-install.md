@@ -143,28 +143,41 @@ git -C "${UC_DEPLOY}" commit -m "my-k3s: secrets generation"
 
 ### Defining the app deployment
 
-In this section we will use the [App of Apps][app-of-apps] pattern to define
-the deployment of all the components of UnderStack.
+In this section we will initialize the deployment configuration and create
+the component manifests.
 
 ```bash
-./scripts/gitops-deploy.sh ${UC_DEPLOY}/my-k3s.env
-git -C "${UC_DEPLOY}" add helm-configs/my-k3s
-git -C "${UC_DEPLOY}" commit -m "my-k3s: initial cluster config"
+cd "${UC_DEPLOY}"
+understackctl deploy init my-k3s --type aio
+understackctl deploy update my-k3s
+git add my-k3s
+git commit -m "my-k3s: initial cluster config"
 ```
+
+The `deploy init` command creates a `deploy.yaml` with all components for an
+AIO (all-in-one) deployment. The `deploy update` command creates the manifest
+directories with `kustomization.yaml` and `values.yaml` files for each component.
 
 ## Final modifications of your deployment
 
-This is point you can make changes to the [ArgoCD][argocd] configs before
-you do the deployment in your `$UC_DEPLOY` repo. You'll want to consider
-any changes to each of components to your cluster by modifying or adding
-values files or kustomize patches. This should be considered a rough template
-that is yours to modify. Once you've made all the changes you want to make,
-ensure that you `git push` your `$UC_DEPLOY` repo so that ArgoCD can access it.
+This is the point you can make changes to the [ArgoCD][argocd] configs before
+you do the deployment in your `$UC_DEPLOY` repo. You can:
+
+- Edit component-specific Helm values in `my-k3s/<component>/values.yaml`
+- Add Kustomize patches in `my-k3s/<component>/kustomization.yaml`
+- Enable/disable components by editing the `components` list in `my-k3s/deploy.yaml`
+  and running `understackctl deploy update my-k3s`
+
+Verify your configuration:
+
+```bash
+understackctl deploy check my-k3s
+```
+
+Once you've made all the changes you want to make, ensure that you `git push`
+your `$UC_DEPLOY` repo so that ArgoCD can access it.
 
 For authentication, please review the [authentication](auth.md) documentation.
-
-For OpenStack Helm components, an empty file in `$UC_DEPLOY/my-k3s/helm-configs`
-has been created for each component for you to use for customization.
 
 See the Preparing Your Deployment section for component specific details.
 
@@ -177,13 +190,13 @@ to your git server so that ArgoCD can access it.
 Configure your ArgoCD to be aware of your cluster:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/manifests/argocd/secret-*-cluster.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/argocd/secret-*-cluster.yaml"
 ```
 
 Now configure your ArgoCD to have the credential access to your deploy repo:
 
 ```bash
-kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/manifests/argocd/secret-deploy-repo.yaml"
+kubectl -n argocd apply -f "${UC_DEPLOY}/${DEPLOY_NAME}/argocd/secret-deploy-repo.yaml"
 ```
 
 Label the node(s) to allow OpenStack control plane installation:

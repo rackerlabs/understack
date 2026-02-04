@@ -1,8 +1,16 @@
 #!/bin/bash
 
+# DEPRECATED: This script is deprecated in favor of understackctl deploy commands.
+# Use instead:
+#   understackctl deploy init <cluster-name> --type <global|site|aio>
+#   understackctl deploy update <cluster-name>
+#
+# This script remains for backward compatibility but may be removed in a future release.
+
 usage() {
     echo "$(basename "$0") <deploy.env>" >&2
     echo "" >&2
+    echo "DEPRECATED: Use 'understackctl deploy init' and 'understackctl deploy update' instead" >&2
     echo "Generates an initial layout of configs for deploying" >&2
     exit 1
 }
@@ -50,18 +58,20 @@ if [ -z "${DEPLOY_NAME}" ]; then
 fi
 
 UC_REPO_COMPONENTS="${UC_REPO}/components"
-UC_DEPLOY_HELM_CFG="${UC_DEPLOY}/${DEPLOY_NAME}/helm-configs"
+UC_DEPLOY_MANIFESTS="${UC_DEPLOY}/${DEPLOY_NAME}/manifests"
 
 export DNS_ZONE
 export UC_DEPLOY_GIT_URL
 export DEPLOY_NAME
 
-# create helm-configs directory for values.yaml overrides
-mkdir -p "${UC_DEPLOY_HELM_CFG}"
+# create manifests directory for component configs
+mkdir -p "${UC_DEPLOY_MANIFESTS}"
 
 # shellcheck disable=SC2043
 for component in "dex"; do
-    helmvals="${UC_DEPLOY_HELM_CFG}/${component}.yaml"
+    compdir="${UC_DEPLOY_MANIFESTS}/${component}"
+    helmvals="${compdir}/values.yaml"
+    mkdir -p "${compdir}"
     if [ -f "${helmvals}" ]; then
         echo "You have ${helmvals} already, not overwriting"
         continue

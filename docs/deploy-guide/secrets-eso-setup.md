@@ -33,9 +33,9 @@ For each OpenStack service, the ESO integration creates:
 
 ### 1. Enable ESO Integration
 
-In your `$DEPLOY_NAME/helm-configs/openstack.yaml`:
+In your `$DEPLOY_NAME/openstack/values.yaml`:
 
-```yaml title="$DEPLOY_NAME/helm-configs/openstack.yaml"
+```yaml title="$DEPLOY_NAME/openstack/values.yaml"
 keystoneServiceUsers:
   enabled: true
   secretStore:
@@ -51,7 +51,7 @@ keystoneServiceUsers:
 
 Define the service accounts for each OpenStack component:
 
-```yaml title="$DEPLOY_NAME/helm-configs/openstack.yaml"
+```yaml title="$DEPLOY_NAME/openstack/values.yaml"
 keystoneServiceUsers:
   services:
     nova:
@@ -89,7 +89,7 @@ Each service requires specific usage types:
 UnderStack's ['openstack' component][openstack-component] a `ClusterSecretStore` will be created
 that uses Kubernetes authentication:
 
-```yaml title="$DEPLOY_NAME/helm-configs/openstack.yaml"
+```yaml title="$DEPLOY_NAME/openstack/values.yaml"
 # Generated automatically by the openstack component
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
@@ -170,7 +170,7 @@ kubectl get secrets -n openstack | grep keystone-password
 ```
 
 ```bash title="Check if ESO is enabled in your configuration"
-grep -A 10 "keystoneServiceUsers:" $DEPLOY_NAME/helm-configs/openstack.yaml
+grep -A 10 "keystoneServiceUsers:" $DEPLOY_NAME/openstack/values.yaml
 ```
 
 ### Migration Steps

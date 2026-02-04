@@ -17,10 +17,10 @@ spec:
       ignoreMissingValueFiles: true
       releaseName: nautobotop
       valueFiles:
-      - $deploy/{{ include "understack.deploy_path" $ }}/helm-configs/nautobotop.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/nautobotop/values.yaml
     repoURL: ghcr.io/rackerlabs/charts
     targetRevision: 0.0.1
-  - path: {{ include "understack.deploy_path" $ }}/manifests/nautobotop
+  - path: {{ include "understack.deploy_path" $ }}/nautobotop
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
