@@ -72,7 +72,7 @@ spec:
   applyTo: "queues"  # set to 'queues', 'exchanges', or 'all'
   priority: 1  # defaults to 0
   definition:  # policy definition
-    message-ttl: 86400000
+    ha-mode: all
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
