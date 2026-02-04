@@ -23,14 +23,14 @@ spec:
       releaseName: kube-prometheus-stack
       valueFiles:
       - $understack/operators/monitoring/values.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/manifests/monitoring/values.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/monitoring/values.yaml
     repoURL: https://prometheus-community.github.io/helm-charts
     targetRevision: 79.5.0
   - path: operators/monitoring
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ include "understack.deploy_path" $ }}/manifests/monitoring
+  - path: {{ include "understack.deploy_path" $ }}/monitoring
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
