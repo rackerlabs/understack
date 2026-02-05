@@ -23,6 +23,9 @@ conf:
       scheduler_default_filters: DriverFilter,AvailabilityZoneFilter,CapacityFilter,CapabilitiesFilter
   rabbitmq:
     policies: [] # Override the policy being injected by OSH
+  cinder_api_uwsgi:
+    uwsgi:
+      processes: 2
 
 # typically overridden by environmental
 # values, but should include all endpoints
