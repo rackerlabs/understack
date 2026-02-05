@@ -1,0 +1,40 @@
+From 1e7fea13cfd60e6584d9b6687cfe9b82d330af07 Mon Sep 17 00:00:00 2001
+From: Milan Fencik <milan.fencik@rackspace.co.uk>
+Date: Tue, 4 Nov 2025 13:56:22 +0000
+Subject: [PATCH] Handle missing storage controller mode attribute
+
+On some Dell hardware, a storage controller may appear as a PCIe
+Extender 1. These types of controllers are used internally for
+connectivity to NVMe devices or other storage controllers via
+the backplane.
+
+When using such hardware, these storage controllers may not have
+a controller mode attribute, which currently results in an
+AttributeError.
+
+This change adds a check for the attribute and returns None if
+it is not found.
+
+Change-Id: I25295fee0118852c4c36cec07217d720ff556587
+Signed-off-by: Milan Fencik <milan.fencik@rackspace.co.uk>
+---
+ sushy/oem/dell/resources/system/storage/controller.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/sushy/oem/dell/resources/system/storage/controller.py b/sushy/oem/dell/resources/system/storage/controller.py
+index 07362282..f7f299ea 100644
+--- a/sushy/oem/dell/resources/system/storage/controller.py
++++ b/sushy/oem/dell/resources/system/storage/controller.py
+@@ -37,7 +37,11 @@ class DellStorageControllerExtension(oem_base.OEMResourceBase):
+         :returns: TaskMonitor if controller mode changes applied and need to
+             reboot, otherwise None
+         """
+-        controller_mode = self.dell_storage_controller.controller_mode
++        # Some controllers do not have controller_mode
++        try:
++            controller_mode = self.dell_storage_controller.controller_mode
++        except AttributeError:
++            return None
+
+         # BOSS will have this empty, PERC will have something assigned
+         if controller_mode and controller_mode != s_cons.ControllerMode.RAID:
