@@ -89,6 +89,9 @@ conf:
         - ServerGroupAntiAffinityFilter
         - ServerGroupAffinityFilter
         - JsonFilter
+  nova_api_uwsgi:
+    uwsgi:
+      processes: 2
 
 console:
   # we are working with baremetal nodes and not QEMU so we don't need novnc or spice
