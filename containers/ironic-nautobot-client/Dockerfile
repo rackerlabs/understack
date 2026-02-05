@@ -11,7 +11,7 @@ COPY --chown=appuser:appgroup python/understack-flavor-matcher /tmp/understack/p
 
 # install our requirements and our packages
 RUN --mount=type=cache,target=/root/.cache/uv \
-  uv venv /opt/venv && \
+  uv venv /opt/venv --clear && \
   uv pip install \
     netifaces \
     psutil==6.1.1 \
