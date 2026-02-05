@@ -1,5 +1,5 @@
 serviceMonitor:
-  interval: 4m
+  interval: 10m
   scrapeTimeout: 3m
 
 nodeSelector:
