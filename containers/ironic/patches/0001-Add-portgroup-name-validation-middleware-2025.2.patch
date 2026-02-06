@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Syed <syed8048@users.noreply.github.com>
+Date: Thu, 6 Feb 2026 00:00:00 +0000
+Subject: [PATCH] Add portgroup name validation middleware for undersync
+
+Add portgroup name validation middleware directly in setup_app.
+Validates names match format: {node_name}-port-channel{number}
+---
+ ironic/api/app.py | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/ironic/api/app.py b/ironic/api/app.py
+--- a/ironic/api/app.py
++++ b/ironic/api/app.py
+@@ -135,6 +135,12 @@ def setup_app(pecan_config=None, extra_hooks=None):
+     # Add request logging middleware
+     app = request_log.RequestLogMiddleware(app)
+
++    # Add understack portgroup name validation middleware
++    from ironic_understack.portgroup_name_middleware import (
++        PortgroupNameValidationMiddleware,
++    )
++    app = PortgroupNameValidationMiddleware(app)
++
+     return app
+
+
+--
+2.25.1
