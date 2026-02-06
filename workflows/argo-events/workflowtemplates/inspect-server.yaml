@@ -156,9 +156,43 @@ spec:
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
             when: "'{{tasks.server-start-state.outputs.result}}' != 'active'"
+          - name: server-restore-inspect-redfish
+            # restore the server back to redfish based inspection
+            depends: "inspect-server-agent.Succeeded"
+            template: openstack-set-cmd
+            arguments:
+              parameters:
+                - name: object
+                  value: node
+                - name: flag
+                  value: "--inspect-interface"
+                - name: value
+                  value: "redfish"
+                - name: obj_id
+                  value: "{{tasks.node-id.outputs.result}}"
+            when: >-
+              '{{tasks.server-driver.outputs.result}}' == 'redfish' &&
+              '{{tasks.server-start-state.outputs.result}}' != 'active'
+          - name: server-restore-inspect-idrac-redfish
+            # restore the server back to idrac-redfish based inspection
+            depends: "inspect-server-agent.Succeeded"
+            template: openstack-set-cmd
+            arguments:
+              parameters:
+                - name: object
+                  value: node
+                - name: flag
+                  value: "--inspect-interface"
+                - name: value
+                  value: "idrac-redfish"
+                - name: obj_id
+                  value: "{{tasks.node-id.outputs.result}}"
+            when: >-
+              '{{tasks.server-driver.outputs.result}}' == 'idrac' &&
+              '{{tasks.server-start-state.outputs.result}}' != 'active'
           - name: return-server
             # returns a server to its previous state if needed
-            depends: "server-start-state.Succeeded && inspect-server-agent.Succeeded"
+            depends: "inspect-server-agent.Succeeded && (server-restore-inspect-redfish.Succeeded || server-restore-inspect-idrac-redfish.Succeeded)"
             template: openstack-wait-cmd
             arguments:
               parameters:
