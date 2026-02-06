@@ -1,4 +1,4 @@
-FROM ghcr.io/flant/shell-operator:latest AS prod
+FROM ghcr.io/flant/shell-operator:v1.13.1 AS prod
 LABEL org.opencontainers.image.description="shell-operator for Ironic Runbooks"
 
 RUN --mount=type=cache,target=/var/cache/apk apk add python3

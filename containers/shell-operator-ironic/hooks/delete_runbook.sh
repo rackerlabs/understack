@@ -8,7 +8,11 @@ if [[ $1 == "--config" ]] ; then
     "apiVersion": "baremetal.ironicproject.org/v1alpha1",
     "kind": "IronicRunbook",
     "executeHookOnEvent":[ "Deleted" ]
-  }]
+  }],
+  "settings": {
+    "executionMinInterval": 30s,
+    "executionBurst": 1
+  }
 }
 EOF
 else
