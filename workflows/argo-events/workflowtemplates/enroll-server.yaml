@@ -86,7 +86,7 @@ spec:
             when: "{{steps.server-manage-state.outputs.result}} == manageable"
     - name: enroll-server
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1633
         command:
           - enroll-server
         args:
@@ -118,7 +118,7 @@ spec:
                 path: clouds.yaml
     - name: bios-settings
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1633
         command:
           - bios-settings
         args:
