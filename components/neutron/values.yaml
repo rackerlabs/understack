@@ -83,10 +83,6 @@ conf:
       default_availability_zones: ""
       # add 50 to the max MTU we want of 9000 to handle Neutron's -50 for VXLAN type
       global_physnet_mtu: 9050
-    oslo_messaging_rabbit:
-      amqp_durable_queues: true
-      # https://docs.openstack.org/large-scale/journey/configure/rabbitmq.html#rabbit-transient-queues-ttl
-      rabbit_transient_queues_ttl: 300
     service_providers:
       service_provider:
         type: multistring

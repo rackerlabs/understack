@@ -14,8 +14,6 @@ conf:
       volume_backend_name: netapp_nvme
       volume_driver: cinder_understack.dynamic_netapp_driver.NetappCinderDynamicDriver
   cinder:
-    oslo_messaging_rabbit:
-      amqp_durable_queues: true
     DEFAULT:
       enabled_backends: netapp_nvme
       default_volume_type: __DEFAULT__

@@ -76,8 +76,6 @@ conf:
     ironic:
       api_max_retries: 90  # number of times to retry. default is 60.
       api_retry_interval: 10  # number of sesconds between retries. default is 2.
-    oslo_messaging_rabbit:
-      amqp_durable_queues: true
 
     # https://docs.openstack.org/nova/2025.2/admin/scheduling.html#the-filter-scheduler
     filter_scheduler:
