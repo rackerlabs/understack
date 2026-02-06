@@ -22,7 +22,7 @@ images:
     keystone_fernet_setup: "ghcr.io/rackerlabs/understack/keystone:2025.2"
 
     # ironic
-    ironic_api: "ghcr.io/rackerlabs/understack/ironic:2025.2"
+    ironic_api: "ghcr.io/rackerlabs/understack/ironic:pr-1666"
     ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:2025.2"
     ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:2025.2"
     ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:2025.2"
