@@ -61,6 +61,13 @@ type NautobotReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
+// resourceConfig defines configuration for a single resource type
+type resourceConfig struct {
+	name       string
+	configRefs []syncv1alpha1.ConfigMapRef
+	syncFunc   func(context.Context, *nbClient.NautobotClient, map[string]string) error
+}
+
 func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 	var nautobotCR syncv1alpha1.Nautobot
@@ -68,63 +75,73 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Aggregate device type data from all referenced ConfigMaps
-	locationTypeMap, err := r.aggregateDeviceTypeDataFromConfigMap(ctx, nautobotCR.Spec.LocationTypesRef)
-	if err != nil {
-		log.Error(err, "failed to aggregate device type data from ConfigMaps")
-		return ctrl.Result{}, err
-	}
-
-	// Aggregate device type data from all referenced ConfigMaps
-	deviceTypeMap, err := r.aggregateDeviceTypeDataFromConfigMap(ctx, nautobotCR.Spec.DeviceTypesRef)
-	if err != nil {
-		log.Error(err, "failed to aggregate device type data from ConfigMaps")
-		return ctrl.Result{}, err
-	}
-
-	// Check if sync should proceed based on time interval and data changes
 	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
-	requestTimeAfter := time.Duration(nautobotCR.Spec.RequeueAfter) * time.Second
-	currentHash := computeHash(deviceTypeMap)
-	previousHash := nautobotCR.GetSyncHash("deviceType")
+	requeueAfter := time.Duration(nautobotCR.Spec.RequeueAfter) * time.Second
 
-	syncDecision := r.shouldSync(nautobotCR.Status.LastSyncedAt, syncInterval, currentHash, previousHash)
-	if !syncDecision.ShouldSync {
-		log.Info("skipping sync", "reason", syncDecision.Reason, "hash", currentHash)
-		nautobotCR.Status.Message = syncDecision.StatusMessage
+	// Define all resources to sync
+	// Add more resources here: {name: "location", configRefs: nautobotCR.Spec.LocationsRef, syncFunc: r.syncLocations}
+	resources := []resourceConfig{
+		{name: "locationType", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
+		{name: "location", configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
+		{name: "rackGroup", configRefs: nautobotCR.Spec.RackGroupRef, syncFunc: r.syncRackGroup},
+		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
+	}
+
+	// Aggregate data and check sync decisions for all resources
+	resourcesToSync := make(map[string]map[string]string)
+	for _, res := range resources {
+		dataMap, err := r.aggregateDataFromConfigMap(ctx, res.configRefs)
+		if err != nil {
+			log.Error(err, "failed to aggregate data", "resource", res.name)
+			return ctrl.Result{}, err
+		}
+
+		currentHash := computeHash(dataMap)
+		previousHash := nautobotCR.GetSyncHash(res.name)
+		decision := r.shouldSync(nautobotCR.Status.LastSyncedAt, syncInterval, currentHash, previousHash)
+
+		if decision.ShouldSync {
+			log.Info("resource needs sync", "resource", res.name, "reason", decision.Reason)
+			resourcesToSync[res.name] = dataMap
+		} else {
+			log.Info("skipping resource sync", "resource", res.name, "reason", decision.Reason)
+		}
+	}
+
+	// If nothing to sync, update status and requeue
+	if len(resourcesToSync) == 0 {
+		nautobotCR.Status.Message = "No changes detected"
 		if err := r.Status().Update(ctx, &nautobotCR); err != nil {
 			log.Error(err, "failed to update status")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{RequeueAfter: requestTimeAfter}, nil
-	}
-
-	log.Info("proceeding with sync", "reason", syncDecision.Reason, "hash", currentHash)
-
-	// Retrieve the Nautobot authentication token from a secret or external source
-	username, token, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
-	if err != nil {
-		log.Error(err, "failed parse find nautobot auth token")
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 
 	// Create Nautobot client
+	username, token, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
+	if err != nil {
+		log.Error(err, "failed to get nautobot auth token")
+		return ctrl.Result{}, err
+	}
 	nautobotURL := fmt.Sprintf("http://%s.%s.svc.cluster.local/api", nautobotCR.Spec.NautobotServiceRef.Name, nautobotCR.Spec.NautobotServiceRef.Namespace)
 	nautobotClient := nbClient.NewNautobotClient(nautobotURL, username, token)
 
-	if err := r.syncLocationTypes(ctx, nautobotClient, locationTypeMap); err != nil {
-		log.Error(err, "failed to sync device types")
-		return ctrl.Result{}, err
-	}
-	if err := r.syncDeviceTypes(ctx, nautobotClient, deviceTypeMap); err != nil {
-		log.Error(err, "failed to sync device types")
-		return ctrl.Result{}, err
+	// Sync resources that need updating
+	for _, res := range resources {
+		if dataMap, ok := resourcesToSync[res.name]; ok {
+			if err := res.syncFunc(ctx, nautobotClient, dataMap); err != nil {
+				log.Error(err, "failed to sync resource", "resource", res.name)
+				return ctrl.Result{}, err
+			}
+			nautobotCR.SetSyncHash(res.name, computeHash(dataMap))
+		}
 	}
 
+	// Update status
 	nautobotCR.Status.LastSyncedAt = metav1.Now()
 	nautobotCR.Status.Ready = true
 	nautobotCR.Status.NautobotStatusReport = nautobotClient.Report
-	nautobotCR.SetSyncHash("deviceType", currentHash)
 	if len(nautobotClient.Report) > 0 {
 		nautobotCR.Status.Message = "sync completed with some errors"
 	} else {
@@ -134,15 +151,14 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		log.Error(err, "failed to update status")
 		return ctrl.Result{}, err
 	}
-	// Successfully completed reconciliation; requeue after configured sync interval
+
 	log.Info("sync completed successfully")
-	return ctrl.Result{RequeueAfter: requestTimeAfter}, nil
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
-// aggregateDeviceTypeDataFromConfigMap fetches and merges data from all referenced ConfigMaps.
-// It returns a map containing all device type configurations.
-func (r *NautobotReconciler) aggregateDeviceTypeDataFromConfigMap(ctx context.Context, refs []syncv1alpha1.ConfigMapRef) (map[string]string, error) {
-	deviceTypeMap := make(map[string]string)
+// aggregateDataFromConfigMap fetches and merges data from all referenced ConfigMaps.
+func (r *NautobotReconciler) aggregateDataFromConfigMap(ctx context.Context, refs []syncv1alpha1.ConfigMapRef) (map[string]string, error) {
+	dataMap := make(map[string]string)
 
 	for _, ref := range refs {
 		var configMap corev1.ConfigMap
@@ -156,27 +172,49 @@ func (r *NautobotReconciler) aggregateDeviceTypeDataFromConfigMap(ctx context.Co
 				namespacedName.Namespace, namespacedName.Name, err)
 		}
 
-		// Merge ConfigMap data into the aggregate map
-		maps.Copy(deviceTypeMap, configMap.Data)
+		maps.Copy(dataMap, configMap.Data)
 	}
 
-	return deviceTypeMap, nil
+	return dataMap, nil
 }
 
 // syncDeviceTypes syncs device types to Nautobot.
-// The hash comparison is now handled in the Reconcile function.
 func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 	nautobotClient *nbClient.NautobotClient,
 	deviceTypeMap map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-
-	log.Info("syncing device types", "deviceTypeCount", len(deviceTypeMap))
+	log.Info("syncing device types", "count", len(deviceTypeMap))
 	syncSvc := sync.NewDeviceTypeSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, deviceTypeMap); err != nil {
 		return fmt.Errorf("failed to sync device types: %w", err)
 	}
+	return nil
+}
 
+func (r *NautobotReconciler) syncRackGroup(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	locationType map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing rack group", "count", len(locationType))
+	syncSvc := sync.NewRackGroupSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
+		return fmt.Errorf("failed to sync rack group: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncLocation(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	locationType map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing location types", "count", len(locationType))
+	syncSvc := sync.NewLocationSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
+		return fmt.Errorf("failed to sync location types: %w", err)
+	}
 	return nil
 }
 
@@ -185,13 +223,11 @@ func (r *NautobotReconciler) syncLocationTypes(ctx context.Context,
 	locationType map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-
-	log.Info("syncing location types", "locationTypeCount", len(locationType))
+	log.Info("syncing location types", "count", len(locationType))
 	syncSvc := sync.NewLocationTypeSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
 		return fmt.Errorf("failed to sync location types: %w", err)
 	}
-
 	return nil
 }
 

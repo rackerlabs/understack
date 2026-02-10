@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rackerlabs.github.io/understack/schema/rack-group.schema.json",
+  "title": "UnderStack Rack Groups",
+  "description": "Hierarchical rack group configuration schema for Nautobot rack organization",
+  "type": "array",
+  "items": {
+    "$ref": "#/$defs/rackGroup"
+  },
+  "minItems": 1,
+  "$defs": {
+    "rackGroup": {
+      "type": "object",
+      "description": "A rack group definition with optional nested children",
+      "properties": {
+        "name": {
+          "description": "Name of the rack group",
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "description": "Human-readable description of the rack group",
+          "type": "string"
+        },
+        "location": {
+          "description": "Location where the rack group is situated (must correspond to a defined location)",
+          "type": "string",
+          "minLength": 1
+        },
+        "children": {
+          "description": "Child rack groups nested under this rack group",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rackGroup"
+          }
+        }
+      },
+      "required": ["name", "description", "location"],
+      "additionalProperties": false
+    }
+  }
+}
