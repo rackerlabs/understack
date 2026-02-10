@@ -33,9 +33,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY containers/ironic/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
-    patch -p1 < /tmp/patches/0001-Solve-IPMI-call-issue-results-in-UTF-8-format-error-.patch
+    patch -p1 < /tmp/patches/0001-Add-portgroup-name-validation-middleware-2025.2.patch
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
-    patch -p1 < /tmp/patches/0002-Handle-missing-storage-controller-mode-attribute.patch
+    patch -p1 < /tmp/patches/0002-Solve-IPMI-call-issue-results-in-UTF-8-format-error-.patch
+RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
+    patch -p1 < /tmp/patches/0003-Handle-missing-storage-controller-mode-attribute.patch
 
 # download and unpack novnc
 RUN \
