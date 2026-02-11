@@ -40,10 +40,10 @@ spec:
           value:
             - "compute.instance.delete.end"
         # Only process if storage was wanted
-#        - path: "body.payload.metadata.storage"
-#          type: "string"
-#          value:
-#            - "wanted"
+        - path: "body.payload.metadata.storage"
+          type: "string"
+          value:
+            - "wanted"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
