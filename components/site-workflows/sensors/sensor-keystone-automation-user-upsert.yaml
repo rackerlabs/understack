@@ -49,6 +49,7 @@ spec:
                               echo "Empty password supplied, skipping setting the password"
                             else
                               openstack user set --password "${svc_pass}" "${SVC_ID}"
+                              echo "Password for ${SVC_ID} was set."
                             fi
                             set -x
                             openstack role add --user "${SVC_ID}" --project "${PROJ_ID}" reader
