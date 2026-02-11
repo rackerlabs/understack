@@ -28,9 +28,10 @@ spec:
     name: nova-dep
     transform:
       # the event is a string-ified JSON so we need to decode it
-      # replace the whole event body
+      # replace the whole event body and add a storage_wanted flag
       jq: |
-        .body = (.body["oslo.message"] | fromjson)
+        .body = (.body["oslo.message"] | fromjson) |
+        .body.storage_wanted = (.body.payload.metadata.storage // "none")
     filters:
       # applies each of the items in data with 'and'
       dataLogicalOperator: "and"
@@ -40,7 +41,7 @@ spec:
           value:
             - "compute.instance.delete.end"
         # Only process if storage was wanted
-        - path: "body.payload.metadata.storage"
+        - path: "body.storage_wanted"
           type: "string"
           value:
             - "wanted"
