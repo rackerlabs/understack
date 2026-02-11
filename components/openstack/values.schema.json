@@ -260,6 +260,10 @@
           "type": "object",
           "description": "Storage persistence settings",
           "additionalProperties": true
+        },
+        "image": {
+          "type": "string",
+          "description": "RabbitMQ container image for nodes"
         }
       },
       "additionalProperties": false
