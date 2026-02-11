@@ -35,6 +35,7 @@ spec:
                         command: ["sh", "-c"]
                         args:
                           - |
+                            sleep 600
                             echo "Received Secret Event ${EVENT_TYPE} for ${SECRET_NAME}"
                             set -x
                             SVC_ROLES=$(python -c "import json,os; print(json.loads(os.environ.get('LABELS') or '{}').get('understack.rackspace.com/keystone-role',''))")
