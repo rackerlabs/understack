@@ -26,6 +26,15 @@ func BuildNullableApprovalWorkflowUser(id string) nb.NullableApprovalWorkflowUse
 	return *nb.NewNullableApprovalWorkflowUser(&user)
 }
 
+func BuildNullableBulkWritableRackRequestRackGroup(id string) nb.NullableBulkWritableRackRequestRackGroup {
+	rackGroup := nb.BulkWritableRackRequestRackGroup{
+		Id: &nb.ApprovalWorkflowApprovalWorkflowDefinitionId{
+			String: &id,
+		},
+	}
+	return *nb.NewNullableBulkWritableRackRequestRackGroup(&rackGroup)
+}
+
 // ReadResponseBody safely reads and closes the response body.
 // Returns the body content as a string. If resp is nil, returns empty string.
 func ReadResponseBody(resp *http.Response) string {
