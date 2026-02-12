@@ -84,6 +84,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		{name: "locationType", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
 		{name: "location", configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
 		{name: "rackGroup", configRefs: nautobotCR.Spec.RackGroupRef, syncFunc: r.syncRackGroup},
+		{name: "rack", configRefs: nautobotCR.Spec.RackRef, syncFunc: r.syncRack},
 		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
 	}
 
@@ -201,6 +202,19 @@ func (r *NautobotReconciler) syncRackGroup(ctx context.Context,
 	syncSvc := sync.NewRackGroupSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
 		return fmt.Errorf("failed to sync rack group: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncRack(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	rackData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing racks", "count", len(rackData))
+	syncSvc := sync.NewRackSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, rackData); err != nil {
+		return fmt.Errorf("failed to sync racks: %w", err)
 	}
 	return nil
 }
