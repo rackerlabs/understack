@@ -1,0 +1,91 @@
+diff --git a/ironic/api/app.py b/ironic/api/app.py
+index 7f7bc0c3d..6370fa140 100644
+--- a/ironic/api/app.py
++++ b/ironic/api/app.py
+@@ -18,11 +18,13 @@
+ import keystonemiddleware.audit as audit_middleware
+ from keystonemiddleware import auth_token
+ from oslo_config import cfg
++from oslo_log import log as logging
+ import oslo_middleware.cors as cors_middleware
+ from oslo_middleware import healthcheck
+ from oslo_middleware import http_proxy_to_wsgi
+ import osprofiler.web as osprofiler_web
+ import pecan
++import stevedore
+
+ from ironic.api import config
+ from ironic.api.controllers import base
+@@ -33,8 +35,10 @@ from ironic.api.middleware import json_ext
+ from ironic.api.middleware import request_log
+ from ironic.common import auth_basic
+ from ironic.common import exception
++from ironic.common.i18n import _
+ from ironic.conf import CONF
+
++LOG = logging.getLogger(__name__)
+
+ class IronicCORS(cors_middleware.CORS):
+     """Ironic-specific CORS class
+@@ -143,8 +147,36 @@ def setup_app(pecan_config=None, extra_hooks=None):
+     # Add request logging middleware
+     app = request_log.RequestLogMiddleware(app)
+
++    if CONF.api.middleware:
++        app = _load_custom_middleware(app, CONF.api.middleware)
++
+     return app
+
++def _missing_middleware_callback(names):
++    """Raise RuntimeError with list of missing middleware."""
++    error = _('The following middleware failed to load: %s')
++    raise RuntimeError(error % ', '.join(names))
++
++
++def _load_custom_middleware(app, middleware_names):
++    """Load custom WSGI middleware via stevedore entry points.
++
++    :param app: The WSGI application to wrap
++    :param middleware_names: List of middleware names to load
++    :returns: The wrapped WSGI application
++    """
++    LOG.info('Loading custom API middleware: %s', middleware_names)
++    mgr = stevedore.NamedExtensionManager(
++        'ironic.api.middleware',
++        names=middleware_names,
++        invoke_on_load=False,
++        on_missing_entrypoints_callback=_missing_middleware_callback,
++        name_order=True,
++    )
++    for ext in mgr:
++        LOG.info('Applying middleware: %s (%s)', ext.name, ext.plugin)
++        app = ext.plugin(app)
++    return app
+
+ class VersionSelectorApplication(object):
+     def __init__(self):
+diff --git a/ironic/conf/api.py b/ironic/conf/api.py
+index 9fae0fcc5..aec1b60a1 100644
+--- a/ironic/conf/api.py
++++ b/ironic/conf/api.py
+@@ -109,6 +109,19 @@ opts = [
+     cfg.StrOpt('key_file',
+                help="Private key file to use when starting "
+                     "the server securely."),
++    cfg.ListOpt('middleware',
++                default=[],
++                help=_('Comma-separated list of WSGI middleware to load '
++                       'from the ironic.api.middleware entry point namespace. '
++                       'Middleware are applied in the order specified, '
++                       'wrapping the API application. This allows operators '
++                       'to add custom request processing (validation, '
++                       'logging, '
++                       'rate limiting, etc.) without modifying Ironic code. '
++                       'External packages can register middleware by adding '
++                       'entry points to the ironic.api.middleware namespace. '
++                       'Each middleware must be a callable that accepts a '
++                       'WSGI application and returns a wrapped application.')),
+ ]
+
+
+
