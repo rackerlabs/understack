@@ -5,9 +5,11 @@ resources:
   - eventbus/eventbus-default.yaml
   - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
   - eventsources/eventsource-openstack-ironic.yaml
+  - eventsources/eventsource-openstack-nova.yaml
   - eventsources/eventsource-openstack-keystone.yaml
   - eventsources/eventsource-openstack-neutron.yaml
   - eventsources/rabbitmq-user-argo-ironic.yaml
+  - eventsources/rabbitmq-user-argo-nova.yaml
   - eventsources/rabbitmq-user-argo-keystone.yaml
   - eventsources/rabbitmq-user-argo-neutron.yaml
   - eventsources/eventsource-k8s-openstack-secrets.yaml
@@ -24,6 +26,7 @@ resources:
   - sensors/sensor-ironic-node-port.yaml
   - sensors/sensor-ironic-node-portgroup.yaml
   - sensors/sensor-ironic-oslo-event.yaml
+  - sensors/sensor-nova-oslo-event.yaml
 
 helmCharts:
   - name: nautobot-token
