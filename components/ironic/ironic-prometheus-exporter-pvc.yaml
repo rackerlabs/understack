@@ -1,0 +1,25 @@
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   labels:
+#     undercloud.local/purpose: ironic-prometheus-exporter
+#   name: pvc-ironic-prometheus-exporter
+#   namespace: openstack
+# spec:
+#   accessModes:
+#   - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 1Gi
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-ironic-prometheus-exporter
+  namespace: openstack
+spec:
+  storageClassName: ceph-fs-ec
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi

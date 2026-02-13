@@ -13,6 +13,7 @@ on:
       - "containers/ironic-nautobot-client/**"
       - "containers/ironic-vnc-client/**"
       - "containers/understack-tests/**"
+      - "containers/ironic-prometheus-exporter/**"
       - "python/**"
       - ".github/workflows/containers.yaml"
       - ".github/workflows/build-container-reuse.yaml"
@@ -45,6 +46,8 @@ jobs:
           - name: shell-operator-ironic
             target: prod
           - name: nautobot
+            target: prod
+          - name: ironic-prometheus-exporter
             target: prod
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
