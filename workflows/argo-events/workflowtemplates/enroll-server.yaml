@@ -32,7 +32,7 @@ spec:
       steps:
         - - name: enroll-server
             template: enroll-server
-        - - name: server-enroll-state
+        - - name: baremetal-node-provision-state
             template: openstack-state-cmd
             arguments:
               parameters:
@@ -46,7 +46,10 @@ spec:
                   value: "manage"
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
-            when: "{{steps.server-enroll-state.outputs.result}} == enroll"
+            when: >-
+              "{{steps.baremetal-node-provision-state.outputs.result}}" == "enroll" ||
+              "{{steps.baremetal-node-provision-state.outputs.result}}" == "clean failed" ||
+              "{{steps.baremetal-node-provision-state.outputs.result}}" == "inspect failed"
         - - name: get-raid-config
             template: get-raid-config
             when: "{{workflow.parameters.raid_configure}} == true"
