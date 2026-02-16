@@ -16,6 +16,8 @@ log_config = {
     "disable_existing_loggers": False,
     "loggers": {
         "__main__": {"level": "INFO"},
+        "understack_workflows": {"level": "INFO"},
+        "sushy": {"level": "INFO"},
         "sushy.main": {"level": "INFO"},
         "sushy.resources.base": {"level": "INFO"},
         "sushy.connector": {"level": "INFO"},
@@ -51,7 +53,6 @@ def main():
     raid_config = parse_controller_details(client)
     json_details = build_raid_config(raid_config)
     print(json.dumps(json_details))
-    return json.dumps(json_details)
 
 
 def argument_parser():
