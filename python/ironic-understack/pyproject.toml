@@ -31,6 +31,9 @@ chassis_model = "ironic_understack.inspect_hook_chassis_model:InspectHookChassis
 redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackRedfishInspect"
 idrac-redfish-understack = "ironic_understack.redfish_inspect_understack:UnderstackDracRedfishInspect"
 
+[project.entry-points."ironic.api.middleware"]
+portgroup-name-validation = "ironic_understack.portgroup_name_middleware:PortgroupNameValidationMiddleware"
+
 [dependency-groups]
 test = [
     "pytest>=9.0.1,<10",
