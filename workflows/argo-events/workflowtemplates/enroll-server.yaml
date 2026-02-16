@@ -22,8 +22,8 @@ spec:
       steps:
         - - name: enroll-server
             template: enroll-server
-        - - name: server-enroll-state
-            template: openstack-state-cmd
+        - - name: baremetal-node-provision-state
+            template: get-baremetal-node-provision-state-cmd
             arguments:
               parameters:
                 - name: device_id
@@ -36,7 +36,11 @@ spec:
                   value: "manage"
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
-            when: "{{steps.server-enroll-state.outputs.result}} == enroll"
+            when: >-
+              "{{steps.baremetal-node-provision-state.outputs.result}}" == "enroll" ||
+              "{{steps.baremetal-node-provision-state.outputs.result}}" == "available" ||
+              "{{steps.baremetal-node-provision-state.outputs.result}}" == "clean failed" ||
+              "{{steps.baremetal-node-provision-state.outputs.result}}" == "inspect failed"
         - - name: get-raid-config
             template: get-raid-config
             when: "{{workflow.parameters.raid_configure}} == true"
@@ -50,7 +54,7 @@ spec:
                   value: "{{steps.get-raid-config.outputs.result}}"
             when: "{{workflow.parameters.raid_configure}} == true"
         - - name: server-manage-state
-            template: openstack-state-cmd
+            template: get-baremetal-node-provision-state-cmd
             arguments:
               parameters:
                 - name: device_id
@@ -249,7 +253,7 @@ spec:
             items:
               - key: clouds.yaml
                 path: clouds.yaml
-    - name: openstack-state-cmd
+    - name: get-baremetal-node-provision-state-cmd
       inputs:
         parameters:
           - name: device_id
