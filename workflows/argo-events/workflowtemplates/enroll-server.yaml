@@ -185,10 +185,10 @@ spec:
         image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
         command: [sh]
         source: |
-          echo "setting RAID1 config for node: {{inputs.parameters.device_id}}"
-          # create the raid1-config.json file. I find this easier to read
+          echo "setting RAID config for node: {{inputs.parameters.device_id}}"
+          # create the raid-config.json file. I find this easier to read
           # than passing a big json string on command line
-          cat <<'EOF' >> raid1-config.json
+          cat <<'EOF' >> raid-config.json
           {{inputs.parameters.raid_config}}
           EOF
           # create the initial clean steps which will create a raid config
@@ -205,7 +205,7 @@ spec:
           ]
           EOF
           # apply the target raid config to the node
-          openstack baremetal node set {{inputs.parameters.device_id}} --target-raid-config raid1-config.json
+          openstack baremetal node set {{inputs.parameters.device_id}} --target-raid-config raid-config.json
           # create the raid config
           openstack baremetal node clean --wait 0 --clean-steps raid-clean-steps.json --disable-ramdisk {{inputs.parameters.device_id}}
         env:
