@@ -80,6 +80,7 @@ def parse_controller_details(client: Sushy) -> dict:
             break
     return result
 
+
 def get_raid_type(disk_count: int) -> int:
     if disk_count < 2:
         return 0
