@@ -1,0 +1,27 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ironic-low-resource-availability
+  namespace: openstack
+spec:
+  groups:
+    - name: ironic.rules
+      interval: 30s
+      rules:
+        - alert: ServerPoolLowResourceAvailability
+          expr: |
+            label_replace(
+              (
+                count by (resourcetype) (openstack_placement_resource_usage == 0)
+                /
+                count by (resourcetype) (openstack_placement_resource_usage)
+              ) < 0.15,
+              "resource_name", "$1", "resourcetype", "CUSTOM_(.*)"
+            )
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Server pool {{ $labels.resource_name }} nearly exhausted."
+            description: "{{ $labels.resource_name }} server pool has only {{ $value | humanizePercentage }} available machines (threshold: 15%)."

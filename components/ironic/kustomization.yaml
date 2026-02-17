@@ -19,3 +19,4 @@ resources:
   - role-binding-ironic-graphical-console.yaml
   # Alerting
   - pr-clean-failed-servers.yaml
+  - pr-resource-availability.yaml
