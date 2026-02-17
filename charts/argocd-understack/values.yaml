@@ -344,8 +344,8 @@ site:
   # -- Octavia (Load Balancer Service)
   octavia:
     # -- Enable/disable deploying Octavia
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 3
     wave: 3
