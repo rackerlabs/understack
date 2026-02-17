@@ -3,6 +3,7 @@ package dcim
 import (
 	"context"
 
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
@@ -28,10 +29,18 @@ func (s *DeviceTypeService) Create(ctx context.Context, req nb.WritableDeviceTyp
 		return nil, err
 	}
 	log.Info("CreateDeviceType", "created device type", deviceType.Display)
+
+	cache.AddToCollection(s.client.Cache, "devicetypes", *deviceType)
+
 	return deviceType, nil
 }
 
 func (s *DeviceTypeService) GetByName(ctx context.Context, name string) nb.DeviceType {
+	if deviceType, ok := cache.FindByName(s.client.Cache, "devicetypes", name, func(dt nb.DeviceType) string {
+		return dt.Model
+	}); ok {
+		return deviceType
+	}
 	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Depth(10).Model([]string{name}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -44,6 +53,7 @@ func (s *DeviceTypeService) GetByName(ctx context.Context, name string) nb.Devic
 	if list.Results[0].Id == nil {
 		return nb.DeviceType{}
 	}
+
 	return list.Results[0]
 }
 
@@ -73,6 +83,10 @@ func (s *DeviceTypeService) Update(ctx context.Context, id string, req nb.Writab
 		return nil, err
 	}
 	log.Info("successfully updated device type", "id", id, "model", deviceType.GetModel())
+	cache.UpdateInCollection(s.client.Cache, "devicetypes", *deviceType, func(dt nb.DeviceType) bool {
+		return dt.Id != nil && *dt.Id == id
+	})
+
 	return deviceType, nil
 }
 
@@ -83,5 +97,8 @@ func (s *DeviceTypeService) Destroy(ctx context.Context, id string) error {
 		s.client.AddReport("DestroyDeviceType", "failed to destroy", "id", id, "error", err.Error(), "response_body", bodyString)
 		return err
 	}
+	cache.RemoveFromCollection(s.client.Cache, "devicetypes", func(dt nb.DeviceType) bool {
+		return dt.Id != nil && *dt.Id == id
+	})
 	return nil
 }

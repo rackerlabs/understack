@@ -3,6 +3,7 @@ package dcim
 import (
 	"context"
 
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	nb "github.com/nautobot/go-nautobot/v3"
@@ -20,10 +21,16 @@ func NewStatusService(nautobotClient *client.NautobotClient) *StatusService {
 }
 
 func (s *StatusService) GetByName(ctx context.Context, name string) nb.Status {
+	if status, ok := cache.FindByName(s.client.Cache, "statuses", name, func(s nb.Status) string {
+		return s.Name
+	}); ok {
+		return status
+	}
+
 	list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasStatusesList(ctx).Depth(1).Name([]string{name}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("GetLocationByName", "failed to get", "name", name, "error", err.Error(), "response_body", bodyString)
+		s.client.AddReport("GetStatusByName", "failed to get", "name", name, "error", err.Error(), "response_body", bodyString)
 		return nb.Status{}
 	}
 	if list == nil || len(list.Results) == 0 {
@@ -32,5 +39,6 @@ func (s *StatusService) GetByName(ctx context.Context, name string) nb.Status {
 	if list.Results[0].Id == nil {
 		return nb.Status{}
 	}
+
 	return list.Results[0]
 }

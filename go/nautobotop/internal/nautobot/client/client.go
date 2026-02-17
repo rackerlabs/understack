@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	nb "github.com/nautobot/go-nautobot/v3"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/samber/lo"
 )
 
@@ -16,6 +17,7 @@ type NautobotClient struct {
 	APIClient *nb.APIClient
 	Username  string
 	Report    map[string][]string
+	Cache     *cache.Cache
 }
 
 // AddReport appends one or more lines to the current reconciliation report.
@@ -28,7 +30,11 @@ func (n *NautobotClient) AddReport(key string, line ...string) {
 // NewNautobotClient creates and configures a new Nautobot API client.
 // apiURL: The base URL of the Nautobot API (e.g., "http://localhost:8000").
 // authToken: The API token for authentication.
-func NewNautobotClient(apiURL string, username, authToken string) *NautobotClient {
+// NewNautobotClient creates and configures a new Nautobot API client.
+// apiURL: The base URL of the Nautobot API (e.g., "http://localhost:8000").
+// authToken: The API token for authentication.
+// cacheMaxSize: The maximum size of the cache (0 uses default of 70,000).
+func NewNautobotClient(apiURL string, username, authToken string, cacheMaxSize int) (*NautobotClient, error) {
 	config := nb.NewConfiguration()
 	config.Servers = nb.ServerConfigurations{
 		{
@@ -41,12 +47,18 @@ func NewNautobotClient(apiURL string, username, authToken string) *NautobotClien
 	}
 	client := nb.NewAPIClient(config)
 
+	c, err := cache.New(cacheMaxSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cache: %w", err)
+	}
+
 	return &NautobotClient{
 		Username:  username,
 		Config:    config,
 		APIClient: client,
 		Report:    make(map[string][]string),
-	}
+		Cache:     c,
+	}, nil
 }
 
 // GetClient returns the Nautobot API client
