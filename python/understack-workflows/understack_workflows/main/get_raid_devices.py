@@ -80,16 +80,25 @@ def parse_controller_details(client: Sushy) -> dict:
             break
     return result
 
+def get_raid_type(disk_count: int) -> int:
+    if disk_count == 1:
+        return 0
+    if disk_count == 2:
+        return 1
+    if disk_count > 2:
+        return 5
+
 
 def build_raid_config(raid_config: dict):
     """Return a raid config supported by ironic for cleanup tasks."""
+    raid_level = get_raid_type(len(raid_config["physical_disks"]))
     result = {
         "logical_disks": [
             {
                 "controller": raid_config["controller"],
                 "is_root_volume": True,
                 "physical_disks": raid_config["physical_disks"],
-                "raid_level": "1",
+                "raid_level": str(raid_level),
                 "size_gb": "MAX",
             }
         ]
