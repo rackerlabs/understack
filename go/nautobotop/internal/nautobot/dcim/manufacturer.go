@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/charmbracelet/log"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	nb "github.com/nautobot/go-nautobot/v3"
@@ -47,6 +48,11 @@ func (s *ManufacturerService) ListAll(ctx context.Context) []nb.Manufacturer {
 }
 
 func (s *ManufacturerService) GetByName(ctx context.Context, name string) nb.Manufacturer {
+	if manufacturer, ok := cache.FindByName(s.client.Cache, "manufacturers", name, func(m nb.Manufacturer) string {
+		return m.Name
+	}); ok {
+		return manufacturer
+	}
 	list, resp, err := s.client.APIClient.DcimAPI.DcimManufacturersList(ctx).Limit(10000).Depth(2).Name([]string{name}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -59,6 +65,7 @@ func (s *ManufacturerService) GetByName(ctx context.Context, name string) nb.Man
 	if list.Results[0].Id == nil {
 		return nb.Manufacturer{}
 	}
+
 	return list.Results[0]
 }
 
@@ -70,5 +77,7 @@ func (s *ManufacturerService) Create(ctx context.Context, req nb.ManufacturerReq
 		return nil, err
 	}
 	log.Info("Created manufacture: %s", manufacture.Display)
+	cache.AddToCollection(s.client.Cache, "manufacturers", *manufacture)
+
 	return manufacture, nil
 }

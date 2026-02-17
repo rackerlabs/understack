@@ -3,6 +3,7 @@ package dcim
 import (
 	"context"
 
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
@@ -28,10 +29,18 @@ func (s *LocationTypeService) Create(ctx context.Context, req nb.LocationTypeReq
 		return nil, err
 	}
 	log.Info("CreateLocationType", "created device type", locationType.Name)
+	cache.AddToCollection(s.client.Cache, "locationtypes", *locationType)
+
 	return locationType, nil
 }
 
 func (s *LocationTypeService) GetByName(ctx context.Context, name string) nb.LocationType {
+	if locationType, ok := cache.FindByName(s.client.Cache, "locationtypes", name, func(lt nb.LocationType) string {
+		return lt.Name
+	}); ok {
+		return locationType
+	}
+
 	list, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesList(ctx).Depth(10).Name([]string{name}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -44,6 +53,7 @@ func (s *LocationTypeService) GetByName(ctx context.Context, name string) nb.Loc
 	if list.Results[0].Id == nil {
 		return nb.LocationType{}
 	}
+
 	return list.Results[0]
 }
 
@@ -73,6 +83,10 @@ func (s *LocationTypeService) Update(ctx context.Context, id string, req nb.Loca
 		return nil, err
 	}
 	log.Info("successfully updated device type", "id", id, "model", locationType.GetName())
+	cache.UpdateInCollection(s.client.Cache, "locationtypes", *locationType, func(lt nb.LocationType) bool {
+		return lt.Id != nil && *lt.Id == id
+	})
+
 	return locationType, nil
 }
 
@@ -83,5 +97,11 @@ func (s *LocationTypeService) Destroy(ctx context.Context, id string) error {
 		s.client.AddReport("DestroyLocationType", "failed to destroy", "id", id, "error", err.Error(), "response_body", bodyString)
 		return err
 	}
+
+	// Remove from cache
+	cache.RemoveFromCollection(s.client.Cache, "locationtypes", func(lt nb.LocationType) bool {
+		return lt.Id != nil && *lt.Id == id
+	})
+
 	return nil
 }

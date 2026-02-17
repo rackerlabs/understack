@@ -3,6 +3,7 @@ package dcim
 import (
 	"context"
 
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
 	"github.com/charmbracelet/log"
@@ -28,10 +29,18 @@ func (s *RackGroupService) Create(ctx context.Context, req nb.RackGroupRequest) 
 		return nil, err
 	}
 	log.Info("CreateRackGroup", "created rack group", rackGroup.Name)
+	cache.AddToCollection(s.client.Cache, "rackgroups", *rackGroup)
+
 	return rackGroup, nil
 }
 
 func (s *RackGroupService) GetByName(ctx context.Context, name string) nb.RackGroup {
+	if rackGroup, ok := cache.FindByName(s.client.Cache, "rackgroups", name, func(rg nb.RackGroup) string {
+		return rg.Name
+	}); ok {
+		return rackGroup
+	}
+
 	list, resp, err := s.client.APIClient.DcimAPI.DcimRackGroupsList(ctx).Depth(2).Name([]string{name}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -44,6 +53,7 @@ func (s *RackGroupService) GetByName(ctx context.Context, name string) nb.RackGr
 	if list.Results[0].Id == nil {
 		return nb.RackGroup{}
 	}
+
 	return list.Results[0]
 }
 
@@ -73,6 +83,11 @@ func (s *RackGroupService) Update(ctx context.Context, id string, req nb.RackGro
 		return nil, err
 	}
 	log.Info("successfully updated rack group", "id", id, "model", rackGroup.GetName())
+
+	cache.UpdateInCollection(s.client.Cache, "rackgroups", *rackGroup, func(rg nb.RackGroup) bool {
+		return rg.Id != nil && *rg.Id == id
+	})
+
 	return rackGroup, nil
 }
 
@@ -83,5 +98,9 @@ func (s *RackGroupService) Destroy(ctx context.Context, id string) error {
 		s.client.AddReport("DestroyRackGroup", "failed to destroy", "id", id, "error", err.Error(), "response_body", bodyString)
 		return err
 	}
+	cache.RemoveFromCollection(s.client.Cache, "rackgroups", func(rg nb.RackGroup) bool {
+		return rg.Id != nil && *rg.Id == id
+	})
+
 	return nil
 }

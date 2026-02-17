@@ -28,13 +28,16 @@ type NautobotSpec struct {
 	// +kubebuilder:default=600
 	RequeueAfter int `json:"requeueAfter,omitempty"`
 	// +kubebuilder:default=172800
-	SyncIntervalSeconds int               `json:"syncIntervalSeconds,omitempty"`
-	NautobotSecretRef   SecretKeySelector `json:"nautobotSecretRef,omitempty"`
-	NautobotServiceRef  ServiceSelector   `json:"nautobotServiceRef,omitempty"`
-	DeviceTypesRef      []ConfigMapRef    `json:"deviceTypeRef,omitempty"`
-	LocationTypesRef    []ConfigMapRef    `json:"locationTypesRef,omitempty"`
-	LocationRef         []ConfigMapRef    `json:"locationRef,omitempty"`
-	RackGroupRef        []ConfigMapRef    `json:"rackGroupRef,omitempty"`
+	SyncIntervalSeconds int `json:"syncIntervalSeconds,omitempty"`
+	// +kubebuilder:default=70000
+	CacheMaxSize       int               `json:"cacheMaxSize,omitempty"`
+	NautobotSecretRef  SecretKeySelector `json:"nautobotSecretRef,omitempty"`
+	NautobotServiceRef ServiceSelector   `json:"nautobotServiceRef,omitempty"`
+	DeviceTypesRef     []ConfigMapRef    `json:"deviceTypeRef,omitempty"`
+	LocationTypesRef   []ConfigMapRef    `json:"locationTypesRef,omitempty"`
+	LocationRef        []ConfigMapRef    `json:"locationRef,omitempty"`
+	RackGroupRef       []ConfigMapRef    `json:"rackGroupRef,omitempty"`
+	RackRef            []ConfigMapRef    `json:"rackRef,omitempty"`
 }
 
 // NautobotStatus defines the observed state of Nautobot.
