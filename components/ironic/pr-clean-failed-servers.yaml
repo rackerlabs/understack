@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ironic-clean-failed-servers
+  namespace: openstack
+spec:
+  groups:
+    - name: ironic.rules
+      interval: 30s
+      rules:
+        - alert: IronicCleanFailedServer
+          expr: openstack_ironic_node{provision_state="clean failed"} == 1
+          for: 30s
+          labels:
+            severity: warning
+          annotations:
+            summary: "Ironic node {{ $labels.name }} in clean failed state"
+            description: "Ironic node {{ $labels.name }} (ID: {{ $labels.id }}) is in 'clean failed' provision state"
