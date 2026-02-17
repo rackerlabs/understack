@@ -81,12 +81,11 @@ def parse_controller_details(client: Sushy) -> dict:
     return result
 
 def get_raid_type(disk_count: int) -> int:
-    if disk_count == 1:
+    if disk_count < 2:
         return 0
-    if disk_count == 2:
-        return 1
     if disk_count > 2:
         return 5
+    return 1
 
 
 def build_raid_config(raid_config: dict):
