@@ -11,7 +11,7 @@ from understack_workflows.netapp.manager import NetAppManager
 from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 from understack_workflows.netapp.value_objects import VirtualMachineNetworkInfo
 
-logger = setup_logger(__name__, level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # GraphQL query to retrieve virtual machine network information as specified in
 # requirements
@@ -364,6 +364,7 @@ def main():
             - 2: GraphQL query errors, syntax errors, execution errors
             - 3: Data validation errors, interface validation failures
     """
+    setup_logger(level=logging.INFO)
     try:
         # Parse command line arguments using argument_parser()
         args = argument_parser().parse_args()

@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import pathlib
 import sys
 from collections.abc import Callable
@@ -21,7 +22,7 @@ from understack_workflows.oslo_event import nautobot_device_sync
 from understack_workflows.oslo_event import neutron_network
 from understack_workflows.oslo_event import neutron_subnet
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 _EXIT_SUCCESS = 0
@@ -166,11 +167,12 @@ def initialize_clients(args: argparse.Namespace) -> tuple[Connection, NautobotAp
 
 def main() -> int:
     """Handles OpenStack events in a generic way."""
+    setup_logger()
     # parse our input arguments
     args = argument_parser().parse_args()
 
     logger.info("Starting OpenStack event receiver")
-    logger.debug("Arguments: %s", args)
+    logger.debug("Arguments: %s", vars(args))
 
     # read and parse the basics of the event
     try:

@@ -17,11 +17,7 @@ from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.helpers import setup_logger
 
-logger = setup_logger(__name__)
-
-# These are extremely verbose by default:
-for name in ["ironicclient", "keystoneauth", "stevedore"]:
-    logging.getLogger(name).setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -56,6 +52,7 @@ def main():
       - set the name to "{manufacturer}-{servicetag}"
       - set the driver as appropriate
     """
+    setup_logger()
     args = argument_parser().parse_args()
 
     bmc_ip_address = args.bmc_ip_address
