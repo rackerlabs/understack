@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -7,10 +8,9 @@ from openstack.exceptions import ConflictException
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
-from understack_workflows.helpers import setup_logger
 from understack_workflows.oslo_event.keystone_project import is_project_svm_enabled
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass

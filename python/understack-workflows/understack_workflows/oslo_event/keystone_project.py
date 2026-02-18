@@ -1,14 +1,14 @@
 import json
+import logging
 from dataclasses import dataclass
 
 from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
-from understack_workflows.helpers import setup_logger
 from understack_workflows.netapp.manager import NetAppManager
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 SVM_PROJECT_TAG = "UNDERSTACK_SVM"

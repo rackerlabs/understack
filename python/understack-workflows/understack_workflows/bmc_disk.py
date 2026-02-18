@@ -1,11 +1,11 @@
+import logging
 import math
 from dataclasses import dataclass
 
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import RedfishRequestError
-from understack_workflows.helpers import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)

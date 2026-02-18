@@ -1,3 +1,4 @@
+import logging
 from typing import cast
 
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
@@ -5,10 +6,9 @@ from ironicclient.v1.client import Client as IronicV1Client
 from ironicclient.v1.node import Node
 from ironicclient.v1.port import Port
 
-from understack_workflows.helpers import setup_logger
 from understack_workflows.openstack.client import get_ironic_client
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class IronicClient:

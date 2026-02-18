@@ -21,20 +21,14 @@ class TestIntegrationTests:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_complete_script_execution_with_mock_nautobot_responses(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test complete script execution with mock Nautobot responses."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -105,20 +99,14 @@ class TestIntegrationTests:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_output_format_validation_structured_data(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test output format validation for structured data."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -202,20 +190,14 @@ class TestIntegrationTests:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_exit_code_scenario_connection_error(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test exit code 1 for connection errors."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -248,20 +230,14 @@ class TestIntegrationTests:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_exit_code_scenario_graphql_error(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test exit code 2 for GraphQL query errors."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -301,20 +277,14 @@ class TestIntegrationTests:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_exit_code_scenario_data_validation_error(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test exit code 3 for data validation errors."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -356,20 +326,14 @@ class TestIntegrationTests:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_exit_code_scenario_success_with_empty_results(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test exit code 0 for successful execution with empty results."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -422,20 +386,14 @@ class TestIntegrationTests:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_end_to_end_workflow_with_various_input_combinations(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test end-to-end workflow with various input combinations."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "fallback-token"
@@ -552,20 +510,14 @@ class TestIntegrationWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_complete_script_execution_with_netapp_interface_creation(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test complete script execution including NetApp interface creation."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -635,20 +587,14 @@ class TestIntegrationWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_script_execution_with_custom_netapp_config_path(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test script execution with custom NetApp config path."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -711,20 +657,14 @@ class TestIntegrationWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_script_handles_netapp_lif_creation_error(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test that script handles NetApp LIF creation errors appropriately."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -779,10 +719,8 @@ class TestIntegrationWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_script_execution_with_empty_vm_results_skips_netapp_creation(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -793,10 +731,6 @@ class TestIntegrationWithNetAppManager:
         gracefully and skip NetApp interface creation operations.
         """
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -854,10 +788,8 @@ class TestIntegrationWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_end_to_end_netapp_interface_creation_with_realistic_data(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -868,10 +800,6 @@ class TestIntegrationWithNetAppManager:
         and validates that interface details are properly configured.
         """
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -960,10 +888,8 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_complete_route_creation_workflow_with_complex_sample(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -971,10 +897,6 @@ class TestRouteCreationIntegration:
         """Test complete route creation workflow with complex sample data."""
         from understack_workflows.main.netapp_configure_net import main
         from understack_workflows.netapp.value_objects import RouteResult
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1056,10 +978,8 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_route_creation_with_mocked_netapp_sdk(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -1068,10 +988,6 @@ class TestRouteCreationIntegration:
         """Test route creation with mocked NetApp SDK NetworkRoute calls."""
         from understack_workflows.main.netapp_configure_net import main
         from understack_workflows.netapp.value_objects import RouteResult
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1146,20 +1062,14 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_route_creation_error_propagation(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test error propagation from route creation failures."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1209,10 +1119,8 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_netapp_rest_error_handling_during_route_creation(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -1220,10 +1128,6 @@ class TestRouteCreationIntegration:
         """Test NetAppRestError handling during route creation."""
         from understack_workflows.main.netapp_configure_net import main
         from understack_workflows.netapp.exceptions import NetworkOperationError
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1282,20 +1186,14 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_script_termination_on_route_creation_failure(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test script termination when route creation fails."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1348,10 +1246,8 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_error_logging_and_context_for_route_failures(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -1359,10 +1255,6 @@ class TestRouteCreationIntegration:
         """Test error logging and context information for route failures."""
         from understack_workflows.main.netapp_configure_net import main
         from understack_workflows.netapp.exceptions import NetworkOperationError
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1427,10 +1319,8 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_invalid_svm_name_handling_during_route_creation(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -1438,10 +1328,6 @@ class TestRouteCreationIntegration:
         """Test handling of invalid SVM names during route creation."""
         from understack_workflows.main.netapp_configure_net import main
         from understack_workflows.netapp.exceptions import SvmOperationError
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1503,10 +1389,8 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_route_creation_logging_verification(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -1514,10 +1398,6 @@ class TestRouteCreationIntegration:
         """Test logging output for successful route creation operations."""
         from understack_workflows.main.netapp_configure_net import main
         from understack_workflows.netapp.value_objects import RouteResult
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1586,10 +1466,8 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_route_creation_with_single_interface_sample(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -1597,10 +1475,6 @@ class TestRouteCreationIntegration:
         """Test route creation workflow with single interface sample data."""
         from understack_workflows.main.netapp_configure_net import main
         from understack_workflows.netapp.value_objects import RouteResult
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1668,20 +1542,14 @@ class TestRouteCreationIntegration:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_route_creation_with_empty_results_skips_route_creation(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test that empty VM results skip route creation appropriately."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"

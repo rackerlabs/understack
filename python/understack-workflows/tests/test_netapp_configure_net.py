@@ -1744,10 +1744,8 @@ class TestMainFunctionWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_main_function_initializes_netapp_manager_with_default_path(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -1758,10 +1756,6 @@ class TestMainFunctionWithNetAppManager:
         default configuration path when no custom path is provided.
         """
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1809,20 +1803,14 @@ class TestMainFunctionWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_main_function_initializes_netapp_manager_with_custom_path(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test that main function initializes NetAppManager with custom config path."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1871,20 +1859,14 @@ class TestMainFunctionWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_main_function_handles_netapp_manager_initialization_error(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
     ):
         """Test that main function handles NetAppManager initialization errors."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
@@ -1923,10 +1905,8 @@ class TestMainFunctionWithNetAppManager:
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
-    @patch("understack_workflows.main.netapp_configure_net.setup_logger")
     def test_main_function_calls_netapp_create_interfaces_and_routes(
         self,
-        mock_setup_logger,
         mock_credential,
         mock_nautobot_class,
         mock_netapp_manager_class,
@@ -1934,10 +1914,6 @@ class TestMainFunctionWithNetAppManager:
     ):
         """Test that main function calls netapp_create_interfaces through do_action."""
         from understack_workflows.main.netapp_configure_net import main
-
-        # Mock logger
-        mock_logger = Mock()
-        mock_setup_logger.return_value = mock_logger
 
         # Mock credential function
         mock_credential.return_value = "test-token"
