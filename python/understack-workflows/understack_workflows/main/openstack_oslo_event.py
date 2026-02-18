@@ -168,66 +168,63 @@ def initialize_clients(args: argparse.Namespace) -> tuple[Connection, NautobotAp
 def main() -> int:
     """Handles OpenStack events in a generic way."""
     setup_logger()
-    # parse our input arguments
     args = argument_parser().parse_args()
+    logger.debug("OSLO Event Handler called with: %s", vars(args))
 
-    logger.info("Starting OpenStack event receiver")
-    logger.debug("Arguments: %s", vars(args))
-
-    # read and parse the basics of the event
     try:
         event = read_event(args.file)
     except EventParseError:
         logger.exception("Event parsing failed")
         sys.exit(_EXIT_PARSE_ERROR)
-    logger.debug("Event read: %s", event)
 
-    # validate event structure and extract event type
     try:
         event_type = validate_event(event)
     except EventValidationError as e:
         logger.error("Event validation failed: %s", e)
         sys.exit(_EXIT_PARSE_ERROR)
 
-    logger.info("Processing event type: %s", event_type)
+    logger.info("Received event: %s", event_type)
 
-    # look up the event handler(s)
     event_handlers = _event_handlers.get(event_type)
     if event_handlers is None:
         logger.error("No event handler for event type: %s", event_type)
         logger.debug("Available event handlers: %s", list(_event_handlers.keys()))
         sys.exit(_EXIT_NO_EVENT_HANDLER)
 
-    # normalize to list for consistent processing
     if not isinstance(event_handlers, list):
         event_handlers = [event_handlers]
 
-    logger.debug(
-        "Found %d handler(s) for event type: %s", len(event_handlers), event_type
-    )
+    logger.debug("[%s] Found %d handler(s)", event_type, len(event_handlers))
 
-    # get a connection to OpenStack and to Nautobot
     try:
         conn, nautobot = initialize_clients(args)
     except ClientInitializationError:
         logger.exception("Client initialization failed")
         sys.exit(_EXIT_CLIENT_ERROR)
 
-    # execute all event handlers
     last_ret = _EXIT_SUCCESS
     for idx, event_handler in enumerate(event_handlers, 1):
-        handler_name = getattr(event_handler, "__name__", f"handler_{idx}")
+        handler_path = f"{event_handler.__module__}.{event_handler.__qualname__}"
         logger.info(
-            "Executing handler %d/%d: %s", idx, len(event_handlers), handler_name
+            "[%s] Running handler %d/%d: %s",
+            event_type,
+            idx,
+            len(event_handlers),
+            handler_path,
         )
         try:
             ret = event_handler(conn, nautobot, event)
             if isinstance(ret, int):
                 last_ret = ret
-            logger.info("Handler %s completed with return code: %s", handler_name, ret)
+            logger.info(
+                "[%s] Handler %s finished with return code: %s",
+                event_type,
+                handler_path,
+                ret,
+            )
         except Exception:
-            logger.exception("Handler %s failed", handler_name)
+            logger.exception("[%s] Handler %s failed", event_type, handler_path)
             sys.exit(_EXIT_HANDLER_ERROR)
 
-    logger.info("All handlers completed successfully")
+    logger.info("Finished handling event: %s", event_type)
     return last_ret
