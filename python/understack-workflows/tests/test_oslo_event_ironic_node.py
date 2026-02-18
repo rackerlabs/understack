@@ -169,12 +169,24 @@ class TestHandleProvisionEnd:
 
         assert result == 0
 
+    @patch("understack_workflows.oslo_event.ironic_node.create_volume_connector")
+    @patch("understack_workflows.oslo_event.ironic_node.save_output")
     @patch("understack_workflows.oslo_event.ironic_node.is_project_svm_enabled")
     def test_handle_provision_end_project_not_svm_enabled(
-        self, mock_is_svm_enabled, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_is_svm_enabled,
+        mock_save_output,
+        mock_create_connector,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Test handling when project is not SVM enabled."""
         mock_is_svm_enabled.return_value = False
+        mock_server = MagicMock()
+        mock_server.id = "server-123"
+        mock_server.metadata = {"storage": "not-wanted"}
+        mock_conn.get_server_by_id.return_value = mock_server
 
         result = handle_provision_end(mock_conn, mock_nautobot, valid_event_data)
 
@@ -182,6 +194,8 @@ class TestHandleProvisionEnd:
         lessee = valid_event_data["payload"]["ironic_object.data"]["lessee"]
         lessee_undashed = uuid.UUID(lessee).hex
         mock_is_svm_enabled.assert_called_once_with(mock_conn, lessee_undashed)
+        mock_save_output.assert_any_call("storage", "not-set")
+        mock_create_connector.assert_called_once()
 
     @patch("understack_workflows.oslo_event.ironic_node.create_volume_connector")
     @patch("understack_workflows.oslo_event.ironic_node.save_output")
