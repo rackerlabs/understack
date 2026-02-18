@@ -1,8 +1,9 @@
+import logging
+
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import RedfishRequestError
-from understack_workflows.helpers import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def required_bios_settings(pxe_interface: str) -> dict:

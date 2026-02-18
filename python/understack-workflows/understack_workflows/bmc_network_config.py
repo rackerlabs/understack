@@ -1,8 +1,9 @@
+import logging
+
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc_chassis_info import InterfaceInfo
-from understack_workflows.helpers import setup_logger
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def bmc_set_permanent_ip_addr(bmc: Bmc, interface_info: InterfaceInfo):

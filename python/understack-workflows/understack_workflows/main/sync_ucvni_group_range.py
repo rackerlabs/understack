@@ -14,7 +14,7 @@ from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.nautobot import Nautobot
 
-logger = setup_logger(__name__, level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 _EXIT_SUCCESS = 0
 _EXIT_API_ERROR = 1
@@ -189,6 +189,7 @@ def handle_event(segment_args: Namespace) -> int:
 
 
 def main() -> int:
+    setup_logger(level=logging.INFO)
     args = argument_parser().parse_args()
 
     event: SegmentRangeEvent = args.event

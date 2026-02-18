@@ -15,7 +15,7 @@ from understack_workflows.helpers import setup_logger
 from understack_workflows.openstack.client import Connection
 from understack_workflows.openstack.client import get_openstack_client
 
-logger = setup_logger(__name__, level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 _EXIT_SUCCESS = 0
@@ -197,6 +197,7 @@ def do_action(
 
 
 def main() -> int:
+    setup_logger(level=logging.INFO)
     args = argument_parser().parse_args()
 
     conn = get_openstack_client(cloud=args.os_cloud)

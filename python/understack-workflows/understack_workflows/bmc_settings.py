@@ -1,7 +1,8 @@
-from understack_workflows.bmc import Bmc
-from understack_workflows.helpers import setup_logger
+import logging
 
-logger = setup_logger(__name__)
+from understack_workflows.bmc import Bmc
+
+logger = logging.getLogger(__name__)
 
 # When we read Enum-type keys we can expect a string like "Enabled".
 #

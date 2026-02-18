@@ -12,6 +12,7 @@ consistency between the two systems. For iDRAC interfaces, a deterministic
 UUID is generated from the device UUID and MAC address.
 """
 
+import logging
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
@@ -19,10 +20,9 @@ from typing import Any
 from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 
-from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 EXIT_STATUS_SUCCESS = 0
 EXIT_STATUS_FAILURE = 1

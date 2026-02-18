@@ -11,12 +11,11 @@ from sushy import Sushy
 
 from understack_workflows.bmc_password_standard import standard_password
 from understack_workflows.helpers import credential
-from understack_workflows.helpers import setup_logger
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)  # type: ignore
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 HEADERS = {
     "Accept": "application/json",

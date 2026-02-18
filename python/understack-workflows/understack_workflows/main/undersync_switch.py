@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import sys
 
@@ -62,12 +63,13 @@ def argument_parser():
 
 def main():
     """Requests an Undersync run on a pair of switches."""
+    setup_logger()
     args = argument_parser().parse_args()
 
     response = call_undersync(args)
     logger.info("Undersync returned: %s", response.json())
 
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 if __name__ == "__main__":
     main()

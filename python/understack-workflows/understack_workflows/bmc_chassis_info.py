@@ -1,15 +1,15 @@
 # pylint: disable=E1131,C0103
 
+import logging
 import re
 from dataclasses import dataclass
 from ipaddress import IPv4Address
 from ipaddress import IPv4Interface
 
 from understack_workflows.bmc import Bmc
-from understack_workflows.helpers import setup_logger
 from understack_workflows.interface_normalization import normalize_interface_name
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)

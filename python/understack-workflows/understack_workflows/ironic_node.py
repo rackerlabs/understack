@@ -1,14 +1,15 @@
+import logging
+
 import ironicclient.common.apiclient.exceptions
 from ironicclient.common.utils import args_array_to_patch
 
 from understack_workflows.bmc import Bmc
-from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.node_configuration import IronicNodeConfiguration
 
 STATES_ALLOWING_UPDATES = ["enroll", "manageable"]
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def create_or_update(bmc: Bmc, name: str, manufacturer: str) -> IronicNodeConfiguration:

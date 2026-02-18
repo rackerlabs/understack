@@ -1,7 +1,6 @@
 import argparse
 import json
 import logging
-import logging.config
 import os
 
 from sushy import Sushy
@@ -9,23 +8,7 @@ from sushy import Sushy
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.helpers import setup_logger
 
-logger = setup_logger(__name__)
-
-log_config = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "loggers": {
-        "__main__": {"level": "INFO"},
-        "understack_workflows": {"level": "INFO"},
-        "sushy": {"level": "INFO"},
-        "sushy.main": {"level": "INFO"},
-        "sushy.resources.base": {"level": "INFO"},
-        "sushy.connector": {"level": "INFO"},
-        "urllib3.connectionpool": {"level": "INFO"},
-    },
-}
-
-logging.config.dictConfig(log_config)
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -39,6 +22,7 @@ def main():
 
     - output json object response.
     """
+    setup_logger()
     args = argument_parser().parse_args()
 
     ip_address = args.ip_address

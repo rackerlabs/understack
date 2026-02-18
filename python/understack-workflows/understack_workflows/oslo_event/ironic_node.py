@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -7,10 +8,9 @@ from openstack.exceptions import ConflictException
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
-from understack_workflows.helpers import setup_logger
 from understack_workflows.oslo_event.keystone_project import is_project_svm_enabled
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -78,8 +78,7 @@ def handle_provision_end(
     event = IronicProvisionSetEvent.from_event_dict(event_data)
 
     logger.info("Checking if project %s is tagged with UNDERSTACK_SVM", event.lessee)
-    if not is_project_svm_enabled(conn, event.lessee_undashed):
-        return 0
+    svm_enabled = is_project_svm_enabled(conn, event.lessee_undashed)
 
     # Check if the server instance has an appropriate property.
     logger.info("Looking up Nova instance %s", event.instance_uuid)
@@ -90,7 +89,13 @@ def handle_provision_end(
         save_output("storage", "not-found")
         return 1
 
-    if server.metadata.get("storage") == "wanted":
+    if server.metadata.get("storage") == "wanted" and not svm_enabled:
+        logger.warning(
+            "Server %s wanted storage but project does not have UNDERSTACK_SVM",
+            server.id,
+        )
+        save_output("storage", "wanted-but-not-project")
+    elif server.metadata.get("storage") == "wanted":
         save_output("storage", "wanted")
     else:
         logger.info("Server %s did not want storage enabled.", server.id)

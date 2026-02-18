@@ -1,3 +1,5 @@
+import logging
+
 import urllib3
 from netapp_ontap import config
 from netapp_ontap.error import NetAppRestError
@@ -5,7 +7,6 @@ from netapp_ontap.host_connection import HostConnection
 from netapp_ontap.resources.nvme_namespace import NvmeNamespace
 from netapp_ontap.resources.svm import Svm
 
-from understack_workflows.helpers import setup_logger
 from understack_workflows.netapp.client import NetAppClient
 from understack_workflows.netapp.config import NetAppConfig
 from understack_workflows.netapp.error_handler import ErrorHandler
@@ -17,7 +18,7 @@ from understack_workflows.netapp.value_objects import NodeResult
 from understack_workflows.netapp.value_objects import RouteResult
 from understack_workflows.netapp.volume_service import VolumeService
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 # Suppress warnings for unverified HTTPS requests, common in lab environments

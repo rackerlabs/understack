@@ -22,14 +22,13 @@ from openstack.connection import Connection
 from pynautobot import RequestError
 from pynautobot.core.api import Api as Nautobot
 
-from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.ironic.provision_state_mapper import ProvisionStateMapper
 from understack_workflows.oslo_event.nautobot_device_interface_sync import (
     sync_interfaces_from_data,
 )
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 EXIT_STATUS_SUCCESS = 0
 EXIT_STATUS_FAILURE = 1

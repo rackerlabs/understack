@@ -1,17 +1,17 @@
 import base64
+import logging
 from time import sleep
 
 from understack_workflows.bmc import AuthException
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import RedfishRequestError
-from understack_workflows.helpers import setup_logger
 
 FACTORY_B64 = b"Y2FsdmluLGNhbHZpbmNhbHZpbixjYWx2aW4xLGNhbHZpbmNhbHZpbjE="
 _bstring = base64.b64decode(FACTORY_B64)
 FACTORY_PASSWORDS = _bstring.decode("ascii").split(",")
 
 
-logger = setup_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def set_bmc_password(

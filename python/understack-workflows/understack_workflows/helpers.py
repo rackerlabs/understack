@@ -1,5 +1,6 @@
 import argparse
 import logging
+import logging.config
 import os
 import pathlib
 from functools import partial
@@ -8,22 +9,51 @@ from urllib.parse import urlparse
 OUTPUT_BASE_PATH = "/var/run/argo"
 
 
-def setup_logger(name: str | None = None, level: int = logging.DEBUG):
-    """Standardize our logging.
+_NOISY_LOGGERS = [
+    "ironicclient",
+    "keystoneauth",
+    "keystoneauth1",
+    "stevedore",
+    "sushy",
+    "urllib3",
+]
 
-    Configures the root logger to prefix messages with a timestamp
-    and to output the log level we want to see by default.
+
+def setup_logger(level: int = logging.DEBUG) -> None:
+    """Configure logging for a main entry point.
+
+    Sets the root logger to the requested level and explicitly suppresses
+    noisy third-party libraries to WARNING regardless of the requested level.
+
+    Should only be called from main() entry points, not from library modules.
+    Library modules should use logging.getLogger(__name__) directly.
 
     params:
-    name: logger hierarchy or root logger
-    level: default log level (DEBUG)
+    level: log level for the root logger (default: DEBUG)
     """
-    logging.basicConfig(
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S %z",
-        level=level,
+    logging.config.dictConfig(
+        {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "standard": {
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                    "datefmt": "%Y-%m-%d %H:%M:%S %z",
+                },
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "standard",
+                },
+            },
+            "loggers": {noisy: {"level": "WARNING"} for noisy in _NOISY_LOGGERS},
+            "root": {
+                "handlers": ["console"],
+                "level": level,
+            },
+        }
     )
-    return logging.getLogger(name)
 
 
 def boolean_args(val):
