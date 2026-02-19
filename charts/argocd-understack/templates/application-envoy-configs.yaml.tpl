@@ -4,6 +4,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ printf "%s-%s" $.Release.Name "envoy-configs" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
 spec:

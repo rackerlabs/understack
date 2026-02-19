@@ -5,6 +5,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ printf "%s-%s" $.Release.Name "ovn" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
 spec:
   destination:
     namespace: {{ $.Values.site.openstack.namespace }}
