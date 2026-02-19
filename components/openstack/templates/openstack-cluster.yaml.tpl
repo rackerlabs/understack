@@ -10,6 +10,7 @@ spec:
   replicas: 3
   persistence: {{ .Values.rabbitmq.persistence | toJson }}
   image: {{ .Values.rabbitmq.image |  default "rabbitmq:3.13.7-management" }} # renovate:ignore
+  resources: {{ .Values.rabbitmq.resources | toJson }}
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
