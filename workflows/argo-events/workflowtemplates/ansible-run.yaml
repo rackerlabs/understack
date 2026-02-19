@@ -31,7 +31,7 @@ spec:
       - "{{ inputs.parameters.project_path }}"
       - --playbook
       - "{{ inputs.parameters.playbook }}"
-      - --cmdline=-i {{ inputs.parameters.inventory_file }} --extra-vars '{{ inputs.parameters.extra_vars }}' -vvv
+      - --cmdline=-i {{ inputs.parameters.inventory_file }} --extra-vars '{{ inputs.parameters.extra_vars }} env=$(UNDERSTACK_ENV)' -vvv
       env:
       - name: NAUTOBOT_TOKEN
         valueFrom:
