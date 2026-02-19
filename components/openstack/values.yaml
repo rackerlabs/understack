@@ -58,6 +58,11 @@ mariadb:
 rabbitmq:
   # -- storage settings
   persistence: {}
+  # -- resource settings
+  resources:
+    limits:
+      cpu: "2"
+      memory: "4Gi"
 
 # -- OpenStack service users for OpenStack Helm charts
 keystoneServiceUsers:

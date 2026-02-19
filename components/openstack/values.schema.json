@@ -261,6 +261,11 @@
           "description": "Storage persistence settings",
           "additionalProperties": true
         },
+        "resources": {
+          "type": "object",
+          "description": "Resource settings",
+          "additionalProperties": true
+        },
         "image": {
           "type": "string",
           "description": "RabbitMQ container image for nodes"
