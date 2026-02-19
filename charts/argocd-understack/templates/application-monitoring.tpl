@@ -26,6 +26,15 @@ spec:
       - $deploy/{{ include "understack.deploy_path" $ }}/monitoring/values.yaml
     repoURL: https://prometheus-community.github.io/helm-charts
     targetRevision: 79.5.0
+  - chart: karma
+    helm:
+      ignoreMissingValueFiles: true
+      releaseName: karma
+      valueFiles:
+      - $understack/operators/monitoring/values-karma.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/monitoring/values-karma.yaml
+    repoURL: https://wiremind.github.io/wiremind-helm-charts
+    targetRevision: 2.11.0
   - path: operators/monitoring
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
