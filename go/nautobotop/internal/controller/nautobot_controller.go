@@ -198,6 +198,9 @@ func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 ) error {
 	log := logf.FromContext(ctx)
 	log.Info("syncing device types", "count", len(deviceTypeMap))
+	if len(deviceTypeMap) == 0 {
+		return nil
+	}
 	syncSvc := sync.NewDeviceTypeSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, deviceTypeMap); err != nil {
 		return fmt.Errorf("failed to sync device types: %w", err)
@@ -207,12 +210,15 @@ func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 
 func (r *NautobotReconciler) syncRackGroup(ctx context.Context,
 	nautobotClient *nbClient.NautobotClient,
-	locationType map[string]string,
+	rackGroup map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing rack group", "count", len(locationType))
+	log.Info("syncing rack group", "count", len(rackGroup))
+	if len(rackGroup) == 0 {
+		return nil
+	}
 	syncSvc := sync.NewRackGroupSync(nautobotClient)
-	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
+	if err := syncSvc.SyncAll(ctx, rackGroup); err != nil {
 		return fmt.Errorf("failed to sync rack group: %w", err)
 	}
 	return nil
@@ -224,6 +230,9 @@ func (r *NautobotReconciler) syncRack(ctx context.Context,
 ) error {
 	log := logf.FromContext(ctx)
 	log.Info("syncing racks", "count", len(rackData))
+	if len(rackData) == 0 {
+		return nil
+	}
 	syncSvc := sync.NewRackSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, rackData); err != nil {
 		return fmt.Errorf("failed to sync racks: %w", err)
@@ -237,6 +246,9 @@ func (r *NautobotReconciler) syncLocation(ctx context.Context,
 ) error {
 	log := logf.FromContext(ctx)
 	log.Info("syncing location types", "count", len(locationType))
+	if len(locationType) == 0 {
+		return nil
+	}
 	syncSvc := sync.NewLocationSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
 		return fmt.Errorf("failed to sync location types: %w", err)
@@ -250,6 +262,9 @@ func (r *NautobotReconciler) syncLocationTypes(ctx context.Context,
 ) error {
 	log := logf.FromContext(ctx)
 	log.Info("syncing location types", "count", len(locationType))
+	if len(locationType) == 0 {
+		return nil
+	}
 	syncSvc := sync.NewLocationTypeSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
 		return fmt.Errorf("failed to sync location types: %w", err)
