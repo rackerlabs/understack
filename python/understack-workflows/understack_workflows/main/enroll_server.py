@@ -8,9 +8,6 @@ from pprint import pformat
 from understack_workflows import ironic_node
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import bmc_for_ip_address
-from understack_workflows.bmc_bios import update_dell_bios_settings
-from understack_workflows.bmc_chassis_info import ChassisInfo
-from understack_workflows.bmc_chassis_info import InterfaceInfo
 from understack_workflows.bmc_chassis_info import chassis_info
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
@@ -83,13 +80,6 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
 
     bmc_set_hostname(bmc, device_info.bmc_hostname, device_name)
 
-    pxe_interface = guess_pxe_interface(device_info)
-    logger.info("Selected %s as PXE interface", pxe_interface)
-
-    # Note the above may require a restart of the DRAC, which also may delete
-    # any pending BIOS jobs, so do BIOS settings after the DRAC settings.
-    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
-
     node = ironic_node.create_or_update(
         bmc=bmc,
         name=device_name,
@@ -98,46 +88,6 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
     logger.info("%s complete for %s", __file__, bmc.ip_address)
 
     return node.uuid
-
-
-def guess_pxe_interface(device_info: ChassisInfo) -> str:
-    """Determine most probable PXE interface for BMC."""
-    interface = max(device_info.interfaces, key=_pxe_preference)
-    return interface.name
-
-
-def _pxe_preference(interface: InterfaceInfo) -> int:
-    """Restrict BMC interfaces from PXE selection."""
-    _name = interface.name.upper()
-    if "DRAC" in _name or "ILO" in _name or "NIC.EMBEDDED" in _name:
-        return 0
-    enabled_result = 100 if (interface.remote_switch_port_name is not None) else 0
-
-    NIC_PREFERENCE = {
-        "NIC.Integrated.1-1-1": 100,
-        "NIC.Integrated.1-1": 99,
-        "NIC.Slot.1-1-1": 98,
-        "NIC.Slot.1-1": 97,
-        "NIC.Integrated.1-2-1": 96,
-        "NIC.Integrated.1-2": 95,
-        "NIC.Slot.1-2-1": 94,
-        "NIC.Slot.1-2": 93,
-        "NIC.Slot.1-3-1": 92,
-        "NIC.Slot.1-3": 91,
-        "NIC.Slot.2-1-1": 90,
-        "NIC.Slot.2-1": 89,
-        "NIC.Integrated.2-1-1": 88,
-        "NIC.Integrated.2-1": 87,
-        "NIC.Slot.2-2-1": 86,
-        "NIC.Slot.2-2": 85,
-        "NIC.Integrated.2-2-1": 84,
-        "NIC.Integrated.2-2": 83,
-        "NIC.Slot.3-1-1": 82,
-        "NIC.Slot.3-1": 81,
-        "NIC.Slot.3-2-1": 80,
-        "NIC.Slot.3-2": 79,
-    }
-    return NIC_PREFERENCE.get(interface.name, 50) + enabled_result
 
 
 def argument_parser():
