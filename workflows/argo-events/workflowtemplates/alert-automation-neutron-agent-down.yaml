@@ -48,9 +48,12 @@ spec:
             value: understack
         volumeMounts:
           - mountPath: /etc/openstack
-            name: openstack-svc-acct
+            name: baremetal-manage
             readOnly: true
       volumes:
-        - name: openstack-svc-acct
+        - name: baremetal-manage
           secret:
-            secretName: openstack-svc-acct
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
