@@ -20,3 +20,5 @@ resources:
   # Alerting
   - pr-clean-failed-servers.yaml
   - pr-resource-availability.yaml
+  # ironic-prometheus-exporter
+  - ironic-prometheus-exporter-pvc.yaml
