@@ -55,6 +55,9 @@ conf:
     # force it on always.
     force_config_drive: true
   nova_ironic:
+    DEFAULT:
+      # Use the custom Understack driver that triggers storage network workflows
+      compute_driver: nova.virt.ironic_understack.driver.IronicUnderstackDriver
     ironic:
       # this is where we populate our hardware
       project_domain_name: infra
