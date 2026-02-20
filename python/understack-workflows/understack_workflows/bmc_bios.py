@@ -16,6 +16,9 @@ def required_bios_settings(pxe_interface: str) -> dict:
         # when its serving data from its own http server
         "HttpDev1TlsMode": "None",
         "TimeZone": "UTC",
+        # This option is available on newer R7615 and it
+        # defaults to Enabled which casues it not to boot:
+        "InteractiveMode": "Disabled",
     }
 
 
