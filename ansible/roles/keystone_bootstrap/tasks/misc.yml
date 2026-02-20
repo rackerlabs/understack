@@ -13,21 +13,6 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-- name: Create 'argoworkflow' user
-  openstack.cloud.identity_user:
-    name: argoworkflow
-    password: demo
-    domain: infra
-    state: present
-
-- name: Set 'argoworkflow' role
-  openstack.cloud.role_assignment:
-    domain: infra
-    user: argoworkflow
-    project: baremetal
-    role: admin
-    state: present
-
 - name: Create 'monitoring' user
   openstack.cloud.identity_user:
     name: monitoring
