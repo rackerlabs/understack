@@ -9,6 +9,13 @@ metadata:
 kind: WorkflowTemplate
 spec:
   entrypoint: main
+  volumes:
+    - name: baremetal-manage
+      secret:
+        secretName: baremetal-manage
+        items:
+          - key: clouds.yaml
+            path: clouds.yaml
   arguments:
     parameters:
       - name: device_id
@@ -61,13 +68,6 @@ spec:
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
-      volumes:
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
     - name: openstack-state-cmd
       inputs:
         parameters:
@@ -92,10 +92,3 @@ spec:
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
-      volumes:
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
