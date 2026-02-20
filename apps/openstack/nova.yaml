@@ -1,4 +1,4 @@
 ---
 component: nova
 repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.1.19+12458c92d
+chartVersion: 2025.2.8+8a90b438d
