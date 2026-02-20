@@ -230,7 +230,7 @@ diff expected.yaml current.yaml
 
 ### Adding a New Component
 
-1. Create template in `templates/application-<component>.yaml.tpl`
+1. Create template in `templates/application-<component>.yaml`
 2. Add configuration to `values.yaml` under appropriate section
 3. Update this README
 
