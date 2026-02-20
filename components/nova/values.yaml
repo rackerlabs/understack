@@ -54,10 +54,9 @@ conf:
     # config_drive to pass data. To avoid users having to remember this, just
     # force it on always.
     force_config_drive: true
+    # Use the custom Understack driver for compute-ironic nodes
+    compute_driver: nova.virt.ironic_understack.driver.IronicUnderstackDriver
   nova_ironic:
-    DEFAULT:
-      # Use the custom Understack driver that triggers storage network workflows
-      compute_driver: nova.virt.ironic_understack.driver.IronicUnderstackDriver
     ironic:
       # this is where we populate our hardware
       project_domain_name: infra
