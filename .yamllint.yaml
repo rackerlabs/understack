@@ -2,6 +2,7 @@ extends: default
 
 ignore:
   - components/etcdbackup/templates/
+  - charts/argocd-understack/templates/
 
 rules:
   comments:
