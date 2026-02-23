@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: openstack
+patches:
+  - target:
+      kind: HelmRelease
+      name: understack-flux-keystone
+    patch: |
+      - op: add
+        path: /spec/values
+        value:
+          bootstrap:
+            admin_password: CHANGEME
+          database:
+            password: CHANGEME
+          memcache:
+            secret: CHANGEME
+          rabbitmq:
+            password: CHANGEME
+            username: keystone
+          endpoint_is_internal: false

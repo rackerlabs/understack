@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+patches:
+  - target:
+      kind: HelmRelease
+      name: understack-flux-monitoring
+    patch: |
+      - op: add
+        path: /spec/values
+        value:
+          grafana:
+            admin:
+              existingSecret: "grafana-admin"
+            ingress:
+              enabled: true
+              hostname: grafana.example.com
+            persistence:
+              enabled: true
+              sizeGi: 10
+          prometheus:
+            prometheusSpec:
+              retention: 30d
+              storageSpec:
+                volumeClaimTemplate:
+                  spec:
+                    storageClassName: standard
+                    resources:
+                      requests:
+                        storage: 50Gi
+              externalLabels:
+                env: dev
+                cluster: dev-cluster

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cert-manager
+resources:
+  - cluster-issuer.yaml
+patches:
+  - target:
+      kind: HelmRelease
+      name: understack-flux-cert-manager
+    patch: |
+      - op: add
+        path: /spec/values
+        value:
+          installCRDs: true
+          extraArgs:
+            - --dns01-recursive-nameservers-only
+            - --dns01-recursive-nameservers=1.1.1.1:53,9.9.9.9:53
+          cainjector:
+            replicaCount: 2

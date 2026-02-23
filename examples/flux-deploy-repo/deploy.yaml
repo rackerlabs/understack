@@ -1,0 +1,21 @@
+# Example deploy.yaml configuration
+# This file can be used to document available options
+
+understack_url: https://github.com/rackerlabs/understack.git
+deploy_url: https://github.com/your-org/flux-deploy-repo.git
+
+global:
+  enabled: true
+  cert_manager:
+    enabled: true
+  monitoring:
+    enabled: true
+  nautobot:
+    enabled: true
+
+site:
+  enabled: true
+  keystone:
+    enabled: true
+  rook:
+    enabled: true
