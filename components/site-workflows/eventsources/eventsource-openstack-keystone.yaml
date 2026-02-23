@@ -24,7 +24,7 @@ spec:
         durable: true
         exclusive: false
         autoDelete: false
-        noWait: false
+        noWait: true
       # optional consume settings
       # if not provided, default values will be used
       consume:
