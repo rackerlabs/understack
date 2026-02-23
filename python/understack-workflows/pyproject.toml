@@ -30,7 +30,6 @@ dependencies = [
 ]
 
 [project.scripts]
-sync-keystone = "understack_workflows.main.sync_keystone:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
 get-raid-devices = "understack_workflows.main.get_raid_devices:main"
