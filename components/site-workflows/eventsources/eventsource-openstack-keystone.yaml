@@ -21,6 +21,7 @@ spec:
       routingKey: 'notifications.info'
       # queue settings, if not provided defaults are used
       queueDeclare:
+        name: argo_notifications
         durable: true
         exclusive: false
         autoDelete: false
