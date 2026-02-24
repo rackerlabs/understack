@@ -1,0 +1,11 @@
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: firmware-images
+  namespace: cdn
+spec:
+  bucketName: firmware-images
+  storageClassName: ceph-bucket
+  additionalConfig:
+    maxObjects: "1000"
+    maxSize: "5G"
