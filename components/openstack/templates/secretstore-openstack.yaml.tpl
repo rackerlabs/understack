@@ -26,7 +26,6 @@ rules:
   - watch
   resourceNames:
   - baremetal-manage
-  - svc-acct-argoworkflow
   - svc-acct-netapp
   - cinder-netapp-config
   - admin-keystone-password

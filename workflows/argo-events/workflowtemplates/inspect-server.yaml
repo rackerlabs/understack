@@ -10,6 +10,13 @@ kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow
   entrypoint: inspect-server
+  volumes:
+    - name: baremetal-manage
+      secret:
+        secretName: baremetal-manage
+        items:
+          - key: clouds.yaml
+            path: clouds.yaml
   arguments:
     parameters:
       - name: node
@@ -226,13 +233,6 @@ spec:
         volumeMounts:
           - mountPath: /etc/openstack
             name: baremetal-manage
-      volumes:
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
     - name: openstack-set-cmd
       inputs:
         parameters:
@@ -257,13 +257,6 @@ spec:
         volumeMounts:
           - mountPath: /etc/openstack
             name: baremetal-manage
-      volumes:
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
     - name: openstack-read-param
       inputs:
         parameters:
@@ -289,10 +282,3 @@ spec:
         volumeMounts:
           - mountPath: /etc/openstack
             name: baremetal-manage
-      volumes:
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml

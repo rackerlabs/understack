@@ -10,6 +10,16 @@ kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow
   entrypoint: main
+  volumes:
+    - name: bmc-master
+      secret:
+        secretName: bmc-master
+    - name: baremetal-manage
+      secret:
+        secretName: baremetal-manage
+        items:
+          - key: clouds.yaml
+            path: clouds.yaml
   arguments:
     parameters:
       - name: ip_address
@@ -104,16 +114,6 @@ spec:
           value: "{{workflow.name}}"
         - name: WF_UID
           value: "{{workflow.uid}}"
-      volumes:
-        - name: bmc-master
-          secret:
-            secretName: bmc-master
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
     - name: openstack-wait-cmd
       inputs:
         parameters:
@@ -136,13 +136,6 @@ spec:
         volumeMounts:
           - mountPath: /etc/openstack
             name: baremetal-manage
-      volumes:
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
     - name: get-raid-config
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
@@ -165,16 +158,6 @@ spec:
           value: "{{workflow.name}}"
         - name: WF_UID
           value: "{{workflow.uid}}"
-      volumes:
-        - name: bmc-master
-          secret:
-            secretName: bmc-master
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
     - name: openstack-set-baremetal-node-raid-config
       inputs:
         parameters:
@@ -214,13 +197,6 @@ spec:
         volumeMounts:
           - mountPath: /etc/openstack
             name: baremetal-manage
-      volumes:
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
     - name: openstack-state-cmd
       inputs:
         parameters:
@@ -244,10 +220,3 @@ spec:
         volumeMounts:
           - mountPath: /etc/openstack
             name: baremetal-manage
-      volumes:
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml

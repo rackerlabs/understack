@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - eventbus/eventbus-default.yaml
   - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
-  - secrets/openstack-svc-acct.yaml
   - secrets/operate-workflow-sa.token.yaml
   - secrets/baremetal-manage.yaml
   - eventsources/nautobot-webhook.yaml
