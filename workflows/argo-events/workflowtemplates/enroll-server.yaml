@@ -32,7 +32,7 @@ spec:
       steps:
         - - name: enroll-server
             template: enroll-server
-        - - name: baremetal-node-provision-state
+        - - name: server-enroll-state
             template: openstack-state-cmd
             arguments:
               parameters:
@@ -46,10 +46,7 @@ spec:
                   value: "manage"
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
-            when: >-
-              "{{steps.baremetal-node-provision-state.outputs.result}}" == "enroll" ||
-              "{{steps.baremetal-node-provision-state.outputs.result}}" == "clean failed" ||
-              "{{steps.baremetal-node-provision-state.outputs.result}}" == "inspect failed"
+            when: "{{steps.server-enroll-state.outputs.result}} == enroll"
         - - name: get-raid-config
             template: get-raid-config
             when: "{{workflow.parameters.raid_configure}} == true"
@@ -68,8 +65,6 @@ spec:
               parameters:
                 - name: device_id
                   value: "{{steps.enroll-server.outputs.result}}"
-        - - name: bios-settings
-            template: bios-settings
         - - name: inspect-server
             templateRef:
               name: inspect-server
@@ -99,7 +94,7 @@ spec:
             when: "{{steps.server-manage-state.outputs.result}} == manageable"
     - name: enroll-server
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1633
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - enroll-server
         args:
@@ -119,42 +114,6 @@ spec:
           value: "{{workflow.name}}"
         - name: WF_UID
           value: "{{workflow.uid}}"
-      volumes:
-        - name: bmc-master
-          secret:
-            secretName: bmc-master
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
-    - name: bios-settings
-      container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1633
-        command:
-          - bios-settings
-        args:
-          - --bmc-ip-address
-          - "{{workflow.parameters.ip_address}}"
-        volumeMounts:
-          - mountPath: /etc/openstack
-            name: baremetal-manage
-            readOnly: true
-          - mountPath: /etc/bmc_master/
-            name: bmc-master
-            readOnly: true
-        env:
-        - name: WF_NS
-          value: "{{workflow.namespace}}"
-        - name: WF_NAME
-          value: "{{workflow.name}}"
-        - name: WF_UID
-          value: "{{workflow.uid}}"
-      volumes:
-        - name: bmc-master
-          secret:
-            secretName: bmc-master
     - name: openstack-wait-cmd
       inputs:
         parameters:
