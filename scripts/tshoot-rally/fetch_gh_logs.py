@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import tempfile
+from datetime import datetime
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 
@@ -60,13 +61,22 @@ def extract_server_data(log_content):
         data["start_timestamp"] = timestamps[0]
         data["end_timestamp"] = timestamps[-1]
 
-    # Find POST request to create server
-    post_pattern = r"POST https://nova\.[^/]+/v2\.1/servers.*?-d \'({.*?})\'"
+    # Find POST request to create server and extract nova hostname
+    post_pattern = r"POST https://nova\.([^/]+)/v2\.1/servers.*?-d \'({.*?})\'"
     post_match = re.search(post_pattern, log_content, re.DOTALL)
 
     if post_match:
+        nova_host = post_match.group(1)
+        env_map = {
+            "dev.undercloud.rackspace.net": "bravo-uc-iad3-dev",
+            "staging.undercloud.rackspace.net": "charlie-uc-iad3-staging",
+            "prod.undercloud.rackspace.net": "delta-uc-dfw3-prod",
+            "rxdb-lab.undercloud.rackspace.net": "echo-uc-iad3-rxdb-lab",
+        }
+        data["k8s_cluster"] = env_map.get(nova_host, "delta-uc-dfw3-prod")
+
         try:
-            request_body = json.loads(post_match.group(1))
+            request_body = json.loads(post_match.group(2))
             data["server_name"] = request_body.get("server", {}).get("name")
             networks = request_body.get("server", {}).get("networks", [])
             if networks:
@@ -115,6 +125,35 @@ def main():
 
     print("\nExtracted data:")
     print(json.dumps(data, indent=2))
+
+    # Generate Grafana URL
+    if all(
+        k in data
+        for k in ["server_id", "start_timestamp", "end_timestamp", "k8s_cluster"]
+    ):
+        # Convert ISO timestamps to Unix milliseconds
+        start_dt = datetime.fromisoformat(
+            data["start_timestamp"].replace("Z", "+00:00")
+        )
+        end_dt = datetime.fromisoformat(data["end_timestamp"].replace("Z", "+00:00"))
+        start_ms = int(start_dt.timestamp() * 1000)
+        end_ms = int(end_dt.timestamp() * 1000)
+
+        cluster = data["k8s_cluster"]
+        grafana_url = (
+            f"https://grafana.core.ord.pvceng.rax.io/a/grafana-lokiexplore-app/explore/"
+            f"k8s_cluster_name/{cluster}/logs?patterns=%5B%5D"
+            f"&from={start_ms}&to={end_ms}"
+            f"&var-lineFormat=&var-ds=ab332d05-8028-40de-a9d6-522b8926cf2a"
+            f"&var-filters=k8s_cluster_name%7C%3D%7C{cluster}"
+            f"&var-filters=k8s_statefulset_name%7C%3D%7Cnova-compute-ironic"
+            f"&var-fields=&var-levels=&var-metadata=&var-jsonFields=&var-patterns="
+            f"&var-lineFilterV2=&var-lineFilters=caseInsensitive,0%7C__gfp__~%7C{data['server_id']}"
+            f"&displayedFields=%5B%5D&urlColumns=%5B%5D&visualizationType=%22logs%22"
+            f"&timezone=browser&var-all-fields=&userDisplayedFields=false"
+            f"&prettifyLogMessage=false&sortOrder=%22Ascending%22&wrapLogMessage=true"
+        )
+        print(f"\nGrafana logs URL:\n{grafana_url}")
 
     return data
 
