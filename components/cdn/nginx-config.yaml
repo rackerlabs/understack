@@ -102,10 +102,11 @@ data:
         proxy_no_cache 0;
         proxy_ignore_headers Cache-Control Expires Set-Cookie;
 
-        location / {
+        location /firmware-images/ {
             # Forward to Object Storage.
             # S3-compatible API expects requests in the form: /bucket/key
-            proxy_pass http://s3_origin/firmware-images$request_uri;
+            # Our bucket is called firmware-images
+            proxy_pass http://s3_origin$request_uri;
 
             proxy_http_version 1.1;
             proxy_set_header Connection "";           # keepalive to upstream
