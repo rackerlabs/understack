@@ -26,6 +26,7 @@ resources:
   - eventsources/alertmanager-webhook-eventsource.yaml
   - workflowtemplates/alert-automation-neutron-agent-down.yaml
   - workflowtemplates/resync-ironic-nautobot.yaml
+  - workflowtemplates/resync-neutron-nautobot.yaml
   # CronWorkflows
   - cronworkflows/resync-ironic-nautobot.yaml
 

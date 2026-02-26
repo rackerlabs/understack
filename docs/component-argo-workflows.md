@@ -14,6 +14,7 @@ set of WorkflowTemplates below.
 | nautobot-api            | HTTP Template Workflow to query the Nautobot API          | method,nautobot_url,uri | result     |   |
 | bmc-sync-creds          | Sync's a devices BMC password with what we have on record | device_id               |            |   |
 | resync-ironic-nautobot  | Resync Ironic nodes to Nautobot                           | node (optional)         |            |   |
+| resync-neutron-nautobot | Resync Neutron networks/subnets to Nautobot               | network (optional)      |            |   |
 
 \* WorkflowTemplate which requires a manual / custom implementation.
 

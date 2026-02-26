@@ -1,0 +1,63 @@
+---
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: resync-neutron-nautobot
+  annotations:
+    workflows.argoproj.io/title: Resync Neutron networks and subnets to Nautobot
+    workflows.argoproj.io/description: |
+      Resyncs Neutron network and subnet data to Nautobot. Use when Nautobot
+      gets out of sync with Neutron, e.g., after database restore or missed events.
+
+      Should be run before resync-ironic-nautobot to ensure IPAM namespaces
+      and prefixes exist before device/interface sync.
+
+      To resync all networks:
+      ```
+      argo -n argo-events submit --from workflowtemplate/resync-neutron-nautobot
+      ```
+
+      To resync a specific network:
+      ```
+      argo -n argo-events submit --from workflowtemplate/resync-neutron-nautobot \
+        -p network="<network-uuid>"
+      ```
+
+      Defined in `workflows/argo-events/workflowtemplates/resync-neutron-nautobot.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: main
+  serviceAccountName: workflow
+  arguments:
+    parameters:
+      - name: network
+        value: ""  # empty = all networks
+  templates:
+    - name: main
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - resync-neutron-nautobot
+        args:
+          - "--network"
+          - "{{workflow.parameters.network}}"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+              optional: false
+      volumes:
+        - name: nb-token
+          secret:
+            secretName: nautobot-token
+        - name: baremetal-manage
+          secret:
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
