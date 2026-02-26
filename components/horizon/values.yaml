@@ -13,7 +13,6 @@ conf:
         session_cookie_httponly: "True"
         allowed_hosts:
           - '*'
-        session_engine: 'django.contrib.sessions.backends.cached_db'
         openstack_cinder_features:
           enable_backup: false
     local_settings_d:
