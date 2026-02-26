@@ -1,0 +1,26 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: resync-ironic-nautobot
+  annotations:
+    workflows.argoproj.io/title: Scheduled resync of Ironic nodes to Nautobot
+    workflows.argoproj.io/description: |
+      Periodically resyncs all Ironic nodes to Nautobot to catch any drift.
+      Runs daily at 2:00 AM UTC by default.
+
+      To manually trigger:
+      ```
+      argo -n argo-events submit --from cronworkflow/resync-ironic-nautobot
+      ```
+
+      Defined in `components/site-workflows/cronworkflows/resync-ironic-nautobot.yaml`
+spec:
+  schedule: "0 2 * * *"
+  timezone: "UTC"
+  concurrencyPolicy: "Forbid"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  workflowSpec:
+    workflowTemplateRef:
+      name: resync-ironic-nautobot

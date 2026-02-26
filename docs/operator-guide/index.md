@@ -37,6 +37,7 @@ be the regular project area.
 
 - [Gateway API Migration Guide](gateway-api.md) - Migration from ingress-nginx to Kubernetes Gateway API with Envoy Gateway
 - [Argo Workflows](workflows.md) - Workflow orchestration and troubleshooting
+- [Ironic to Nautobot Sync](ironic-nautobot-sync.md) - Event-driven sync and bulk resync operations
 - [Monitoring Stack](monitoring.md) - Prometheus and Grafana monitoring
 
 [cli]: <../user-guide/openstack-cli.md>
