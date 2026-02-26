@@ -14,6 +14,8 @@ conf:
         allowed_hosts:
           - '*'
         session_engine: 'django.contrib.sessions.backends.cached_db'
+        openstack_cinder_features:
+          enable_backup: false
     local_settings_d:
       # Set default options when creating a server from the
       # horizon UI for a more friendly and efficient user experience.
