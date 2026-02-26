@@ -1,0 +1,7 @@
+---
+component: understack-cdn
+sources:
+  - ref: understack
+    path: 'components/understack-cdn'
+  - ref: deploy
+    path: '{{.name}}/manifests/understack-cdn'

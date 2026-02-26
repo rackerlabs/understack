@@ -2,7 +2,7 @@
 
 Images are stored in Object Store
 
-Cacheing reverse-proxies at each fabric will fetch the images from Object Store
+Caching reverse-proxies at each fabric will fetch the images from Object Store
 and make them available via HTTPS.
 
 This allows a device to access firmware images via an HTTPS request to a
@@ -26,8 +26,8 @@ Our credentials and bucket info is in a secret and a configmap both named after
 the bucketclaim:
 
 ``` sh
-KEY_ID=`kubectl -n cdn get secrets firmware-images -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d`
-KEY=`kubectl -n cdn get secrets firmware-images -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d`
+KEY_ID=`kubectl -n understack-cdn get secrets firmware-images -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d`
+KEY=`kubectl -n understack-cdn get secrets firmware-images -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d`
 ```
 
 I was able to manage the bucket using the minio CLI client called "mc".
@@ -48,12 +48,12 @@ mc anonymous set download myrook/firmware-images/DELL/R7615/BIOS_H3TGJ_WN64_1.15
 
 ## Testing with curl
 
-curl https://cdn.dev.undercloud.rackspace.net/DELL/R7615/BIOS_H3TGJ_WN64_1.15.3.EXE | sha256sum
+curl https://cdn.dev.undercloud.rackspace.net/firmware-images/DELL/R7615/BIOS_H3TGJ_WN64_1.15.3.EXE | shasum
 
-## See nginx logs to check that it is Cacheing
+## See nginx logs to check that it is Caching
 
 ``` sh
-⇒ kubectl -n cdn logs deployments/cdn-edge
+⇒ kubectl -n understack-cdn logs deployments/cdn-edge
 Defaulted container "nginx" out of: nginx, cache-dir-init (init)
 /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
 /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/

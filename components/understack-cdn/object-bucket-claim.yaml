@@ -2,7 +2,7 @@ apiVersion: objectbucket.io/v1alpha1
 kind: ObjectBucketClaim
 metadata:
   name: firmware-images
-  namespace: cdn
+  namespace: understack-cdn
 spec:
   bucketName: firmware-images
   storageClassName: ceph-bucket

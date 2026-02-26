@@ -1,7 +1,0 @@
----
-component: cdn
-sources:
-  - ref: understack
-    path: 'components/cdn'
-  - ref: deploy
-    path: '{{.name}}/manifests/cdn'
