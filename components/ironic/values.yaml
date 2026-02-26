@@ -117,7 +117,8 @@ conf:
       enable: true
       container_provider: kubernetes
       console_image: ghcr.io/rackerlabs/understack/ironic-vnc-container:latest
-      expire_console_session_interval: 480
+      expire_console_session_interval: 1800
+      token_timeout: 1800
       #  kubernetes_container_template: $pybasedir/console/container/ironic-console-pod.yaml.template
 
 endpoints:
