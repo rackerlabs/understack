@@ -1,18 +1,29 @@
 import logging
+import os
 
 from understack_workflows.bmc import Bmc
 
 logger = logging.getLogger(__name__)
 
-# When we read Enum-type keys we can expect a string like "Enabled".
-#
-# To change that key requires the numeric new_value string like "1".
-STANDARD = {
-    "SNMP.1.AgentEnable": {"expect": "Enabled", "new_value": "1"},
-    "SNMP.1.SNMPProtocol": {"expect": "All", "new_value": "0"},
-    "SNMP.1.AgentCommunity": {"expect": "public", "new_value": "public"},
-    "SNMP.1.AlertPort": {"expect": 161, "new_value": 161},
-    "SwitchConnectionView.1.Enable": {"expect": "Enabled", "new_value": "Enabled"},
+REQUIRED_VALUES = {
+    "SNMP.1.AgentEnable": "Enabled",
+    "SNMP.1.SNMPProtocol": "All",
+    "SNMP.1.AgentCommunity": "public",
+    "SNMP.1.AlertPort": 161,
+    "SwitchConnectionView.1.Enable": "Enabled",
+    "NTPConfigGroup.1.NTPEnable": "Enabled",
+    "Time.1.Timezone": "UTC",
+    "IPv4.1.DNS1": os.getenv("DNS_SERVER_IPV4_ADDR_1"),
+    "IPv4.1.DNS2": os.getenv("DNS_SERVER_IPV4_ADDR_2"),
+    "NTPConfigGroup.1.NTP1": os.getenv("NTP_SERVER_IPV4_ADDR_1"),
+    "NTPConfigGroup.1.NTP2": os.getenv("NTP_SERVER_IPV4_ADDR_2"),
+}
+
+# When we GET Enum-type keys we can expect a string like "Enabled".
+# To change that key requires us to POST the numeric string like "1".
+VALUES_TO_POST = REQUIRED_VALUES | {
+    "SNMP.1.AgentEnable": "1",
+    "SNMP.1.SNMPProtocol": "0",
 }
 
 
@@ -28,20 +39,23 @@ def update_dell_drac_settings(bmc: Bmc) -> dict:
     attribute_path = bmc.manager_path + "/Attributes"
     current_values = bmc.redfish_request(attribute_path)["Attributes"]
 
-    for key, _value in STANDARD.items():
-        if key not in current_values:
-            raise BiosSettingException(f"{bmc} has no BMC attribute {key}")
-
-    required_changes = {
-        k: x["new_value"]
-        for k, x in STANDARD.items()
-        if current_values[k] != x["expect"]
-    }
+    required_changes = {}
+    for key, required_value in REQUIRED_VALUES.items():
+        if not required_value:
+            logger.warning(
+                "We have no required value configured for BMC attribute '%s'", key
+            )
+        elif key not in current_values:
+            logger.warning("%s has no BMC attribute '%s'", bmc, key)
+        elif current_values[key] == required_value:
+            logger.warning("%s: '%s' already set to '%s'", bmc, key, required_value)
+        else:
+            required_changes[key] = VALUES_TO_POST[key]
 
     if required_changes:
         logger.info("%s Updating DRAC settings:", bmc)
         for k in required_changes:
-            logger.info("  %s: %s->%s", k, current_values[k], STANDARD[k]["expect"])
+            logger.info("  %s: %s->%s", k, current_values[k], REQUIRED_VALUES[k])
 
         payload = {"Attributes": required_changes}
         bmc.redfish_request(attribute_path, payload=payload, method="PATCH")
