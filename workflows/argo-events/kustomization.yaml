@@ -25,6 +25,7 @@ resources:
   - sensors/alertmanager-webhook-sensor.yaml
   - eventsources/alertmanager-webhook-eventsource.yaml
   - workflowtemplates/alert-automation-neutron-agent-down.yaml
+  - workflowtemplates/resync-ironic-nautobot.yaml
 
 helmCharts:
   - name: nautobot-token

@@ -24,6 +24,8 @@ resources:
   - sensors/sensor-ironic-node-port.yaml
   - sensors/sensor-ironic-node-portgroup.yaml
   - sensors/sensor-ironic-oslo-event.yaml
+  # CronWorkflows
+  - cronworkflows/resync-ironic-nautobot.yaml
 
 helmCharts:
   - name: nautobot-token

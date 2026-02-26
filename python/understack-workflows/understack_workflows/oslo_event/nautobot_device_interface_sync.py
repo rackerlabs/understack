@@ -33,7 +33,7 @@ INTERFACE_TYPE_MAP = {
     "embedded": "25gbase-x-sfp28",  # Embedded NICs
     "integrated": "25gbase-x-sfp28",  # Integrated NICs
 }
-DEFAULT_INTERFACE_TYPE = "unknown"
+DEFAULT_INTERFACE_TYPE = "other"
 
 
 @dataclass
