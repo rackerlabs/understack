@@ -111,6 +111,12 @@ global:
     # @default -- true
     enabled: true
 
+  # -- Alerts management (karma)
+  karma:
+    # -- Enable/disable deploying kube-prometheus-stack
+    # @default -- true
+    enabled: true
+
   # -- Monitoring via kube-prometheus-stack
   monitoring:
     # -- Enable/disable deploying kube-prometheus-stack
@@ -416,6 +422,12 @@ site:
   # -- External Secrets operator
   external_secrets:
     # -- Enable/disable deploying External Secrets
+    # @default -- true
+    enabled: true
+
+  # -- Alerts management (karma)
+  karma:
+    # -- Enable/disable deploying kube-prometheus-stack
     # @default -- true
     enabled: true
 

@@ -1,0 +1,11 @@
+# Default values for karma.
+resources:
+  limits:
+    cpu: 1000m
+    memory: 4Gi
+  # requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+env:
+  - name: ALERTMANAGER_URI
+    value: http://kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093
