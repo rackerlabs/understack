@@ -14,7 +14,7 @@ conf:
         allowed_hosts:
           - '*'
         openstack_cinder_features:
-          enable_backup: false
+          enable_backup: "False"
     local_settings_d:
       # Set default options when creating a server from the
       # horizon UI for a more friendly and efficient user experience.
