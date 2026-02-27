@@ -3,32 +3,10 @@
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
-from understack_workflows.main.resync_ironic_to_nautobot import SyncResult
 from understack_workflows.main.resync_ironic_to_nautobot import argument_parser
 from understack_workflows.main.resync_ironic_to_nautobot import main
 from understack_workflows.main.resync_ironic_to_nautobot import sync_nodes
-
-
-class TestSyncResult:
-    """Test cases for SyncResult dataclass."""
-
-    def test_defaults(self):
-        result = SyncResult()
-        assert result.total == 0
-        assert result.failed == 0
-        assert result.succeeded == 0
-
-    def test_succeeded_calculation(self):
-        result = SyncResult(total=10, failed=3)
-        assert result.succeeded == 7
-
-    def test_all_failed(self):
-        result = SyncResult(total=5, failed=5)
-        assert result.succeeded == 0
-
-    def test_none_failed(self):
-        result = SyncResult(total=5, failed=0)
-        assert result.succeeded == 5
+from understack_workflows.resync import SyncResult
 
 
 class TestArgumentParser:
@@ -128,16 +106,11 @@ class TestMain:
     """Test cases for main function."""
 
     @patch("understack_workflows.main.resync_ironic_to_nautobot.sync_nodes")
-    @patch("understack_workflows.main.resync_ironic_to_nautobot.pynautobot")
-    @patch("understack_workflows.main.resync_ironic_to_nautobot.credential")
+    @patch("understack_workflows.main.resync_ironic_to_nautobot.get_nautobot_client")
     @patch("understack_workflows.main.resync_ironic_to_nautobot.setup_logger")
     @patch("understack_workflows.main.resync_ironic_to_nautobot.argument_parser")
-    def test_main_success(
-        self, mock_parser, mock_logger, mock_cred, mock_pynb, mock_sync
-    ):
+    def test_main_success(self, mock_parser, mock_logger, mock_get_nb, mock_sync):
         mock_args = MagicMock()
-        mock_args.nautobot_token = "token"
-        mock_args.nautobot_url = "http://nautobot"
         mock_args.node = None
         mock_args.dry_run = False
         mock_parser.return_value.parse_args.return_value = mock_args
@@ -148,16 +121,11 @@ class TestMain:
         assert result == 0
 
     @patch("understack_workflows.main.resync_ironic_to_nautobot.sync_nodes")
-    @patch("understack_workflows.main.resync_ironic_to_nautobot.pynautobot")
-    @patch("understack_workflows.main.resync_ironic_to_nautobot.credential")
+    @patch("understack_workflows.main.resync_ironic_to_nautobot.get_nautobot_client")
     @patch("understack_workflows.main.resync_ironic_to_nautobot.setup_logger")
     @patch("understack_workflows.main.resync_ironic_to_nautobot.argument_parser")
-    def test_main_with_failures(
-        self, mock_parser, mock_logger, mock_cred, mock_pynb, mock_sync
-    ):
+    def test_main_with_failures(self, mock_parser, mock_logger, mock_get_nb, mock_sync):
         mock_args = MagicMock()
-        mock_args.nautobot_token = "token"
-        mock_args.nautobot_url = "http://nautobot"
         mock_args.node = None
         mock_args.dry_run = False
         mock_parser.return_value.parse_args.return_value = mock_args

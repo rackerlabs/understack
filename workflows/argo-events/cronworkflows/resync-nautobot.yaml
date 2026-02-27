@@ -1,0 +1,29 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: CronWorkflow
+metadata:
+  name: resync-nautobot
+  annotations:
+    workflows.argoproj.io/title: Scheduled resync of Keystone and Ironic to Nautobot
+    workflows.argoproj.io/description: |
+      Periodically resyncs Keystone projects and Ironic nodes to Nautobot to
+      catch any drift. Runs daily at 2:00 AM UTC by default.
+
+      Keystone projects are synced first (tenants must exist before devices can
+      reference them), then Ironic nodes.
+
+      To manually trigger:
+      ```
+      argo -n argo-events submit --from cronworkflow/resync-nautobot
+      ```
+
+      Defined in `workflows/argo-events/cronworkflows/resync-nautobot.yaml`
+spec:
+  schedule: "0 2 * * *"
+  timezone: "UTC"
+  concurrencyPolicy: "Forbid"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  workflowSpec:
+    workflowTemplateRef:
+      name: resync-nautobot
