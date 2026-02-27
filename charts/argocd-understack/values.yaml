@@ -30,230 +30,230 @@ deploy_path_prefix:
 # -- This block is for setting up the UnderStack global specific ArgoCD Applications
 global:
   # -- Enable/disable deploying the global specific applications
-  # @default -- true
-  enabled: true
+  # @default -- false
+  enabled: false
 
   # -- Argo Events configuration for event-driven workflows
   argo_events:
     # -- Enable/disable deploying Argo Events
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Argo Workflows configuration
   argo_workflows:
     # -- Enable/disable deploying Argo Workflows
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Cert-Manager
   cert_manager:
     # -- Enable/disable deploying Cert-Manager
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # Cilium configurations
   cilium:
     # -- Enable/disable deploying Cilium configurations
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Cloud Native PostgreSQL Operator
   cnpg_system:
     # -- Enable/disable deploying CNPG operator
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Dex OIDC provider for SSO
   dex:
     # -- Enable/disable deploying Dex
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Envoy configs for Envoy Gateway API
   envoy_configs:
     # -- Enable/disable deploy Envoy Configs
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Envoy Gateway API gateway
   envoy_gateway:
     # -- Enable/disable deploying Envoy Gateway
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # etcd backup
   etcdbackup:
     # Enable/disable deploying etcdbackup
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- External DNS operator
   external_dns:
     # -- Enable/disable deploying External DNS
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- External Secrets operator
   external_secrets:
     # -- Enable/disable deploying External Secrets
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Global workflows for Argo Events and Workflows
   global_workflows:
     # -- Enable/disable deploying global workflows
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- ingress-nginx
   ingress_nginx:
     # -- Enable/disable deploying ingress-nginx
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Alerts management (karma)
   karma:
     # -- Enable/disable deploying kube-prometheus-stack
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Monitoring via kube-prometheus-stack
   monitoring:
     # -- Enable/disable deploying kube-prometheus-stack
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Nautobot Network Source of Truth
   nautobot:
     # -- Enable/disable deploying Nautobot
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Nautobot Operator for Kubernetes
   nautobotop:
     # -- Enable/disable deploying Nautobot Operator
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenEBS
   openebs:
     # -- Enable/disable deploying OpenEBS
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenStack Resource Controller operator
   openstack_resource_controller:
     # -- Enable/disable deploying OpenStack Resource Controller
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenTelemetry Operator
   opentelemetry_operator:
     # -- Enable/disable deploying opentelemetry-operator
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenTelemetry collector for observability
   otel_collector:
     # -- Enable/disable deploying OTel collector
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- RabbitMQ Cluster Operator
   rabbitmq_system:
     # -- Enable/disable deploying RabbitMQ operator
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Rook
   rook:
     # -- Enable/disable deploying Rook
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # Sealed Secrets operator
   sealed_secrets:
     # -- Enable/disable deploying sealed secrets
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- UnderStack cluster issuer for cert-manager
   understack_cluster_issuer:
     # -- Enable/disable deploying cluster issuer
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
 # -- This block is for setting up the UnderStack site specific ArgoCD Applications
 site:
   # -- Enable/disable deploying the site specific applications
-  # @default -- true
-  enabled: true
+  # @default -- false
+  enabled: false
 
   # -- Argo Events configuration for event-driven workflows
   argo_events:
     # -- Enable/disable deploying Argo Events
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Argo Workflows configuration
   argo_workflows:
     # -- Enable/disable deploying Argo Workflows
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # Cilium configurations
   cilium:
     # -- Enable/disable deploying Cilium configurations
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Envoy Gateway configurations (site-level routes and policies)
   envoy_configs:
     # -- Enable/disable deploying Envoy Gateway configs
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Envoy Gateway API gateway (site deployment)
   envoy_gateway:
     # -- Enable/disable deploying Envoy Gateway
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # etcd backup
   etcdbackup:
     # Enable/disable deploying etcdbackup
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- ingress-nginx
   ingress_nginx:
     # -- Enable/disable deploying ingress-nginx
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenStack Resource Controller operator (site deployment)
   openstack_resource_controller:
     # -- Enable/disable deploying OpenStack Resource Controller
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- RabbitMQ Cluster Operator (site deployment)
   rabbitmq_system:
     # -- Enable/disable deploying RabbitMQ operator
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # Sealed Secrets operator
   sealed_secrets:
     # -- Enable/disable deploying sealed secrets
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenStack service applications configuration
   openstack:
     # -- Enable/disable deploying the base OpenStack configs
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
     # -- OpenStack Helm chart repository URL
     # @default -- https://tarballs.opendev.org/openstack/openstack-helm
@@ -266,8 +266,8 @@ site:
   # -- Keystone (Identity Service)
   keystone:
     # -- Enable/disable deploying Keystone
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering (lower numbers deploy first)
     # @default -- 1
     wave: 1
@@ -278,8 +278,8 @@ site:
   # -- Glance (Image Service)
   glance:
     # -- Enable/disable deploying Glance
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
@@ -290,8 +290,8 @@ site:
   # -- Cinder (Block Storage Service)
   cinder:
     # -- Enable/disable deploying Cinder
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
@@ -302,8 +302,8 @@ site:
   # -- Ironic (Bare Metal Service)
   ironic:
     # -- Enable/disable deploying Ironic
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
@@ -314,8 +314,8 @@ site:
   # -- Neutron (Networking Service)
   neutron:
     # -- Enable/disable deploying Neutron
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
@@ -326,8 +326,8 @@ site:
   # -- Placement (Placement Service)
   placement:
     # -- Enable/disable deploying Placement
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 2
     wave: 2
@@ -338,8 +338,8 @@ site:
   # -- Nova (Compute Service)
   nova:
     # -- Enable/disable deploying Nova
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 3
     wave: 3
@@ -362,8 +362,8 @@ site:
   # -- Horizon (Dashboard)
   horizon:
     # -- Enable/disable deploying Horizon
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 4
     wave: 4
@@ -374,8 +374,8 @@ site:
   # -- Skyline (Dashboard)
   skyline:
     # -- Enable/disable deploying Skyline
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Sync wave for deployment ordering
     # @default -- 4
     wave: 4
@@ -386,8 +386,8 @@ site:
   # -- Open vSwitch (Networking)
   openvswitch:
     # -- Enable/disable deploying Open vSwitch
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Chart version for Open vSwitch
     # renovate: datasource=helm depName=openvswitch registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
     chartVersion: "2025.1.0"
@@ -395,8 +395,8 @@ site:
   # -- OVN (Open Virtual Network)
   ovn:
     # -- Enable/disable deploying OVN
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
     # -- Chart version for OVN
     # renovate: datasource=helm depName=ovn registryUrl=https://tarballs.opendev.org/openstack/openstack-helm-infra
     chartVersion: "2024.2.0"
@@ -404,107 +404,107 @@ site:
   # -- Cert-Manager
   cert_manager:
     # -- Enable/disable deploying Cert-Manager
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Chrony NTP service configuration
   chrony:
     # -- Enable/disable deploying Chrony
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- External DNS operator
   external_dns:
     # -- Enable/disable deploying External DNS
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- External Secrets operator
   external_secrets:
     # -- Enable/disable deploying External Secrets
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Alerts management (karma)
   karma:
     # -- Enable/disable deploying kube-prometheus-stack
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- MariaDB Operator
   mariadb_operator:
     # -- Enable/disable deploying MariaDB Operator
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Monitoring via kube-prometheus-stack
   monitoring:
     # -- Enable/disable deploying kube-prometheus-stack
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Nautobot site-specific configuration
   nautobot_site:
     # -- Enable/disable deploying Nautobot site resources
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenEBS
   openebs:
     # -- Enable/disable deploying OpenEBS
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenStack exporter for Prometheus metrics
   openstack_exporter:
     # -- Enable/disable deploying OpenStack exporter
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Memcached for OpenStack caching
   openstack_memcached:
     # -- Enable/disable deploying OpenStack memcached
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenTelemetry Operator
   opentelemetry_operator:
     # -- Enable/disable deploying opentelemetry-operator
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- OpenTelemetry collector for observability
   otel_collector:
     # -- Enable/disable deploying OTel collector
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Rook
   rook:
     # -- Enable/disable deploying Rook
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Site-specific workflows and event handlers
   site_workflows:
     # -- Enable/disable deploying site workflows
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- SNMP exporter for network device monitoring
   snmp_exporter:
     # -- Enable/disable deploying SNMP exporter
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- UnderStack cluster issuer for cert-manager
   understack_cluster_issuer:
     # -- Enable/disable deploying cluster issuer
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
 
   # -- Undersync service for synchronization
   undersync:
     # -- Enable/disable deploying undersync
-    # @default -- true
-    enabled: true
+    # @default -- false
+    enabled: false
