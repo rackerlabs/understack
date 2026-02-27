@@ -22,16 +22,16 @@ images:
     keystone_fernet_setup: "ghcr.io/rackerlabs/understack/keystone:2025.2"
 
     # ironic
-    ironic_api: "ghcr.io/rackerlabs/understack/ironic:2025.2"
-    ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:2025.2"
-    ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:2025.2"
-    ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:2025.2"
+    ironic_api: "ghcr.io/rackerlabs/understack/ironic:pr-1673"
+    ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:pr-1673"
+    ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:pr-1673"
+    ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:pr-1673"
     ironic_pxe_http: "docker.io/nginx:1.29.4"
-    ironic_db_sync: "ghcr.io/rackerlabs/understack/ironic:2025.2"
+    ironic_db_sync: "ghcr.io/rackerlabs/understack/ironic:pr-1673"
     # these want curl which apparently is in the openstack-client image
-    ironic_manage_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
-    ironic_retrive_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
-    ironic_retrive_swift_config: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
+    ironic_manage_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:pr-1673"
+    ironic_retrive_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:pr-1673"
+    ironic_retrive_swift_config: "ghcr.io/rackerlabs/understack/openstack-client:pr-1673"
 
     # neutron
     neutron_db_sync: "ghcr.io/rackerlabs/understack/neutron:2025.2"
