@@ -14,7 +14,7 @@ metadata:
       argo -n argo-events submit --from cronworkflow/resync-ironic-nautobot
       ```
 
-      Defined in `components/site-workflows/cronworkflows/resync-ironic-nautobot.yaml`
+      Defined in `workflows/argo-events/cronworkflows/resync-ironic-nautobot.yaml`
 spec:
   schedule: "0 2 * * *"
   timezone: "UTC"
