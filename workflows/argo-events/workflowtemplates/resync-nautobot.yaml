@@ -1,0 +1,94 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: resync-nautobot
+  annotations:
+    workflows.argoproj.io/title: Resync Keystone and Ironic to Nautobot
+    workflows.argoproj.io/description: |
+      Resyncs Keystone projects and Ironic nodes to Nautobot. Use when Nautobot
+      gets out of sync, e.g., after database restore, missed events, or manual changes.
+
+      Keystone projects are synced first (tenants must exist before devices can
+      reference them), then Ironic nodes.
+
+      To resync all:
+      ```
+      argo -n argo-events submit --from workflowtemplate/resync-nautobot
+      ```
+
+      To resync specific items:
+      ```
+      argo -n argo-events submit --from workflowtemplate/resync-nautobot \
+        -p project="<project-uuid>" -p node="<node-uuid>"
+      ```
+
+      Defined in `workflows/argo-events/workflowtemplates/resync-nautobot.yaml`
+spec:
+  entrypoint: main
+  serviceAccountName: workflow
+  arguments:
+    parameters:
+      - name: project
+        value: ""  # empty = all projects
+      - name: node
+        value: ""  # empty = all nodes
+  templates:
+    - name: main
+      steps:
+        - - name: resync-keystone
+            template: resync-keystone
+        - - name: resync-ironic
+            template: resync-ironic
+
+    - name: resync-keystone
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1710
+        command:
+          - resync-keystone-nautobot
+        args:
+          - "--project"
+          - "{{workflow.parameters.project}}"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+              optional: false
+
+    - name: resync-ironic
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1710
+        command:
+          - resync-ironic-nautobot
+        args:
+          - "--node"
+          - "{{workflow.parameters.node}}"
+        volumeMounts:
+          - mountPath: /etc/nb-token/
+            name: nb-token
+            readOnly: true
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+              optional: false
+
+  volumeClaimTemplates: []
+  volumes:
+    - name: nb-token
+      secret:
+        secretName: nautobot-token
+    - name: baremetal-manage
+      secret:
+        secretName: baremetal-manage
+        items:
+          - key: clouds.yaml
+            path: clouds.yaml
