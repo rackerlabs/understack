@@ -34,18 +34,7 @@ class TestArgumentParser:
     def test_default_args(self):
         parser = argument_parser()
         args = parser.parse_args([])
-        assert args.project is None
-        assert args.dry_run is False
-
-    def test_project_arg(self):
-        parser = argument_parser()
-        args = parser.parse_args(["--project", "test-uuid"])
-        assert args.project == "test-uuid"
-
-    def test_dry_run_arg(self):
-        parser = argument_parser()
-        args = parser.parse_args(["--dry-run"])
-        assert args.dry_run is True
+        assert args.nautobot_url is not None or args.nautobot_token is None
 
 
 class TestSyncProjects:
@@ -85,7 +74,7 @@ class TestSyncProjects:
             name="project-1",
             is_domain=False,
         )
-        conn.identity.get_project.return_value = project
+        conn.identity.projects.return_value = [project]
 
         nautobot = MagicMock()
 
@@ -93,15 +82,11 @@ class TestSyncProjects:
             "understack_workflows.main.resync_keystone_to_nautobot.handle_project_update"
         ) as mock_update:
             mock_update.return_value = 0
-            result = sync_projects(
-                conn, nautobot, project_uuid="12345678-1234-5678-1234-567812345678"
-            )
+            result = sync_projects(conn, nautobot)
 
         assert result.total == 1
         assert result.failed == 0
-        conn.identity.get_project.assert_called_once_with(
-            "12345678-1234-5678-1234-567812345678"
-        )
+        conn.identity.projects.assert_called_once()
 
     def test_sync_with_failures(self):
         conn = MagicMock()
@@ -156,21 +141,16 @@ class TestSyncProjects:
         assert result.succeeded == 1
         mock_update.assert_called_once()
 
-    def test_dry_run_skips_sync(self):
+    def test_sync_no_projects(self):
         conn = MagicMock()
-        project = MagicMock(id="uuid-1", name="project-1", is_domain=False)
-        conn.identity.projects.return_value = [project]
+        conn.identity.projects.return_value = []
 
         nautobot = MagicMock()
 
-        with patch(
-            "understack_workflows.main.resync_keystone_to_nautobot.handle_project_update"
-        ) as mock_update:
-            result = sync_projects(conn, nautobot, dry_run=True)
+        result = sync_projects(conn, nautobot)
 
-        assert result.total == 1
+        assert result.total == 0
         assert result.failed == 0
-        mock_update.assert_not_called()
 
 
 class TestMain:

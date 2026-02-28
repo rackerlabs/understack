@@ -33,6 +33,13 @@ def test_handle_network_create(network_create_event_data):
     mock_nautobot = Mock()
     mock_nautobot.ipam.namespaces.create.return_value = "123"
 
+    # Mock update to return 404 so create path is taken
+    mock_pynautobot_req = Mock()
+    mock_pynautobot_req.status_code = 404
+    mock_nautobot.plugins.undercloud_vni.ucvnis.update.side_effect = (
+        pynautobot.RequestError(mock_pynautobot_req)
+    )
+
     result = neutron_network.handle_network_create_or_update(
         None, mock_nautobot, network_create_event_data, ucvni_group_name="FOO"
     )
@@ -59,7 +66,8 @@ def test_handle_network_create(network_create_event_data):
 
 def test_handle_network_update(network_update_event_data):
     mock_nautobot = Mock()
-    mock_nautobot.ipam.namespaces.update.return_value = "123"
+    mock_nautobot.ipam.namespaces.create.return_value = "123"
+    mock_nautobot.plugins.undercloud_vni.ucvnis.update.return_value = "updated"
 
     result = neutron_network.handle_network_create_or_update(
         None, mock_nautobot, network_update_event_data, ucvni_group_name="FOO"
@@ -68,9 +76,9 @@ def test_handle_network_update(network_update_event_data):
     mock_nautobot.ipam.namespaces.create.assert_called_once_with(
         name="f4aa4b99-2c2f-4698-a2f0-ac9920b1ee81"
     )
-    mock_nautobot.plugins.undercloud_vni.ucvnis.create.assert_called_once_with(
-        {
-            "id": "f4aa4b99-2c2f-4698-a2f0-ac9920b1ee81",
+    mock_nautobot.plugins.undercloud_vni.ucvnis.update.assert_called_once_with(
+        id="f4aa4b99-2c2f-4698-a2f0-ac9920b1ee81",
+        data={
             "name": "service-net",
             "status": {
                 "name": "Active",
