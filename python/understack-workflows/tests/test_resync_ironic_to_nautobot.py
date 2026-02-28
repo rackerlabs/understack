@@ -15,18 +15,7 @@ class TestArgumentParser:
     def test_default_args(self):
         parser = argument_parser()
         args = parser.parse_args([])
-        assert args.node is None
-        assert args.dry_run is False
-
-    def test_node_arg(self):
-        parser = argument_parser()
-        args = parser.parse_args(["--node", "test-uuid"])
-        assert args.node == "test-uuid"
-
-    def test_dry_run_arg(self):
-        parser = argument_parser()
-        args = parser.parse_args(["--dry-run"])
-        assert args.dry_run is True
+        assert args.nautobot_url is not None or args.nautobot_token is None
 
 
 class TestSyncNodes:
@@ -59,15 +48,15 @@ class TestSyncNodes:
         mock_ironic = MagicMock()
         mock_ironic_class.return_value = mock_ironic
         mock_node = MagicMock(uuid="uuid-1", name="node-1")
-        mock_ironic.get_node.return_value = mock_node
+        mock_ironic.list_nodes.return_value = [mock_node]
         mock_sync.return_value = 0
 
         nautobot = MagicMock()
-        result = sync_nodes(nautobot, node_uuid="uuid-1")
+        result = sync_nodes(nautobot)
 
         assert result.total == 1
         assert result.failed == 0
-        mock_ironic.get_node.assert_called_once_with("uuid-1")
+        mock_ironic.list_nodes.assert_called_once()
 
     @patch("understack_workflows.main.resync_ironic_to_nautobot.IronicClient")
     @patch(
@@ -89,16 +78,18 @@ class TestSyncNodes:
         assert result.succeeded == 1
 
     @patch("understack_workflows.main.resync_ironic_to_nautobot.IronicClient")
-    def test_dry_run_skips_sync(self, mock_ironic_class):
+    @patch(
+        "understack_workflows.main.resync_ironic_to_nautobot.sync_device_to_nautobot"
+    )
+    def test_sync_no_nodes(self, mock_sync, mock_ironic_class):
         mock_ironic = MagicMock()
         mock_ironic_class.return_value = mock_ironic
-        mock_node = MagicMock(uuid="uuid-1", name="node-1")
-        mock_ironic.list_nodes.return_value = [mock_node]
+        mock_ironic.list_nodes.return_value = []
 
         nautobot = MagicMock()
-        result = sync_nodes(nautobot, dry_run=True)
+        result = sync_nodes(nautobot)
 
-        assert result.total == 1
+        assert result.total == 0
         assert result.failed == 0
 
 
