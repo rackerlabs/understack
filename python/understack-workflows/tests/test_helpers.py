@@ -7,7 +7,7 @@ from understack_workflows.helpers import parser_nautobot_args
 
 
 @pytest.mark.parametrize(
-    "arg_list,context,expected_url",
+    ("arg_list", "context", "expected_url"),
     [
         (["--nautobot_url", ""], pytest.raises(SystemExit), None),
         (["--nautobot_url", "http"], pytest.raises(SystemExit), None),
@@ -25,7 +25,7 @@ def test_parse_nautobot_url(arg_list, context, expected_url):
 
 
 @pytest.mark.parametrize(
-    "arg_list,context,expected_token",
+    ("arg_list", "context", "expected_token"),
     [
         (["--nautobot_token", ""], nullcontext(), ""),
         (["--nautobot_token", "foo"], nullcontext(), "foo"),

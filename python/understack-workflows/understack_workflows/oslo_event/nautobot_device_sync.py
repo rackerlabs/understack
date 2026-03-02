@@ -451,8 +451,6 @@ def _preserve_location_from_device(device_info: DeviceInfo, nautobot_device) -> 
 class DeviceNotReadyError(Exception):
     """Raised when device cannot be synced yet (e.g., awaiting inspection)."""
 
-    pass
-
 
 def _delete_old_device_by_name(ironic_node_info: DeviceInfo, nautobot_client: Nautobot):
     """Handle re-enrollment scenario where device exists with different UUID.

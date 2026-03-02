@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
 
@@ -22,7 +24,7 @@ class PortBiosNameHook(base.InspectionHook):
 
     # "ports" hook creates baremetal ports for each physical NIC, be sure to run
     # this first because we will only be updating ports that already exist:
-    dependencies = ["ports"]
+    dependencies: ClassVar[list[str]] = ["ports"]
 
     def __call__(self, task, inventory, plugin_data):
         """Populate the baremetal_port.extra.bios_name attribute."""

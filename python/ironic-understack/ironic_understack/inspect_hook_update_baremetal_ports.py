@@ -1,5 +1,6 @@
 import re
 from typing import Any
+from typing import ClassVar
 
 from ironic import objects
 from ironic.common import exception
@@ -19,7 +20,7 @@ class InspectHookUpdateBaremetalPorts(base.InspectionHook):
 
     # "validate-interfaces" provides the all_interfaces field in plugin_data.
     # "parse-lldp" provides the parsed_lldp field in plugin_data.
-    dependencies = ["validate-interfaces", "parse-lldp"]
+    dependencies: ClassVar[list[str]] = ["validate-interfaces", "parse-lldp"]
 
     def __call__(self, task, inventory, plugin_data):
         """Update Ports' local_link_info and physnet based on LLDP data.

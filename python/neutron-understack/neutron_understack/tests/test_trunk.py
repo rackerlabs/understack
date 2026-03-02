@@ -52,8 +52,8 @@ class TestTrunkCreated:
         )
 
 
-@pytest.mark.usefixtures("ironic_baremetal_port_physical_network")
-@pytest.mark.usefixtures("utils_fetch_subport_network_id_patch")
+@pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
+@pytest.mark.usefixtures("_utils_fetch_subport_network_id_patch")
 class Test_HandleTenantVlanIDAndSwitchportConfig:
     def test_that_check_subports_segmentation_id_is_called(
         self, mocker, understack_trunk_driver, trunk, subport, network_id, vlan_num
@@ -186,8 +186,8 @@ class TestTrunkDeleted:
         )
 
 
-@pytest.mark.usefixtures("ironic_baremetal_port_physical_network")
-@pytest.mark.usefixtures("utils_fetch_subport_network_id_patch")
+@pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
+@pytest.mark.usefixtures("_utils_fetch_subport_network_id_patch")
 class Test_CleanParentPortSwitchportConfig:
     def test_when_parent_port_is_bound(
         self,

@@ -50,7 +50,7 @@ class Port(Base):
     device_owner = Column(String)
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture
 def db_session():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -70,7 +70,7 @@ def sample_port(db_session):
 
 
 @pytest.fixture
-def mock_get_admin_context(db_session):
+def _mock_get_admin_context(db_session):
     class Context:
         session = db_session
 
@@ -78,27 +78,22 @@ def mock_get_admin_context(db_session):
         yield
 
 
+@pytest.mark.usefixtures("_mock_get_admin_context")
 class TestPortFieldManipulation:
-    def test_update_port_fields_updates_fields(
-        self, db_session, mock_get_admin_context, sample_port
-    ):
+    def test_update_port_fields_updates_fields(self, db_session, sample_port):
         id = sample_port.id
         utils.update_port_fields(id, {"device_id": "new-id"})
         port = db_session.query(Port).filter_by(id=id).one()
         assert port.device_id == "new-id"
         assert port.device_owner == "owner"
 
-    def test_clear_device_id_for_port(
-        self, db_session, mock_get_admin_context, sample_port
-    ):
+    def test_clear_device_id_for_port(self, db_session, sample_port):
         id = sample_port.id
         utils.clear_device_id_for_port(id)
         port = db_session.query(Port).filter_by(id=id).one()
         assert port.device_id == ""
 
-    def test_set_device_id_and_owner_for_port(
-        self, db_session, mock_get_admin_context, sample_port
-    ):
+    def test_set_device_id_and_owner_for_port(self, db_session, sample_port):
         id = sample_port.id
         utils.set_device_id_and_owner_for_port(id, "dev-2", "own-2")
         port = db_session.query(Port).filter_by(id=id).one()
@@ -255,7 +250,7 @@ class TestIsUuid:
 
 class TestFetchNetworkNodeTrunkId:
     @pytest.fixture(autouse=True)
-    def reset_cache(self):
+    def _reset_cache(self):
         """Reset the cache before each test."""
         utils._cached_network_node_trunk_id = None
         yield

@@ -73,11 +73,11 @@ class TestValidatePortgroupName:
         assert str(PORT_CHANNEL_MAX) in error
 
     def test_invalid_number_zero(self):
-        is_valid, error = validate_portgroup_name("node01-port-channel0")
+        is_valid, _ = validate_portgroup_name("node01-port-channel0")
         assert is_valid is False
 
     def test_invalid_number_very_large(self):
-        is_valid, error = validate_portgroup_name("node01-port-channel99999")
+        is_valid, _ = validate_portgroup_name("node01-port-channel99999")
         assert is_valid is False
 
 

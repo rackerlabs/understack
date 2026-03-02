@@ -3,11 +3,14 @@
 import ipaddress
 
 import pytest
+from pydantic import ValidationError
 
+from understack_workflows.netapp.value_objects import InterfaceInfo
 from understack_workflows.netapp.value_objects import InterfaceResult
 from understack_workflows.netapp.value_objects import InterfaceSpec
 from understack_workflows.netapp.value_objects import NamespaceResult
 from understack_workflows.netapp.value_objects import NamespaceSpec
+from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 from understack_workflows.netapp.value_objects import PortResult
 from understack_workflows.netapp.value_objects import PortSpec
 from understack_workflows.netapp.value_objects import RouteResult
@@ -57,8 +60,6 @@ class TestSvmSpec:
         """Test that SVM specification is immutable."""
         spec = SvmSpec(name="test-svm", aggregate_name="aggr1")
 
-        from pydantic import ValidationError
-
         with pytest.raises(ValidationError):
             spec.name = "new-name"  # type: ignore[misc]
 
@@ -95,8 +96,6 @@ class TestVolumeSpec:
         spec = VolumeSpec(
             name="test-volume", svm_name="test-svm", aggregate_name="aggr1", size="1TB"
         )
-
-        from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
             spec.name = "new-name"  # type: ignore[misc]
@@ -154,8 +153,6 @@ class TestInterfaceSpec:
 
     def test_interface_spec_invalid_ip_address(self):
         """Test interface specification with invalid IP address."""
-        from pydantic import ValidationError
-
         with pytest.raises(ValidationError):
             InterfaceSpec(
                 name="test-lif",
@@ -176,8 +173,6 @@ class TestInterfaceSpec:
             home_port_uuid="port-uuid-123",
             broadcast_domain_name="Fabric-A",
         )
-
-        from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
             spec.name = "new-name"  # type: ignore[misc]
@@ -230,8 +225,6 @@ class TestPortSpec:
 
     def test_port_spec_invalid_vlan_ids(self):
         """Test port specification with invalid VLAN IDs."""
-        from pydantic import ValidationError
-
         invalid_vlan_ids = [0, 4095, 5000, -1]  # Invalid VLAN IDs
 
         for vlan_id in invalid_vlan_ids:
@@ -251,8 +244,6 @@ class TestPortSpec:
             base_port_name="e4a",
             broadcast_domain_name="Fabric-A",
         )
-
-        from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
             spec.vlan_id = 200  # type: ignore[misc]
@@ -278,8 +269,6 @@ class TestNamespaceSpec:
     def test_namespace_spec_immutable(self):
         """Test that namespace specification is immutable."""
         spec = NamespaceSpec(svm_name="test-svm", volume_name="test-volume")
-
-        from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
             spec.svm_name = "new-svm"  # type: ignore[misc]
@@ -496,8 +485,6 @@ class TestRouteSpec:
             destination="100.126.0.0/17",
         )
 
-        from pydantic import ValidationError
-
         with pytest.raises(ValidationError):
             spec.svm_name = "new-svm"  # type: ignore[misc]
 
@@ -570,14 +557,14 @@ class TestRouteSpec:
 
         for invalid_ip in invalid_ips:
             with pytest.raises(
-                ValueError, match="not within required 100.64.0.0/10 subnet"
+                ValueError, match=r"not within required 100\.64\.0\.0/10 subnet"
             ):
                 RouteSpec._calculate_destination(invalid_ip)
 
     def test_from_nexthop_ip_invalid_pattern(self):
         """Test from_nexthop_ip with IPs outside carrier-grade NAT range."""
         with pytest.raises(
-            ValueError, match="not within required 100.64.0.0/10 subnet"
+            ValueError, match=r"not within required 100\.64\.0\.0/10 subnet"
         ):
             RouteSpec.from_nexthop_ip("os-test-project", "192.168.1.17")
 
@@ -645,7 +632,7 @@ class TestRouteSpec:
         for base_addr in invalid_base_addresses:
             invalid_ip = f"{base_addr}.1.1"
             with pytest.raises(
-                ValueError, match="not within required 100.64.0.0/10 subnet"
+                ValueError, match=r"not within required 100\.64\.0\.0/10 subnet"
             ):
                 RouteSpec._calculate_destination(invalid_ip)
 
@@ -697,7 +684,7 @@ class TestRouteSpec:
 
         for invalid_ip in invalid_ips:
             with pytest.raises(
-                ValueError, match="not within required 100.64.0.0/10 subnet"
+                ValueError, match=r"not within required 100\.64\.0\.0/10 subnet"
             ):
                 RouteSpec.from_nexthop_ip(svm_name, invalid_ip)
 
@@ -762,7 +749,9 @@ class TestRouteSpec:
         ]
 
         for invalid_ip in invalid_subnet_ips:
-            with pytest.raises(ValueError, match="not within required 100.64.0.0/10"):
+            with pytest.raises(
+                ValueError, match=r"not within required 100\.64\.0\.0/10"
+            ):
                 RouteSpec._calculate_destination(invalid_ip)
 
     def test_from_nexthop_ip_subnet_validation(self):
@@ -780,7 +769,9 @@ class TestRouteSpec:
         ]
 
         for invalid_ip in invalid_subnet_ips:
-            with pytest.raises(ValueError, match="not within required 100.64.0.0/10"):
+            with pytest.raises(
+                ValueError, match=r"not within required 100\.64\.0\.0/10"
+            ):
                 RouteSpec.from_nexthop_ip(svm_name, invalid_ip)
 
     def test_calculate_destination_valid_subnet_range(self):
@@ -819,8 +810,6 @@ class TestRouteSpec:
 
     def test_route_spec_invalid_gateway_ip(self):
         """Test route specification with gateway IP outside carrier-grade NAT range."""
-        from pydantic import ValidationError
-
         invalid_gateways = [
             "192.168.1.1",  # Private network
             "10.0.0.1",  # Private network
@@ -863,8 +852,6 @@ class TestRouteResult:
             destination=ipaddress.IPv4Network("100.126.0.0/17"),
             svm_name="os-test-project",
         )
-
-        from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
             result.uuid = "new-uuid"  # type: ignore[misc]
@@ -917,10 +904,6 @@ class TestCustomVLANValidation:
 
     def test_out_of_range_vlan_ids(self):
         """Test VLAN validation with extreme out-of-range values."""
-        from pydantic import ValidationError
-
-        from understack_workflows.netapp.value_objects import InterfaceInfo
-
         extreme_invalid_vlans = [-100, 10000, -1, 5000, 0, 4095]
 
         for invalid_vlan in extreme_invalid_vlans:
@@ -938,10 +921,8 @@ class TestCustomInterfaceNameValidation:
     """Test cases for custom interface name validation and computed fields."""
 
     def test_malformed_interface_names_for_side_detection(self):
-        """Test interface names that cannot determine side."""
-        from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
-
-        # Test names that can't determine side
+        """Test interface names that fail pattern validation due to invalid side."""
+        # Names that don't match ^N\d-lif-(A|B)$ due to missing or invalid side suffix
         invalid_names_for_side = [
             "N1-test",  # Missing side suffix
             "N1-test-C",  # Invalid side (not A or B)
@@ -952,39 +933,33 @@ class TestCustomInterfaceNameValidation:
         ]
 
         for invalid_name in invalid_names_for_side:
-            with pytest.raises(ValueError):
-                config = NetappIPInterfaceConfig(
+            with pytest.raises(ValidationError):
+                NetappIPInterfaceConfig(
                     name=invalid_name,
                     address="192.168.1.10",  # type: ignore[arg-type]
                     network="192.168.1.0/24",  # type: ignore[arg-type]
                     vlan_id=100,
                 )
-                _ = config.side
 
     def test_malformed_interface_names_for_node_detection(self):
-        """Test interface names that cannot determine node number."""
-        from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
-
-        # Test names that can't determine node number or side
+        """Test interface names that fail pattern validation due to invalid node."""
+        # Names that don't match ^N\d-lif-(A|B)$ due to missing or invalid node prefix
         invalid_names_for_node = [
-            "X1-test-A",  # Invalid node prefix
-            "N3-test-A",  # Unsupported node number
-            "test-A",  # Missing node prefix
-            "N-test-A",  # Missing node number
-            "N1-blah",  # Missing side
+            "X1-lif-A",  # Invalid node prefix (not N)
+            "test-lif-A",  # Missing node prefix entirely
+            "N-lif-A",  # Missing node number
+            "N1-blah",  # Missing lif-(A|B) section
             "",  # Empty name
         ]
 
         for invalid_name in invalid_names_for_node:
-            # The error should occur when accessing the computed field
-            with pytest.raises(ValueError):
-                config = NetappIPInterfaceConfig(
+            with pytest.raises(ValidationError):
+                NetappIPInterfaceConfig(
                     name=invalid_name,
                     address="192.168.1.10",  # type: ignore[arg-type]
                     network="192.168.1.0/24",  # type: ignore[arg-type]
                     vlan_id=100,
                 )
-                _ = config.desired_node_number
 
 
 class TestCustomRouteGatewayValidation:
@@ -992,8 +967,6 @@ class TestCustomRouteGatewayValidation:
 
     def test_route_gateway_cgn_range_validation(self):
         """Test that route gateways must be in CGN range (100.64.0.0/10)."""
-        from pydantic import ValidationError
-
         # Test valid CGN range addresses
         valid_gateways = [
             "100.64.0.1",
@@ -1022,7 +995,7 @@ class TestCustomRouteGatewayValidation:
 
         for gateway in invalid_gateways:
             with pytest.raises(
-                ValidationError, match="must be within 100.64.0.0/10 subnet"
+                ValidationError, match=r"must be within 100\.64\.0\.0/10 subnet"
             ):
                 RouteSpec(
                     svm_name="test-svm",

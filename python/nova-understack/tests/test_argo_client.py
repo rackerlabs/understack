@@ -270,8 +270,8 @@ class TestArgoClient:
         mock_get.return_value.raise_for_status = Mock()
 
         # Should continue polling when status is missing
-        with patch("time.time", side_effect=[0, 700]):  # Simulate timeout
-            with pytest.raises(RuntimeError, match="timed out"):
-                client._wait_for_completion(
-                    "test-workflow", timeout=600, poll_interval=1
-                )
+        with (
+            patch("time.time", side_effect=[0, 700]),  # Simulate timeout
+            pytest.raises(RuntimeError, match="timed out"),
+        ):
+            client._wait_for_completion("test-workflow", timeout=600, poll_interval=1)

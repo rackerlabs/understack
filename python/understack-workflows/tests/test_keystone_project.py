@@ -28,7 +28,7 @@ class TestKeystoneProjectEvent:
         """Test event parsing with missing payload."""
         event_data = {}
 
-        with pytest.raises(Exception, match="Invalid event. No 'payload'"):
+        with pytest.raises(Exception, match=r"Invalid event\. No 'payload'"):
             KeystoneProjectEvent.from_event_dict(event_data)
 
     def test_from_event_dict_no_target(self):
