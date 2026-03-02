@@ -1,0 +1,48 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: openstack-cinder
+spec:
+  amqp:
+    # this is our eventName
+    notifications:
+      # amqp server url
+      url: amqp://rabbitmq-server-0.rabbitmq-nodes.openstack.svc.cluster.local:5672/cinder
+      # jsonBody specifies that all event body payload coming from this
+      # source will be JSON
+      jsonBody: true
+      # name of the exchange.
+      # NOTE: Unlike other services (ironic, keystone, neutron) which use their
+      # service name as the exchange, Cinder uses "openstack" as the exchange name.
+      # Confirmed via: rabbitmqadmin -V cinder list exchanges
+      # The only topic exchange in the cinder vhost is named "openstack", not "cinder".
+      exchangeName: openstack
+      exchangeType: topic
+      exchangeDeclare:
+        durable: true
+      # routing key for messages within the exchange
+      routingKey: 'notifications.info'
+      # queue settings, if not provided defaults are used
+      queueDeclare:
+        name: argo_notifications
+        durable: true
+        exclusive: false
+        autoDelete: false
+        noWait: true
+      # optional consume settings
+      # if not provided, default values will be used
+      consume:
+        consumerTag: "argo-events"
+        autoAck: true
+        exclusive: false
+        noLocal: false
+      # username and password for authentication
+      # use secret selectors
+      auth:
+        username:
+          name: argo-cinder-user-credentials
+          key: username
+        password:
+          name: argo-cinder-user-credentials
+          key: password
