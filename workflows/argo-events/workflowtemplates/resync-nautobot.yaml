@@ -12,15 +12,9 @@ metadata:
       devices can reference them), then Neutron networks, then Ironic nodes.
       Each step continues even if the previous step fails.
 
-      To resync all:
+      Usage:
       ```
       argo -n argo-events submit --from workflowtemplate/resync-nautobot
-      ```
-
-      To resync specific items:
-      ```
-      argo -n argo-events submit --from workflowtemplate/resync-nautobot \
-        -p project="<project-uuid>" -p node="<node-uuid>"
       ```
 
       Defined in `workflows/argo-events/workflowtemplates/resync-nautobot.yaml`
