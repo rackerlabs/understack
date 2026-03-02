@@ -54,7 +54,7 @@ def _get_project(conn: Connection, project_id: uuid.UUID) -> Project:
     return conn.identity.get_project(project_id.hex)  # type: ignore
 
 
-def _is_domain(project: Project) -> bool:
+def is_domain(project: Project) -> bool:
     """Check if a project is actually a domain.
 
     Returns True if the project is a domain, False otherwise.
@@ -127,7 +127,7 @@ def handle_project_update(
     logger.info("got request to update tenant %s", project_id.hex)
 
     project = _get_project(conn, project_id)
-    if _is_domain(project):
+    if is_domain(project):
         logger.info(
             "Skipping domain %s - domains are not synced to Nautobot", project_id.hex
         )
