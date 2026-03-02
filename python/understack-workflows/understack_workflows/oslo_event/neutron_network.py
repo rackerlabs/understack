@@ -89,6 +89,16 @@ def _create_nautobot_ucvni(
     except pynautobot.RequestError as error:
         if error.req.status_code == 400 and "this Id already exists" in error.error:
             logger.debug("UCVNI %s already existed in Nautobot", id)
+        elif (
+            error.req.status_code == 400
+            and "UCVNI with this Ucvni group and UCVNI_ID already exists" in error.error
+        ):
+            raise RuntimeError(
+                f"Segmentation ID conflict: ucvni_id={event.provider_segmentation_id} "
+                f"already exists in ucvni_group={ucvni_group_name}. "
+                f"Cannot create UCVNI for network {id} ({event.network_name}). "
+                f"This indicates a duplicate VXLAN VNI assignment in OpenStack."
+            ) from error
         else:
             raise NautobotRequestError(error) from error
 

@@ -127,6 +127,34 @@ def test_handle_network_create_idempotent_ucvni(network_create_event_data):
     assert result == 0
 
 
+def test_handle_network_create_duplicate_ucvni_group_and_id(network_create_event_data):
+    """Test that duplicate ucvni_group + ucvni_id combination fails the sync."""
+    mock_nautobot = Mock()
+    mock_nautobot.ipam.namespaces.create.return_value = "123"
+
+    # Mock update to return 404 so create path is taken
+    mock_update_req = Mock()
+    mock_update_req.status_code = 404
+    mock_nautobot.plugins.undercloud_vni.ucvnis.update.side_effect = (
+        pynautobot.RequestError(mock_update_req)
+    )
+
+    # Mock create to fail with duplicate ucvni_group + ucvni_id error
+    mock_create_req = Mock()
+    mock_create_req.status_code = 400
+    mock_create_req.text = "UCVNI with this Ucvni group and UCVNI_ID already exists."
+
+    mock_nautobot.plugins.undercloud_vni.ucvnis.create.side_effect = (
+        pynautobot.RequestError(mock_create_req)
+    )
+
+    result = neutron_network.handle_network_create_or_update(
+        None, mock_nautobot, network_create_event_data, ucvni_group_name="FOO"
+    )
+    # Should return 1 (failure) due to segmentation ID conflict
+    assert result == 1
+
+
 def test_handle_network_delete(network_delete_event_data):
     mock_nautobot_namespace = Mock()
     mock_nautobot_namespace.delete.return_value = "123"
