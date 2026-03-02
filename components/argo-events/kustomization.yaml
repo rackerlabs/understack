@@ -15,8 +15,3 @@ resources:
   ## configure webhook Sensor and associated role
   - sensor-workflow-role.yaml
   - workflow-role.yaml
-
-  - configmaps.yaml
-
-  ## copy openstack/cinder-netapp-config to argo-events/netapp-config
-  - secret-netapp.yaml
