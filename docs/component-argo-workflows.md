@@ -12,7 +12,7 @@ set of WorkflowTemplates below.
 | get-bmc-creds           | Get the credentials for the target Device                 | device_id               | secret     | * |
 | get-bmc-ip              | Get BMC IP address for target Device                      | device_id               | ip         |   |
 | bmc-sync-creds          | Sync's a devices BMC password with what we have on record | device_id               |            |   |
-| resync-ironic-nautobot  | Resync Ironic nodes to Nautobot                           | node (optional)         |            |   |
+| resync-nautobot         | Resync Keystone, Neutron, and Ironic to Nautobot          |                         |            |   |
 
 \* WorkflowTemplate which requires a manual / custom implementation.
 

@@ -174,7 +174,7 @@ nav:
     - 'Infrastructure':
       - operator-guide/argocd-helm-chart.md
       - operator-guide/workflows.md
-      - operator-guide/ironic-nautobot-sync.md
+      - operator-guide/openstack-nautobot-sync.md
       - operator-guide/monitoring.md
       - operator-guide/gateway-api.md
       - operator-guide/bmc-password.md
