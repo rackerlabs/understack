@@ -45,7 +45,7 @@ spec:
 
     - name: resync-keystone
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1710
         command:
           - resync-keystone-nautobot
         volumeMounts:
@@ -62,7 +62,7 @@ spec:
 
     - name: resync-neutron
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1710
         command:
           - resync-neutron-nautobot
         volumeMounts:
@@ -79,7 +79,7 @@ spec:
 
     - name: resync-ironic
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1710
         command:
           - resync-ironic-nautobot
         volumeMounts:

@@ -35,7 +35,7 @@ spec:
           - name: lessee
           - name: resource_class
       container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:pr-1710
         command:
           - sync-provision-state
         args:
