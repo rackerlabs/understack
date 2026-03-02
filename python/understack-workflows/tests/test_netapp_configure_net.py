@@ -106,7 +106,7 @@ class TestArgumentParser:
             parser.parse_args(["--project-id", ""])
 
     @pytest.mark.parametrize(
-        "url,context,expected_url",
+        ("url", "context", "expected_url"),
         [
             # Valid URLs
             ("http://localhost", nullcontext(), "http://localhost"),
@@ -174,7 +174,7 @@ class TestArgumentParser:
         assert args.nautobot_token is None
 
     @pytest.mark.parametrize(
-        "token_value,expected_token",
+        ("token_value", "expected_token"),
         [
             ("", ""),  # Empty token should be accepted
             ("simple-token", "simple-token"),
@@ -338,7 +338,7 @@ class TestArgumentParser:
         assert args.project_id == "12345678123456789abc123456789012"
 
     @pytest.mark.parametrize(
-        "uuid_input,expected_output",
+        ("uuid_input", "expected_output"),
         [
             # Valid UUIDs with dashes
             (
@@ -635,7 +635,7 @@ class TestInterfaceInfo:
             "tagged_vlans": [{"vid": 100}],
         }
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="multiple IP addresses") as exc_info:
             InterfaceInfo.from_graphql_interface(interface_data)
 
         error_message = str(exc_info.value)
@@ -650,7 +650,7 @@ class TestInterfaceInfo:
             "tagged_vlans": [{"vid": 100}, {"vid": 200}, {"vid": 300}],
         }
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="multiple tagged VLANs") as exc_info:
             InterfaceInfo.from_graphql_interface(interface_data)
 
         error_message = str(exc_info.value)
@@ -862,7 +862,7 @@ class TestVirtualMachineNetworkInfo:
             ]
         }
 
-        with pytest.raises(ValueError) as exc_info:
+        with pytest.raises(ValueError, match="problematic-interface") as exc_info:
             VirtualMachineNetworkInfo.from_graphql_vm(vm_data)
 
         error_message = str(exc_info.value)
@@ -880,7 +880,7 @@ class TestGraphQLQueryFunctionality:
             "query ($device_names: [String]){virtual_machines(name: $device_names) "
             "{interfaces { name ip_addresses{ address } tagged_vlans { vid }}}}"
         )
-        assert VIRTUAL_MACHINES_QUERY == expected_query
+        assert expected_query == VIRTUAL_MACHINES_QUERY
 
         # Test that the query contains all required fields
         assert "virtual_machines" in VIRTUAL_MACHINES_QUERY
@@ -1781,16 +1781,18 @@ class TestMainFunctionWithNetAppManager:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv with default netapp config path
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print"),
         ):
-            with patch("builtins.print"):
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -1837,18 +1839,20 @@ class TestMainFunctionWithNetAppManager:
 
         # Mock sys.argv with custom netapp config path
         custom_path = "/custom/netapp/config.conf"
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-                "--netapp-config-path",
-                custom_path,
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                    "--netapp-config-path",
+                    custom_path,
+                ],
+            ),
+            patch("builtins.print"),
         ):
-            with patch("builtins.print"):
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -1936,16 +1940,18 @@ class TestMainFunctionWithNetAppManager:
 
         # Mock sys.argv
         project_id = "12345678123456789abc123456789012"  # UUID without dashes
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print"),
         ):
-            with patch("builtins.print"):
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0

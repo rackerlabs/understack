@@ -105,7 +105,7 @@ class FlavorInspectMixin:
             LOG.warning("No resource class matched for %s", task.node.uuid)
             return upstream_state
 
-        device_type, resource_class = match_result
+        _device_type, resource_class = match_result
         LOG.info("Matched %s to resource class %s", task.node.uuid, resource_class.name)
 
         task.node.resource_class = resource_class.name

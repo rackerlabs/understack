@@ -330,7 +330,7 @@ def fetch_network_node_trunk_id() -> str:
         >>> fetch_network_node_trunk_id()
         '2e558202-0bd0-4971-a9f8-61d1adea0427'
     """
-    global _cached_network_node_trunk_id
+    global _cached_network_node_trunk_id  # noqa: PLW0603
     if _cached_network_node_trunk_id:
         LOG.info(
             "Returning cached network node trunk ID: %s", _cached_network_node_trunk_id
@@ -562,7 +562,7 @@ def segmentation_id_in_ranges(
 def printable_ranges(ranges: list[tuple[int, int]]) -> str:
     return ",".join(
         [
-            f"{str(tpl[0])}-{str(tpl[1])}" if tpl[0] != tpl[1] else str(tpl[0])
+            f"{tpl[0]!s}-{tpl[1]!s}" if tpl[0] != tpl[1] else str(tpl[0])
             for tpl in ranges
         ]
     )

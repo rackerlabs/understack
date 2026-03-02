@@ -35,23 +35,10 @@ def mock_pynautobot_api(mocker):
 
 
 @pytest.mark.parametrize(
-    "arg_list,context,expected_id",
+    ("arg_list", "context", "expected_id"),
     [
         (["identity.project.created", ""], pytest.raises(SystemExit), None),
         (["identity.project.created", "http"], pytest.raises(SystemExit), None),
-        (
-            ["identity.project.created", lf("project_id")],
-            nullcontext(),
-            lf("project_id"),
-        ),
-        (
-            [
-                "identity.project.created",
-                lf("project_id"),
-            ],
-            nullcontext(),
-            lf("project_id"),
-        ),
         (
             ["identity.project.created", lf("project_id")],
             nullcontext(),
@@ -117,7 +104,7 @@ def test_delete_project(
 
 
 @pytest.mark.parametrize(
-    "tenant_exists, expect_delete_call, expect_unmap_call",
+    ("tenant_exists", "expect_delete_call", "expect_unmap_call"),
     [
         (False, False, False),  # Tenant does NOT exist
         (True, True, True),  # Tenant exists

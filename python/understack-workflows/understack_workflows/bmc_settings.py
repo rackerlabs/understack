@@ -40,7 +40,7 @@ def update_dell_drac_settings(bmc: Bmc) -> dict:
 
     if required_changes:
         logger.info("%s Updating DRAC settings:", bmc)
-        for k in required_changes.keys():
+        for k in required_changes:
             logger.info("  %s: %s->%s", k, current_values[k], STANDARD[k]["expect"])
 
         payload = {"Attributes": required_changes}

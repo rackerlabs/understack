@@ -49,3 +49,9 @@ filterwarnings = "ignore::DeprecationWarning"
 # use our default and override anything we need specifically
 extend = "../pyproject.toml"
 target-version = "py312"
+
+[tool.ruff.lint.per-file-ignores]
+"cinder_understack/tests/*.py" = [
+    "S101",     # allow 'assert' for pytest
+    "PT009",    # OpenStack TestCase base class uses unittest-style assertions
+]

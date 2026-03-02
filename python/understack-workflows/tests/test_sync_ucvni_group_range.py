@@ -15,7 +15,7 @@ from understack_workflows.main.sync_ucvni_group_range import modify_range
 
 
 @pytest.mark.parametrize(
-    "action,new_range,existing_range,segment_range_note,expected",
+    ("action", "new_range", "existing_range", "segment_range_note", "expected"),
     [
         (SegmentRangeEvent.CREATE, "20-30", "", None, "20-30"),
         (SegmentRangeEvent.CREATE, "20-30", "10-15", None, "10-15,20-30"),
@@ -71,7 +71,7 @@ def test_handle_event_ucvni_group_not_found(mock_nautobot_class, mock_credential
 
 
 @pytest.mark.parametrize(
-    "event,handle_event_return,expected_exit_code",
+    ("event", "handle_event_return", "expected_exit_code"),
     [
         (SegmentRangeEvent.CREATE, _EXIT_SUCCESS, _EXIT_SUCCESS),
         ("UNKNOWN_EVENT", None, _EXIT_EVENT_UNKNOWN),

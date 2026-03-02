@@ -35,31 +35,21 @@ _EXIT_HANDLER_ERROR = 8
 class EventParseError(Exception):
     """Raised when event data cannot be parsed or is invalid."""
 
-    pass
-
 
 class EventValidationError(Exception):
     """Raised when event structure validation fails."""
-
-    pass
 
 
 class ClientInitializationError(Exception):
     """Raised when client initialization fails."""
 
-    pass
-
 
 class EventHandlerError(Exception):
     """Raised when event handler execution fails."""
 
-    pass
-
 
 class NoEventHandlerError(Exception):
     """Raised when no handler exists for the event type."""
-
-    pass
 
 
 # Type alias for event handler functions

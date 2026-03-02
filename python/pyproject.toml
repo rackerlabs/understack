@@ -14,17 +14,25 @@ select = [
   "UP",      # pyupgrade
   "LOG",     # flake8-logging
   "ASYNC",   # flake8-async
+  "C4",      # flake8-comprehensions
+  "PIE",     # flake8-pie
+  "PT",      # flake8-pytest-style
+  "PLE",     # pylint errors
+  "PLW",     # pylint warnings
+  "RUF",     # ruff-specific rules
+  "SIM",     # flake8-simplify
 ]
 
 ignore = [
-    "D100",  # don't require docs for every module
-    "D101",  # don't require docs for every class
-    "D102",  # don't require docs for every class method
-    "D103",  # don't require docs for every function
-    "D104",  # don't require docs for every package
-    "D106",  # don't require docs for every nested class
-    "D107",  # don't require docs for __init__
-    "D417"   # don't require docs for every function parameter
+    "D100",   # don't require docs for every module
+    "D101",   # don't require docs for every class
+    "D102",   # don't require docs for every class method
+    "D103",   # don't require docs for every function
+    "D104",   # don't require docs for every package
+    "D106",   # don't require docs for every nested class
+    "D107",   # don't require docs for __init__
+    "D417",   # don't require docs for every function parameter
+    "SIM108", # ternary operator is not always clearer than if/else
 ]
 
 [tool.ruff.lint.isort]
