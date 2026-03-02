@@ -14,16 +14,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
-        id: setup-python
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-      - uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
-      - run: pip install pre-commit
-      - name: "run pre-commit"
-        run: |
-          pre-commit run --all-files --show-diff-on-failure
+      - uses: j178/prek-action@v1
