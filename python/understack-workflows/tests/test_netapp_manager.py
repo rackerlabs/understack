@@ -78,11 +78,13 @@ netapp_password = test-password
             return_value="vol_test-project"
         )
 
-        result = manager.create_volume("test-project", "1TB", "test-aggregate")
+        result = manager.create_volume(
+            "test-project", "test-volume-type", "1TB", "test-aggregate"
+        )
 
         # Verify delegation with correct parameters
         manager._volume_service.create_volume.assert_called_once_with(
-            "test-project", "1TB", "test-aggregate"
+            "test-project", "test-volume-type", "1TB", "test-aggregate"
         )
         assert result == "vol_test-project"
 
@@ -159,7 +161,7 @@ netapp_password = test-password
             return_value=expected_namespaces
         )
 
-        result = manager.mapped_namespaces("os-test-project", "vol_test-project")
+        result = manager.mapped_namespaces("os-test-project", "vol_testproject")
 
         # Verify delegation with extracted project_id
         manager._volume_service.get_mapped_namespaces.assert_called_once_with(
@@ -197,11 +199,11 @@ netapp_password = test-password
         """Test naming convention utility methods."""
         manager = NetAppManager(mock_config_file)
 
-        # Test SVM naming
-        assert manager._svm_name("test-project") == "os-test-project"
+        # Test SVM naming (delegated to SvmService)
+        assert manager._svm_service.get_svm_name("test-project") == "os-test-project"
 
-        # Test volume naming
-        assert manager._volume_name("test-project") == "vol_test-project"
+        # Test volume naming (delegated to VolumeService, dashes stripped)
+        assert manager.get_volume_name("test-project") == "vol_testproject"
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
@@ -229,7 +231,9 @@ netapp_password = test-password
         )
 
         with pytest.raises(VolumeOperationError, match="Volume creation failed"):
-            manager.create_volume("test-project", "1TB", "test-aggregate")
+            manager.create_volume(
+                "test-project", "test-volume-type", "1TB", "test-aggregate"
+            )
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
@@ -304,7 +308,7 @@ netapp_password = test-password
         try:
             manager.create_svm("project", "aggregate")
             manager.delete_svm("svm-name")
-            manager.create_volume("project", "1TB", "aggregate")
+            manager.create_volume("project", "test-volume-type", "1TB", "aggregate")
             manager.delete_volume("volume-name")
             manager.delete_volume("volume-name", force=True)
             manager.check_if_svm_exists("project")
