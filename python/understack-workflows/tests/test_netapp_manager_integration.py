@@ -86,7 +86,9 @@ netapp_password = test-password
         )
 
         with pytest.raises(VolumeOperationError, match="Volume creation failed"):
-            manager.create_volume("test-project", "1TB", "test-aggregate")
+            manager.create_volume(
+                "test-project", "test-volume-type", "1TB", "test-aggregate"
+            )
 
     # ========================================================================
     # Cleanup Project Integration Tests
@@ -324,7 +326,9 @@ netapp_password = test-password
 
         # Test creation phase
         svm_result = manager.create_svm(project_id, "test-aggregate")
-        volume_result = manager.create_volume(project_id, "1TB", "test-aggregate")
+        volume_result = manager.create_volume(
+            project_id, "test-volume-type", "1TB", "test-aggregate"
+        )
 
         assert svm_result == f"os-{project_id}"
         assert volume_result == f"vol_{project_id}"
@@ -339,7 +343,7 @@ netapp_password = test-password
             project_id, "test-aggregate"
         )
         manager._volume_service.create_volume.assert_called_once_with(
-            project_id, "1TB", "test-aggregate"
+            project_id, "test-volume-type", "1TB", "test-aggregate"
         )
         manager._volume_service.delete_volume.assert_called_once_with(
             project_id, force=True
@@ -423,7 +427,10 @@ netapp_password = test-password
             # Core SVM/Volume operations
             assert manager.create_svm("project", "aggregate") == "test-svm"
             assert manager.delete_svm("os-project") is True
-            assert manager.create_volume("project", "1TB", "aggregate") == "test-volume"
+            assert (
+                manager.create_volume("project", "test-volume-type", "1TB", "aggregate")
+                == "test-volume"
+            )
             assert manager.delete_volume("vol_project") is True
             assert manager.delete_volume("vol_project", force=True) is True
             assert manager.check_if_svm_exists("project") is True

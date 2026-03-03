@@ -6,7 +6,6 @@ import pytest
 
 from understack_workflows.oslo_event.keystone_project import AGGREGATE_NAME
 from understack_workflows.oslo_event.keystone_project import SVM_PROJECT_TAG
-from understack_workflows.oslo_event.keystone_project import VOLUME_SIZE
 from understack_workflows.oslo_event.keystone_project import KeystoneProjectEvent
 from understack_workflows.oslo_event.keystone_project import _keystone_project_tags
 from understack_workflows.oslo_event.keystone_project import handle_project_created
@@ -182,11 +181,7 @@ class TestHandleProjectCreated:
         mock_netapp_manager.create_svm.assert_called_once_with(
             project_id="test-project-123", aggregate_name=AGGREGATE_NAME
         )
-        mock_netapp_manager.create_volume.assert_called_once_with(
-            project_id="test-project-123",
-            volume_size=VOLUME_SIZE,
-            aggregate_name=AGGREGATE_NAME,
-        )
+        mock_netapp_manager.create_volume.assert_not_called()
 
         # Verify project tags are written as JSON
         expected_calls = [
@@ -256,40 +251,6 @@ class TestHandleProjectCreated:
             project_id="test-project-123", aggregate_name=AGGREGATE_NAME
         )
 
-    @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
-    @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
-    def test_handle_project_created_volume_creation_failure(
-        self,
-        mock_open,
-        mock_tags,
-        mock_netapp_class,
-        mock_conn,
-        mock_nautobot,
-        valid_event_data,
-    ):
-        """Test handling when volume creation fails."""
-        mock_tags.return_value = [SVM_PROJECT_TAG]
-        mock_netapp_manager = MagicMock()
-        mock_netapp_manager.create_volume.side_effect = Exception(
-            "Volume creation failed"
-        )
-        mock_netapp_class.return_value = mock_netapp_manager
-
-        with pytest.raises(Exception, match="Volume creation failed"):
-            handle_project_created(mock_conn, mock_nautobot, valid_event_data)
-
-        mock_tags.assert_called_once_with(mock_conn, "test-project-123")
-        mock_netapp_class.assert_called_once()
-        mock_netapp_manager.create_svm.assert_called_once_with(
-            project_id="test-project-123", aggregate_name=AGGREGATE_NAME
-        )
-        mock_netapp_manager.create_volume.assert_called_once_with(
-            project_id="test-project-123",
-            volume_size=VOLUME_SIZE,
-            aggregate_name=AGGREGATE_NAME,
-        )
-
     def test_handle_project_created_invalid_event_data(self, mock_conn, mock_nautobot):
         """Test handling with invalid event data."""
         invalid_event_data = {
@@ -321,11 +282,7 @@ class TestHandleProjectCreated:
                 project_id="test-project-123",
                 aggregate_name="aggr02_n02_NVME",  # AGGREGATE_NAME constant
             )
-            mock_netapp_manager.create_volume.assert_called_once_with(
-                project_id="test-project-123",
-                volume_size="514GB",  # VOLUME_SIZE constant
-                aggregate_name="aggr02_n02_NVME",  # AGGREGATE_NAME constant
-            )
+            mock_netapp_manager.create_volume.assert_not_called()
         mock_open.assert_called()
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
@@ -428,11 +385,7 @@ class TestHandleProjectUpdated:
         mock_netapp_manager.create_svm.assert_called_once_with(
             project_id="test-project-123", aggregate_name=AGGREGATE_NAME
         )
-        mock_netapp_manager.create_volume.assert_called_once_with(
-            project_id="test-project-123",
-            volume_size=VOLUME_SIZE,
-            aggregate_name=AGGREGATE_NAME,
-        )
+        mock_netapp_manager.create_volume.assert_not_called()
 
         # Verify project tags are written as JSON
         mock_open.assert_any_call("/var/run/argo/output.project_tags", "w")
