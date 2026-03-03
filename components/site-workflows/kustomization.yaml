@@ -18,10 +18,12 @@ resources:
   - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
   - serviceaccounts/serviceaccount-k8s-openstack-events-secrets.yaml
   - sensors/sensor-ironic-node-update.yaml
-  - sensors/sensor-keystone-event-project.yaml
-  - sensors/sensor-keystone-oslo-event.yaml
-  - sensors/sensor-keystone-automation-user-upsert.yaml
-  - sensors/sensor-keystone-automation-user-delete.yaml
+  # disabled because there is no keystone here.
+  # TODO: address properly
+  # - sensors/sensor-keystone-event-project.yaml
+  # - sensors/sensor-keystone-oslo-event.yaml
+  # - sensors/sensor-keystone-automation-user-upsert.yaml
+  # - sensors/sensor-keystone-automation-user-delete.yaml
   - sensors/sensor-neutron-event-network-segment-range.yaml
   - sensors/sensor-neutron-olso-event.yaml
   - sensors/sensor-ironic-reclean.yaml
