@@ -78,11 +78,13 @@ netapp_password = test-password
             return_value="vol_test-project"
         )
 
-        result = manager.create_volume("test-project", "1TB", "test-aggregate")
+        result = manager.create_volume(
+            "test-project", "test-volume-type", "1TB", "test-aggregate"
+        )
 
         # Verify delegation with correct parameters
         manager._volume_service.create_volume.assert_called_once_with(
-            "test-project", "1TB", "test-aggregate"
+            "test-project", "test-volume-type", "1TB", "test-aggregate"
         )
         assert result == "vol_test-project"
 
@@ -229,7 +231,9 @@ netapp_password = test-password
         )
 
         with pytest.raises(VolumeOperationError, match="Volume creation failed"):
-            manager.create_volume("test-project", "1TB", "test-aggregate")
+            manager.create_volume(
+                "test-project", "test-volume-type", "1TB", "test-aggregate"
+            )
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
@@ -304,7 +308,7 @@ netapp_password = test-password
         try:
             manager.create_svm("project", "aggregate")
             manager.delete_svm("svm-name")
-            manager.create_volume("project", "1TB", "aggregate")
+            manager.create_volume("project", "test-volume-type", "1TB", "aggregate")
             manager.delete_volume("volume-name")
             manager.delete_volume("volume-name", force=True)
             manager.check_if_svm_exists("project")
