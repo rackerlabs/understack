@@ -77,7 +77,7 @@ func runDeployEnable(clusterName, name, componentType string) error {
 		return err
 	}
 
-	log.Infof("Enabled %s in %s", name, componentType)
+	log.Infof("Enabled %s in %s for %s", name, componentType, clusterName)
 	return nil
 }
 
@@ -104,7 +104,7 @@ func runDeployDisable(clusterName, name, componentType string) error {
 		return err
 	}
 
-	log.Infof("Disabled %s in %s", name, componentType)
+	log.Infof("Disabled %s in %s for %s", name, componentType, clusterName)
 	return nil
 }
 

@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/rackerlabs/understack/go/understackctl/internal/chartvalues"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 const understackRepoURL = "https://github.com/rackerlabs/understack.git"
@@ -91,12 +90,7 @@ func runDeployInit(clusterName, clusterType, gitRemote string) error {
 		config["site"] = siteMap
 	}
 
-	data, err := yaml.Marshal(&config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(deployYamlPath, data, 0644); err != nil {
+	if err := writeYAMLFile(deployYamlPath, config); err != nil {
 		return fmt.Errorf("failed to write deploy.yaml: %w", err)
 	}
 
