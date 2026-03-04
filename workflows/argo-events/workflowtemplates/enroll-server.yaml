@@ -109,6 +109,9 @@ spec:
           - mountPath: /etc/bmc_master/
             name: bmc-master
             readOnly: true
+        envFrom:
+        - configMapRef:
+            name: cluster-metadata
         env:
         - name: WF_NS
           value: "{{workflow.namespace}}"
@@ -141,6 +144,9 @@ spec:
           - mountPath: /etc/bmc_master/
             name: bmc-master
             readOnly: true
+        envFrom:
+        - configMapRef:
+            name: cluster-metadata
         env:
         - name: WF_NS
           value: "{{workflow.namespace}}"
