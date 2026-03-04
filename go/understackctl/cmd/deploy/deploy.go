@@ -34,6 +34,8 @@ func NewCmdDeploy() *cobra.Command {
 	cmd.AddCommand(newCmdDeployCheck())
 	cmd.AddCommand(newCmdDeployUpdate())
 	cmd.AddCommand(newCmdDeployRender())
+	cmd.AddCommand(newCmdDeployEnable())
+	cmd.AddCommand(newCmdDeployDisable())
 
 	return cmd
 }

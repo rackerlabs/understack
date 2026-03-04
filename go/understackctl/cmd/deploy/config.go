@@ -24,6 +24,20 @@ func loadDeployConfig(clusterName string) (map[string]any, error) {
 	return config, nil
 }
 
+func saveDeployConfig(clusterName string, config map[string]any) error {
+	deployYamlPath := filepath.Join(clusterName, "deploy.yaml")
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal deploy.yaml: %w", err)
+	}
+
+	if err := os.WriteFile(deployYamlPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write deploy.yaml: %w", err)
+	}
+
+	return nil
+}
+
 func enabledComponents(config map[string]any) []string {
 	var components []string
 

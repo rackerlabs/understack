@@ -3,6 +3,7 @@ package deploy
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -318,5 +319,256 @@ func TestDeployWorkflowIntegration(t *testing.T) {
 
 	if err := runDeployCheck(clusterName); err != nil {
 		t.Fatalf("check after cleanup failed: %v", err)
+	}
+}
+
+func TestDeployEnableUpdatesConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	clusterName := filepath.Join(tmpDir, "test-cluster")
+
+	config := map[string]any{
+		"site": map[string]any{
+			"enabled": true,
+		},
+	}
+
+	if err := os.MkdirAll(clusterName, 0755); err != nil {
+		t.Fatalf("failed to create cluster dir: %v", err)
+	}
+
+	data, err := yaml.Marshal(&config)
+	if err != nil {
+		t.Fatalf("failed to marshal config: %v", err)
+	}
+
+	deployYaml := filepath.Join(clusterName, "deploy.yaml")
+	if err := os.WriteFile(deployYaml, data, 0644); err != nil {
+		t.Fatalf("failed to write deploy.yaml: %v", err)
+	}
+
+	if err := runDeployEnable(clusterName, "external-secrets", "site"); err != nil {
+		t.Fatalf("runDeployEnable failed: %v", err)
+	}
+
+	updated, err := loadDeployConfig(clusterName)
+	if err != nil {
+		t.Fatalf("failed to reload config: %v", err)
+	}
+
+	site, ok := updated["site"].(map[string]any)
+	if !ok {
+		t.Fatal("site section missing")
+	}
+
+	component, ok := site["external_secrets"].(map[string]any)
+	if !ok {
+		t.Fatal("expected external_secrets component")
+	}
+
+	if enabled, ok := component["enabled"].(bool); !ok || !enabled {
+		t.Fatal("external_secrets should be enabled")
+	}
+}
+
+func TestDeployDisableUpdatesConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	clusterName := filepath.Join(tmpDir, "test-cluster")
+
+	config := map[string]any{
+		"global": map[string]any{
+			"enabled": true,
+			"cert_manager": map[string]any{
+				"enabled": true,
+			},
+		},
+	}
+
+	if err := os.MkdirAll(clusterName, 0755); err != nil {
+		t.Fatalf("failed to create cluster dir: %v", err)
+	}
+
+	data, err := yaml.Marshal(&config)
+	if err != nil {
+		t.Fatalf("failed to marshal config: %v", err)
+	}
+
+	deployYaml := filepath.Join(clusterName, "deploy.yaml")
+	if err := os.WriteFile(deployYaml, data, 0644); err != nil {
+		t.Fatalf("failed to write deploy.yaml: %v", err)
+	}
+
+	if err := runDeployDisable(clusterName, "cert-manager", "global"); err != nil {
+		t.Fatalf("runDeployDisable failed: %v", err)
+	}
+
+	updated, err := loadDeployConfig(clusterName)
+	if err != nil {
+		t.Fatalf("failed to reload config: %v", err)
+	}
+
+	global, ok := updated["global"].(map[string]any)
+	if !ok {
+		t.Fatal("global section missing")
+	}
+
+	component, ok := global["cert_manager"].(map[string]any)
+	if !ok {
+		t.Fatal("expected cert_manager component")
+	}
+
+	if enabled, ok := component["enabled"].(bool); !ok || enabled {
+		t.Fatal("cert_manager should be disabled")
+	}
+}
+
+func TestDeployEnableDisableRejectInvalidType(t *testing.T) {
+	tmpDir := t.TempDir()
+	clusterName := filepath.Join(tmpDir, "test-cluster")
+
+	if err := os.MkdirAll(clusterName, 0755); err != nil {
+		t.Fatalf("failed to create cluster dir: %v", err)
+	}
+
+	deployYaml := filepath.Join(clusterName, "deploy.yaml")
+	if err := os.WriteFile(deployYaml, []byte("site:\n  enabled: true\n"), 0644); err != nil {
+		t.Fatalf("failed to write deploy.yaml: %v", err)
+	}
+
+	if err := runDeployEnable(clusterName, "keystone", "invalid"); err == nil {
+		t.Fatal("expected runDeployEnable to reject invalid type")
+	}
+
+	if err := runDeployDisable(clusterName, "keystone", "invalid"); err == nil {
+		t.Fatal("expected runDeployDisable to reject invalid type")
+	}
+}
+
+func TestDeployEnableAIOUpdatesBothSections(t *testing.T) {
+	tmpDir := t.TempDir()
+	clusterName := filepath.Join(tmpDir, "test-cluster")
+
+	config := map[string]any{
+		"global": map[string]any{
+			"enabled": true,
+		},
+		"site": map[string]any{
+			"enabled": true,
+		},
+	}
+
+	if err := os.MkdirAll(clusterName, 0755); err != nil {
+		t.Fatalf("failed to create cluster dir: %v", err)
+	}
+
+	data, err := yaml.Marshal(&config)
+	if err != nil {
+		t.Fatalf("failed to marshal config: %v", err)
+	}
+
+	deployYaml := filepath.Join(clusterName, "deploy.yaml")
+	if err := os.WriteFile(deployYaml, data, 0644); err != nil {
+		t.Fatalf("failed to write deploy.yaml: %v", err)
+	}
+
+	if err := runDeployEnable(clusterName, "dex", "aio"); err != nil {
+		t.Fatalf("runDeployEnable failed: %v", err)
+	}
+
+	updated, err := loadDeployConfig(clusterName)
+	if err != nil {
+		t.Fatalf("failed to reload config: %v", err)
+	}
+
+	for _, sectionName := range []string{"global", "site"} {
+		section := updated[sectionName].(map[string]any)
+		component, ok := section["dex"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected dex component in %s", sectionName)
+		}
+		if enabled, ok := component["enabled"].(bool); !ok || !enabled {
+			t.Fatalf("dex should be enabled in %s", sectionName)
+		}
+	}
+}
+
+func TestDeployDisableAIOUpdatesBothSections(t *testing.T) {
+	tmpDir := t.TempDir()
+	clusterName := filepath.Join(tmpDir, "test-cluster")
+
+	config := map[string]any{
+		"global": map[string]any{
+			"enabled": true,
+			"dex": map[string]any{
+				"enabled": true,
+			},
+		},
+		"site": map[string]any{
+			"enabled": true,
+			"dex": map[string]any{
+				"enabled": true,
+			},
+		},
+	}
+
+	if err := os.MkdirAll(clusterName, 0755); err != nil {
+		t.Fatalf("failed to create cluster dir: %v", err)
+	}
+
+	data, err := yaml.Marshal(&config)
+	if err != nil {
+		t.Fatalf("failed to marshal config: %v", err)
+	}
+
+	deployYaml := filepath.Join(clusterName, "deploy.yaml")
+	if err := os.WriteFile(deployYaml, data, 0644); err != nil {
+		t.Fatalf("failed to write deploy.yaml: %v", err)
+	}
+
+	if err := runDeployDisable(clusterName, "dex", "aio"); err != nil {
+		t.Fatalf("runDeployDisable failed: %v", err)
+	}
+
+	updated, err := loadDeployConfig(clusterName)
+	if err != nil {
+		t.Fatalf("failed to reload config: %v", err)
+	}
+
+	for _, sectionName := range []string{"global", "site"} {
+		section := updated[sectionName].(map[string]any)
+		component, ok := section["dex"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected dex component in %s", sectionName)
+		}
+		if enabled, ok := component["enabled"].(bool); !ok || enabled {
+			t.Fatalf("dex should be disabled in %s", sectionName)
+		}
+	}
+}
+
+func TestDeployEnableRequiresTypeFlag(t *testing.T) {
+	cmd := newCmdDeployEnable()
+	cmd.SetArgs([]string{"cluster-a", "keystone"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when --type is missing")
+	}
+
+	if !strings.Contains(err.Error(), "required flag(s) \"type\" not set") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeployDisableRequiresTypeFlag(t *testing.T) {
+	cmd := newCmdDeployDisable()
+	cmd.SetArgs([]string{"cluster-a", "keystone"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when --type is missing")
+	}
+
+	if !strings.Contains(err.Error(), "required flag(s) \"type\" not set") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
