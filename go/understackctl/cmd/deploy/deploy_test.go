@@ -572,3 +572,18 @@ func TestDeployDisableRequiresTypeFlag(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestDeployRenderDefaultsToDeployYAML(t *testing.T) {
+	tmpDir := t.TempDir()
+	clusterName := filepath.Join(tmpDir, "test-cluster")
+
+	err := runDeployRender(clusterName, "", "main")
+	if err == nil {
+		t.Fatal("expected error when deploy.yaml is missing")
+	}
+
+	expected := filepath.Join(clusterName, "deploy.yaml")
+	if !strings.Contains(err.Error(), expected) {
+		t.Fatalf("expected missing deploy.yaml path in error, got: %v", err)
+	}
+}
