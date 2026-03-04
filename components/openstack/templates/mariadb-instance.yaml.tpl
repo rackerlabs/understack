@@ -53,6 +53,12 @@ spec:
               operator: In
               values:
                 - enabled
+
+  startupProbe:
+    failureThreshold: 60
+    periodSeconds: 10
+    timeoutSeconds: 5
+    initialDelaySeconds: 30
 ---
 # mariadb-operator backups for openstack
 # https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/BACKUP.md
