@@ -88,6 +88,14 @@ jobs:
         run: |
           ./bootstrap/argocd.sh
 
-      - name: install argocd-understack
+      - name: Install argocd-understack
         if: steps.list-changed.outputs.argocd-understack == 'true'
         run: helm install testsite charts/argocd-understack --namespace argocd --values charts/argocd-understack/ci/example.yaml
+
+      - name: Install nautobot-api-tokens
+        if: steps.list-changed.outputs.nautobot-api-tokens == 'true'
+        run: |
+          helm install nautobot-api-tokens-test charts/nautobot-api-tokens \
+            --namespace nautobot \
+            --create-namespace \
+            --values charts/nautobot-api-tokens/ci/example.yaml

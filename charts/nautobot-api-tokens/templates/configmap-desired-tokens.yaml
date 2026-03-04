@@ -1,0 +1,15 @@
+{{- $desired := list -}}
+{{- range $token := .Values.tokens -}}
+{{- if (default true $token.enabled) -}}
+{{- $desired = append $desired $token.name -}}
+{{- end -}}
+{{- end -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nautobot-api-tokens.desiredConfigMapName" . }}
+  labels:
+    {{- include "nautobot-api-tokens.labels" . | nindent 4 }}
+data:
+  token-names.json: |
+    {{ $desired | toJson }}

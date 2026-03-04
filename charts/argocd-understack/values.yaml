@@ -129,6 +129,12 @@ global:
     # @default -- false
     enabled: false
 
+  # -- Nautobot API token generation jobs
+  nautobot_api_tokens:
+    # -- Enable/disable deploying
+    # @default -- false
+    enabled: false
+
   # -- Nautobot Operator for Kubernetes
   nautobotop:
     # -- Enable/disable deploying Nautobot Operator
