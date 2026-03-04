@@ -12,15 +12,14 @@ cluster-local tendot IP address.
 
 The proxy edge service caches files locally on a persistent volume.
 
-Nginx configuration contains:
-- the service address for rook-ceph
-- the name of our bucket
-
-All files are proxied to that object bucket.  Anonymous credentials are used,
+All files are proxied to our object bucket.  Anonymous credentials are used,
 therefore we need to make the files in our bucket readable by anonymous if they
 are to be accessible via HTTP.
 
 ## Uploading file to object storage
+
+We have an ObjectBucket provisioned via rook/ceph.  The operator for our
+ObjectBucketClaim creates credentials for us to access this bucket.
 
 Our credentials and bucket info is in a secret and a configmap both named after
 the bucketclaim:

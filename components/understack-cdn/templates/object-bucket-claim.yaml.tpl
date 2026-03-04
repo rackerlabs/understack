@@ -1,11 +1,13 @@
+{{- if .Values.cdn.objectBucketIsLocal }}
 apiVersion: objectbucket.io/v1alpha1
 kind: ObjectBucketClaim
 metadata:
-  name: firmware-images
+  name: {{ .Values.cdn.bucketName }}
   namespace: understack-cdn
 spec:
-  bucketName: firmware-images
+  bucketName: {{ .Values.cdn.bucketName }}
   storageClassName: ceph-bucket
   additionalConfig:
     maxObjects: "1000"
-    maxSize: "5G"
+    maxSize: {{ .Values.cdn.bucketMaxSize }}
+{{- end }}

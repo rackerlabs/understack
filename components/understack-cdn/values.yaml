@@ -1,0 +1,16 @@
+cdn:
+  # Cache is limited to this size.  We will provision a volume this size so
+  # changing it would require the filesystem to be rebuilt/resized:
+  cacheSize: 10g
+  # Files are evicted from the cache if they have not been accessed in:
+  inactive: 7d
+
+  # The location of our object bucket (s3-compatible object store) providing us
+  # with anonymous access to our image files:
+  objectStorageServerHostname: object-storage.dev.undercloud.rackspace.net
+  bucketName: firmware-images
+
+  # Whether to create a local ObjectBucketClaim on this cluster
+  objectBucketIsLocal: false
+  # If above is true, how much space to claim for this object bucket:
+  bucketMaxSize: 40g

@@ -43,8 +43,8 @@ data:
         proxy_cache_path /var/cache/nginx/cdn
             levels=1:2
             keys_zone=cdn_cache:50m
-            max_size=5g
-            inactive=7d
+            max_size={{ .Values.cdn.cacheSize }}
+            inactive={{ .Values.cdn.inactive }}
             use_temp_path=off;
 
         # Don't buffer large files to disk before sending — stream them
@@ -64,11 +64,8 @@ data:
         include /etc/nginx/conf.d/*.conf;
     }
   default.conf: |
-    # Upstream: your S3 S3 origin
-    # In production this points at your S3 service endpoint.
-    # Can also point at R2/S3 by changing the server and Host header.
     upstream s3_origin {
-        server rook-ceph-rgw-ceph-objectstore.rook-ceph.svc:80;
+        server {{ .Values.cdn.objectStorageServerHostname }}:443;
         keepalive 32;
     }
 
@@ -102,11 +99,11 @@ data:
         proxy_no_cache 0;
         proxy_ignore_headers Cache-Control Expires Set-Cookie;
 
-        location /firmware-images/ {
+        location /{{ .Values.cdn.bucketName }}/ {
             # Forward to Object Storage.
-            # S3-compatible API expects requests in the form: /bucket/key
-            # Our bucket is called firmware-images
-            proxy_pass http://s3_origin$request_uri;
+            # S3-compatible API expects requests in the form: /bucket-name/key
+            # Our clients are using URL paths in the exact same format.
+            proxy_pass https://s3_origin$request_uri;
 
             proxy_http_version 1.1;
             proxy_set_header Connection "";           # keepalive to upstream
@@ -116,6 +113,10 @@ data:
 
             # Don't forward auth headers downstream
             proxy_set_header Authorization "";
+
+            # SSL settings for upstream connection
+            proxy_ssl_server_name on;
+            proxy_ssl_protocols TLSv1.2 TLSv1.3;
 
             # Tell clients files are immutable — they should cache forever
             add_header Cache-Control "public, max-age=31536000, immutable" always;
