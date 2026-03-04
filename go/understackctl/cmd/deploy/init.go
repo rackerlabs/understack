@@ -10,7 +10,6 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/rackerlabs/understack/go/understackctl/internal/chartvalues"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 const understackRepoURL = "https://github.com/rackerlabs/understack.git"
@@ -38,8 +37,8 @@ Populates global and site component sections based on cluster type.`,
 }
 
 func runDeployInit(clusterName, clusterType, gitRemote string) error {
-	if clusterType != "global" && clusterType != "site" && clusterType != "aio" {
-		return fmt.Errorf("invalid cluster type %q: must be global, site, or aio", clusterType)
+	if err := validateDeployType(clusterType, deployTypeGlobal, deployTypeSite, deployTypeAIO); err != nil {
+		return err
 	}
 
 	clusterDir := clusterName
@@ -73,7 +72,7 @@ func runDeployInit(clusterName, clusterType, gitRemote string) error {
 		return fmt.Errorf("failed to parse components: %w", err)
 	}
 
-	if clusterType == "global" || clusterType == "aio" {
+	if clusterType == deployTypeGlobal || clusterType == deployTypeAIO {
 		globalMap := make(map[string]any)
 		globalMap["enabled"] = true
 		for _, c := range globalComponents {
@@ -82,7 +81,7 @@ func runDeployInit(clusterName, clusterType, gitRemote string) error {
 		config["global"] = globalMap
 	}
 
-	if clusterType == "site" || clusterType == "aio" {
+	if clusterType == deployTypeSite || clusterType == deployTypeAIO {
 		siteMap := make(map[string]any)
 		siteMap["enabled"] = true
 		for _, c := range siteComponents {
@@ -91,12 +90,7 @@ func runDeployInit(clusterName, clusterType, gitRemote string) error {
 		config["site"] = siteMap
 	}
 
-	data, err := yaml.Marshal(&config)
-	if err != nil {
-		return fmt.Errorf("failed to marshal config: %w", err)
-	}
-
-	if err := os.WriteFile(deployYamlPath, data, 0644); err != nil {
+	if err := writeYAMLFile(deployYamlPath, config); err != nil {
 		return fmt.Errorf("failed to write deploy.yaml: %w", err)
 	}
 

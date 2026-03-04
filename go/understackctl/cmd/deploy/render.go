@@ -5,17 +5,18 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
 
 const (
-	defaultChartURL = "https://github.com/rackerlabs/understack//charts/argocd-understack"
+	defaultChartRepo = "https://github.com/rackerlabs/understack.git"
+	defaultChartDir  = "charts/argocd-understack"
 )
 
 func newCmdDeployRender() *cobra.Command {
 	var chartPath string
-	var valuesFile string
 	var version string
 
 	cmd := &cobra.Command{
@@ -27,29 +28,31 @@ helm template.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			clusterName := args[0]
-			return runDeployRender(clusterName, chartPath, valuesFile, version)
+			return runDeployRender(clusterName, chartPath, version)
 		},
 	}
 
-	cmd.Flags().StringVar(&chartPath, "chart-path", "", "Path or URL to the ArgoCD Helm chart (default: UnderStack GitHub repo)")
-	cmd.Flags().StringVarP(&valuesFile, "values", "f", "", "Path to the per-cluster values file (default: <cluster-name>/values.yaml)")
-	cmd.Flags().StringVar(&version, "version", "main", "Chart version (branch/tag) when using the default git chart URL")
+	cmd.Flags().StringVar(&chartPath, "chart-path", "", "Path to the ArgoCD Helm chart (default: clone understack repo and use charts/argocd-understack)")
+	cmd.Flags().StringVar(&version, "version", "main", "Git ref (branch/tag) to use when cloning the default chart source")
 
 	return cmd
 }
 
-func runDeployRender(clusterName, chartPath, valuesFile, version string) error {
+func runDeployRender(clusterName, chartPath, version string) error {
+	deployFile := filepath.Join(clusterName, "deploy.yaml")
+	if _, err := os.Stat(deployFile); err != nil {
+		return fmt.Errorf("deploy config file not found: %s", deployFile)
+	}
+
+	cleanup := func() {}
 	if chartPath == "" {
-		chartPath = defaultChartURL + "?ref=" + version
+		var err error
+		chartPath, cleanup, err = defaultDeployRenderChartPath(clusterName, version)
+		if err != nil {
+			return err
+		}
 	}
-
-	if valuesFile == "" {
-		valuesFile = filepath.Join(clusterName, "values.yaml")
-	}
-
-	if _, err := os.Stat(valuesFile); err != nil {
-		return fmt.Errorf("values file not found: %s", valuesFile)
-	}
+	defer cleanup()
 
 	helmPath, err := exec.LookPath("helm")
 	if err != nil {
@@ -60,7 +63,7 @@ func runDeployRender(clusterName, chartPath, valuesFile, version string) error {
 		"template",
 		clusterName,
 		chartPath,
-		"-f", valuesFile,
+		"-f", deployFile,
 	}
 
 	helmCmd := exec.Command(helmPath, args...)
@@ -72,4 +75,43 @@ func runDeployRender(clusterName, chartPath, valuesFile, version string) error {
 	}
 
 	return nil
+}
+
+func defaultDeployRenderChartPath(clusterName, version string) (string, func(), error) {
+	repoURL := defaultChartRepo
+	if config, err := loadDeployConfig(clusterName); err == nil {
+		if understackURL, ok := config["understack_url"].(string); ok && understackURL != "" {
+			repoURL = understackURL
+		}
+	}
+
+	tmpDir, err := os.MkdirTemp("", "understackctl-render-chart-*")
+	if err != nil {
+		return "", func() {}, fmt.Errorf("failed to create temp directory for chart checkout: %w", err)
+	}
+
+	cleanup := func() {
+		_ = os.RemoveAll(tmpDir)
+	}
+
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		cleanup()
+		return "", func() {}, fmt.Errorf("git not found in PATH: %w", err)
+	}
+
+	cloneCmd := exec.Command(gitPath, "clone", "--depth", "1", "--branch", version, repoURL, tmpDir)
+	output, err := cloneCmd.CombinedOutput()
+	if err != nil {
+		cleanup()
+		return "", func() {}, fmt.Errorf("failed to clone %s at ref %s: %s", repoURL, version, strings.TrimSpace(string(output)))
+	}
+
+	chartPath := filepath.Join(tmpDir, defaultChartDir)
+	if _, err := os.Stat(chartPath); err != nil {
+		cleanup()
+		return "", func() {}, fmt.Errorf("chart directory not found in cloned repo: %s", chartPath)
+	}
+
+	return chartPath, cleanup, nil
 }
