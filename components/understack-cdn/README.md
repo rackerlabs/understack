@@ -31,15 +31,8 @@ KEY=`kubectl -n understack-cdn get secrets firmware-images -o jsonpath='{.data.A
 
 I was able to manage the bucket using the minio CLI client called "mc".
 
-I was testing this without direct access to the object store because there was
-no ingress for it at the time of writing.  Therefore I configured a port forward
-so I could upload files from my laptop.  I also had to mess with DNS resolution
-because RGW is looking at the "host" header:
-
 ``` sh
-kubectl -n rook-ceph port-forward svc/rook-ceph-rgw-ceph-objectstore 8081:80 &
-echo "127.0.0.1  rook-ceph-rgw-ceph-objectstore.rook-ceph.svc" | sudo tee -a /etc/hosts
-mc alias set myrook http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc:8081 $KEY_ID $KEY
+mc alias set myrook https://object-storage.dev.undercloud.rackspace.net/firmware-images/ $KEY_ID $KEY
 mc anonymous set download myrook/firmware-images
 mc cp DELL/R7615/BIOS_H3TGJ_WN64_1.15.3.EXE myrook/firmware-images/DELL/R7615/
 mc anonymous set download myrook/firmware-images/DELL/R7615/BIOS_H3TGJ_WN64_1.15.3.EXE
