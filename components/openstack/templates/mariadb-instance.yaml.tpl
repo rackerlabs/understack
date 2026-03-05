@@ -10,8 +10,9 @@ spec:
   rootPasswordSecretKeyRef:
 {{ toYaml .Values.mariadb.rootPasswordSecretKeyRef | indent 4 }}
 
-  # renovate: datasource=docker
-  image: docker-registry1.mariadb.com/library/mariadb:11.4.4
+{{- if .Values.mariadb.image }}
+  image: {{ .Values.mariadb.image }}
+{{- end }}
   imagePullPolicy: IfNotPresent
 
   port: 3306
