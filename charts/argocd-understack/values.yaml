@@ -57,6 +57,12 @@ global:
     # @default -- false
     enabled: false
 
+  # -- User/Deployment supplied ClusterIssuer for cert-manager
+  cluster_issuer:
+    # -- Enable/disable deploying cluster issuer
+    # @default -- false
+    enabled: false
+
   # -- Cloud Native PostgreSQL Operator
   cnpg_system:
     # -- Enable/disable deploying CNPG operator
@@ -183,11 +189,6 @@ global:
     # @default -- false
     enabled: false
 
-  # -- UnderStack cluster issuer for cert-manager
-  understack_cluster_issuer:
-    # -- Enable/disable deploying cluster issuer
-    # @default -- false
-    enabled: false
 
 # -- This block is for setting up the UnderStack site specific ArgoCD Applications
 site:
@@ -207,9 +208,21 @@ site:
     # @default -- false
     enabled: false
 
+  # -- Cert-Manager
+  cert_manager:
+    # -- Enable/disable deploying Cert-Manager
+    # @default -- false
+    enabled: false
+
   # Cilium configurations
   cilium:
     # -- Enable/disable deploying Cilium configurations
+    # @default -- false
+    enabled: false
+
+  # -- User/Deployment supplied ClusterIssuer for cert-manager
+  cluster_issuer:
+    # -- Enable/disable deploying cluster issuer
     # @default -- false
     enabled: false
 
@@ -407,12 +420,6 @@ site:
     # renovate: datasource=helm depName=ovn registryUrl=https://tarballs.opendev.org/openstack/openstack-helm-infra
     chartVersion: "2024.2.0"
 
-  # -- Cert-Manager
-  cert_manager:
-    # -- Enable/disable deploying Cert-Manager
-    # @default -- false
-    enabled: false
-
   # -- Chrony NTP service configuration
   chrony:
     # -- Enable/disable deploying Chrony
@@ -500,12 +507,6 @@ site:
   # -- SNMP exporter for network device monitoring
   snmp_exporter:
     # -- Enable/disable deploying SNMP exporter
-    # @default -- false
-    enabled: false
-
-  # -- UnderStack cluster issuer for cert-manager
-  understack_cluster_issuer:
-    # -- Enable/disable deploying cluster issuer
     # @default -- false
     enabled: false
 
