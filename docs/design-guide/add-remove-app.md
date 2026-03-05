@@ -50,6 +50,11 @@ sources:
 
 {% endraw %}
 
+!!! Note "CRDs"
+    If what you are adding has CRDs, you should create another Application
+    with the suffix `-crds` and set an annotation of it of
+    `argocd.argoproj.io/sync-wave: "-2"`.
+
 ### Configuring the namespace
 
 If the namespace you'll be adding the component to is currently not in

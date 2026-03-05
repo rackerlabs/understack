@@ -3,32 +3,24 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ printf "%s-%s" $.Release.Name "monitoring" }}
+  name: {{ printf "%s-%s" $.Release.Name "prometheus-operator-crds" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+    # we always want CRDs to be at -2 sync wave
+    argocd.argoproj.io/sync-wave: "-2"
 spec:
   destination:
     namespace: monitoring
     server: {{ $.Values.cluster_server }}
   project: understack-operators
-  sources:
-  - chart: kube-prometheus-stack
-    helm:
-      ignoreMissingValueFiles: true
-      releaseName: kube-prometheus-stack
-      valueFiles:
-      - $understack/operators/monitoring/values.yaml
-      - $deploy/{{ include "understack.deploy_path" $ }}/monitoring/values.yaml
+  source:
     repoURL: https://prometheus-community.github.io/helm-charts
-    targetRevision: 79.5.0
-  - path: operators/monitoring
-    ref: understack
-    repoURL: {{ include "understack.understack_url" $ }}
-    targetRevision: {{ include "understack.understack_ref" $ }}
-  - path: {{ include "understack.deploy_path" $ }}/monitoring
-    ref: deploy
-    repoURL: {{ include "understack.deploy_url" $ }}
-    targetRevision: {{ include "understack.deploy_ref" $ }}
+    chart: prometheus-operator-crds
+    targetRevision: 24.0.2
+    helm:
+      releaseName: prometheus-operator-crds
   syncPolicy:
     automated:
       prune: true
