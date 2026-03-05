@@ -37,6 +37,8 @@ spec:
     server: '*'
   - namespace: 'envoy-gateway'
     server: '*'
+  - namespace: 'rook-ceph'
+    server: '*'
   clusterResourceWhitelist:
   - group: '*'
     kind: '*'
