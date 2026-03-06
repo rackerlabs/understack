@@ -3,7 +3,6 @@ apiVersion: objectbucket.io/v1alpha1
 kind: ObjectBucketClaim
 metadata:
   name: {{ .Values.cdn.bucketName }}
-  namespace: understack-cdn
 spec:
   bucketName: {{ .Values.cdn.bucketName }}
   storageClassName: ceph-bucket

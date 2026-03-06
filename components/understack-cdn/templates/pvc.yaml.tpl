@@ -3,7 +3,6 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: nginx-cache
-  namespace: understack-cdn
 spec:
   accessModes:
     - ReadWriteOnce

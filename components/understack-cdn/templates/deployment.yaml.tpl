@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: cdn-edge
-  namespace: understack-cdn
   labels:
     app: cdn-edge
 spec:

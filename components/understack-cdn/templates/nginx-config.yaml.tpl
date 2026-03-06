@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nginx-config
-  namespace: understack-cdn
 data:
   nginx.conf: |
     worker_processes auto;

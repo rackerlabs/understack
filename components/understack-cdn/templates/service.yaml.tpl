@@ -2,7 +2,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: cdn-edge
-  namespace: understack-cdn
 spec:
   selector:
     app: cdn-edge
