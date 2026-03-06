@@ -53,6 +53,8 @@ spec:
               operator: In
               values:
                 - enabled
+  updateStrategy:
+    autoUpdateDataPlane: true
 ---
 # mariadb-operator backups for openstack
 # https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/BACKUP.md
