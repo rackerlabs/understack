@@ -196,11 +196,15 @@ class NetAppManager:
                 return False
 
     def create_volume(
-        self, project_id: str, volume_size: str, aggregate_name: str
+        self,
+        project_id: str,
+        volume_type_id: str,
+        volume_size: str,
+        aggregate_name: str,
     ) -> str:
         """Creates a new volume within a specific SVM and aggregate."""
         return self._volume_service.create_volume(
-            project_id, volume_size, aggregate_name
+            project_id, volume_type_id, volume_size, aggregate_name
         )
 
     def delete_volume(self, volume_name: str, force: bool = False) -> bool:
