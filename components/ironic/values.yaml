@@ -219,6 +219,8 @@ manifests:
   # that is later consumed via components/openstack helm chart
   secret_keystone: false
   secret_ks_etc: false
+  # Use our custom configmap-ironic-bin.yaml with uWSGI instead of upstream's ironic-api
+  configmap_bin: false
 
 pod:
   # Use etcSources to mount the ironic-ks-etc secret at /etc/ironic/ironic.conf.d/
