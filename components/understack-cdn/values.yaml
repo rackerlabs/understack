@@ -4,6 +4,8 @@ cdn:
   cacheSize: 10g
   # Files are evicted from the cache if they have not been accessed in:
   inactive: 7d
+  # where to create our PersistentVolume for the cache
+  CacheStorageClassName: openebs-lvm
 
   # The location of our object bucket (s3-compatible object store) providing us
   # with anonymous access to our image files:

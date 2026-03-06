@@ -6,7 +6,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: openebs-lvm
+  storageClassName: {{ .Values.cdn.CacheStorageClassName }}
   resources:
     requests:
-      storage: 5Gi
+      storage: {{ .Values.cdn.cacheSize }}
