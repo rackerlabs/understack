@@ -9,6 +9,7 @@ on:
     paths: &triggerpaths
       - "ansible/**"
       - "containers/ansible/**"
+      - "containers/diff-nautobot-understack/**"
       - "containers/dnsmasq/**"
       - "containers/ironic-nautobot-client/**"
       - "containers/ironic-vnc-client/**"
@@ -29,6 +30,8 @@ jobs:
       matrix:
         container:
           - name: ansible
+            target: prod
+          - name: diff-nautobot-understack
             target: prod
           - name: dnsmasq
             target: prod
