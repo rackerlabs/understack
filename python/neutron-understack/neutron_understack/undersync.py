@@ -77,3 +77,30 @@ class Undersync:
 
     def force(self, vlan_group: str) -> requests.Response:
         return self._undersync_post("force", vlan_group)
+
+    def sync_with_payload(self, vlan_group: str, payload: dict) -> requests.Response:
+        """Push Neutron data to Undersync for switch configuration.
+
+        This is the push-based API that sends all necessary Neutron data
+        in the payload, eliminating the need for Undersync to pull from
+        OpenStack APIs.
+
+        Args:
+            vlan_group: The VLAN group (physical_network) being synced
+            payload: Complete payload conforming to Undersync push API v1
+                     (includes options.dry_run and options.force)
+
+        Returns:
+            Response from Undersync API
+        """
+        response = self.client.post(
+            f"{self.api_url}/v2/sync",
+            json=payload,
+            timeout=self.timeout,
+        )
+        LOG.debug(
+            "undersync sync_with_payload resp: %(resp)s for vlan_group: %(vlan_group)s",
+            {"resp": response.json(), "vlan_group": vlan_group},
+        )
+        self._log_and_raise_for_status(response)
+        return response
