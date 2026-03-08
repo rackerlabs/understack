@@ -27,7 +27,9 @@ class VolumeService:
         self._error_handler = error_handler
         self._logger = logging.getLogger(__name__)
 
-    def create_volume(self, project_id: str, size: str, aggregate_name: str) -> str:  # pyright: ignore
+    def create_volume(
+        self, project_id: str, volume_type_id: str, size: str, aggregate_name: str
+    ) -> str:  # pyright: ignore
         """Create a volume for a project with business naming conventions.
 
         Args:
@@ -41,7 +43,7 @@ class VolumeService:
         Raises:
             VolumeOperationError: If volume creation fails
         """
-        volume_name = self.get_volume_name(project_id)
+        volume_name = self.get_volume_name(volume_type_id)
         svm_name = self._get_svm_name(project_id)
 
         # Create volume specification with business rules
@@ -141,7 +143,7 @@ class VolumeService:
         Returns:
             str: The volume name following the convention 'vol_{project_id}'
         """
-        return f"vol_{project_id}"
+        return f"vol_{project_id.replace('-', '_')}"
 
     def exists(self, project_id: str) -> bool:
         """Check if a volume exists for a project.

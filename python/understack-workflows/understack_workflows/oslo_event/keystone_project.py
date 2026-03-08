@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 SVM_PROJECT_TAG = "UNDERSTACK_SVM"
 AGGREGATE_NAME = "aggr02_n02_NVME"
-VOLUME_SIZE = "514GB"
 
 
 @dataclass
@@ -72,7 +71,7 @@ def handle_project_created(
     svm_name = None
     try:
         netapp_manager = NetAppManager()
-        svm_name = _create_svm_and_volume(netapp_manager, event)
+        svm_name = _create_svm(netapp_manager, event)
         save_output("svm_created", str(True))
     finally:
         if not svm_name:
@@ -112,7 +111,7 @@ def handle_project_updated(
             if svm_exists:
                 save_output("svm_created", str(False))
             else:
-                svm_name = _create_svm_and_volume(netapp_manager, event)
+                svm_name = _create_svm(netapp_manager, event)
             save_output("svm_created", str(True))
     finally:
         if not svm_name:
@@ -145,13 +144,7 @@ def handle_project_deleted(
     return 0
 
 
-def _create_svm_and_volume(netapp_manager, event) -> str:
-    svm_name = netapp_manager.create_svm(
+def _create_svm(netapp_manager, event) -> str:
+    return netapp_manager.create_svm(
         project_id=event.project_id, aggregate_name=AGGREGATE_NAME
     )
-    netapp_manager.create_volume(
-        project_id=event.project_id,
-        volume_size=VOLUME_SIZE,
-        aggregate_name=AGGREGATE_NAME,
-    )
-    return svm_name
