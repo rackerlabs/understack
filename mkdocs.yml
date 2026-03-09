@@ -140,8 +140,7 @@ nav:
     - Quick Start: deploy-guide/gitops-install.md
     - Preparing Our Deployment:
       - deploy-guide/deploy-repo.md
-      - deploy-guide/component-config.md
-      - Component Pages:
+      - Configuring Components:
         - deploy-guide/components/index.md
         - deploy-guide/components/argo-events-workflows.md
         - deploy-guide/components/argo-events.md

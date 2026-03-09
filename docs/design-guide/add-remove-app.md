@@ -4,7 +4,7 @@ UnderStack **Components** are deployed via [ArgoCD]
 as [Applications][argocd-app], these are generated using [ArgoCD][argocd]'s
 [ApplicationSet][argocd-appset] controller. This allows us to use common
 patterns to deploy each of the components and allow specific environments
-to modify or disable some components. See the [Configuring Components](../deploy-guide/component-config.md)
+to modify or disable some components. See the [Configuring Components](../deploy-guide/components/index.md)
 guide for more info on how to do so.
 
 ## Adding a Component to UnderStack
