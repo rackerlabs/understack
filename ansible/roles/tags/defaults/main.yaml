@@ -1,0 +1,26 @@
+---
+instance_tags:
+  - name: "leaf a side"
+    content_types:
+      - "dcim.device"
+    color: "f44336"
+  - name: "leaf b side"
+    content_types:
+      - "dcim.device"
+    color: "3f51b5"
+  - name: "storage-a-side"
+    content_types:
+      - "dcim.device"
+      - "ipam.prefix"
+      - "dcim.interface"
+      - "vni_custom_model.ucvni"
+      - "ipam.vrf"
+    color: "f44336"
+  - name: "storage-b-side"
+    content_types:
+      - "dcim.device"
+      - "ipam.prefix"
+      - "dcim.interface"
+      - "vni_custom_model.ucvni"
+      - "ipam.vrf"
+    color: "3f51b5"

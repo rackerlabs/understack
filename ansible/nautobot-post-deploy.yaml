@@ -42,6 +42,7 @@
     - role: secrets
     - role: git_repos
     - role: roles
+    - role: tags
     - role: statuses
     - role: custom_fields
     - role: computed_fields
