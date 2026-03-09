@@ -59,6 +59,18 @@ conf:
       # this is where we populate our hardware
       project_domain_name: infra
       project_name: baremetal
+    oslo_messaging_notifications:
+      driver: messagingv2
+    oslo_messaging_rabbit:
+      amqp_durable_queues: true
+      rabbit_ha_queues: false
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: true
+      rabbit_qos_prefetch_count: 1
+      use_queue_manager: true
+      rabbit_stream_fanout: true
+    oslo_concurrency:
+      lock_path: /var/lock
   nova:
     quota:
       # adjust default quotas to make it possible to use baremetal
@@ -76,8 +88,18 @@ conf:
     ironic:
       api_max_retries: 90  # number of times to retry. default is 60.
       api_retry_interval: 10  # number of sesconds between retries. default is 2.
+    oslo_messaging_notifications:
+      driver: messagingv2
     oslo_messaging_rabbit:
       amqp_durable_queues: true
+      rabbit_ha_queues: false
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: true
+      rabbit_qos_prefetch_count: 1
+      use_queue_manager: true
+      rabbit_stream_fanout: true
+    oslo_concurrency:
+      lock_path: /var/lock
 
     # https://docs.openstack.org/nova/2025.2/admin/scheduling.html#the-filter-scheduler
     filter_scheduler:
@@ -92,10 +114,6 @@ conf:
   nova_api_uwsgi:
     uwsgi:
       processes: 2
-
-    # Enable oslo.messaging notifications for Argo Events integration
-    oslo_messaging_notifications:
-      driver: messagingv2
 
 console:
   # we are working with baremetal nodes and not QEMU so we don't need novnc or spice

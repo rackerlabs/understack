@@ -47,8 +47,18 @@ conf:
       ovn_sb_connection: tcp:ovn-ovsdb-sb.openstack.svc.cluster.local:6642
     task_flow:
       jobboard_enabled: false
-  oslo_messaging_rabbit:
-    amqp_durable_queues: true
+    oslo_messaging_notifications:
+      driver: messagingv2
+    oslo_messaging_rabbit:
+      amqp_durable_queues: true
+      rabbit_ha_queues: false
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: true
+      rabbit_qos_prefetch_count: 1
+      use_queue_manager: true
+      rabbit_stream_fanout: true
+    oslo_concurrency:
+      lock_path: /var/lock
 
 dependencies:
   dynamic:
