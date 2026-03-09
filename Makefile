@@ -36,10 +36,14 @@ wftmpls: $(WFTMPLS) $(ACTIVATE)
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py components/site-workflows docs/workflows
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py workflows docs/workflows
 
+.PHONY: component-docs-check
+component-docs-check: ## Validate component docs coverage for ArgoCD app templates
+	@$(PYTHON) scripts/check-component-docs.py
+
 .PHONY: docs
 docs: $(ACTIVATE) wftmpls component-docs-check ## Builds the documentation
 	NO_MKDOCS_2_WARNING=1 $(MKDOCS) build --strict
 
 .PHONY: docs-local
-docs-local: $(ACTIVATE) wftmpls ## Build and locally host the documentation
+docs-local: $(ACTIVATE) wftmpls component-docs-check ## Build and locally host the documentation
 	$(MKDOCS) serve --strict
