@@ -41,12 +41,9 @@
     - role: jobs
     - role: secrets
     - role: git_repos
-    - role: location_types
-    - role: locations
     - role: roles
     - role: statuses
     - role: custom_fields
     - role: computed_fields
-    - role: device_types  # Moved BEFORE platforms (creates manufacturers)
-    - role: platforms     # platforms creates platforms that reference those manufacturers
+    - role: platforms
     - role: relationships
