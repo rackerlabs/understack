@@ -24,7 +24,7 @@ help: ## Displays this help message
 	@echo "$$(grep -hE '^\S+:.*##' $(MAKEFILE_LIST) | sed -e 's/:.*##\s*/|/' -e 's/^\(.\+\):\(.*\)/\\x1b[36m\1\\x1b[m:\2/' | column -c2 -t -s'|' | sort)"
 
 $(ACTIVATE): requirements-docs.txt
-	@[ ! -d "$(VENV_DIR)" ] && python -m venv "$(VENV_DIR)" || :
+	@[ -n "${VENV_DIR}" -a ! -d "${VENV_DIR}" ] && python -m venv $(VENV_DIR) || :
 	@$(PIP) install -U -r requirements-docs.txt
 	@touch $(ACTIVATE)
 
@@ -37,8 +37,8 @@ wftmpls: $(WFTMPLS) $(ACTIVATE)
 	@$(PYTHON) scripts/argo-workflows-to-mkdocs.py workflows docs/workflows
 
 .PHONY: docs
-docs: $(ACTIVATE) wftmpls ## Builds the documentation
-	$(MKDOCS) build --strict
+docs: $(ACTIVATE) wftmpls component-docs-check ## Builds the documentation
+	NO_MKDOCS_2_WARNING=1 $(MKDOCS) build --strict
 
 .PHONY: docs-local
 docs-local: $(ACTIVATE) wftmpls ## Build and locally host the documentation

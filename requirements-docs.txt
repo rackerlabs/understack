@@ -1,4 +1,4 @@
-mkdocs
+mkdocs<2.0
 mkdocs-material
 mkdocs-swagger-ui-tag
 mkdocs-glightbox
