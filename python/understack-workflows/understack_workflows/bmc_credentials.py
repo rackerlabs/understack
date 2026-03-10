@@ -49,7 +49,10 @@ def set_bmc_password(
         "Trying old / factory default credentials."
     )
 
-    for test_password in set(filter(None, [old_password, *FACTORY_PASSWORDS])):
+    _wait_timer = 30
+    password_list = get_password_test_list(old_password)
+    for test_password in password_list:
+        sleep(_wait_timer)
         try:
             token, session = bmc.get_session(test_password)
         except RedfishRequestError as e:
@@ -59,7 +62,7 @@ def set_bmc_password(
             break
         # Go Slow, or else the BMC will lock us out for a
         # few mins if we try too may "incorrect passwords"
-        sleep(30)
+        _wait_timer += 30
     if not token:
         raise AuthException(
             f"Unable to log in to BMC {ip_address} with any known password!"
@@ -74,3 +77,13 @@ def set_bmc_password(
     if token and session:
         logger.info("Production BMC credentials are working on this BMC.")
         bmc.close_session(session=session, token=token)
+
+
+def get_password_test_list(old_password: str | None) -> list:
+    """Return a list of testable passwords for BMC."""
+    password_list = []
+    _sub_list = [i for i in [old_password, *FACTORY_PASSWORDS] if i is not None]
+    for i in _sub_list:
+        if i not in password_list:
+            password_list.append(i)
+    return password_list
