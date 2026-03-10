@@ -41,7 +41,7 @@
     - role: jobs
     - role: secrets
     - role: git_repos
-    - role: roles
+    - role: nautobot_roles
     - role: tags
     - role: statuses
     - role: custom_fields
