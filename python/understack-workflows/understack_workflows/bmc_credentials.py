@@ -49,7 +49,7 @@ def set_bmc_password(
         "Trying old / factory default credentials."
     )
 
-    for test_password in filter(None, [old_password, *FACTORY_PASSWORDS]):
+    for test_password in set(filter(None, [old_password, *FACTORY_PASSWORDS])):
         try:
             token, session = bmc.get_session(test_password)
         except RedfishRequestError as e:
