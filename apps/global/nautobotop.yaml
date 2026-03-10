@@ -12,8 +12,8 @@ sources:
   - ref: deploy
     path: '{{.name}}/manifests/nautobotop'
   - ref: understack
-    path: 'workflows/nautobot-token'
+    path: 'charts/nautobot-token'
     helm:
       valueFiles:
-        - $understack/workflows/nautobot-token/values.yaml
+        - $understack/charts/nautobot-token/values.yaml
       ignoreMissingValueFiles: true

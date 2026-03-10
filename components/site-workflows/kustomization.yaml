@@ -11,4 +11,4 @@ helmCharts:
     valuesFile: nautobot-token-values.yaml
 
 helmGlobals:
-  chartHome: ../../workflows/
+  chartHome: ../../charts/
