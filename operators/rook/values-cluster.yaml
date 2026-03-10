@@ -165,3 +165,7 @@ cephObjectStores:
       #     - objectstore.example.com
       #   secretName: ceph-objectstore-tls
       # ingressClassName: nginx
+
+configOverride: |
+  [global]
+  mon_data_avail_warn = 5
