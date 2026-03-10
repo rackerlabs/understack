@@ -101,6 +101,10 @@ conf:
       # Redfish inspection hooks run after inspecting out-of-band using the BMC:
       inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class"
       add_ports: "all"
+      # To avoid SSL issues due to the system clock differing, have the conductor
+      # set the system clock to its time whenever we go to boot the machine into
+      # IPA
+      enable_verify_bmc_clock: true
     # enable sensors and metrics for redfish metrics - https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
     sensor_data:
       send_sensor_data: true
