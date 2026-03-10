@@ -1,0 +1,17 @@
+{{- if .Values.enabled.neutron }}
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: argo-neutron
+spec:
+  vhost: "neutron"
+  userReference:
+    name: "argo-neutron"
+  permissions:
+    write: ".*"
+    configure: ".*"
+    read: ".*"
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}

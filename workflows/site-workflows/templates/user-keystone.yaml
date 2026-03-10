@@ -1,0 +1,10 @@
+{{- if .Values.enabled.keystone }}
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: argo-keystone
+spec:
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}

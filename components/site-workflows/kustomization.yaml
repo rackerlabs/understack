@@ -1,37 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - eventbus/eventbus-default.yaml
-  - eventbus/poddisruptionbudget-eventbus-default-pdb.yaml
-  - eventsources/eventsource-openstack-cinder.yaml
-  - eventsources/eventsource-openstack-ironic.yaml
-  - eventsources/eventsource-openstack-nova.yaml
-  - eventsources/eventsource-openstack-keystone.yaml
-  - eventsources/eventsource-openstack-neutron.yaml
-  - eventsources/rabbitmq-user-argo-cinder.yaml
-  - eventsources/rabbitmq-user-argo-ironic.yaml
-  - eventsources/rabbitmq-user-argo-nova.yaml
-  - eventsources/rabbitmq-user-argo-keystone.yaml
-  - eventsources/rabbitmq-user-argo-neutron.yaml
-  - eventsources/eventsource-k8s-openstack-secrets.yaml
-  - serviceaccounts/serviceaccount-sensor-submit-workflow.yaml
-  - serviceaccounts/serviceaccount-k8s-openstack-events-secrets.yaml
-  - sensors/sensor-ironic-node-update.yaml
-  - sensors/sensor-keystone-event-project.yaml
-  - sensors/sensor-keystone-oslo-event.yaml
-  - sensors/sensor-keystone-automation-user-upsert.yaml
-  - sensors/sensor-keystone-automation-user-delete.yaml
-  - sensors/sensor-neutron-event-network-segment-range.yaml
-  - sensors/sensor-neutron-olso-event.yaml
-  - sensors/sensor-ironic-reclean.yaml
-  - sensors/sensor-ironic-node-port.yaml
-  - sensors/sensor-ironic-node-portgroup.yaml
-  - sensors/sensor-cinder-oslo-event.yaml
-  - sensors/sensor-ironic-oslo-event.yaml
-  - sensors/sensor-nova-oslo-event.yaml
+resources: []
 
 helmCharts:
+  - name: site-workflows
+    namespace: argo-events
   - name: nautobot-token
     namespace: openstack
     valuesFile: nautobot-token-values.yaml

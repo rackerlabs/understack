@@ -1,0 +1,17 @@
+{{- if .Values.enabled.ironic }}
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: argo-ironic
+spec:
+  vhost: "ironic"
+  userReference:
+    name: "argo-ironic"
+  permissions:
+    write: ".*"
+    configure: ".*"
+    read: ".*"
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}

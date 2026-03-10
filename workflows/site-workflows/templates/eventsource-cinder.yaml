@@ -1,0 +1,34 @@
+{{- if .Values.enabled.cinder }}
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: openstack-cinder
+spec:
+  amqp:
+    notifications:
+      url: amqp://rabbitmq-server-0.rabbitmq-nodes.openstack.svc.cluster.local:5672/cinder
+      jsonBody: true
+      exchangeName: openstack
+      exchangeType: topic
+      exchangeDeclare:
+        durable: true
+      routingKey: 'notifications.info'
+      queueDeclare:
+        name: argo_notifications
+        durable: true
+        exclusive: false
+        autoDelete: false
+        noWait: true
+      consume:
+        consumerTag: "argo-events"
+        autoAck: true
+        exclusive: false
+        noLocal: false
+      auth:
+        username:
+          name: argo-cinder-user-credentials
+          key: username
+        password:
+          name: argo-cinder-user-credentials
+          key: password
+{{- end }}

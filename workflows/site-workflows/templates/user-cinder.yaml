@@ -1,0 +1,10 @@
+{{- if .Values.enabled.cinder }}
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: argo-cinder
+spec:
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}

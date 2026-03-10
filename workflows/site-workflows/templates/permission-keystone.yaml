@@ -1,0 +1,17 @@
+{{- if .Values.enabled.keystone }}
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: argo-keystone
+spec:
+  vhost: "keystone"
+  userReference:
+    name: "argo-keystone"
+  permissions:
+    write: ".*"
+    configure: ".*"
+    read: ".*"
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}

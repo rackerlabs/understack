@@ -1,0 +1,10 @@
+{{- if .Values.enabled.neutron }}
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: argo-neutron
+spec:
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}
