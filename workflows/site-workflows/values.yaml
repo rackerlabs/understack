@@ -1,0 +1,15 @@
+enabled:
+  cinder: true
+  ironic: true
+  keystone: true
+  neutron: true
+  nova: true
+
+eventbus:
+  enabled: true
+
+serviceAccounts:
+  enabled: true
+
+k8sSecretsEventSource:
+  enabled: true

@@ -1,0 +1,22 @@
+{{- if .Values.eventbus.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: default
+spec:
+  nats:
+    native:
+      replicas: 3
+      auth: token
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: eventbus-default-pdb
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      controller: eventbus-controller
+      eventbus-name: default
+{{- end }}

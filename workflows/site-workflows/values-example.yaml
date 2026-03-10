@@ -1,0 +1,16 @@
+# Example: Disable Cinder and Nova
+enabled:
+  cinder: false
+  ironic: true
+  keystone: true
+  neutron: true
+  nova: false
+
+eventbus:
+  enabled: true
+
+serviceAccounts:
+  enabled: true
+
+k8sSecretsEventSource:
+  enabled: true

@@ -1,0 +1,10 @@
+{{- if .Values.enabled.ironic }}
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: argo-ironic
+spec:
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}

@@ -1,0 +1,17 @@
+{{- if .Values.enabled.cinder }}
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: argo-cinder
+spec:
+  vhost: "cinder"
+  userReference:
+    name: "argo-cinder"
+  permissions:
+    write: ".*"
+    configure: ".*"
+    read: ".*"
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}

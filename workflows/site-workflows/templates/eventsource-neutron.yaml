@@ -1,0 +1,34 @@
+{{- if .Values.enabled.neutron }}
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: openstack-neutron
+spec:
+  amqp:
+    notifications:
+      url: amqp://rabbitmq-server-0.rabbitmq-nodes.openstack.svc.cluster.local:5672/neutron
+      jsonBody: true
+      exchangeName: neutron
+      exchangeType: topic
+      exchangeDeclare:
+        durable: true
+      routingKey: 'notifications.info'
+      queueDeclare:
+        name: argo_notifications
+        durable: true
+        exclusive: false
+        autoDelete: false
+        noWait: true
+      consume:
+        consumerTag: "argo-events"
+        autoAck: true
+        exclusive: false
+        noLocal: false
+      auth:
+        username:
+          name: argo-neutron-user-credentials
+          key: username
+        password:
+          name: argo-neutron-user-credentials
+          key: password
+{{- end }}
