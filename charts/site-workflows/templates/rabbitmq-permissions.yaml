@@ -1,21 +1,14 @@
----
-apiVersion: rabbitmq.com/v1beta1
-kind: User
-metadata:
-  name: argo-cinder
-spec:
-  rabbitmqClusterReference:
-    name: rabbitmq
-    namespace: openstack
+{{- range $service, $enabled := .Values.enabled }}
+{{- if $enabled }}
 ---
 apiVersion: rabbitmq.com/v1beta1
 kind: Permission
 metadata:
-  name: argo-cinder
+  name: argo-{{ $service }}
 spec:
-  vhost: "cinder"
+  vhost: {{ $service | quote }}
   userReference:
-    name: "argo-cinder"
+    name: argo-{{ $service }}
   permissions:
     write: ".*"
     configure: ".*"
@@ -23,3 +16,5 @@ spec:
   rabbitmqClusterReference:
     name: rabbitmq
     namespace: openstack
+{{- end }}
+{{- end }}

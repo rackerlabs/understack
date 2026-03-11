@@ -1,50 +1,44 @@
----
+{{- if .Values.enabled.neutron }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: ironic-node-port
+  name: neutron-oslo-event
   annotations:
-    workflows.argoproj.io/title: Update Nautobot from Ironic Node Port Events
+    workflows.argoproj.io/title: Add/edit Nautobot objects according to Neutron events
     workflows.argoproj.io/description: |+
-      Triggers on the following Ironic Events:
+      Triggers on Events from Neutron:
 
-      - baremetal.port.create.end which happens when a baremetal port is created
-      - baremetal.port.update.end which happens after a port is updated
-      - baremetal.port.delete.end which happens when a port is deleted
+      - network create/update/delete
 
-      Resulting code should be very similar to:
+      Submits workflow using workflowtemplate/openstack-oslo-event
 
-      ```
-      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
-      -p event-json "JSON-payload"
-      ```
-
-      Defined in `workflows/argo-events/sensors/ironic-node-port.yaml`
+      Defined in `components/site-workflows/sensors/sensor-neutron-oslo-event.yaml`
 spec:
   dependencies:
-  - eventName: openstack
-    eventSourceName: openstack-ironic
-    name: ironic-dep
+  - eventName: notifications
+    eventSourceName: openstack-neutron
+    name: oslo-event-type
     transform:
       # the event is a string-ified JSON so we need to decode it
-      # replace the whole event body
-      jq: |
-        .body = (.body["oslo.message"] | fromjson)
+      jq: '{body: (.body["oslo.message"] | fromjson)}'
     filters:
-      # applies each of the items in data with 'and' but there's only one
       dataLogicalOperator: "and"
       data:
-        - path: "body.event_type"
+        - path: body.event_type
           type: "string"
+          # any of the values will trigger
           value:
-            - "baremetal.port.create.end"
-            - "baremetal.port.update.end"
-            - "baremetal.port.delete.end"
+            - "network.create.end"
+            - "network.update.end"
+            - "network.delete.end"
+            - "subnet.create.end"
+            - "subnet.update.end"
+            - "subnet.delete.end"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
     - template:
-        name: ironic-node-port
+        name: neutron-oslo-event
         # creates workflow object directly via k8s API
         k8s:
           operation: create
@@ -53,14 +47,14 @@ spec:
             - dest: spec.arguments.parameters.0.value
               src:
                 dataKey: body
-                dependencyName: ironic-dep
+                dependencyName: oslo-event-type
           source:
             # create a workflow in argo-events prefixed with ironic-node-update-
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: ironic-node-port-
+                generateName: neutron-oslo-event-
                 namespace: argo-events
               spec:
                 # defines the parameters being replaced above
@@ -70,3 +64,4 @@ spec:
                 # references the workflow
                 workflowTemplateRef:
                   name: openstack-oslo-event
+{{- end }}

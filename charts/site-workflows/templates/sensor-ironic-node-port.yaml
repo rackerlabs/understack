@@ -1,21 +1,16 @@
----
+{{- if .Values.enabled.ironic }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: ironic-node-portgroup
+  name: ironic-node-port
   annotations:
-    workflows.argoproj.io/title: Sync Portgroups to Nautobot LAGs
+    workflows.argoproj.io/title: Update Nautobot from Ironic Node Port Events
     workflows.argoproj.io/description: |+
       Triggers on the following Ironic Events:
 
-      - baremetal.portgroup.create.end which happens when a baremetal portgroup is created
-      - baremetal.portgroup.update.end which happens when a portgroup is updated
-      - baremetal.portgroup.delete.end which happens when a portgroup is deleted
-
-      This sensor:
-      1. Validates that portgroup names are prefixed with the node name
-      2. Creates/updates LAGs (Link Aggregation Groups) in Nautobot
-      3. Strips the node name prefix when creating LAG names in Nautobot
+      - baremetal.port.create.end which happens when a baremetal port is created
+      - baremetal.port.update.end which happens after a port is updated
+      - baremetal.port.delete.end which happens when a port is deleted
 
       Resulting code should be very similar to:
 
@@ -24,7 +19,7 @@ metadata:
       -p event-json "JSON-payload"
       ```
 
-      Defined in `workflows/argo-events/sensors/ironic-node-portgroup.yaml`
+      Defined in `workflows/argo-events/sensors/ironic-node-port.yaml`
 spec:
   dependencies:
   - eventName: openstack
@@ -42,14 +37,14 @@ spec:
         - path: "body.event_type"
           type: "string"
           value:
-            - "baremetal.portgroup.create.end"
-            - "baremetal.portgroup.update.end"
-            - "baremetal.portgroup.delete.end"
+            - "baremetal.port.create.end"
+            - "baremetal.port.update.end"
+            - "baremetal.port.delete.end"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
     - template:
-        name: ironic-node-portgroup
+        name: ironic-node-port
         # creates workflow object directly via k8s API
         k8s:
           operation: create
@@ -60,12 +55,12 @@ spec:
                 dataKey: body
                 dependencyName: ironic-dep
           source:
-            # create a workflow in argo-events prefixed with ironic-node-portgroup-
+            # create a workflow in argo-events prefixed with ironic-node-update-
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: ironic-node-portgroup-
+                generateName: ironic-node-port-
                 namespace: argo-events
               spec:
                 # defines the parameters being replaced above
@@ -75,3 +70,4 @@ spec:
                 # references the workflow
                 workflowTemplateRef:
                   name: openstack-oslo-event
+{{- end }}

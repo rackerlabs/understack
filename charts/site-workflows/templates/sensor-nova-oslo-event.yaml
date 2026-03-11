@@ -1,4 +1,4 @@
----
+{{- if .Values.enabled.nova }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -89,7 +89,7 @@ spec:
                         - name: playbook
                           value: storage_on_server_delete.yml
                         - name: extra_vars
-                          value: device_id={{workflow.parameters.device_id}} project_id={{workflow.parameters.project_id}}
+                          value: {{ `"device_id={{workflow.parameters.device_id}} project_id={{workflow.parameters.project_id}}"` | quote }}
                   - - name: ansible-update-switches
                       templateRef:
                         name: ansible-workflow-template
@@ -100,3 +100,4 @@ spec:
                           value: storage_update_switches.yml
                         - name: extra_vars
                           value: plan_mode=remediation
+{{- end }}

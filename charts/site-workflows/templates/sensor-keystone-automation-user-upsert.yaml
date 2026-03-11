@@ -1,4 +1,4 @@
----
+{{- if .Values.enabled.keystone }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -111,3 +111,4 @@ spec:
                 dependencyName: secret-dep
                 dataKey: body.metadata.name
               dest: spec.template.spec.volumes.0.secret.secretName
+{{- end }}

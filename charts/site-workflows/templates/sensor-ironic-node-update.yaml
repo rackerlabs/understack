@@ -1,15 +1,24 @@
----
+{{- if .Values.enabled.ironic }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: ironic-node-reclean
+  name: ironic-node-update
   annotations:
-    workflows.argoproj.io/title: Reclean ironic node if it hits cleaned failed state
+    workflows.argoproj.io/title: Update Nautobot with Ironic Node Data
     workflows.argoproj.io/description: |+
-      Sensor to issue an ironic reclean of a node if it hits 'clean failed' state.
+      Triggers on the following Ironic Events:
+
+      - baremetal.node.update.end which happens when node fields are updated
+      - baremetal.node.delete.end which happens when a node is deleted
+
+      Resulting code should be very similar to:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/openstack-oslo-event \
+      -p event-json "JSON-payload"
       ```
 
-      Defined in `workflows/argo-events/sensors/sensor-ironic-reclean.yaml`
+      Defined in `workflows/argo-events/sensors/ironic-node-update.yaml`
 spec:
   dependencies:
   - eventName: openstack
@@ -17,46 +26,46 @@ spec:
     name: ironic-dep
     transform:
       # the event is a string-ified JSON so we need to decode it
-      jq: ".body[\"oslo.message\"] | fromjson"
+      # replace the whole event body
+      jq: |
+        .body = (.body["oslo.message"] | fromjson)
     filters:
       # applies each of the items in data with 'and' but there's only one
       dataLogicalOperator: "and"
       data:
-        - path: "event_type"
+        - path: "body.event_type"
           type: "string"
           value:
-            - "baremetal.node.power_set.end"
-        - path: payload.ironic_object\.data.provision_state
-          type: "string"
-          value:
-            - "clean failed"
+            - "baremetal.node.update.end"
+            - "baremetal.node.delete.end"
   template:
     serviceAccountName: sensor-submit-workflow
   triggers:
     - template:
-        name: ironic-reclean
+        name: ironic-node-update
         # creates workflow object directly via k8s API
         k8s:
           operation: create
           parameters:
-            # first parameter's value is replaced with the uuid
+            # first parameter is the parsed oslo.message
             - dest: spec.arguments.parameters.0.value
               src:
-                dataKey: payload.ironic_object\.data.uuid
+                dataKey: body
                 dependencyName: ironic-dep
           source:
-            # create a workflow in argo-events prefixed with ironic-reclean-
+            # create a workflow in argo-events prefixed with ironic-node-update-
             resource:
               apiVersion: argoproj.io/v1alpha1
               kind: Workflow
               metadata:
-                generateName: ironic-reclean-
+                generateName: ironic-node-update-
                 namespace: argo-events
               spec:
                 # defines the parameters being replaced above
                 arguments:
                   parameters:
-                    - name: device_uuid
+                    - name: event-json
                 # references the workflow
                 workflowTemplateRef:
-                  name: reclean-server
+                  name: openstack-oslo-event
+{{- end }}

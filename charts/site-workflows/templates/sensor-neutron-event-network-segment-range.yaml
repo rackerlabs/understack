@@ -1,4 +1,4 @@
----
+{{- if .Values.enabled.neutron }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -95,3 +95,4 @@ spec:
                 # references the workflow
                 workflowTemplateRef:
                   name: neutron-event-network-segment-range
+{{- end }}

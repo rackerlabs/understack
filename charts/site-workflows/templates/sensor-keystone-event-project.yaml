@@ -1,4 +1,4 @@
----
+{{- if .Values.enabled.keystone }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -79,3 +79,4 @@ spec:
                 # references the workflow
                 workflowTemplateRef:
                   name: keystone-event-project
+{{- end }}

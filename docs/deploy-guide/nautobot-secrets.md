@@ -62,7 +62,7 @@ The workflow is fully event-driven, eliminating manual intervention for user and
     ```
 
 4. A **Kubernetes Secret** is generated in the respective namespace.
-5. We packaged as [helm chart](https://github.com/rackerlabs/understack/blob/main/workflows/nautobot-token) which contains EventBus, EventSource and Sensor.
+5. We packaged as [helm chart](https://github.com/rackerlabs/understack/blob/main/charts/nautobot-token) which contains EventBus, EventSource and Sensor.
 6. Add the [namespace](https://github.com/rackerlabs/understack/blob/main/workflows/kustomization.yaml) in which you want to create nautobot-token.
 7. **Argo Events** detects the secret creation or update based on the `token/type=nautobot` label.
 8. An [**Ansible job**](https://github.com/rackerlabs/understack/blob/main/ansible/playbooks/nautobot-user-token.yaml) runs automatically to create the corresponding user and token in Nautobot.
