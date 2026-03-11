@@ -14,8 +14,18 @@ conf:
       volume_backend_name: netapp_nvme
       volume_driver: cinder_understack.dynamic_netapp_driver.NetappCinderDynamicDriver
   cinder:
+    oslo_messaging_notifications:
+      driver: messagingv2
     oslo_messaging_rabbit:
       amqp_durable_queues: true
+      rabbit_ha_queues: false
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: true
+      rabbit_qos_prefetch_count: 1
+      use_queue_manager: true
+      rabbit_stream_fanout: true
+    oslo_concurrency:
+      lock_path: /var/lock
     DEFAULT:
       enabled_backends: netapp_nvme
       default_volume_type: __DEFAULT__
