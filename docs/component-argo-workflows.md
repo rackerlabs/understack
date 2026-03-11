@@ -6,13 +6,13 @@ set of WorkflowTemplates below.
 
 ## WorkflowTemplates
 
-| WorkflowTemplate      | Description                                               | Input                   | Output     |   |
-|---------------------- |-----------------------------------------------------------|-------------------------|------------|---|
-| get-device-nautobot   | Return Device Information from Nautobot                   | device_id               | device     |   |
-| get-bmc-creds         | Get the credentials for the target Device                 | device_id               | secret     | * |
-| get-bmc-ip            | Get BMC IP address for target Device                      | device_id               | ip         |   |
-| nautobot-api          | HTTP Template Workflow to query the Nautobot API          | method,nautobot_url,uri | result     |   |
-| bmc-sync-creds        | Sync's a devices BMC password with what we have on record | device_id               |            |   |
+| WorkflowTemplate        | Description                                               | Input                   | Output     |   |
+|-------------------------|-----------------------------------------------------------|-------------------------|------------|---|
+| get-device-nautobot     | Return Device Information from Nautobot                   | device_id               | device     |   |
+| get-bmc-creds           | Get the credentials for the target Device                 | device_id               | secret     | * |
+| get-bmc-ip              | Get BMC IP address for target Device                      | device_id               | ip         |   |
+| bmc-sync-creds          | Sync's a devices BMC password with what we have on record | device_id               |            |   |
+| resync-nautobot         | Resync Keystone, Neutron, and Ironic to Nautobot          |                         |            |   |
 
 \* WorkflowTemplate which requires a manual / custom implementation.
 

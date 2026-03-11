@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nautobot-api-tokens.scriptConfigMapName" . }}
+  labels:
+    {{- include "nautobot-api-tokens.labels" . | nindent 4 }}
+data:
+  managed.py: |
+    import os
+
+    from django.contrib.auth.models import Group
+    from django.contrib.auth import get_user_model
+    from nautobot.users.models import Token
+
+    MARKER_PREFIX = "nautobot-api-token-managed:"
+
+
+    def _required(name):
+      value = os.getenv(name)
+      if not value:
+        raise RuntimeError(f"missing required environment variable: {name}")
+      return value
+
+
+    def _parse_bool(value, default=False):
+      if value is None:
+        return default
+      return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+    username = _required("NAUTOBOT_MANAGED_USERNAME")
+    email = _required("NAUTOBOT_MANAGED_EMAIL")
+    password = _required("NAUTOBOT_MANAGED_PASSWORD")
+    api_token = _required("NAUTOBOT_MANAGED_API_TOKEN")
+    managed_token_name = _required("NAUTOBOT_MANAGED_TOKEN_NAME")
+    managed_group_name = _required("NAUTOBOT_MANAGED_GROUP_NAME")
+    managed_description = f"{MARKER_PREFIX}{managed_token_name}"
+
+    is_superuser = _parse_bool(os.getenv("NAUTOBOT_MANAGED_IS_SUPERUSER"), default=False)
+
+    User = get_user_model()
+    user, _ = User.objects.get_or_create(username=username, defaults={"email": email})
+
+    if user.email != email:
+      user.email = email
+
+    if user.is_superuser != is_superuser:
+      user.is_superuser = is_superuser
+
+    if not user.check_password(password):
+      user.set_password(password)
+
+    user.validated_save()
+
+    group, _ = Group.objects.get_or_create(name=managed_group_name)
+    user.groups.add(group)
+
+    token, _ = Token.objects.get_or_create(
+      user=user,
+      defaults={"key": api_token, "description": managed_description},
+    )
+    if token.key != api_token:
+      token.key = api_token
+    if token.description != managed_description:
+      token.description = managed_description
+    token.validated_save()
+
+    print(f"Nautobot API token ensured for user '{username}'")
+
+  cleanup.py: |
+    import json
+    import os
+
+    from django.contrib.auth.models import Group
+    from nautobot.users.models import Token
+
+    MARKER_PREFIX = "nautobot-api-token-managed:"
+
+
+    def _required(name):
+      value = os.getenv(name)
+      if not value:
+        raise RuntimeError(f"missing required environment variable: {name}")
+      return value
+
+
+    def _parse_bool(value, default=False):
+      if value is None:
+        return default
+      return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+    def _load_desired(path):
+      with open(path, "r", encoding="utf-8") as fp:
+        raw = json.load(fp)
+      if not isinstance(raw, list):
+        raise RuntimeError(f"expected a JSON list in {path}")
+      return {str(item) for item in raw}
+
+
+    desired_tokens = _load_desired("/desired/token-names.json")
+    managed_group_name = _required("NAUTOBOT_MANAGED_GROUP_NAME")
+    delete_users = _parse_bool(os.getenv("NAUTOBOT_DELETE_USER_WHEN_NO_MANAGED_TOKENS"), default=True)
+
+    stale_count = 0
+    for token in Token.objects.filter(description__startswith=MARKER_PREFIX).select_related("user"):
+      managed_name = token.description[len(MARKER_PREFIX):]
+      if managed_name in desired_tokens:
+        continue
+
+      stale_count += 1
+      user = token.user
+      username = user.username if user else "<none>"
+      print(f"Deleting managed token '{managed_name}' for user '{username}'")
+      token.delete()
+
+      if not delete_users or not user:
+        continue
+
+    deleted_users = 0
+    if delete_users:
+      group = Group.objects.filter(name=managed_group_name).first()
+      if group is None:
+        print(f"Managed group '{managed_group_name}' not found; skipping user cleanup")
+      else:
+        desired_descriptions = [f"{MARKER_PREFIX}{name}" for name in desired_tokens]
+        for user in list(group.user_set.all()):
+          desired_token_exists = Token.objects.filter(
+            user=user,
+            description__in=desired_descriptions,
+          ).exists()
+          if desired_token_exists:
+            continue
+
+          username = user.username
+          user.delete()
+          deleted_users += 1
+          print(f"Deleted managed user '{username}' (no desired managed tokens remain)")
+
+    print(
+      f"Nautobot managed token cleanup complete, removed {stale_count} stale tokens "
+      f"and {deleted_users} users"
+    )

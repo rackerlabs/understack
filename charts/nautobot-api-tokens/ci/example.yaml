@@ -1,0 +1,15 @@
+image:
+  repository: ghcr.io/nautobot/nautobot
+  tag: "3.0.7"
+
+tokens:
+  - name: inventory-client
+    sourceSecretRef:
+      name: nautobot-token-inventory
+      keys:
+        username: username
+        email: email
+        password: password
+        apiToken: apiToken
+    user:
+      isSuperuser: false

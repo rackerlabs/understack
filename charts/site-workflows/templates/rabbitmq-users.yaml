@@ -1,0 +1,13 @@
+{{- range $service, $enabled := .Values.enabled }}
+{{- if $enabled }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: User
+metadata:
+  name: argo-{{ $service }}
+spec:
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}
+{{- end }}

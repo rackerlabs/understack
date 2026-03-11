@@ -1,9 +1,6 @@
 ---
 
 platforms_defaults:
-  - man: Arista
-    name: "Arista EOS"
-    driver: eos
   - man: Cisco
     name: "Cisco IOS"
     driver: ios

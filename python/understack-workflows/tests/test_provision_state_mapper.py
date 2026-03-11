@@ -4,7 +4,7 @@ from understack_workflows.ironic.provision_state_mapper import ProvisionStateMap
 
 
 @pytest.mark.parametrize(
-    "ironic_state,nautobot_state",
+    ("ironic_state", "nautobot_state"),
     [
         ("active", "Active"),
         ("deploying", "Provisioning"),
@@ -17,5 +17,5 @@ def test_translate(ironic_state, nautobot_state):
 
 
 def test_raises_on_unknown():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown"):
         ProvisionStateMapper.translate_to_nautobot("blahblah")

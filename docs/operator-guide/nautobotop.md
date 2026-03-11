@@ -176,7 +176,7 @@ module-bays:
 
 ## Understack Integration
 
-### Component Configuration
+### Component Reference
 
 The nautobotop component is defined in the UnderStack repository at `apps/global/nautobotop.yaml`.
 

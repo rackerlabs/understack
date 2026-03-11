@@ -1,0 +1,36 @@
+{{- if eq (include "understack.isEnabled" (list $.Values.site "mariadb_operator")) "true" }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" $.Release.Name "mariadb-operator-crds" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+    # we always want CRDs to be at -2 sync wave
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  destination:
+    namespace: mariadb-operator
+    server: {{ $.Values.cluster_server }}
+  project: understack-operators
+  source:
+    repoURL: https://mariadb-operator.github.io/mariadb-operator
+    chart: mariadb-operator-crds
+    targetRevision: 25.8.4
+    helm:
+      ignoreMissingValueFiles: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      annotations:
+        argocd.argoproj.io/sync-options: Delete=false
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+{{- end }}

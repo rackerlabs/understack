@@ -46,7 +46,7 @@ class TestIronicProvisionSetEvent:
         """Test event parsing with missing payload."""
         event_data = {"instance_uuid": str(uuid.uuid4())}
 
-        with pytest.raises(ValueError, match="Invalid event. No 'payload'"):
+        with pytest.raises(ValueError, match=r"Invalid event\. No 'payload'"):
             IronicProvisionSetEvent.from_event_dict(event_data)
 
     def test_from_event_dict_no_ironic_object_data(self):
@@ -56,7 +56,7 @@ class TestIronicProvisionSetEvent:
         }
 
         with pytest.raises(
-            ValueError, match="Invalid event. No 'ironic_object.data' in payload"
+            ValueError, match=r"Invalid event\. No 'ironic_object\.data' in payload"
         ):
             IronicProvisionSetEvent.from_event_dict(event_data)
 

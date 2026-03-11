@@ -89,7 +89,7 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
 def interface_data(bmc: Bmc) -> list[InterfaceInfo]:
     """Interface parsed from BMC outputs."""
     bmc_interface_info = bmc_interface(bmc)
-    interfaces = [bmc_interface_info] + in_band_interfaces(bmc)
+    interfaces = [bmc_interface_info, *in_band_interfaces(bmc)]
     if get_system_vendor(bmc) == "Dell":
         lldp = lldp_data_by_name(bmc)
         return [combine_lldp(lldp, interface) for interface in interfaces]
@@ -187,7 +187,7 @@ def in_band_interfaces(bmc: Bmc) -> list[dict]:
         for url in urls
         if (not re.search(r"-\d$", url)) or (re.sub(r"-\d$", "", url) not in urls)
     ]
-    return [interface for interface in interface_results]
+    return list(interface_results)
 
 
 def interface_detail(bmc, path) -> dict:
@@ -279,7 +279,7 @@ def parse_lldp_port(port_data: dict[str, str]) -> dict:
 def get_system_vendor(bmc: Bmc) -> str:
     """Read Vendor name from Oem reference."""
     _data = bmc.redfish_request(bmc.system_path)
-    vendor = [key for key in _data["Oem"]][0]
+    vendor = next(iter(_data["Oem"]))
     return normalise_manufacturer(vendor)
 
 

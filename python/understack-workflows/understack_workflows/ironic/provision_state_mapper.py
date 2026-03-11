@@ -1,5 +1,8 @@
+from typing import ClassVar
+
+
 class ProvisionStateMapper:
-    STATUS_MAP = {
+    STATUS_MAP: ClassVar[dict[str, str]] = {
         "active": "Active",
         "enroll": "Planned",
         "available": "Available",
@@ -15,7 +18,7 @@ class ProvisionStateMapper:
         "clean failed": "Quarantine",
         "deleting": "Decommissioning",
     }
-    ALL_IRONIC_STATES = [
+    ALL_IRONIC_STATES: ClassVar[list[str]] = [
         "enroll",
         "verifying",
         "manageable",

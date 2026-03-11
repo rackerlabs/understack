@@ -10,7 +10,7 @@ class TestUpdatePortPostCommit:
         understack_driver.undersync.sync_devices.assert_called_once()
 
 
-@pytest.mark.usefixtures("ironic_baremetal_port_physical_network")
+@pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
 class TestBindPort:
     def test_with_no_trunk(
         self,
@@ -44,7 +44,7 @@ class TestBindPort:
 
 
 class TestCreateNetworkPostCommit:
-    @pytest.mark.usefixtures("ml2_understack_conf")
+    @pytest.mark.usefixtures("_ml2_understack_conf")
     def test_vxlan_network(
         self,
         mocker,

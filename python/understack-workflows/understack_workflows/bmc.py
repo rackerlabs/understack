@@ -3,6 +3,7 @@
 import copy
 import logging
 import os
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import requests
@@ -129,6 +130,16 @@ class Bmc:
             return token, session
         else:
             return None, None
+
+    @contextmanager
+    def session(self, password):
+        """Yields a token for use with later requests, logs out afterwards."""
+        token, session = self.get_session(password)
+        try:
+            yield token
+        finally:
+            if session:
+                self.close_session(session=session, token=token)
 
     def close_session(self, session: str, token: str | None = None) -> None:
         """Close BMC token session."""

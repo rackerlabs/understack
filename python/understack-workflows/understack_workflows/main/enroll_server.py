@@ -57,14 +57,16 @@ def main():
 
     bmc = bmc_for_ip_address(bmc_ip_address)
 
-    device_id = enroll_server(bmc, args.old_bmc_password)
+    device_id = enroll_server(bmc, args.old_bmc_password, args.external_cmdb_id)
 
     # argo workflows captures stdout as the results which we can use
     # to return the device UUID
     print(device_id)
 
 
-def enroll_server(bmc: Bmc, old_password: str | None) -> str:
+def enroll_server(
+    bmc: Bmc, old_password: str | None, external_cmdb_id: str | None = None
+) -> str:
     """Enroll BMC to Undercloud Ironic."""
     set_bmc_password(
         ip_address=bmc.ip_address,
@@ -84,6 +86,7 @@ def enroll_server(bmc: Bmc, old_password: str | None) -> str:
         bmc=bmc,
         name=device_name,
         manufacturer=device_info.manufacturer,
+        external_cmdb_id=external_cmdb_id,
     )
     logger.info("%s complete for %s", __file__, bmc.ip_address)
 
@@ -98,6 +101,12 @@ def argument_parser():
     parser.add_argument("--bmc-ip-address", type=str, required=True, help="BMC IP")
     parser.add_argument(
         "--old-bmc-password", type=str, required=False, help="Old Password"
+    )
+    parser.add_argument(
+        "--external-cmdb-id",
+        type=str,
+        required=False,
+        help="External CMDB ID for RXDB integration",
     )
     return parser
 

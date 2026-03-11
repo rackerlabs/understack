@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,6 +23,30 @@ func loadDeployConfig(clusterName string) (map[string]any, error) {
 	}
 
 	return config, nil
+}
+
+func saveDeployConfig(clusterName string, config map[string]any) error {
+	deployYamlPath := filepath.Join(clusterName, "deploy.yaml")
+	return writeYAMLFile(deployYamlPath, config)
+}
+
+func writeYAMLFile(path string, value any) error {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(value); err != nil {
+		_ = enc.Close()
+		return fmt.Errorf("failed to marshal YAML: %w", err)
+	}
+	if err := enc.Close(); err != nil {
+		return fmt.Errorf("failed to finalize YAML encoding: %w", err)
+	}
+
+	if err := os.WriteFile(path, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write YAML file %s: %w", path, err)
+	}
+
+	return nil
 }
 
 func enabledComponents(config map[string]any) []string {

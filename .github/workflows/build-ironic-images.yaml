@@ -25,7 +25,7 @@ jobs:
       yaml-files: ${{ steps.set-matrix.outputs.yaml-files }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Find YAML files
         id: set-matrix
@@ -42,7 +42,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Install Dependencies
         run: sudo apt update && sudo apt install -y grub-efi-amd64-signed shim-signed mtools ipxe
@@ -67,7 +67,7 @@ jobs:
         run: ls -la artifacts
 
       - name: Save artifacts for next job
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
         with:
           name: image-artifacts
           path: ironic-images/artifacts/
@@ -84,7 +84,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up variables
         run: |
@@ -94,7 +94,7 @@ jobs:
           echo "release=${imagename##*-}" >> $GITHUB_ENV
 
       - name: Setup python environment
-        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         id: setup-python
         with:
           python-version: '3.11'
@@ -119,7 +119,7 @@ jobs:
         run: echo "TIMESTAMP=$(git show --no-patch --no-notes --pretty='%cd' --date=format:'%Y%m%d%H%M%S' ${{ github.sha }})" >>  $GITHUB_ENV
 
       - name: Download artifacts from previous job
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8
         with:
           name: image-artifacts
           path: ironic-images/artifacts

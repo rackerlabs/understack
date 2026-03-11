@@ -4,8 +4,8 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
-  - https://github.com/argoproj/argo-events/releases/download/v1.9.9/install.yaml
-  - https://github.com/argoproj/argo-events/releases/download/v1.9.9/install-validating-webhook.yaml
+  - https://github.com/argoproj/argo-events/releases/download/v1.9.10/install.yaml
+  - https://github.com/argoproj/argo-events/releases/download/v1.9.10/install-validating-webhook.yaml
 
   # grant the argo-workflows the ability to run workflows in this namespace
   - workflow-controller-rolebinding.yaml
@@ -16,7 +16,13 @@ resources:
   - sensor-workflow-role.yaml
   - workflow-role.yaml
 
-  - configmaps.yaml
-
-  ## copy openstack/cinder-netapp-config to argo-events/netapp-config
-  - secret-netapp.yaml
+patches:
+  - target:
+      version: v1
+      kind: ServiceAccount
+      name: workflow
+    patch: |-
+      - op: add
+        path: /imagePullSecrets
+        value:
+          - name: dockerconfigjson-github-com

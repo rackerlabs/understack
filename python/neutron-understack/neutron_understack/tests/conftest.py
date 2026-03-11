@@ -103,7 +103,7 @@ def network(project_id, network_id) -> Network:
 
 
 @pytest.fixture
-def patch_extend_subnet(mocker) -> None:
+def _patch_extend_subnet(mocker) -> None:
     """Ml2 Plugin extend subnet patch.
 
     This patch is needed as the Ml2Plugin's _make_subnet_dict method is calling
@@ -119,7 +119,7 @@ def patch_extend_subnet(mocker) -> None:
 
 
 @pytest.fixture
-def ml2_plugin(patch_extend_subnet) -> Ml2PluginNoInit:
+def ml2_plugin(_patch_extend_subnet) -> Ml2PluginNoInit:
     return Ml2PluginNoInit()
 
 
@@ -291,7 +291,7 @@ def understack_trunk_driver(understack_driver) -> UnderStackTrunkDriver:
 
 
 @pytest.fixture
-def ironic_baremetal_port_physical_network(mocker, understack_driver) -> None:
+def _ironic_baremetal_port_physical_network(mocker, understack_driver) -> None:
     mocker.patch.object(
         understack_driver.ironic_client,
         "baremetal_port_physical_network",
@@ -300,12 +300,12 @@ def ironic_baremetal_port_physical_network(mocker, understack_driver) -> None:
 
 
 @pytest.fixture(autouse=True)
-def undersync_sync_devices_patch(mocker, understack_driver) -> None:
+def _undersync_sync_devices_patch(mocker, understack_driver) -> None:
     mocker.patch.object(understack_driver.undersync, "sync_devices")
 
 
 @pytest.fixture
-def utils_fetch_subport_network_id_patch(mocker, network_id) -> None:
+def _utils_fetch_subport_network_id_patch(mocker, network_id) -> None:
     mocker.patch(
         "neutron_understack.utils.fetch_subport_network_id",
         return_value=str(network_id),
@@ -354,7 +354,7 @@ def oslo_config():
 
 
 @pytest.fixture
-def ml2_understack_conf(oslo_config, ucvni_group_id) -> None:
+def _ml2_understack_conf(oslo_config, ucvni_group_id) -> None:
     oslo_config.config(
         ucvni_group=str(ucvni_group_id),
         group="ml2_understack",

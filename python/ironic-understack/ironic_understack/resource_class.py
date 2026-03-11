@@ -84,5 +84,5 @@ class ResourceClassHook(base.InspectionHook):
         if not match_result:
             raise NoMatchError(f"No resource class found for {machine}")
         else:
-            device_type, resource_class = match_result
+            _device_type, resource_class = match_result
             return resource_class.name

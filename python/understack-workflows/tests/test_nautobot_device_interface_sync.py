@@ -73,7 +73,7 @@ class TestGetInterfaceType:
         assert _get_interface_type("NIC.Integrated.1-1") == "25gbase-x-sfp28"
 
     def test_unknown_interface(self):
-        assert _get_interface_type("eth0") == "unknown"
+        assert _get_interface_type("eth0") == "other"
 
 
 class TestGetInterfaceDescription:
@@ -228,7 +228,7 @@ class TestInterfaceInfo:
         assert iface.enabled is True
         assert iface.mgmt_only is False
         assert iface.pxe_enabled is False
-        assert iface.interface_type == "unknown"
+        assert iface.interface_type == "other"
 
 
 class TestCreateNautobotInterface:

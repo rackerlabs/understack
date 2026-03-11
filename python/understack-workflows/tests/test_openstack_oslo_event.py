@@ -108,9 +108,11 @@ class TestReadEvent:
 
     def test_read_event_stdin_invalid_json(self):
         """Test reading invalid JSON from stdin."""
-        with patch("sys.stdin", StringIO("invalid json")):
-            with pytest.raises(EventParseError):
-                read_event(None)
+        with (
+            patch("sys.stdin", StringIO("invalid json")),
+            pytest.raises(EventParseError),
+        ):
+            read_event(None)
 
 
 class TestValidateEvent:
@@ -184,7 +186,7 @@ class TestInitializeClients:
         assert conn == mock_conn
         assert nautobot == mock_nautobot
         mock_get_openstack_client.assert_called_once_with(cloud="test-cloud")
-        mock_nautobot_api.assert_called_once_with("http://test.com", token="test-token")  # noqa: S106
+        mock_nautobot_api.assert_called_once_with("http://test.com", token="test-token")
 
     @patch("understack_workflows.main.openstack_oslo_event.get_openstack_client")
     def test_initialize_clients_openstack_error(self, mock_get_openstack_client):
@@ -210,7 +212,7 @@ class TestInitializeClients:
         args = argparse.Namespace(
             os_cloud="test-cloud",
             nautobot_url="http://test.com",
-            nautobot_token="test-token",  # noqa: S106
+            nautobot_token="test-token",
         )
 
         with pytest.raises(
@@ -393,15 +395,17 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the port event handler by patching the event handlers dict
         mock_handler = _mock_handler(return_value=0)
-        with patch(
-            "understack_workflows.main.openstack_oslo_event._event_handlers",
-            {"baremetal.port.create.end": mock_handler},
-        ):
-            with patch(
+        with (
+            patch(
+                "understack_workflows.main.openstack_oslo_event._event_handlers",
+                {"baremetal.port.create.end": mock_handler},
+            ),
+            patch(
                 "understack_workflows.main.openstack_oslo_event.read_event",
                 return_value=test_event,
-            ):
-                result = main()
+            ),
+        ):
+            result = main()
 
         assert result == _EXIT_SUCCESS
         mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
@@ -431,15 +435,17 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the port event handler by patching the event handlers dict
         mock_handler = _mock_handler(return_value=0)
-        with patch(
-            "understack_workflows.main.openstack_oslo_event._event_handlers",
-            {"baremetal.port.delete.end": mock_handler},
-        ):
-            with patch(
+        with (
+            patch(
+                "understack_workflows.main.openstack_oslo_event._event_handlers",
+                {"baremetal.port.delete.end": mock_handler},
+            ),
+            patch(
                 "understack_workflows.main.openstack_oslo_event.read_event",
                 return_value=test_event,
-            ):
-                result = main()
+            ),
+        ):
+            result = main()
 
         assert result == _EXIT_SUCCESS
         mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
@@ -469,15 +475,17 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the keystone project event handler by patching the event handlers dict
         mock_handler = _mock_handler(return_value=0)
-        with patch(
-            "understack_workflows.main.openstack_oslo_event._event_handlers",
-            {"identity.project.created": mock_handler},
-        ):
-            with patch(
+        with (
+            patch(
+                "understack_workflows.main.openstack_oslo_event._event_handlers",
+                {"identity.project.created": mock_handler},
+            ),
+            patch(
                 "understack_workflows.main.openstack_oslo_event.read_event",
                 return_value=test_event,
-            ):
-                result = main()
+            ),
+        ):
+            result = main()
 
         assert result == _EXIT_SUCCESS
         mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
@@ -507,15 +515,17 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the keystone project event handler by patching the event handlers dict
         mock_handler = _mock_handler(return_value=0)
-        with patch(
-            "understack_workflows.main.openstack_oslo_event._event_handlers",
-            {"identity.project.created": mock_handler},
-        ):
-            with patch(
+        with (
+            patch(
+                "understack_workflows.main.openstack_oslo_event._event_handlers",
+                {"identity.project.created": mock_handler},
+            ),
+            patch(
                 "understack_workflows.main.openstack_oslo_event.read_event",
                 return_value=test_event,
-            ):
-                result = main()
+            ),
+        ):
+            result = main()
 
         assert result == _EXIT_SUCCESS
         mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
@@ -545,17 +555,19 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the keystone project event handler to raise an exception
         mock_handler = _mock_handler(side_effect=Exception("Handler failed"))
-        with patch(
-            "understack_workflows.main.openstack_oslo_event._event_handlers",
-            {"identity.project.created": mock_handler},
-        ):
-            with patch(
+        with (
+            patch(
+                "understack_workflows.main.openstack_oslo_event._event_handlers",
+                {"identity.project.created": mock_handler},
+            ),
+            patch(
                 "understack_workflows.main.openstack_oslo_event.read_event",
                 return_value=test_event,
-            ):
-                with pytest.raises(SystemExit) as exc_info:
-                    main()
-                assert exc_info.value.code == _EXIT_HANDLER_ERROR
+            ),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == _EXIT_HANDLER_ERROR
 
         mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)
 
@@ -590,15 +602,17 @@ class TestIntegrationWithEventHandlers:
 
         # Mock the handler to verify it gets called with correct data
         mock_handler = _mock_handler(return_value=0)
-        with patch(
-            "understack_workflows.main.openstack_oslo_event._event_handlers",
-            {"identity.project.created": mock_handler},
-        ):
-            with patch(
+        with (
+            patch(
+                "understack_workflows.main.openstack_oslo_event._event_handlers",
+                {"identity.project.created": mock_handler},
+            ),
+            patch(
                 "understack_workflows.main.openstack_oslo_event.read_event",
                 return_value=test_event,
-            ):
-                result = main()
+            ),
+        ):
+            result = main()
 
         assert result == _EXIT_SUCCESS
         mock_handler.assert_called_once_with(mock_conn, mock_nautobot, test_event)

@@ -48,26 +48,15 @@ def handle_subnet_create_or_update(
     """Handle Openstack Neutron Subnet create/update Event."""
     subnet = SubnetEvent.from_event_dict(event_data)
 
-    id = str(subnet.subnet_uuid)
-
-    if subnet.external:
-        namespace = "Global"
-    else:
-        namespace = str(subnet.network_uuid)
-
-    nautobot_prefix_payload = {
-        "id": id,
-        "prefix": subnet.cidr,
-        "status": "Active",
-        "namespace": {"name": namespace},
-        "tenant": {"id": str(subnet.tenant_uuid)},
-    }
-
-    existing = _update_nautobot_prefix(nautobot, id, nautobot_prefix_payload)
-    if not existing:
-        _create_nautobot_prefix(nautobot, nautobot_prefix_payload)
-
-    return 0
+    logger.info("Handling Subnet create/update for %s", subnet.subnet_name)
+    return sync_subnet_to_nautobot(
+        nautobot,
+        str(subnet.subnet_uuid),
+        str(subnet.network_uuid),
+        str(subnet.tenant_uuid),
+        subnet.cidr,
+        subnet.external,
+    )
 
 
 def handle_subnet_delete(
@@ -104,3 +93,46 @@ def _create_nautobot_prefix(nautobot, payload: dict):
         logger.info("Created Nautobot prefix: %s", response)
     except pynautobot.RequestError as e:
         raise NautobotRequestError(e) from e
+
+
+def sync_subnet_to_nautobot(
+    nautobot: Nautobot,
+    subnet_id: str,
+    network_id: str,
+    tenant_id: str,
+    cidr: str,
+    is_external: bool = False,
+) -> int:
+    """Sync a single subnet to Nautobot.
+
+    Args:
+        nautobot: Nautobot API client
+        subnet_id: Subnet UUID
+        network_id: Parent network UUID
+        tenant_id: Tenant/project UUID
+        cidr: Subnet CIDR
+        is_external: Whether the parent network is external (determines namespace)
+
+    Returns:
+        0 on success, 1 on failure
+    """
+    try:
+        # External network subnets go to Global namespace
+        namespace = "Global" if is_external else network_id
+
+        payload = {
+            "id": subnet_id,
+            "prefix": cidr,
+            "status": "Active",
+            "namespace": {"name": namespace},
+            "tenant": {"id": tenant_id},
+        }
+
+        # Try update first, then create
+        if not _update_nautobot_prefix(nautobot, subnet_id, payload):
+            _create_nautobot_prefix(nautobot, payload)
+
+        return 0
+    except Exception:
+        logger.exception("Failed to sync subnet %s", subnet_id)
+        return 1

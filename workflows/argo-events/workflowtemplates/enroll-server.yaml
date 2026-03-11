@@ -27,6 +27,10 @@ spec:
         value: "false"
       - name: raid_configure
         value: "true"
+      - name: old_password
+        value: calvin
+      - name: external_cmdb_id
+        value: ""
   templates:
     - name: main
       steps:
@@ -100,6 +104,10 @@ spec:
         args:
           - --bmc-ip-address
           - "{{workflow.parameters.ip_address}}"
+          - --old-bmc-password
+          - "{{workflow.parameters.old_password}}"
+          - --external-cmdb-id
+          - "{{workflow.parameters.external_cmdb_id}}"
         volumeMounts:
           - mountPath: /etc/openstack
             name: baremetal-manage

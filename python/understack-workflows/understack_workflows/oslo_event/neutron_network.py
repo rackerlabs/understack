@@ -43,10 +43,14 @@ def handle_network_create_or_update(
     event = NetworkEvent.from_event_dict(event_data)
 
     logger.info("Handling Network create/update for %s", event.network_name)
-    _ensure_nautobot_ipam_namespace_exists(nautobot, str(event.network_uuid))
-    _create_nautobot_ucvni(nautobot, event, ucvni_group_name)
-
-    return 0
+    return sync_network_to_nautobot(
+        nautobot,
+        str(event.network_uuid),
+        event.network_name,
+        str(event.tenant_id),
+        event.provider_segmentation_id,
+        ucvni_group_name,
+    )
 
 
 def handle_network_delete(_conn, nautobot: Nautobot, event_data: dict) -> int:
@@ -85,6 +89,16 @@ def _create_nautobot_ucvni(
     except pynautobot.RequestError as error:
         if error.req.status_code == 400 and "this Id already exists" in error.error:
             logger.debug("UCVNI %s already existed in Nautobot", id)
+        elif (
+            error.req.status_code == 400
+            and "UCVNI with this Ucvni group and UCVNI_ID already exists" in error.error
+        ):
+            raise RuntimeError(
+                f"Segmentation ID conflict: ucvni_id={event.provider_segmentation_id} "
+                f"already exists in ucvni_group={ucvni_group_name}. "
+                f"Cannot create UCVNI for network {id} ({event.network_name}). "
+                f"This indicates a duplicate VXLAN VNI assignment in OpenStack."
+            ) from error
         else:
             raise NautobotRequestError(error) from error
 
@@ -134,3 +148,83 @@ def _delete_nautobot_prefixes_in_namespace(nautobot: Nautobot, namespace_id: str
         prefix = cast(Record, prefix)
         prefix.delete()
         logger.info("Deleted dependent prefix %s from Nautobot", prefix.prefix)
+
+
+def sync_network_to_nautobot(
+    nautobot: Nautobot,
+    network_id: str,
+    network_name: str,
+    tenant_id: str,
+    segmentation_id: int | None = None,
+    ucvni_group_name: str | None = None,
+) -> int:
+    """Sync a single network to Nautobot.
+
+    Creates IPAM namespace and UCVNI for the network.
+
+    Args:
+        nautobot: Nautobot API client
+        network_id: Network UUID
+        network_name: Network name
+        tenant_id: Tenant/project UUID
+        segmentation_id: Provider segmentation ID (optional)
+        ucvni_group_name: UCVNI group name (defaults to UCVNI_GROUP_NAME env var)
+
+    Returns:
+        0 on success, 1 on failure
+    """
+    try:
+        # Create IPAM namespace
+        _ensure_nautobot_ipam_namespace_exists(nautobot, network_id)
+
+        # Create or update UCVNI if segmentation ID exists
+        if segmentation_id:
+            event = NetworkEvent(
+                event_type="network.sync",
+                network_uuid=UUID(network_id),
+                network_name=network_name,
+                tenant_id=UUID(tenant_id),
+                external=False,
+                provider_segmentation_id=segmentation_id,
+            )
+            if not _update_nautobot_ucvni(nautobot, event, ucvni_group_name):
+                _create_nautobot_ucvni(nautobot, event, ucvni_group_name)
+
+        return 0
+    except Exception:
+        logger.exception("Failed to sync network %s", network_id)
+        return 1
+
+
+def _update_nautobot_ucvni(
+    nautobot: Nautobot,
+    event: NetworkEvent,
+    ucvni_group_name: str | None = None,
+) -> bool:
+    """Update existing UCVNI. Returns True if updated, False if not found."""
+    ucvni_id = str(event.network_uuid)
+
+    if ucvni_group_name is None:
+        ucvni_group_name = os.getenv("UCVNI_GROUP_NAME")
+    if ucvni_group_name is None:
+        raise RuntimeError("Please set environment variable UCVNI_GROUP_NAME")
+
+    payload = {
+        "name": event.network_name,
+        "status": {"name": "Active"},
+        "tenant": str(event.tenant_id),
+        "ucvni_group": {"name": ucvni_group_name},
+        "ucvni_id": event.provider_segmentation_id,
+    }
+
+    try:
+        response = nautobot.plugins.undercloud_vni.ucvnis.update(
+            id=ucvni_id, data=payload
+        )
+        logger.info("Updated Nautobot UCVNI: %s", response)
+        return True
+    except pynautobot.RequestError as e:
+        if e.req.status_code == 404:
+            logger.debug("No pre-existing Nautobot UCVNI with id=%s", ucvni_id)
+            return False
+        raise NautobotRequestError(e) from e

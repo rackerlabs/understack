@@ -1,0 +1,11 @@
+---
+component: understack-cdn
+sources:
+  - ref: understack
+    path: 'components/understack-cdn'
+    helm:
+      valueFiles:
+        - $understack/components/understack-cdn/values.yaml
+        - $deploy/{{.name}}/understack-cdn/values.yaml
+      ignoreMissingValueFiles: true
+  - ref: deploy

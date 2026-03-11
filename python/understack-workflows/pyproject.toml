@@ -7,7 +7,7 @@ name = "understack-workflows"
 version = "0.0.0"
 description = "The glue between different systems and services that are run in our Workflows"
 authors = [{ name = "Understack Developers" }]
-requires-python = "~=3.11.0"
+requires-python = "~=3.12.0"
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -38,6 +38,9 @@ get-raid-devices = "understack_workflows.main.get_raid_devices:main"
 netapp-configure-interfaces = "understack_workflows.main.netapp_configure_net:main"
 netapp-create-svm = "understack_workflows.main.netapp_create_svm:main"
 openstack-oslo-event = "understack_workflows.main.openstack_oslo_event:main"
+resync-ironic-nautobot = "understack_workflows.main.resync_ironic_to_nautobot:main"
+resync-keystone-nautobot = "understack_workflows.main.resync_keystone_to_nautobot:main"
+resync-neutron-nautobot = "understack_workflows.main.resync_neutron_to_nautobot:main"
 sync-keystone = "understack_workflows.main.sync_keystone:main"
 sync-network-segment-range = "understack_workflows.main.sync_ucvni_group_range:main"
 undersync-switch = "understack_workflows.main.undersync_switch:main"
@@ -80,7 +83,7 @@ filterwarnings = [
 [tool.ruff]
 # use our default and override anything we need specifically
 extend = "../pyproject.toml"
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/test_nautobot_event_parser.py" = ["E501"]

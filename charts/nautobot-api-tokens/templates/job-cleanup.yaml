@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "nautobot-api-tokens.cleanupJobName" . }}
+  labels:
+    {{- include "nautobot-api-tokens.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: "PostSync"
+    argocd.argoproj.io/hook-delete-policy: "HookSucceeded,BeforeHookCreation"
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  backoffLimit: {{ .Values.job.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.job.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "nautobot-api-tokens.selectorLabels" . | nindent 8 }}
+        nautobot-api-tokens/job: "cleanup"
+    spec:
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      restartPolicy: {{ .Values.job.restartPolicy }}
+      containers:
+        - name: cleanup
+          image: {{ printf "%s:%s" .Values.image.repository (default .Chart.AppVersion .Values.image.tag) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -lc
+          args:
+            - nautobot-server shell --interface python < /scripts/cleanup.py
+          env:
+            {{- if .Values.nautobot.configPath }}
+            - name: NAUTOBOT_CONFIG
+              value: {{ .Values.nautobot.configPath | quote }}
+            {{- end }}
+            - name: NAUTOBOT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.nautobot.dbPasswordSecretRef.name | quote }}
+                  key: {{ .Values.nautobot.dbPasswordSecretRef.key | quote }}
+            - name: NAUTOBOT_MANAGED_GROUP_NAME
+              value: {{ .Values.cleanup.groupName | quote }}
+            - name: NAUTOBOT_DELETE_USER_WHEN_NO_MANAGED_TOKENS
+              value: {{ .Values.cleanup.deleteUserWhenNoManagedTokens | quote }}
+          envFrom:
+            {{- range $cm := .Values.nautobot.envFromConfigMaps }}
+            - configMapRef:
+                name: {{ $cm | quote }}
+            {{- end }}
+            {{- range $secret := .Values.nautobot.envFromSecrets }}
+            - secretRef:
+                name: {{ $secret | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: desired
+              mountPath: /desired
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "nautobot-api-tokens.scriptConfigMapName" . }}
+        - name: desired
+          configMap:
+            name: {{ include "nautobot-api-tokens.desiredConfigMapName" . }}

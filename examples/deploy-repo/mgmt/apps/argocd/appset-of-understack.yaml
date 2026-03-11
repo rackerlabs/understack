@@ -27,7 +27,7 @@ spec:
           helm:
             releaseName: '{{.name}}'
             valueFiles:
-              - /examples/deploy-repo/{{.name}}/argocd-understack-values.yaml
+              - /examples/deploy-repo/{{.name}}/deploy.yaml
             valuesObject:
               cluster_server: '{{.server}}'
               deploy_url: https://github.com/rackerlabs/understack.git

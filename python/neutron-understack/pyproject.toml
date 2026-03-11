@@ -65,4 +65,5 @@ target-version = "py312"
 "neutron_understack/tests/*.py" = [
     "S311",     # allow non-cryptographic secure bits for test data
     "S101",
+    "RUF012",   # test fixture classes often use mutable class-level data
 ]

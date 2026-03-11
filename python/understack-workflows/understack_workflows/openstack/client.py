@@ -54,6 +54,6 @@ def get_ironic_client(cloud=None, region_name="") -> IronicClient:  # type: igno
 
 
 __all__ = [
-    "get_openstack_client",
     "get_ironic_client",
+    "get_openstack_client",
 ]

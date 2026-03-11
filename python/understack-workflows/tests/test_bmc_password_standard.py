@@ -14,15 +14,15 @@ def test_standard_password_good_2():
 
 
 def test_standard_password_with_empty_input():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Need an IPv4 address"):
         standard_password("", "new secret string")
 
 
 def test_standard_password_with_bad_input():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Need an IPv4 address"):
         standard_password("elephants", "new secret string")
 
 
 def test_standard_password_with_empty_key():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Missing/empty master_key"):
         standard_password("1.2.3.4", "")

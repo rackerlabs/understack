@@ -58,6 +58,12 @@
       "versioningTemplate": "semver"
     }
   ],
+  "argocd": {
+    "enabled": true,
+    "managerFilePatterns": [
+      "/^charts/argocd-understack/templates/.*\\.ya?ml$/"
+    ]
+  },
   "devbox": {
     "enabled": false
   }

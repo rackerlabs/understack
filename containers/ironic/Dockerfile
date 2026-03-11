@@ -13,7 +13,7 @@ RUN apt-get update && \
 
 # clone source and patch it
 # renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2025.2
-ARG IRONIC_GIT_REF=095c3bcaede90095a639ec154b4c3783f1ea75a8
+ARG IRONIC_GIT_REF=e466b35fcea31a2fef1ff555e4c5e633dbd32a19
 ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
 RUN git -C /src/ironic fetch --unshallow --tags
 
@@ -50,6 +50,17 @@ RUN \
    tar -C /usr/share/novnc/ --strip-components=1 -zxvf "${DEST_FILE}" "$PFX/app" "$PFX/core" "$PFX/vendor" "$PFX/vnc.html"
 COPY containers/ironic/ironic-console-pod.yaml.template /var/lib/openstack/lib/python3.12/site-packages/ironic/console/container/
 
+FROM docker.io/debian:13 AS pxebuild
+# example --build-arg IPXE_FLAGS="DEBUG=tcp:3,xfer:3,netdevice:2,ipv4:2,httpcore:2,httpconn:2"
+ARG IPXE_FLAGS=""
+RUN apt-get update && apt-get install -y git build-essential bison flex libssl-dev && mkdir /src
+WORKDIR /src
+RUN git clone https://github.com/ipxe/ipxe.git
+COPY containers/ironic/ipxe-general.h /src/ipxe/src/config/local/general.h
+COPY containers/ironic/ipxe-branding.h /src/ipxe/src/config/local/branding.h
+WORKDIR /src/ipxe/src
+RUN make bin-x86_64-efi/snponly.efi ${IPXE_FLAGS}
+
 ARG OPENSTACK_VERSION="required_argument"
 FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS final
 
@@ -66,5 +77,7 @@ RUN apt-get update && \
         kubectl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+
 COPY --from=build --link /var/lib/openstack /var/lib/openstack
 COPY --from=build /usr/share/novnc /usr/share/novnc
+COPY --from=pxebuild  /src/ipxe/src/bin-x86_64-efi/snponly.efi /usr/lib/ipxe/snponly.efi

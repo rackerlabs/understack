@@ -12,7 +12,7 @@ repos:
       - id: check-yaml
         args:
           - --allow-multiple-documents
-        exclude: "mkdocs.yml|^charts/argocd-understack/templates/"
+        exclude: "mkdocs.yml|^charts/.*/templates/"
       - id: check-yaml
         name: check-yaml-mkdocs
         # --unsafe is a workaround for the use of !! in mkdocs.yml
@@ -110,6 +110,12 @@ repos:
 
   - repo: local
     hooks:
+      - id: component-docs-check
+        name: Component Docs Check
+        description: Ensure every ArgoCD Application template has a component docs page.
+        entry: python scripts/check-component-docs.py
+        language: system
+        files: '^charts/argocd-understack/templates/application-.*\.yaml$|^docs/deploy-guide/components/.*\.md$'
       - id: trufflehog
         name: TruffleHog
         description: Detect secrets in your data.

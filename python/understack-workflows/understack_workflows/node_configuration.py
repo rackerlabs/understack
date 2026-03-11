@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from dataclasses import dataclass
 from dataclasses import field
+from typing import ClassVar
 
 from ironicclient.v1.node import Node
 
@@ -148,7 +149,7 @@ class IronicNodeConfiguration:
     retired_reason: str = ""
     """The reason the node is marked as retired."""
 
-    CREATE_EXCLUDED_KEYWORDS = [
+    CREATE_EXCLUDED_KEYWORDS: ClassVar[list[str]] = [
         "owner",
         "description",
         "lessee",
@@ -168,9 +169,9 @@ class IronicNodeConfiguration:
         """Create a node from our config."""
         # this follows the code in the python-ironicclient
         field_list = ["uuid", "name", "driver", "driver_info"]
-        fields = dict(
-            (k, v)
+        fields = {
+            k: v
             for (k, v) in asdict(self, dict_factory=dict_without_none).items()
             if k in field_list and v is not None
-        )
+        }
         return client.create_node(fields)

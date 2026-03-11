@@ -1,0 +1,95 @@
+{{- $root := . -}}
+{{- range $idx, $token := .Values.tokens }}
+{{- if (default true $token.enabled) }}
+{{- $source := required (printf "tokens[%d].sourceSecretRef.name is required" $idx) $token.sourceSecretRef.name }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "nautobot-api-tokens.jobName" (list $root $token) }}
+  labels:
+    {{- include "nautobot-api-tokens.labels" $root | nindent 4 }}
+    nautobot-api-tokens/name: {{ $token.name | quote }}
+  annotations:
+    argocd.argoproj.io/hook: "PostSync"
+    argocd.argoproj.io/hook-delete-policy: "HookSucceeded,BeforeHookCreation"
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  backoffLimit: {{ $root.Values.job.backoffLimit }}
+  ttlSecondsAfterFinished: {{ $root.Values.job.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "nautobot-api-tokens.selectorLabels" $root | nindent 8 }}
+        nautobot-api-tokens/name: {{ $token.name | quote }}
+    spec:
+      serviceAccountName: {{ $root.Values.serviceAccountName }}
+      restartPolicy: {{ $root.Values.job.restartPolicy }}
+      containers:
+        - name: managed
+          image: {{ printf "%s:%s" $root.Values.image.repository (default $root.Chart.AppVersion $root.Values.image.tag) | quote }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -lc
+          args:
+            - nautobot-server shell --interface python < /scripts/managed.py
+          env:
+            {{- if $root.Values.nautobot.configPath }}
+            - name: NAUTOBOT_CONFIG
+              value: {{ $root.Values.nautobot.configPath | quote }}
+            {{- end }}
+            - name: NAUTOBOT_MANAGED_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $source | quote }}
+                  key: {{ default "username" $token.sourceSecretRef.keys.username | quote }}
+            - name: NAUTOBOT_MANAGED_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $source | quote }}
+                  key: {{ default "email" $token.sourceSecretRef.keys.email | quote }}
+            - name: NAUTOBOT_MANAGED_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $source | quote }}
+                  key: {{ default "password" $token.sourceSecretRef.keys.password | quote }}
+            - name: NAUTOBOT_MANAGED_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $source | quote }}
+                  key: {{ default "apiToken" $token.sourceSecretRef.keys.apiToken | quote }}
+            - name: NAUTOBOT_MANAGED_TOKEN_NAME
+              value: {{ $token.name | quote }}
+            - name: NAUTOBOT_MANAGED_GROUP_NAME
+              value: {{ $root.Values.cleanup.groupName | quote }}
+            - name: NAUTOBOT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $root.Values.nautobot.dbPasswordSecretRef.name | quote }}
+                  key: {{ $root.Values.nautobot.dbPasswordSecretRef.key | quote }}
+            {{- if hasKey $token "user" }}
+            {{- if hasKey $token.user "isSuperuser" }}
+            - name: NAUTOBOT_MANAGED_IS_SUPERUSER
+              value: {{ $token.user.isSuperuser | quote }}
+            {{- end }}
+            {{- end }}
+          envFrom:
+            {{- range $cm := $root.Values.nautobot.envFromConfigMaps }}
+            - configMapRef:
+                name: {{ $cm | quote }}
+            {{- end }}
+            {{- range $secret := $root.Values.nautobot.envFromSecrets }}
+            - secretRef:
+                name: {{ $secret | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "nautobot-api-tokens.scriptConfigMapName" $root }}
+{{- end }}
+{{- end }}

@@ -78,10 +78,7 @@ def is_only_router_port_on_network(
     )
 
     LOG.debug("Router ports found: %(ports)s", {"ports": other_router_ports})
-    if len(other_router_ports) > 1:
-        return False
-    else:
-        return True
+    return not len(other_router_ports) > 1
 
 
 def add_subport_to_trunk(shared_port: PortDict, segment: NetworkSegmentDict) -> None:
@@ -138,7 +135,7 @@ _cached_ovn_client = None
 
 def ovn_client() -> OVNClient | None:
     """Retrieve the OVN client from the OVN ML2 plugin."""
-    global _cached_ovn_client
+    global _cached_ovn_client  # noqa: PLW0603
     if _cached_ovn_client:
         return _cached_ovn_client
 

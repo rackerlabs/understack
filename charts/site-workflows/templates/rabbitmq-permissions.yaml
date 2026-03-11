@@ -1,0 +1,20 @@
+{{- range $service, $enabled := .Values.enabled }}
+{{- if $enabled }}
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Permission
+metadata:
+  name: argo-{{ $service }}
+spec:
+  vhost: {{ $service | quote }}
+  userReference:
+    name: argo-{{ $service }}
+  permissions:
+    write: ".*"
+    configure: ".*"
+    read: ".*"
+  rabbitmqClusterReference:
+    name: rabbitmq
+    namespace: openstack
+{{- end }}
+{{- end }}

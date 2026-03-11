@@ -54,16 +54,18 @@ class TestIntegrationTests:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -132,16 +134,18 @@ class TestIntegrationTests:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "abcdef12-3456-7890-abcd-ef1234567890",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "abcdef12-3456-7890-abcd-ef1234567890",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -357,16 +361,18 @@ class TestIntegrationTests:
         mock_nautobot_class.return_value = mock_nautobot_instance
 
         # Mock sys.argv
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "44444444-5555-6666-7777-888888888888",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "44444444-5555-6666-7777-888888888888",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify exit code 0 for successful execution (even with empty results)
         assert result == 0
@@ -466,9 +472,11 @@ class TestIntegrationTests:
             mock_nautobot_class.return_value = mock_nautobot_instance
 
             # Execute test case
-            with patch("sys.argv", test_case["argv"]):
-                with patch("builtins.print") as mock_print:
-                    result = main()
+            with (
+                patch("sys.argv", test_case["argv"]),
+                patch("builtins.print") as mock_print,
+            ):
+                result = main()
 
             # Verify successful execution
             assert (
@@ -543,16 +551,18 @@ class TestIntegrationWithNetAppManager:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -621,18 +631,20 @@ class TestIntegrationWithNetAppManager:
 
         # Mock sys.argv with custom NetApp config path
         custom_config_path = "/custom/path/to/netapp.conf"
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-                "--netapp-config-path",
-                custom_config_path,
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                    "--netapp-config-path",
+                    custom_config_path,
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -754,16 +766,18 @@ class TestIntegrationWithNetAppManager:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution (empty results are still success)
         assert result == 0
@@ -828,12 +842,14 @@ class TestIntegrationWithNetAppManager:
         project_id_with_dashes = "abcdef12-3456-7890-abcd-ef1234567890"
         project_id_normalized = "abcdef1234567890abcdef1234567890"
 
-        with patch(
-            "sys.argv",
-            ["netapp_configure_net.py", "--project-id", project_id_with_dashes],
+        with (
+            patch(
+                "sys.argv",
+                ["netapp_configure_net.py", "--project-id", project_id_with_dashes],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -938,16 +954,18 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -1036,16 +1054,18 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -1439,16 +1459,18 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -1510,16 +1532,18 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution
         assert result == 0
@@ -1572,16 +1596,18 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            patch("builtins.print") as mock_print,
         ):
-            with patch("builtins.print") as mock_print:
-                result = main()
+            result = main()
 
         # Verify successful execution (empty results are still success)
         assert result == 0

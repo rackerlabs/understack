@@ -1,0 +1,72 @@
+# -- Override chart name for generated resource names.
+nameOverride: ""
+
+# -- Override fully-qualified release name.
+fullnameOverride: ""
+
+image:
+  # -- Nautobot image repository used for managed token jobs.
+  #    Defaults to upstream Nautobot image.
+  repository: ghcr.io/nautobot/nautobot
+  # -- Nautobot image tag used for managed token jobs.
+  #    If empty, chart appVersion is used.
+  tag: ""
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+
+# -- Name of the service account used by the managed token jobs.
+serviceAccountName: nautobot
+
+nautobot:
+  # -- Optional value for NAUTOBOT_CONFIG. If empty, container default is used.
+  configPath: ""
+
+  # -- Secret reference used to set NAUTOBOT_DB_PASSWORD on the managed job container.
+  dbPasswordSecretRef:
+    # -- Secret name containing the Nautobot DB password.
+    name: nautobot-env
+    # -- Secret key containing the Nautobot DB password.
+    key: NAUTOBOT_DB_PASSWORD
+
+  # -- ConfigMaps to include via envFrom.
+  envFromConfigMaps:
+    - nautobot-env
+
+  # -- Secrets to include via envFrom.
+  envFromSecrets:
+    - nautobot-env
+    - nautobot-custom-env
+
+job:
+  # -- Restart policy for managed token jobs.
+  restartPolicy: OnFailure
+  # -- Number of retries before marking the job failed.
+  backoffLimit: 3
+  # -- Time-to-live for completed jobs.
+  ttlSecondsAfterFinished: 300
+
+cleanup:
+  # -- Group for users managed by this chart.
+  groupName: nautobot-api-token-managed
+  # -- Delete users in cleanup.groupName when they no longer have desired managed tokens.
+  deleteUserWhenNoManagedTokens: true
+
+# -- Managed script ConfigMap name override.
+scriptConfigMapName: ""
+
+# -- Multiple managed token definitions. One Kubernetes Job is created per entry.
+tokens: []
+#  - name: my-client
+#    enabled: true
+#    # Kubernetes Secret containing the input values for this token.
+#    sourceSecretRef:
+#      name: nautobot-client-managed
+#      # Key names in sourceSecretRef.name
+#      keys:
+#        username: username
+#        email: email
+#        password: password
+#        apiToken: apiToken
+#    # Optional user flags.
+#    user:
+#      isSuperuser: false

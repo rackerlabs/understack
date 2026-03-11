@@ -64,7 +64,7 @@ spec:
           user_domain_name={{ include "openstack.serviceuser.user_domain_name" $user }}
           username={{ printf "{{ (fromJson .%s).username }}" $user.usage }}
           password={{ printf "{{ (fromJson .%s).password }}" $user.usage }}
-          region_name={{ $.Values.regionName | quote }}
+          region_name={{ $.Values.regionName }}
         {{- end }}
         {{- end }}
   data:

@@ -1,0 +1,37 @@
+{{- range $service, $config := .Values.eventsources }}
+{{- if index $.Values.enabled $service }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: openstack-{{ $service }}
+spec:
+  amqp:
+    {{ $config.amqpKey }}:
+      url: {{ $.Values.rabbitmq.url }}/{{ $service }}
+      jsonBody: true
+      exchangeName: {{ $config.exchangeName }}
+      exchangeType: topic
+      exchangeDeclare:
+        durable: true
+      routingKey: {{ $config.routingKey | quote }}
+      queueDeclare:
+        name: argo_notifications
+        durable: true
+        exclusive: false
+        autoDelete: false
+        noWait: true
+      consume:
+        consumerTag: "argo-events"
+        autoAck: true
+        exclusive: false
+        noLocal: false
+      auth:
+        username:
+          name: argo-{{ $service }}-user-credentials
+          key: username
+        password:
+          name: argo-{{ $service }}-user-credentials
+          key: password
+{{- end }}
+{{- end }}

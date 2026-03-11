@@ -14,6 +14,7 @@ from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.openstack.client import get_openstack_client
+from understack_workflows.oslo_event import cinder_volume_type
 from understack_workflows.oslo_event import ironic_node
 from understack_workflows.oslo_event import ironic_port
 from understack_workflows.oslo_event import ironic_portgroup
@@ -35,31 +36,21 @@ _EXIT_HANDLER_ERROR = 8
 class EventParseError(Exception):
     """Raised when event data cannot be parsed or is invalid."""
 
-    pass
-
 
 class EventValidationError(Exception):
     """Raised when event structure validation fails."""
-
-    pass
 
 
 class ClientInitializationError(Exception):
     """Raised when client initialization fails."""
 
-    pass
-
 
 class EventHandlerError(Exception):
     """Raised when event handler execution fails."""
 
-    pass
-
 
 class NoEventHandlerError(Exception):
     """Raised when no handler exists for the event type."""
-
-    pass
 
 
 # Type alias for event handler functions
@@ -82,6 +73,12 @@ _event_handlers: dict[str, EventHandler | list[EventHandler]] = {
     "identity.project.created": keystone_project.handle_project_created,
     "identity.project.updated": keystone_project.handle_project_updated,
     "identity.project.deleted": keystone_project.handle_project_deleted,
+    "volume_type_project.access.add": (
+        cinder_volume_type.handle_volume_type_access_added
+    ),
+    "volume_type_project.access.remove": (
+        cinder_volume_type.handle_volume_type_access_removed
+    ),
     "network.create.end": neutron_network.handle_network_create_or_update,
     "network.update.end": neutron_network.handle_network_create_or_update,
     "network.delete.end": neutron_network.handle_network_delete,

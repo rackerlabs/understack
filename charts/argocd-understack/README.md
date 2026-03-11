@@ -39,7 +39,7 @@ spec:
       helm:
         releaseName: my-cluster-name
         valueFiles:
-          - $deploy/my-cluster-name/argocd-understack-values.yaml
+          - $deploy/my-cluster-name/deploy.yaml
     - repoURL: https://github.com/your-org/deploy.git
       targetRevision: HEAD
       ref: deploy
@@ -71,7 +71,7 @@ spec:
       helm:
         releaseName: my-cluster-name
         valueFiles:
-          - $deploy/my-cluster-name/argocd-understack-values.yaml
+          - $deploy/my-cluster-name/deploy.yaml
     - repoURL: https://github.com/your-org/deploy.git
       targetRevision: HEAD
       ref: deploy
@@ -109,8 +109,8 @@ helm install argocd-understack oci://ghcr.io/rackerlabs/understack/argocd-unders
 | `understack_url` | UnderStack repository URL | `https://github.com/rackerlabs/understack.git` |
 | `understack_ref` | UnderStack git reference | `HEAD` |
 | `deploy_ref` | Deployment repo git reference | `HEAD` |
-| `global.enabled` | Enable global cluster components | `true` |
-| `site.enabled` | Enable site cluster components | `true` |
+| `global.enabled` | Enable global cluster components | `false` |
+| `site.enabled` | Enable site cluster components | `false` |
 
 ### Example Values Files
 
