@@ -31,3 +31,6 @@ docs/workflows/
 
 # mkdocs site output
 /site/
+
+# miscellaneous
+.local/
