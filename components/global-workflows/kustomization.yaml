@@ -1,11 +1,3 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
-helmCharts:
-  - name: nautobot-token
-    # site-clusters superuser token are created in nautobot namespace in global cluster
-    namespace: nautobot
-    valuesFile: nautobot-token-values.yaml
-
-helmGlobals:
-  chartHome: ../../workflows/
+resources: []

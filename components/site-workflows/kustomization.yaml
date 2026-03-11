@@ -6,9 +6,6 @@ resources: []
 helmCharts:
   - name: site-workflows
     namespace: argo-events
-  - name: nautobot-token
-    namespace: openstack
-    valuesFile: nautobot-token-values.yaml
 
 helmGlobals:
   chartHome: ../../charts/

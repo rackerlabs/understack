@@ -1,178 +1,181 @@
-# Automate Nautobot tokens Provisioning
+# Manage Nautobot API Token Secrets
 
-This document explains the design, flow, and deployment details of the automated Nautobot tokens provisioning system implemented in the UnderStack project.
-
-The feature enables seamless creation and synchronization of Nautobot service accounts and tokens across multiple site clusters using Secret Management Backend ex:(Vault, AKV, PasswordSafe), Kubernetes, Argo Events, and Ansible.
-
----
+This guide documents the current Nautobot token workflow in UnderStack.
+Use the `nautobot-api-tokens` chart to reconcile Nautobot users and API tokens from Kubernetes `Secret` objects.
 
 ## Overview
 
-The automation ensures that whenever service account credentials are created or updated in Secret Management Backend, corresponding Nautobot users and tokens are automatically provisioned.
-The workflow is fully event-driven, eliminating manual intervention for user and token management.
+`nautobot-api-tokens` is deployed by Argo CD into the `nautobot` namespace. During sync, it creates:
 
-**High-level Flow:**
+- one PostSync `Job` per configured token in `tokens[]`
+- one cleanup PostSync `Job` that removes stale managed tokens
 
-1. Service account details are stored in **Secret Management Backend**.
-   Below is the format we expect the credentials to be stored
+Each job runs `nautobot-server shell --interface python` inside the Nautobot image and reconciles the target Nautobot user and token directly.
 
-      ```json
-       {
-         "credential": {
-           "username": "my-nautobot-creds",
-           "password": "{\"password\": \"abcxyz\", \"token\": \"rvwe3457797fd4321a79a5f06830701b8xyz12\"}"
-         }
-       }
-    ```
+## How It Works
 
-2. Configure **External Secret Store** in the respective namespace.
-3. Create **External Secret** in the respective namespace.
+1. Create or sync a Kubernetes `Secret` in the `nautobot` namespace with the desired username, email, password, and API token.
+2. Reference that secret from `nautobot-api-tokens/values.yaml` in your deploy repo.
+3. Argo CD syncs the `nautobot-api-tokens` Application.
+4. The chart runs a PostSync job for each configured entry in `tokens[]`.
+5. Each job creates or updates the Nautobot user, sets the password, ensures group membership, and creates or updates the API token.
+6. The cleanup job removes previously managed tokens that are no longer listed in `tokens[]`. It can also delete managed users when no desired managed tokens remain.
 
-    ```yaml
-        ---
-        apiVersion: external-secrets.io/v1
-        kind: ExternalSecret
-        metadata:
-          name: nautobot-token
-          annotations:
-            link.argocd.argoproj.io/external-link: https://vault-secret-management-backend.example.com/credentials/12345
-        spec:
-          refreshInterval: 1h
-          secretStoreRef:
-            kind: SecretStore
-            name: mySecretManagementBackend
-          target:
-            name: nautobot-token
-            creationPolicy: Owner
-            template:
-              metadata:
-                labels:
-                  token/type: nautobot
-              engineVersion: v2
-              type: Opaque
-              data:
-                hostname: "&#123;&#123; .hostname &#125;&#125;"
-                username: "&#123;&#123; .username &#125;&#125;"
-                password: "&#123;&#123; index (.password | fromJson) \"password\" &#125;&#125;"
-                token: "&#123;&#123; index (.password | fromJson) \"token\" &#125;&#125;"
-          dataFrom:
-            - extract:
-                key: "12345"
+No `Argo Events`, sensor, label trigger, or Ansible playbook is involved in this workflow.
 
-    ```
+## Source Secret Requirements
 
-4. A **Kubernetes Secret** is generated in the respective namespace.
-5. We packaged as [helm chart](https://github.com/rackerlabs/understack/blob/main/charts/nautobot-token) which contains EventBus, EventSource and Sensor.
-6. Add the [namespace](https://github.com/rackerlabs/understack/blob/main/workflows/kustomization.yaml) in which you want to create nautobot-token.
-7. **Argo Events** detects the secret creation or update based on the `token/type=nautobot` label.
-8. An [**Ansible job**](https://github.com/rackerlabs/understack/blob/main/ansible/playbooks/nautobot-user-token.yaml) runs automatically to create the corresponding user and token in Nautobot.
+The referenced source secret must exist in the `nautobot` namespace because the reconciliation jobs run there and use `secretKeyRef`.
 
----
+By default, each token entry expects these keys in the source secret:
 
-## Architecture Diagram (Conceptual)
+| Key | Required | Purpose |
+|-----|----------|---------|
+| `username` | yes | Nautobot username to manage |
+| `email` | yes | Nautobot email for that user |
+| `password` | yes | Nautobot password for that user |
+| `apiToken` | yes | Nautobot API token value to enforce |
 
-```text
-Secret Management Backend ──▶ K8s Secret (nautobot ns)
-          │
-          ▼
-    Argo Event Trigger
-          │
-          ▼
-  Ansible Playbook ──▶ Nautobot API
-          │
-          ▼
-   User + Token Created
+You can override the key names per token with `sourceSecretRef.keys`.
+
+Example `ExternalSecret` that renders the expected keys:
+
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: nautobot-token-openstack
+  namespace: nautobot
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: SecretStore
+    name: my-secret-backend
+  target:
+    name: nautobot-token-openstack
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      type: Opaque
+      data:
+        username: "&#123;&#123; .username &#125;&#125;"
+        email: "&#123;&#123; .email &#125;&#125;"
+        password: "&#123;&#123; index (.password | fromJson) \"password\" &#125;&#125;"
+        apiToken: "&#123;&#123; index (.password | fromJson) \"token\" &#125;&#125;"
+  dataFrom:
+    - extract:
+        key: "12345"
 ```
 
----
+The source system can still be Vault, AKV, PasswordSafe, or another backend. The chart only cares about the final Kubernetes `Secret`.
 
-## Key Components
+## Prerequisites
 
-| Component                     | Purpose                                                                     |
-|-------------------------------|-----------------------------------------------------------------------------|
-| **Secret Management Backend** | Stores service account credentials (username, password and token) securely. |
-| **SecretStore**               | Configuration of Secret Management Backend.                                 |
-| **Kubernetes Secret**         | Auto-generated representation of credentials.                               |
-| **Argo Events**               | Detects changes in secrets and triggers an automated workflow.              |
-| **Ansible Playbook**          | Interacts with the Nautobot API to create users and tokens.                 |
-| **Nautobot API**              | Endpoint for managing users and tokens programmatically.                    |
+- Nautobot is deployed and healthy in the cluster.
+- `global.nautobot_api_tokens.enabled` is set to `true`.
+- The Argo CD Application template `charts/argocd-understack/templates/application-nautobot-api-tokens.yaml` is enabled for the cluster.
+- Required Nautobot runtime config is available to the job pods.
+  By default this chart expects:
+    - `ConfigMap` `nautobot-env`
+    - `Secret` `nautobot-env`
+    - `Secret` `nautobot-custom-env`
+    - `Secret` key `nautobot-env/NAUTOBOT_DB_PASSWORD`
 
----
+If your deployment uses different names, override them in the chart values.
 
-## Required Secrets
+## Argo CD Deployment
 
-| Secret Name                | Source         | Namespace | Description                                  |
-|----------------------------|----------------|-----------|----------------------------------------------|
-| `nautobot-superuser-token` | global cluster | nautobot  | Used to bootstrap all other nautobot tokens. |
+Enable the component in your cluster deploy file:
 
----
+```yaml title="$CLUSTER_NAME/deploy.yaml"
+global:
+  nautobot_api_tokens:
+    enabled: true
+```
 
-## Usage Flow Summary
+Provide chart values in the deploy repo at:
 
-1. Add or update service account credentials in **Secret Management Backend**.
-2. ExternalSecret sync with Secret Management Backend based on configured interval and generates/updates a **Kubernetes Secret** in respective namespace. ExternalSecret will be in SyncError state if details are not present in **Secret Management Backend**.
-3. **Argo Events** detects the change and triggers a workflow.
-4. Workflow launches **Ansible Playbook** Job in `nautobot` namespace to interact with Nautobot API.
-5. Nautobot user and token are created or updated accordingly.
-6. Site clusters continue to use local tokens for operations.
+```text
+$CLUSTER_NAME/nautobot-api-tokens/values.yaml
+```
 
----
+The Argo CD Application reads that file from:
 
-## Deployment via Argo CD
+```text
+charts/argocd-understack/templates/application-nautobot-api-tokens.yaml
+```
 
-The Nautobot service account automation is deployed and managed through **Argo CD** using the following application manifests:
+## Example Values
 
-| Manifest                                                                                                          | Description                                                                                                                                  |
-|-------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| [`apps/global/nautobot.yaml`](https://github.com/rackerlabs/understack/blob/main/apps/global/nautobot.yaml)       | Defines the global Nautobot deployment. This configuration is responsible for creating the superuser token and bootstrapping global secrets. |
-| [`apps/site/nautobot-site.yaml`](https://github.com/rackerlabs/understack/blob/main/apps/site/nautobot-site.yaml) | Reference to deploy directory containing Site cluster nautobot secrets                                                                       |
+```yaml
+image:
+  repository: ghcr.io/nautobot/nautobot
+  tag: "3.0.7"
+  pullPolicy: IfNotPresent
 
-### Deployment Workflow
+serviceAccountName: nautobot
 
-1. **Global Nautobot Deployment**
-    - The global Argo CD application (`nautobot.yaml`) deploys the base Nautobot configuration and generates a **superuser token**.
-    - This token is stored securely as a Kubernetes Secret in the `nautobot` namespace of the global cluster.
-    - Another responsibility of global cluster is to create superuser token of site clusters which is used by site cluster to bootstrap other tokens.
-      - example: global cluster (staging) creates site cluster super-user (rxdb-lab) secret and creates user and token in nautobot.
-    - In deploy repo create sites cluster superuser secrets in `"&#123;&#123;.name&#125;&#125;/nautobot-site` directory as defined in [`apps/site/nautobot-site.yaml`](https://github.com/rackerlabs/understack/blob/main/apps/site/nautobot-site.yaml).
+nautobot:
+  configPath: ""
+  dbPasswordSecretRef:
+    name: nautobot-env
+    key: NAUTOBOT_DB_PASSWORD
+  envFromConfigMaps:
+    - nautobot-env
+  envFromSecrets:
+    - nautobot-env
+    - nautobot-custom-env
 
-2. **Site Nautobot Deployment**
-    - Each site’s Argo CD application (`nautobot-site.yaml`) only creates secrets.
-    - Site cluster creates secret of **superuser** (do not add `token/type=nautobot` label).
-    - The site retrieves the **superuser token** and uses it to authenticate against Nautobot.
-    - Site-specific **service accounts and tokens** are then created through Argo Events and Ansible workflows.
-    - Global cluster's superuser token is not used anywhere in site cluster.
-    - In deploy repo define superuser bootstrap secret in `"&#123;&#123;.name&#125;&#125;/nautobot-site` directory as defined in [`apps/site/nautobot-site.yaml`](https://github.com/rackerlabs/understack/blob/main/apps/site/nautobot-site.yaml).
+cleanup:
+  groupName: nautobot-api-token-managed
+  deleteUserWhenNoManagedTokens: true
 
-3. **Automation Integration**
-    - When new site credentials are created in Secret Management Backend, the change triggers the site-level automation flow.
-    - The site Nautobot instance creates or updates its user and token accordingly.
+tokens:
+  - name: openstack
+    sourceSecretRef:
+      name: nautobot-token-openstack
+      keys:
+        username: username
+        email: email
+        password: password
+        apiToken: apiToken
+    user:
+      isSuperuser: false
 
----
+  - name: workflow
+    sourceSecretRef:
+      name: nautobot-token-workflow
+```
 
-## Nautobot Secrets in Global Cluster
+## Reconciliation Behavior
 
-| nautobot Secret Name      | Namespace     | label                | token user in Nautobot  | Description                                                        |
-|---------------------------|---------------|----------------------|-------------------------|--------------------------------------------------------------------|
-| `nautobot-superuser`      | `nautobot`    |                      | admin                   | Currently it is a SealedSecret, Token used to access Nautobot API. |
-| `nautobot-token`          | `openstack`   | token/type: nautobot | cluster-name-openstack  | Token used by openstack services to access Nautobot.               |
-| `nautobot-token`          | `argo-events` | token/type: nautobot | cluster-name-workflow   | Token used by workflow jobs to access Nautobot.                    |
-| `site-cluster-name-token` | `nautobot`    | token/type: nautobot | site-cluster-name-token | Token used by Site cluster to bootstrap other tokens.              |
+For each enabled entry in `tokens[]`, the chart:
 
----
+- creates the Nautobot user if it does not exist
+- updates email, password, and `isSuperuser` when configured
+- ensures the user is a member of `cleanup.groupName`
+- creates the Nautobot token if it does not exist
+- updates the token key if the desired value changes
 
-## Nautobot Secrets in Site Cluster
+Managed tokens are marked with the description prefix `nautobot-api-token-managed:` so the cleanup job can identify them safely.
 
-| nautobot Secret Name | Namespace     | label                | token user in Nautobot | Description                                          |
-|----------------------|---------------|----------------------|------------------------|------------------------------------------------------|
-| `nautobot-superuser` | `nautobot`    |                      | cluster-name-openstack | Token used to access Nautobot API.                   |
-| `nautobot-token`     | `openstack`   | token/type: nautobot | cluster-name-openstack | Token used by openstack services to access Nautobot. |
-| `nautobot-token`     | `argo-events` | token/type: nautobot | cluster-name-workflow  | Token used by workflow jobs to access Nautobot.      |
+## Validation
 
----
+After syncing Argo CD:
+
+- confirm the `nautobot-api-tokens` Application synced successfully
+- confirm the PostSync jobs in the `nautobot` namespace completed successfully
+- confirm the expected user and token exist in Nautobot
+
+If a job fails, check:
+
+- the referenced source secret exists in `nautobot`
+- the secret contains the expected keys
+- `NAUTOBOT_DB_PASSWORD` is available from `nautobot.dbPasswordSecretRef`
+- `nautobot-env` and `nautobot-custom-env` references match your deployment
 
 ## References
 
-- **PR:** [rackerlabs/understack#1318](https://github.com/rackerlabs/understack/pull/1318)
-
----
+- `charts/nautobot-api-tokens`
+- `charts/argocd-understack/templates/application-nautobot-api-tokens.yaml`
+- `docs/deploy-guide/components/nautobot-api-tokens.md`
