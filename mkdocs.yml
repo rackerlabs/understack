@@ -140,7 +140,6 @@ nav:
     - Quick Start: deploy-guide/gitops-install.md
     - Preparing Our Deployment:
       - deploy-guide/deploy-repo.md
-      - deploy-guide/component-config.md
       - deploy-guide/config-dex.md
       - deploy-guide/config-openstack.md
       - deploy-guide/secrets-eso-setup.md
@@ -159,6 +158,59 @@ nav:
     - Further Actions:
       - deploy-guide/extra-sites.md
       - deploy-guide/override-openstack-svc-config.md
+    - Reference:
+      - Component Reference:
+        - deploy-guide/components/index.md
+        - deploy-guide/components/argo-events-workflows.md
+        - deploy-guide/components/argo-events.md
+        - deploy-guide/components/argo-workflows.md
+        - deploy-guide/components/cdn.md
+        - deploy-guide/components/cert-manager.md
+        - deploy-guide/components/chrony.md
+        - deploy-guide/components/cilium.md
+        - deploy-guide/components/cinder.md
+        - deploy-guide/components/cluster-issuer.md
+        - deploy-guide/components/cnpg-system.md
+        - deploy-guide/components/dex.md
+        - deploy-guide/components/envoy-configs.md
+        - deploy-guide/components/envoy-gateway.md
+        - deploy-guide/components/etcdbackup.md
+        - deploy-guide/components/external-dns.md
+        - deploy-guide/components/external-secrets.md
+        - deploy-guide/components/glance.md
+        - deploy-guide/components/global-workflows.md
+        - deploy-guide/components/horizon.md
+        - deploy-guide/components/ingress-nginx.md
+        - deploy-guide/components/ironic.md
+        - deploy-guide/components/karma.md
+        - deploy-guide/components/keystone.md
+        - deploy-guide/components/mariadb-operator.md
+        - deploy-guide/components/monitoring.md
+        - deploy-guide/components/nautobot-api-tokens.md
+        - deploy-guide/components/nautobot-site.md
+        - deploy-guide/components/nautobot.md
+        - deploy-guide/components/nautobotop.md
+        - deploy-guide/components/neutron.md
+        - deploy-guide/components/nova.md
+        - deploy-guide/components/octavia.md
+        - deploy-guide/components/openebs.md
+        - deploy-guide/components/openstack-exporter.md
+        - deploy-guide/components/openstack-helm.md
+        - deploy-guide/components/openstack-memcached.md
+        - deploy-guide/components/openstack-resource-controller.md
+        - deploy-guide/components/openstack.md
+        - deploy-guide/components/opentelemetry-operator.md
+        - deploy-guide/components/openvswitch.md
+        - deploy-guide/components/otel-collector.md
+        - deploy-guide/components/ovn.md
+        - deploy-guide/components/placement.md
+        - deploy-guide/components/rabbitmq-system.md
+        - deploy-guide/components/rook.md
+        - deploy-guide/components/sealed-secrets.md
+        - deploy-guide/components/site-workflows.md
+        - deploy-guide/components/skyline.md
+        - deploy-guide/components/snmp-exporter.md
+        - deploy-guide/components/undersync.md
   - 'Operator Guide':
     - operator-guide/index.md
     - 'OpenStack':
