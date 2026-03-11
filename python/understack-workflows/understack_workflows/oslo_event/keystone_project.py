@@ -7,12 +7,12 @@ from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
 from understack_workflows.netapp.manager import NetAppManager
+from understack_workflows.oslo_event.constants import AGGREGATE_NAME
 
 logger = logging.getLogger(__name__)
 
 
 SVM_PROJECT_TAG = "UNDERSTACK_SVM"
-AGGREGATE_NAME = "aggr02_n02_NVME"
 
 
 @dataclass

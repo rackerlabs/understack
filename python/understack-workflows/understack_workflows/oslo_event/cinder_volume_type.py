@@ -6,11 +6,10 @@ from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
 from understack_workflows.netapp.manager import NetAppManager
+from understack_workflows.oslo_event.constants import AGGREGATE_NAME
+from understack_workflows.oslo_event.constants import VOLUME_SIZE
 
 logger = logging.getLogger(__name__)
-
-AGGREGATE_NAME = "aggr02_n02_NVME"
-VOLUME_SIZE = "514GB"
 
 
 @dataclass
@@ -65,19 +64,19 @@ def handle_volume_type_access_added(
         save_output("volume_created", str(False))
         return 1
 
-    netapp_manager.create_volume(
+    volume_name = netapp_manager.create_volume(
         project_id=event.project_id,
         volume_type_id=event.volume_type_id,
         volume_size=volume_size,
         aggregate_name=aggregate_name,
     )
     save_output("volume_created", str(True))
-    save_output("volume_name", f"vol_{event.volume_type_id}")
+    save_output("volume_name", volume_name)
     return 0
 
 
 def handle_volume_type_access_removed(
-    conn: Connection, _nautobot: Nautobot, event_data: dict
+    _conn: Connection, _nautobot: Nautobot, event_data: dict
 ) -> int:
     if event_data.get("event_type") != "volume_type_project.access.remove":
         logger.error("Received event that is not volume_type_project.access.remove")
@@ -92,7 +91,7 @@ def handle_volume_type_access_removed(
 
     try:
         netapp_manager = NetAppManager()
-        volume_name = f"vol_{event.volume_type_id}"
+        volume_name = netapp_manager.get_volume_name(event.volume_type_id)
         deleted = netapp_manager.delete_volume(volume_name, force=False)
         save_output("volume_deleted", str(deleted))
     except Exception as e:
@@ -103,4 +102,4 @@ def handle_volume_type_access_removed(
         )
         return 1
 
-    return 0
+    return 0 if deleted else 1

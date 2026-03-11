@@ -2,10 +2,8 @@ import logging
 
 import urllib3
 from netapp_ontap import config
-from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
 from netapp_ontap.resources.nvme_namespace import NvmeNamespace
-from netapp_ontap.resources.svm import Svm
 
 from understack_workflows.netapp.client import NetAppClient
 from understack_workflows.netapp.config import NetAppConfig
@@ -217,14 +215,10 @@ class NetAppManager:
         Returns:
             bool: True if deleted successfully, False otherwise
 
-        Raises:
-            Exception: If volume not found or deletion fails
         """
-        # Extract project_id from volume_name for service delegation
-        # Volume names follow the pattern "vol_{project_id}"
         if volume_name.startswith("vol_"):
-            project_id = volume_name[4:]  # Remove "vol_" prefix
-            return self._volume_service.delete_volume(project_id, force)
+            volume_type_id = volume_name[4:]  # Remove "vol_" prefix
+            return self._volume_service.delete_volume(volume_type_id, force)
         else:
             # Handle non-standard volume names by falling back to direct client call
             logger.warning(
@@ -255,14 +249,14 @@ class NetAppManager:
             List of namespace results or None if no connection
         """
         # Extract project_id from svm_name and volume_name to use VolumeService
-        # SVM names follow pattern "os-{project_id}" and volume names follow
-        # "vol_{project_id}"
         if svm_name.startswith("os-") and volume_name.startswith("vol_"):
             svm_project_id = svm_name[3:]  # Remove "os-" prefix
             vol_project_id = volume_name[4:]  # Remove "vol_" prefix
 
-            # Ensure both names refer to the same project
-            if svm_project_id == vol_project_id:
+            # Ensure both names refer to the same project.
+            # Normalize svm_project_id by stripping dashes since volume names
+            # have dashes stripped.
+            if svm_project_id.replace("-", "") == vol_project_id:
                 return self._volume_service.get_mapped_namespaces(svm_project_id)
 
         # Fall back to direct client call for non-standard names
@@ -497,21 +491,8 @@ class NetAppManager:
             # This ensures route creation failures terminate script execution
             raise
 
-    def _svm_by_project(self, project_id):
-        try:
-            svm_name = self._svm_name(project_id)
-            svm = Svm.find(name=svm_name)
-            if svm:
-                return svm
-        except NetAppRestError:
-            return None
-        return None
-
-    def _svm_name(self, project_id):
-        return f"os-{project_id}"
-
-    def _volume_name(self, project_id):
-        return f"vol_{project_id}"
+    def get_volume_name(self, volume_type_id: str) -> str:
+        return self._volume_service.get_volume_name(volume_type_id)
 
     @property
     def config(self):

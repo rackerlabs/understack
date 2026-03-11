@@ -161,7 +161,7 @@ netapp_password = test-password
             return_value=expected_namespaces
         )
 
-        result = manager.mapped_namespaces("os-test-project", "vol_test-project")
+        result = manager.mapped_namespaces("os-test-project", "vol_testproject")
 
         # Verify delegation with extracted project_id
         manager._volume_service.get_mapped_namespaces.assert_called_once_with(
@@ -199,11 +199,11 @@ netapp_password = test-password
         """Test naming convention utility methods."""
         manager = NetAppManager(mock_config_file)
 
-        # Test SVM naming
-        assert manager._svm_name("test-project") == "os-test-project"
+        # Test SVM naming (delegated to SvmService)
+        assert manager._svm_service.get_svm_name("test-project") == "os-test-project"
 
-        # Test volume naming
-        assert manager._volume_name("test-project") == "vol_test-project"
+        # Test volume naming (delegated to VolumeService, dashes stripped)
+        assert manager.get_volume_name("test-project") == "vol_testproject"
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")

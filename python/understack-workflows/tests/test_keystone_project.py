@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from understack_workflows.oslo_event.keystone_project import AGGREGATE_NAME
+from understack_workflows.oslo_event.constants import AGGREGATE_NAME
 from understack_workflows.oslo_event.keystone_project import SVM_PROJECT_TAG
 from understack_workflows.oslo_event.keystone_project import KeystoneProjectEvent
 from understack_workflows.oslo_event.keystone_project import _keystone_project_tags

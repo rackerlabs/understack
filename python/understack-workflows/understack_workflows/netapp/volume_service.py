@@ -4,8 +4,6 @@ This module provides business logic for volume operations,
 including naming conventions, lifecycle management, and namespace queries.
 """
 
-import logging
-
 from understack_workflows.netapp.client import NetAppClientInterface
 from understack_workflows.netapp.error_handler import ErrorHandler
 from understack_workflows.netapp.value_objects import NamespaceResult
@@ -25,7 +23,6 @@ class VolumeService:
         """
         self._client = client
         self._error_handler = error_handler
-        self._logger = logging.getLogger(__name__)
 
     def create_volume(
         self, project_id: str, volume_type_id: str, size: str, aggregate_name: str
@@ -34,6 +31,7 @@ class VolumeService:
 
         Args:
             project_id: The project identifier
+            volume_type_id: The volume type identifier used to name the volume
             size: Size of the volume (e.g., "1TB", "500GB")
             aggregate_name: Name of the aggregate to use for the volume
 
@@ -94,56 +92,66 @@ class VolumeService:
                 },
             )
 
-    def delete_volume(self, project_id: str, force: bool = False) -> bool:
-        """Delete a volume for a project.
+    def delete_volume(self, volume_type_id: str, force: bool = False) -> bool:
+        """Delete a volume by volume_type_id.
 
         Args:
-            project_id: The project identifier
+            volume_type_id: The volume type identifier used to derive the volume
+                name. Can also be a project_id for backwards compatibility.
             force: If True, delete even if volume has dependencies
 
         Returns:
             bool: True if deletion was successful, False otherwise
         """
-        volume_name = self.get_volume_name(project_id)
+        volume_name = self.get_volume_name(volume_type_id)
 
         try:
             self._error_handler.log_info(
-                "Deleting volume for project %s",
-                {"project_id": project_id, "volume_name": volume_name, "force": force},
+                "Deleting volume %s",
+                {
+                    "volume_type_id": volume_type_id,
+                    "volume_name": volume_name,
+                    "force": force,
+                },
             )
 
             success = self._client.delete_volume(volume_name, force)
 
             if success:
                 self._error_handler.log_info(
-                    "Volume deleted successfully for project %s",
-                    {"project_id": project_id, "volume_name": volume_name},
+                    "Volume deleted successfully %s",
+                    {"volume_type_id": volume_type_id, "volume_name": volume_name},
                 )
             else:
                 self._error_handler.log_warning(
-                    "Volume deletion failed for project %s",
-                    {"project_id": project_id, "volume_name": volume_name},
+                    "Volume deletion failed %s",
+                    {"volume_type_id": volume_type_id, "volume_name": volume_name},
                 )
 
             return success
 
         except Exception as e:
             self._error_handler.log_warning(
-                "Error during volume deletion for project %s: %s",
-                {"project_id": project_id, "volume_name": volume_name, "error": str(e)},
+                "Error during volume deletion %s: %s",
+                {
+                    "volume_type_id": volume_type_id,
+                    "volume_name": volume_name,
+                    "error": str(e),
+                },
             )
             return False
 
-    def get_volume_name(self, project_id: str) -> str:
+    def get_volume_name(self, volume_type_id: str) -> str:
         """Generate volume name using business naming conventions.
 
         Args:
-            project_id: The project identifier
+            volume_type_id: The volume type identifier. Can also be a
+                project_id for backwards compatibility.
 
         Returns:
-            str: The volume name following the convention 'vol_{project_id}'
+            str: The volume name following the convention 'vol_{volume_type_id}'
         """
-        return f"vol_{project_id.replace('-', '_')}"
+        return f"vol_{volume_type_id.replace('-', '')}"
 
     def exists(self, project_id: str) -> bool:
         """Check if a volume exists for a project.
