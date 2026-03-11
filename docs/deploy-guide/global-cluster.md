@@ -192,7 +192,7 @@ can provide:
 - **Helm value overrides** in `my-global/<component>/values.yaml`
 - **Kustomize manifests** in `my-global/<component>/`
 
-See [Configuring Components](./components/index.md) for details on these
+See [Component Reference](./components/index.md) for details on these
 customization methods.
 
 [nautobot]: <https://docs.nautobot.com/>

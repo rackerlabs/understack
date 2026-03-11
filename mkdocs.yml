@@ -140,7 +140,26 @@ nav:
     - Quick Start: deploy-guide/gitops-install.md
     - Preparing Our Deployment:
       - deploy-guide/deploy-repo.md
-      - Configuring Components:
+      - deploy-guide/config-dex.md
+      - deploy-guide/config-openstack.md
+      - deploy-guide/secrets-eso-setup.md
+      - deploy-guide/openstack-automation-users.md
+      - deploy-guide/nautobot-secrets.md
+      - deploy-guide/auth.md
+      - deploy-guide/config-argo-workflows.md
+    - Starting the Deployment:
+      - deploy-guide/management-cluster.md
+      - deploy-guide/global-cluster.md
+      - deploy-guide/site-cluster.md
+    - Post Deployment:
+      - deploy-guide/load-balancers.md
+      - deploy-guide/testing-verification.md
+      - deploy-guide/troubleshooting.md
+    - Further Actions:
+      - deploy-guide/extra-sites.md
+      - deploy-guide/override-openstack-svc-config.md
+    - Reference:
+      - Component Reference:
         - deploy-guide/components/index.md
         - deploy-guide/components/argo-events-workflows.md
         - deploy-guide/components/argo-events.md
@@ -192,24 +211,6 @@ nav:
         - deploy-guide/components/skyline.md
         - deploy-guide/components/snmp-exporter.md
         - deploy-guide/components/undersync.md
-      - deploy-guide/config-dex.md
-      - deploy-guide/config-openstack.md
-      - deploy-guide/secrets-eso-setup.md
-      - deploy-guide/openstack-automation-users.md
-      - deploy-guide/nautobot-secrets.md
-      - deploy-guide/auth.md
-      - deploy-guide/config-argo-workflows.md
-    - Starting the Deployment:
-      - deploy-guide/management-cluster.md
-      - deploy-guide/global-cluster.md
-      - deploy-guide/site-cluster.md
-    - Post Deployment:
-      - deploy-guide/load-balancers.md
-      - deploy-guide/testing-verification.md
-      - deploy-guide/troubleshooting.md
-    - Further Actions:
-      - deploy-guide/extra-sites.md
-      - deploy-guide/override-openstack-svc-config.md
   - 'Operator Guide':
     - operator-guide/index.md
     - 'OpenStack':

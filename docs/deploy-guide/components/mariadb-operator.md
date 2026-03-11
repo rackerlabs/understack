@@ -22,7 +22,7 @@ site:
 ## Deployment Repo Overrides
 
 Use your deployment repo to provide environment-specific values and overlays.
-Start with [Configuring Components](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
 
 ## Notes
 

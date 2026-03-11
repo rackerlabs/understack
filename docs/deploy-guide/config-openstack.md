@@ -219,6 +219,6 @@ kubectl get pods -l app=mariadb -w
 ## Related Documentation
 
 - [External Secrets Operator Setup](./secrets-eso-setup.md) - Detailed ESO configuration for OpenStack service accounts
-- [Component Configuration](./components/index.md) - General component configuration patterns
+- [Component Reference](./components/index.md) - General component configuration patterns
 - [Override OpenStack Service Config](./override-openstack-svc-config.md) - Service-specific configuration overrides
 - [Deploy Repo](./deploy-repo.md) - Deployment repository structure
