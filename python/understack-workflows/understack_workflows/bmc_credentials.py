@@ -6,9 +6,9 @@ from understack_workflows.bmc import AuthException
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import RedfishRequestError
 
+# Factory-default root passwords for various BMCs, most likely first
 FACTORY_B64 = b"Y2FsdmluLGNhbHZpbmNhbHZpbixjYWx2aW4xLGNhbHZpbmNhbHZpbjE="
-_bstring = base64.b64decode(FACTORY_B64)
-FACTORY_PASSWORDS = _bstring.decode("ascii").split(",")
+FACTORY_PASSWORDS = base64.b64decode(FACTORY_B64).decode("ascii").split(",")
 
 
 logger = logging.getLogger(__name__)
@@ -22,55 +22,62 @@ def set_bmc_password(
 ):
     """Access BMC via redfish and change password from old password if needed.
 
-    Old password, if not specified, is the maufacturer's factory default.
-
     Check that we can log in using the standard password.
 
-    If that doesn't work, try the old password, if that succeeds then we change
-    the BMC password to our standard one.
+    If the standard password is not working, log in and CHANGE the BMC password
+    to our standard one.
 
-    Once the password has been changed, we check that it works by logging in
-    again, otherwise raise an Exception.
+    We attempt old_password, and if that is not supplied or doesn't work, try
+    some well-known maufacturers' factory defaults.
+
+    If all the above cannot be completed we raise an Exception.  Therefore if
+    this function returns, the production password is working.
     """
-    bmc = Bmc(ip_address=ip_address, username=username, password=new_password)
+    bmc = Bmc(ip_address=ip_address, username=username)
 
-    try:
-        token, session = bmc.get_session(new_password)
-    except RedfishRequestError as e:
-        logger.debug("Password test for %s failed. %s", ip_address, e)
-        token, session = None, None
-    if token and session:
-        logger.info("Production BMC credentials are working on this BMC.")
-        bmc.close_session(session=session, token=token)
-        return
-
-    logger.info(
-        "Production BMC credentials don't work on this BMC. "
-        "Trying old / factory default credentials."
+    candidate_passwords = _remove_dups_and_nulls(
+        new_password, old_password, *FACTORY_PASSWORDS
     )
 
-    for test_password in set(filter(None, [old_password, *FACTORY_PASSWORDS])):
-        try:
-            token, session = bmc.get_session(test_password)
-        except RedfishRequestError as e:
-            logger.debug("Password test for %s failed. %s", ip_address, e)
-            token, session = None, None
-        if token and session:
-            break
-        # Go Slow, or else the BMC will lock us out for a
-        # few mins if we try too may "incorrect passwords"
-        sleep(30)
-    if not token:
-        raise AuthException(
-            f"Unable to log in to BMC {ip_address} with any known password!"
-        )
-    if token and session:
-        logger.info("Changing BMC password to standard")
-        bmc.set_bmc_creds(password=new_password, token=token)
-        logger.info("BMC password has been set.")
-        bmc.close_session(session=session, token=token)
+    failures = []
+    for attempt, password in enumerate(candidate_passwords):
+        if attempt > 1:
+            logger.debug(
+                "Waiting for 1 minute before BMC login attempt "
+                "with password %s of %s to avoid security lock-out",
+                attempt + 1,
+                len(candidate_passwords),
+            )
+            sleep(60)
 
-    token, session = bmc.get_session(new_password)
-    if token and session:
+        try:
+            return _log_in_and_set_password(bmc, password, new_password)
+        except RedfishRequestError as e:
+            failures.append(e)
+
+    raise AuthException(
+        f"Unable to log in to BMC {ip_address} with any known password! "
+        f"Errors from all {len(failures)} attempts: {failures}"
+    )
+
+
+def _log_in_and_set_password(bmc, password, new_password):
+    if password != new_password:
+        with bmc.session(password) as token:
+            logger.info(
+                "Login successful using old/default password. "
+                "Changing BMC password to production standard."
+            )
+            bmc.set_bmc_creds(password=new_password, token=token)
+            logger.info("BMC password has been set.")
+
+    with bmc.session(new_password):
         logger.info("Production BMC credentials are working on this BMC.")
-        bmc.close_session(session=session, token=token)
+
+
+def _remove_dups_and_nulls(*args):
+    result = []
+    for x in args:
+        if x and x not in result:
+            result.append(x)
+    return result
