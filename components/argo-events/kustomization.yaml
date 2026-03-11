@@ -15,3 +15,14 @@ resources:
   ## configure webhook Sensor and associated role
   - sensor-workflow-role.yaml
   - workflow-role.yaml
+
+patches:
+  - target:
+      version: v1
+      kind: ServiceAccount
+      name: workflow
+    patch: |-
+      - op: add
+        path: /imagePullSecrets
+        value:
+          - name: dockerconfigjson-github-com
