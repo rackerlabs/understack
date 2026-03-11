@@ -1,9 +1,36 @@
+#  yaml-language-server: $schema=./values.schema.json
+
 enabled:
   cinder: true
   ironic: true
   keystone: true
   neutron: true
   nova: true
+
+rabbitmq:
+  url: amqp://rabbitmq-server-0.rabbitmq-nodes.openstack.svc.cluster.local:5672
+
+eventsources:
+  cinder:
+    amqpKey: notifications
+    exchangeName: openstack
+    routingKey: notifications.info
+  ironic:
+    amqpKey: openstack
+    exchangeName: ironic
+    routingKey: ironic_versioned_notifications.info
+  keystone:
+    amqpKey: notifications
+    exchangeName: keystone
+    routingKey: notifications.info
+  neutron:
+    amqpKey: notifications
+    exchangeName: neutron
+    routingKey: notifications.info
+  nova:
+    amqpKey: notifications
+    exchangeName: nova
+    routingKey: notifications.info
 
 eventbus:
   enabled: true

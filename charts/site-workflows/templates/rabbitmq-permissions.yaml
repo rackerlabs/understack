@@ -1,12 +1,14 @@
-{{- if .Values.enabled.nova }}
+{{- range $service, $enabled := .Values.enabled }}
+{{- if $enabled }}
+---
 apiVersion: rabbitmq.com/v1beta1
 kind: Permission
 metadata:
-  name: argo-nova
+  name: argo-{{ $service }}
 spec:
-  vhost: "nova"
+  vhost: {{ $service | quote }}
   userReference:
-    name: "argo-nova"
+    name: argo-{{ $service }}
   permissions:
     write: ".*"
     configure: ".*"
@@ -14,4 +16,5 @@ spec:
   rabbitmqClusterReference:
     name: rabbitmq
     namespace: openstack
+{{- end }}
 {{- end }}

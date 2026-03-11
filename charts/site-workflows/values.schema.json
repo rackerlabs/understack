@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "enabled": {
+      "type": "object",
+      "description": "Enable or disable individual OpenStack services",
+      "properties": {
+        "cinder": {
+          "type": "boolean",
+          "description": "Enable Cinder (Block Storage) service integration"
+        },
+        "ironic": {
+          "type": "boolean",
+          "description": "Enable Ironic (Bare Metal) service integration"
+        },
+        "keystone": {
+          "type": "boolean",
+          "description": "Enable Keystone (Identity) service integration"
+        },
+        "neutron": {
+          "type": "boolean",
+          "description": "Enable Neutron (Networking) service integration"
+        },
+        "nova": {
+          "type": "boolean",
+          "description": "Enable Nova (Compute) service integration"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rabbitmq": {
+      "type": "object",
+      "description": "RabbitMQ connection configuration",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "RabbitMQ AMQP URL (without vhost path)",
+          "pattern": "^amqp://.*"
+        }
+      },
+      "required": ["url"],
+      "additionalProperties": false
+    },
+    "eventsources": {
+      "type": "object",
+      "description": "EventSource configuration for each OpenStack service",
+      "properties": {
+        "cinder": {
+          "$ref": "#/definitions/eventsourceConfig"
+        },
+        "ironic": {
+          "$ref": "#/definitions/eventsourceConfig"
+        },
+        "keystone": {
+          "$ref": "#/definitions/eventsourceConfig"
+        },
+        "neutron": {
+          "$ref": "#/definitions/eventsourceConfig"
+        },
+        "nova": {
+          "$ref": "#/definitions/eventsourceConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "eventbus": {
+      "type": "object",
+      "description": "Argo Events EventBus configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable EventBus deployment"
+        }
+      },
+      "additionalProperties": false
+    },
+    "serviceAccounts": {
+      "type": "object",
+      "description": "Service account configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable service account creation"
+        }
+      },
+      "additionalProperties": false
+    },
+    "k8sSecretsEventSource": {
+      "type": "object",
+      "description": "Kubernetes secrets EventSource configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable K8s secrets EventSource"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["enabled", "rabbitmq", "eventsources"],
+  "additionalProperties": false,
+  "definitions": {
+    "eventsourceConfig": {
+      "type": "object",
+      "description": "AMQP EventSource configuration for an OpenStack service",
+      "properties": {
+        "amqpKey": {
+          "type": "string",
+          "description": "Key name for the AMQP configuration in EventSource spec"
+        },
+        "exchangeName": {
+          "type": "string",
+          "description": "RabbitMQ exchange name"
+        },
+        "routingKey": {
+          "type": "string",
+          "description": "RabbitMQ routing key pattern"
+        }
+      },
+      "required": ["amqpKey", "exchangeName", "routingKey"],
+      "additionalProperties": false
+    }
+  }
+}
