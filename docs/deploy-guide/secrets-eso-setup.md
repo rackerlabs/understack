@@ -266,7 +266,7 @@ kubectl get secret nova-ks-etc -n openstack -o jsonpath='{.data.nova_auth\.conf}
 ## Related Documentation
 
 - [Configuring OpenStack](./config-openstack.md) - Main OpenStack component configuration and basic ESO setup
-- [Component Configuration](./component-config.md) - General component patterns
+- [Component Reference](./components/index.md) - General component patterns
 - [External Secrets Operator Documentation](https://external-secrets.io/) - Official ESO documentation
 
 [openstack-component]: <https://github.com/rackerlabs/understack/blob/89429881be13dbf1bc5bb05c8f68b56e4e790fdb/components/openstack/templates/secretstore-openstack.yaml.tpl#L49-L67>

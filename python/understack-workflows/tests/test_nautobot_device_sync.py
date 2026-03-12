@@ -891,3 +891,253 @@ class TestIsRetryableError:
     def test_value_error_is_not_retryable(self):
         exc = ValueError("Invalid value")
         assert _is_retryable_error(exc) is False
+
+
+class TestExternalCmdbIdPopulateFromNode:
+    """Test cases for external_cmdb_id handling in _populate_from_node."""
+
+    @pytest.fixture
+    def device_info(self):
+        return DeviceInfo(uuid="test-uuid")
+
+    @pytest.fixture
+    def mock_node_with_external_cmdb_id(self):
+        """Node with external_cmdb_id in extra field."""
+        node = MagicMock()
+        node.properties = {}
+        node.traits = None
+        node.provision_state = "active"
+        node.lessee = None
+        node.extra = {"external_cmdb_id": "CORE-12345"}
+        return node
+
+    @pytest.fixture
+    def mock_node_without_external_cmdb_id(self):
+        """Node without external_cmdb_id in extra field."""
+        node = MagicMock()
+        node.properties = {}
+        node.traits = None
+        node.provision_state = "active"
+        node.lessee = None
+        node.extra = {}
+        return node
+
+    @pytest.fixture
+    def mock_node_with_empty_external_cmdb_id(self):
+        """Node with empty external_cmdb_id (cleared) in extra field."""
+        node = MagicMock()
+        node.properties = {}
+        node.traits = None
+        node.provision_state = "active"
+        node.lessee = None
+        node.extra = {"external_cmdb_id": ""}
+        return node
+
+    @pytest.fixture
+    def mock_node_with_null_external_cmdb_id(self):
+        """Node with null external_cmdb_id in extra field."""
+        node = MagicMock()
+        node.properties = {}
+        node.traits = None
+        node.provision_state = "active"
+        node.lessee = None
+        node.extra = {"external_cmdb_id": None}
+        return node
+
+    def test_populate_with_external_cmdb_id(
+        self, device_info, mock_node_with_external_cmdb_id
+    ):
+        """Test that external_cmdb_id is populated from node extra field.
+
+        WHEN a Nautobot_Device is synced from
+        an Ironic_Node containing external_cmdb_id in extra, THE Nautobot_Device
+        SHALL have the value set in a custom field named "external_cmdb_id"
+        """
+        _populate_from_node(device_info, mock_node_with_external_cmdb_id)
+
+        assert device_info.external_cmdb_id == "CORE-12345"
+
+    def test_populate_without_external_cmdb_id(
+        self, device_info, mock_node_without_external_cmdb_id
+    ):
+        """Test that external_cmdb_id is None when not in node extra field.
+
+        WHEN a Nautobot_Device is synced from
+        an Ironic_Node without external_cmdb_id in extra, THE Nautobot_Device
+        SHALL NOT have the "external_cmdb_id" custom field modified
+        """
+        _populate_from_node(device_info, mock_node_without_external_cmdb_id)
+
+        # None means "don't modify" the custom field
+        assert device_info.external_cmdb_id is None
+
+    def test_populate_with_empty_external_cmdb_id(
+        self, device_info, mock_node_with_empty_external_cmdb_id
+    ):
+        """Test that empty external_cmdb_id is normalized to None.
+
+        WHEN the external_cmdb_id is empty in Ironic_Node extra,
+        THE device_info.external_cmdb_id SHALL be None (no value)
+        """
+        _populate_from_node(device_info, mock_node_with_empty_external_cmdb_id)
+
+        # Empty string is normalized to None
+        assert device_info.external_cmdb_id is None
+
+    def test_populate_with_null_external_cmdb_id(
+        self, device_info, mock_node_with_null_external_cmdb_id
+    ):
+        """Test that null external_cmdb_id stays None.
+
+        WHEN the external_cmdb_id is null in Ironic_Node extra,
+        THE device_info.external_cmdb_id SHALL be None
+        """
+        _populate_from_node(device_info, mock_node_with_null_external_cmdb_id)
+
+        # Null value stays None
+        assert device_info.external_cmdb_id is None
+
+
+class TestExternalCmdbIdUpdateNautobotDevice:
+    """Test cases for external_cmdb_id handling in _update_nautobot_device."""
+
+    @pytest.fixture
+    def mock_nautobot_device(self):
+        device = MagicMock()
+        device.status = MagicMock(name="Active")
+        device.name = "Dell-ABC123"
+        device.serial = None
+        device.location = None
+        device.rack = None
+        device.tenant = None
+        device.custom_fields = {}
+        return device
+
+    @pytest.fixture
+    def mock_nautobot_device_with_existing_cmdb_id(self):
+        device = MagicMock()
+        device.status = MagicMock(name="Active")
+        device.name = "Dell-ABC123"
+        device.serial = None
+        device.location = None
+        device.rack = None
+        device.tenant = None
+        device.custom_fields = {"external_cmdb_id": "OLD-CORE-ID"}
+        return device
+
+    def test_update_with_external_cmdb_id_populates_custom_field(
+        self, mock_nautobot_device
+    ):
+        """Test sync with external_cmdb_id populates custom field.
+
+        WHEN a Nautobot_Device is synced from
+        an Ironic_Node containing external_cmdb_id in extra, THE Nautobot_Device
+        SHALL have the value set in a custom field named "external_cmdb_id"
+        """
+        device_info = DeviceInfo(uuid="test-uuid", external_cmdb_id="CORE-12345")
+
+        result = _update_nautobot_device(device_info, mock_nautobot_device)
+
+        assert result is True
+        assert mock_nautobot_device.custom_fields["external_cmdb_id"] == "CORE-12345"
+        mock_nautobot_device.save.assert_called_once()
+
+    def test_update_clears_custom_field_when_device_info_has_none(
+        self, mock_nautobot_device_with_existing_cmdb_id
+    ):
+        """Test sync clears custom field when device_info has None.
+
+        WHEN device_info.external_cmdb_id is None (Ironic has no value) and
+        Nautobot device has an existing value, THE field SHALL be cleared.
+        Note: In practice, if Ironic has a value, _populate_from_node will
+        set device_info.external_cmdb_id before _update_nautobot_device is called.
+        """
+        device_info = DeviceInfo(uuid="test-uuid", external_cmdb_id=None)
+
+        result = _update_nautobot_device(
+            device_info, mock_nautobot_device_with_existing_cmdb_id
+        )
+
+        # Change should be made: None != "OLD-CORE-ID"
+        assert result is True
+        assert (
+            mock_nautobot_device_with_existing_cmdb_id.custom_fields["external_cmdb_id"]
+            is None
+        )
+        mock_nautobot_device_with_existing_cmdb_id.save.assert_called_once()
+
+    def test_update_with_removed_external_cmdb_id_clears_custom_field(
+        self, mock_nautobot_device_with_existing_cmdb_id
+    ):
+        """Test sync with removed external_cmdb_id clears custom field.
+
+        WHEN the external_cmdb_id is removed
+        from Ironic_Node extra, THE Nautobot_Device custom field SHALL be cleared
+        """
+        # Empty string means "clear the field"
+        device_info = DeviceInfo(uuid="test-uuid", external_cmdb_id="")
+
+        result = _update_nautobot_device(
+            device_info, mock_nautobot_device_with_existing_cmdb_id
+        )
+
+        assert result is True
+        # Field should be cleared (set to None)
+        assert (
+            mock_nautobot_device_with_existing_cmdb_id.custom_fields["external_cmdb_id"]
+            is None
+        )
+        mock_nautobot_device_with_existing_cmdb_id.save.assert_called_once()
+
+    def test_update_external_cmdb_id_changes_value(
+        self, mock_nautobot_device_with_existing_cmdb_id
+    ):
+        """Test sync with changed external_cmdb_id updates custom field.
+
+        WHEN the external_cmdb_id value in
+        Ironic_Node extra is modified, THE Nautobot_Device custom field SHALL
+        be updated to reflect the new value
+        """
+        device_info = DeviceInfo(uuid="test-uuid", external_cmdb_id="NEW-CORE-ID")
+
+        result = _update_nautobot_device(
+            device_info, mock_nautobot_device_with_existing_cmdb_id
+        )
+
+        assert result is True
+        assert (
+            mock_nautobot_device_with_existing_cmdb_id.custom_fields["external_cmdb_id"]
+            == "NEW-CORE-ID"
+        )
+        mock_nautobot_device_with_existing_cmdb_id.save.assert_called_once()
+
+    def test_update_external_cmdb_id_no_change_when_same(
+        self, mock_nautobot_device_with_existing_cmdb_id
+    ):
+        """Test no update when external_cmdb_id value is unchanged."""
+        # Set the same value as existing
+        mock_nautobot_device_with_existing_cmdb_id.custom_fields = {
+            "external_cmdb_id": "SAME-VALUE"
+        }
+        device_info = DeviceInfo(uuid="test-uuid", external_cmdb_id="SAME-VALUE")
+
+        result = _update_nautobot_device(
+            device_info, mock_nautobot_device_with_existing_cmdb_id
+        )
+
+        assert result is False
+        mock_nautobot_device_with_existing_cmdb_id.save.assert_not_called()
+
+    def test_update_external_cmdb_id_clear_when_already_none(
+        self, mock_nautobot_device
+    ):
+        """Test no update when clearing already-empty external_cmdb_id."""
+        # Device has no external_cmdb_id set (empty dict)
+        device_info = DeviceInfo(uuid="test-uuid", external_cmdb_id="")
+
+        result = _update_nautobot_device(device_info, mock_nautobot_device)
+
+        # Should still update since we're explicitly setting to None
+        # (current_cf.get("external_cmdb_id") returns None, new_value is None)
+        assert result is False
+        mock_nautobot_device.save.assert_not_called()

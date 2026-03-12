@@ -141,7 +141,7 @@ spec:
       helm:
         releaseName: my-cluster-name
         valueFiles:
-          - $deploy/my-cluster-name/argocd-understack-values.yaml
+          - $deploy/my-cluster-name/deploy.yaml
     - repoURL: https://github.com/your-org/deploy.git
       targetRevision: HEAD
       ref: deploy
@@ -164,7 +164,7 @@ sources:
     helm:
       releaseName: my-cluster-name
       valueFiles:
-        - $deploy/my-cluster-name/argocd-understack-values.yaml
+        - $deploy/my-cluster-name/deploy.yaml
   - repoURL: https://github.com/your-org/deploy.git
     targetRevision: HEAD
     ref: deploy

@@ -94,13 +94,14 @@ conf:
     pxe:
       loader_file_paths: "snponly.efi:/usr/lib/ipxe/snponly.efi"
     inspector:
+      add_ports: "all"
       extra_kernel_params: ipa-collect-lldp=1
       # Agent inspection hooks run after inspecting in-band using the IPA image:
       hooks: "ramdisk-error,validate-interfaces,architecture,pci-devices,parse-lldp,update-baremetal-port"
+      keep_ports: "present"
     redfish:
       # Redfish inspection hooks run after inspecting out-of-band using the BMC:
       inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class"
-      add_ports: "all"
       # To avoid SSL issues due to the system clock differing, have the conductor
       # set the system clock to its time whenever we go to boot the machine into
       # IPA

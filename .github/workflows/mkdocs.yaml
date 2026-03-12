@@ -39,6 +39,8 @@ jobs:
           python-version: 3.x
           cache: pip
           cache-dependency-path: requirements-docs.txt
+      - name: Check component docs coverage
+        run: make component-docs-check
       - run: make docs
       - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:

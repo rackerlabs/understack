@@ -402,7 +402,7 @@ can provide:
 - **Helm value overrides** in `my-site/<component>/values.yaml`
 - **Kustomize manifests** in `my-site/<component>/`
 
-See [Configuring Components](./component-config.md) for details on these
+See [Component Reference](./components/index.md) for details on these
 customization methods.
 
 ## Related Documentation

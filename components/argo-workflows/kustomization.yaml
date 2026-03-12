@@ -15,9 +15,6 @@ resources:
   - argo-server-role.yaml
   - argo-server-rolebinding.yaml
 
-  # external secret for SSO auth
-  - external-secret-argo-sso.yaml
-
 # keep all the images consistent
 images:
   - name: quay.io/argoproj/workflow-controller

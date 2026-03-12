@@ -28,11 +28,3 @@ resources:
   - workflowtemplates/resync-nautobot.yaml
   # CronWorkflows
   - cronworkflows/resync-nautobot.yaml
-
-helmCharts:
-  - name: nautobot-token
-    namespace: argo-events
-    valuesFile: nautobot-token-values.yaml
-
-helmGlobals:
-  chartHome: ../

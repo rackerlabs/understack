@@ -9,7 +9,7 @@ metadata:
   annotations:
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/sync-wave: "1"
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: 2
   template:

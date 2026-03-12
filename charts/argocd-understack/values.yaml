@@ -456,12 +456,6 @@ site:
     # @default -- false
     enabled: false
 
-  # -- Nautobot site-specific configuration
-  nautobot_site:
-    # -- Enable/disable deploying Nautobot site resources
-    # @default -- false
-    enabled: false
-
   # -- OpenEBS
   openebs:
     # -- Enable/disable deploying OpenEBS

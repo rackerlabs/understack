@@ -100,6 +100,9 @@ class DeviceInfo:
     # Custom fields for Nautobot
     custom_fields: dict[str, str] = field(default_factory=dict)
 
+    # External CMDB identifier (from Ironic node extra)
+    external_cmdb_id: str | None = None
+
 
 def _normalise_manufacturer(name: str) -> str:
     """Return a standard name for Manufacturer."""
@@ -141,6 +144,10 @@ def _populate_from_node(device_info: DeviceInfo, node) -> None:
             )
         except (ValueError, TypeError) as e:
             logger.warning("Invalid lessee UUID %s: %s", lessee, e)
+
+    # External CMDB ID from node extra field
+    extra = node.extra or {}
+    device_info.external_cmdb_id = extra.get("external_cmdb_id") or None
 
 
 def _populate_from_inventory(device_info: DeviceInfo, inventory: dict | None) -> None:
@@ -401,18 +408,33 @@ def _update_nautobot_device(
     # Custom fields (merge, don't replace)
     # pynautobot tracks custom_fields specially - we need to modify in place
     cf_updated = False
-    if device_info.custom_fields:
-        current_cf = (
-            dict(nautobot_device.custom_fields) if nautobot_device.custom_fields else {}
+    current_cf = (
+        dict(nautobot_device.custom_fields) if nautobot_device.custom_fields else {}
+    )
+
+    # Map external_cmdb_id to custom_fields
+    new_value = device_info.external_cmdb_id or None
+    current_value = current_cf.get("external_cmdb_id") or None
+    if new_value != current_value:
+        current_cf["external_cmdb_id"] = new_value
+        cf_updated = True
+        logger.debug(
+            "Updating custom field external_cmdb_id: %s -> %s",
+            current_value,
+            new_value,
         )
+
+    # Merge any additional custom fields from device_info
+    if device_info.custom_fields:
         for key, value in device_info.custom_fields.items():
             if current_cf.get(key) != value:
                 current_cf[key] = value
                 cf_updated = True
                 logger.debug("Updating custom field %s: %s", key, value)
-        if cf_updated:
-            nautobot_device.custom_fields = current_cf
-            updated = True
+
+    if cf_updated:
+        nautobot_device.custom_fields = current_cf
+        updated = True
 
     if updated:
         result = nautobot_device.save()

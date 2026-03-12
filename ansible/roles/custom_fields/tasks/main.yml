@@ -55,3 +55,17 @@
     validation_minimum: 1
     validation_maximum: 4096
     filter_logic: exact
+
+- name: Create Custom Field External CMDB ID
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: External CMDB identifier for integration with external systems
+    label: External CMDB ID
+    key: external_cmdb_id
+    type: text
+    required: false
+    weight: 100
+    content_types: dcim.device
+    filter_logic: exact
