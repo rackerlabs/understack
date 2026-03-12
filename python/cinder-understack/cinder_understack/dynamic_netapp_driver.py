@@ -1,5 +1,6 @@
 """NetApp NVMe driver with dynamic multi-SVM support."""
 
+import uuid as _uuid
 from collections.abc import Generator
 from contextlib import contextmanager
 from functools import cached_property
@@ -239,7 +240,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """
         for svm_name in self._get_svms():
             if svm_name in self._libraries:
-                LOG.info("SVMe library already exists for SVM %s, skipping", svm_name)
+                LOG.info("NVMe library already exists for SVM %s, skipping", svm_name)
                 continue
 
             LOG.info("Creating NVMe library instance for SVM %s", svm_name)
@@ -259,13 +260,14 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def _actual_refresh_svm_libraries(self, ctxt):
         """Refresh the SVM libraries."""
-        LOG.info("Start refreshing SVM libraries")
-        # Print all current library keys
+        LOG.debug("Start refreshing SVM libraries")
         existing_libs = set(self._libraries.keys())
-        LOG.info("Existing library keys: %s", existing_libs)
-        # Get the current SVMs from cluster
         current_svms = set(self._get_svms())
-        LOG.info("Current SVMs detected from cluster: %s", current_svms)
+        LOG.debug(
+            "_refresh_svm_libraries: existing=%s current=%s",
+            existing_libs,
+            current_svms,
+        )
         # Remove libraries for SVMs that no longer exist
         stale_svms = existing_libs - current_svms
         for svm_name in stale_svms:
@@ -296,15 +298,25 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def check_for_setup_error(self):
         """Check for setup errors."""
         svm_to_init = set(self._libraries.keys())
+        LOG.debug(
+            "check_for_setup_error: verifying %d SVM(s): %s",
+            len(svm_to_init),
+            svm_to_init,
+        )
         for svm_name in svm_to_init:
             LOG.info("Checking NVMe library for errors for SVM %s", svm_name)
             svm_lib = self._libraries[svm_name]
             try:
                 svm_lib.check_for_setup_error()
+                LOG.debug("SVM %s setup check passed", svm_name)
             except Exception:
                 LOG.exception("Failed to initialize SVM %s, skipping", svm_name)
                 self._remove_svm_lib(svm_lib)
                 del self._libraries[svm_name]
+        LOG.debug(
+            "check_for_setup_error complete: active SVMs=%s",
+            list(self._libraries.keys()),
+        )
 
         # looping call to refresh SVM libraries
         if not self._looping_call:
@@ -313,7 +325,6 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
                 self._looping_call = loopingcall.FixedIntervalLoopingCall(
                     self._refresh_svm_libraries
                 )
-                # removed initial_delay the first call run after full interval .
                 self._looping_call.start(interval=interval)
             else:
                 LOG.info("SVM discovery timer disabled (interval=%s)", interval)
@@ -331,7 +342,30 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         pool["pool_name"] = f"{svm_name}{_SVM_NAME_DELIM}{pool_name}"
         pool["netapp_vserver"] = svm_name
         prefix = self.configuration.safe_get("netapp_vserver_prefix")
-        pool["netapp_project_id"] = svm_name.replace(prefix, "")
+        project_uuid = svm_name.removeprefix(prefix)
+        pool["netapp_project_id"] = project_uuid
+
+        pool_regex = na_utils.get_pool_name_filter_regex(self.configuration)
+        match = pool_regex.match(pool_name)
+        netapp_volume_type_id = ""
+        if match:
+            raw_id = match.group(1)
+            try:
+                netapp_volume_type_id = str(_uuid.UUID(raw_id))
+            except ValueError:
+                LOG.warning(
+                    "_svmify_pool: pool=%s capture group %r is not a valid UUID,"
+                    " netapp_volume_type_id left empty",
+                    pool_name,
+                    raw_id,
+                )
+        else:
+            LOG.warning(
+                "_svmify_pool: pool=%s did not match pattern,"
+                " netapp_volume_type_id left empty",
+                pool_name,
+            )
+        pool["netapp_volume_type_id"] = netapp_volume_type_id
         pool.update(kwargs)
         return pool
 
@@ -340,29 +374,35 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """From a volume find the specific NVMe library to use."""
         # save this to restore it in the end
         original_host = volume["host"]
-        # svm plus pool_name
-        svm_pool_name = volume_utils.extract_host(original_host, level="pool")
-        if not svm_pool_name:
+
+        # Pool name format is "{svm_name}+{flexvol_name}"
+        qualified_pool = volume_utils.extract_host(original_host, level="pool")
+        if not qualified_pool:
             raise exception.InvalidInput(
                 reason=f"pool name not found in {original_host}"
             )
 
-        svm_name = svm_pool_name.split(_SVM_NAME_DELIM)[0]
-        # workaround when the svm_name has already been stripped from the pool
-        prefix = self.configuration.netapp_vserver_prefix
-        if not svm_name.startswith(prefix):
-            LOG.debug(
-                "Volume host already had SVM name stripped %s, "
-                "using volume project_id %s",
-                original_host,
-                volume["project_id"],
+        svm_name, _, flexvol_name = qualified_pool.partition(_SVM_NAME_DELIM)
+        if not flexvol_name:
+            raise exception.InvalidInput(
+                reason=f"pool {qualified_pool!r} missing delimiter {_SVM_NAME_DELIM!r}"
             )
-            svm_name = f"os-{volume['project_id']}"
+
+        LOG.debug(
+            "_volume_to_library: host=%s svm=%s flexvol=%s",
+            original_host,
+            svm_name,
+            flexvol_name,
+        )
 
         try:
             lib = self._libraries[svm_name]
         except KeyError:
-            LOG.error("No such SVM %s instantiated", svm_name)
+            LOG.error(
+                "_volume_to_library: SVM=%s not found in active libraries=%s",
+                svm_name,
+                list(self._libraries.keys()),
+            )
             raise exception.DriverNotInitialized() from None
 
         if lib.vserver != svm_name:
@@ -429,13 +469,19 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             return lib.terminate_connection(volume, connector, **kwargs)
 
     def get_filter_function(self):
-        """Prefixes any filter function with our SVM matching."""
+        """Prefixes any filter function with our SVM and volume type matching."""
         base_filter = super().get_filter_function()
         svm_filter = "(capabilities.netapp_project_id == volume.project_id)"
+        vol_type_filter = (
+            '(capabilities.netapp_volume_type_id == ""'
+            " or capabilities.netapp_volume_type_id == volume.volume_type_id)"
+        )
+        combined = f"{svm_filter} and {vol_type_filter}"
         if base_filter:
-            return f"{svm_filter} and {base_filter}"
+            result = f"{combined} and {base_filter}"
         else:
-            return svm_filter
+            result = combined
+        return result
 
     def _empty_volume_stats(self):
         data = {}
@@ -463,7 +509,6 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             for svm_name, svm_lib in self._libraries.items():
                 LOG.info("Get Volume Stats for SVM %s", svm_name)
                 ret = svm_lib.get_volume_stats(refresh)
-                LOG.info("Adding SVM data to pools for SVM %s", svm_name)
                 data["pools"].extend(
                     [
                         self._svmify_pool(
