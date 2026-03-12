@@ -1,5 +1,6 @@
 """NetApp NVMe driver with dynamic multi-SVM support."""
 
+import uuid as _uuid
 from collections.abc import Generator
 from contextlib import contextmanager
 from functools import cached_property
@@ -94,6 +95,11 @@ class NetAppMinimalLibrary(NetAppNVMeStorageLibrary):
         would check that the dynamic config group we made existed in the
         parsed config, which it does not and it would then fail.
         """
+        LOG.info(
+            "NetAppMinimalLibrary.do_setup: vserver=%s hostname=%s",
+            self.configuration.netapp_vserver,
+            self.configuration.netapp_server_hostname,
+        )
         na_utils.check_flags(self.REQUIRED_FLAGS_BASIC, self.configuration)
         self.namespace_ostype = (
             self.configuration.netapp_namespace_ostype or self.DEFAULT_NAMESPACE_OS
@@ -120,6 +126,7 @@ class NetAppMinimalLibrary(NetAppNVMeStorageLibrary):
             certificate_host_validation=None,
         )
         self.vserver = self.client.vserver
+        LOG.info("NetAppMinimalLibrary REST client created: vserver=%s", self.vserver)
 
         # Storage service catalog.
         self.ssc_library = capabilities.CapabilitiesLibrary(
@@ -129,6 +136,12 @@ class NetAppMinimalLibrary(NetAppNVMeStorageLibrary):
         self.ssc_library.check_api_permissions()
 
         self.using_cluster_credentials = self.ssc_library.cluster_user_supported()
+        LOG.info(
+            "NetAppMinimalLibrary.do_setup complete: vserver=%s"
+            " cluster_credentials=%s",
+            self.vserver,
+            self.using_cluster_credentials,
+        )
 
         # Performance monitoring library.
         self.perf_library = perf_cmode.PerformanceCmodeLibrary(self.client)
@@ -149,6 +162,10 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         """Initialize the driver and create library instance."""
         super().__init__(*args, **kwargs)
         self.configuration.append_config_values(self.__class__.get_driver_options())
+        LOG.info(
+            "NetappCinderDynamicDriver __init__: config_group=%s",
+            self.configuration.config_group,
+        )
         # save the arguments supplied
         self._init_kwargs = kwargs
         # but we don't need the configuration
@@ -164,6 +181,7 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         # we create a configuration object per SVM library to
         # provide the SVM name to the SVM library
         child_grp = f"{self.configuration.config_group}_{svm_name}"
+        LOG.info("Creating child config group=%s for SVM=%s", child_grp, svm_name)
         child_cfg = configuration.Configuration(
             volume_driver.volume_opts,
             config_group=child_grp,
@@ -184,6 +202,12 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         CONF.set_override("netapp_vserver", svm_name, group=child_grp)
         # now set the backend configuration name
         CONF.set_override("volume_backend_name", child_grp, group=child_grp)
+        LOG.info(
+            "Child config created: group=%s vserver=%s hostname=%s",
+            child_grp,
+            svm_name,
+            child_cfg.netapp_server_hostname,
+        )
         # return an instance of the library scoped to one SVM
         # netapp_mode=proxy is necessary to quiet the driver from reporting that
         # its not
@@ -202,6 +226,14 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     @cached_property
     def cluster(self) -> RestNaServer:
+        LOG.info(
+            "Creating cluster-level REST client: hostname=%s port=%s"
+            " transport=%s user=%s",
+            self.configuration.netapp_server_hostname,
+            self.configuration.netapp_server_port,
+            self.configuration.netapp_transport_type,
+            self.configuration.netapp_login,
+        )
         return RestNaServer(
             transport_type=self.configuration.netapp_transport_type,
             ssl_cert_path=self.configuration.netapp_ssl_cert_path,
@@ -221,31 +253,57 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def _get_svms(self):
         prefix = self.configuration.safe_get("netapp_vserver_prefix")
+        LOG.info("Discovering SVMs with prefix=%s", prefix)
         svm_filter = {
             "state": "running",
             "nvme.enabled": "true",
             "name": f"{prefix}*",
             "fields": "name,uuid",
         }
-        ret = self.cluster.get_records(
-            "svm/svms", query=svm_filter, enable_tunneling=False
-        )
-        return [rec["name"] for rec in ret["records"]]
+        try:
+            ret = self.cluster.get_records(
+                "svm/svms", query=svm_filter, enable_tunneling=False
+            )
+        except Exception:
+            LOG.exception(
+                "Failed to query SVMs from cluster %s",
+                self.configuration.netapp_server_hostname,
+            )
+            raise
+        svms = [rec["name"] for rec in ret["records"]]
+        LOG.info("Discovered %d SVM(s) with prefix=%s: %s", len(svms), prefix, svms)
+        return svms
 
     def do_setup(self, ctxt):
         """Setup the driver.
 
         Connected to the NetApp with cluster credentials to find the SVMs.
         """
-        for svm_name in self._get_svms():
+        LOG.info(
+            "Starting NetappCinderDynamicDriver setup, backend=%s",
+            self.configuration.safe_get("volume_backend_name"),
+        )
+        try:
+            svms = self._get_svms()
+        except Exception:
+            LOG.exception("do_setup failed during SVM discovery")
+            raise
+        LOG.info("do_setup found %d SVM(s) to initialize", len(svms))
+        for svm_name in svms:
             if svm_name in self._libraries:
-                LOG.info("SVMe library already exists for SVM %s, skipping", svm_name)
+                LOG.info("NVMe library already exists for SVM %s, skipping", svm_name)
                 continue
 
             LOG.info("Creating NVMe library instance for SVM %s", svm_name)
-            svm_lib = self._create_svm_lib(svm_name)
-            svm_lib.do_setup(ctxt)
+            try:
+                svm_lib = self._create_svm_lib(svm_name)
+                svm_lib.do_setup(ctxt)
+            except Exception:
+                LOG.exception("Failed to setup NVMe library for SVM %s", svm_name)
+                raise
             self._libraries[svm_name] = svm_lib
+            LOG.info("NVMe library initialized successfully for SVM %s", svm_name)
+        LOG.info("do_setup complete, initialized libraries: %s", list(self._libraries))
 
     def _remove_svm_lib(self, svm_lib: NetAppMinimalLibrary):
         """Remove resources for a given SVM library."""
@@ -296,15 +354,25 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
     def check_for_setup_error(self):
         """Check for setup errors."""
         svm_to_init = set(self._libraries.keys())
+        LOG.info(
+            "check_for_setup_error: checking %d SVM libraries: %s",
+            len(svm_to_init),
+            svm_to_init,
+        )
         for svm_name in svm_to_init:
             LOG.info("Checking NVMe library for errors for SVM %s", svm_name)
             svm_lib = self._libraries[svm_name]
             try:
                 svm_lib.check_for_setup_error()
+                LOG.info("SVM %s passed check_for_setup_error", svm_name)
             except Exception:
                 LOG.exception("Failed to initialize SVM %s, skipping", svm_name)
                 self._remove_svm_lib(svm_lib)
                 del self._libraries[svm_name]
+        LOG.info(
+            "check_for_setup_error complete: active libraries=%s",
+            list(self._libraries.keys()),
+        )
 
         # looping call to refresh SVM libraries
         if not self._looping_call:
@@ -332,6 +400,31 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
         pool["netapp_vserver"] = svm_name
         prefix = self.configuration.safe_get("netapp_vserver_prefix")
         pool["netapp_project_id"] = svm_name.replace(prefix, "")
+
+        # Diagnostic: if FlexVol name looks like vol_<uuid-no-dashes>,
+        # log what the normalised UUID would be. This validates that
+        # str(UUID(no_dash_id)) == volume.volume_type_id before we wire
+        # up the netapp_volume_type_id filter capability.
+        _FLEXVOL_PREFIX = "vol_"
+        if pool_name.startswith(_FLEXVOL_PREFIX):
+            raw_id = pool_name[len(_FLEXVOL_PREFIX) :]
+            try:
+                normalised = str(_uuid.UUID(raw_id))
+                LOG.info(
+                    "_svmify_pool: pool=%s raw_vol_type_id=%s normalised=%s"
+                    " (use normalised in filter to match volume.volume_type_id)",
+                    pool_name,
+                    raw_id,
+                    normalised,
+                )
+            except ValueError:
+                LOG.debug(
+                    "_svmify_pool: pool=%s suffix %r is not a UUID, skipping"
+                    " volume_type_id normalisation",
+                    pool_name,
+                    raw_id,
+                )
+
         pool.update(kwargs)
         return pool
 
