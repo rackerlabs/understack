@@ -38,6 +38,7 @@ type NautobotSpec struct {
 	LocationRef        []ConfigMapRef    `json:"locationRef,omitempty"`
 	RackGroupRef       []ConfigMapRef    `json:"rackGroupRef,omitempty"`
 	RackRef            []ConfigMapRef    `json:"rackRef,omitempty"`
+	VlanGroupRef       []ConfigMapRef    `json:"vlanGroupRef,omitempty"`
 }
 
 // NautobotStatus defines the observed state of Nautobot.

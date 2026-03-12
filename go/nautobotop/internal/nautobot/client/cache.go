@@ -42,5 +42,10 @@ func (n *NautobotClient) PreLoadCacheForLookup(ctx context.Context) error {
 		log.Info("pre-load device types cache", "count", len(list.Results))
 	}
 
+	if list, _, err := n.APIClient.IpamAPI.IpamVlanGroupsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("vlangroups", list.Results)
+		log.Info("pre-load vlan groups cache", "count", len(list.Results))
+	}
+
 	return nil
 }
