@@ -89,7 +89,7 @@ spec:
                         - name: playbook
                           value: storage_on_server_delete.yml
                         - name: extra_vars
-                          value: {{ `"device_id={{workflow.parameters.device_id}} project_id={{workflow.parameters.project_id}}"` | quote }}
+                          value: {{ printf "device_id={{workflow.parameters.device_id}} project_id={{workflow.parameters.project_id}}" | quote }}
                   - - name: ansible-update-switches
                       templateRef:
                         name: ansible-workflow-template
