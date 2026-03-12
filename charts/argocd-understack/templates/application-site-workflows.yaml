@@ -14,7 +14,12 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - path: components/site-workflows
+  - helm:
+      ignoreMissingValueFiles: true
+      valueFiles:
+      - $understack/charts/site-workflows/values.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/site-workflows/values.yaml
+    path: charts/site-workflows
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
