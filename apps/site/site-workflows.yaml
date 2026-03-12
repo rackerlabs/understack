@@ -4,10 +4,5 @@ componentNamespace: openstack
 sources:
   - ref: understack
     path: 'components/site-workflows'
-    helm:
-      valueFiles:
-        - $understack/workflows/site-workflows/values.yaml
-        - $deploy/{{.name}}/site-workflows/values.yaml
-      ignoreMissingValueFiles: true
   - ref: deploy
-    path: '{{.name}}/site-workflows'
+    path: '{{.name}}/manifests/site-workflows'

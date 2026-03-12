@@ -4,7 +4,6 @@ ignore:
   - components/etcdbackup/templates/
   - charts/argocd-understack/templates/
   - charts/nautobot-api-tokens/templates/
-  - workflows/site-workflows/templates/
 
 rules:
   comments:
