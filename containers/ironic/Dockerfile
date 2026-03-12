@@ -13,7 +13,7 @@ RUN apt-get update && \
 
 # clone source and patch it
 # renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2025.2
-ARG IRONIC_GIT_REF=722816c3ab528f8f818cf53251ea3d2d358cce26
+ARG IRONIC_GIT_REF=b834dcc207546147abb7780235f5dbe448cf2412
 ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
 RUN git -C /src/ironic fetch --unshallow --tags
 
@@ -32,8 +32,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         proliantutils==2.16.3
 
 COPY containers/ironic/patches /tmp/patches/
-RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
-    patch -p1 < /tmp/patches/0001-Add-portgroup-name-validation-middleware-2025.2.patch
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
     patch -p1 < /tmp/patches/0002-Solve-IPMI-call-issue-results-in-UTF-8-format-error-.patch
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
