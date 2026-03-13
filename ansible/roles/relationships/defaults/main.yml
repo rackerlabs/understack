@@ -25,3 +25,11 @@ relationships_defaults:
     destination_label: "VLAN Group"
     source_hidden: false
     destination_hidden: false
+  - name: "UCVNI to VRF"
+    source_type: "vni_custom_model.ucvni"
+    source_label: "VRF"
+    type: "one-to-one"
+    destination_type: "ipam.vrf"
+    destination_label: "UCVNI"
+    source_hidden: false
+    destination_hidden: false
