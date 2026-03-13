@@ -14,6 +14,7 @@ from typing import cast
 from netapp_ontap import config
 from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
+from netapp_ontap.resources import Aggregate
 from netapp_ontap.resources import IpInterface
 from netapp_ontap.resources import NetworkRoute
 from netapp_ontap.resources import Node
@@ -24,6 +25,7 @@ from netapp_ontap.resources import Volume
 
 from understack_workflows.netapp.config import NetAppConfig
 from understack_workflows.netapp.error_handler import ErrorHandler
+from understack_workflows.netapp.value_objects import AggregateResult
 from understack_workflows.netapp.value_objects import InterfaceResult
 from understack_workflows.netapp.value_objects import InterfaceSpec
 from understack_workflows.netapp.value_objects import NamespaceResult
@@ -178,6 +180,14 @@ class NetAppClientInterface(ABC):
         Raises:
             NetworkOperationError: If route creation fails due to network issues
             NetAppRestError: If NetApp API returns an error during route creation
+        """
+
+    @abstractmethod
+    def get_aggregates(self) -> list[AggregateResult]:
+        """Get aggregate names available on the cluster.
+
+        Returns:
+            list[AggregateResult]: Aggregate metadata reported by ONTAP
         """
 
 
@@ -595,6 +605,43 @@ class NetAppClient(NetAppClientInterface):
 
         except NetAppRestError as e:
             self._error_handler.handle_netapp_error(e, "Node retrieval", {})
+
+    def get_aggregates(self) -> list[AggregateResult]:
+        """Get aggregate metadata available on the cluster."""
+        try:
+            self._error_handler.log_debug("Retrieving cluster aggregates")
+
+            aggregates = list(
+                Aggregate.get_collection(
+                    fields="name,state,space.block_storage.used_percent"
+                )
+            )
+            results = [
+                AggregateResult(
+                    name=str(aggregate.name),
+                    state=str(aggregate.state)
+                    if getattr(aggregate, "state", None) is not None
+                    else None,
+                    used_percent=getattr(
+                        getattr(
+                            getattr(aggregate, "space", None), "block_storage", None
+                        ),
+                        "used_percent",
+                        None,
+                    ),
+                )
+                for aggregate in aggregates
+                if getattr(aggregate, "name", None)
+            ]
+
+            self._error_handler.log_info(
+                "Retrieved %(aggregate_count)d aggregates from cluster",
+                {"aggregate_count": len(results)},
+            )
+            return results
+
+        except NetAppRestError as e:
+            self._error_handler.handle_netapp_error(e, "Aggregate retrieval", {})
 
     def get_namespaces(self, namespace_spec: NamespaceSpec) -> list[NamespaceResult]:
         """Get NVMe namespaces for a specific SVM and volume."""
