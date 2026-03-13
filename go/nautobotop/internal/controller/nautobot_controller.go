@@ -86,6 +86,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		{name: "rackGroup", configRefs: nautobotCR.Spec.RackGroupRef, syncFunc: r.syncRackGroup},
 		{name: "rack", configRefs: nautobotCR.Spec.RackRef, syncFunc: r.syncRack},
 		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
+		{name: "vlanGroup", configRefs: nautobotCR.Spec.VlanGroupRef, syncFunc: r.syncVlanGroup},
 	}
 
 	// Aggregate data and check sync decisions for all resources
@@ -268,6 +269,22 @@ func (r *NautobotReconciler) syncLocationTypes(ctx context.Context,
 	syncSvc := sync.NewLocationTypeSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
 		return fmt.Errorf("failed to sync location types: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncVlanGroup(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	vlanGroupData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing vlan groups", "count", len(vlanGroupData))
+	if len(vlanGroupData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewVlanGroupSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, vlanGroupData); err != nil {
+		return fmt.Errorf("failed to sync vlan groups: %w", err)
 	}
 	return nil
 }
