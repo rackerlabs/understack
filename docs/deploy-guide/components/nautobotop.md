@@ -1,6 +1,6 @@
 # nautobotop
 
-Nautobot Kubernetes operator.
+Global Nautobot operator deployment driven from the deploy repo.
 
 ## Deployment Scope
 
@@ -8,9 +8,15 @@ Nautobot Kubernetes operator.
 - Values key: `global.nautobotop`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-nautobotop.yaml`
 
+## How ArgoCD Builds It
+
+- ArgoCD renders Helm chart `nautobotop`.
+- The deploy repo contributes `values.yaml` for this component.
+- The deploy repo overlay directory for this component is applied as a second source, so `kustomization.yaml` and any referenced manifests are part of the final Application.
+
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
@@ -18,13 +24,16 @@ global:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `values.yaml`: Provide the Helm values for the operator itself.
+- `Operator custom resource`: Add the `Nautobot` custom resource that declares the instance the operator should manage.
+- `nautobot-token` Secret: Provide `username`, `token`, and `hostname` so the operator or helper jobs can call the source-of-truth API.
+
+Optional additions:
+
+- `Additional operator-managed objects`: Add extra custom resources here if you run more than one operator-managed Nautobot workload.
