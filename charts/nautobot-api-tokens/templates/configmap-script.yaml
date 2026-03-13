@@ -28,6 +28,14 @@ data:
       return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+    def _raise_token_conflict(conflict, user, managed_token_name):
+      conflict_user = conflict.user.username if conflict.user else "<none>"
+      raise RuntimeError(
+        f"managed token '{managed_token_name}' for user '{user.username}' cannot use the configured "
+        f"token value because it is already assigned to user '{conflict_user}'"
+      )
+
+
     username = _required("NAUTOBOT_MANAGED_USERNAME")
     email = _required("NAUTOBOT_MANAGED_EMAIL")
     password = _required("NAUTOBOT_MANAGED_PASSWORD")
@@ -55,15 +63,18 @@ data:
     group, _ = Group.objects.get_or_create(name=managed_group_name)
     user.groups.add(group)
 
-    token, _ = Token.objects.get_or_create(
-      user=user,
-      defaults={"key": api_token, "description": managed_description},
-    )
-    if token.key != api_token:
-      token.key = api_token
-    if token.description != managed_description:
-      token.description = managed_description
-    token.validated_save()
+    try:
+      token = Token.objects.get(key=api_token)
+    except Token.DoesNotExist:
+      token = Token(user=user, key=api_token, description=managed_description)
+      token.validated_save()
+    else:
+      if token.user_id != user.id:
+        _raise_token_conflict(token, user, managed_token_name)
+
+      if token.description != managed_description:
+        token.description = managed_description
+      token.validated_save()
 
     print(f"Nautobot API token ensured for user '{username}'")
 

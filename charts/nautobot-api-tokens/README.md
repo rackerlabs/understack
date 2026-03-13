@@ -13,6 +13,7 @@ Helm chart that manages Nautobot users and API tokens from Kubernetes Secret ref
   - ensure group membership for managed users
   - create token if missing
   - update token key if changed
+  - fail with a clear error if a desired token value is already assigned to a different user
 - Managed tokens are stamped with `Token.description` prefix `nautobot-api-token-managed:`.
 - Cleanup job removes managed tokens that are no longer present in `tokens[]`.
 - Cleanup job can also delete users in `cleanup.groupName` when they have no desired managed tokens.
