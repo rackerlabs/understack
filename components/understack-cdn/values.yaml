@@ -9,7 +9,7 @@ cdn:
 
   # The location of our object bucket (s3-compatible object store) providing us
   # with anonymous access to our image files:
-  objectStorageServerHostname: object-storage.dev.undercloud.rackspace.net
+  objectStorageServerHostname: rook-ceph-rgw-ceph-objectstore.rook-ceph.svc
   bucketName: firmware-images
 
   # Whether to create a local ObjectBucketClaim on this cluster

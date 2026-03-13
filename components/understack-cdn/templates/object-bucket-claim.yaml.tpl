@@ -8,5 +8,5 @@ spec:
   storageClassName: ceph-bucket
   additionalConfig:
     maxObjects: "1000"
-    maxSize: {{ .Values.cdn.bucketMaxSize }}
+    maxSize: {{ .Values.cdn.bucketMaxSize | upper }}
 {{- end }}
