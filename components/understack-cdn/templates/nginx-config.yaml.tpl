@@ -64,7 +64,11 @@ data:
     }
   default.conf: |
     upstream s3_origin {
+{{- if .Values.cdn.objectBucketIsLocal }}
+        server {{ .Values.cdn.objectStorageServerHostname }}:80;
+{{- else }}
         server {{ .Values.cdn.objectStorageServerHostname }}:443;
+{{- end }}
         keepalive 32;
     }
 
@@ -102,7 +106,11 @@ data:
             # Forward to Object Storage.
             # S3-compatible API expects requests in the form: /bucket-name/key
             # Our clients are using URL paths in the exact same format.
+{{- if .Values.cdn.objectBucketIsLocal }}
+            proxy_pass http://s3_origin$request_uri;
+{{- else }}
             proxy_pass https://s3_origin$request_uri;
+{{- end }}
 
             proxy_http_version 1.1;
             proxy_set_header Connection "";           # keepalive to upstream
