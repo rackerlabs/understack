@@ -1,30 +1,42 @@
 # otel-collector
 
-OpenTelemetry collector deployment.
+OpenTelemetry collector resources supplied directly from the deploy repo.
 
 ## Deployment Scope
 
-- Cluster scope: global, site
-- Values key: `global.otel_collector / site.otel_collector`
+- Cluster scope: global or site
+- Values keys: `global.otel_collector`, `site.otel_collector`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-otel-collector.yaml`
+
+## How ArgoCD Builds It
+
+- ArgoCD renders only the sources declared directly in the Application template.
+- The current template does not read a deploy-repo `values.yaml` for this component.
+- The deploy repo overlay directory for this component is applied as a second source, so `kustomization.yaml` and any referenced manifests are part of the final Application.
 
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   otel_collector:
     enabled: true
+site:
+  otel_collector:
+    enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `kustomization.yaml`: Include the collector manifests that should run in this environment.
+- `Backend credential Secret`: Create the Secret name referenced by your collector manifests and populate it with `username` and `password` when exporters write to an authenticated log or metrics backend.
+
+Optional additions:
+
+- `Node collector manifests`: Add a DaemonSet, RBAC, or other collector workloads if you want node-level telemetry. The current example includes both.
+- `Additional collector pipelines`: Add more Deployments, ConfigMaps, or Secrets as telemetry requirements grow.
