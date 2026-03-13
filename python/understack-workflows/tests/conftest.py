@@ -8,6 +8,17 @@ from pynautobot import __version__ as pynautobot_version
 from understack_workflows.nautobot import Nautobot
 
 
+@pytest.fixture(autouse=True)
+def _set_nautobot_url_env(monkeypatch):
+    """Set NAUTOBOT_URL environment variable for all tests.
+
+    This is required because parser_nautobot_args() raises ValueError
+    if NAUTOBOT_URL is not set. Nautobot runs centrally in the global
+    cluster, so workflows need this env var to connect.
+    """
+    monkeypatch.setenv("NAUTOBOT_URL", "http://nautobot.example.com")
+
+
 @pytest.fixture
 def device_id() -> uuid.UUID:
     return uuid.uuid4()

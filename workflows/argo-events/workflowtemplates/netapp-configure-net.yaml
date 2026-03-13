@@ -38,6 +38,10 @@ spec:
           - mountPath: /etc/netapp
             name: netapp-ini
             readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+              optional: false
       volumes:
         - name: nb-token
           secret:

@@ -74,9 +74,9 @@ def _valid_url(value):
 
 
 def parser_nautobot_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    default_value = os.getenv(
-        "NAUTOBOT_URL", "http://nautobot-default.nautobot.svc.cluster.local"
-    )
+    default_value = os.getenv("NAUTOBOT_URL")
+    if default_value is None:
+        raise ValueError("NAUTOBOT_URL environment variable must be set")
     parser.add_argument(
         "--nautobot_url",
         type=_valid_url,
