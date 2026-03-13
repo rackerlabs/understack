@@ -8,7 +8,9 @@ from unittest.mock import patch
 
 import pytest
 
+from understack_workflows.netapp.exceptions import NetAppManagerError
 from understack_workflows.netapp.manager import NetAppManager
+from understack_workflows.netapp.value_objects import AggregateResult
 from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 
 
@@ -87,6 +89,90 @@ netapp_password = test-password
             "test-project", "test-volume-type", "1TB", "test-aggregate"
         )
         assert result == "vol_test-project"
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_get_aggregates_delegates_to_client(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test get_aggregates delegates to NetAppClient."""
+        manager = NetAppManager(mock_config_file)
+        aggregates = [
+            AggregateResult(name="aggr_b", state="online", used_percent=40),
+            AggregateResult(name="aggr_a", state="online", used_percent=20),
+        ]
+        manager._client.get_aggregates = MagicMock(return_value=aggregates)
+
+        result = manager.get_aggregates()
+
+        manager._client.get_aggregates.assert_called_once_with()
+        assert result == aggregates
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_select_aggregate_name_uses_lowest_used_percent(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test aggregate selection prefers the least-used online aggregate."""
+        manager = NetAppManager(mock_config_file)
+        manager._client.get_aggregates = MagicMock(
+            return_value=[
+                AggregateResult(name="aggr_b", state="online", used_percent=40),
+                AggregateResult(name="aggr_a", state="online", used_percent=20),
+                AggregateResult(name="aggr_c", state="offline", used_percent=5),
+            ]
+        )
+
+        result = manager.select_aggregate_name()
+
+        assert result == "aggr_a"
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_select_aggregate_name_uses_name_to_break_ties(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test aggregate selection remains deterministic on equal utilization."""
+        manager = NetAppManager(mock_config_file)
+        manager._client.get_aggregates = MagicMock(
+            return_value=[
+                AggregateResult(name="aggr_b", state="online", used_percent=20),
+                AggregateResult(name="aggr_a", state="online", used_percent=20),
+            ]
+        )
+
+        result = manager.select_aggregate_name()
+
+        assert result == "aggr_a"
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_select_aggregate_name_raises_when_none_available(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test aggregate selection fails when the cluster reports none."""
+        manager = NetAppManager(mock_config_file)
+        manager._client.get_aggregates = MagicMock(return_value=[])
+
+        with pytest.raises(NetAppManagerError, match="No NetApp aggregates"):
+            manager.select_aggregate_name()
+
+    @patch("understack_workflows.netapp.manager.config")
+    @patch("understack_workflows.netapp.manager.HostConnection")
+    def test_select_aggregate_name_raises_when_no_eligible_aggregates(
+        self, mock_host_connection, mock_config, mock_config_file
+    ):
+        """Test aggregate selection fails when usage data is unavailable."""
+        manager = NetAppManager(mock_config_file)
+        manager._client.get_aggregates = MagicMock(
+            return_value=[
+                AggregateResult(name="aggr_a", state="offline", used_percent=10),
+                AggregateResult(name="aggr_b", state="online", used_percent=None),
+            ]
+        )
+
+        with pytest.raises(NetAppManagerError, match="No eligible NetApp aggregates"):
+            manager.select_aggregate_name()
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
@@ -297,6 +383,11 @@ netapp_password = test-password
         manager._svm_service.create_svm = MagicMock(return_value="test-svm")
         manager._svm_service.delete_svm = MagicMock(return_value=True)
         manager._svm_service.exists = MagicMock(return_value=True)
+        manager._client.get_aggregates = MagicMock(
+            return_value=[
+                AggregateResult(name="aggregate", state="online", used_percent=10)
+            ]
+        )
         manager._volume_service.create_volume = MagicMock(return_value="test-volume")
         manager._volume_service.delete_volume = MagicMock(return_value=True)
         manager._volume_service.get_mapped_namespaces = MagicMock(return_value=[])
@@ -307,6 +398,8 @@ netapp_password = test-password
         # Test all public methods can be called with expected signatures
         try:
             manager.create_svm("project", "aggregate")
+            manager.get_aggregates()
+            manager.select_aggregate_name()
             manager.delete_svm("svm-name")
             manager.create_volume("project", "test-volume-type", "1TB", "aggregate")
             manager.delete_volume("volume-name")

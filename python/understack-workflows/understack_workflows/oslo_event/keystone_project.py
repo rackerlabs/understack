@@ -7,7 +7,6 @@ from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
 from understack_workflows.netapp.manager import NetAppManager
-from understack_workflows.oslo_event.constants import AGGREGATE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +144,7 @@ def handle_project_deleted(
 
 
 def _create_svm(netapp_manager, event) -> str:
+    aggregate_name = netapp_manager.select_aggregate_name()
     return netapp_manager.create_svm(
-        project_id=event.project_id, aggregate_name=AGGREGATE_NAME
+        project_id=event.project_id, aggregate_name=aggregate_name
     )

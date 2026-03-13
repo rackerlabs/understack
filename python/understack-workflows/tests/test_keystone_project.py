@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 import pytest
 
-from understack_workflows.oslo_event.constants import AGGREGATE_NAME
 from understack_workflows.oslo_event.keystone_project import SVM_PROJECT_TAG
 from understack_workflows.oslo_event.keystone_project import KeystoneProjectEvent
 from understack_workflows.oslo_event.keystone_project import _keystone_project_tags
@@ -169,6 +168,7 @@ class TestHandleProjectCreated:
         """Test successful project creation handling with SVM tag."""
         mock_tags.return_value = ["tag1", SVM_PROJECT_TAG, "tag2"]
         mock_netapp_manager = MagicMock()
+        mock_netapp_manager.select_aggregate_name.return_value = "aggr-selected"
         mock_netapp_class.return_value = mock_netapp_manager
         mock_file = MagicMock()
         mock_open.return_value.__enter__.return_value = mock_file
@@ -178,8 +178,9 @@ class TestHandleProjectCreated:
         assert result == 0
         mock_tags.assert_called_once_with(mock_conn, "test-project-123")
         mock_netapp_class.assert_called_once()
+        mock_netapp_manager.select_aggregate_name.assert_called_once_with()
         mock_netapp_manager.create_svm.assert_called_once_with(
-            project_id="test-project-123", aggregate_name=AGGREGATE_NAME
+            project_id="test-project-123", aggregate_name="aggr-selected"
         )
         mock_netapp_manager.create_volume.assert_not_called()
 
@@ -239,6 +240,7 @@ class TestHandleProjectCreated:
         """Test handling when SVM creation fails."""
         mock_tags.return_value = [SVM_PROJECT_TAG]
         mock_netapp_manager = MagicMock()
+        mock_netapp_manager.select_aggregate_name.return_value = "aggr-selected"
         mock_netapp_manager.create_svm.side_effect = Exception("SVM creation failed")
         mock_netapp_class.return_value = mock_netapp_manager
 
@@ -247,8 +249,9 @@ class TestHandleProjectCreated:
 
         mock_tags.assert_called_once_with(mock_conn, "test-project-123")
         mock_netapp_class.assert_called_once()
+        mock_netapp_manager.select_aggregate_name.assert_called_once_with()
         mock_netapp_manager.create_svm.assert_called_once_with(
-            project_id="test-project-123", aggregate_name=AGGREGATE_NAME
+            project_id="test-project-123", aggregate_name="aggr-selected"
         )
 
     def test_handle_project_created_invalid_event_data(self, mock_conn, mock_nautobot):
@@ -263,27 +266,54 @@ class TestHandleProjectCreated:
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
     @patch("builtins.open")
-    def test_handle_project_created_constants_used(
+    def test_handle_project_created_selects_aggregate(
         self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_event_data
     ):
-        """Test constants used for aggregate name and volume size."""
+        """Test aggregate selection is used for SVM creation."""
         mock_tags.return_value = [SVM_PROJECT_TAG]
 
         with patch(
             "understack_workflows.oslo_event.keystone_project.NetAppManager"
         ) as mock_netapp_class:
             mock_netapp_manager = MagicMock()
+            mock_netapp_manager.select_aggregate_name.return_value = "aggr_dynamic"
             mock_netapp_class.return_value = mock_netapp_manager
 
             handle_project_created(mock_conn, mock_nautobot, valid_event_data)
 
-            # Verify the constants are used correctly
+            mock_netapp_manager.select_aggregate_name.assert_called_once_with()
             mock_netapp_manager.create_svm.assert_called_once_with(
                 project_id="test-project-123",
-                aggregate_name="aggr02_n02_NVME",  # AGGREGATE_NAME constant
+                aggregate_name="aggr_dynamic",
             )
             mock_netapp_manager.create_volume.assert_not_called()
         mock_open.assert_called()
+
+    @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
+    @patch("builtins.open")
+    def test_handle_project_created_aggregate_selection_failure(
+        self,
+        mock_open,
+        mock_tags,
+        mock_netapp_class,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
+    ):
+        """Test handling when no aggregate can be selected."""
+        mock_tags.return_value = [SVM_PROJECT_TAG]
+        mock_netapp_manager = MagicMock()
+        mock_netapp_manager.select_aggregate_name.side_effect = Exception(
+            "No NetApp aggregates are available"
+        )
+        mock_netapp_class.return_value = mock_netapp_manager
+
+        with pytest.raises(Exception, match="No NetApp aggregates are available"):
+            handle_project_created(mock_conn, mock_nautobot, valid_event_data)
+
+        mock_netapp_manager.select_aggregate_name.assert_called_once_with()
+        mock_netapp_manager.create_svm.assert_not_called()
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
     @patch("builtins.open")
@@ -370,6 +400,7 @@ class TestHandleProjectUpdated:
         mock_netapp_manager.check_if_svm_exists.return_value = (
             False  # SVM doesn't exist yet
         )
+        mock_netapp_manager.select_aggregate_name.return_value = "aggr-selected"
         mock_netapp_manager.create_svm.return_value = "os-test-project-123"
         mock_netapp_class.return_value = mock_netapp_manager
 
@@ -382,8 +413,9 @@ class TestHandleProjectUpdated:
         mock_netapp_manager.check_if_svm_exists.assert_called_once_with(
             project_id="test-project-123"
         )
+        mock_netapp_manager.select_aggregate_name.assert_called_once_with()
         mock_netapp_manager.create_svm.assert_called_once_with(
-            project_id="test-project-123", aggregate_name=AGGREGATE_NAME
+            project_id="test-project-123", aggregate_name="aggr-selected"
         )
         mock_netapp_manager.create_volume.assert_not_called()
 
@@ -573,6 +605,7 @@ class TestHandleProjectUpdated:
 
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = False
+        mock_netapp_manager.select_aggregate_name.return_value = "aggr-selected"
         mock_netapp_manager.create_svm.side_effect = Exception("SVM creation failed")
         mock_netapp_class.return_value = mock_netapp_manager
 
@@ -583,8 +616,9 @@ class TestHandleProjectUpdated:
         mock_netapp_manager.check_if_svm_exists.assert_called_once_with(
             project_id="test-project-123"
         )
+        mock_netapp_manager.select_aggregate_name.assert_called_once_with()
         mock_netapp_manager.create_svm.assert_called_once_with(
-            project_id="test-project-123", aggregate_name=AGGREGATE_NAME
+            project_id="test-project-123", aggregate_name="aggr-selected"
         )
 
     def test_handle_project_updated_invalid_event_data(self, mock_conn, mock_nautobot):

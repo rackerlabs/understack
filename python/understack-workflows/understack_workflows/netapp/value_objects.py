@@ -765,6 +765,20 @@ class VolumeResult(BaseModel):
     svm_name: str | None = None
 
 
+class AggregateResult(BaseModel):
+    """Result of an aggregate query operation.
+
+    This model represents aggregate metadata returned from ONTAP and is used
+    for selection decisions such as choosing the least-used aggregate.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    state: str | None = None
+    used_percent: int | None = None
+
+
 class NodeResult(BaseModel):
     """Result of a node query operation.
 

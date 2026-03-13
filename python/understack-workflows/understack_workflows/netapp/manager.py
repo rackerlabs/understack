@@ -8,9 +8,11 @@ from netapp_ontap.resources.nvme_namespace import NvmeNamespace
 from understack_workflows.netapp.client import NetAppClient
 from understack_workflows.netapp.config import NetAppConfig
 from understack_workflows.netapp.error_handler import ErrorHandler
+from understack_workflows.netapp.exceptions import NetAppManagerError
 from understack_workflows.netapp.lif_service import LifService
 from understack_workflows.netapp.route_service import RouteService
 from understack_workflows.netapp.svm_service import SvmService
+from understack_workflows.netapp.value_objects import AggregateResult
 from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 from understack_workflows.netapp.value_objects import NodeResult
 from understack_workflows.netapp.value_objects import RouteResult
@@ -159,6 +161,30 @@ class NetAppManager:
     def create_svm(self, project_id: str, aggregate_name: str):
         """Creates a new Storage Virtual Machine (SVM)."""
         return self._svm_service.create_svm(project_id, aggregate_name)
+
+    def get_aggregates(self) -> list[AggregateResult]:
+        """Return aggregate metadata reported by the NetApp cluster."""
+        return self._client.get_aggregates()
+
+    def select_aggregate_name(self) -> str:
+        """Select the least-used online aggregate for SVM creation."""
+        aggregates = self.get_aggregates()
+        if not aggregates:
+            raise NetAppManagerError("No NetApp aggregates are available")
+
+        eligible_aggregates = [
+            aggregate
+            for aggregate in aggregates
+            if aggregate.state == "online" and aggregate.used_percent is not None
+        ]
+        if not eligible_aggregates:
+            raise NetAppManagerError("No eligible NetApp aggregates are available")
+
+        selected = min(
+            eligible_aggregates,
+            key=lambda aggregate: (aggregate.used_percent, aggregate.name),
+        )
+        return selected.name
 
     def delete_svm(self, svm_name: str) -> bool:
         """Deletes a Storage Virtual Machine (SVM) based on its name.

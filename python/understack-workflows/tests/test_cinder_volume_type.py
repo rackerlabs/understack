@@ -12,7 +12,6 @@ from understack_workflows.oslo_event.cinder_volume_type import (
 from understack_workflows.oslo_event.cinder_volume_type import (
     handle_volume_type_access_removed,
 )
-from understack_workflows.oslo_event.constants import AGGREGATE_NAME
 from understack_workflows.oslo_event.constants import VOLUME_SIZE
 
 PROJECT_ID = "06f78699-5138-462a-b847-36ecd0e6bf32"
@@ -99,10 +98,11 @@ class TestHandleVolumeTypeAccessAdded:
     def test_successful_volume_creation(
         self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
     ):
-        """Volume created with correct project_id, volume_type_id, defaults."""
+        """Volume created with the dynamically selected aggregate and default size."""
         mock_conn.block_storage.get_type.return_value = MagicMock(extra_specs={})
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = True
+        mock_netapp_manager.select_aggregate_name.return_value = "aggr-selected"
         mock_netapp_class.return_value = mock_netapp_manager
 
         result = handle_volume_type_access_added(
@@ -110,11 +110,12 @@ class TestHandleVolumeTypeAccessAdded:
         )
 
         assert result == 0
+        mock_netapp_manager.select_aggregate_name.assert_called_once_with()
         mock_netapp_manager.create_volume.assert_called_once_with(
             project_id=PROJECT_ID,
             volume_type_id=VOLUME_TYPE_ID,
             volume_size=VOLUME_SIZE,
-            aggregate_name=AGGREGATE_NAME,
+            aggregate_name="aggr-selected",
         )
 
     @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
@@ -138,12 +139,34 @@ class TestHandleVolumeTypeAccessAdded:
         )
 
         assert result == 0
+        mock_netapp_manager.select_aggregate_name.assert_not_called()
         mock_netapp_manager.create_volume.assert_called_once_with(
             project_id=PROJECT_ID,
             volume_type_id=VOLUME_TYPE_ID,
             volume_size="1TB",
             aggregate_name="aggr_custom",
         )
+
+    @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
+    @patch("builtins.open")
+    def test_aggregate_selection_failure_propagates(
+        self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+    ):
+        """If no aggregate can be selected, volume creation is not attempted."""
+        mock_conn.block_storage.get_type.return_value = MagicMock(extra_specs={})
+        mock_netapp_manager = MagicMock()
+        mock_netapp_manager.check_if_svm_exists.return_value = True
+        mock_netapp_manager.select_aggregate_name.side_effect = Exception(
+            "No eligible NetApp aggregates are available"
+        )
+        mock_netapp_class.return_value = mock_netapp_manager
+
+        with pytest.raises(
+            Exception, match="No eligible NetApp aggregates are available"
+        ):
+            handle_volume_type_access_added(mock_conn, mock_nautobot, valid_event_data)
+
+        mock_netapp_manager.create_volume.assert_not_called()
 
 
 class TestHandleVolumeTypeAccessRemoved:

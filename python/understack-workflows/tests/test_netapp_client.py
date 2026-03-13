@@ -16,6 +16,7 @@ from understack_workflows.netapp.error_handler import ErrorHandler
 from understack_workflows.netapp.exceptions import NetworkOperationError
 from understack_workflows.netapp.exceptions import SvmOperationError
 from understack_workflows.netapp.exceptions import VolumeOperationError
+from understack_workflows.netapp.value_objects import AggregateResult
 from understack_workflows.netapp.value_objects import InterfaceResult
 from understack_workflows.netapp.value_objects import InterfaceSpec
 from understack_workflows.netapp.value_objects import NamespaceResult
@@ -208,6 +209,50 @@ class TestNetAppClient:
         result = netapp_client.find_svm("test-svm")
 
         assert result is None
+
+    @patch("understack_workflows.netapp.client.Aggregate")
+    def test_get_aggregates_success(self, mock_aggregate_class, netapp_client):
+        """Test successful aggregate discovery."""
+        mock_aggregate_a = MagicMock()
+        mock_aggregate_a.name = "aggregate_a"
+        mock_aggregate_a.state = "online"
+        mock_aggregate_a.space.block_storage.used_percent = 30
+        mock_aggregate_b = MagicMock()
+        mock_aggregate_b.name = "aggregate_b"
+        mock_aggregate_b.state = "online"
+        mock_aggregate_b.space.block_storage.used_percent = 15
+        mock_aggregate_class.get_collection.return_value = [
+            mock_aggregate_a,
+            mock_aggregate_b,
+        ]
+
+        result = netapp_client.get_aggregates()
+
+        assert result == [
+            AggregateResult(name="aggregate_a", state="online", used_percent=30),
+            AggregateResult(name="aggregate_b", state="online", used_percent=15),
+        ]
+        mock_aggregate_class.get_collection.assert_called_once_with(
+            fields="name,state,space.block_storage.used_percent"
+        )
+
+    @patch("understack_workflows.netapp.client.Aggregate")
+    def test_get_aggregates_netapp_error(self, mock_aggregate_class, netapp_client):
+        """Test aggregate discovery failure."""
+        error = NetAppRestError("Aggregate retrieval failed")
+        mock_aggregate_class.get_collection.side_effect = error
+        netapp_client._error_handler.handle_netapp_error.side_effect = Exception(
+            "aggregate error"
+        )
+
+        with pytest.raises(Exception, match="aggregate error"):
+            netapp_client.get_aggregates()
+
+        netapp_client._error_handler.handle_netapp_error.assert_called_once_with(
+            error,
+            "Aggregate retrieval",
+            {},
+        )
 
     @patch("understack_workflows.netapp.client.Volume")
     def test_create_volume_success(self, mock_volume_class, netapp_client):
@@ -745,6 +790,7 @@ class TestNetAppClientInterface:
             "find_volume",
             "get_or_create_ip_interface",
             "get_or_create_port",
+            "get_aggregates",
             "get_nodes",
             "get_namespaces",
             "create_route",
