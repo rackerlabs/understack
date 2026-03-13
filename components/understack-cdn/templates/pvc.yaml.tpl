@@ -9,4 +9,4 @@ spec:
   storageClassName: {{ .Values.cdn.CacheStorageClassName }}
   resources:
     requests:
-      storage: {{ .Values.cdn.cacheSize }}
+      storage: {{ .Values.cdn.cacheSize | upper }}
