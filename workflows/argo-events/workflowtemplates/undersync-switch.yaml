@@ -29,6 +29,10 @@ spec:
           - mountPath: /etc/undersync/
             name: undersync-token
             readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+              optional: false
       inputs:
         parameters:
           - name: vlan_group_uuid

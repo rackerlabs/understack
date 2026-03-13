@@ -53,16 +53,20 @@ class TestArgumentParser:
 
     def test_valid_argument_combinations_with_required_only(self):
         """Test valid argument combinations with only required arguments."""
-        parser = argument_parser()
-        args = parser.parse_args(
-            ["--project-id", "abcdef12-3456-7890-abcd-ef1234567890"]
-        )
+        import os
+        from unittest.mock import patch
 
-        assert args.project_id == "abcdef1234567890abcdef1234567890"
-        # Should use default nautobot_url
-        assert args.nautobot_url == "http://nautobot-default.nautobot.svc.cluster.local"
-        # nautobot_token should be None when not provided
-        assert args.nautobot_token is None
+        with patch.dict(os.environ, {"NAUTOBOT_URL": "https://nautobot.example.com"}):
+            parser = argument_parser()
+            args = parser.parse_args(
+                ["--project-id", "abcdef12-3456-7890-abcd-ef1234567890"]
+            )
+
+            assert args.project_id == "abcdef1234567890abcdef1234567890"
+            # Should use NAUTOBOT_URL from environment
+            assert args.nautobot_url == "https://nautobot.example.com"
+            # nautobot_token should be None when not provided
+            assert args.nautobot_token is None
 
     def test_valid_argument_combinations_with_https_url(self):
         """Test valid argument combinations with HTTPS URL."""
@@ -154,14 +158,18 @@ class TestArgumentParser:
             assert args.nautobot_url == expected_url
 
     def test_default_value_handling_nautobot_url(self):
-        """Test default value handling for nautobot_url."""
-        parser = argument_parser()
-        args = parser.parse_args(
-            ["--project-id", "22222222-3333-4444-5555-666666666666"]
-        )
+        """Test default value handling for nautobot_url from environment."""
+        import os
+        from unittest.mock import patch
 
-        # Should use the default URL
-        assert args.nautobot_url == "http://nautobot-default.nautobot.svc.cluster.local"
+        with patch.dict(os.environ, {"NAUTOBOT_URL": "https://nautobot.example.net"}):
+            parser = argument_parser()
+            args = parser.parse_args(
+                ["--project-id", "22222222-3333-4444-5555-666666666666"]
+            )
+
+            # Should use the URL from environment
+            assert args.nautobot_url == "https://nautobot.example.net"
 
     def test_default_value_handling_nautobot_token(self):
         """Test default value handling for nautobot_token."""
@@ -324,14 +332,14 @@ class TestArgumentParser:
                 "--project-id",
                 "12345678-1234-5678-9abc-123456789012",
                 "--nautobot_url",
-                "http://custom.nautobot.com",
+                "http://custom.example.com",
                 "--nautobot_token",
                 "custom-token",
             ]
         )
 
         # All nautobot args should be present and functional
-        assert args.nautobot_url == "http://custom.nautobot.com"
+        assert args.nautobot_url == "http://custom.example.com"
         assert args.nautobot_token == "custom-token"
 
         # And our custom project_id should also work (UUID without dashes)

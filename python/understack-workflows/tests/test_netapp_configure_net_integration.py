@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 from ipaddress import IPv4Network
 from unittest.mock import Mock
@@ -53,8 +54,9 @@ class TestIntegrationTests:
         mock_netapp_manager_instance.create_routes_for_project.return_value = []
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
-        # Mock sys.argv for argument parsing
+        # Mock sys.argv for argument parsing and set NAUTOBOT_URL env var
         with (
+            patch.dict(os.environ, {"NAUTOBOT_URL": "https://nautobot.example.com"}),
             patch(
                 "sys.argv",
                 [
@@ -75,7 +77,7 @@ class TestIntegrationTests:
         # call was made
         mock_nautobot_class.assert_called_once()
         call_args = mock_nautobot_class.call_args
-        assert call_args[0][0] == "http://nautobot-default.nautobot.svc.cluster.local"
+        assert call_args[0][0] == "https://nautobot.example.com"
         assert call_args[0][1] == "test-token"
         assert "logger" in call_args[1]
 
@@ -413,7 +415,7 @@ class TestIntegrationTests:
                     "--project-id",
                     "55555555-6666-7777-8888-999999999999",
                 ],
-                "expected_url": "http://nautobot-default.nautobot.svc.cluster.local",
+                "expected_url": "https://nautobot.example.org",
                 "expected_token": "fallback-token",
                 "expected_device": "os-55555555666677778888999999999999",
             },
@@ -424,9 +426,9 @@ class TestIntegrationTests:
                     "--project-id",
                     "66666666-7777-8888-9999-aaaaaaaaaaaa",
                     "--nautobot_url",
-                    "https://custom.nautobot.com",
+                    "https://custom.example.com",
                 ],
-                "expected_url": "https://custom.nautobot.com",
+                "expected_url": "https://custom.example.com",
                 "expected_token": "fallback-token",
                 "expected_device": "os-66666666777788889999aaaaaaaaaaaa",
             },
@@ -437,11 +439,11 @@ class TestIntegrationTests:
                     "--project-id",
                     "77777777-8888-9999-aaaa-bbbbbbbbbbbb",
                     "--nautobot_url",
-                    "https://full.custom.com",
+                    "https://full.example.net",
                     "--nautobot_token",
                     "full-custom-token",
                 ],
-                "expected_url": "https://full.custom.com",
+                "expected_url": "https://full.example.net",
                 "expected_token": "full-custom-token",
                 "expected_device": "os-7777777788889999aaaabbbbbbbbbbbb",
             },
@@ -471,8 +473,11 @@ class TestIntegrationTests:
             mock_nautobot_instance.session.graphql.query.return_value = mock_response
             mock_nautobot_class.return_value = mock_nautobot_instance
 
-            # Execute test case
+            # Execute test case with NAUTOBOT_URL env var set
             with (
+                patch.dict(
+                    os.environ, {"NAUTOBOT_URL": "https://nautobot.example.org"}
+                ),
                 patch("sys.argv", test_case["argv"]),
                 patch("builtins.print") as mock_print,
             ):
