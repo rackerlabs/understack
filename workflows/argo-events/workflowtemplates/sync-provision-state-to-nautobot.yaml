@@ -51,6 +51,12 @@ spec:
           - mountPath: /etc/nb-token/
             name: nb-token
             readOnly: true
+        env:
+          - name: NAUTOBOT_URL
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: url
         envFrom:
           - configMapRef:
               name: cluster-metadata

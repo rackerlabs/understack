@@ -38,6 +38,11 @@ spec:
           secretKeyRef:
             key: token
             name: nautobot-token
+      - name: NAUTOBOT_URL
+        valueFrom:
+          secretKeyRef:
+            name: nautobot-token
+            key: url
       envFrom:
       - configMapRef:
           name: cluster-metadata

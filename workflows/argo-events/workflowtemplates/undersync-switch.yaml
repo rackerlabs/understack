@@ -29,10 +29,12 @@ spec:
           - mountPath: /etc/undersync/
             name: undersync-token
             readOnly: true
-        envFrom:
-          - configMapRef:
-              name: cluster-metadata
-              optional: false
+        env:
+          - name: NAUTOBOT_URL
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: url
       inputs:
         parameters:
           - name: vlan_group_uuid

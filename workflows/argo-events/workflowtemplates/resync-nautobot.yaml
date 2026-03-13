@@ -49,6 +49,12 @@ spec:
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
+        env:
+          - name: NAUTOBOT_URL
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: url
         envFrom:
           - configMapRef:
               name: cluster-metadata
@@ -66,6 +72,12 @@ spec:
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
+        env:
+          - name: NAUTOBOT_URL
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: url
         envFrom:
           - configMapRef:
               name: cluster-metadata
@@ -83,6 +95,12 @@ spec:
           - mountPath: /etc/openstack
             name: baremetal-manage
             readOnly: true
+        env:
+          - name: NAUTOBOT_URL
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: url
         envFrom:
           - configMapRef:
               name: cluster-metadata
