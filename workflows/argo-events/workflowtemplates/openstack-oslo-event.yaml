@@ -52,6 +52,12 @@ spec:
           - mountPath: /etc/netapp
             name: netapp-ini
             readOnly: true
+        env:
+          - name: NAUTOBOT_URL
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-token
+                key: url
         envFrom:
           - configMapRef:
               name: cluster-metadata
