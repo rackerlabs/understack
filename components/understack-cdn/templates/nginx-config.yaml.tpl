@@ -106,7 +106,7 @@ data:
 
             proxy_http_version 1.1;
             proxy_set_header Connection "";           # keepalive to upstream
-            proxy_set_header Host             rook-ceph-rgw-ceph-objectstore.rook-ceph.svc;
+            proxy_set_header Host             {{ .Values.cdn.objectStorageServerHostname }};
             proxy_set_header X-Real-IP        $remote_addr;
             proxy_set_header X-Forwarded-For  $proxy_add_x_forwarded_for;
 
