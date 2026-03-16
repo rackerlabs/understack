@@ -10,6 +10,7 @@ import (
 	"github.com/rackerlabs/understack/go/understackctl/cmd/dex"
 	"github.com/rackerlabs/understack/go/understackctl/cmd/flavor"
 	"github.com/rackerlabs/understack/go/understackctl/cmd/helmConfig"
+	"github.com/rackerlabs/understack/go/understackctl/cmd/nautobotOp"
 	"github.com/rackerlabs/understack/go/understackctl/cmd/node"
 	"github.com/rackerlabs/understack/go/understackctl/cmd/openstack"
 	"github.com/rackerlabs/understack/go/understackctl/cmd/other"
@@ -35,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(dex.NewCmdDexSecrets())
 	rootCmd.AddCommand(flavor.NewCmdFlavor())
 	rootCmd.AddCommand(helmConfig.NewCmdHelmConfig())
+	rootCmd.AddCommand(nautobotOp.NewCmdNautobotOp())
 	rootCmd.AddCommand(node.NewCmdNode())
 	rootCmd.AddCommand(openstack.NewCmdOpenstackSecrets())
 	rootCmd.AddCommand(quickstart.NewCmdQuickStart())
