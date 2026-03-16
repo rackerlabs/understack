@@ -403,6 +403,28 @@ class TestNetAppClient:
 
         assert exc_info.value.__cause__ is not None
 
+    @patch("understack_workflows.netapp.client.Port")
+    def test_get_broadcast_domain_name_success(self, mock_port_class, netapp_client):
+        """Test successful broadcast domain lookup."""
+        port = MagicMock()
+        port.broadcast_domain.name = "Fabric-A"
+        mock_port_class.get_collection.return_value = [port]
+
+        result = netapp_client.get_broadcast_domain_name("node-01", "e4a")
+
+        assert result == "Fabric-A"
+
+    @patch("understack_workflows.netapp.client.Port")
+    def test_get_broadcast_domain_name_not_found(self, mock_port_class, netapp_client):
+        """Test broadcast domain lookup when no matching port exists."""
+        mock_port_class.get_collection.return_value = []
+
+        with pytest.raises(NetworkOperationError) as exc_info:
+            netapp_client.get_broadcast_domain_name("node-01", "e4a")
+
+        assert exc_info.value.context["node_name"] == "node-01"
+        assert exc_info.value.context["port_name"] == "e4a"
+
     @patch("understack_workflows.netapp.client.Node")
     def test_get_nodes_success(self, mock_node_class, netapp_client):
         """Test successful node retrieval."""
@@ -566,6 +588,7 @@ class TestNetAppClientInterface:
             "find_volume",
             "get_or_create_ip_interface",
             "get_or_create_port",
+            "get_broadcast_domain_name",
             "get_aggregates",
             "get_nodes",
             "get_namespaces",

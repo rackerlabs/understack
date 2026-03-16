@@ -156,6 +156,10 @@ class NetAppClientInterface(ABC):
         """
 
     @abstractmethod
+    def get_broadcast_domain_name(self, node_name: str, port_name: str) -> str:
+        """Get the broadcast domain name for a port."""
+
+    @abstractmethod
     def get_nodes(self) -> list[NodeResult]:
         """Get all nodes in the cluster.
 
@@ -598,6 +602,36 @@ class NetAppClient(NetAppClientInterface):
                     "netapp_error": str(e),
                 },
             ) from e
+
+    def get_broadcast_domain_name(self, node_name: str, port_name: str) -> str:
+        """Get the broadcast domain name for a port."""
+        try:
+            ports = Port.get_collection(
+                name=port_name,
+                fields="node.name,name,broadcast_domain",
+                **{"node.name": node_name},  # pyright: ignore[reportArgumentType]
+            )
+
+            port = cast(Port, next(iter(ports)))
+            return str(port.broadcast_domain.name)
+
+        except NetAppRestError as e:
+            raise NetworkOperationError(
+                f"NetApp broadcast domain lookup failed: {e}",
+                context={
+                    "node_name": node_name,
+                    "port_name": port_name,
+                    "netapp_error": str(e),
+                },
+            ) from e
+        except StopIteration:
+            raise NetworkOperationError(
+                "No broadcast domain found for the requested port",
+                context={
+                    "node_name": node_name,
+                    "port_name": port_name,
+                },
+            ) from None
 
     def get_nodes(self) -> list[NodeResult]:
         """Get all nodes in the cluster."""

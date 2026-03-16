@@ -10,6 +10,7 @@ import pytest
 from understack_workflows.netapp.exceptions import SvmOperationError
 from understack_workflows.netapp.exceptions import VolumeOperationError
 from understack_workflows.netapp.manager import NetAppManager
+from understack_workflows.netapp.value_objects import NodeResult
 
 
 class TestNetAppManagerIntegration:
@@ -444,6 +445,12 @@ netapp_password = test-password
                 address=ipaddress.IPv4Address("192.168.1.1"),
                 network=ipaddress.IPv4Network("192.168.1.0/24"),
                 vlan_id=100,
+            )
+            manager._lif_service.identify_home_node = MagicMock(
+                return_value=NodeResult(name="node-03", uuid="node-uuid-3")
+            )
+            manager._client.get_broadcast_domain_name = MagicMock(
+                return_value="test-domain"
             )
             manager.create_lif("project", config_obj)
             manager.create_home_port(config_obj)

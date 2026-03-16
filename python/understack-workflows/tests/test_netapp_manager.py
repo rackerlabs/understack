@@ -12,6 +12,7 @@ from understack_workflows.netapp.exceptions import NetAppManagerError
 from understack_workflows.netapp.manager import NetAppManager
 from understack_workflows.netapp.value_objects import AggregateResult
 from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
+from understack_workflows.netapp.value_objects import NodeResult
 
 
 class TestNetAppManagerOrchestration:
@@ -392,7 +393,12 @@ netapp_password = test-password
         manager._volume_service.get_mapped_namespaces = MagicMock(return_value=[])
         manager._lif_service.create_lif = MagicMock()
         manager._lif_service.create_home_port = MagicMock()
-        manager._lif_service.identify_home_node = MagicMock()
+        manager._lif_service.identify_home_node = MagicMock(
+            return_value=NodeResult(name="node-01", uuid="node-uuid-1")
+        )
+        manager._client.get_broadcast_domain_name = MagicMock(
+            return_value="test-domain"
+        )
 
         # Test all public methods can be called with expected signatures
         try:

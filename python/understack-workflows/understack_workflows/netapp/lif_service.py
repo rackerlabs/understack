@@ -67,8 +67,17 @@ class LifService:
                     context={"project_id": project_id, "interface_name": config.name},
                 )
 
+            home_node = self.identify_home_node(config)
+            broadcast_domain_name = self._client.get_broadcast_domain_name(
+                home_node.name, config.base_port_name
+            )
+
             # Create the home port first
-            home_port = self.create_home_port(config)
+            home_port = self.create_home_port(
+                config,
+                home_node,
+                broadcast_domain_name,
+            )
 
             # Create interface specification
             interface_spec = InterfaceSpec(
@@ -77,7 +86,7 @@ class LifService:
                 netmask=str(config.network.netmask),
                 svm_name=svm_name,
                 home_port_uuid=home_port.uuid,
-                broadcast_domain_name=config.broadcast_domain_name,
+                broadcast_domain_name=broadcast_domain_name,
                 service_policy="default-data-nvme-tcp",
             )
 
@@ -109,11 +118,18 @@ class LifService:
                 },
             ) from e
 
-    def create_home_port(self, config: NetappIPInterfaceConfig) -> PortResult:  # pyright: ignore
+    def create_home_port(
+        self,
+        config: NetappIPInterfaceConfig,
+        home_node: NodeResult,
+        broadcast_domain_name: str,
+    ) -> PortResult:  # pyright: ignore
         """Create a home port for the network interface.
 
         Args:
             config: Network interface configuration
+            home_node: Pre-resolved node that should host the port
+            broadcast_domain_name: Pre-resolved broadcast domain name
 
         Returns:
             PortResult: Result of the port creation
@@ -129,28 +145,14 @@ class LifService:
                     "interface_name": config.name,
                     "vlan_id": config.vlan_id,
                     "base_port": config.base_port_name,
-                    "broadcast_domain": config.broadcast_domain_name,
                 },
             )
 
-            # Identify the home node using business logic
-            home_node = self.identify_home_node(config)
-            if not home_node:
-                raise HomeNodeNotFoundError(
-                    f"Could not find home node for interface {config.name}",
-                    interface_name=config.name,
-                    context={
-                        "desired_node_number": config.desired_node_number,
-                        "vlan_id": config.vlan_id,
-                    },
-                )
-
-            # Create port specification
             port_spec = PortSpec(
                 node_name=home_node.name,
                 vlan_id=config.vlan_id,
                 base_port_name=config.base_port_name,
-                broadcast_domain_name=config.broadcast_domain_name,
+                broadcast_domain_name=broadcast_domain_name,
             )
 
             # Get or create the port
@@ -182,14 +184,14 @@ class LifService:
                 },
             ) from e
 
-    def identify_home_node(self, config: NetappIPInterfaceConfig) -> NodeResult | None:
+    def identify_home_node(self, config: NetappIPInterfaceConfig) -> NodeResult:
         """Identify the home node for a network interface using business logic.
 
         Args:
             config: Network interface configuration
 
         Returns:
-            Optional[NodeResult]: The identified home node, or None if not found
+            NodeResult: The identified home node
         """
         try:
             logger.debug(
@@ -230,15 +232,28 @@ class LifService:
                 },
             )
 
-            return None
-
-        except Exception as e:
-            logger.warning(
-                "Error identifying home node for interface %(interface_name)s: "
-                "%(error)s",
-                {"interface_name": config.name, "error": str(e)},
+            raise HomeNodeNotFoundError(
+                f"Could not find home node for interface {config.name}",
+                interface_name=config.name,
+                context={
+                    "desired_node_number": config.desired_node_number,
+                    "vlan_id": config.vlan_id,
+                    "available_nodes": [node.name for node in nodes],
+                },
             )
-            return None
+
+        except HomeNodeNotFoundError:
+            raise
+        except Exception as e:
+            raise HomeNodeNotFoundError(
+                f"Could not find home node for interface {config.name}: {e}",
+                interface_name=config.name,
+                context={
+                    "desired_node_number": config.desired_node_number,
+                    "vlan_id": config.vlan_id,
+                    "original_error": str(e),
+                },
+            ) from e
 
     def _get_svm_name(self, project_id: str) -> str:
         """Generate SVM name using business naming conventions.
