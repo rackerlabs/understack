@@ -58,3 +58,11 @@ spec:
       labels:
         rulesgroup: rabbitmq
         severity: warning
+    - alert: RabbitMQNetworkPartition
+      expr: rabbitmq_unreachable_cluster_peers_count > 0
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "RabbitMQ node {{ $labels.pod }} detects network partition"
+        description: "{{ $labels.instance }} ({{ $labels.pod }}) cannot reach {{ $value }} cluster peers"
