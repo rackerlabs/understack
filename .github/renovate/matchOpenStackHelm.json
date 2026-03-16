@@ -14,6 +14,20 @@
       "depNameTemplate": "openstack-helm/{{depName}}",
       "packageNameTemplate": "{{depName}}",
       "versioningTemplate": "helm"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^charts\\/argocd-understack\\/values\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=helm\\s+depName=(?<depName>[\\w\\-]+)\\s+registryUrl=(?<registryUrl>\\S+)\\s*\\n\\s*chartVersion:\\s['\"]?(?<currentValue>[\\w\\.\\-\\+]+)['\"]?"
+      ],
+      "datasourceTemplate": "helm",
+      "registryUrlTemplate": "{{registryUrl}}",
+      "depNameTemplate": "openstack-helm/{{depName}}",
+      "packageNameTemplate": "{{depName}}",
+      "versioningTemplate": "helm"
     }
   ]
 }
