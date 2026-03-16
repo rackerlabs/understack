@@ -16,6 +16,10 @@ spec:
   parentRefs:
     - name: {{ $.Values.gateways.external.name }}
       namespace: {{ $.Values.gateways.external.namespace }}
+    {{- if .alsoInternal }}
+    - name: {{ $.Values.gateways.internal.name }}
+      namespace: {{ $.Values.gateways.internal.namespace }}
+    {{- end }}
   hostnames: [{{ .fqdn | quote }}]
   rules:
     - matches:
