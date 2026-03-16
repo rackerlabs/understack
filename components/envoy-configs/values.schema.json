@@ -150,6 +150,10 @@
                     "description": "BackendRequest specifies a timeout for an individual request from the gateway to a backend. This covers the time from when the request first starts being sent from the gateway to when the full response has been received from the backend."
                   }
                 }
+              },
+              "alsoInternal": {
+                "type": "boolean",
+                "description": "Also attach this route to the internal (plain HTTP) gateway. Useful for clients that do not support HTTP/2 or TLS 1.3."
               }
             },
             "required": [
