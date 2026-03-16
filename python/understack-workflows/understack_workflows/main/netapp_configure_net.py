@@ -393,11 +393,6 @@ def main():
         # Handle exit codes from do_action() - these are already logged
         return e.code if e.code is not None else 1
 
-    except Exception as e:
-        # Handle connection errors and other unexpected errors with exit code 1
-        logger.error("Connection or initialization error: %s", e)
-        return 1
-
 
 if __name__ == "__main__":
     exit(main())

@@ -7,25 +7,24 @@ including naming conventions, lifecycle management, and business rules.
 import logging
 
 from understack_workflows.netapp.client import NetAppClientInterface
-from understack_workflows.netapp.error_handler import ErrorHandler
+from understack_workflows.netapp.exceptions import NetAppManagerError
 from understack_workflows.netapp.exceptions import SvmOperationError
 from understack_workflows.netapp.value_objects import SvmResult
 from understack_workflows.netapp.value_objects import SvmSpec
+
+logger = logging.getLogger(__name__)
 
 
 class SvmService:
     """Service for managing Storage Virtual Machine (SVM) operations."""
 
-    def __init__(self, client: NetAppClientInterface, error_handler: ErrorHandler):
+    def __init__(self, client: NetAppClientInterface):
         """Initialize the SVM service.
 
         Args:
             client: NetApp client for low-level operations
-            error_handler: Error handler for centralized error management
         """
         self._client = client
-        self._error_handler = error_handler
-        self._logger = logging.getLogger(__name__)
 
     def create_svm(self, project_id: str, aggregate_name: str) -> str:  # pyright: ignore
         """Create an SVM for a project with business naming conventions.
@@ -44,7 +43,7 @@ class SvmService:
 
         # Check if SVM already exists
         if self.exists(project_id):
-            self._error_handler.log_warning(
+            logger.warning(
                 "SVM already exists for project %(project_id)s",
                 {"project_id": project_id, "svm_name": svm_name},
             )
@@ -63,7 +62,7 @@ class SvmService:
         )
 
         try:
-            self._error_handler.log_info(
+            logger.info(
                 "Creating SVM for project %(project_id)s",
                 {
                     "project_id": project_id,
@@ -74,7 +73,7 @@ class SvmService:
 
             result = self._client.create_svm(svm_spec)
 
-            self._error_handler.log_info(
+            logger.info(
                 "SVM created successfully for project %(project_id)s",
                 {
                     "project_id": project_id,
@@ -86,16 +85,18 @@ class SvmService:
 
             return result.name
 
+        except NetAppManagerError:
+            raise
         except Exception as e:
-            self._error_handler.handle_operation_error(
-                e,
-                f"SVM creation for project {project_id}",
-                {
+            raise SvmOperationError(
+                f"Operation 'SVM creation for project {project_id}' failed: {e}",
+                svm_name=svm_name,
+                context={
                     "project_id": project_id,
                     "svm_name": svm_name,
                     "aggregate_name": aggregate_name,
                 },
-            )
+            ) from e
 
     def delete_svm(self, project_id: str) -> bool:
         """Delete an SVM for a project.
@@ -113,7 +114,7 @@ class SvmService:
         svm_name = self.get_svm_name(project_id)
 
         try:
-            self._error_handler.log_info(
+            logger.info(
                 "Deleting SVM for project %(project_id)s",
                 {"project_id": project_id, "svm_name": svm_name},
             )
@@ -121,21 +122,21 @@ class SvmService:
             success = self._client.delete_svm(svm_name)
 
             if success:
-                self._error_handler.log_info(
-                    "SVM deleted successfully for project %s",
+                logger.info(
+                    "SVM deleted successfully for project %(project_id)s",
                     {"project_id": project_id, "svm_name": svm_name},
                 )
             else:
-                self._error_handler.log_warning(
-                    "SVM deletion failed for project %s",
+                logger.warning(
+                    "SVM deletion failed for project %(project_id)s",
                     {"project_id": project_id, "svm_name": svm_name},
                 )
 
             return success
 
         except Exception as e:
-            self._error_handler.log_warning(
-                "Error during SVM deletion for project %s: %s",
+            logger.warning(
+                "Error during SVM deletion for project %(project_id)s: %(error)s",
                 {"project_id": project_id, "svm_name": svm_name, "error": str(e)},
             )
             return False
@@ -155,16 +156,16 @@ class SvmService:
             result = self._client.find_svm(svm_name)
             exists = result is not None
 
-            self._error_handler.log_debug(
-                "SVM existence check for project %s: %s",
+            logger.debug(
+                "SVM existence check for project %(project_id)s: %(exists)s",
                 {"project_id": project_id, "svm_name": svm_name, "exists": exists},
             )
 
             return exists
 
         except Exception as e:
-            self._error_handler.log_warning(
-                "Error checking SVM existence for project %s: %s",
+            logger.warning(
+                "Error checking SVM existence for project %(project_id)s: %(error)s",
                 {"project_id": project_id, "svm_name": svm_name, "error": str(e)},
             )
             return False
@@ -194,8 +195,8 @@ class SvmService:
         try:
             return self._client.find_svm(svm_name)
         except Exception as e:
-            self._error_handler.log_warning(
-                "Error retrieving SVM for project %s: %s",
+            logger.warning(
+                "Error retrieving SVM for project %(project_id)s: %(error)s",
                 {"project_id": project_id, "svm_name": svm_name, "error": str(e)},
             )
             return None

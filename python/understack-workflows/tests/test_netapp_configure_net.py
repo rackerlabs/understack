@@ -1893,18 +1893,18 @@ class TestMainFunctionWithNetAppManager:
         )
 
         # Mock sys.argv
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            pytest.raises(Exception, match="NetApp config file not found"),
         ):
-            result = main()
-
-        # Verify exit code 1 for initialization error
-        assert result == 1
+            main()
 
         # Verify NetAppManager initialization was attempted
         mock_netapp_manager_class.assert_called_once_with(

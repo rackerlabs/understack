@@ -5,7 +5,9 @@ from unittest.mock import Mock
 
 import pytest
 
-from understack_workflows.netapp.exceptions import NetAppManagerError
+from understack_workflows.netapp.exceptions import HomeNodeNotFoundError
+from understack_workflows.netapp.exceptions import NetworkOperationError
+from understack_workflows.netapp.exceptions import SvmNotFoundError
 from understack_workflows.netapp.lif_service import LifService
 from understack_workflows.netapp.value_objects import InterfaceResult
 from understack_workflows.netapp.value_objects import InterfaceSpec
@@ -25,14 +27,9 @@ class TestLifService:
         return Mock()
 
     @pytest.fixture
-    def mock_error_handler(self):
-        """Create a mock error handler."""
-        return Mock()
-
-    @pytest.fixture
-    def lif_service(self, mock_client, mock_error_handler):
+    def lif_service(self, mock_client):
         """Create LifService instance with mocked dependencies."""
-        return LifService(mock_client, mock_error_handler)
+        return LifService(mock_client)
 
     @pytest.fixture
     def sample_config(self):
@@ -44,9 +41,7 @@ class TestLifService:
             vlan_id=100,
         )
 
-    def test_create_lif_success(
-        self, lif_service, mock_client, mock_error_handler, sample_config
-    ):
+    def test_create_lif_success(self, lif_service, mock_client, sample_config):
         """Test successful LIF creation."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -97,12 +92,7 @@ class TestLifService:
         assert interface_call_args.svm_name == expected_svm_name
         assert interface_call_args.home_port_uuid == mock_port.uuid
 
-        # Verify logging
-        mock_error_handler.log_info.assert_called()
-
-    def test_create_lif_svm_not_found(
-        self, lif_service, mock_client, mock_error_handler, sample_config
-    ):
+    def test_create_lif_svm_not_found(self, lif_service, mock_client, sample_config):
         """Test LIF creation when SVM is not found."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -110,7 +100,7 @@ class TestLifService:
         # Mock SVM doesn't exist
         mock_client.find_svm.return_value = None
 
-        with pytest.raises(Exception, match="SVM Not Found"):
+        with pytest.raises(SvmNotFoundError, match="not found for project"):
             lif_service.create_lif(project_id, sample_config)
 
         # Verify SVM was checked
@@ -121,7 +111,7 @@ class TestLifService:
         mock_client.get_or_create_ip_interface.assert_not_called()
 
     def test_create_lif_port_creation_error(
-        self, lif_service, mock_client, mock_error_handler, sample_config
+        self, lif_service, mock_client, sample_config
     ):
         """Test LIF creation when port creation fails."""
         project_id = "test-project-123"
@@ -138,19 +128,14 @@ class TestLifService:
 
         # Mock port creation failure
         mock_client.get_or_create_port.side_effect = Exception("Port creation failed")
-        mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
-            "Operation failed"
-        )
 
-        with pytest.raises(NetAppManagerError):
+        with pytest.raises(NetworkOperationError) as exc_info:
             lif_service.create_lif(project_id, sample_config)
 
-        # Verify error handler was called
-        mock_error_handler.handle_operation_error.assert_called()
+        assert exc_info.value.interface_name == sample_config.name
+        assert exc_info.value.__cause__ is not None
 
-    def test_create_home_port_success(
-        self, lif_service, mock_client, mock_error_handler, sample_config
-    ):
+    def test_create_home_port_success(self, lif_service, mock_client, sample_config):
         """Test successful home port creation."""
         # Mock node identification
         mock_node = NodeResult(name="node-01", uuid="node-uuid-1")
@@ -175,9 +160,7 @@ class TestLifService:
         assert call_args.base_port_name == sample_config.base_port_name
         assert call_args.broadcast_domain_name == sample_config.broadcast_domain_name
 
-    def test_create_home_port_no_node(
-        self, lif_service, mock_client, mock_error_handler, sample_config
-    ):
+    def test_create_home_port_no_node(self, lif_service, mock_client, sample_config):
         """Test home port creation when no suitable node is found."""
         # Mock no matching nodes
         mock_client.get_nodes.return_value = [
@@ -185,15 +168,13 @@ class TestLifService:
             NodeResult(name="node-04", uuid="node-uuid-4"),
         ]
 
-        with pytest.raises(Exception, match="Could not find home node"):
+        with pytest.raises(HomeNodeNotFoundError, match="Could not find home node"):
             lif_service.create_home_port(sample_config)
 
         # Verify no port creation was attempted
         mock_client.get_or_create_port.assert_not_called()
 
-    def test_identify_home_node_success(
-        self, lif_service, mock_client, mock_error_handler, sample_config
-    ):
+    def test_identify_home_node_success(self, lif_service, mock_client, sample_config):
         """Test successful node identification."""
         # Mock nodes with different numbers
         mock_nodes = [
@@ -209,9 +190,7 @@ class TestLifService:
         assert result == mock_nodes[0]  # node-01
         mock_client.get_nodes.assert_called_once()
 
-    def test_identify_home_node_n2_interface(
-        self, lif_service, mock_client, mock_error_handler
-    ):
+    def test_identify_home_node_n2_interface(self, lif_service, mock_client):
         """Test node identification for N2 interface."""
         config = NetappIPInterfaceConfig(
             name="N2-lif-B",
@@ -233,7 +212,7 @@ class TestLifService:
         assert result == mock_nodes[1]  # node-02
 
     def test_identify_home_node_not_found(
-        self, lif_service, mock_client, mock_error_handler, sample_config
+        self, lif_service, mock_client, sample_config
     ):
         """Test node identification when no matching node is found."""
         # Mock nodes that don't match the desired node number
@@ -246,10 +225,9 @@ class TestLifService:
         result = lif_service.identify_home_node(sample_config)
 
         assert result is None
-        mock_error_handler.log_warning.assert_called()
 
     def test_identify_home_node_exception(
-        self, lif_service, mock_client, mock_error_handler, sample_config
+        self, lif_service, mock_client, sample_config
     ):
         """Test node identification when client raises an exception."""
         mock_client.get_nodes.side_effect = Exception("NetApp error")
@@ -257,7 +235,6 @@ class TestLifService:
         result = lif_service.identify_home_node(sample_config)
 
         assert result is None
-        mock_error_handler.log_warning.assert_called()
 
     def test_svm_name_generation(self, lif_service):
         """Test SVM name generation follows naming convention."""
@@ -268,9 +245,7 @@ class TestLifService:
 
         assert result == expected_svm_name
 
-    def test_interface_spec_creation(
-        self, lif_service, mock_client, mock_error_handler, sample_config
-    ):
+    def test_interface_spec_creation(self, lif_service, mock_client, sample_config):
         """Test that interface specification is created correctly."""
         project_id = "test-project-789"
         expected_svm_name = "os-test-project-789"
@@ -314,9 +289,7 @@ class TestLifService:
         )
         assert interface_call_args.service_policy == "default-data-nvme-tcp"
 
-    def test_port_spec_creation(
-        self, lif_service, mock_client, mock_error_handler, sample_config
-    ):
+    def test_port_spec_creation(self, lif_service, mock_client, sample_config):
         """Test that port specification is created correctly."""
         # Mock node identification
         mock_node = NodeResult(name="node-01", uuid="node-uuid-1")
@@ -338,9 +311,7 @@ class TestLifService:
             port_call_args.broadcast_domain_name == sample_config.broadcast_domain_name
         )
 
-    def test_node_number_extraction_logic(
-        self, lif_service, mock_client, mock_error_handler
-    ):
+    def test_node_number_extraction_logic(self, lif_service, mock_client):
         """Test the node number extraction logic with various node names."""
         test_cases = [
             ("node-01", "N1-lif-A", 1),

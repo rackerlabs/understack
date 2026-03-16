@@ -42,7 +42,6 @@ netapp_password = test-password
         # Verify all services are initialized
         assert hasattr(manager, "_client")
         assert hasattr(manager, "_config")
-        assert hasattr(manager, "_error_handler")
         assert hasattr(manager, "_svm_service")
         assert hasattr(manager, "_volume_service")
         assert hasattr(manager, "_lif_service")
@@ -628,14 +627,12 @@ netapp_password = test-password
 
         # Create mock dependencies
         mock_client = MagicMock()
-        mock_error_handler = MagicMock()
         mock_route_service = MagicMock(spec=RouteService)
 
         manager = NetAppManager(
             config_path=mock_config_file,
             netapp_client=mock_client,
             route_service=mock_route_service,
-            error_handler=mock_error_handler,
         )
 
         # Verify injected route service is used
