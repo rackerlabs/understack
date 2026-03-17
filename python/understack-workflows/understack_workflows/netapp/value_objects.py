@@ -318,7 +318,7 @@ class SvmSpec(BaseModel):
     Example:
         >>> svm = SvmSpec(name="test-svm", aggregate_name="aggr1")
         >>> print(svm.root_volume_name)  # Computed field
-        test-svm_root
+        test_svm_root
     """
 
     model_config = ConfigDict(frozen=True)
@@ -334,9 +334,10 @@ class SvmSpec(BaseModel):
         """Generate the root volume name for this SVM.
 
         Returns:
-            str: Root volume name in format "{svm_name}_root"
+            str: Root volume name in format "{sanitized_svm_name}_root"
         """
-        return f"{self.name}_root"
+        sanitized_name = self.name.replace("-", "_")
+        return f"{sanitized_name}_root"
 
 
 class VolumeSpec(BaseModel):

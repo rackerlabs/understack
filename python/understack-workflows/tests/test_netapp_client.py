@@ -107,7 +107,7 @@ class TestNetAppClient:
         mock_svm_instance.post.assert_called_once()
         mock_svm_instance.get.assert_called_once()
         mock_volume_class.get_collection.assert_called_once_with(
-            name="test-svm_root",
+            name="test_svm_root",
             fields="uuid,name",
             **{"svm.name": "test-svm"},
         )

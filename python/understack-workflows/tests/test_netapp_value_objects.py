@@ -37,7 +37,7 @@ class TestSvmSpec:
         assert spec.aggregate_name == "aggr1"
         assert spec.language == "c.utf_8"
         assert spec.allowed_protocols == ["nvme"]
-        assert spec.root_volume_name == "test-svm_root"
+        assert spec.root_volume_name == "test_svm_root"
 
     def test_svm_spec_defaults(self):
         """Test SVM specification with default values."""
@@ -55,6 +55,15 @@ class TestSvmSpec:
         )
 
         assert spec.allowed_protocols == ["nvme", "nfs", "iscsi"]
+
+    def test_svm_spec_root_volume_name_sanitizes_invalid_characters(self):
+        """Test root volume names are normalized to NetApp-safe characters."""
+        spec = SvmSpec(
+            name="os-9fc03212a8fe491eac6314044cd17de9",
+            aggregate_name="aggr1",
+        )
+
+        assert spec.root_volume_name == "os_9fc03212a8fe491eac6314044cd17de9_root"
 
     def test_svm_spec_immutable(self):
         """Test that SVM specification is immutable."""

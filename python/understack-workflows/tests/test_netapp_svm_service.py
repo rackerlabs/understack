@@ -56,7 +56,7 @@ class TestSvmService:
         assert call_args.aggregate_name == aggregate_name
         assert call_args.language == "c.utf_8"
         assert call_args.allowed_protocols == ["nvme"]
-        assert call_args.root_volume_name == f"{expected_svm_name}_root"
+        assert call_args.root_volume_name == "os_test_project_123_root"
 
     def test_create_svm_already_exists(self, svm_service, mock_client):
         """Test SVM creation when SVM already exists."""
