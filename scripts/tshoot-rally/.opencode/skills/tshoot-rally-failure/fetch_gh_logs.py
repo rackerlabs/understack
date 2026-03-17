@@ -66,20 +66,24 @@ def extract_server_data(log_content):
         data["start_timestamp"] = timestamps[0]
         data["end_timestamp"] = timestamps[-1]
 
-    # Find POST request to create server and extract nova hostname
-    post_pattern = r"POST https://nova\.([^/]+)/v2\.1/servers.*?-d \'({.*?})\'"
-    post_match = re.search(post_pattern, log_content, re.DOTALL)
+    env_map = {
+        "dev.undercloud.rackspace.net": "bravo-uc-iad3-dev",
+        "staging.undercloud.rackspace.net": "charlie-uc-iad3-staging",
+        "prod.undercloud.rackspace.net": "delta-uc-dfw3-prod",
+        "rxdb-lab.undercloud.rackspace.net": "echo-uc-iad3-rxdb-lab",
+    }
 
-    if post_match:
-        nova_host = post_match.group(1)
-        env_map = {
-            "dev.undercloud.rackspace.net": "bravo-uc-iad3-dev",
-            "staging.undercloud.rackspace.net": "charlie-uc-iad3-staging",
-            "prod.undercloud.rackspace.net": "delta-uc-dfw3-prod",
-            "rxdb-lab.undercloud.rackspace.net": "echo-uc-iad3-rxdb-lab",
-        }
+    # Find cluster from any nova API call (GET or POST)
+    nova_host_pattern = r"https://nova\.([^/]+)/v2\.1"
+    nova_host_match = re.search(nova_host_pattern, log_content)
+    if nova_host_match:
+        nova_host = nova_host_match.group(1)
         data["k8s_cluster"] = env_map.get(nova_host, "delta-uc-dfw3-prod")
 
+    # Find POST request to create server and extract request body
+    post_pattern = r"POST https://nova\.([^/]+)/v2\.1/servers.*?-d \'({.*?})\'"
+    post_match = re.search(post_pattern, log_content, re.DOTALL)
+    if post_match:
         try:
             request_body = json.loads(post_match.group(2))
             data["server_name"] = request_body.get("server", {}).get("name")
@@ -94,6 +98,12 @@ def extract_server_data(log_content):
     location_match = re.search(location_pattern, log_content, re.IGNORECASE)
     if location_match:
         data["server_id"] = location_match.group(1)
+
+    # Extract router ID from NotFound errors or router references
+    router_pattern = r"Router ([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}) could not be found"
+    router_match = re.search(router_pattern, log_content)
+    if router_match:
+        data["router_id"] = router_match.group(1)
 
     return data
 
@@ -228,10 +238,7 @@ def main():
     print(json.dumps(data, indent=2))
 
     # Generate Grafana URL
-    if all(
-        k in data
-        for k in ["server_id", "start_timestamp", "end_timestamp", "k8s_cluster"]
-    ):
+    if all(k in data for k in ["start_timestamp", "end_timestamp", "k8s_cluster"]):
         # Convert ISO timestamps to Unix milliseconds
         start_dt = datetime.fromisoformat(
             data["start_timestamp"].replace("Z", "+00:00")
@@ -241,135 +248,136 @@ def main():
         end_ms = int(end_dt.timestamp() * 1000)
 
         cluster = data["k8s_cluster"]
-        grafana_url = (
-            f"https://grafana.core.ord.pvceng.rax.io/a/grafana-lokiexplore-app/explore/"
-            f"k8s_cluster_name/{cluster}/logs?patterns=%5B%5D"
-            f"&from={start_ms}&to={end_ms}"
-            f"&var-lineFormat=&var-ds=ab332d05-8028-40de-a9d6-522b8926cf2a"
-            f"&var-filters=k8s_cluster_name%7C%3D%7C{cluster}"
-            f"&var-filters=k8s_statefulset_name%7C%3D%7Cnova-compute-ironic"
-            f"&var-fields=&var-levels=&var-metadata=&var-jsonFields=&var-patterns="
-            f"&var-lineFilterV2=&var-lineFilters=caseInsensitive,0%7C__gfp__~%7C{data['server_id']}"
-            f"&displayedFields=%5B%5D&urlColumns=%5B%5D&visualizationType=%22logs%22"
-            f"&timezone=browser&var-all-fields=&userDisplayedFields=false"
-            f"&prettifyLogMessage=false&sortOrder=%22Ascending%22&wrapLogMessage=true"
-        )
-        print(f"\nGrafana: nova-compute-ironic logs:\n{grafana_url}")
-
-        # Fetch Grafana logs if token provided
         grafana_token = args.grafana_token or os.getenv("GRAFANA_TOKEN")
-        if grafana_token:
-            print("\nFetching logs from Grafana...")
-            try:
-                grafana_data = fetch_grafana_logs(
-                    cluster,
-                    data["server_id"],
-                    data["start_timestamp"],
-                    data["end_timestamp"],
-                    grafana_token,
-                    statefulset="nova-compute-ironic",
-                )
 
-                # Save Grafana logs
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".json", delete=False, prefix="grafana-logs-"
-                ) as f:
-                    json.dump(grafana_data, f, indent=2)
-                    print(f"Grafana logs saved to: {f.name}")
+        # nova-compute-ironic and ironic-conductor: only when server_id is known
+        if "server_id" in data:
+            server_id = data["server_id"]
+            nova_url = (
+                f"https://grafana.core.ord.pvceng.rax.io/a/grafana-lokiexplore-app/explore/"
+                f"k8s_cluster_name/{cluster}/logs?patterns=%5B%5D"
+                f"&from={start_ms}&to={end_ms}"
+                f"&var-lineFormat=&var-ds=ab332d05-8028-40de-a9d6-522b8926cf2a"
+                f"&var-filters=k8s_cluster_name%7C%3D%7C{cluster}"
+                f"&var-filters=k8s_statefulset_name%7C%3D%7Cnova-compute-ironic"
+                f"&var-fields=&var-levels=&var-metadata=&var-jsonFields=&var-patterns="
+                f"&var-lineFilterV2=&var-lineFilters=caseInsensitive,0%7C__gfp__~%7C{server_id}"
+                f"&displayedFields=%5B%5D&urlColumns=%5B%5D&visualizationType=%22logs%22"
+                f"&timezone=browser&var-all-fields=&userDisplayedFields=false"
+                f"&prettifyLogMessage=false&sortOrder=%22Ascending%22&wrapLogMessage=true"
+            )
+            print(f"\nGrafana: nova-compute-ironic logs:\n{nova_url}")
 
-                print_grafana_logs(grafana_data, "nova-compute-ironic")
-
-                # Extract baremetal_node_id
-                baremetal_node_id = extract_baremetal_node_id(grafana_data)
-                if baremetal_node_id:
-                    data["baremetal_node_id"] = baremetal_node_id
-
-                    # Generate ironic-conductor Grafana URL
-                    ironic_url = (
-                        f"https://grafana.core.ord.pvceng.rax.io/a/grafana-lokiexplore-app/explore/"
-                        f"k8s_cluster_name/{cluster}/logs?patterns=%5B%5D"
-                        f"&from={start_ms}&to={end_ms}"
-                        f"&var-lineFormat=&var-ds=ab332d05-8028-40de-a9d6-522b8926cf2a"
-                        f"&var-filters=k8s_cluster_name%7C%3D%7C{cluster}"
-                        f"&var-filters=k8s_statefulset_name%7C%3D%7Cironic-conductor"
-                        f"&var-fields=&var-levels=&var-metadata=&var-jsonFields=&var-patterns="
-                        f"&var-lineFilterV2=&var-lineFilters=caseInsensitive,0%7C__gfp__~%7C{baremetal_node_id}"
-                        f"&displayedFields=%5B%5D&urlColumns=%5B%5D&visualizationType=%22logs%22"
-                        f"&timezone=browser&var-all-fields=&userDisplayedFields=false"
-                        f"&prettifyLogMessage=false&sortOrder=%22Ascending%22&wrapLogMessage=true"
+            if grafana_token:
+                print("\nFetching nova-compute-ironic logs...")
+                try:
+                    grafana_data = fetch_grafana_logs(
+                        cluster,
+                        server_id,
+                        data["start_timestamp"],
+                        data["end_timestamp"],
+                        grafana_token,
+                        statefulset="nova-compute-ironic",
                     )
-                    print(f"\nGrafana: ironic-conductor logs:\n{ironic_url}")
+                    with tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".json", delete=False, prefix="grafana-logs-"
+                    ) as f:
+                        json.dump(grafana_data, f, indent=2)
+                        print(f"Nova-compute-ironic logs saved to: {f.name}")
 
-                    # Fetch ironic-conductor logs
-                    print("\nFetching ironic-conductor logs...")
-                    try:
-                        ironic_data = fetch_grafana_logs(
-                            cluster,
-                            baremetal_node_id,
-                            data["start_timestamp"],
-                            data["end_timestamp"],
-                            grafana_token,
-                            statefulset="ironic-conductor",
+                    print_grafana_logs(grafana_data, "nova-compute-ironic")
+
+                    baremetal_node_id = extract_baremetal_node_id(grafana_data)
+                    if baremetal_node_id:
+                        data["baremetal_node_id"] = baremetal_node_id
+
+                        ironic_url = (
+                            f"https://grafana.core.ord.pvceng.rax.io/a/grafana-lokiexplore-app/explore/"
+                            f"k8s_cluster_name/{cluster}/logs?patterns=%5B%5D"
+                            f"&from={start_ms}&to={end_ms}"
+                            f"&var-lineFormat=&var-ds=ab332d05-8028-40de-a9d6-522b8926cf2a"
+                            f"&var-filters=k8s_cluster_name%7C%3D%7C{cluster}"
+                            f"&var-filters=k8s_statefulset_name%7C%3D%7Cironic-conductor"
+                            f"&var-fields=&var-levels=&var-metadata=&var-jsonFields=&var-patterns="
+                            f"&var-lineFilterV2=&var-lineFilters=caseInsensitive,0%7C__gfp__~%7C{baremetal_node_id}"
+                            f"&displayedFields=%5B%5D&urlColumns=%5B%5D&visualizationType=%22logs%22"
+                            f"&timezone=browser&var-all-fields=&userDisplayedFields=false"
+                            f"&prettifyLogMessage=false&sortOrder=%22Ascending%22&wrapLogMessage=true"
                         )
-                        with tempfile.NamedTemporaryFile(
-                            mode="w",
-                            suffix=".json",
-                            delete=False,
-                            prefix="ironic-logs-",
-                        ) as f:
-                            json.dump(ironic_data, f, indent=2)
-                            print(f"Ironic-conductor logs saved to: {f.name}")
+                        print(f"\nGrafana: ironic-conductor logs:\n{ironic_url}")
 
-                        print_grafana_logs(ironic_data, "ironic-conductor")
-                    except Exception as e:
-                        print(
-                            f"Error fetching ironic-conductor logs: {e}",
-                            file=sys.stderr,
-                        )
-
-                    # Generate neutron-server Grafana URL
-                    neutron_url = (
-                        f"https://grafana.core.ord.pvceng.rax.io/a/grafana-lokiexplore-app/explore/"
-                        f"k8s_cluster_name/{cluster}/logs?patterns=%5B%5D"
-                        f"&from={start_ms}&to={end_ms}"
-                        f"&var-lineFormat=&var-ds=ab332d05-8028-40de-a9d6-522b8926cf2a"
-                        f"&var-filters=k8s_cluster_name%7C%3D%7C{cluster}"
-                        f"&var-filters=k8s_deployment_name%7C%3D%7Cneutron-server"
-                        f"&var-fields=&var-levels=&var-metadata=&var-jsonFields=&var-patterns="
-                        f"&var-lineFilterV2=&var-lineFilters=caseInsensitive,0%7C__gfp__~%7C{baremetal_node_id}"
-                        f"&displayedFields=%5B%5D&urlColumns=%5B%5D&visualizationType=%22logs%22"
-                        f"&timezone=browser&var-all-fields=&userDisplayedFields=false"
-                        f"&prettifyLogMessage=false&sortOrder=%22Ascending%22&wrapLogMessage=true"
+                        print("\nFetching ironic-conductor logs...")
+                        try:
+                            ironic_data = fetch_grafana_logs(
+                                cluster,
+                                baremetal_node_id,
+                                data["start_timestamp"],
+                                data["end_timestamp"],
+                                grafana_token,
+                                statefulset="ironic-conductor",
+                            )
+                            with tempfile.NamedTemporaryFile(
+                                mode="w",
+                                suffix=".json",
+                                delete=False,
+                                prefix="ironic-logs-",
+                            ) as f:
+                                json.dump(ironic_data, f, indent=2)
+                                print(f"Ironic-conductor logs saved to: {f.name}")
+                            print_grafana_logs(ironic_data, "ironic-conductor")
+                        except Exception as e:
+                            print(
+                                f"Error fetching ironic-conductor logs: {e}",
+                                file=sys.stderr,
+                            )
+                except Exception as e:
+                    print(
+                        f"Error fetching nova-compute-ironic logs: {e}", file=sys.stderr
                     )
-                    print(f"\nGrafana: neutron-server logs:\n{neutron_url}")
 
-                    # Fetch neutron-server logs
-                    print("\nFetching neutron-server logs...")
-                    try:
-                        neutron_data = fetch_grafana_logs(
-                            cluster,
-                            baremetal_node_id,
-                            data["start_timestamp"],
-                            data["end_timestamp"],
-                            grafana_token,
-                            deployment="neutron-server",
-                        )
-                        with tempfile.NamedTemporaryFile(
-                            mode="w",
-                            suffix=".json",
-                            delete=False,
-                            prefix="neutron-logs-",
-                        ) as f:
-                            json.dump(neutron_data, f, indent=2)
-                            print(f"Neutron-server logs saved to: {f.name}")
+        # neutron-server: always fetch when cluster + timestamps are available
+        # use router_id if present, fall back to server_id or network_id
+        neutron_search_id = (
+            data.get("router_id") or data.get("server_id") or data.get("network_id")
+        )
+        if neutron_search_id:
+            neutron_url = (
+                f"https://grafana.core.ord.pvceng.rax.io/a/grafana-lokiexplore-app/explore/"
+                f"k8s_cluster_name/{cluster}/logs?patterns=%5B%5D"
+                f"&from={start_ms}&to={end_ms}"
+                f"&var-lineFormat=&var-ds=ab332d05-8028-40de-a9d6-522b8926cf2a"
+                f"&var-filters=k8s_cluster_name%7C%3D%7C{cluster}"
+                f"&var-filters=k8s_deployment_name%7C%3D%7Cneutron-server"
+                f"&var-fields=&var-levels=&var-metadata=&var-jsonFields=&var-patterns="
+                f"&var-lineFilterV2=&var-lineFilters=caseInsensitive,0%7C__gfp__~%7C{neutron_search_id}"
+                f"&displayedFields=%5B%5D&urlColumns=%5B%5D&visualizationType=%22logs%22"
+                f"&timezone=browser&var-all-fields=&userDisplayedFields=false"
+                f"&prettifyLogMessage=false&sortOrder=%22Ascending%22&wrapLogMessage=true"
+            )
+            print(f"\nGrafana: neutron-server logs:\n{neutron_url}")
 
-                        print_grafana_logs(neutron_data, "neutron-server")
-                    except Exception as e:
-                        print(
-                            f"Error fetching neutron-server logs: {e}", file=sys.stderr
-                        )
-            except Exception as e:
-                print(f"Error fetching Grafana logs: {e}", file=sys.stderr)
+            if grafana_token:
+                print("\nFetching neutron-server logs...")
+                try:
+                    neutron_data = fetch_grafana_logs(
+                        cluster,
+                        neutron_search_id,
+                        data["start_timestamp"],
+                        data["end_timestamp"],
+                        grafana_token,
+                        deployment="neutron-server",
+                    )
+                    with tempfile.NamedTemporaryFile(
+                        mode="w",
+                        suffix=".json",
+                        delete=False,
+                        prefix="neutron-logs-",
+                    ) as f:
+                        json.dump(neutron_data, f, indent=2)
+                        print(f"Neutron-server logs saved to: {f.name}")
+                    print_grafana_logs(neutron_data, "neutron-server")
+                except Exception as e:
+                    print(f"Error fetching neutron-server logs: {e}", file=sys.stderr)
 
     return data
 
