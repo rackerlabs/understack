@@ -17,6 +17,15 @@ def required_bios_settings(pxe_interface: str) -> dict:
         # when its serving data from its own http server
         "HttpDev1TlsMode": "None",
         "TimeZone": "UTC",
+        # This disables a virtual USB NIC that was confusing vmware.  This
+        # device allows the operating system to talk to the iDRAC.  Disabling it
+        # closes down one of the ways that the operating system can make changes
+        # to the iDRAC.  We want to retain complete control over the iDRAC
+        # because we rely upon it for cleaning, power cycle, and other critical
+        # tasks:
+        "OS-BMC.1.AdminState": "Disabled",
+        # This closes down IPMI, which we don't use anyhow:
+        "IPMILan.1.Enable": "Disabled",
     }
 
 
