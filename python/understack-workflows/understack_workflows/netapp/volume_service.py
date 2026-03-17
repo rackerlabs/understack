@@ -4,25 +4,28 @@ This module provides business logic for volume operations,
 including naming conventions, lifecycle management, and namespace queries.
 """
 
+import logging
+
 from understack_workflows.netapp.client import NetAppClientInterface
-from understack_workflows.netapp.error_handler import ErrorHandler
+from understack_workflows.netapp.exceptions import NetAppManagerError
+from understack_workflows.netapp.exceptions import VolumeOperationError
 from understack_workflows.netapp.value_objects import NamespaceResult
 from understack_workflows.netapp.value_objects import NamespaceSpec
 from understack_workflows.netapp.value_objects import VolumeSpec
+
+logger = logging.getLogger(__name__)
 
 
 class VolumeService:
     """Service for managing volume operations with business logic."""
 
-    def __init__(self, client: NetAppClientInterface, error_handler: ErrorHandler):
+    def __init__(self, client: NetAppClientInterface):
         """Initialize the volume service.
 
         Args:
             client: NetApp client for low-level operations
-            error_handler: Error handler for centralized error management
         """
         self._client = client
-        self._error_handler = error_handler
 
     def create_volume(
         self, project_id: str, volume_type_id: str, size: str, aggregate_name: str
@@ -53,8 +56,8 @@ class VolumeService:
         )
 
         try:
-            self._error_handler.log_info(
-                "Creating volume for project %s",
+            logger.info(
+                "Creating volume for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "volume_name": volume_name,
@@ -66,8 +69,8 @@ class VolumeService:
 
             result = self._client.create_volume(volume_spec)
 
-            self._error_handler.log_info(
-                "Volume created successfully for project %s",
+            logger.info(
+                "Volume created successfully for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "volume_name": result.name,
@@ -79,18 +82,20 @@ class VolumeService:
 
             return result.name
 
+        except NetAppManagerError:
+            raise
         except Exception as e:
-            self._error_handler.handle_operation_error(
-                e,
-                f"Volume creation for project {project_id}",
-                {
+            raise VolumeOperationError(
+                f"Operation 'Volume creation for project {project_id}' failed: {e}",
+                volume_name=volume_name,
+                context={
                     "project_id": project_id,
                     "volume_name": volume_name,
                     "svm_name": svm_name,
                     "size": size,
                     "aggregate_name": aggregate_name,
                 },
-            )
+            ) from e
 
     def delete_volume(self, volume_type_id: str, force: bool = False) -> bool:
         """Delete a volume by volume_type_id.
@@ -106,8 +111,8 @@ class VolumeService:
         volume_name = self.get_volume_name(volume_type_id)
 
         try:
-            self._error_handler.log_info(
-                "Deleting volume %s",
+            logger.info(
+                "Deleting volume %(volume_name)s",
                 {
                     "volume_type_id": volume_type_id,
                     "volume_name": volume_name,
@@ -118,21 +123,21 @@ class VolumeService:
             success = self._client.delete_volume(volume_name, force)
 
             if success:
-                self._error_handler.log_info(
-                    "Volume deleted successfully %s",
+                logger.info(
+                    "Volume deleted successfully %(volume_name)s",
                     {"volume_type_id": volume_type_id, "volume_name": volume_name},
                 )
             else:
-                self._error_handler.log_warning(
-                    "Volume deletion failed %s",
+                logger.warning(
+                    "Volume deletion failed %(volume_name)s",
                     {"volume_type_id": volume_type_id, "volume_name": volume_name},
                 )
 
             return success
 
         except Exception as e:
-            self._error_handler.log_warning(
-                "Error during volume deletion %s: %s",
+            logger.warning(
+                "Error during volume deletion %(volume_name)s: %(error)s",
                 {
                     "volume_type_id": volume_type_id,
                     "volume_name": volume_name,
@@ -166,8 +171,8 @@ class VolumeService:
         svm_name = self._get_svm_name(project_id)
 
         try:
-            self._error_handler.log_debug(
-                "Checking if volume exists for project %s",
+            logger.debug(
+                "Checking if volume exists for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "volume_name": volume_name,
@@ -178,8 +183,8 @@ class VolumeService:
             volume_result = self._client.find_volume(volume_name, svm_name)
             exists = volume_result is not None
 
-            self._error_handler.log_debug(
-                "Volume existence check for project %s: %s",
+            logger.debug(
+                "Volume existence check for project %(project_id)s: %(exists)s",
                 {
                     "project_id": project_id,
                     "volume_name": volume_name,
@@ -190,8 +195,8 @@ class VolumeService:
             return exists
 
         except Exception as e:
-            self._error_handler.log_warning(
-                "Error checking volume existence for project %s: %s",
+            logger.warning(
+                "Error checking volume existence for project %(project_id)s: %(error)s",
                 {"project_id": project_id, "volume_name": volume_name, "error": str(e)},
             )
             # Return False on error to avoid blocking cleanup operations
@@ -210,8 +215,8 @@ class VolumeService:
         svm_name = self._get_svm_name(project_id)
 
         try:
-            self._error_handler.log_debug(
-                "Querying mapped namespaces for project %s",
+            logger.debug(
+                "Querying mapped namespaces for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "volume_name": volume_name,
@@ -223,8 +228,8 @@ class VolumeService:
 
             namespaces = self._client.get_namespaces(namespace_spec)
 
-            self._error_handler.log_info(
-                "Retrieved %d namespaces for project %s",
+            logger.info(
+                "Retrieved %(namespace_count)d namespaces for project %(project_id)s",
                 {
                     "project_id": project_id,
                     "namespace_count": len(namespaces),
@@ -236,8 +241,8 @@ class VolumeService:
             return namespaces
 
         except Exception as e:
-            self._error_handler.log_warning(
-                "Error retrieving namespaces for project %s: %s",
+            logger.warning(
+                "Error retrieving namespaces for project %(project_id)s: %(error)s",
                 {
                     "project_id": project_id,
                     "volume_name": volume_name,

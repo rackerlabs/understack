@@ -4,7 +4,6 @@ from unittest.mock import Mock
 
 import pytest
 
-from understack_workflows.netapp.exceptions import NetAppManagerError
 from understack_workflows.netapp.exceptions import SvmOperationError
 from understack_workflows.netapp.svm_service import SvmService
 from understack_workflows.netapp.value_objects import SvmResult
@@ -20,14 +19,9 @@ class TestSvmService:
         return Mock()
 
     @pytest.fixture
-    def mock_error_handler(self):
-        """Create a mock error handler."""
-        return Mock()
-
-    @pytest.fixture
-    def svm_service(self, mock_client, mock_error_handler):
+    def svm_service(self, mock_client):
         """Create SvmService instance with mocked dependencies."""
-        return SvmService(mock_client, mock_error_handler)
+        return SvmService(mock_client)
 
     def test_get_svm_name(self, svm_service):
         """Test SVM name generation follows naming convention."""
@@ -38,7 +32,7 @@ class TestSvmService:
 
         assert result == expected_name
 
-    def test_create_svm_success(self, svm_service, mock_client, mock_error_handler):
+    def test_create_svm_success(self, svm_service, mock_client):
         """Test successful SVM creation."""
         project_id = "test-project-123"
         aggregate_name = "test-aggregate"
@@ -62,13 +56,9 @@ class TestSvmService:
         assert call_args.aggregate_name == aggregate_name
         assert call_args.language == "c.utf_8"
         assert call_args.allowed_protocols == ["nvme"]
+        assert call_args.root_volume_name == f"{expected_svm_name}_root"
 
-        # Verify logging
-        mock_error_handler.log_info.assert_called()
-
-    def test_create_svm_already_exists(
-        self, svm_service, mock_client, mock_error_handler
-    ):
+    def test_create_svm_already_exists(self, svm_service, mock_client):
         """Test SVM creation when SVM already exists."""
         project_id = "test-project-123"
         aggregate_name = "test-aggregate"
@@ -88,12 +78,7 @@ class TestSvmService:
         # Verify client create was not called
         mock_client.create_svm.assert_not_called()
 
-        # Verify warning was logged
-        mock_error_handler.log_warning.assert_called()
-
-    def test_create_svm_client_error(
-        self, svm_service, mock_client, mock_error_handler
-    ):
+    def test_create_svm_client_error(self, svm_service, mock_client):
         """Test SVM creation when client raises an error."""
         project_id = "test-project-123"
         aggregate_name = "test-aggregate"
@@ -102,18 +87,14 @@ class TestSvmService:
         mock_client.find_svm.return_value = None  # SVM doesn't exist
         mock_client.create_svm.side_effect = Exception("NetApp error")
 
-        # Mock error handler to raise exception
-        mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
-            "Operation failed"
-        )
-
-        with pytest.raises(NetAppManagerError):
+        with pytest.raises(SvmOperationError) as exc_info:
             svm_service.create_svm(project_id, aggregate_name)
 
-        # Verify error handler was called
-        mock_error_handler.handle_operation_error.assert_called_once()
+        assert "SVM creation for project" in str(exc_info.value)
+        assert exc_info.value.svm_name == "os-test-project-123"
+        assert exc_info.value.__cause__ is not None
 
-    def test_delete_svm_success(self, svm_service, mock_client, mock_error_handler):
+    def test_delete_svm_success(self, svm_service, mock_client):
         """Test successful SVM deletion."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -124,9 +105,8 @@ class TestSvmService:
 
         assert result is True
         mock_client.delete_svm.assert_called_once_with(expected_svm_name)
-        mock_error_handler.log_info.assert_called()
 
-    def test_delete_svm_failure(self, svm_service, mock_client, mock_error_handler):
+    def test_delete_svm_failure(self, svm_service, mock_client):
         """Test SVM deletion failure."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -137,9 +117,8 @@ class TestSvmService:
 
         assert result is False
         mock_client.delete_svm.assert_called_once_with(expected_svm_name)
-        mock_error_handler.log_warning.assert_called()
 
-    def test_delete_svm_exception(self, svm_service, mock_client, mock_error_handler):
+    def test_delete_svm_exception(self, svm_service, mock_client):
         """Test SVM deletion when client raises an exception."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -150,9 +129,8 @@ class TestSvmService:
 
         assert result is False
         mock_client.delete_svm.assert_called_once_with(expected_svm_name)
-        mock_error_handler.log_warning.assert_called()
 
-    def test_exists_true(self, svm_service, mock_client, mock_error_handler):
+    def test_exists_true(self, svm_service, mock_client):
         """Test SVM existence check when SVM exists."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -165,9 +143,8 @@ class TestSvmService:
 
         assert result is True
         mock_client.find_svm.assert_called_once_with(expected_svm_name)
-        mock_error_handler.log_debug.assert_called()
 
-    def test_exists_false(self, svm_service, mock_client, mock_error_handler):
+    def test_exists_false(self, svm_service, mock_client):
         """Test SVM existence check when SVM doesn't exist."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -178,9 +155,8 @@ class TestSvmService:
 
         assert result is False
         mock_client.find_svm.assert_called_once_with(expected_svm_name)
-        mock_error_handler.log_debug.assert_called()
 
-    def test_exists_exception(self, svm_service, mock_client, mock_error_handler):
+    def test_exists_exception(self, svm_service, mock_client):
         """Test SVM existence check when client raises an exception."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -191,9 +167,8 @@ class TestSvmService:
 
         assert result is False
         mock_client.find_svm.assert_called_once_with(expected_svm_name)
-        mock_error_handler.log_warning.assert_called()
 
-    def test_get_svm_result_success(self, svm_service, mock_client, mock_error_handler):
+    def test_get_svm_result_success(self, svm_service, mock_client):
         """Test getting SVM result when SVM exists."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -208,9 +183,7 @@ class TestSvmService:
         assert result == expected_result
         mock_client.find_svm.assert_called_once_with(expected_svm_name)
 
-    def test_get_svm_result_not_found(
-        self, svm_service, mock_client, mock_error_handler
-    ):
+    def test_get_svm_result_not_found(self, svm_service, mock_client):
         """Test getting SVM result when SVM doesn't exist."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -222,9 +195,7 @@ class TestSvmService:
         assert result is None
         mock_client.find_svm.assert_called_once_with(expected_svm_name)
 
-    def test_get_svm_result_exception(
-        self, svm_service, mock_client, mock_error_handler
-    ):
+    def test_get_svm_result_exception(self, svm_service, mock_client):
         """Test getting SVM result when client raises an exception."""
         project_id = "test-project-123"
         expected_svm_name = "os-test-project-123"
@@ -235,7 +206,6 @@ class TestSvmService:
 
         assert result is None
         mock_client.find_svm.assert_called_once_with(expected_svm_name)
-        mock_error_handler.log_warning.assert_called()
 
     def test_naming_convention_consistency(self, svm_service):
         """Test that naming convention is consistent across methods."""
@@ -250,9 +220,7 @@ class TestSvmService:
         assert name.startswith("os-")
         assert name.endswith(project_id)
 
-    def test_business_rules_in_svm_spec(
-        self, svm_service, mock_client, mock_error_handler
-    ):
+    def test_business_rules_in_svm_spec(self, svm_service, mock_client):
         """Test that business rules are properly applied in SVM specification."""
         project_id = "test-project-789"
         aggregate_name = "test-aggregate"

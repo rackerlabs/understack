@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from understack_workflows.netapp.exceptions import NetAppManagerError
+from understack_workflows.netapp.exceptions import VolumeOperationError
 from understack_workflows.netapp.value_objects import NamespaceResult
 from understack_workflows.netapp.value_objects import NamespaceSpec
 from understack_workflows.netapp.value_objects import VolumeResult
@@ -21,14 +21,9 @@ class TestVolumeService:
         return Mock()
 
     @pytest.fixture
-    def mock_error_handler(self):
-        """Create a mock error handler."""
-        return Mock()
-
-    @pytest.fixture
-    def volume_service(self, mock_client, mock_error_handler):
+    def volume_service(self, mock_client):
         """Create VolumeService instance with mocked dependencies."""
-        return VolumeService(mock_client, mock_error_handler)
+        return VolumeService(mock_client)
 
     def test_get_volume_name(self, volume_service):
         """Test volume name generation follows naming convention."""
@@ -48,9 +43,7 @@ class TestVolumeService:
 
         assert result == expected_name
 
-    def test_create_volume_success(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_create_volume_success(self, volume_service, mock_client):
         """Test successful volume creation."""
         project_id = "test-project-123"
         volume_type_id = "test-volume-type-456"
@@ -82,12 +75,7 @@ class TestVolumeService:
         assert call_args.aggregate_name == aggregate_name
         assert call_args.size == size
 
-        # Verify logging
-        mock_error_handler.log_info.assert_called()
-
-    def test_create_volume_client_error(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_create_volume_client_error(self, volume_service, mock_client):
         """Test volume creation when client raises an error."""
         project_id = "test-project-123"
         volume_type_id = "test-volume-type-456"
@@ -95,21 +83,16 @@ class TestVolumeService:
         aggregate_name = "test-aggregate"
 
         mock_client.create_volume.side_effect = Exception("NetApp error")
-        mock_error_handler.handle_operation_error.side_effect = NetAppManagerError(
-            "Operation failed"
-        )
 
-        with pytest.raises(NetAppManagerError):
+        with pytest.raises(VolumeOperationError) as exc_info:
             volume_service.create_volume(
                 project_id, volume_type_id, size, aggregate_name
             )
 
-        # Verify error handler was called
-        mock_error_handler.handle_operation_error.assert_called_once()
+        assert exc_info.value.volume_name == "vol_testvolumetype456"
+        assert exc_info.value.__cause__ is not None
 
-    def test_delete_volume_success(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_delete_volume_success(self, volume_service, mock_client):
         """Test successful volume deletion."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -120,11 +103,8 @@ class TestVolumeService:
 
         assert result is True
         mock_client.delete_volume.assert_called_once_with(expected_volume_name, False)
-        mock_error_handler.log_info.assert_called()
 
-    def test_delete_volume_with_force(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_delete_volume_with_force(self, volume_service, mock_client):
         """Test volume deletion with force flag."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -135,11 +115,8 @@ class TestVolumeService:
 
         assert result is True
         mock_client.delete_volume.assert_called_once_with(expected_volume_name, True)
-        mock_error_handler.log_info.assert_called()
 
-    def test_delete_volume_failure(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_delete_volume_failure(self, volume_service, mock_client):
         """Test volume deletion failure."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -150,11 +127,8 @@ class TestVolumeService:
 
         assert result is False
         mock_client.delete_volume.assert_called_once_with(expected_volume_name, False)
-        mock_error_handler.log_warning.assert_called()
 
-    def test_delete_volume_exception(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_delete_volume_exception(self, volume_service, mock_client):
         """Test volume deletion when client raises an exception."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -165,11 +139,8 @@ class TestVolumeService:
 
         assert result is False
         mock_client.delete_volume.assert_called_once_with(expected_volume_name, False)
-        mock_error_handler.log_warning.assert_called()
 
-    def test_get_mapped_namespaces_success(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_get_mapped_namespaces_success(self, volume_service, mock_client):
         """Test successful namespace retrieval."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -205,12 +176,7 @@ class TestVolumeService:
         assert call_args.svm_name == expected_svm_name
         assert call_args.volume_name == expected_volume_name
 
-        # Verify logging
-        mock_error_handler.log_info.assert_called()
-
-    def test_get_mapped_namespaces_empty(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_get_mapped_namespaces_empty(self, volume_service, mock_client):
         """Test namespace retrieval when no namespaces exist."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -229,9 +195,7 @@ class TestVolumeService:
         assert call_args.svm_name == expected_svm_name
         assert call_args.volume_name == expected_volume_name
 
-    def test_get_mapped_namespaces_exception(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_get_mapped_namespaces_exception(self, volume_service, mock_client):
         """Test namespace retrieval when client raises an exception."""
         project_id = "test-project-123"
 
@@ -241,7 +205,6 @@ class TestVolumeService:
 
         assert result == []
         mock_client.get_namespaces.assert_called_once()
-        mock_error_handler.log_warning.assert_called()
 
     def test_naming_convention_consistency(self, volume_service):
         """Test that naming convention is consistent across methods."""
@@ -257,9 +220,7 @@ class TestVolumeService:
         svm_name = volume_service._get_svm_name(project_id)
         assert svm_name == expected_svm_name
 
-    def test_volume_spec_creation(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_volume_spec_creation(self, volume_service, mock_client):
         """Test that volume specification is created correctly."""
         project_id = "test-project-789"
         volume_type_id = "test-volume-type-789"
@@ -280,9 +241,7 @@ class TestVolumeService:
         assert call_args.aggregate_name == aggregate_name
         assert call_args.size == "2048M"
 
-    def test_namespace_spec_creation(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_namespace_spec_creation(self, volume_service, mock_client):
         """Test that namespace specification is created correctly."""
         project_id = "test-project-789"
 
@@ -306,7 +265,7 @@ class TestVolumeService:
         expected_svm_name = f"os-{project_id}"
         assert svm_name == expected_svm_name
 
-    def test_exists_volume_found(self, volume_service, mock_client, mock_error_handler):
+    def test_exists_volume_found(self, volume_service, mock_client):
         """Test exists method when volume is found."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -327,11 +286,8 @@ class TestVolumeService:
         mock_client.find_volume.assert_called_once_with(
             expected_volume_name, expected_svm_name
         )
-        mock_error_handler.log_debug.assert_called()
 
-    def test_exists_volume_not_found(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_exists_volume_not_found(self, volume_service, mock_client):
         """Test exists method when volume is not found."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -345,11 +301,8 @@ class TestVolumeService:
         mock_client.find_volume.assert_called_once_with(
             expected_volume_name, expected_svm_name
         )
-        mock_error_handler.log_debug.assert_called()
 
-    def test_exists_client_exception(
-        self, volume_service, mock_client, mock_error_handler
-    ):
+    def test_exists_client_exception(self, volume_service, mock_client):
         """Test exists method when client raises an exception."""
         project_id = "test-project-123"
         expected_volume_name = "vol_testproject123"
@@ -363,4 +316,3 @@ class TestVolumeService:
         mock_client.find_volume.assert_called_once_with(
             expected_volume_name, expected_svm_name
         )
-        mock_error_handler.log_warning.assert_called()

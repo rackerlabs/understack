@@ -23,6 +23,10 @@ class TestNetAppManagerError:
         context = {"operation": "test", "resource": "svm"}
         error = NetAppManagerError("Test error", context=context)
 
+        assert (
+            str(error)
+            == "Test error | context={'operation': 'test', 'resource': 'svm'}"
+        )
         assert error.message == "Test error"
         assert error.context == context
 
@@ -60,6 +64,7 @@ class TestConfigurationError:
             "Missing configuration", config_path="/etc/config.conf", context=context
         )
 
+        assert "missing_key" in str(error)
         assert error.context == context
         assert error.config_path == "/etc/config.conf"
 
@@ -96,6 +101,7 @@ class TestSvmOperationError:
             "SVM operation failed", svm_name="os-project-123", context=context
         )
 
+        assert "project_id" in str(error)
         assert error.context == context
         assert error.svm_name == "os-project-123"
 
@@ -134,6 +140,7 @@ class TestVolumeOperationError:
             "Volume operation failed", volume_name="vol_project_123", context=context
         )
 
+        assert "size" in str(error)
         assert error.context == context
         assert error.volume_name == "vol_project_123"
 
@@ -172,6 +179,7 @@ class TestNetworkOperationError:
             "Port creation failed", interface_name="N1-storage-A", context=context
         )
 
+        assert "vlan_id" in str(error)
         assert error.context == context
         assert error.interface_name == "N1-storage-A"
 

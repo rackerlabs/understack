@@ -7,7 +7,6 @@ from netapp_ontap.resources.nvme_namespace import NvmeNamespace
 
 from understack_workflows.netapp.client import NetAppClient
 from understack_workflows.netapp.config import NetAppConfig
-from understack_workflows.netapp.error_handler import ErrorHandler
 from understack_workflows.netapp.exceptions import NetAppManagerError
 from understack_workflows.netapp.lif_service import LifService
 from understack_workflows.netapp.route_service import RouteService
@@ -39,7 +38,6 @@ class NetAppManager:
         volume_service=None,
         lif_service=None,
         route_service=None,
-        error_handler=None,
     ):
         """Initialize NetAppManager with dependency injection support.
 
@@ -51,7 +49,6 @@ class NetAppManager:
             volume_service: VolumeService instance (optional, for dependency injection)
             lif_service: LifService instance (optional, for dependency injection)
             route_service: RouteService instance (optional, for dependency injection)
-            error_handler: ErrorHandler instance (optional, for dependency injection)
         """
         # Set up dependencies with dependency injection or create defaults
         self._setup_dependencies(
@@ -62,7 +59,6 @@ class NetAppManager:
             volume_service,
             lif_service,
             route_service,
-            error_handler,
         )
 
     def _setup_dependencies(
@@ -74,7 +70,6 @@ class NetAppManager:
         volume_service,
         lif_service,
         route_service,
-        error_handler,
     ):
         """Set up all service dependencies with dependency injection."""
         # Initialize configuration
@@ -89,12 +84,6 @@ class NetAppManager:
             else:
                 # Client provided via dependency injection - config not needed
                 self._config = None
-
-        # Initialize error handler
-        if error_handler is not None:
-            self._error_handler = error_handler
-        else:
-            self._error_handler = ErrorHandler(logger)
 
         # Set up connection if using traditional constructor pattern
         if (
@@ -135,28 +124,28 @@ class NetAppManager:
                 raise ValueError(
                     "NetAppConfig is required when NetAppClient is not provided"
                 )
-            self._client = NetAppClient(self._config, self._error_handler)
+            self._client = NetAppClient(self._config)
 
         # Initialize services - they should always be created if not provided
         if svm_service is not None:
             self._svm_service = svm_service
         else:
-            self._svm_service = SvmService(self._client, self._error_handler)
+            self._svm_service = SvmService(self._client)
 
         if volume_service is not None:
             self._volume_service = volume_service
         else:
-            self._volume_service = VolumeService(self._client, self._error_handler)
+            self._volume_service = VolumeService(self._client)
 
         if lif_service is not None:
             self._lif_service = lif_service
         else:
-            self._lif_service = LifService(self._client, self._error_handler)
+            self._lif_service = LifService(self._client)
 
         if route_service is not None:
             self._route_service = route_service
         else:
-            self._route_service = RouteService(self._client, self._error_handler)
+            self._route_service = RouteService(self._client)
 
     def create_svm(self, project_id: str, aggregate_name: str):
         """Creates a new Storage Virtual Machine (SVM)."""
@@ -475,9 +464,15 @@ class NetAppManager:
 
         Delegates to LifService for port management.
         """
-        return self._lif_service.create_home_port(config)
+        home_node = self._lif_service.identify_home_node(config)
+        broadcast_domain_name = self._client.get_broadcast_domain_name(
+            home_node.name, config.base_port_name
+        )
+        return self._lif_service.create_home_port(
+            config, home_node, broadcast_domain_name
+        )
 
-    def identify_home_node(self, config: NetappIPInterfaceConfig) -> NodeResult | None:
+    def identify_home_node(self, config: NetappIPInterfaceConfig) -> NodeResult:
         """Identifies the home node for a network interface.
 
         Delegates to LifService for node identification.

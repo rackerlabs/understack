@@ -7,25 +7,25 @@ including route creation and nexthop management.
 import logging
 
 from understack_workflows.netapp.client import NetAppClientInterface
-from understack_workflows.netapp.error_handler import ErrorHandler
+from understack_workflows.netapp.exceptions import NetAppManagerError
+from understack_workflows.netapp.exceptions import NetworkOperationError
 from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 from understack_workflows.netapp.value_objects import RouteResult
 from understack_workflows.netapp.value_objects import RouteSpec
+
+logger = logging.getLogger(__name__)
 
 
 class RouteService:
     """Service for managing network route operations with business logic."""
 
-    def __init__(self, client: NetAppClientInterface, error_handler: ErrorHandler):
+    def __init__(self, client: NetAppClientInterface):
         """Initialize the route service.
 
         Args:
             client: NetApp client for low-level operations
-            error_handler: Error handler for centralized error management
         """
         self._client = client
-        self._error_handler = error_handler
-        self._logger = logging.getLogger(__name__)
 
     def create_routes_from_interfaces(
         self,
@@ -48,7 +48,7 @@ class RouteService:
             # Extract unique nexthop addresses
             unique_nexthops = self._extract_unique_nexthops(interface_configs)
 
-            self._error_handler.log_debug(
+            logger.debug(
                 "Found %(count)d unique nexthop addresses for project %(project_id)s",
                 {"count": len(unique_nexthops), "project_id": project_id},
             )
@@ -63,7 +63,7 @@ class RouteService:
                     result = self._client.create_route(route_spec)
                     results.append(result)
 
-                    self._error_handler.log_info(
+                    logger.info(
                         "Created route: %(destination)s via %(gateway)s for SVM "
                         "%(svm_name)s",
                         {
@@ -73,28 +73,30 @@ class RouteService:
                         },
                     )
 
+                except NetAppManagerError:
+                    raise
                 except Exception as e:
-                    self._error_handler.handle_operation_error(
-                        e,
-                        f"Route creation for nexthop {nexthop}",
-                        {
+                    raise NetworkOperationError(
+                        f"Operation 'Route creation for nexthop {nexthop}' failed: {e}",
+                        context={
                             "project_id": project_id,
                             "svm_name": svm_name,
                             "nexthop": nexthop,
                         },
-                    )
+                    ) from e
 
             return results
 
+        except NetAppManagerError:
+            raise
         except Exception as e:
-            self._error_handler.handle_operation_error(
-                e,
-                f"Route creation for project {project_id}",
-                {
+            raise NetworkOperationError(
+                f"Operation 'Route creation for project {project_id}' failed: {e}",
+                context={
                     "project_id": project_id,
                     "interface_count": len(interface_configs),
                 },
-            )
+            ) from e
 
     def _extract_unique_nexthops(
         self, interface_configs: list[NetappIPInterfaceConfig]
@@ -110,7 +112,7 @@ class RouteService:
         nexthops = [str(config.route_nexthop) for config in interface_configs]
         unique_nexthops = list(set(nexthops))  # Remove duplicates
 
-        self._error_handler.log_debug(
+        logger.debug(
             "Extracted %(unique_count)d unique nexthops from %(total_count)d "
             "interfaces",
             {

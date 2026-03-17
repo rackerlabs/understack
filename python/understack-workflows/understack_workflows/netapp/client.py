@@ -11,6 +11,7 @@ from abc import ABC
 from abc import abstractmethod
 from typing import cast
 
+import requests
 from netapp_ontap import config
 from netapp_ontap.error import NetAppRestError
 from netapp_ontap.host_connection import HostConnection
@@ -24,7 +25,11 @@ from netapp_ontap.resources import Svm
 from netapp_ontap.resources import Volume
 
 from understack_workflows.netapp.config import NetAppConfig
-from understack_workflows.netapp.error_handler import ErrorHandler
+from understack_workflows.netapp.exceptions import ConfigurationError
+from understack_workflows.netapp.exceptions import NetAppManagerError
+from understack_workflows.netapp.exceptions import NetworkOperationError
+from understack_workflows.netapp.exceptions import SvmOperationError
+from understack_workflows.netapp.exceptions import VolumeOperationError
 from understack_workflows.netapp.value_objects import AggregateResult
 from understack_workflows.netapp.value_objects import InterfaceResult
 from understack_workflows.netapp.value_objects import InterfaceSpec
@@ -39,6 +44,11 @@ from understack_workflows.netapp.value_objects import SvmResult
 from understack_workflows.netapp.value_objects import SvmSpec
 from understack_workflows.netapp.value_objects import VolumeResult
 from understack_workflows.netapp.value_objects import VolumeSpec
+
+logger = logging.getLogger(__name__)
+
+SVM_ROOT_VOLUME_SIZE_BYTES = 1024**3
+SVM_ROOT_VOLUME_AUTOSIZE_MAXIMUM_BYTES = 2 * 1024**3
 
 
 class NetAppClientInterface(ABC):
@@ -149,6 +159,10 @@ class NetAppClientInterface(ABC):
         """
 
     @abstractmethod
+    def get_broadcast_domain_name(self, node_name: str, port_name: str) -> str:
+        """Get the broadcast domain name for a port."""
+
+    @abstractmethod
     def get_nodes(self) -> list[NodeResult]:
         """Get all nodes in the cluster.
 
@@ -194,16 +208,13 @@ class NetAppClientInterface(ABC):
 class NetAppClient(NetAppClientInterface):
     """Concrete implementation of NetApp SDK abstraction layer."""
 
-    def __init__(self, netapp_config: NetAppConfig, error_handler: ErrorHandler):
+    def __init__(self, netapp_config: NetAppConfig):
         """Initialize the NetApp client.
 
         Args:
             netapp_config: NetApp configuration object
-            error_handler: Error handler for centralized error management
         """
         self._config = netapp_config
-        self._error_handler = error_handler
-        self._logger = logging.getLogger(__name__)
 
         # Initialize NetApp SDK connection
         self._setup_connection()
@@ -219,24 +230,26 @@ class NetAppClient(NetAppClientInterface):
                     username=self._config.username,
                     password=self._config.password,
                 )
-                self._error_handler.log_info(
+                logger.info(
                     "NetApp connection established to %(hostname)s",
                     {"hostname": self._config.hostname},
                 )
             else:
-                self._error_handler.log_info(
+                logger.info(
                     "Using existing NetApp connection to %(hostname)s",
                     {"hostname": self._config.hostname},
                 )
         except Exception as e:
-            self._error_handler.handle_config_error(
-                e, self._config.config_path, {"hostname": self._config.hostname}
-            )
+            raise ConfigurationError(
+                f"Configuration error with {self._config.config_path}: {e}",
+                config_path=self._config.config_path,
+                context={"hostname": self._config.hostname, "original_error": str(e)},
+            ) from e
 
     def create_svm(self, svm_spec: SvmSpec) -> SvmResult:
         """Create a Storage Virtual Machine (SVM)."""
         try:
-            self._error_handler.log_info(
+            logger.info(
                 "Creating SVM: %(svm_name)s",
                 {"svm_name": svm_spec.name, "aggregate": svm_spec.aggregate_name},
             )
@@ -255,6 +268,7 @@ class NetAppClient(NetAppClientInterface):
 
             svm.post()
             svm.get()  # Refresh to get the latest state
+            self._configure_svm_root_volume(svm_spec)
 
             result = SvmResult(
                 name=str(svm.name),
@@ -262,7 +276,7 @@ class NetAppClient(NetAppClientInterface):
                 state=getattr(svm, "state", "unknown"),
             )
 
-            self._error_handler.log_info(
+            logger.info(
                 "SVM '%(svm_name)s' created successfully",
                 {"svm_name": svm_spec.name, "uuid": result.uuid, "state": result.state},
             )
@@ -270,37 +284,72 @@ class NetAppClient(NetAppClientInterface):
             return result
 
         except NetAppRestError as e:
-            self._error_handler.handle_netapp_error(
-                e,
-                "SVM creation",
-                {"svm_name": svm_spec.name, "aggregate": svm_spec.aggregate_name},
+            raise SvmOperationError(
+                f"NetApp SVM creation failed: {e}",
+                svm_name=svm_spec.name,
+                context={
+                    "svm_name": svm_spec.name,
+                    "aggregate": svm_spec.aggregate_name,
+                    "netapp_error": str(e),
+                },
+            ) from e
+
+    def _configure_svm_root_volume(self, svm_spec: SvmSpec) -> None:
+        """Apply administrative settings to an SVM root volume."""
+        try:
+            root_volume = cast(
+                Volume,
+                next(
+                    iter(
+                        Volume.get_collection(
+                            name=svm_spec.root_volume_name,
+                            fields="uuid,name",
+                            **{"svm.name": svm_spec.name},  # pyright: ignore[reportArgumentType]
+                        )
+                    )
+                ),
             )
+        except StopIteration as e:
+            raise SvmOperationError(
+                "SVM root volume was not found after SVM creation",
+                svm_name=svm_spec.name,
+                context={
+                    "svm_name": svm_spec.name,
+                    "root_volume_name": svm_spec.root_volume_name,
+                },
+            ) from e
+
+        root_volume.size = SVM_ROOT_VOLUME_SIZE_BYTES
+        root_volume.snapshot_policy = {"name": "none"}
+        root_volume.autosize = {
+            "mode": "grow",
+            "maximum": SVM_ROOT_VOLUME_AUTOSIZE_MAXIMUM_BYTES,
+        }
+        root_volume.patch()
 
     def delete_svm(self, svm_name: str) -> bool:
         """Delete a Storage Virtual Machine (SVM)."""
         try:
-            self._error_handler.log_info(
-                "Deleting SVM: %(svm_name)s", {"svm_name": svm_name}
-            )
+            logger.info("Deleting SVM: %(svm_name)s", {"svm_name": svm_name})
 
             svm = Svm()
             svm.get(name=svm_name)
 
-            self._error_handler.log_info(
+            logger.info(
                 "Found SVM '%(svm_name)s' with UUID %(uuid)s",
                 {"svm_name": svm_name, "uuid": svm.uuid},
             )
 
             svm.delete()
 
-            self._error_handler.log_info(
+            logger.info(
                 "SVM '%(svm_name)s' deletion initiated successfully",
                 {"svm_name": svm_name},
             )
             return True
 
         except Exception as e:
-            self._error_handler.log_warning(
+            logger.warning(
                 "Failed to delete SVM '%(svm_name)s': %(error)s",
                 {"svm_name": svm_name, "error": str(e)},
             )
@@ -318,20 +367,27 @@ class NetAppClient(NetAppClientInterface):
                 )
             return None
 
-        except NetAppRestError:
+        except NetAppRestError as e:
             # NetApp SDK raises exception when SVM is not found
-            return None
+            if e.status_code == requests.codes.not_found:
+                return None
+
+            raise SvmOperationError(
+                f"NetApp SVM lookup failed: {e}",
+                svm_name=svm_name,
+                context={"svm_name": svm_name, "netapp_error": str(e)},
+            ) from e
         except Exception as e:
-            self._error_handler.log_warning(
-                "Error finding SVM '%(svm_name)s': %(error)s",
-                {"svm_name": svm_name, "error": str(e)},
-            )
-            return None
+            raise SvmOperationError(
+                f"Unexpected SVM lookup failure: {e}",
+                svm_name=svm_name,
+                context={"svm_name": svm_name, "original_error": str(e)},
+            ) from e
 
     def create_volume(self, volume_spec: VolumeSpec) -> VolumeResult:
         """Create a volume."""
         try:
-            self._error_handler.log_info(
+            logger.info(
                 "Creating volume '%(volume_name)s' with size %(size)s",
                 {
                     "volume_name": volume_spec.name,
@@ -359,7 +415,7 @@ class NetAppClient(NetAppClientInterface):
                 svm_name=volume_spec.svm_name,
             )
 
-            self._error_handler.log_info(
+            logger.info(
                 "Volume '%(volume_name)s' created successfully",
                 {
                     "volume_name": volume_spec.name,
@@ -371,20 +427,21 @@ class NetAppClient(NetAppClientInterface):
             return result
 
         except NetAppRestError as e:
-            self._error_handler.handle_netapp_error(
-                e,
-                "Volume creation",
-                {
+            raise VolumeOperationError(
+                f"NetApp Volume creation failed: {e}",
+                volume_name=volume_spec.name,
+                context={
                     "volume_name": volume_spec.name,
                     "svm_name": volume_spec.svm_name,
                     "aggregate": volume_spec.aggregate_name,
+                    "netapp_error": str(e),
                 },
-            )
+            ) from e
 
     def delete_volume(self, volume_name: str, force: bool = False) -> bool:
         """Delete a volume."""
         try:
-            self._error_handler.log_info(
+            logger.info(
                 "Deleting volume: %(volume_name)s",
                 {"volume_name": volume_name, "force": force},
             )
@@ -392,13 +449,11 @@ class NetAppClient(NetAppClientInterface):
             volume = Volume()
             volume.get(name=volume_name)
 
-            self._error_handler.log_info(
-                "Found volume '%(volume_name)s'", {"volume_name": volume_name}
-            )
+            logger.info("Found volume '%(volume_name)s'", {"volume_name": volume_name})
 
             # Check if volume is online and log warning
             if hasattr(volume, "state") and volume.state == "online":
-                self._error_handler.log_warning(
+                logger.warning(
                     "Volume '%(volume_name)s' is online", {"volume_name": volume_name}
                 )
 
@@ -407,14 +462,14 @@ class NetAppClient(NetAppClientInterface):
             else:
                 volume.delete()
 
-            self._error_handler.log_info(
+            logger.info(
                 "Volume '%(volume_name)s' deletion initiated successfully",
                 {"volume_name": volume_name},
             )
             return True
 
         except Exception as e:
-            self._error_handler.log_warning(
+            logger.warning(
                 "Failed to delete volume '%(volume_name)s': %(error)s",
                 {"volume_name": volume_name, "force": force, "error": str(e)},
             )
@@ -438,7 +493,7 @@ class NetAppClient(NetAppClientInterface):
             # NetApp SDK raises exception when volume is not found
             return None
         except Exception as e:
-            self._error_handler.log_warning(
+            logger.warning(
                 "Error finding volume '%(volume_name)s' in SVM '%(svm_name)s': "
                 "%(error)s",
                 {"volume_name": volume_name, "svm_name": svm_name, "error": str(e)},
@@ -450,7 +505,7 @@ class NetAppClient(NetAppClientInterface):
     ) -> InterfaceResult:
         """Get or create a logical interface (LIF)."""
         try:
-            self._error_handler.log_info(
+            logger.info(
                 "Defining IP interface: %(interface_name)s",
                 {
                     "interface_name": interface_spec.name,
@@ -483,9 +538,7 @@ class NetAppClient(NetAppClientInterface):
                 }
                 interface.service_policy = {"name": interface_spec.service_policy}
 
-                self._error_handler.log_debug(
-                    "Creating IpInterface", {"interface": str(interface)}
-                )
+                logger.debug("Creating IpInterface %s", interface)
                 interface.post(hydrate=True)
 
             result = InterfaceResult(
@@ -497,7 +550,7 @@ class NetAppClient(NetAppClientInterface):
                 svm_name=interface_spec.svm_name,
             )
 
-            self._error_handler.log_info(
+            logger.info(
                 "IP interface '%(interface_name)s' created successfully",
                 {"interface_name": interface_spec.name, "uuid": result.uuid},
             )
@@ -505,20 +558,21 @@ class NetAppClient(NetAppClientInterface):
             return result
 
         except NetAppRestError as e:
-            self._error_handler.handle_netapp_error(
-                e,
-                "IP interface creation",
-                {
+            raise NetworkOperationError(
+                f"NetApp IP interface creation failed: {e}",
+                interface_name=interface_spec.name,
+                context={
                     "interface_name": interface_spec.name,
                     "svm_name": interface_spec.svm_name,
                     "address": interface_spec.address,
+                    "netapp_error": str(e),
                 },
-            )
+            ) from e
 
     def get_or_create_port(self, port_spec: PortSpec) -> PortResult:
         """Get or create a network port."""
         try:
-            self._error_handler.log_info(
+            logger.info(
                 "Defining port on node %(node_name)s",
                 {
                     "node_name": port_spec.node_name,
@@ -552,7 +606,7 @@ class NetAppClient(NetAppClientInterface):
                 }
                 port.vlan = port_spec.vlan_config
 
-                self._error_handler.log_debug("Creating Port", {"port": str(port)})
+                logger.debug("Creating Port %s", port)
                 port.post(hydrate=True)
 
             result = PortResult(
@@ -564,7 +618,7 @@ class NetAppClient(NetAppClientInterface):
                 port_type="vlan",
             )
 
-            self._error_handler.log_info(
+            logger.info(
                 "Port exists on node %(node_name)s",
                 {
                     "node_name": port_spec.node_name,
@@ -576,20 +630,50 @@ class NetAppClient(NetAppClientInterface):
             return result
 
         except NetAppRestError as e:
-            self._error_handler.handle_netapp_error(
-                e,
-                "Port creation",
-                {
+            raise NetworkOperationError(
+                f"NetApp Port creation failed: {e}",
+                context={
                     "node_name": port_spec.node_name,
                     "vlan_id": port_spec.vlan_id,
                     "base_port": port_spec.base_port_name,
+                    "netapp_error": str(e),
                 },
+            ) from e
+
+    def get_broadcast_domain_name(self, node_name: str, port_name: str) -> str:
+        """Get the broadcast domain name for a port."""
+        try:
+            ports = Port.get_collection(
+                name=port_name,
+                fields="node.name,name,broadcast_domain",
+                **{"node.name": node_name},  # pyright: ignore[reportArgumentType]
             )
+
+            port = cast(Port, next(iter(ports)))
+            return str(port.broadcast_domain.name)
+
+        except NetAppRestError as e:
+            raise NetworkOperationError(
+                f"NetApp broadcast domain lookup failed: {e}",
+                context={
+                    "node_name": node_name,
+                    "port_name": port_name,
+                    "netapp_error": str(e),
+                },
+            ) from e
+        except StopIteration:
+            raise NetworkOperationError(
+                "No broadcast domain found for the requested port",
+                context={
+                    "node_name": node_name,
+                    "port_name": port_name,
+                },
+            ) from None
 
     def get_nodes(self) -> list[NodeResult]:
         """Get all nodes in the cluster."""
         try:
-            self._error_handler.log_debug("Retrieving cluster nodes")
+            logger.debug("Retrieving cluster nodes")
 
             nodes = list(Node.get_collection())
             results = []
@@ -597,19 +681,22 @@ class NetAppClient(NetAppClientInterface):
             for node in nodes:
                 results.append(NodeResult(name=str(node.name), uuid=str(node.uuid)))
 
-            self._error_handler.log_info(
+            logger.info(
                 "Retrieved %(node_count)d nodes from cluster",
                 {"node_count": len(results)},
             )
             return results
 
         except NetAppRestError as e:
-            self._error_handler.handle_netapp_error(e, "Node retrieval", {})
+            raise NetAppManagerError(
+                f"NetApp Node retrieval failed: {e}",
+                context={"netapp_error": str(e)},
+            ) from e
 
     def get_aggregates(self) -> list[AggregateResult]:
         """Get aggregate metadata available on the cluster."""
         try:
-            self._error_handler.log_debug("Retrieving cluster aggregates")
+            logger.debug("Retrieving cluster aggregates")
 
             aggregates = list(
                 Aggregate.get_collection(
@@ -634,26 +721,27 @@ class NetAppClient(NetAppClientInterface):
                 if getattr(aggregate, "name", None)
             ]
 
-            self._error_handler.log_info(
+            logger.info(
                 "Retrieved %(aggregate_count)d aggregates from cluster",
                 {"aggregate_count": len(results)},
             )
             return results
 
         except NetAppRestError as e:
-            self._error_handler.handle_netapp_error(e, "Aggregate retrieval", {})
+            raise NetAppManagerError(
+                f"NetApp Aggregate retrieval failed: {e}",
+                context={"netapp_error": str(e)},
+            ) from e
 
     def get_namespaces(self, namespace_spec: NamespaceSpec) -> list[NamespaceResult]:
         """Get NVMe namespaces for a specific SVM and volume."""
         try:
             # Check if connection is available
             if not config.CONNECTION:
-                self._error_handler.log_warning(
-                    "No NetApp connection available for namespace query"
-                )
+                logger.warning("No NetApp connection available for namespace query")
                 return []
 
-            self._error_handler.log_debug(
+            logger.debug(
                 "Querying namespaces for SVM %(svm_name)s, volume %(volume_name)s",
                 {
                     "svm_name": namespace_spec.svm_name,
@@ -680,7 +768,7 @@ class NetAppClient(NetAppClientInterface):
                     )
                 )
 
-            self._error_handler.log_info(
+            logger.info(
                 "Retrieved %(namespace_count)d namespaces",
                 {
                     "namespace_count": len(results),
@@ -692,14 +780,14 @@ class NetAppClient(NetAppClientInterface):
             return results
 
         except NetAppRestError as e:
-            self._error_handler.handle_netapp_error(
-                e,
-                "Namespace query",
-                {
+            raise NetAppManagerError(
+                f"NetApp Namespace query failed: {e}",
+                context={
                     "svm_name": namespace_spec.svm_name,
                     "volume_name": namespace_spec.volume_name,
+                    "netapp_error": str(e),
                 },
-            )
+            ) from e
 
     def create_route(self, route_spec: RouteSpec) -> RouteResult:
         """Create a network route.
@@ -715,7 +803,7 @@ class NetAppClient(NetAppClientInterface):
             NetAppRestError: If NetApp API returns an error during route creation
         """
         try:
-            self._error_handler.log_info(
+            logger.info(
                 "Creating route: %(destination)s via %(gateway)s for SVM %(svm_name)s",
                 {
                     "destination": route_spec.destination,
@@ -732,9 +820,7 @@ class NetAppClient(NetAppClientInterface):
                 "netmask": str(route_spec.destination.netmask),
             }
 
-            self._error_handler.log_debug(
-                "Creating NetworkRoute", {"route": str(route)}
-            )
+            logger.debug("Creating NetworkRoute %s", route)
             route.post(hydrate=True)
 
             result = RouteResult(
@@ -744,7 +830,7 @@ class NetAppClient(NetAppClientInterface):
                 svm_name=route_spec.svm_name,
             )
 
-            self._error_handler.log_info(
+            logger.info(
                 "Route created successfully: %(destination)s via %(gateway)s",
                 {
                     "destination": route_spec.destination,
@@ -757,12 +843,12 @@ class NetAppClient(NetAppClientInterface):
             return result
 
         except NetAppRestError as e:
-            self._error_handler.handle_netapp_error(
-                e,
-                "Route creation",
-                {
+            raise NetworkOperationError(
+                f"NetApp Route creation failed: {e}",
+                context={
                     "svm_name": route_spec.svm_name,
                     "gateway": route_spec.gateway,
                     "destination": route_spec.destination,
+                    "netapp_error": str(e),
                 },
-            )
+            ) from e

@@ -5,6 +5,8 @@ from ipaddress import IPv4Network
 from unittest.mock import Mock
 from unittest.mock import patch
 
+import pytest
+
 from understack_workflows.main.netapp_configure_net import VIRTUAL_MACHINES_QUERY
 
 
@@ -220,18 +222,18 @@ class TestIntegrationTests:
         mock_nautobot_class.side_effect = Exception("Connection failed")
 
         # Mock sys.argv
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "11111111-2222-3333-4444-555555555555",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "11111111-2222-3333-4444-555555555555",
+                ],
+            ),
+            pytest.raises(Exception, match="Connection failed"),
         ):
-            result = main()
-
-        # Verify exit code 1 for connection error
-        assert result == 1
+            main()
 
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
@@ -709,18 +711,18 @@ class TestIntegrationWithNetAppManager:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            pytest.raises(Exception, match="SVM not found for project"),
         ):
-            result = main()
-
-        # Verify exit code 1 for connection/initialization error (NetApp error)
-        assert result == 1
+            main()
 
         # Verify NetAppManager was initialized
         mock_netapp_manager_class.assert_called_once_with(
@@ -1122,18 +1124,18 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            pytest.raises(Exception, match="Route creation failed: SVM not found"),
         ):
-            result = main()
-
-        # Verify exit code 1 for connection/initialization error (route creation error)
-        assert result == 1
+            main()
 
         # Verify LIF creation was attempted before route creation failed
         assert mock_netapp_manager_instance.create_lif.call_count == 4
@@ -1189,18 +1191,21 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            pytest.raises(
+                NetworkOperationError,
+                match="Route creation failed: NetApp REST API error",
+            ),
         ):
-            result = main()
-
-        # Verify exit code 1 for NetApp error
-        assert result == 1
+            main()
 
         # Verify LIF creation was attempted before route creation failed
         assert mock_netapp_manager_instance.create_lif.call_count == 2
@@ -1246,18 +1251,24 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "abcdef12-3456-7890-abcd-ef1234567890",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "abcdef12-3456-7890-abcd-ef1234567890",
+                ],
+            ),
+            pytest.raises(
+                Exception,
+                match=(
+                    "Critical route creation failure: Unable to connect to NetApp "
+                    "system"
+                ),
+            ),
         ):
-            result = main()
-
-        # Verify script terminates with exit code 1 (connection/initialization error)
-        assert result == 1
+            main()
 
         # Verify LIF creation completed successfully before route creation failed
         assert mock_netapp_manager_instance.create_lif.call_count == 4
@@ -1319,18 +1330,21 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            pytest.raises(
+                NetworkOperationError,
+                match="Route creation failed: Invalid gateway address",
+            ),
         ):
-            result = main()
-
-        # Verify exit code 1 for route creation error
-        assert result == 1
+            main()
 
         # Verify route creation was attempted
         mock_netapp_manager_instance.create_routes_for_project.assert_called_once()
@@ -1390,18 +1404,24 @@ class TestRouteCreationIntegration:
         mock_netapp_manager_class.return_value = mock_netapp_manager_instance
 
         # Mock sys.argv for argument parsing
-        with patch(
-            "sys.argv",
-            [
-                "netapp_configure_net.py",
-                "--project-id",
-                "12345678-1234-5678-9abc-123456789012",
-            ],
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "netapp_configure_net.py",
+                    "--project-id",
+                    "12345678-1234-5678-9abc-123456789012",
+                ],
+            ),
+            pytest.raises(
+                SvmOperationError,
+                match=(
+                    r"Route creation failed: SVM "
+                    r"'os-12345678123456789abc123456789012'not found"
+                ),
+            ),
         ):
-            result = main()
-
-        # Verify exit code 1 for SVM error during route creation
-        assert result == 1
+            main()
 
         # Verify LIF creation was attempted before route creation failed
         assert mock_netapp_manager_instance.create_lif.call_count == 2
