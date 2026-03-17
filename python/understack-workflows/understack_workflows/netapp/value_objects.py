@@ -162,7 +162,6 @@ class NetappIPInterfaceConfig(BaseModel):
         side: Extracts side (A or B) from interface name
         desired_node_number: Extracts node number (1 or 2) from interface name
         base_port_name: Constructs base port name using NIC slot prefix and side
-        broadcast_domain_name: Constructs broadcast domain name using side
         route_nexthop: Calculates next hop IP address from network
 
     Example:
@@ -253,16 +252,6 @@ class NetappIPInterfaceConfig(BaseModel):
             str: Base port name (e.g., "e4a", "e4b")
         """
         return f"{self.nic_slot_prefix}{self.side.lower()}"
-
-    @computed_field
-    @property
-    def broadcast_domain_name(self) -> str:
-        """Get the broadcast domain name based on the side.
-
-        Returns:
-            str: Broadcast domain name (e.g., "Fabric-A", "Fabric-B")
-        """
-        return f"Fabric-{self.side}"
 
     @computed_field
     @property

@@ -47,6 +47,9 @@ from understack_workflows.netapp.value_objects import VolumeSpec
 
 logger = logging.getLogger(__name__)
 
+SVM_ROOT_VOLUME_SIZE_BYTES = 1024**3
+SVM_ROOT_VOLUME_AUTOSIZE_MAXIMUM_BYTES = 2 * 1024**3
+
 
 class NetAppClientInterface(ABC):
     """Abstract interface for NetApp operations."""
@@ -156,6 +159,10 @@ class NetAppClientInterface(ABC):
         """
 
     @abstractmethod
+    def get_broadcast_domain_name(self, node_name: str, port_name: str) -> str:
+        """Get the broadcast domain name for a port."""
+
+    @abstractmethod
     def get_nodes(self) -> list[NodeResult]:
         """Get all nodes in the cluster.
 
@@ -261,6 +268,7 @@ class NetAppClient(NetAppClientInterface):
 
             svm.post()
             svm.get()  # Refresh to get the latest state
+            self._configure_svm_root_volume(svm_spec)
 
             result = SvmResult(
                 name=str(svm.name),
@@ -285,6 +293,39 @@ class NetAppClient(NetAppClientInterface):
                     "netapp_error": str(e),
                 },
             ) from e
+
+    def _configure_svm_root_volume(self, svm_spec: SvmSpec) -> None:
+        """Apply administrative settings to an SVM root volume."""
+        try:
+            root_volume = cast(
+                Volume,
+                next(
+                    iter(
+                        Volume.get_collection(
+                            name=svm_spec.root_volume_name,
+                            fields="uuid,name",
+                            **{"svm.name": svm_spec.name},  # pyright: ignore[reportArgumentType]
+                        )
+                    )
+                ),
+            )
+        except StopIteration as e:
+            raise SvmOperationError(
+                "SVM root volume was not found after SVM creation",
+                svm_name=svm_spec.name,
+                context={
+                    "svm_name": svm_spec.name,
+                    "root_volume_name": svm_spec.root_volume_name,
+                },
+            ) from e
+
+        root_volume.size = SVM_ROOT_VOLUME_SIZE_BYTES
+        root_volume.snapshot_policy = {"name": "none"}
+        root_volume.autosize = {
+            "mode": "grow",
+            "maximum": SVM_ROOT_VOLUME_AUTOSIZE_MAXIMUM_BYTES,
+        }
+        root_volume.patch()
 
     def delete_svm(self, svm_name: str) -> bool:
         """Delete a Storage Virtual Machine (SVM)."""
@@ -598,6 +639,36 @@ class NetAppClient(NetAppClientInterface):
                     "netapp_error": str(e),
                 },
             ) from e
+
+    def get_broadcast_domain_name(self, node_name: str, port_name: str) -> str:
+        """Get the broadcast domain name for a port."""
+        try:
+            ports = Port.get_collection(
+                name=port_name,
+                fields="node.name,name,broadcast_domain",
+                **{"node.name": node_name},  # pyright: ignore[reportArgumentType]
+            )
+
+            port = cast(Port, next(iter(ports)))
+            return str(port.broadcast_domain.name)
+
+        except NetAppRestError as e:
+            raise NetworkOperationError(
+                f"NetApp broadcast domain lookup failed: {e}",
+                context={
+                    "node_name": node_name,
+                    "port_name": port_name,
+                    "netapp_error": str(e),
+                },
+            ) from e
+        except StopIteration:
+            raise NetworkOperationError(
+                "No broadcast domain found for the requested port",
+                context={
+                    "node_name": node_name,
+                    "port_name": port_name,
+                },
+            ) from None
 
     def get_nodes(self) -> list[NodeResult]:
         """Get all nodes in the cluster."""

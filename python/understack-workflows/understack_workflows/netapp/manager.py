@@ -464,9 +464,15 @@ class NetAppManager:
 
         Delegates to LifService for port management.
         """
-        return self._lif_service.create_home_port(config)
+        home_node = self._lif_service.identify_home_node(config)
+        broadcast_domain_name = self._client.get_broadcast_domain_name(
+            home_node.name, config.base_port_name
+        )
+        return self._lif_service.create_home_port(
+            config, home_node, broadcast_domain_name
+        )
 
-    def identify_home_node(self, config: NetappIPInterfaceConfig) -> NodeResult | None:
+    def identify_home_node(self, config: NetappIPInterfaceConfig) -> NodeResult:
         """Identifies the home node for a network interface.
 
         Delegates to LifService for node identification.
