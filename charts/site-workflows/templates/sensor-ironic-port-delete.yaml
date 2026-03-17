@@ -1,0 +1,71 @@
+{{- if .Values.enabled.ironic }}
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: ironic-port-delete
+  annotations:
+    workflows.argoproj.io/title: Trigger Undersync from Ironic Node Port Delete Events
+    workflows.argoproj.io/description: |+
+      Triggers on the following Ironic Events:
+
+      - baremetal.port.delete.end which happens when a port is deleted
+
+      This is needed as Undersync has to configure unused ports to provisioning VLAN, so
+      when node gets re-enroled, it will be able to go through inspection/cleaning.
+
+      Defined in `charts/site-workflows/templates/sensor-ironic-port-delete.yaml`
+spec:
+  dependencies:
+  - eventName: openstack
+    eventSourceName: openstack-ironic
+    name: ironic-port-delete
+    transform:
+      # the event is a string-ified JSON so we need to decode it
+      # replace the whole event body
+      jq: |
+        .body = (.body["oslo.message"] | fromjson)
+    filters:
+      data:
+        - path: "body.event_type"
+          type: "string"
+          value:
+            - "baremetal.port.delete.end"
+        - path: "body.payload.ironic_object\\.data.physical_network"
+          type: "string"
+          value:
+            - ".+"
+  template:
+    serviceAccountName: sensor-submit-workflow
+  triggers:
+    - template:
+        name: ironic-port-delete
+        # creates workflow object directly via k8s API
+        k8s:
+          operation: create
+          parameters:
+            # first parameter is the parsed oslo.message
+            - dest: spec.arguments.parameters.0.value
+              src:
+                dataKey: body.payload.ironic_object\.data.physical_network
+                dependencyName: ironic-port-delete
+          source:
+            # create a workflow in argo-events prefixed with ironic-port-delete-
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: ironic-port-delete-
+                namespace: argo-events
+              spec:
+                # defines the parameters being replaced above
+                arguments:
+                  parameters:
+                    - name: vlan_group_uuid
+                    - name: force
+                      value: false
+                    - name: dry_run
+                      value: false
+                # references the workflow
+                workflowTemplateRef:
+                  name: undersync-switch
+{{- end }}
