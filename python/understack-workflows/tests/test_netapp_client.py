@@ -84,14 +84,17 @@ class TestNetAppClient:
         assert exc_info.value.config_path == "/test/config/path"
         assert exc_info.value.__cause__ is not None
 
+    @patch("understack_workflows.netapp.client.Volume")
     @patch("understack_workflows.netapp.client.Svm")
-    def test_create_svm_success(self, mock_svm_class, netapp_client):
+    def test_create_svm_success(self, mock_svm_class, mock_volume_class, netapp_client):
         """Test successful SVM creation."""
         mock_svm_instance = MagicMock()
         mock_svm_instance.name = "test-svm"
         mock_svm_instance.uuid = "svm-uuid-123"
         mock_svm_instance.state = "online"
         mock_svm_class.return_value = mock_svm_instance
+        mock_root_volume = MagicMock()
+        mock_volume_class.get_collection.return_value = [mock_root_volume]
 
         svm_spec = SvmSpec(name="test-svm", aggregate_name="test-aggregate")
 
@@ -103,6 +106,18 @@ class TestNetAppClient:
         assert result.state == "online"
         mock_svm_instance.post.assert_called_once()
         mock_svm_instance.get.assert_called_once()
+        mock_volume_class.get_collection.assert_called_once_with(
+            name="test-svm_root",
+            fields="uuid,name",
+            **{"svm.name": "test-svm"},
+        )
+        assert mock_root_volume.size == 1024**3
+        assert mock_root_volume.snapshot_policy == {"name": "none"}
+        assert mock_root_volume.autosize == {
+            "mode": "grow",
+            "maximum": 2 * 1024**3,
+        }
+        mock_root_volume.patch.assert_called_once()
 
     @patch("understack_workflows.netapp.client.Svm")
     def test_create_svm_failure(self, mock_svm_class, netapp_client):

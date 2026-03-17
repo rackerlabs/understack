@@ -47,6 +47,9 @@ from understack_workflows.netapp.value_objects import VolumeSpec
 
 logger = logging.getLogger(__name__)
 
+SVM_ROOT_VOLUME_SIZE_BYTES = 1024**3
+SVM_ROOT_VOLUME_AUTOSIZE_MAXIMUM_BYTES = 2 * 1024**3
+
 
 class NetAppClientInterface(ABC):
     """Abstract interface for NetApp operations."""
@@ -265,6 +268,7 @@ class NetAppClient(NetAppClientInterface):
 
             svm.post()
             svm.get()  # Refresh to get the latest state
+            self._configure_svm_root_volume(svm_spec)
 
             result = SvmResult(
                 name=str(svm.name),
@@ -289,6 +293,39 @@ class NetAppClient(NetAppClientInterface):
                     "netapp_error": str(e),
                 },
             ) from e
+
+    def _configure_svm_root_volume(self, svm_spec: SvmSpec) -> None:
+        """Apply administrative settings to an SVM root volume."""
+        try:
+            root_volume = cast(
+                Volume,
+                next(
+                    iter(
+                        Volume.get_collection(
+                            name=svm_spec.root_volume_name,
+                            fields="uuid,name",
+                            **{"svm.name": svm_spec.name},  # pyright: ignore[reportArgumentType]
+                        )
+                    )
+                ),
+            )
+        except StopIteration as e:
+            raise SvmOperationError(
+                "SVM root volume was not found after SVM creation",
+                svm_name=svm_spec.name,
+                context={
+                    "svm_name": svm_spec.name,
+                    "root_volume_name": svm_spec.root_volume_name,
+                },
+            ) from e
+
+        root_volume.size = SVM_ROOT_VOLUME_SIZE_BYTES
+        root_volume.snapshot_policy = {"name": "none"}
+        root_volume.autosize = {
+            "mode": "grow",
+            "maximum": SVM_ROOT_VOLUME_AUTOSIZE_MAXIMUM_BYTES,
+        }
+        root_volume.patch()
 
     def delete_svm(self, svm_name: str) -> bool:
         """Delete a Storage Virtual Machine (SVM)."""
