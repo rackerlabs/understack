@@ -4,6 +4,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - rule-backups-too-old.yaml
 
 helmGlobals:
   chartHome: ../../charts/

@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-alert-nautobot-backup
+spec:
+  groups:
+    - name: cnpg
+      rules:
+        - alert: CnpgLastBackupTooOld
+          expr: |
+            (time() - sum by (namespace) (
+              cnpg_collector_last_available_backup_timestamp{pod=~"nautobot-cluster-([1-9][0-9]*)$"}
+            )) / 3600 > 24
+          for: 0s
+          labels:
+            severity: warning
+          annotations:
+            summary: "Last available Nautobot CNPG backup is older than 24h"
+            description: "Last available backup for cluster in {{ $labels.namespace }} is {{ $value }} hours old"
