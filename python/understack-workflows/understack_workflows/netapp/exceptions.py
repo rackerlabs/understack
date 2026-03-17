@@ -9,6 +9,12 @@ class NetAppManagerError(Exception):
         self.message = message
         self.context = context or {}
 
+    def __str__(self) -> str:
+        """Render the base message plus any structured context."""
+        if not self.context:
+            return self.message
+        return f"{self.message} | context={self.context}"
+
 
 class ConfigurationError(NetAppManagerError):
     """Configuration-related errors."""
@@ -36,6 +42,10 @@ class SvmOperationError(NetAppManagerError):
         self.svm_name = svm_name
 
 
+class SvmNotFoundError(SvmOperationError):
+    """Raised when an expected SVM does not exist."""
+
+
 class VolumeOperationError(NetAppManagerError):
     """Volume operation errors."""
 
@@ -60,3 +70,7 @@ class NetworkOperationError(NetAppManagerError):
     ):
         super().__init__(message, context)
         self.interface_name = interface_name
+
+
+class HomeNodeNotFoundError(NetworkOperationError):
+    """Raised when a matching home node cannot be identified."""
