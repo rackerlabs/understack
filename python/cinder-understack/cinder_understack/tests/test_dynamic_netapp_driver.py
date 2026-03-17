@@ -44,6 +44,7 @@ class NetappDynamicDriverTestCase(test.TestCase):
             "host": "openstack@netapp_dynamic",
         }
         self.driver = dynamic_netapp_driver.NetappCinderDynamicDriver(**kwargs)
+        self.override_config("netapp_pool_name_search_pattern", r"vol_(.+)")
         self.driver._cluster = mock.Mock()
         self.driver._get_svms = mock.Mock(return_value=self.svms)
 
@@ -117,7 +118,7 @@ class NetappDynamicDriverTestCase(test.TestCase):
         self.driver.get_volume_stats(refresh=True)
         mock_get_volume_stats.assert_called_with(True)
 
-    # Mocked check_for_setup_errort to avoid below error .
+    # Mock check_for_setup_error to avoid:
     # NetAppDriverException: No pools are available for provisioning volumes.
     @mock.patch(
         "cinder_understack.dynamic_netapp_driver.loopingcall.FixedIntervalLoopingCall"
@@ -214,3 +215,129 @@ class NetappDynamicDriverTestCase(test.TestCase):
 
         # The failing SVM should not be added to self._libraries
         self.assertNotIn("os-new-failing-svm", self.driver._libraries)
+
+    # --- _svmify_pool tests ---
+
+    def _make_pool(self, pool_name):
+        return {
+            "pool_name": pool_name,
+            "free_capacity_gb": 100,
+            "total_capacity_gb": 200,
+        }
+
+    def test_svmify_pool_vol_matching_pattern(self):
+        """FlexVol matching pool name pattern gets netapp_volume_type_id set."""
+        svm_name = f"os-{self.project_id}"
+        vol_type_id = str(uuid.uuid4())
+        pool_name = f"vol_{vol_type_id}"
+        pool = self._make_pool(pool_name)
+
+        result = self.driver._svmify_pool(pool, svm_name)
+
+        self.assertEqual(vol_type_id, result["netapp_volume_type_id"])
+        self.assertEqual(self.project_id, result["netapp_project_id"])
+
+    def test_svmify_pool_multi_flexvol(self):
+        """Multi-FlexVol vol_{volume_type_uuid} gets netapp_volume_type_id set."""
+        svm_name = f"os-{self.project_id}"
+        vol_type_id = str(uuid.uuid4())
+        pool_name = f"vol_{vol_type_id.replace('-', '')}"
+        pool = self._make_pool(pool_name)
+
+        result = self.driver._svmify_pool(pool, svm_name)
+
+        self.assertEqual(vol_type_id, result["netapp_volume_type_id"])
+
+    def test_svmify_pool_invalid_uuid_suffix(self):
+        """FlexVol with vol_ prefix but non-UUID suffix gets empty volume_type_id."""
+        svm_name = f"os-{self.project_id}"
+        pool = self._make_pool("vol_not_a_uuid")
+
+        result = self.driver._svmify_pool(pool, svm_name)
+
+        self.assertEqual("", result["netapp_volume_type_id"])
+
+    def test_svmify_pool_no_pattern_match(self):
+        """FlexVol not matching pool name pattern gets empty netapp_volume_type_id."""
+        svm_name = f"os-{self.project_id}"
+        pool = self._make_pool("svm_root")
+
+        result = self.driver._svmify_pool(pool, svm_name)
+
+        self.assertEqual("", result["netapp_volume_type_id"])
+
+    def test_svmify_pool_sets_project_id_and_vserver(self):
+        """_svmify_pool sets netapp_project_id and netapp_vserver."""
+        svm_name = f"os-{self.project_id}"
+        pool = self._make_pool("some_pool")
+
+        result = self.driver._svmify_pool(pool, svm_name)
+
+        self.assertEqual(self.project_id, result["netapp_project_id"])
+        self.assertEqual(svm_name, result["netapp_vserver"])
+
+    def test_svmify_pool_prefixes_pool_name_with_svm(self):
+        """_svmify_pool prefixes pool_name with svm_name+delimiter."""
+        svm_name = f"os-{self.project_id}"
+        pool = self._make_pool("some_pool")
+
+        result = self.driver._svmify_pool(pool, svm_name)
+
+        self.assertEqual(
+            f"{svm_name}{dynamic_netapp_driver._SVM_NAME_DELIM}some_pool",
+            result["pool_name"],
+        )
+
+    # --- get_filter_function tests ---
+
+    def test_get_filter_function_contains_project_filter(self):
+        """Filter must include netapp_project_id == volume.project_id."""
+        f = self.driver.get_filter_function()
+        self.assertIn("capabilities.netapp_project_id == volume.project_id", f)
+
+    def test_get_filter_function_contains_volume_type_filter(self):
+        """Filter must include netapp_volume_type_id conditions."""
+        f = self.driver.get_filter_function()
+        self.assertIn('capabilities.netapp_volume_type_id == ""', f)
+        self.assertIn("capabilities.netapp_volume_type_id == volume.volume_type_id", f)
+
+    def test_get_filter_function_combines_with_base_filter(self):
+        """If a base filter exists it should be appended with AND."""
+        with mock.patch.object(
+            self.driver.__class__.__bases__[0],
+            "get_filter_function",
+            return_value="capabilities.some_cap > 0",
+        ):
+            f = self.driver.get_filter_function()
+        self.assertIn("capabilities.some_cap > 0", f)
+        self.assertIn("capabilities.netapp_project_id == volume.project_id", f)
+
+    def test_get_filter_function_no_base_filter(self):
+        """When no base filter exists the result contains only our filters."""
+        with mock.patch.object(
+            self.driver.__class__.__bases__[0],
+            "get_filter_function",
+            return_value=None,
+        ):
+            f = self.driver.get_filter_function()
+        self.assertNotIn("and None", f)
+        self.assertIn("capabilities.netapp_project_id == volume.project_id", f)
+
+    # --- delete_volume tests ---
+
+    @mock.patch.object(NetAppNVMeStorageLibrary, "delete_volume")
+    def test_delete_volume_calls_library(self, mock_delete_volume):
+        """delete_volume delegates to the correct SVM library."""
+        ctxt = context.get_admin_context()
+        self.driver.do_setup(ctxt)
+        vol_type = test_utils.create_volume_type(
+            ctxt,
+            self,
+            id=na_fakes.VOLUME.volume_type_id,
+            name="my_vol_type_del",
+            is_public=False,
+        )
+        db.volume_type_access_add(ctxt, vol_type.id, self.project_id)
+        test_vol = self._get_fake_volume(vol_type.id)
+        self.driver.delete_volume(test_vol)
+        mock_delete_volume.assert_called_once_with(test_vol)
