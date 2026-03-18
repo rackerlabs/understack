@@ -25,6 +25,8 @@ import (
 
 // NautobotSpec defines the desired state of Nautobot.
 type NautobotSpec struct {
+	// +kubebuilder:default=false
+	IsEnabled bool `json:"isEnabled,omitempty"`
 	// +kubebuilder:default=600
 	RequeueAfter int `json:"requeueAfter,omitempty"`
 	// +kubebuilder:default=172800
