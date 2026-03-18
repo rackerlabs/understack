@@ -114,11 +114,17 @@ def _set_port_local_link_connection(baremetal_port, mac, required_pxe):
 
 def _pxe_interface_name(inspected_interfaces: list[dict], node_uuid) -> str | None:
     """Use a heuristic to determine our default interface for PXE."""
-    names = sorted(i["name"] for i in inspected_interfaces if i.get("speed_mbps"))
+    interfaces = sorted(inspected_interfaces, key=lambda i: i["name"])
+    fallback = None
     for prefix in PXE_BIOS_NAME_PREFIXES:
-        for name in names:
-            if name.startswith(prefix):
-                return name
+        for iface in interfaces:
+            if iface["name"].startswith(prefix):
+                if iface.get("speed_mbps"):
+                    return iface["name"]
+                if fallback is None:
+                    fallback = iface["name"]
+    if fallback:
+        return fallback
     LOG.error(
         "No PXE interface found for node %s.  Expected to find an "
         "interface whose bios_name starts with one of %s",
