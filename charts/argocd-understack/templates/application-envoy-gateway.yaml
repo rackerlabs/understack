@@ -22,7 +22,7 @@ spec:
       - $understack/components/envoy-gateway/values.yaml
       - $deploy/{{ include "understack.deploy_path" $ }}/envoy-gateway/values.yaml
     repoURL: docker.io/envoyproxy
-    targetRevision: v1.6.0
+    targetRevision: 1.7.1
   - path: components/envoy-gateway
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
