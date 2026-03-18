@@ -89,6 +89,10 @@ spec:
             valueFrom:
               path: /var/run/argo/output.svm_created
               default: "False"
+          - name: svm_state
+            valueFrom:
+              path: /var/run/argo/output.svm_state
+              default: "unknown"
           - name: project_tags
             valueFrom:
               path: /var/run/argo/output.project_tags

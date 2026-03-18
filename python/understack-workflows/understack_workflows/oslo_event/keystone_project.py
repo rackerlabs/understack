@@ -65,17 +65,21 @@ def handle_project_created(
 
     if not project_is_svm_enabled:
         logger.info("The %s is missing, not creating SVM.", SVM_PROJECT_TAG)
+        save_output("svm_state", "nonexistent")
         return 0
 
     svm_name = None
+    svm_state = "unknown"
     try:
         netapp_manager = NetAppManager()
         svm_name = _create_svm(netapp_manager, event)
         save_output("svm_created", str(True))
+        svm_state = "created"
     finally:
         if not svm_name:
             svm_name = "not_returned"
         save_output("svm_name", svm_name)
+        save_output("svm_state", svm_state)
     return 0
 
 
@@ -92,6 +96,7 @@ def handle_project_updated(
     save_output("svm_enabled", str(project_is_svm_enabled))
 
     svm_name = None
+    svm_state = "unknown"
     try:
         netapp_manager = NetAppManager()
         svm_exists = netapp_manager.check_if_svm_exists(project_id=event.project_id)
@@ -105,17 +110,21 @@ def handle_project_updated(
                 SVM_PROJECT_TAG,
             )
             netapp_manager.cleanup_project(event.project_id)
+            svm_state = "removed"
         # Tag added
         elif project_is_svm_enabled:
             if svm_exists:
                 save_output("svm_created", str(False))
+                svm_state = "present"
             else:
                 svm_name = _create_svm(netapp_manager, event)
-            save_output("svm_created", str(True))
+                save_output("svm_created", str(True))
+                svm_state = "created"
     finally:
         if not svm_name:
             svm_name = "not_returned"
         save_output("svm_name", svm_name)
+        save_output("svm_state", svm_state)
     return 0
 
 
@@ -135,10 +144,13 @@ def handle_project_deleted(
         if svm_exists:
             logger.info("SVM for project %s exists - cleaning it up.", event.project_id)
             netapp_manager.cleanup_project(event.project_id)
+            save_output("svm_state", "removed")
         else:
             logger.info("SVM for project %s did not exist.", event.project_id)
+            save_output("svm_state", "nonexistent")
     except Exception as e:
         logger.error(e)
+        save_output("svm_state", "unknown")
         return 1
     return 0
 
