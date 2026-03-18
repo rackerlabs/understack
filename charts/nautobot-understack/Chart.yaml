@@ -1,0 +1,10 @@
+apiVersion: v2
+name: nautobot-understack
+description: UnderStack wrapper chart for Nautobot and supporting resources
+type: application
+version: 0.1.0
+appVersion: "3.0.9"
+dependencies:
+  - name: nautobot
+    version: 2.5.6
+    repository: https://nautobot.github.io/helm-charts/

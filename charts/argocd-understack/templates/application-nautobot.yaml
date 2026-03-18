@@ -14,20 +14,15 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - chart: nautobot
+  - path: charts/nautobot-understack
     helm:
       fileParameters:
-      - name: nautobot.config
-        path: $understack/components/nautobot/nautobot_config.py
+      - name: nautobot.nautobot.config
+        path: files/nautobot_config.py
       ignoreMissingValueFiles: true
       releaseName: nautobot
       valueFiles:
-      - $understack/components/nautobot/values.yaml
       - $deploy/{{ include "understack.deploy_path" $ }}/nautobot/values.yaml
-    repoURL: https://nautobot.github.io/helm-charts/
-    targetRevision: 2.5.6
-  - path: components/nautobot
-    ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
   - path: {{ include "understack.deploy_path" $ }}/nautobot

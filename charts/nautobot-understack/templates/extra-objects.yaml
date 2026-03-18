@@ -1,0 +1,4 @@
+{{- range .Values.understack.nautobot.extraObjects }}
+---
+{{ tpl (toYaml .) $ }}
+{{- end }}

@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "nautobot": {
+      "type": "object",
+      "description": "Values passed through to the upstream Nautobot chart dependency.",
+      "additionalProperties": true
+    },
+    "understack": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nautobot": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sso": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "configMap": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "enableGroupSync": { "type": "string" },
+                    "claimsGroup": { "type": "string", "minLength": 1 },
+                    "staffGroups": { "type": "string" },
+                    "superuserGroups": { "type": "string" }
+                  },
+                  "required": [
+                    "enabled",
+                    "enableGroupSync",
+                    "claimsGroup",
+                    "staffGroups",
+                    "superuserGroups"
+                  ]
+                },
+                "externalSecret": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                    },
+                    "spec": {
+                      "type": "object",
+                      "minProperties": 1,
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "name",
+                    "spec"
+                  ]
+                }
+              },
+              "required": ["configMap", "externalSecret"]
+            },
+            "cnpg": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "cluster": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                    },
+                    "annotations": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "imageName": { "type": "string", "minLength": 1 },
+                    "instances": { "type": "integer", "minimum": 1 },
+                    "storage": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "size": {
+                          "type": "string",
+                          "pattern": "^[0-9]+(Mi|Gi|Ti)$"
+                        },
+                        "storageClass": { "type": "string" }
+                      },
+                      "required": ["size", "storageClass"]
+                    },
+                    "affinity": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "podAntiAffinityType": {
+                          "type": "string",
+                          "enum": ["preferred", "required"]
+                        },
+                        "topologyKey": { "type": "string", "minLength": 1 }
+                      },
+                      "required": ["podAntiAffinityType", "topologyKey"]
+                    },
+                    "monitoring": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "enablePodMonitor": { "type": "boolean" }
+                      },
+                      "required": ["enablePodMonitor"]
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "annotations",
+                    "imageName",
+                    "instances",
+                    "storage",
+                    "affinity",
+                    "monitoring"
+                  ]
+                },
+                "backup": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                    },
+                    "schedule": { "type": "string", "minLength": 1 },
+                    "destinationPath": { "type": "string" },
+                    "secretName": { "type": "string" },
+                    "accessKeyIdKey": { "type": "string", "minLength": 1 },
+                    "secretAccessKeyKey": { "type": "string", "minLength": 1 }
+                  },
+                  "required": [
+                    "enabled",
+                    "name",
+                    "schedule",
+                    "destinationPath",
+                    "secretName",
+                    "accessKeyIdKey",
+                    "secretAccessKeyKey"
+                  ]
+                }
+              },
+              "required": ["enabled", "cluster", "backup"]
+            },
+            "postDeployJob": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                },
+                "image": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "repository": { "type": "string", "minLength": 1 },
+                    "tag": { "type": "string" },
+                    "pullPolicy": {
+                      "type": "string",
+                      "enum": ["Always", "IfNotPresent", "Never"]
+                    }
+                  },
+                  "required": ["repository", "tag", "pullPolicy"]
+                },
+                "backoffLimit": { "type": "integer", "minimum": 0 },
+                "nautobotUrl": { "type": "string" },
+                "resources": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "requests": {
+                      "$ref": "#/definitions/resources"
+                    },
+                    "limits": {
+                      "$ref": "#/definitions/resources"
+                    }
+                  },
+                  "required": ["requests", "limits"]
+                }
+              },
+              "required": [
+                "enabled",
+                "name",
+                "image",
+                "backoffLimit",
+                "nautobotUrl",
+                "resources"
+              ]
+            },
+            "extraObjects": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": ["sso", "cnpg", "postDeployJob", "extraObjects"]
+        }
+      },
+      "required": ["nautobot"]
+    }
+  },
+  "required": ["nautobot", "understack"],
+  "definitions": {
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": { "type": "string", "minLength": 1 },
+        "memory": { "type": "string", "minLength": 1 }
+      },
+      "required": ["cpu", "memory"]
+    }
+  }
+}

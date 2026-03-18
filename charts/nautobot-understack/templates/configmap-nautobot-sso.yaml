@@ -1,0 +1,13 @@
+{{- $config := .Values.understack.nautobot.sso.configMap -}}
+{{- if $config.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nautobot-understack.ssoConfigMapName" . }}
+data:
+  NAUTOBOT_SSO_ENABLE_GROUP_SYNC: {{ $config.enableGroupSync | quote }}
+  NAUTOBOT_SSO_CLAIMS_GROUP: {{ $config.claimsGroup | quote }}
+  NAUTOBOT_SSO_STAFF_GROUPS: {{ $config.staffGroups | quote }}
+  NAUTOBOT_SSO_SUPERUSER_GROUPS: {{ $config.superuserGroups | quote }}
+{{- end }}

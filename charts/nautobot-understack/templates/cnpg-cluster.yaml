@@ -1,0 +1,49 @@
+{{- $cnpg := .Values.understack.nautobot.cnpg -}}
+{{- if $cnpg.enabled }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ $cnpg.cluster.name }}
+  {{- with $cnpg.cluster.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+  {{- end }}
+spec:
+  imageName: {{ $cnpg.cluster.imageName }}
+  instances: {{ $cnpg.cluster.instances }}
+  storage:
+    size: {{ $cnpg.cluster.storage.size }}
+    {{- with $cnpg.cluster.storage.storageClass }}
+    storageClass: {{ . }}
+    {{- end }}
+  affinity:
+    podAntiAffinityType: {{ $cnpg.cluster.affinity.podAntiAffinityType }}
+    topologyKey: {{ $cnpg.cluster.affinity.topologyKey }}
+  monitoring:
+    enablePodMonitor: {{ $cnpg.cluster.monitoring.enablePodMonitor }}
+  {{- if and $cnpg.backup.enabled $cnpg.backup.destinationPath $cnpg.backup.secretName }}
+  backup:
+    barmanObjectStore:
+      destinationPath: {{ $cnpg.backup.destinationPath | quote }}
+      s3Credentials:
+        accessKeyId:
+          name: {{ $cnpg.backup.secretName }}
+          key: {{ $cnpg.backup.accessKeyIdKey }}
+        secretAccessKey:
+          name: {{ $cnpg.backup.secretName }}
+          key: {{ $cnpg.backup.secretAccessKeyKey }}
+  {{- end }}
+---
+{{- if $cnpg.backup.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ $cnpg.backup.name }}
+spec:
+  schedule: {{ $cnpg.backup.schedule | quote }}
+  backupOwnerReference: self
+  cluster:
+    name: {{ $cnpg.cluster.name }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,232 @@
+# yaml-language-server: $schema=./values.schema.json
+---
+
+# -- Values passed through to the upstream Nautobot chart dependency.
+#    This wrapper intentionally leaves this schema mostly open so sites can
+#    continue to use upstream chart settings without UnderStack mirroring the
+#    entire upstream values interface.
+nautobot:
+  nautobot:
+    # -- Nautobot database configuration.
+    db:
+      # -- Django database engine for Nautobot.
+      engine: "django.db.backends.postgresql"
+      # -- Database host for Nautobot application traffic.
+      #    When understack.nautobot.cnpg.enabled is true and this value is empty,
+      #    the wrapper derives the host as <cnpg cluster name>-rw.<release namespace>.svc.
+      host: ""
+      # -- Database name used by Nautobot.
+      name: "app"
+      # -- Database user used by Nautobot.
+      user: "app"
+      # -- Existing Secret containing the database password.
+      existingSecret: "nautobot-cluster-app"
+      # -- Secret key containing the database password.
+      existingSecretPasswordKey: "password"
+    # -- Django secret configuration.
+    django:
+      # -- Existing Secret containing the Django secret key and related settings.
+      existingSecret: nautobot-django
+    # -- Nautobot superuser bootstrap configuration.
+    superUser:
+      # -- Enable creation/management of the Nautobot superuser secret wiring.
+      enabled: true
+      # -- Existing Secret containing superuser bootstrap values.
+      existingSecret: nautobot-superuser
+      # -- Secret key containing the superuser password.
+      existingSecretPasswordKey: password
+      # -- Secret key containing the superuser API token.
+      existingSecretApiTokenKey: apitoken
+    # -- Additional volumes mounted into the Nautobot web pods.
+    extraVolumes:
+      - name: nautobot-sso
+        secret:
+          # -- Secret name providing SSO files. When empty, the wrapper derives
+          #    this from understack.nautobot.sso.externalSecret.spec.target.name
+          #    or understack.nautobot.sso.externalSecret.name.
+          secretName: ""
+          defaultMode: 420
+          optional: false
+    # -- Additional volume mounts for Nautobot web pods.
+    extraVolumeMounts:
+      - name: nautobot-sso
+        mountPath: /opt/nautobot/sso/
+        readOnly: true
+    # -- ConfigMaps to load into the Nautobot web pods via envFrom.
+    # -- When empty and understack.nautobot.sso.configMap.enabled is true,
+    #    the wrapper derives this from the SSO ConfigMap resource name.
+    extraEnvVarsCM: []
+    # -- Secrets to load into the Nautobot web pods via envFrom.
+    extraEnvVarsSecret:
+      - nautobot-custom-env
+    # -- Resource requests and limits for Nautobot web pods.
+    resources:
+      requests:
+        cpu: "1000m"
+        memory: "1536M"
+      limits:
+        cpu: "2000m"
+        memory: "8704M"
+    # -- Liveness probe overrides for Nautobot web pods.
+    livenessProbe:
+      periodSeconds: 120
+      timeoutSeconds: 60
+
+  celery:
+    # -- Celery worker concurrency.
+    concurrency: 2
+    # -- Number of Celery worker replicas.
+    replicaCount: 1
+    # -- Secrets to load into Celery worker pods via envFrom.
+    extraEnvVarsSecret:
+      - nautobot-django
+      - nautobot-custom-env
+    # -- Liveness probe overrides for Celery worker pods.
+    livenessProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 120
+      timeoutSeconds: 60
+    # -- Readiness probe overrides for Celery worker pods.
+    readinessProbe:
+      initialDelaySeconds: 60
+      periodSeconds: 120
+      timeoutSeconds: 60
+
+  postgresql:
+    # -- Disable the upstream bundled PostgreSQL dependency. UnderStack uses CNPG.
+    enabled: false
+
+  redis:
+    # -- Enable the upstream Redis dependency.
+    enabled: true
+    auth:
+      # -- Existing Secret containing the Redis password.
+      existingSecret: nautobot-redis
+      # -- Secret key containing the Redis password.
+      existingSecretPasswordKey: NAUTOBOT_REDIS_PASSWORD
+    commonAnnotations:
+      # -- Prevent ArgoCD from deleting Redis during app deletion.
+      argocd.argoproj.io/sync-options: Delete=false
+
+  ingress:
+    # -- Disable the upstream ingress objects by default.
+    enabled: false
+
+  metrics:
+    # -- Enable Nautobot metrics.
+    enabled: true
+    prometheusRule:
+      # -- Enable the upstream PrometheusRule resource.
+      enabled: true
+
+understack:
+  nautobot:
+    sso:
+      configMap:
+        # -- Enable the SSO environment ConfigMap managed by UnderStack.
+        enabled: true
+        # -- Whether the Nautobot SSO group sync plugin should be enabled.
+        enableGroupSync: "true"
+        # -- JWT/OIDC claim used as the source of group membership.
+        claimsGroup: "groups"
+        # -- Comma-separated list of groups treated as staff users.
+        staffGroups: "ucadmin"
+        # -- Comma-separated list of groups treated as superusers.
+        superuserGroups: ""
+      externalSecret:
+        # -- Enable the ExternalSecret used to materialize Nautobot SSO config.
+        enabled: true
+        # -- ExternalSecret resource name.
+        name: nautobot-sso
+        # -- ExternalSecret spec passed through to the rendered resource.
+        spec:
+          refreshInterval: 1h
+          secretStoreRef:
+            kind: ClusterSecretStore
+            name: dex
+          target:
+            name: nautobot-sso
+            creationPolicy: Owner
+            deletionPolicy: Delete
+          dataFrom:
+            - extract:
+                key: nautobot-sso
+                conversionStrategy: Default
+                decodingStrategy: None
+                metadataPolicy: None
+
+    cnpg:
+      # -- Enable UnderStack-managed CloudNativePG resources for Nautobot.
+      enabled: true
+      cluster:
+        # -- CNPG Cluster resource name.
+        name: nautobot-cluster
+        annotations:
+          # -- Prevent ArgoCD from deleting the CNPG cluster automatically.
+          argocd.argoproj.io/sync-options: Delete=false
+        # -- PostgreSQL image used by the CNPG cluster.
+        imageName: ghcr.io/cloudnative-pg/postgresql:15.17-minimal-trixie
+        # -- Number of CNPG instances.
+        instances: 3
+        storage:
+          # -- Persistent volume size for each CNPG instance.
+          size: 20Gi
+          # -- Optional storageClass for CNPG volumes. Empty uses the cluster default.
+          storageClass: ""
+        affinity:
+          # -- Pod anti-affinity behavior for CNPG instances.
+          podAntiAffinityType: required
+          # -- Topology key used for CNPG anti-affinity.
+          topologyKey: kubernetes.io/hostname
+        monitoring:
+          # -- Enable CNPG PodMonitor generation.
+          enablePodMonitor: true
+      backup:
+        # -- Enable CNPG ScheduledBackup generation.
+        enabled: true
+        # -- ScheduledBackup resource name.
+        name: nautobot-backup
+        # -- CNPG backup cron schedule.
+        schedule: "0 0 0 * * *"
+        # -- Optional barman destinationPath. When empty, object storage config is omitted.
+        destinationPath: ""
+        # -- Secret containing backup object-store credentials.
+        secretName: ""
+        # -- Secret key containing the object-store access key ID.
+        accessKeyIdKey: access-key-id
+        # -- Secret key containing the object-store secret access key.
+        secretAccessKeyKey: secret-access-key
+
+    postDeployJob:
+      # -- Enable the Nautobot post-deploy job managed by UnderStack.
+      enabled: true
+      # -- Name of the Nautobot post-deploy Job.
+      name: nautobot-post-deploy
+      image:
+        # -- Container image repository for the post-deploy job.
+        repository: ghcr.io/rackerlabs/understack/ansible
+        # -- Container image tag for the post-deploy job.
+        #    When empty, the wrapper uses Chart.appVersion.
+        tag: ""
+        # -- Image pull policy for the post-deploy job.
+        pullPolicy: Always
+      # -- Number of retries before the post-deploy job is marked failed.
+      backoffLimit: 2
+      # -- Base Nautobot URL used by the post-deploy job.
+      #    When empty, the wrapper derives this as
+      #    http://<release name>-default.<release namespace>.svc.cluster.local.
+      nautobotUrl: ""
+      # -- Resource requests and limits for the post-deploy job container.
+      resources:
+        requests:
+          cpu: "1000m"
+          memory: "512Mi"
+        limits:
+          cpu: "1000m"
+          memory: "512Mi"
+
+    # -- Additional Kubernetes objects rendered by the wrapper chart.
+    #    Values are passed through `tpl`, so entries may reference chart values,
+    #    release metadata, and helper templates. Use sparingly as an escape hatch
+    #    for site-specific adjunct resources.
+    extraObjects: []

@@ -3,6 +3,7 @@ extends: default
 ignore:
   - components/etcdbackup/templates/
   - charts/argocd-understack/templates/
+  - charts/nautobot-understack/templates/
   - charts/nautobot-api-tokens/templates/
   - charts/site-workflows/templates/
 
