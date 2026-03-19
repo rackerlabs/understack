@@ -11,7 +11,7 @@ Rook Ceph operator and cluster installation.
 ## How ArgoCD Builds It
 
 - ArgoCD renders Helm chart `rook-ceph`, Helm chart `rook-ceph-cluster`, Kustomize path `operators/rook`.
-- The current template does not read a deploy-repo `values.yaml` for this component.
+- The deploy repo contributes `rook-operator/values.yaml` and `rook-cluster/values.yaml` for this component.
 - The current template does not apply a deploy-repo overlay directory for this component.
 
 ## How to Enable
@@ -27,7 +27,15 @@ site:
     enabled: true
 ```
 
-## Notes
+## Deployment Repo Content
 
-- The current ArgoCD template installs the shared charts and operator manifests directly and does not consume deploy-repo values or overlay manifests for this component.
-- If you later need site-specific storage overlays, update the ArgoCD template first so the deploy repo is actually part of the rendered Application.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- `rook-operator/values.yaml`: Provide operator chart overrides when the shared defaults are not sufficient.
+- `rook-cluster/values.yaml`: Provide cluster topology, storage devices, pools, object stores, and CSI settings.
+
+Optional additions:
+
+- `Storage credential or class resources`: If your values reference Secrets, StorageClasses, CephObjectStores, or similar supporting resources, materialize those final resources with whatever workflow you prefer.

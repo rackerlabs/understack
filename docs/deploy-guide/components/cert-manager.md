@@ -27,7 +27,14 @@ site:
     enabled: true
 ```
 
-## Notes
+## Deployment Repo Content
 
-- The current ArgoCD template installs the upstream chart directly and does not consume a deploy-repo values file or overlay directory for this component.
-- Document issuer-specific Secrets and issuer manifests in the `cluster-issuer` page instead of here.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- None for this Application today. It installs the upstream chart with inline values and does not consume deploy-repo `values.yaml` or overlay content.
+
+Optional additions:
+
+- Document issuer manifests and challenge-credential Secrets in the `cluster-issuer` component page rather than here.

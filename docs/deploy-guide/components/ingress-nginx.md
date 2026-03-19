@@ -18,13 +18,20 @@ global:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+- ArgoCD renders Helm chart `ingress-nginx`.
+- The deploy repo contributes `values.yaml` for this component.
+- The current template does not apply a deploy-repo overlay directory for this component.
 
-## Notes
+## Deployment Repo Content
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- `values.yaml`: Provide controller service type, ingress class, load balancer, and default TLS behavior in `$CLUSTER_NAME/ingress-nginx/values.yaml`.
+
+Optional additions:
+
+- `Default certificate Secret`: If your values reference a default TLS certificate, create the Secret with `tls.crt` and `tls.key`.

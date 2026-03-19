@@ -27,7 +27,14 @@ site:
     enabled: true
 ```
 
-## Notes
+## Deployment Repo Content
 
-- The current ArgoCD template deploys the shared operator manifests directly and does not read deploy-repo values or overlay manifests for this component.
-- Provider-specific SecretStores and authentication material should be documented only where a consuming component needs the resulting Secret shape.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- None for this Application today. It deploys the shared operator manifests directly and does not read deploy-repo values or overlay manifests for this component.
+
+Optional additions:
+
+- Document provider-specific SecretStores and authentication material only where a consuming component needs the resulting Secret shape.

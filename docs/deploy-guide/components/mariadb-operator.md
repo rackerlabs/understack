@@ -24,7 +24,14 @@ site:
     enabled: true
 ```
 
-## Notes
+## Deployment Repo Content
 
-- The current ArgoCD template deploys the shared operator manifests directly and does not consume deploy-repo values or overlay manifests for this component.
-- Put database instance configuration in the components that own those databases rather than in this operator page.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- None for this Application today. It deploys the shared operator manifests directly and does not consume deploy-repo values or overlay manifests for this component.
+
+Optional additions:
+
+- Put database instance configuration in the components that own those databases rather than on this operator page.

@@ -27,7 +27,14 @@ site:
     enabled: true
 ```
 
-## Notes
+## Deployment Repo Content
 
-- The current ArgoCD template deploys the shared operator manifests directly and does not consume deploy-repo values or overlay manifests for this component.
-- Document any per-resource credentials or sync rules with the consuming OpenStack component instead of here.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- None for this Application today. It deploys the shared operator manifests directly and does not consume deploy-repo values or overlay manifests for this component.
+
+Optional additions:
+
+- Document any per-resource credentials or sync rules with the consuming OpenStack component instead of on this operator page.

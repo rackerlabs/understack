@@ -18,13 +18,21 @@ global:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+- ArgoCD renders Helm chart `karma`.
+- The deploy repo contributes `values.yaml` for this component.
+- The deploy repo overlay directory for this component is applied as a second source, so `kustomization.yaml` and any referenced manifests are part of the final Application.
 
-## Notes
+## Deployment Repo Content
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- `values.yaml`: Provide Alertmanager endpoints, ingress, auth, and UI settings.
+- `kustomization.yaml`: Include any Secret or manifest resources referenced by your Karma values.
+
+Optional additions:
+
+- `SSO or proxy credential Secret`: Create the Secret name referenced by your values or overlay and populate it with the keys expected by your authentication flow.

@@ -27,7 +27,14 @@ site:
     enabled: true
 ```
 
-## Notes
+## Deployment Repo Content
 
-- The current ArgoCD template deploys the shared bootstrap manifests directly and does not consume deploy-repo values or overlay manifests for this component.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- None for this Application today. It deploys the shared bootstrap manifests directly and does not consume deploy-repo values or overlay manifests for this component.
+
+Optional additions:
+
 - Document individual decrypted Secret shapes on the component pages that consume them rather than here.

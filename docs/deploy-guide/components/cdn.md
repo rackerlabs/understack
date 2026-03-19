@@ -18,13 +18,20 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+- ArgoCD renders Helm chart `components/understack-cdn`.
+- The deploy repo contributes `understack-cdn/values.yaml` for this component.
+- The current template does not apply a deploy-repo overlay directory for this component.
 
-## Notes
+## Deployment Repo Content
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- `values.yaml`: Provide CDN ingress, object-bucket, cache, and runtime settings in `$CLUSTER_NAME/understack-cdn/values.yaml`.
+
+Optional additions:
+
+- `Object storage credential Secret`: If your values reference an authenticated backend instead of anonymous access, create the Secret name referenced by the chart and populate it with the key names that backend expects.

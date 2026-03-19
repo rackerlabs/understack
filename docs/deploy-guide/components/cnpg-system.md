@@ -24,7 +24,14 @@ global:
     enabled: true
 ```
 
-## Notes
+## Deployment Repo Content
 
-- The current ArgoCD template deploys the operator manifests directly and does not consume deploy-repo values or overlay manifests for this component.
-- Create database clusters and backup configuration in the components that own those databases, such as `nautobot`.
+Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+
+Required or commonly required items:
+
+- None for this Application today. It deploys the shared operator manifests directly and does not consume deploy-repo values or overlay manifests for this component.
+
+Optional additions:
+
+- Create database clusters and backup configuration in the components that own those databases, such as `nautobot`, rather than on this operator page.
