@@ -50,7 +50,7 @@ def handle_volume_type_access_added(
 
     vol_type = conn.block_storage.get_type(event.volume_type_id)  # pyright: ignore[reportAttributeAccessIssue]
     extra_specs = getattr(vol_type, "extra_specs", {}) or {}
-    volume_size = extra_specs.get("volume_size", VOLUME_SIZE)
+    volume_size = extra_specs.get("netapp:flexvol_size", VOLUME_SIZE)
 
     netapp_manager = NetAppManager()
 
@@ -62,7 +62,7 @@ def handle_volume_type_access_added(
         save_output("volume_created", str(False))
         return 1
 
-    aggregate_name = extra_specs.get("aggregate_name")
+    aggregate_name = extra_specs.get("netapp:aggregate_name")
     if aggregate_name is None:
         aggregate_name = netapp_manager.select_aggregate_name()
 
