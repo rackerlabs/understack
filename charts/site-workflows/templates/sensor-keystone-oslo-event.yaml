@@ -135,7 +135,7 @@ spec:
                           value: {{ printf "{{workflow.parameters.project_id}}" | quote }}
 
                   - - name: ansible-remove-svm
-                      when: {{ printf "{{steps.oslo-events.outputs.parameters.svm_state}} == 'removed'" | quote }}
+                      when: {{ printf "'{{steps.oslo-events.outputs.parameters.svm_state}}' == 'removed'" | quote }}
                       templateRef:
                         name: ansible-workflow-template
                         template: ansible-run
@@ -147,7 +147,7 @@ spec:
                           value: {{ printf "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}}" | quote }}
 
                   - - name: ansible-remove-project-svm
-                      when: {{ printf "{{steps.oslo-events.outputs.parameters.svm_state}} == 'removed'" | quote }}
+                      when: {{ printf "'{{steps.oslo-events.outputs.parameters.svm_state}}' == 'removed'" | quote }}
                       templateRef:
                         name: ansible-workflow-template
                         template: ansible-run
@@ -159,7 +159,7 @@ spec:
                           value: {{ printf "project_id={{steps.convert-project-id.outputs.result}} dry_run=false" | quote }}
 
                   - - name: ansible-remove-project
-                      when: {{ printf "{{workflow.parameters.event_type}} == 'identity.project.deleted'" | quote }}
+                      when: {{ printf "'{{workflow.parameters.event_type}}' == 'identity.project.deleted'" | quote }}
                       templateRef:
                         name: ansible-workflow-template
                         template: ansible-run
