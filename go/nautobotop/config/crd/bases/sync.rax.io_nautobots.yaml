@@ -71,6 +71,9 @@ spec:
                   - name
                   type: object
                 type: array
+              isEnabled:
+                default: true
+                type: boolean
               locationRef:
                 items:
                   description: ConfigMapRef defines a reference to a specific ConfigMap

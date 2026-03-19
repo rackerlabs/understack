@@ -75,8 +75,14 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
 	requeueAfter := time.Duration(nautobotCR.Spec.RequeueAfter) * time.Second
+
+	if !nautobotCR.Spec.IsEnabled {
+		log.Info("reconciliation is disabled for this resource", "name", req.NamespacedName)
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	}
+
+	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
 
 	// Define all resources to sync
 	// Add more resources here: {name: "location", configRefs: nautobotCR.Spec.LocationsRef, syncFunc: r.syncLocations}
