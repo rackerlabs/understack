@@ -127,7 +127,7 @@ class TestHandleVolumeTypeAccessAdded:
         mock_conn.block_storage.get_type.return_value = MagicMock(
             extra_specs={
                 "aggregate_name": "aggr_custom",
-                "volume_size": "1TB",
+                "netapp:flexvol_size": "1TB",
             }
         )
         mock_netapp_manager = MagicMock()

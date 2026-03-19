@@ -50,7 +50,7 @@ def handle_volume_type_access_added(
 
     vol_type = conn.block_storage.get_type(event.volume_type_id)  # pyright: ignore[reportAttributeAccessIssue]
     extra_specs = getattr(vol_type, "extra_specs", {}) or {}
-    volume_size = extra_specs.get("volume_size", VOLUME_SIZE)
+    volume_size = extra_specs.get("netapp:flexvol_size", VOLUME_SIZE)
 
     netapp_manager = NetAppManager()
 
