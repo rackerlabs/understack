@@ -120,10 +120,20 @@ def _pxe_interface_name(inspected_interfaces: list[dict], node_uuid) -> str | No
         for iface in interfaces:
             if iface["name"].startswith(prefix):
                 if iface.get("speed_mbps"):
+                    LOG.info(
+                        "PXE interface for node %s: %s (link detected)",
+                        node_uuid,
+                        iface["name"],
+                    )
                     return iface["name"]
                 if fallback is None:
                     fallback = iface["name"]
     if fallback:
+        LOG.info(
+            "PXE interface for node %s: %s (link not detected)",
+            node_uuid,
+            fallback,
+        )
         return fallback
     LOG.error(
         "No PXE interface found for node %s.  Expected to find an "
