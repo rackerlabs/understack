@@ -58,6 +58,10 @@ spec:
               src:
                 dataKey: body.payload.target.id
                 dependencyName: keystone-dep
+            - dest: spec.arguments.parameters.2.value
+              src:
+                dataKey: body.event_type
+                dependencyName: keystone-dep
           source:
             # create a workflow in argo-events prefixed with keystone-project-
             resource:
@@ -74,6 +78,7 @@ spec:
                   parameters:
                     - name: event-json
                     - name: project_id
+                    - name: event_type
                 templates:
                 - name: main
                   steps:
@@ -128,4 +133,40 @@ spec:
                         parameters:
                         - name: project_id
                           value: {{ printf "{{workflow.parameters.project_id}}" | quote }}
+
+                  - - name: ansible-remove-svm
+                      when: {{ printf "{{steps.oslo-events.outputs.parameters.svm_state}} == removed" | quote }}
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_svm_delete.yml
+                        - name: extra_vars
+                          value: {{ printf "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}}" | quote }}
+
+                  - - name: ansible-remove-project-svm
+                      when: {{ printf "{{steps.oslo-events.outputs.parameters.svm_state}} == removed" | quote }}
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_project_delete.yml
+                        - name: extra_vars
+                          value: {{ printf "project_id={{steps.convert-project-id.outputs.result}} dry_run=false" | quote }}
+
+                  - - name: ansible-remove-project
+                      when: {{ printf "{{workflow.parameters.event_type}} == 'identity.project.deleted'" | quote }}
+                      templateRef:
+                        name: ansible-workflow-template
+                        template: ansible-run
+                      arguments:
+                        parameters:
+                        - name: playbook
+                          value: storage_on_project_delete.yml
+                        - name: extra_vars
+                          value: {{ printf "project_id={{steps.convert-project-id.outputs.result}} dry_run=false delete_tenant=true" | quote }}
 {{- end }}

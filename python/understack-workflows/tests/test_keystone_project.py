@@ -1,3 +1,4 @@
+from unittest import mock
 from unittest.mock import MagicMock
 from unittest.mock import call
 from unittest.mock import patch
@@ -124,14 +125,13 @@ class TestHandleProjectCreated:
         assert result == 1
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_created_no_svm_tag(
         self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_event_data
     ):
         """Test handling project creation without SVM tag."""
         mock_tags.return_value = ["tag1", "tag2"]
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
+        mock_file = mock_open.return_value
 
         result = handle_project_created(mock_conn, mock_nautobot, valid_event_data)
         assert result == 0
@@ -141,8 +141,10 @@ class TestHandleProjectCreated:
         expected_calls = [
             call("/var/run/argo/output.project_tags", "w"),
             call("/var/run/argo/output.svm_enabled", "w"),
+            call("/var/run/argo/output.svm_state", "w"),
         ]
         mock_open.assert_has_calls(expected_calls, any_order=True)
+        mock_file.write.assert_any_call("nonexistent")
 
         # Check that JSON-encoded tags were written
         write_calls = mock_file.write.call_args_list
@@ -155,7 +157,7 @@ class TestHandleProjectCreated:
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_created_with_svm_tag(
         self,
         mock_open,
@@ -169,9 +171,9 @@ class TestHandleProjectCreated:
         mock_tags.return_value = ["tag1", SVM_PROJECT_TAG, "tag2"]
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.select_aggregate_name.return_value = "aggr-selected"
+        mock_netapp_manager.create_svm.return_value = "os-test-project-123"
         mock_netapp_class.return_value = mock_netapp_manager
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
+        mock_file = mock_open.return_value
 
         result = handle_project_created(mock_conn, mock_nautobot, valid_event_data)
 
@@ -190,8 +192,10 @@ class TestHandleProjectCreated:
             call("/var/run/argo/output.svm_enabled", "w"),
             call("/var/run/argo/output.svm_created", "w"),
             call("/var/run/argo/output.svm_name", "w"),
+            call("/var/run/argo/output.svm_state", "w"),
         ]
         mock_open.assert_has_calls(expected_calls, any_order=True)
+        mock_file.write.assert_any_call("created")
 
         # Check that JSON-encoded tags were written
         write_calls = mock_file.write.call_args_list
@@ -204,7 +208,7 @@ class TestHandleProjectCreated:
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_created_netapp_manager_failure(
         self,
         mock_open,
@@ -227,7 +231,7 @@ class TestHandleProjectCreated:
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_created_svm_creation_failure(
         self,
         mock_open,
@@ -265,7 +269,7 @@ class TestHandleProjectCreated:
             handle_project_created(mock_conn, mock_nautobot, invalid_event_data)
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_created_selects_aggregate(
         self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_event_data
     ):
@@ -291,7 +295,7 @@ class TestHandleProjectCreated:
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_created_aggregate_selection_failure(
         self,
         mock_open,
@@ -316,15 +320,14 @@ class TestHandleProjectCreated:
         mock_netapp_manager.create_svm.assert_not_called()
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_created_json_tags_output(
         self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_event_data
     ):
         """Test that project tags are written as JSON to output file."""
         test_tags = ["custom_tag", "another_tag", SVM_PROJECT_TAG]
         mock_tags.return_value = test_tags
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
+        mock_file = mock_open.return_value
 
         with patch(
             "understack_workflows.oslo_event.keystone_project.NetAppManager"
@@ -379,7 +382,7 @@ class TestHandleProjectUpdated:
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_svm_tag_added(
         self,
         mock_open,
@@ -393,8 +396,7 @@ class TestHandleProjectUpdated:
         # Project now has SVM tag
         test_tags = ["tag1", SVM_PROJECT_TAG, "tag2"]
         mock_tags.return_value = test_tags
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
+        mock_file = mock_open.return_value
 
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = (
@@ -425,10 +427,12 @@ class TestHandleProjectUpdated:
 
         expected_json = json.dumps(test_tags)
         mock_file.write.assert_any_call(expected_json)
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_file.write.assert_any_call("created")
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_svm_tag_removed(
         self,
         mock_open,
@@ -462,10 +466,12 @@ class TestHandleProjectUpdated:
         # Should not create SVM or volume when tag is removed
         mock_netapp_manager.create_svm.assert_not_called()
         mock_netapp_manager.create_volume.assert_not_called()
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_open.return_value.write.assert_any_call("removed")
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_svm_tag_removed_no_svm(
         self,
         mock_open,
@@ -499,10 +505,12 @@ class TestHandleProjectUpdated:
         # Should not create SVM or volume
         mock_netapp_manager.create_svm.assert_not_called()
         mock_netapp_manager.create_volume.assert_not_called()
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_open.return_value.write.assert_any_call("unknown")
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_random_tag_added(
         self,
         mock_open,
@@ -532,10 +540,12 @@ class TestHandleProjectUpdated:
         # Should not create SVM or volume when no SVM tag
         mock_netapp_manager.create_svm.assert_not_called()
         mock_netapp_manager.create_volume.assert_not_called()
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_open.return_value.write.assert_any_call("unknown")
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_svm_exists_and_tag_exists(
         self,
         mock_open,
@@ -565,10 +575,12 @@ class TestHandleProjectUpdated:
         # Should not create SVM or volume when both exist
         mock_netapp_manager.create_svm.assert_not_called()
         mock_netapp_manager.create_volume.assert_not_called()
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_open.return_value.write.assert_any_call("present")
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_netapp_manager_failure(
         self,
         mock_open,
@@ -590,7 +602,7 @@ class TestHandleProjectUpdated:
 
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_svm_creation_failure(
         self,
         mock_open,
@@ -632,7 +644,7 @@ class TestHandleProjectUpdated:
             handle_project_updated(mock_conn, mock_nautobot, invalid_event_data)
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_output_files_written(
         self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_update_event_data
     ):
@@ -656,18 +668,18 @@ class TestHandleProjectUpdated:
                 call("/var/run/argo/output.project_tags", "w"),
                 call("/var/run/argo/output.svm_enabled", "w"),
                 call("/var/run/argo/output.svm_name", "w"),
+                call("/var/run/argo/output.svm_state", "w"),
             ]
             mock_open.assert_has_calls(expected_calls, any_order=True)
 
     @patch("understack_workflows.oslo_event.keystone_project._keystone_project_tags")
-    @patch("builtins.open")
+    @patch("builtins.open", new_callable=mock.mock_open)
     def test_handle_project_updated_json_tags_empty_list(
         self, mock_open, mock_tags, mock_conn, mock_nautobot, valid_update_event_data
     ):
         """Test that empty project tags are written as JSON empty list."""
         mock_tags.return_value = []
-        mock_file = MagicMock()
-        mock_open.return_value.__enter__.return_value = mock_file
+        mock_file = mock_open.return_value
 
         with patch(
             "understack_workflows.oslo_event.keystone_project.NetAppManager"
@@ -723,15 +735,18 @@ class TestHandleProjectDeleted:
         result = handle_project_deleted(mock_conn, mock_nautobot, event_data)
         assert result == 1
 
+    @patch("builtins.open", new_callable=mock.mock_open)
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     def test_handle_project_deleted_svm_exists(
         self,
         mock_netapp_class,
+        mock_open,
         mock_conn,
         mock_nautobot,
         valid_delete_event_data,
     ):
         """Test project deletion when SVM exists."""
+        mock_file = mock_open.return_value
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_class.return_value = mock_netapp_manager
@@ -745,16 +760,21 @@ class TestHandleProjectDeleted:
             project_id="test-project-123"
         )
         mock_netapp_manager.cleanup_project.assert_called_once_with("test-project-123")
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_file.write.assert_any_call("removed")
 
+    @patch("builtins.open", new_callable=mock.mock_open)
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     def test_handle_project_deleted_svm_does_not_exist(
         self,
         mock_netapp_class,
+        mock_open,
         mock_conn,
         mock_nautobot,
         valid_delete_event_data,
     ):
         """Test project deletion when SVM does not exist."""
+        mock_file = mock_open.return_value
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = False
         mock_netapp_class.return_value = mock_netapp_manager
@@ -768,16 +788,21 @@ class TestHandleProjectDeleted:
             project_id="test-project-123"
         )
         mock_netapp_manager.cleanup_project.assert_not_called()
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_file.write.assert_any_call("nonexistent")
 
+    @patch("builtins.open", new_callable=mock.mock_open)
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     def test_handle_project_deleted_netapp_manager_failure(
         self,
         mock_netapp_class,
+        mock_open,
         mock_conn,
         mock_nautobot,
         valid_delete_event_data,
     ):
         """Test handling when NetAppManager creation fails during deletion."""
+        mock_file = mock_open.return_value
         mock_netapp_class.side_effect = Exception("NetApp connection failed")
 
         result = handle_project_deleted(
@@ -786,16 +811,21 @@ class TestHandleProjectDeleted:
 
         assert result == 1  # Should return 1 on exception
         mock_netapp_class.assert_called_once()
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_file.write.assert_any_call("unknown")
 
+    @patch("builtins.open", new_callable=mock.mock_open)
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
     def test_handle_project_deleted_cleanup_failure(
         self,
         mock_netapp_class,
+        mock_open,
         mock_conn,
         mock_nautobot,
         valid_delete_event_data,
     ):
         """Test handling when cleanup_project fails during deletion."""
+        mock_file = mock_open.return_value
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_manager.cleanup_project.side_effect = Exception("Cleanup failed")
@@ -810,6 +840,8 @@ class TestHandleProjectDeleted:
             project_id="test-project-123"
         )
         mock_netapp_manager.cleanup_project.assert_called_once_with("test-project-123")
+        mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
+        mock_file.write.assert_any_call("unknown")
 
     def test_handle_project_deleted_invalid_event_data(self, mock_conn, mock_nautobot):
         """Test handling deletion with invalid event data."""
