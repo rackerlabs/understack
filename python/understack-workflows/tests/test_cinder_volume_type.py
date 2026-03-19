@@ -126,7 +126,7 @@ class TestHandleVolumeTypeAccessAdded:
         """aggregate_name and volume_size from extra_specs override defaults."""
         mock_conn.block_storage.get_type.return_value = MagicMock(
             extra_specs={
-                "aggregate_name": "aggr_custom",
+                "netapp:aggregate_name": "aggr_custom",
                 "netapp:flexvol_size": "1TB",
             }
         )
