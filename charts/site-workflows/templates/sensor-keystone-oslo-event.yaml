@@ -101,7 +101,7 @@ spec:
                               print(str(uuid.UUID(project_id_without_dashes)))
 
                   - - name: ansible-create-project
-                      when: {{ printf "{{steps.oslo-events.outputs.parameters.svm_enabled}} == True" | quote }}
+                      when: {{ printf "'{{steps.oslo-events.outputs.parameters.svm_state}}' == 'created'" | quote }}
                       templateRef:
                         name: ansible-workflow-template
                         template: ansible-run
@@ -113,7 +113,7 @@ spec:
                           value: {{ printf "project_id={{steps.convert-project-id.outputs.result}}" | quote }}
 
                   - - name: ansible-create-svm
-                      when: {{ printf "{{steps.oslo-events.outputs.parameters.svm_created}} == True" | quote }}
+                      when: {{ printf "'{{steps.oslo-events.outputs.parameters.svm_state}}' == 'created'" | quote }}
                       templateRef:
                         name: ansible-workflow-template
                         template: ansible-run
@@ -125,7 +125,7 @@ spec:
                           value: {{ printf "svm_name=os-{{workflow.parameters.project_id}} project_id={{steps.convert-project-id.outputs.result}}" | quote }}
 
                   - - name: netapp-configure-net
-                      when: {{ printf "{{steps.oslo-events.outputs.parameters.svm_created}} == True" | quote }}
+                      when: {{ printf "'{{steps.oslo-events.outputs.parameters.svm_state}}' == 'created'" | quote }}
                       templateRef:
                         name: netapp-configure-net
                         template: main
