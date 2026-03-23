@@ -1,30 +1,48 @@
+---
+charts:
+- cert-manager
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: none
+---
+
 # cert-manager
 
-Certificate management and issuer automation.
+Certificate management operator installation.
 
 ## Deployment Scope
 
-- Cluster scope: global, site
-- Values key: `global.cert_manager / site.cert_manager`
+- Cluster scope: global or site
+- Values keys: `global.cert_manager`, `site.cert_manager`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-cert-manager.yaml`
+
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   cert_manager:
     enabled: true
+site:
+  cert_manager:
+    enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- None for this Application today. It installs the upstream chart with inline values and does not consume deploy-repo `values.yaml` or overlay content.
+
+Optional additions:
+
+- Document issuer manifests and challenge-credential Secrets in the `cluster-issuer` component page rather than here.

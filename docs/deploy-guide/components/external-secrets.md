@@ -1,30 +1,48 @@
+---
+kustomize_paths:
+- operators/external-secrets
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: none
+---
+
 # external-secrets
 
-External Secrets Operator and secret synchronization.
+External Secrets operator installation.
 
 ## Deployment Scope
 
-- Cluster scope: global, site
-- Values key: `global.external_secrets / site.external_secrets`
+- Cluster scope: global or site
+- Values keys: `global.external_secrets`, `site.external_secrets`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-external-secrets.yaml`
+
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   external_secrets:
     enabled: true
+site:
+  external_secrets:
+    enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- None for this Application today. It deploys the shared operator manifests directly and does not read deploy-repo values or overlay manifests for this component.
+
+Optional additions:
+
+- Document provider-specific SecretStores and authentication material only where a consuming component needs the resulting Secret shape.

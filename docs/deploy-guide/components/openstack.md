@@ -1,6 +1,16 @@
+---
+kustomize_paths:
+- components/openstack
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # openstack
 
-Base OpenStack shared resources and namespace setup.
+Base site-level OpenStack shared resources and bootstrap content.
 
 ## Deployment Scope
 
@@ -8,9 +18,13 @@ Base OpenStack shared resources and namespace setup.
 - Values key: `site.openstack`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-openstack.yaml`
 
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
+
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 site:
@@ -18,13 +32,17 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `values.yaml`: Provide the OpenStack-wide values used by the shared base component.
+- `nautobot-token` Secret: Provide `username`, `token`, and `hostname` for any jobs or controllers that need to query the source-of-truth service.
+
+Optional additions:
+
+- `Hardware and inventory bundles`: Add device types, flavor catalogs, location types, locations, rack groups, and racks when the site should be bootstrapped with platform inventory data.
+- `Service-user secret sync bundle`: Add manifests that materialize the service-user Secrets consumed by automation or Keystone integrations.
+- `Secret sync bootstrap resources`: Add the generic auth or SecretStore resources required by your chosen secret workflow, but document only the final Secret shapes consumed by OpenStack.

@@ -1,3 +1,15 @@
+---
+charts:
+- components/understack-cdn
+deploy_overrides:
+  helm:
+    mode: values_files
+    paths:
+    - understack-cdn/values.yaml
+  kustomize:
+    mode: none
+---
+
 # cdn
 
 UnderStack CDN service deployment.
@@ -18,13 +30,18 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ component_argocd_builds() }}
 
-## Notes
+## Deployment Repo Content
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- `values.yaml`: Provide CDN ingress, object-bucket, cache, and runtime settings in `$CLUSTER_NAME/understack-cdn/values.yaml`.
+
+Optional additions:
+
+- `Object storage credential Secret`: If your values reference an authenticated backend instead of anonymous access, create the Secret name referenced by the chart and populate it with the key names that backend expects.

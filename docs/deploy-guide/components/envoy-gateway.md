@@ -1,30 +1,51 @@
+---
+charts:
+- gateway-helm
+kustomize_paths:
+- components/envoy-gateway
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # envoy-gateway
 
-Envoy Gateway control plane.
+Envoy Gateway installation plus any deploy-specific gateway-class resources.
 
 ## Deployment Scope
 
-- Cluster scope: global, site
-- Values key: `global.envoy_gateway / site.envoy_gateway`
+- Cluster scope: global or site
+- Values keys: `global.envoy_gateway`, `site.envoy_gateway`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-envoy-gateway.yaml`
+
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   envoy_gateway:
     enabled: true
+site:
+  envoy_gateway:
+    enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `values.yaml`: Provide the Helm values that tune the gateway controller for your environment.
+
+Optional additions:
+
+- `GatewayClass manifest`: Add a GatewayClass if you need an explicit class name, controller parameters, or multiple gateway classes in the same cluster.
+- `Additional Gateway API resources`: Place environment-specific gateway bootstrap objects in this overlay if they must be applied with the controller.

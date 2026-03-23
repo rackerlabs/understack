@@ -1,30 +1,48 @@
+---
+kustomize_paths:
+- operators/rabbitmq-system
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: none
+---
+
 # rabbitmq-system
 
-RabbitMQ Cluster Operator.
+RabbitMQ cluster operator installation.
 
 ## Deployment Scope
 
-- Cluster scope: global, site
-- Values key: `global.rabbitmq_system / site.rabbitmq_system`
+- Cluster scope: global or site
+- Values keys: `global.rabbitmq_system`, `site.rabbitmq_system`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-rabbitmq-system.yaml`
+
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   rabbitmq_system:
     enabled: true
+site:
+  rabbitmq_system:
+    enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- None for this Application today. It deploys the shared operator manifests directly and does not consume deploy-repo values or overlay manifests for this component.
+
+Optional additions:
+
+- Per-application RabbitMQ user Secrets belong with the consuming services such as Nova, Neutron, Glance, or Ironic rather than here.

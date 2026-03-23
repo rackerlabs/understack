@@ -1,3 +1,18 @@
+---
+charts:
+- octavia
+kustomize_paths:
+- components/octavia/
+argocd_extra:
+- The shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml`
+  files are loaded before the service-specific values file.
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # octavia
 
 OpenStack Load Balancing service.
@@ -18,13 +33,25 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ component_argocd_builds() }}
+
+## Deployment Repo Content
+
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- `values.yaml`: Provide the Octavia-specific chart or manifest values.
+- `octavia-db-password` Secret: Provide `username` and `password` for the Octavia database user.
+- `octavia-rabbitmq-password` Secret: Provide `username` and `password` for the messaging user Octavia should use.
+
+Optional additions:
+
+- `octavia-tls-public` Secret: Provide `tls.crt` and `tls.key` when the public endpoint is exposed with TLS.
+- `Extra manifests`: Add provider-network, certificate, or post-deploy supporting resources if the base component is not sufficient.
 
 ## Notes
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- This service is rendered by `application-openstack-helm.yaml`, which also reads the shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml` files before it reads `octavia/values.yaml`.

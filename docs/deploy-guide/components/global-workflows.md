@@ -1,3 +1,13 @@
+---
+source_text: ArgoCD renders only the sources declared directly in the Application
+  template.
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: second_source
+---
+
 # global-workflows
 
 Global automation workflows.
@@ -18,13 +28,18 @@ global:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ component_argocd_builds() }}
 
-## Notes
+## Deployment Repo Content
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- `kustomization.yaml`: Because this Application points directly at the deploy overlay, the overlay must include the base global workflow manifests or a remote/base reference that brings them in.
+
+Optional additions:
+
+- `Workflow manifests`: Add workflow templates, RBAC, parameters, or Secrets needed by global automation.

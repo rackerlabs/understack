@@ -1,6 +1,18 @@
+---
+charts:
+- prometheus-snmp-exporter
+deploy_overrides:
+  helm:
+    mode: values_files
+    paths:
+    - prometheus-snmp-exporter/values.yaml
+  kustomize:
+    mode: none
+---
+
 # snmp-exporter
 
-SNMP exporter for network telemetry.
+SNMP exporter installation.
 
 ## Deployment Scope
 
@@ -8,9 +20,13 @@ SNMP exporter for network telemetry.
 - Values key: `site.snmp_exporter`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-snmp-exporter.yaml`
 
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
+
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 site:
@@ -18,13 +34,14 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `values.yaml`: Provide exporter modules, scrape settings, and auth references in `$CLUSTER_NAME/prometheus-snmp-exporter/values.yaml`.
+
+Optional additions:
+
+- `SNMP credential Secret`: If your values reference per-target authentication material, create the Secret name referenced by the chart and populate it with the keys expected by your auth configuration.

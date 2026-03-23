@@ -1,6 +1,16 @@
+---
+kustomize_paths:
+- components/ovn/
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # ovn
 
-OVN control plane and dataplane components.
+OVN configuration values for a site deployment.
 
 ## Deployment Scope
 
@@ -8,9 +18,13 @@ OVN control plane and dataplane components.
 - Values key: `site.ovn`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-ovn.yaml`
 
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
+
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 site:
@@ -18,13 +32,14 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `values.yaml`: Provide the OVN-specific values consumed by the shared base manifests.
+
+Optional additions:
+
+- No extra manifests are present in the current example overlay, but this directory is available if you later need OVN-specific Kustomize resources.

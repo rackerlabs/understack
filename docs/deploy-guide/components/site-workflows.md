@@ -1,6 +1,16 @@
+---
+source_text: ArgoCD renders only the sources declared directly in the Application
+  template.
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # site-workflows
 
-Site automation workflows.
+Site-level workflow bundle driven by deploy-repo values and overlays.
 
 ## Deployment Scope
 
@@ -8,9 +18,13 @@ Site automation workflows.
 - Values key: `site.site_workflows`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-site-workflows.yaml`
 
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
+
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 site:
@@ -18,13 +32,14 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `values.yaml`: Provide the parameters that the site workflow bundle reads at render time.
+
+Optional additions:
+
+- `Additional workflow manifests`: This overlay directory is wired into ArgoCD, so you can add workflow templates, parameters, RBAC, or Secrets here as site automation grows.

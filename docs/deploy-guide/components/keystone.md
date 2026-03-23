@@ -1,3 +1,18 @@
+---
+charts:
+- keystone
+kustomize_paths:
+- components/keystone/
+argocd_extra:
+- The shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml`
+  files are loaded before the service-specific values file.
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # keystone
 
 OpenStack Identity service.
@@ -18,13 +33,26 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ component_argocd_builds() }}
+
+## Deployment Repo Content
+
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- `values.yaml`: Provide the Keystone-specific chart or manifest values.
+- `keystone-admin` Secret: Provide `password` for the admin or bootstrap account.
+- `keystone-db-password` Secret: Provide `username` and `password` for the Keystone database user.
+- `keystone-rabbitmq-password` Secret: Provide `username` and `password` for the messaging user Keystone should use.
+
+Optional additions:
+
+- `keystone-sso` Secret: Provide `client-id`, `client-secret`, and `issuer` when Keystone uses OIDC or web SSO.
+- `sso-passphrase` Secret: Provide the passphrase consumed by the SSO configuration when that flow is enabled.
 
 ## Notes
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- This service is rendered by `application-openstack-helm.yaml`, which also reads the shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml` files before it reads `keystone/values.yaml`.

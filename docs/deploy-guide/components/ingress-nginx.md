@@ -1,3 +1,13 @@
+---
+charts:
+- ingress-nginx
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: none
+---
+
 # ingress-nginx
 
 NGINX ingress controller deployment.
@@ -18,13 +28,18 @@ global:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ component_argocd_builds() }}
 
-## Notes
+## Deployment Repo Content
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- `values.yaml`: Provide controller service type, ingress class, load balancer, and default TLS behavior in `$CLUSTER_NAME/ingress-nginx/values.yaml`.
+
+Optional additions:
+
+- `Default certificate Secret`: If your values reference a default TLS certificate, create the Secret with `tls.crt` and `tls.key`.

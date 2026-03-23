@@ -1,3 +1,13 @@
+---
+charts:
+- karma
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # karma
 
 Karma alert dashboard for Alertmanager.
@@ -18,13 +28,19 @@ global:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ component_argocd_builds() }}
 
-## Notes
+## Deployment Repo Content
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- `values.yaml`: Provide Alertmanager endpoints, ingress, auth, and UI settings.
+- `kustomization.yaml`: Include any Secret or manifest resources referenced by your Karma values.
+
+Optional additions:
+
+- `SSO or proxy credential Secret`: Create the Secret name referenced by your values or overlay and populate it with the keys expected by your authentication flow.

@@ -1,30 +1,50 @@
+---
+charts:
+- opentelemetry-operator
+kustomize_paths:
+- operators/opentelemetry-operator
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: none
+---
+
 # opentelemetry-operator
 
-OpenTelemetry operator deployment.
+OpenTelemetry operator installation.
 
 ## Deployment Scope
 
-- Cluster scope: global, site
-- Values key: `global.opentelemetry_operator / site.opentelemetry_operator`
+- Cluster scope: global or site
+- Values keys: `global.opentelemetry_operator`, `site.opentelemetry_operator`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-opentelemetry-operator.yaml`
+
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   opentelemetry_operator:
     enabled: true
+site:
+  opentelemetry_operator:
+    enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- `values.yaml`: Provide operator chart values if you need to tune admission webhooks, collector image defaults, or related behavior.
 
 ## Notes
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- The current ArgoCD template reads deploy-repo values for this component but does not apply deploy overlay manifests.

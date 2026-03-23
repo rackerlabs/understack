@@ -1,6 +1,21 @@
+---
+charts:
+- placement
+kustomize_paths:
+- components/placement/
+argocd_extra:
+- The shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml`
+  files are loaded before the service-specific values file.
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # placement
 
-OpenStack Placement service.
+Placement service overlays for a site OpenStack Helm deployment.
 
 ## Deployment Scope
 
@@ -8,9 +23,13 @@ OpenStack Placement service.
 - Values key: `site.placement`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-openstack-helm.yaml`
 
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
+
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 site:
@@ -18,13 +37,19 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- `values.yaml`: Provide the Placement-specific chart or manifest values.
+- `placement-db-password` Secret: Provide `username` and `password` for the Placement database user.
+
+Optional additions:
+
+- `Extra manifests`: Add service-specific policy or integration resources if they are not already covered by values.
 
 ## Notes
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- This service is rendered by `application-openstack-helm.yaml`, which also reads the shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml` files before it reads `placement/values.yaml`.

@@ -1,6 +1,16 @@
+---
+kustomize_paths:
+- components/undersync
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: second_source
+---
+
 # undersync
 
-Undersync synchronization service.
+Undersync application overlays and deployment-specific Secrets.
 
 ## Deployment Scope
 
@@ -8,9 +18,13 @@ Undersync synchronization service.
 - Values key: `site.undersync`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-undersync.yaml`
 
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
+
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 site:
@@ -18,13 +32,16 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `kustomization.yaml`: Include the override manifests and Secrets that must be applied with the shared base component.
+- `settings-file` Secret: Provide a `settings-file.yaml` key containing the rendered application settings file.
+- `dockerconfigjson-github-com` Secret: Provide `.dockerconfigjson` when the deployment pulls from a private registry.
+
+Optional additions:
+
+- `Deployment override manifest`: Add a Deployment or patch if this environment needs image, volume, or runtime changes beyond the shared base. The current example includes a full Deployment override.

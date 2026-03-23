@@ -1,30 +1,50 @@
+---
+charts:
+- openebs
+kustomize_paths:
+- operators/openebs
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # openebs
 
-OpenEBS storage platform deployment.
+OpenEBS operator values and optional StorageClass overlays.
 
 ## Deployment Scope
 
-- Cluster scope: global, site
-- Values key: `global.openebs / site.openebs`
+- Cluster scope: global or site
+- Values keys: `global.openebs`, `site.openebs`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-openebs.yaml`
+
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   openebs:
     enabled: true
+site:
+  openebs:
+    enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- `values.yaml`: Provide the OpenEBS chart values for your storage topology.
+
+Optional additions:
+
+- `StorageClass manifests`: Add one or more StorageClasses when you need named pools, specific volume parameters, or a different default class. The current example adds an LVM-backed class.

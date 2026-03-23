@@ -1,30 +1,48 @@
+---
+kustomize_paths:
+- bootstrap/sealed-secrets
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: none
+---
+
 # sealed-secrets
 
-Sealed Secrets controller.
+Sealed Secrets controller installation.
 
 ## Deployment Scope
 
-- Cluster scope: global, site
-- Values key: `global.sealed_secrets / site.sealed_secrets`
+- Cluster scope: global or site
+- Values keys: `global.sealed_secrets`, `site.sealed_secrets`
 - ArgoCD Application template: `charts/argocd-understack/templates/application-sealed-secrets.yaml`
+
+## How ArgoCD Builds It
+
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
-Set this component to enabled in your deployment values file:
+Enable this component under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   sealed_secrets:
     enabled: true
+site:
+  sealed_secrets:
+    enabled: true
 ```
 
-## Deployment Repo Overrides
+## Deployment Repo Content
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ secrets_disclaimer }}
 
-## Notes
+Required or commonly required items:
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+- None for this Application today. It deploys the shared bootstrap manifests directly and does not consume deploy-repo values or overlay manifests for this component.
+
+Optional additions:
+
+- Document individual decrypted Secret shapes on the component pages that consume them rather than here.

@@ -1,3 +1,13 @@
+---
+source_text: The deploy guide and chart README list `nautobot-site` as a site-scoped
+  component.
+argocd_extra:
+- The current chart does not contain `charts/argocd-understack/templates/application-nautobot-site.yaml`,
+  so there is not yet an ArgoCD source definition to describe here.
+- Until that template exists, there is no deploy-repo values file or overlay directory
+  consumed by ArgoCD for this page.
+---
+
 # nautobot-site
 
 Site-level Nautobot integration resources.
@@ -18,13 +28,18 @@ site:
     enabled: true
 ```
 
-## Deployment Repo Overrides
+## How ArgoCD Builds It
 
-Use your deployment repo to provide environment-specific values and overlays.
-Start with [Component Reference](../components/index.md) and [Deploy Repo](../deploy-repo.md).
+{{ component_argocd_builds() }}
 
-## Notes
+## Deployment Repo Content
 
-- Document prerequisites for this component.
-- Document required secrets and config inputs.
-- Document validation checks and troubleshooting commands.
+{{ secrets_disclaimer }}
+
+Required or commonly required items:
+
+- None today. Add the final Secret or manifest contract here when the `nautobot-site` Application template is implemented.
+
+Optional additions:
+
+- If you are carrying site-specific Nautobot resources out of tree, document them with the component that currently applies them rather than assuming a future `nautobot-site` Application.
