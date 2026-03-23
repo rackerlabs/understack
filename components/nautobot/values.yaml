@@ -88,9 +88,6 @@ redis:
 ingress:
   enabled: false
 
-# (nicholas.kuechler) seeing something unexpected:
-# https://networktocode.slack.com/archives/C01NWPK6WHL/p1736445485521569
+# disabled in favor of explicit definitions through kustomize
 metrics:
-  enabled: true
-  prometheusRule:
-    enabled: true
+  enabled: false

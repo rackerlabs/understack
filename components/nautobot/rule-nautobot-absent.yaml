@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  labels:
+    app.kubernetes.io/component: nautobot
+  name: nautobot
+  namespace: nautobot
+spec:
+  groups:
+  - name: nautobot
+    rules:
+    - alert: NautobotAbsent
+      annotations:
+        description: Nautobot has disappeared from Prometheus service discovery.
+        summary: Nautobot is down.
+      expr: |
+        absent(up{job=~".*nautobot.*"} == 1)
+      for: 5m
+      labels:
+        severity: critical
