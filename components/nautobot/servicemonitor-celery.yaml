@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: nautobot-celery-default
+    app.kubernetes.io/instance: nautobot
+    app.kubernetes.io/name: nautobot
+  name: nautobot-celery-default
+  namespace: nautobot
+spec:
+  endpoints:
+  - port: workermetrics
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nautobot-celery-default
+      app.kubernetes.io/instance: nautobot
+      app.kubernetes.io/name: nautobot

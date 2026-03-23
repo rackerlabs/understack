@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app.kubernetes.io/component: nautobot-default
+    app.kubernetes.io/instance: nautobot
+  name: nautobot-default
+  namespace: nautobot
+spec:
+  scrapeProtocols:
+    - OpenMetricsText1.0.0
+  endpoints:
+    - interval: 1m
+      port: http
+      scrapeTimeout: 30s
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: nautobot-default
+      app.kubernetes.io/instance: nautobot
+      app.kubernetes.io/name: nautobot
