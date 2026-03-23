@@ -4,6 +4,9 @@ nautobot_permissions_groups:
   read-all:
     - ucadmin
     - ucuser
+  napalm-read:
+    - ucadmin
+    - ucuser
   user-api-tokens:
     - ucadmin
     - ucuser
@@ -72,6 +75,13 @@ nautobot_permissions_permissions:
       - virtualization.vminterface
       - vni_custom_model.ucvni
       - vni_custom_model.ucvnigroup
+  napalm-read:
+    description: Allow NAPALM read operations on devices
+    enabled: true
+    actions:
+      - napalm_read
+    object_types:
+      - dcim.device
   user-api-tokens:
     description: allow users to manage their own API tokens
     enabled: true
