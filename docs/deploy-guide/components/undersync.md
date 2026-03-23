@@ -1,3 +1,13 @@
+---
+kustomize_paths:
+- components/undersync
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: second_source
+---
+
 # undersync
 
 Undersync application overlays and deployment-specific Secrets.
@@ -10,9 +20,7 @@ Undersync application overlays and deployment-specific Secrets.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Kustomize path `components/undersync`.
-- The current template does not read a deploy-repo `values.yaml` for this component.
-- The deploy repo overlay directory for this component is applied as a second source, so `kustomization.yaml` and any referenced manifests are part of the final Application.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -26,7 +34,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

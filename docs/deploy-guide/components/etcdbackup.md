@@ -1,3 +1,13 @@
+---
+source_text: ArgoCD renders only the sources declared directly in the Application
+  template.
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: none
+---
+
 # etcdbackup
 
 Scheduled etcd backup job configuration.
@@ -10,9 +20,7 @@ Scheduled etcd backup job configuration.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders only the sources declared directly in the Application template.
-- The deploy repo contributes `values.yaml` for this component.
-- The current template does not apply a deploy-repo overlay directory for this component.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -29,7 +37,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

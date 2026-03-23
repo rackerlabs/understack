@@ -1,3 +1,15 @@
+---
+charts:
+- components/understack-cdn
+deploy_overrides:
+  helm:
+    mode: values_files
+    paths:
+    - understack-cdn/values.yaml
+  kustomize:
+    mode: none
+---
+
 # cdn
 
 UnderStack CDN service deployment.
@@ -20,13 +32,11 @@ site:
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Helm chart `components/understack-cdn`.
-- The deploy repo contributes `understack-cdn/values.yaml` for this component.
-- The current template does not apply a deploy-repo overlay directory for this component.
+{{ component_argocd_builds() }}
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

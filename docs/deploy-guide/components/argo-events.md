@@ -1,3 +1,13 @@
+---
+kustomize_paths:
+- components/argo-events
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: second_source
+---
+
 # argo-events
 
 Argo Events event sources, sensors, and helper resources.
@@ -10,9 +20,7 @@ Argo Events event sources, sensors, and helper resources.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Kustomize path `components/argo-events`.
-- The current template does not read a deploy-repo `values.yaml` for this component.
-- The deploy repo overlay directory for this component is applied as a second source, so `kustomization.yaml` and any referenced manifests are part of the final Application.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -29,7 +37,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

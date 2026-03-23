@@ -93,7 +93,8 @@ plugins:
   - include_dir_to_nav:
       sort_file: true
       sort_directory: true
-  - macros
+  - macros:
+      module_name: docs/macros
   - callouts
   - mermaid-zoom
 

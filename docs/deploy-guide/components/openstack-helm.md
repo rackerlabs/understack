@@ -1,3 +1,16 @@
+---
+source_text: ArgoCD renders the matching OpenStack Helm chart for each enabled site
+  service and the companion Kustomize path `components/<service>/`.
+argocd_extra:
+- The shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml`
+  files are loaded before the service-specific values file.
+- The deploy repo contributes `secret-openstack.yaml`, optional `images-openstack.yaml`,
+  and `<service>/values.yaml`.
+- The deploy repo overlay directory for each enabled service is applied as a second
+  source, so `<service>/kustomization.yaml` and any referenced manifests are part
+  of the final Application.
+---
+
 # openstack-helm
 
 Shared deployment contract for the per-service OpenStack Helm Applications.
@@ -10,10 +23,7 @@ Shared deployment contract for the per-service OpenStack Helm Applications.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders the matching OpenStack Helm chart for each enabled site service and the companion Kustomize path `components/<service>/`.
-- The shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml` files are loaded before the service-specific values file.
-- The deploy repo contributes `secret-openstack.yaml`, optional `images-openstack.yaml`, and `<service>/values.yaml`.
-- The deploy repo overlay directory for each enabled service is applied as a second source, so `<service>/kustomization.yaml` and any referenced manifests are part of the final Application.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -27,7 +37,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

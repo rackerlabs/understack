@@ -1,3 +1,19 @@
+---
+charts:
+- rook-ceph
+- rook-ceph-cluster
+kustomize_paths:
+- operators/rook
+deploy_overrides:
+  helm:
+    mode: values_files
+    paths:
+    - rook-operator/values.yaml
+    - rook-cluster/values.yaml
+  kustomize:
+    mode: none
+---
+
 # rook
 
 Rook Ceph operator and cluster installation.
@@ -10,9 +26,7 @@ Rook Ceph operator and cluster installation.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Helm chart `rook-ceph`, Helm chart `rook-ceph-cluster`, Kustomize path `operators/rook`.
-- The deploy repo contributes `rook-operator/values.yaml` and `rook-cluster/values.yaml` for this component.
-- The current template does not apply a deploy-repo overlay directory for this component.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -29,7 +43,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

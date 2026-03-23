@@ -1,3 +1,13 @@
+---
+charts:
+- cert-manager
+deploy_overrides:
+  helm:
+    mode: none
+  kustomize:
+    mode: none
+---
+
 # cert-manager
 
 Certificate management operator installation.
@@ -10,9 +20,7 @@ Certificate management operator installation.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Helm chart `cert-manager`.
-- The current template does not read a deploy-repo `values.yaml` for this component.
-- The current template does not apply a deploy-repo overlay directory for this component.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -29,7 +37,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

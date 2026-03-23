@@ -1,3 +1,13 @@
+---
+charts:
+- external-dns chart
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: second_source
+---
+
 # external-dns
 
 ExternalDNS deployment settings and provider credential wiring.
@@ -10,9 +20,7 @@ ExternalDNS deployment settings and provider credential wiring.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Helm chart `external-dns chart`.
-- The deploy repo contributes `values.yaml` for this component.
-- The deploy repo overlay directory for this component is applied as a second source, so `kustomization.yaml` and any referenced manifests are part of the final Application.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -29,7 +37,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

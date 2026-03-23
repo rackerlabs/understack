@@ -1,3 +1,15 @@
+---
+charts:
+- prometheus-snmp-exporter
+deploy_overrides:
+  helm:
+    mode: values_files
+    paths:
+    - prometheus-snmp-exporter/values.yaml
+  kustomize:
+    mode: none
+---
+
 # snmp-exporter
 
 SNMP exporter installation.
@@ -10,9 +22,7 @@ SNMP exporter installation.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Helm chart `prometheus-snmp-exporter`.
-- The deploy repo contributes `prometheus-snmp-exporter/values.yaml` for this component.
-- The current template does not apply a deploy-repo overlay directory for this component.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -26,7 +36,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

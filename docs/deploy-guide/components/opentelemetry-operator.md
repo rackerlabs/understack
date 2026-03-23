@@ -1,3 +1,15 @@
+---
+charts:
+- opentelemetry-operator
+kustomize_paths:
+- operators/opentelemetry-operator
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: none
+---
+
 # opentelemetry-operator
 
 OpenTelemetry operator installation.
@@ -10,9 +22,7 @@ OpenTelemetry operator installation.
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Helm chart `opentelemetry-operator`, Kustomize path `operators/opentelemetry-operator`.
-- The deploy repo contributes `values.yaml` for this component.
-- The current template does not apply a deploy-repo overlay directory for this component.
+{{ component_argocd_builds() }}
 
 ## How to Enable
 
@@ -29,7 +39,7 @@ site:
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

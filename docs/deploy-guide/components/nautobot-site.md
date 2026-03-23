@@ -1,3 +1,13 @@
+---
+source_text: The deploy guide and chart README list `nautobot-site` as a site-scoped
+  component.
+argocd_extra:
+- The current chart does not contain `charts/argocd-understack/templates/application-nautobot-site.yaml`,
+  so there is not yet an ArgoCD source definition to describe here.
+- Until that template exists, there is no deploy-repo values file or overlay directory
+  consumed by ArgoCD for this page.
+---
+
 # nautobot-site
 
 Site-level Nautobot integration resources.
@@ -20,13 +30,11 @@ site:
 
 ## How ArgoCD Builds It
 
-- The deploy guide and chart README list `nautobot-site` as a site-scoped component.
-- The current chart does not contain `charts/argocd-understack/templates/application-nautobot-site.yaml`, so there is not yet an ArgoCD source definition to describe here.
-- Until that template exists, there is no deploy-repo values file or overlay directory consumed by ArgoCD for this page.
+{{ component_argocd_builds() }}
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 

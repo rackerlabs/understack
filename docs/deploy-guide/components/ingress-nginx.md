@@ -1,3 +1,13 @@
+---
+charts:
+- ingress-nginx
+deploy_overrides:
+  helm:
+    mode: values
+  kustomize:
+    mode: none
+---
+
 # ingress-nginx
 
 NGINX ingress controller deployment.
@@ -20,13 +30,11 @@ global:
 
 ## How ArgoCD Builds It
 
-- ArgoCD renders Helm chart `ingress-nginx`.
-- The deploy repo contributes `values.yaml` for this component.
-- The current template does not apply a deploy-repo overlay directory for this component.
+{{ component_argocd_builds() }}
 
 ## Deployment Repo Content
 
-Use any secret delivery mechanism you prefer. The contract that matters is the final Kubernetes Secret or manifest shape described below.
+{{ secrets_disclaimer }}
 
 Required or commonly required items:
 
