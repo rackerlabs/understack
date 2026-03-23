@@ -38,7 +38,6 @@ func init() {
 	rootCmd.AddCommand(helmConfig.NewCmdHelmConfig())
 	rootCmd.AddCommand(nautobotOp.NewCmdNautobotOp())
 	rootCmd.AddCommand(node.NewCmdNode())
-	rootCmd.AddCommand(node.NewCmdNodeUpdate())
 	rootCmd.AddCommand(openstack.NewCmdOpenstackSecrets())
 	rootCmd.AddCommand(quickstart.NewCmdQuickStart())
 	rootCmd.AddCommand(other.NewCmdOtherSecrets())
