@@ -60,11 +60,11 @@ spec:
                 # defines the parameters being replaced above
                 arguments:
                   parameters:
-                    - name: vlan_group_uuid
+                    - name: physical_network
                     - name: force
-                      value: false
+                      value: "false"
                     - name: dry_run
-                      value: false
+                      value: "false"
                 # references the workflow
                 workflowTemplateRef:
                   name: undersync-switch

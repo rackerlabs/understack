@@ -4,24 +4,64 @@ metadata:
   annotations:
     workflows.argoproj.io/title: Requests an Undersync run on a pair of switches
     workflows.argoproj.io/description: |
+      Requests an Undersync run for a switch pair identified by `physical_network`.
+
+      Parameters:
+
+      - `physical_network`: required switch pair / physical network identifier
+      - `force`: push non-safe changes, without this config drift in non-safe areas won't apply
+      - `dry_run`: show the intended changes without applying them
+
+      To test this workflow you can run it with the following:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/undersync-switch \
+        -p physical_network=physnet1 -p force=false -p dry_run=false
+      ```
+
       Defined in `workflows/argo-events/workflowtemplates/undersync-switch.yaml`
 kind: WorkflowTemplate
 spec:
   entrypoint: undersync-switch
   serviceAccountName: workflow
+  arguments:
+    parameters:
+      - name: physical_network
+        description: Name of the physical_network (a.k.a. VLAN Group, e.g. "a1-1-network"), tells Undersync which switch pair to configure.
+      - name: force
+        description: |
+          Override safety guardrails when "Change requires approval"
+          When force=true it disables undersync safety features that would otherwise guard against taking the switch offline, guard against operating on the wrong switch (e.g. DNS snafu), allow the NOC to suspend operations, etc.
+          When the guardrails are preventing a change from being pushed to the switch, undersync will respond with an error that includes a status like "Change requires approval".
+          This parameter should never be needed in normal operations.
+        default: "false"
+        enum:
+          - "true"
+          - "false"
+      - name: dry_run
+        description: Preview the changes without making any updates.
+        default: "false"
+        enum:
+          - "true"
+          - "false"
   templates:
     - name: undersync-switch
+      inputs:
+        parameters:
+          - name: physical_network
+          - name: force
+          - name: dry_run
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - undersync-switch
         args:
-          - --vlan_group_uuid
-          - "{{workflow.parameters.vlan_group_uuid}}"
+          - --physical-network
+          - "{{inputs.parameters.physical_network}}"
           - --dry-run
-          - "{{workflow.parameters.dry_run}}"
+          - "{{inputs.parameters.dry_run}}"
           - --force
-          - "{{workflow.parameters.force}}"
+          - "{{inputs.parameters.force}}"
         volumeMounts:
           - mountPath: /etc/nb-token/
             name: nb-token
@@ -35,11 +75,6 @@ spec:
               secretKeyRef:
                 name: nautobot-token
                 key: url
-      inputs:
-        parameters:
-          - name: vlan_group_uuid
-          - name: force
-          - name: dry_run
       volumes:
         - name: nb-token
           secret:
