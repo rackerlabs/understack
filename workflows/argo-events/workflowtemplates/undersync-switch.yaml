@@ -16,8 +16,8 @@ spec:
         command:
           - undersync-switch
         args:
-          - --vlan_group_uuid
-          - "{{workflow.parameters.vlan_group_uuid}}"
+          - --physical-network
+          - "{{workflow.parameters.physical_network}}"
           - --dry-run
           - "{{workflow.parameters.dry_run}}"
           - --force
@@ -37,7 +37,7 @@ spec:
                 key: url
       inputs:
         parameters:
-          - name: vlan_group_uuid
+          - name: physical_network
           - name: force
           - name: dry_run
       volumes:

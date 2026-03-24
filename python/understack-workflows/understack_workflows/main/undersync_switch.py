@@ -20,12 +20,12 @@ def call_undersync(args):
     try:
         logger.debug(
             "Syncing switches in vlan group %s args.dry_run=%s args.force=%s",
-            args.vlan_group_uuid,
+            args.physical_network,
             args.dry_run,
             args.force,
         )
         return undersync.sync_devices(
-            args.vlan_group_uuid,
+            args.physical_network,
             dry_run=args.dry_run,
             force=args.force,
         )
@@ -40,10 +40,10 @@ def argument_parser():
         description="Trigger undersync run for a set of switches.",
     )
     parser.add_argument(
-        "--vlan_group_uuid",
+        "--physical-network",
         type=str,
         required=True,
-        help="UUID of Nautobot VlanGroup containing the switches to Undersync",
+        help="Port physical_network / Nautobot VLANGroup",
     )
     parser.add_argument(
         "--force",

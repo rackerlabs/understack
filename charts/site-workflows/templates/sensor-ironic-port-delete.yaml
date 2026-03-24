@@ -60,7 +60,7 @@ spec:
                 # defines the parameters being replaced above
                 arguments:
                   parameters:
-                    - name: vlan_group_uuid
+                    - name: physical_network
                     - name: force
                       value: false
                     - name: dry_run
