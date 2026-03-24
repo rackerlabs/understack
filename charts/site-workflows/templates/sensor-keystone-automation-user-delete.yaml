@@ -54,7 +54,7 @@ spec:
           parameters:
             - src:
                 dependencyName: secret-dep
-                dataKey: body.type
+                dataKey: type
               dest: spec.template.spec.containers.0.env.0.value
             - src:
                 dependencyName: secret-dep
@@ -64,4 +64,9 @@ spec:
                 dependencyName: secret-dep
                 dataKey: body.metadata.labels
               dest: spec.template.spec.containers.0.env.2.value
+      retryStrategy:
+        steps: 3
+        duration: 5s
+        factor: 2
+        jitter: 1
 {{- end }}
