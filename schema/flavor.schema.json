@@ -41,6 +41,6 @@
       }
     }
   },
-  "required": ["name", "resource_class"],
+  "required": ["name"],
   "additionalProperties": false
 }
