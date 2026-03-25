@@ -204,7 +204,7 @@ spec:
             arguments:
               parameters:
                 - name: operation
-                  value: "{{tasks.server-start-state.outputs.result}}"
+                  value: "provide"
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
             when: >-
