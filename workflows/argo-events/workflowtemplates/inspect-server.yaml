@@ -197,8 +197,19 @@ spec:
             when: >-
               '{{tasks.server-driver.outputs.result}}' == 'idrac' &&
               '{{tasks.server-start-state.outputs.result}}' != 'active'
-          - name: return-server
-            # returns a server to its previous state if needed
+          - name: return-server-available
+            # returns an available server to its previous state
+            depends: "inspect-server-agent.Succeeded && (server-restore-inspect-redfish.Succeeded || server-restore-inspect-idrac-redfish.Succeeded)"
+            template: openstack-wait-cmd
+            arguments:
+              parameters:
+                - name: operation
+                  value: "provide"
+                - name: node_id
+                  value: "{{tasks.node-id.outputs.result}}"
+            when: "'{{tasks.server-start-state.outputs.result}}' == 'available'"
+          - name: return-server-state
+            # returns a server to its previous state when the CLI verb matches the state name
             depends: "inspect-server-agent.Succeeded && (server-restore-inspect-redfish.Succeeded || server-restore-inspect-idrac-redfish.Succeeded)"
             template: openstack-wait-cmd
             arguments:
@@ -208,6 +219,7 @@ spec:
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
             when: >-
+              '{{tasks.server-start-state.outputs.result}}' != 'available' &&
               '{{tasks.server-start-state.outputs.result}}' != 'manageable' &&
               '{{tasks.server-start-state.outputs.result}}' != 'active' &&
               '{{tasks.server-start-state.outputs.result}}' != 'enroll'
