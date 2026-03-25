@@ -208,21 +208,6 @@ spec:
                 - name: node_id
                   value: "{{tasks.node-id.outputs.result}}"
             when: "'{{tasks.server-start-state.outputs.result}}' == 'available'"
-          - name: return-server-state
-            # returns a server to its previous state when the CLI verb matches the state name
-            depends: "inspect-server-agent.Succeeded && (server-restore-inspect-redfish.Succeeded || server-restore-inspect-idrac-redfish.Succeeded)"
-            template: openstack-wait-cmd
-            arguments:
-              parameters:
-                - name: operation
-                  value: "{{tasks.server-start-state.outputs.result}}"
-                - name: node_id
-                  value: "{{tasks.node-id.outputs.result}}"
-            when: >-
-              '{{tasks.server-start-state.outputs.result}}' != 'available' &&
-              '{{tasks.server-start-state.outputs.result}}' != 'manageable' &&
-              '{{tasks.server-start-state.outputs.result}}' != 'active' &&
-              '{{tasks.server-start-state.outputs.result}}' != 'enroll'
     - name: openstack-wait-cmd
       inputs:
         parameters:
