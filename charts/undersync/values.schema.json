@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "asn": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "BGP Autonomous System Number (valid usable range: 1-4294967294).",
+      "default": "4294967294"
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Deployment environment name (for example: production, staging).",
+      "default": "production"
+    },
+    "nameOverride": {
+      "type": "string",
+      "description": "Override the chart name used for app labels and generated names."
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Fully override the generated Kubernetes resource name."
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of pod replicas to run.",
+      "default": 1
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "port"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer",
+            "ExternalName"
+          ],
+          "description": "Kubernetes Service type.",
+          "default": "ClusterIP"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Service port exposed for HTTP traffic.",
+          "default": 80
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "pullPolicy"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Container image repository."
+        },
+        "tag": {
+          "type": "string",
+          "description": "Container image tag. Defaults to chart appVersion when empty."
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ],
+          "description": "Kubernetes image pull policy.",
+          "default": "IfNotPresent"
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "description": "Optional image pull secrets for private registries.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "podAnnotations": {
+      "type": "object",
+      "description": "Annotations applied to pod templates.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "description": "Pod-level securityContext configuration.",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "securityContext": {
+      "type": "object",
+      "description": "Container-level securityContext configuration.",
+      "additionalProperties": true
+    },
+    "settings": {
+      "type": "object",
+      "description": "Settings secret mount and file names used by undersync.",
+      "additionalProperties": false,
+      "required": [
+        "mount_path",
+        "settings_filename",
+        "clouds_filename"
+      ],
+      "properties": {
+        "mount_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Path where settings secrets are mounted.",
+          "default": "/run/secrets/undersync-settings"
+        },
+        "settings_filename": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Filename for undersync settings.",
+          "default": "settings-file.yaml"
+        },
+        "clouds_filename": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Filename for OpenStack clouds config.",
+          "default": "clouds.yaml"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Container resource requests and limits.",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "nodeSelector": {
+      "type": "object",
+      "description": "Node selector labels for pod scheduling.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "tolerations": {
+      "type": "array",
+      "description": "Node taint tolerations for pod scheduling.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "default": []
+    },
+    "affinity": {
+      "type": "object",
+      "description": "Affinity and anti-affinity rules for pod scheduling.",
+      "additionalProperties": true,
+      "default": {}
+    }
+  },
+  "required": [
+    "asn",
+    "environment",
+    "replicaCount",
+    "service",
+    "image"
+  ]
+}
