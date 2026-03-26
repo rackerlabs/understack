@@ -47,5 +47,20 @@ func (n *NautobotClient) PreLoadCacheForLookup(ctx context.Context) error {
 		log.Info("pre-load vlan groups cache", "count", len(list.Results))
 	}
 
+	if list, _, err := n.APIClient.IpamAPI.IpamNamespacesList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("namespaces", list.Results)
+		log.Info("pre-load namespaces cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.TenancyAPI.TenancyTenantsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("tenants", list.Results)
+		log.Info("pre-load tenants cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.TenancyAPI.TenancyTenantGroupsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("tenantgroups", list.Results)
+		log.Info("pre-load tenant groups cache", "count", len(list.Results))
+	}
+
 	return nil
 }
