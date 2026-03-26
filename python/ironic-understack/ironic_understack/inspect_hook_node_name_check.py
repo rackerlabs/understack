@@ -19,7 +19,7 @@ class InspectHookNodeNameCheck(base.InspectionHook):
         node = task.node
         sys_data = inventory.get("system_vendor", {})
 
-        serial_number = sys_data.get("sku", sys_data.get("serial_number"))
+        serial_number = sys_data.get("serial_number")
         if serial_number is None:
             raise exception.InvalidNodeInventory(
                 node=node.uuid, reason="No serial number found in inventory data."

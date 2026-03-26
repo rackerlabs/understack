@@ -68,7 +68,6 @@ class DeviceInfo:
     # Identity
     name: str | None = None
     serial_number: str | None = None
-    service_tag: str | None = None
 
     # Hardware
     manufacturer: str | None = None
@@ -170,20 +169,14 @@ def _populate_from_inventory(device_info: DeviceInfo, inventory: dict | None) ->
     if product_name and product_name != "System":
         device_info.model = re.sub(r" \(.*\)", "", str(product_name))
 
-    # Service tag: sku (REDFISH) or serial_number (AGENT)
-    service_tag = system_vendor.get("sku") or system_vendor.get("serial_number")
-    if service_tag:
-        device_info.service_tag = service_tag
-
-    # Serial number: only if sku exists (REDFISH has both)
-    if system_vendor.get("sku"):
+    if system_vendor.get("serial_number"):
         device_info.serial_number = system_vendor.get("serial_number")
 
 
 def _generate_device_name(device_info: DeviceInfo) -> None:
-    """Generate device name from manufacturer and service tag."""
-    if device_info.manufacturer and device_info.service_tag:
-        device_info.name = f"{device_info.manufacturer}-{device_info.service_tag}"
+    """Generate device name from manufacturer and serial number."""
+    if device_info.manufacturer and device_info.serial_number:
+        device_info.name = f"{device_info.manufacturer}-{device_info.serial_number}"
 
 
 def _set_location_from_switches(

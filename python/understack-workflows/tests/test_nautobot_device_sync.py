@@ -138,7 +138,6 @@ class TestPopulateFromInventory:
 
         assert device_info.manufacturer == "Dell"
         assert device_info.model == "PowerEdge R7615"
-        assert device_info.service_tag == "ABC1234"
         assert device_info.serial_number == "SN123456"
 
     def test_populate_from_inventory_agent_format(self, device_info):
@@ -155,14 +154,12 @@ class TestPopulateFromInventory:
 
         _populate_from_inventory(device_info, inventory)
 
-        assert device_info.service_tag == "SERVICETAG123"
-        assert device_info.serial_number is None  # Only set when sku exists
+        assert device_info.serial_number == "SERVICETAG123"
 
     def test_populate_from_inventory_empty(self, device_info):
         _populate_from_inventory(device_info, None)
 
         assert device_info.model is None
-        assert device_info.service_tag is None
 
     def test_populate_from_inventory_system_product_name(self, device_info):
         """Test that 'System' product name is ignored."""
@@ -202,7 +199,7 @@ class TestGenerateDeviceName:
         device_info = DeviceInfo(
             uuid="test-uuid",
             manufacturer="Dell",
-            service_tag="ABC1234",
+            serial_number="ABC1234",
         )
 
         _generate_device_name(device_info)
@@ -212,14 +209,14 @@ class TestGenerateDeviceName:
     def test_generate_name_missing_manufacturer(self):
         device_info = DeviceInfo(
             uuid="test-uuid",
-            service_tag="ABC1234",
+            serial_number="ABC1234",
         )
 
         _generate_device_name(device_info)
 
         assert device_info.name is None
 
-    def test_generate_name_missing_service_tag(self):
+    def test_generate_name_missing_serial_number(self):
         device_info = DeviceInfo(
             uuid="test-uuid",
             manufacturer="Dell",
