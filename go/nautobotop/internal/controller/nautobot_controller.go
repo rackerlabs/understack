@@ -93,6 +93,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		{name: "rack", configRefs: nautobotCR.Spec.RackRef, syncFunc: r.syncRack},
 		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
 		{name: "vlanGroup", configRefs: nautobotCR.Spec.VlanGroupRef, syncFunc: r.syncVlanGroup},
+		{name: "namespace", configRefs: nautobotCR.Spec.NamespaceRef, syncFunc: r.syncNamespace},
 	}
 
 	// Aggregate data and check sync decisions for all resources
@@ -291,6 +292,22 @@ func (r *NautobotReconciler) syncVlanGroup(ctx context.Context,
 	syncSvc := sync.NewVlanGroupSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, vlanGroupData); err != nil {
 		return fmt.Errorf("failed to sync vlan groups: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncNamespace(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	namespaceData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing namespaces", "count", len(namespaceData))
+	if len(namespaceData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewNamespaceSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, namespaceData); err != nil {
+		return fmt.Errorf("failed to sync namespaces: %w", err)
 	}
 	return nil
 }
