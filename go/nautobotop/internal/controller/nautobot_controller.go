@@ -85,14 +85,17 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
 
 	// Define all resources to sync
-	// Add more resources here: {name: "location", configRefs: nautobotCR.Spec.LocationsRef, syncFunc: r.syncLocations}
 	resources := []resourceConfig{
-		{name: "locationType", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
+		{name: "locationTypes", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
 		{name: "location", configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
 		{name: "rackGroup", configRefs: nautobotCR.Spec.RackGroupRef, syncFunc: r.syncRackGroup},
 		{name: "rack", configRefs: nautobotCR.Spec.RackRef, syncFunc: r.syncRack},
 		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
 		{name: "vlanGroup", configRefs: nautobotCR.Spec.VlanGroupRef, syncFunc: r.syncVlanGroup},
+		{name: "clusterType", configRefs: nautobotCR.Spec.ClusterTypeRef, syncFunc: r.syncClusterType},
+		{name: "clusterGroup", configRefs: nautobotCR.Spec.ClusterGroupRef, syncFunc: r.syncClusterGroup},
+		{name: "cluster", configRefs: nautobotCR.Spec.ClusterRef, syncFunc: r.syncCluster},
+		{name: "namespace", configRefs: nautobotCR.Spec.NamespaceRef, syncFunc: r.syncNamespace},
 	}
 
 	// Aggregate data and check sync decisions for all resources
@@ -291,6 +294,69 @@ func (r *NautobotReconciler) syncVlanGroup(ctx context.Context,
 	syncSvc := sync.NewVlanGroupSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, vlanGroupData); err != nil {
 		return fmt.Errorf("failed to sync vlan groups: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncClusterType(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	clusterTypeData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing cluster types", "count", len(clusterTypeData))
+	if len(clusterTypeData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewClusterTypeSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, clusterTypeData); err != nil {
+		return fmt.Errorf("failed to sync cluster types: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncClusterGroup(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	clusterGroupData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing cluster groups", "count", len(clusterGroupData))
+	if len(clusterGroupData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewClusterGroupSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, clusterGroupData); err != nil {
+		return fmt.Errorf("failed to sync cluster groups: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncCluster(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	clusterData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing clusters", "count", len(clusterData))
+	if len(clusterData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewClusterSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, clusterData); err != nil {
+		return fmt.Errorf("failed to sync clusters: %w", err)
+	}
+	return nil
+}
+func (r *NautobotReconciler) syncNamespace(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	namespaceData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing namespaces", "count", len(namespaceData))
+	if len(namespaceData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewNamespaceSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, namespaceData); err != nil {
+		return fmt.Errorf("failed to sync namespaces: %w", err)
 	}
 	return nil
 }

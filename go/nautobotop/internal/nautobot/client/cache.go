@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/log"
 )
 
+//nolint:gocyclo // sequential cache preloading, complexity is inherent
 func (n *NautobotClient) PreLoadCacheForLookup(ctx context.Context) error {
 	if list, _, err := n.APIClient.ExtrasAPI.ExtrasStatusesList(ctx).Depth(2).Execute(); err == nil && list != nil {
 		n.Cache.SetCollection("statuses", list.Results)
@@ -45,6 +46,40 @@ func (n *NautobotClient) PreLoadCacheForLookup(ctx context.Context) error {
 	if list, _, err := n.APIClient.IpamAPI.IpamVlanGroupsList(ctx).Depth(2).Execute(); err == nil && list != nil {
 		n.Cache.SetCollection("vlangroups", list.Results)
 		log.Info("pre-load vlan groups cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.VirtualizationAPI.VirtualizationClusterTypesList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("clustertypes", list.Results)
+		log.Info("pre-load cluster types cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.VirtualizationAPI.VirtualizationClusterGroupsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("clustergroups", list.Results)
+		log.Info("pre-load cluster groups cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.VirtualizationAPI.VirtualizationClustersList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("clusters", list.Results)
+		log.Info("pre-load clusters cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.DcimAPI.DcimDevicesList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("devices", list.Results)
+		log.Info("pre-load devices cache", "count", len(list.Results))
+	}
+	if list, _, err := n.APIClient.IpamAPI.IpamNamespacesList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("namespaces", list.Results)
+		log.Info("pre-load namespaces cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.TenancyAPI.TenancyTenantsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("tenants", list.Results)
+		log.Info("pre-load tenants cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.TenancyAPI.TenancyTenantGroupsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("tenantgroups", list.Results)
+		log.Info("pre-load tenant groups cache", "count", len(list.Results))
 	}
 
 	return nil
