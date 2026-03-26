@@ -38,6 +38,7 @@ rules:
   - placement-keystone-password
   - skyline-keystone-password
   - openstack-resource-controller
+  - svc-acct-argoworkflow
 - apiGroups:
   - authorization.k8s.io
   resources:
