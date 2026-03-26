@@ -88,22 +88,12 @@ func compareJSONValues(existing, desired any) bool {
 		return comparePrimitiveWithNestedObject(existing, desiredMap)
 	}
 
-	// If both are slices (arrays), compare recursively
+	// If both are slices (arrays), compare as unordered sets
 	existingSlice, existingIsSlice := existing.([]any)
 	desiredSlice, desiredIsSlice := desired.([]any)
 
 	if existingIsSlice && desiredIsSlice {
-		// Arrays must have same length
-		if len(existingSlice) != len(desiredSlice) {
-			return false
-		}
-		// Compare element by element
-		for i := range desiredSlice {
-			if !compareJSONValues(existingSlice[i], desiredSlice[i]) {
-				return false
-			}
-		}
-		return true
+		return compareJSONSlices(existingSlice, desiredSlice)
 	}
 
 	// Handle type mismatches (e.g., array vs primitive)
@@ -198,4 +188,33 @@ func comparePrimitiveWithNestedObject(existing any, desiredMap map[string]any) b
 
 	// No "id" or "value" field - types are incompatible
 	return false
+}
+
+// compareJSONSlices compares two JSON arrays in an order-independent manner.
+// Each element in desired must have a matching element in existing (and vice versa for length).
+func compareJSONSlices(existing, desired []any) bool {
+	if len(existing) != len(desired) {
+		return false
+	}
+	if len(existing) == 0 {
+		return true
+	}
+	matched := make([]bool, len(existing))
+	for _, dVal := range desired {
+		found := false
+		for i, eVal := range existing {
+			if matched[i] {
+				continue
+			}
+			if compareJSONValues(eVal, dVal) {
+				matched[i] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

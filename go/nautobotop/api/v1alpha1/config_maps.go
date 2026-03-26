@@ -2,9 +2,6 @@ package v1alpha1
 
 // ConfigMapRef defines a reference to a specific ConfigMap
 type ConfigMapRef struct {
-	// Name of this config set (logical name)
-	Name string `json:"name"`
-
 	// The name of the ConfigMap resource being referred to
 	ConfigMapSelector ConfigMapKeySelector `json:"configMapSelector"`
 }
