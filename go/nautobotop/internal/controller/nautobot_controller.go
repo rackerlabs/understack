@@ -86,9 +86,11 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Define all resources to sync
 	resources := []resourceConfig{
+		// --- no dependencies ---
 		{name: "locationTypes", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
 		{name: "location", configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
 		{name: "rir", configRefs: nautobotCR.Spec.RirRef, syncFunc: r.syncRir},
+		{name: "role", configRefs: nautobotCR.Spec.RoleRef, syncFunc: r.syncRole},
 		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
 		{name: "clusterType", configRefs: nautobotCR.Spec.ClusterTypeRef, syncFunc: r.syncClusterType},
 		{name: "clusterGroup", configRefs: nautobotCR.Spec.ClusterGroupRef, syncFunc: r.syncClusterGroup},
@@ -103,9 +105,9 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		{name: "tenant", configRefs: nautobotCR.Spec.TenantRef, syncFunc: r.syncTenant},
 		// depends on: location, tenant, tenantGroup
 		{name: "namespace", configRefs: nautobotCR.Spec.NamespaceRef, syncFunc: r.syncNamespace},
-		// depends on: vlanGroup, location, tenant, tenantGroup
+		// depends on: vlanGroup, location, tenant, tenantGroup, role
 		{name: "vlan", configRefs: nautobotCR.Spec.VlanRef, syncFunc: r.syncVlan},
-		// depends on: namespace, rir, location, vlanGroup, vlan, tenant, tenantGroup
+		// depends on: namespace, rir, location, vlanGroup, vlan, tenant, tenantGroup, role
 		{name: "prefix", configRefs: nautobotCR.Spec.PrefixRef, syncFunc: r.syncPrefix},
 	}
 
@@ -416,6 +418,22 @@ func (r *NautobotReconciler) syncRir(ctx context.Context,
 	syncSvc := sync.NewRirSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, rirData); err != nil {
 		return fmt.Errorf("failed to sync rirs: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncRole(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	roleData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing roles", "count", len(roleData))
+	if len(roleData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewRoleSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, roleData); err != nil {
+		return fmt.Errorf("failed to sync roles: %w", err)
 	}
 	return nil
 }

@@ -48,6 +48,7 @@ type NautobotSpec struct {
 	ClusterRef         []ConfigMapRef    `json:"clusterRef,omitempty"`
 	NamespaceRef       []ConfigMapRef    `json:"namespaceRef,omitempty"`
 	RirRef             []ConfigMapRef    `json:"rirRef,omitempty"`
+	RoleRef            []ConfigMapRef    `json:"roleRef,omitempty"`
 	TenantGroupRef     []ConfigMapRef    `json:"tenantGroupRef,omitempty"`
 	TenantRef          []ConfigMapRef    `json:"tenantRef,omitempty"`
 }
