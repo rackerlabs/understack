@@ -155,3 +155,56 @@ Defaults to false if any path segment is missing.
 {{- $result = and $result $componentEnabled -}}
 {{- ternary "true" "false" $result -}}
 {{- end }}
+
+{{/*
+Resolve whether a component sub-option (e.g. installApp, installConfigs) is active
+within a single scope.
+
+Arguments:
+  - scope (.Values.global or .Values.site)
+  - component name (e.g., "external_secrets", "cert_manager")
+  - sub-option key (e.g., "installApp", "installConfigs")
+  - default value (true or false) used when the key is absent
+
+Returns "true" if the scope+component are enabled and the sub-option is active,
+empty string otherwise.
+
+Usage:
+  {{ include "understack.componentOption" (list $.Values.global "external_secrets" "installApp" true) }}
+*/}}
+{{- define "understack.componentOption" -}}
+{{- $scope := index . 0 -}}
+{{- $componentName := index . 1 -}}
+{{- $optionKey := index . 2 -}}
+{{- $default := index . 3 -}}
+{{- $scopeEnabled := get $scope "enabled" -}}
+{{- $component := get $scope $componentName | default dict -}}
+{{- $result := and $scopeEnabled (dig $optionKey $default $component) -}}
+{{- ternary "true" "false" $result -}}
+{{- end }}
+
+{{/*
+Resolve whether a component sub-option is active across both global and site scopes.
+Convenience wrapper around understack.componentOption for components that exist in
+both scopes.
+
+Arguments:
+  - root ($) — the root context
+  - component name (e.g., "external_secrets", "cert_manager")
+  - sub-option key (e.g., "installApp", "installConfigs")
+  - default value (true or false) used when the key is absent
+
+Returns "true" if the sub-option is active in any enabled scope, empty string otherwise.
+
+Usage:
+  {{ include "understack.componentOptionAny" (list $ "external_secrets" "installApp" true) }}
+*/}}
+{{- define "understack.componentOptionAny" -}}
+{{- $root := index . 0 -}}
+{{- $componentName := index . 1 -}}
+{{- $optionKey := index . 2 -}}
+{{- $default := index . 3 -}}
+{{- $globalActive := eq (include "understack.componentOption" (list $root.Values.global $componentName $optionKey $default)) "true" -}}
+{{- $siteActive := eq (include "understack.componentOption" (list $root.Values.site $componentName $optionKey $default)) "true" -}}
+{{- ternary "true" "false" (or $globalActive $siteActive) -}}
+{{- end }}
