@@ -86,6 +86,26 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Define all resources to sync
 	resources := []resourceConfig{
+		{name: "locationTypes", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
+		{name: "location", configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
+		{name: "rir", configRefs: nautobotCR.Spec.RirRef, syncFunc: r.syncRir},
+		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
+		{name: "clusterType", configRefs: nautobotCR.Spec.ClusterTypeRef, syncFunc: r.syncClusterType},
+		{name: "clusterGroup", configRefs: nautobotCR.Spec.ClusterGroupRef, syncFunc: r.syncClusterGroup},
+		{name: "cluster", configRefs: nautobotCR.Spec.ClusterRef, syncFunc: r.syncCluster},
+		// depends on: location
+		{name: "rackGroup", configRefs: nautobotCR.Spec.RackGroupRef, syncFunc: r.syncRackGroup},
+		{name: "vlanGroup", configRefs: nautobotCR.Spec.VlanGroupRef, syncFunc: r.syncVlanGroup},
+		// depends on: location, rackGroup
+		{name: "rack", configRefs: nautobotCR.Spec.RackRef, syncFunc: r.syncRack},
+		// tenancy tenantGroup before tenant
+		{name: "tenantGroup", configRefs: nautobotCR.Spec.TenantGroupRef, syncFunc: r.syncTenantGroup},
+		{name: "tenant", configRefs: nautobotCR.Spec.TenantRef, syncFunc: r.syncTenant},
+		// depends on: location, tenant, tenantGroup
+		{name: "namespace", configRefs: nautobotCR.Spec.NamespaceRef, syncFunc: r.syncNamespace},
+		// depends on: vlanGroup, location, tenant, tenantGroup
+		{name: "vlan", configRefs: nautobotCR.Spec.VlanRef, syncFunc: r.syncVlan},
+		// depends on: namespace, rir, location, vlanGroup, vlan, tenant, tenantGroup
 		{name: "prefix", configRefs: nautobotCR.Spec.PrefixRef, syncFunc: r.syncPrefix},
 	}
 
@@ -380,6 +400,54 @@ func (r *NautobotReconciler) syncNamespace(ctx context.Context,
 	syncSvc := sync.NewNamespaceSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, namespaceData); err != nil {
 		return fmt.Errorf("failed to sync namespaces: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncRir(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	rirData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing rirs", "count", len(rirData))
+	if len(rirData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewRirSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, rirData); err != nil {
+		return fmt.Errorf("failed to sync rirs: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncTenantGroup(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	tenantGroupData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing tenant groups", "count", len(tenantGroupData))
+	if len(tenantGroupData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewTenantGroupSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, tenantGroupData); err != nil {
+		return fmt.Errorf("failed to sync tenant groups: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncTenant(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	tenantData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing tenants", "count", len(tenantData))
+	if len(tenantData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewTenantSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, tenantData); err != nil {
+		return fmt.Errorf("failed to sync tenants: %w", err)
 	}
 	return nil
 }

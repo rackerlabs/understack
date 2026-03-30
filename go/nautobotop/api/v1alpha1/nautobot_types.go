@@ -47,6 +47,9 @@ type NautobotSpec struct {
 	ClusterGroupRef    []ConfigMapRef    `json:"clusterGroupRef,omitempty"`
 	ClusterRef         []ConfigMapRef    `json:"clusterRef,omitempty"`
 	NamespaceRef       []ConfigMapRef    `json:"namespaceRef,omitempty"`
+	RirRef             []ConfigMapRef    `json:"rirRef,omitempty"`
+	TenantGroupRef     []ConfigMapRef    `json:"tenantGroupRef,omitempty"`
+	TenantRef          []ConfigMapRef    `json:"tenantRef,omitempty"`
 }
 
 // NautobotStatus defines the observed state of Nautobot.
