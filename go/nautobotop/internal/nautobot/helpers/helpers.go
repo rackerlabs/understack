@@ -35,6 +35,15 @@ func BuildNullableBulkWritableRackRequestRackGroup(id string) nb.NullableBulkWri
 	return *nb.NewNullableBulkWritableRackRequestRackGroup(&rackGroup)
 }
 
+func BuildNullableBulkWritablePrefixRequestLocation(id string) nb.NullableBulkWritablePrefixRequestLocation {
+	location := nb.BulkWritablePrefixRequestLocation{
+		Id: &nb.ApprovalWorkflowApprovalWorkflowDefinitionId{
+			String: &id,
+		},
+	}
+	return *nb.NewNullableBulkWritablePrefixRequestLocation(&location)
+}
+
 // ReadResponseBody safely reads and closes the response body.
 // Returns the body content as a string. If resp is nil, returns empty string.
 func ReadResponseBody(resp *http.Response) string {
