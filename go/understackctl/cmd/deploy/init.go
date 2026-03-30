@@ -76,7 +76,7 @@ func runDeployInit(clusterName, clusterType, gitRemote string) error {
 		globalMap := make(map[string]any)
 		globalMap["enabled"] = true
 		for _, c := range globalComponents {
-			globalMap[c.Key] = map[string]any{"enabled": true}
+			globalMap[c.Key] = initialComponentConfig(c.UsesInstallOpts)
 		}
 		config["global"] = globalMap
 	}
@@ -85,7 +85,7 @@ func runDeployInit(clusterName, clusterType, gitRemote string) error {
 		siteMap := make(map[string]any)
 		siteMap["enabled"] = true
 		for _, c := range siteComponents {
-			siteMap[c.Key] = map[string]any{"enabled": true}
+			siteMap[c.Key] = initialComponentConfig(c.UsesInstallOpts)
 		}
 		config["site"] = siteMap
 	}
@@ -96,6 +96,19 @@ func runDeployInit(clusterName, clusterType, gitRemote string) error {
 
 	log.Infof("Created %s", deployYamlPath)
 	return nil
+}
+
+// initialComponentConfig returns the default config map for a component.
+// Components using installApp/installConfigs get both set to false explicitly;
+// legacy components get enabled: true.
+func initialComponentConfig(usesInstallOpts bool) map[string]any {
+	if usesInstallOpts {
+		return map[string]any{
+			"installApp":     false,
+			"installConfigs": false,
+		}
+	}
+	return map[string]any{"enabled": true}
 }
 
 func getGitRemoteURL(remoteName string) (string, error) {

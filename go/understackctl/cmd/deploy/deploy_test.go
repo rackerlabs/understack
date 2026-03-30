@@ -82,8 +82,8 @@ func TestEnabledComponentsConvertsToHyphens(t *testing.T) {
 	}
 
 	for _, comp := range components {
-		if !expected[comp] {
-			t.Errorf("unexpected component: %s", comp)
+		if !expected[comp.Name] {
+			t.Errorf("unexpected component: %s", comp.Name)
 		}
 	}
 }
@@ -265,9 +265,9 @@ func TestDeployWorkflowIntegration(t *testing.T) {
 
 	components := enabledComponents(config)
 	for _, comp := range components {
-		compDir := filepath.Join(clusterName, comp)
+		compDir := filepath.Join(clusterName, comp.Name)
 		if _, err := os.Stat(compDir); os.IsNotExist(err) {
-			t.Errorf("directory not created for component: %s", comp)
+			t.Errorf("directory not created for component: %s", comp.Name)
 		}
 	}
 

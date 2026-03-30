@@ -39,16 +39,20 @@ func runDeployCheck(clusterName string) error {
 	missing := []string{}
 
 	for _, comp := range components {
-		compDir := filepath.Join(clusterName, comp)
-		kustomPath := filepath.Join(compDir, "kustomization.yaml")
-		valuesPath := filepath.Join(compDir, "values.yaml")
+		compDir := filepath.Join(clusterName, comp.Name)
 
-		if _, err := os.Stat(kustomPath); os.IsNotExist(err) {
-			missing = append(missing, kustomPath)
+		if comp.InstallApp {
+			valuesPath := filepath.Join(compDir, "values.yaml")
+			if _, err := os.Stat(valuesPath); os.IsNotExist(err) {
+				missing = append(missing, valuesPath)
+			}
 		}
 
-		if _, err := os.Stat(valuesPath); os.IsNotExist(err) {
-			missing = append(missing, valuesPath)
+		if comp.InstallConfigs {
+			kustomPath := filepath.Join(compDir, "kustomization.yaml")
+			if _, err := os.Stat(kustomPath); os.IsNotExist(err) {
+				missing = append(missing, kustomPath)
+			}
 		}
 	}
 

@@ -49,8 +49,15 @@ func writeYAMLFile(path string, value any) error {
 	return nil
 }
 
-func enabledComponents(config map[string]any) []string {
-	var components []string
+// ComponentConfig holds the name and deploy options for an enabled component.
+type ComponentConfig struct {
+	Name           string
+	InstallApp     bool
+	InstallConfigs bool
+}
+
+func enabledComponents(config map[string]any) []ComponentConfig {
+	var components []ComponentConfig
 
 	for _, section := range []string{"global", "site"} {
 		if sectionRaw, ok := config[section]; ok {
@@ -61,8 +68,15 @@ func enabledComponents(config map[string]any) []string {
 							continue
 						}
 						if compMap, ok := val.(map[string]any); ok {
-							if compEnabled, ok := compMap["enabled"].(bool); ok && compEnabled {
-								components = append(components, strings.ReplaceAll(key, "_", "-"))
+							compEnabled := boolOption(compMap, "enabled", false)
+							installApp := boolOption(compMap, "installApp", compEnabled)
+							installConfigs := boolOption(compMap, "installConfigs", compEnabled)
+							if compEnabled || installApp || installConfigs {
+								components = append(components, ComponentConfig{
+									Name:           strings.ReplaceAll(key, "_", "-"),
+									InstallApp:     installApp,
+									InstallConfigs: installConfigs,
+								})
 							}
 						}
 					}
@@ -72,4 +86,11 @@ func enabledComponents(config map[string]any) []string {
 	}
 
 	return components
+}
+
+func boolOption(m map[string]any, key string, defaultVal bool) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return defaultVal
 }
