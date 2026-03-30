@@ -166,6 +166,20 @@ func (in *NautobotSpec) DeepCopyInto(out *NautobotSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.VlanRef != nil {
+		in, out := &in.VlanRef, &out.VlanRef
+		*out = make([]ConfigMapRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.PrefixRef != nil {
+		in, out := &in.PrefixRef, &out.PrefixRef
+		*out = make([]ConfigMapRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.ClusterTypeRef != nil {
 		in, out := &in.ClusterTypeRef, &out.ClusterTypeRef
 		*out = make([]ConfigMapRef, len(*in))

@@ -86,17 +86,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Define all resources to sync
 	resources := []resourceConfig{
-		{name: "locationTypes", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
-		{name: "location", configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
-		{name: "rackGroup", configRefs: nautobotCR.Spec.RackGroupRef, syncFunc: r.syncRackGroup},
-		{name: "rack", configRefs: nautobotCR.Spec.RackRef, syncFunc: r.syncRack},
-		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
-		{name: "vlanGroup", configRefs: nautobotCR.Spec.VlanGroupRef, syncFunc: r.syncVlanGroup},
-		{name: "vlan", configRefs: nautobotCR.Spec.VlanRef, syncFunc: r.syncVlan},
-		{name: "clusterType", configRefs: nautobotCR.Spec.ClusterTypeRef, syncFunc: r.syncClusterType},
-		{name: "clusterGroup", configRefs: nautobotCR.Spec.ClusterGroupRef, syncFunc: r.syncClusterGroup},
-		{name: "cluster", configRefs: nautobotCR.Spec.ClusterRef, syncFunc: r.syncCluster},
-		{name: "namespace", configRefs: nautobotCR.Spec.NamespaceRef, syncFunc: r.syncNamespace},
+		{name: "prefix", configRefs: nautobotCR.Spec.PrefixRef, syncFunc: r.syncPrefix},
 	}
 
 	// Aggregate data and check sync decisions for all resources
@@ -311,6 +301,22 @@ func (r *NautobotReconciler) syncVlan(ctx context.Context,
 	syncSvc := sync.NewVlanSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, vlanData); err != nil {
 		return fmt.Errorf("failed to sync vlans: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncPrefix(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	prefixData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing prefixes", "count", len(prefixData))
+	if len(prefixData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewPrefixSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, prefixData); err != nil {
+		return fmt.Errorf("failed to sync prefixes: %w", err)
 	}
 	return nil
 }

@@ -42,6 +42,7 @@ type NautobotSpec struct {
 	RackRef            []ConfigMapRef    `json:"rackRef,omitempty"`
 	VlanGroupRef       []ConfigMapRef    `json:"vlanGroupRef,omitempty"`
 	VlanRef            []ConfigMapRef    `json:"vlanRef,omitempty"`
+	PrefixRef          []ConfigMapRef    `json:"prefixRef,omitempty"`
 	ClusterTypeRef     []ConfigMapRef    `json:"clusterTypeRef,omitempty"`
 	ClusterGroupRef    []ConfigMapRef    `json:"clusterGroupRef,omitempty"`
 	ClusterRef         []ConfigMapRef    `json:"clusterRef,omitempty"`
