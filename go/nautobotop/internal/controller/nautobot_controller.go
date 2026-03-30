@@ -86,7 +86,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	// Define all resources to sync
 	resources := []resourceConfig{
-		// --- no dependencies ---
+		// No Dependencies, these need to be run first and are independent.
 		{name: "locationTypes", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
 		{name: "location", configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
 		{name: "rir", configRefs: nautobotCR.Spec.RirRef, syncFunc: r.syncRir},
