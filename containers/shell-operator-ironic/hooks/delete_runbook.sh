@@ -16,20 +16,24 @@ if [[ $1 == "--config" ]] ; then
 }
 EOF
 else
-  type=$(jq -r '.[0].type' "${BINDING_CONTEXT_PATH}")
-  if [[ $type == "Synchronization" ]] ; then
-    echo "Implement any reconciliation logic needed here."
-  fi
+  binding_count=$(jq -r 'length' "${BINDING_CONTEXT_PATH}")
+  for ((i = 0; i < binding_count; i++)); do
+    type=$(jq -r ".[$i].type" "${BINDING_CONTEXT_PATH}")
+    if [[ $type == "Synchronization" ]] ; then
+      echo "Implement any reconciliation logic needed here."
+      continue
+    fi
 
-  if [[ $type == "Event" ]] ; then
-    resource_name=$(jq -r '.[0].object.metadata.name' "${BINDING_CONTEXT_PATH}")
-    kind=$(jq -r '.[0].object.kind' "${BINDING_CONTEXT_PATH}")
+    if [[ $type == "Event" ]] ; then
+      resource_name=$(jq -r ".[$i].object.metadata.name" "${BINDING_CONTEXT_PATH}")
+      kind=$(jq -r ".[$i].object.kind" "${BINDING_CONTEXT_PATH}")
 
-    runbook_name=$(jq -r '.[0].object.spec.runbookName' "${BINDING_CONTEXT_PATH}")
+      runbook_name=$(jq -r ".[$i].object.spec.runbookName" "${BINDING_CONTEXT_PATH}")
 
-    command_args=(baremetal runbook delete "${runbook_name}")
-    echo "${kind}/${resource_name} deleted, running: openstack ${command_args[*]}"
+      command_args=(baremetal runbook delete "${runbook_name}")
+      echo "${kind}/${resource_name} deleted, running: openstack ${command_args[*]}"
 
-    openstack "${command_args[@]}"
-  fi
+      openstack "${command_args[@]}"
+    fi
+  done
 fi
