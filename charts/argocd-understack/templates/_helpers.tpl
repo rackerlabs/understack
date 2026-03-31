@@ -122,6 +122,20 @@ Usage in source path:
 {{- end }}
 
 {{/*
+Render a labels block for ArgoCD Application resources from .Values.appLabels.
+Produces nothing when appLabels is empty or unset.
+
+Usage:
+  {{- include "understack.appLabelsBlock" $ | nindent 2 }}
+*/}}
+{{- define "understack.appLabelsBlock" -}}
+{{- with .Values.appLabels }}
+labels:
+{{- toYaml . | nindent 2 }}
+{{- end -}}
+{{- end }}
+
+{{/*
 Check if a component is enabled by walking the configuration hierarchy.
 Supports both "global" and "site" scopes with appropriate kill switches.
 

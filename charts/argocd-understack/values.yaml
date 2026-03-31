@@ -27,6 +27,10 @@ deploy_ref: HEAD
 # @default -- "" (no prefix, just Release.Name)
 deploy_path_prefix:
 
+# -- Additional labels to apply to all generated ArgoCD Application resources.
+# @default -- {}
+appLabels: {}
+
 # -- This block is for setting up the UnderStack global specific ArgoCD Applications
 global:
   # -- Enable/disable deploying the global specific applications

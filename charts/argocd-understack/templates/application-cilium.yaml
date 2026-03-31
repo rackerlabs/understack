@@ -8,6 +8,7 @@ metadata:
   - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
 spec:
   destination:
     namespace: cilium

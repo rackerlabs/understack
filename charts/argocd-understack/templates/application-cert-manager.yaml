@@ -13,6 +13,7 @@ metadata:
     # cert-manager is critical for a number of other charts so sync
     # it right after CRDs and before the default 0 wave
     argocd.argoproj.io/sync-wave: "-1"
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
 spec:
   destination:
     namespace: cert-manager

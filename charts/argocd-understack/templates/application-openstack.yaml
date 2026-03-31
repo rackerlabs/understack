@@ -13,6 +13,7 @@ metadata:
     argocd.argoproj.io/sync-wave: {{ quote . }}
   {{- end }}
   */}}
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
 spec:
   destination:
     namespace: {{ .Values.site.openstack.namespace }}

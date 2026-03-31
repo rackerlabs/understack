@@ -6,6 +6,7 @@ metadata:
   name: {{ printf "%s-%s" $.Release.Name "karma" }}
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
 spec:
   destination:
     namespace: monitoring
