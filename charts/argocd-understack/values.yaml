@@ -47,9 +47,12 @@ global:
 
   # -- Cert-Manager
   cert_manager:
-    # -- Enable/disable deploying Cert-Manager
+    # -- Enable/disable deploying the cert-manager Helm chart (operator)
     # @default -- false
-    enabled: false
+    installApp: false
+    # -- Enable/disable deploying site-specific cert-manager configs from the deploy repo
+    # @default -- false
+    installConfigs: false
 
   # Cilium configurations
   cilium:
@@ -101,9 +104,12 @@ global:
 
   # -- External Secrets operator
   external_secrets:
-    # -- Enable/disable deploying External Secrets
+    # -- Enable/disable deploying the External Secrets Operator Helm chart
     # @default -- false
-    enabled: false
+    installApp: false
+    # -- Enable/disable deploying site-specific ESO configs from the deploy repo
+    # @default -- false
+    installConfigs: false
 
   # -- Global workflows for Argo Events and Workflows
   global_workflows:
@@ -196,13 +202,19 @@ site:
   # @default -- false
   enabled: false
 
-  # -- Argo Events configuration for event-driven workflows
+  # -- Argo Events operator
   argo_events:
     # -- Enable/disable deploying Argo Events
     # @default -- false
     enabled: false
 
-  # -- Argo Workflows configuration
+  # -- Event-driven workflows that live in argo-events namespace (need to move)
+  argo_events_workflows:
+    # -- Enable/disable deploying Workflows
+    # @default -- false
+    enabled: false
+
+  # -- Argo Workflows operator
   argo_workflows:
     # -- Enable/disable deploying Argo Workflows
     # @default -- false
@@ -210,9 +222,12 @@ site:
 
   # -- Cert-Manager
   cert_manager:
-    # -- Enable/disable deploying Cert-Manager
+    # -- Enable/disable deploying the cert-manager Helm chart (operator)
     # @default -- false
-    enabled: false
+    installApp: false
+    # -- Enable/disable deploying site-specific cert-manager configs from the deploy repo
+    # @default -- false
+    installConfigs: false
 
   # Cilium configurations
   cilium:
@@ -434,9 +449,12 @@ site:
 
   # -- External Secrets operator
   external_secrets:
-    # -- Enable/disable deploying External Secrets
+    # -- Enable/disable deploying the External Secrets Operator Helm chart
     # @default -- false
-    enabled: false
+    installApp: false
+    # -- Enable/disable deploying site-specific ESO configs from the deploy repo
+    # @default -- false
+    installConfigs: false
 
   # -- Alerts management (karma)
   karma:

@@ -10,7 +10,7 @@ deploy_overrides:
 
 # external-secrets
 
-External Secrets operator installation.
+External Secrets operator installation and site-specific ESO configuration.
 
 ## Deployment Scope
 
@@ -24,25 +24,52 @@ External Secrets operator installation.
 
 ## How to Enable
 
-Enable this component under the scope that matches your deployment model:
+Enable this component by setting one or both options under the scope that matches your deployment model:
 
 ```yaml title="$CLUSTER_NAME/deploy.yaml"
 global:
   external_secrets:
-    enabled: true
+    installApp: true
 site:
   external_secrets:
-    enabled: true
+    installApp: true
+```
+
+### Options
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `installApp` | `false` | Deploy the External Secrets Operator from the understack repo |
+| `installConfigs` | `false` | Deploy site-specific ESO configs from the deploy repo |
+
+To use an externally-managed ESO installation (e.g. the operator is already installed by another team) while still deploying your site's ESO resources:
+
+```yaml title="$CLUSTER_NAME/deploy.yaml"
+global:
+  external_secrets:
+    installApp: false
+    installConfigs: true
 ```
 
 ## Deployment Repo Content
 
 {{ secrets_disclaimer }}
 
+When `installConfigs: true`, the Application reads from:
+
+```text
+$DEPLOY_REPO/<cluster-name>/external-secrets/
+```
+
+Place any site-specific ESO resources here, for example:
+
+- `ClusterSecretStore` manifests connecting to your secrets backend
+- `ExternalSecret` objects for secrets that don't belong to a specific component
+
 Required or commonly required items:
 
-- None for this Application today. It deploys the shared operator manifests directly and does not read deploy-repo values or overlay manifests for this component.
+- None required. With `installApp: true` the operator manifests are deployed directly from the understack repo with no deploy-repo content needed.
 
 Optional additions:
 
-- Document provider-specific SecretStores and authentication material only where a consuming component needs the resulting Secret shape.
+- Provider-specific `ClusterSecretStore` and authentication `Secret` objects in the `external-secrets/` deploy-repo path when `installConfigs: true`.

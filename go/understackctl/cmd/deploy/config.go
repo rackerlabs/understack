@@ -49,8 +49,19 @@ func writeYAMLFile(path string, value any) error {
 	return nil
 }
 
-func enabledComponents(config map[string]any) []string {
-	var components []string
+// ComponentConfig holds the name and deploy options for an enabled component.
+type ComponentConfig struct {
+	Name           string
+	InstallApp     bool
+	InstallConfigs bool
+}
+
+func enabledComponents(config map[string]any) []ComponentConfig {
+	// Use a map to merge components that appear in both global and site scopes.
+	// InstallApp and InstallConfigs are OR'd across scopes so that enabling an
+	// option in either scope takes effect.
+	seen := make(map[string]*ComponentConfig)
+	var order []string
 
 	for _, section := range []string{"global", "site"} {
 		if sectionRaw, ok := config[section]; ok {
@@ -61,8 +72,24 @@ func enabledComponents(config map[string]any) []string {
 							continue
 						}
 						if compMap, ok := val.(map[string]any); ok {
-							if compEnabled, ok := compMap["enabled"].(bool); ok && compEnabled {
-								components = append(components, strings.ReplaceAll(key, "_", "-"))
+							compEnabled := boolOption(compMap, "enabled", false)
+							installApp := boolOption(compMap, "installApp", compEnabled)
+							installConfigs := boolOption(compMap, "installConfigs", compEnabled)
+							if !compEnabled && !installApp && !installConfigs {
+								continue
+							}
+							name := strings.ReplaceAll(key, "_", "-")
+							if existing, found := seen[name]; found {
+								existing.InstallApp = existing.InstallApp || installApp
+								existing.InstallConfigs = existing.InstallConfigs || installConfigs
+							} else {
+								comp := &ComponentConfig{
+									Name:           name,
+									InstallApp:     installApp,
+									InstallConfigs: installConfigs,
+								}
+								seen[name] = comp
+								order = append(order, name)
 							}
 						}
 					}
@@ -71,5 +98,16 @@ func enabledComponents(config map[string]any) []string {
 		}
 	}
 
+	components := make([]ComponentConfig, 0, len(order))
+	for _, name := range order {
+		components = append(components, *seen[name])
+	}
 	return components
+}
+
+func boolOption(m map[string]any, key string, defaultVal bool) bool {
+	if v, ok := m[key].(bool); ok {
+		return v
+	}
+	return defaultVal
 }

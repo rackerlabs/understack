@@ -1,4 +1,6 @@
-{{- if or (eq (include "understack.isEnabled" (list $.Values.global "cert_manager")) "true") (eq (include "understack.isEnabled" (list $.Values.site "cert_manager")) "true") }}
+{{- $installApp := eq (include "understack.componentOptionAny" (list $ "cert_manager" "installApp" true)) "true" }}
+{{- $installConfigs := eq (include "understack.componentOptionAny" (list $ "cert_manager" "installConfigs" false)) "true" }}
+{{- if or $installApp $installConfigs }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -17,6 +19,7 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack-infra
   sources:
+  {{- if $installApp }}
   - chart: cert-manager
     helm:
       releaseName: cert-manager
@@ -29,6 +32,12 @@ spec:
           enabled: true
     repoURL: https://charts.jetstack.io
     targetRevision: v1.20.0
+  {{- end }}
+  {{- if $installConfigs }}
+  - path: {{ include "understack.deploy_path" $ }}/cert-manager
+    repoURL: {{ include "understack.deploy_url" $ }}
+    targetRevision: {{ include "understack.deploy_ref" $ }}
+  {{- end }}
   syncPolicy:
     automated:
       prune: true

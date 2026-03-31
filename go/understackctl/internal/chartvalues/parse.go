@@ -15,8 +15,9 @@ const (
 
 // ComponentKey represents a component found in the values.yaml.
 type ComponentKey struct {
-	Key  string // original key, e.g. "cert_manager"
-	Name string // hyphenated name, e.g. "cert-manager"
+	Key             string // original key, e.g. "cert_manager"
+	Name            string // hyphenated name, e.g. "cert-manager"
+	UsesInstallOpts bool   // true if component uses installApp/installConfigs instead of enabled
 }
 
 // FetchValues fetches the ArgoCD chart values.yaml from GitHub for the given version.
@@ -102,9 +103,12 @@ func extractComponents(values map[string]any, scope string) ([]ComponentKey, err
 			continue
 		}
 
+		compMap := child.(map[string]any)
+		_, hasInstallApp := compMap["installApp"]
 		components = append(components, ComponentKey{
-			Key:  key,
-			Name: strings.ReplaceAll(key, "_", "-"),
+			Key:             key,
+			Name:            strings.ReplaceAll(key, "_", "-"),
+			UsesInstallOpts: hasInstallApp,
 		})
 	}
 
