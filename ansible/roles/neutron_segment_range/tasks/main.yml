@@ -1,0 +1,53 @@
+---
+- name: Read clouds.yaml
+  ansible.builtin.slurp:
+    src: /etc/openstack/clouds.yaml
+  register: clouds_yaml_raw
+
+- name: Extract OpenStack region name
+  ansible.builtin.set_fact:
+    openstack_region: >-
+      {{ (clouds_yaml_raw.content | b64decode | from_yaml).clouds[lookup('env', 'OS_CLOUD')].region_name }}
+
+- name: Query Nautobot for UCVNI Groups in region {{ openstack_region }}
+  ansible.builtin.uri:
+    url: "{{ nautobot_url }}/api/plugins/undercloud-vni/ucvni-groups/?location={{ openstack_region }}"
+    method: GET
+    headers:
+      Authorization: "Token {{ nautobot_token }}"
+      Accept: "application/json; version={{ nautobot_api_version }}"
+    status_code: 200
+  register: ucvni_groups_result
+
+- name: Assert exactly one UCVNI Group found for region
+  ansible.builtin.assert:
+    that:
+      - ucvni_groups_result.json.count == 1
+    fail_msg: >-
+      Expected exactly 1 UCVNI Group for location '{{ openstack_region }}',
+      found {{ ucvni_groups_result.json.count }}
+
+- name: Extract UCVNI Group data and parse VNI range
+  ansible.builtin.set_fact:
+    ucvni_group: "{{ ucvni_groups_result.json.results[0] }}"
+    vni_min: "{{ ucvni_groups_result.json.results[0].range.split('-')[0] | int }}"
+    vni_max: "{{ ucvni_groups_result.json.results[0].range.split('-')[1] | int }}"
+
+- name: Check if Neutron segment range already exists
+  ansible.builtin.command:
+    cmd: openstack network segment range show {{ ucvni_group.name }} --format value --column id
+  register: existing_segment_range
+  failed_when: false
+  changed_when: false
+
+- name: Create Neutron VXLAN segment range from UCVNI Group {{ ucvni_group.name }}
+  ansible.builtin.command:
+    cmd: >-
+      openstack network segment range create
+      --network-type vxlan
+      --minimum {{ vni_min }}
+      --maximum {{ vni_max }}
+      --share
+      {{ ucvni_group.name }}
+  when: existing_segment_range.rc != 0
+  changed_when: true

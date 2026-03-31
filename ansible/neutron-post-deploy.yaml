@@ -20,6 +20,9 @@
   pre_tasks:
     - name: Check OpenStack connectivity
       ansible.builtin.import_tasks: tasks/check_openstack_auth.yml
+    - name: Check Nautobot connectivity
+      ansible.builtin.import_tasks: tasks/check_nautobot_auth.yml
 
   roles:
+    - role: neutron_segment_range
     - role: openstack_network
