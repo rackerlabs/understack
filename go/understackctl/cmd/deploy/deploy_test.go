@@ -189,6 +189,62 @@ func TestDeployUpdate(t *testing.T) {
 	}
 }
 
+func TestDeployUpdateAIOInstallOptionsAreMergedPerComponent(t *testing.T) {
+	tmpDir := t.TempDir()
+	clusterName := filepath.Join(tmpDir, "aio-cluster")
+
+	config := map[string]any{
+		"global": map[string]any{
+			"enabled": true,
+			"cert_manager": map[string]any{
+				"installApp":     true,
+				"installConfigs": false,
+			},
+		},
+		"site": map[string]any{
+			"enabled": true,
+			"cert_manager": map[string]any{
+				"installApp":     false,
+				"installConfigs": true,
+			},
+		},
+	}
+
+	if err := os.MkdirAll(clusterName, 0755); err != nil {
+		t.Fatalf("failed to create cluster dir: %v", err)
+	}
+
+	data, err := yaml.Marshal(&config)
+	if err != nil {
+		t.Fatalf("failed to marshal config: %v", err)
+	}
+
+	deployYaml := filepath.Join(clusterName, "deploy.yaml")
+	if err := os.WriteFile(deployYaml, data, 0644); err != nil {
+		t.Fatalf("failed to write deploy.yaml: %v", err)
+	}
+
+	if err := runDeployUpdate(clusterName); err != nil {
+		t.Fatalf("runDeployUpdate failed: %v", err)
+	}
+
+	compDir := filepath.Join(clusterName, "cert-manager")
+	valuesPath := filepath.Join(compDir, "values.yaml")
+	kustomPath := filepath.Join(compDir, "kustomization.yaml")
+
+	if _, err := os.Stat(valuesPath); os.IsNotExist(err) {
+		t.Fatalf("expected values.yaml for merged installApp=true")
+	}
+
+	if _, err := os.Stat(kustomPath); os.IsNotExist(err) {
+		t.Fatalf("expected kustomization.yaml for merged installConfigs=true")
+	}
+
+	if err := runDeployCheck(clusterName); err != nil {
+		t.Fatalf("deploy check should pass for merged AIO config: %v", err)
+	}
+}
+
 func TestDeployCheck(t *testing.T) {
 	tmpDir := t.TempDir()
 	clusterName := filepath.Join(tmpDir, "test-cluster")

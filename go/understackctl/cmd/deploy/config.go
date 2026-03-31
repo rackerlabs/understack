@@ -57,7 +57,11 @@ type ComponentConfig struct {
 }
 
 func enabledComponents(config map[string]any) []ComponentConfig {
-	var components []ComponentConfig
+	// Use a map to merge components that appear in both global and site scopes.
+	// InstallApp and InstallConfigs are OR'd across scopes so that enabling an
+	// option in either scope takes effect.
+	seen := make(map[string]*ComponentConfig)
+	var order []string
 
 	for _, section := range []string{"global", "site"} {
 		if sectionRaw, ok := config[section]; ok {
@@ -71,12 +75,21 @@ func enabledComponents(config map[string]any) []ComponentConfig {
 							compEnabled := boolOption(compMap, "enabled", false)
 							installApp := boolOption(compMap, "installApp", compEnabled)
 							installConfigs := boolOption(compMap, "installConfigs", compEnabled)
-							if compEnabled || installApp || installConfigs {
-								components = append(components, ComponentConfig{
-									Name:           strings.ReplaceAll(key, "_", "-"),
+							if !compEnabled && !installApp && !installConfigs {
+								continue
+							}
+							name := strings.ReplaceAll(key, "_", "-")
+							if existing, found := seen[name]; found {
+								existing.InstallApp = existing.InstallApp || installApp
+								existing.InstallConfigs = existing.InstallConfigs || installConfigs
+							} else {
+								comp := &ComponentConfig{
+									Name:           name,
 									InstallApp:     installApp,
 									InstallConfigs: installConfigs,
-								})
+								}
+								seen[name] = comp
+								order = append(order, name)
 							}
 						}
 					}
@@ -85,6 +98,10 @@ func enabledComponents(config map[string]any) []ComponentConfig {
 		}
 	}
 
+	components := make([]ComponentConfig, 0, len(order))
+	for _, name := range order {
+		components = append(components, *seen[name])
+	}
 	return components
 }
 
