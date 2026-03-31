@@ -73,6 +73,33 @@ You can verify all required files exist with:
 understackctl deploy check my-site
 ```
 
+### Top-level Chart Settings
+
+In addition to component sections, `deploy.yaml` supports top-level settings that apply across all generated ArgoCD Applications:
+
+| Key | Description |
+|-----|-------------|
+| `understack_url` | UnderStack source repository URL |
+| `understack_ref` | Git ref (branch, tag, or commit) to deploy from |
+| `deploy_url` | Your deployment repository URL |
+| `deploy_ref` | Git ref for the deployment repository |
+| `deploy_path_prefix` | Optional path prefix within the deploy repo |
+| `cluster_server` | Target cluster API server URL |
+| `appLabels` | Additional labels applied to every ArgoCD Application |
+
+`appLabels` is useful for identifying which cluster or partition an Application belongs to when managing multiple clusters through a single ArgoCD instance:
+
+```yaml title="my-site/deploy.yaml"
+understack_url: https://github.com/rackerlabs/understack.git
+deploy_url: git@github.com:my-org/my-deploy.git
+appLabels:
+  understack.rackspace.com/cluster: my-site
+  understack.rackspace.com/partition: us-east
+site:
+  enabled: true
+  # ...
+```
+
 ### Managing Components
 
 To enable or disable components, edit the component sections in `deploy.yaml`:
