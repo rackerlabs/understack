@@ -49,11 +49,6 @@ spec:
                 secretKeyRef:
                   name: {{ $source | quote }}
                   key: {{ default "email" $token.sourceSecretRef.keys.email | quote }}
-            - name: NAUTOBOT_MANAGED_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ $source | quote }}
-                  key: {{ default "password" $token.sourceSecretRef.keys.password | quote }}
             - name: NAUTOBOT_MANAGED_API_TOKEN
               valueFrom:
                 secretKeyRef:

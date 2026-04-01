@@ -9,7 +9,8 @@ Helm chart that manages Nautobot users and API tokens from Kubernetes Secret ref
 - Each job runs `nautobot-server shell --interface python` using a mounted managed script.
 - User and token reconciliation is idempotent:
   - create user if missing
-  - update email/password/flags if changed
+  - update email/flags if changed
+  - enforce `set_unusable_password()` for managed users
   - ensure group membership for managed users
   - create token if missing
   - update token key if changed
@@ -56,7 +57,6 @@ tokens:
       keys:
         username: username
         email: email
-        password: password
         apiToken: apiToken
     user:
       isSuperuser: false
@@ -67,7 +67,6 @@ tokens:
       keys:
         username: username
         email: email
-        password: password
         apiToken: apiToken
 ```
 
