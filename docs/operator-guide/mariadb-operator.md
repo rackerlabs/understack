@@ -169,6 +169,227 @@ Defaulted container "mariadb" out of: mariadb, mariadb-operator (init)
 💾 Restoring backup: /backup/backup.2025-03-13T09:00:05Z.sql
 ```
 
+## Inspecting backup volume
+
+If you want to check which backups are available on the PVC, here is a quick way to check:
+
+```shell
+kubectl run pvc-browser -it \
+  --image=debian:12-slim \
+  --restart=Never \
+  --rm \
+  --overrides='{
+    "spec": {
+      "containers": [{
+        "name": "shell",
+        "image": "debian:12-slim",
+        "command": ["/bin/bash"],
+        "stdin": true,
+        "tty": true,
+        "volumeMounts": [{
+          "name": "backup-volume",
+          "mountPath": "/data"
+        }]
+      }],
+      "volumes": [{
+        "name": "backup-volume",
+        "persistentVolumeClaim": {
+          "claimName": "backup"
+        }
+      }]
+    }
+  }'
+```
+
+This should spawn the new Pod with attached PVC, so you can browse:
+
+```text
+❯ kubectl run pvc-browser -it \
+  --image=debian:12-slim \
+  --restart=Never
+[...]
+If you don't see a command prompt, try pressing enter.
+
+root@pvc-browser:/# ls /data/
+0-backup-target.txt              backup.2026-03-27T16:00:02Z.sql  backup.2026-03-30T01:00:08Z.sql
+backup.2026-03-25T08:00:03Z.sql  backup.2026-03-27T17:00:01Z.sql  backup.2026-03-30T02:00:10Z.sql
+backup.2026-03-25T09:00:10Z.sql  backup.2026-03-27T18:00:05Z.sql  backup.2026-03-30T03:00:04Z.sql
+backup.2026-03-25T10:00:04Z.sql  backup.2026-03-27T20:22:42Z.sql  backup.2026-03-30T04:00:07Z.sql
+backup.2026-03-25T11:00:06Z.sql  backup.2026-03-27T20:22:58Z.sql  backup.2026-03-30T05:00:02Z.sql
+backup.2026-03-25T12:00:10Z.sql  backup.2026-03-27T21:00:07Z.sql  backup.2026-03-30T06:00:03Z.sql
+backup.2026-03-25T13:00:02Z.sql  backup.2026-03-27T22:00:20Z.sql  backup.2026-03-30T07:00:07Z.sql
+backup.2026-03-25T14:00:06Z.sql  backup.2026-03-27T23:00:06Z.sql  backup.2026-03-30T08:00:09Z.sql
+backup.2026-03-25T15:00:07Z.sql  backup.2026-03-28T00:00:07Z.sql  backup.2026-03-30T09:00:11Z.sql
+backup.2026-03-27T14:00:09Z.sql  backup.2026-03-29T23:00:05Z.sql  lost+found
+backup.2026-03-27T15:00:09Z.sql  backup.2026-03-30T00:00:03Z.sql
+root@pvc-browser:/#
+```
+
+Don't leave that session running for too long. The backups may be blocked while this pod is running.
+Usually you don't need the exact filename for restore, but it's good to know what is available out there.
+
+## Restoring - nuclear option
+
+In some cases, the restore may fail. For example, during recent incident, the existing database has been completely wiped.
+When the OpenStack services restarted, naturally they assumed they are running on a fresh database so the migrations were executed.
+As a result, the tables were already created but the other data was not there.
+This also prevents the normal MariaDB restore process from working.
+
+Here is how it looks like in the restore pod logs:
+
+```text
+{"level":"info","ts":1775026592.1292808,"msg":"writing target file","file":"/backup/0-backup-target.txt","file-content":"/backup/backup.2026-03-27T18:00:05Z.sql"}
+💾 Restoring backup: /backup/backup.2026-03-27T18:00:05Z.sql
+--------------
+CREATE TABLE `attachment_specs` (
+  `created_at` datetime DEFAULT NULL,
+  `updated_at` datetime DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `deleted` tinyint(1) DEFAULT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `attachment_id` varchar(36) NOT NULL,
+  `key` varchar(255) DEFAULT NULL,
+  `value` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `ix_attachment_specs_attachment_id` (`attachment_id`),
+  CONSTRAINT `attachment_specs_ibfk_1` FOREIGN KEY (`attachment_id`) REFERENCES `volume_attachment` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci
+--------------
+ERROR 1005 (HY000) at line 56: Can't create table `cinder`.`attachment_specs` (errno: 150 "Foreign key constraint is incorrectly formed")
+```
+
+The solution is to delete the database and bootstrap new one from existing backup. High level steps are:
+
+- Disable ArgoCD
+- Make backup of the MariaDB cluster manifest and verify backups
+- Delete storage
+- Recreate the MariaDB cluster and users
+- Restart OpenStack services
+
+### Disable ArgoCD
+
+This can be done by removing the relevant ClusterRoleBinding (make a local copy!) or pausing sync of all Applications (not possible in production environments). Example commands:
+
+```shell
+kubectl get clusterrolebinding argo-binding -o yaml > iad3-dev-clusterrolebinding-argo.yaml
+kubectl delete clusterrolebinding argo-binding
+```
+
+### MariaDB resource backup
+
+Obtain local copy of the `MariaDB` resource:
+
+```shell
+kubectl get mariadb mariadb -o yaml > mariadb-cluster-original.yaml
+```
+
+### Verify Backups
+
+Double check that the backups exist. See [inspecting backups](#inspecting-backup-volume) section.
+
+### Delete MariaDB resource
+
+```shell
+kubectl -n openstack delete mariadb mariadb
+```
+
+Verify that it was deleted with
+
+```shell
+kubectl -n openstack get mariadb
+```
+
+### Delete underlying storage
+
+Delete database cluster PVCs:
+
+```shell
+kubectl delete pvc galera-mariadb-0 galera-mariadb-1 galera-mariadb-2 storage-mariadb-0 storage-mariadb-1 storage-mariadb-2
+```
+
+### Prepare recovery with bootstrap
+
+```shell
+cp mariadb-cluster-original.yaml mariadb-bootstrap-from-backup.yaml
+vim mariadb-bootstrap-from-backup.yaml
+```
+
+Update the manifest by adding following snippet under `spec` section:
+
+```yaml
+bootstrapFrom:
+  backupRef:
+    name: backup
+  targetRecoveryTime: 2026-03-27T18:00:00Z
+```
+
+Make sure to adjust the `targetRecoveryTime` to the desired recovery point.
+
+Verify with:
+
+```yaml
+❯ cat mariadb-bootstrap-from-backup.yaml | yq .spec.bootstrapFrom
+backupRef:
+  name: backup
+targetRecoveryTime: 2026-03-27T18:00:00Z
+```
+
+### Execute recovery
+
+```shell
+kubectl create -f mariadb-bootstrap-from-backup.yaml
+```
+
+Monitor progress with:
+
+```shell
+❯ kubectl  get mariadb
+NAME      READY   STATUS      PRIMARY     UPDATES                    AGE
+mariadb   True    Restoring   mariadb-1   ReplicasFirstPrimaryLast   17m
+...
+...
+❯ kubectl  get mariadb
+NAME      READY   STATUS      PRIMARY     UPDATES                    AGE
+mariadb   True    Running     mariadb-1   ReplicasFirstPrimaryLast   47m
+```
+
+### Recreate Users
+
+We have noticed that restore process is not always successful with restoring local users.
+The solution for this is to simply delete the relevant `User` resources and
+allow ArgoCD to recreate the, which forces the operator to recreate them in the
+database:
+
+```shell
+kubectl get users --no-headers -o name | xargs kubectl delete
+```
+
+### Restart Services
+
+#### Deployments
+
+```shell
+
+kubectl get deployments -o name |
+  grep -Ev 'ovn|memcached|mariadb|eventsource|sensor' |
+  xargs kubectl rollout restart
+
+```
+
+#### StatefulSets
+
+```shell
+kubectl get statefulset -o name |
+  grep -Ev 'mariadb|ovs|rabbit|eventbus' |
+  xargs kubectl rollout restart statefulset
+```
+
+### Restore ArgoCD access
+
+```shell
+kubectl create -f iad3-dev-clusterrolebinding-argo.yaml
+```
+
 ## Galera Backup failures
 
 Sometimes the mariadb-operator attempts to take a database backup but fails
