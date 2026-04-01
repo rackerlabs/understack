@@ -1,0 +1,228 @@
+{
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/device-type.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Device type configuration schema for hardware models",
+  "properties": {
+    "class": {
+      "description": "Device class category",
+      "enum": [
+        "server",
+        "switch",
+        "firewall",
+        "storage"
+      ],
+      "type": "string"
+    },
+    "comments": {
+      "description": "Additional comments about the device type",
+      "type": "string"
+    },
+    "console-ports": {
+      "description": "Console ports",
+      "items": {
+        "description": "Console port",
+        "properties": {
+          "name": {
+            "description": "Console port name",
+            "type": "string"
+          },
+          "type": {
+            "description": "Console port type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "interfaces": {
+      "description": "Network interfaces",
+      "items": {
+        "description": "Network interface",
+        "properties": {
+          "mgmt_only": {
+            "description": "Whether this interface is management-only",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Interface name",
+            "type": "string"
+          },
+          "type": {
+            "description": "Interface type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "is_full_depth": {
+      "description": "Whether the device is full depth in the rack",
+      "type": "boolean"
+    },
+    "manufacturer": {
+      "description": "Manufacturer of the hardware chassis",
+      "type": "string"
+    },
+    "model": {
+      "description": "Model of the hardware chassis",
+      "type": "string"
+    },
+    "module-bays": {
+      "description": "Module bays",
+      "items": {
+        "description": "Module bay",
+        "properties": {
+          "label": {
+            "description": "Module bay label",
+            "type": "string"
+          },
+          "name": {
+            "description": "Module bay name",
+            "type": "string"
+          },
+          "position": {
+            "description": "Module bay position",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "position"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "part_number": {
+      "description": "Part number of the hardware",
+      "type": "string"
+    },
+    "power-ports": {
+      "description": "Power ports",
+      "items": {
+        "description": "Power port",
+        "properties": {
+          "allocated_draw": {
+            "description": "Allocated power draw in watts",
+            "type": "integer"
+          },
+          "maximum_draw": {
+            "description": "Maximum power draw in watts",
+            "type": "integer"
+          },
+          "name": {
+            "description": "Power port name",
+            "type": "string"
+          },
+          "type": {
+            "description": "Power port type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "resource_class": {
+      "description": "Resource class configurations",
+      "items": {
+        "description": "Resource class configuration",
+        "properties": {
+          "cpu": {
+            "description": "CPU specifications",
+            "properties": {
+              "cores": {
+                "description": "Total CPU cores",
+                "type": "integer"
+              },
+              "model": {
+                "description": "Processor model",
+                "type": "string"
+              }
+            },
+            "required": [
+              "cores",
+              "model"
+            ],
+            "type": "object"
+          },
+          "drives": {
+            "description": "Drives",
+            "items": {
+              "description": "Drive",
+              "properties": {
+                "size": {
+                  "description": "Capacity in GB",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "size"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "memory": {
+            "description": "Memory specifications",
+            "properties": {
+              "size": {
+                "description": "Total memory in MB",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "size"
+            ],
+            "type": "object"
+          },
+          "name": {
+            "description": "Unique resource class name",
+            "type": "string"
+          },
+          "nic_count": {
+            "description": "Number of network interface cards",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "cpu",
+          "memory",
+          "drives",
+          "nic_count"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "u_height": {
+      "description": "Rack unit height",
+      "exclusiveMinimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "class",
+    "manufacturer",
+    "model",
+    "u_height",
+    "is_full_depth"
+  ],
+  "title": "UnderStack Device Type",
+  "type": "object"
+}

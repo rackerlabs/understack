@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "namespace": {
+      "additionalProperties": false,
+      "description": "A namespace definition for IPAM scoping",
+      "properties": {
+        "description": {
+          "description": "Human-readable description of the namespace",
+          "type": "string"
+        },
+        "location": {
+          "description": "Location associated with this namespace (must correspond to a defined location)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the namespace",
+          "minLength": 1,
+          "type": "string"
+        },
+        "tenant": {
+          "description": "Tenant associated with this namespace",
+          "type": "string"
+        },
+        "tenant_group": {
+          "description": "Tenant group associated with this namespace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "location"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/namespaces.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Namespace configuration schema for Nautobot IPAM organization",
+  "items": {
+    "$ref": "#/$defs/namespace"
+  },
+  "minItems": 1,
+  "title": "UnderStack Namespaces",
+  "type": "array"
+}

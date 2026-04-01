@@ -1,0 +1,51 @@
+{
+  "$defs": {
+    "tenant": {
+      "additionalProperties": false,
+      "description": "A tenant definition for resource ownership",
+      "properties": {
+        "comments": {
+          "description": "Additional comments about the tenant",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description of the tenant",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the tenant",
+          "minLength": 1,
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags applied to this tenant",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tenant_group": {
+          "description": "Tenant group this tenant belongs to (must correspond to a defined tenant group)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "comments",
+        "tenant_group",
+        "tags"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/tenants.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Tenant configuration schema for Nautobot tenancy management",
+  "items": {
+    "$ref": "#/$defs/tenant"
+  },
+  "minItems": 1,
+  "title": "UnderStack Tenants",
+  "type": "array"
+}

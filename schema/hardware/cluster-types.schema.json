@@ -1,0 +1,33 @@
+{
+  "$defs": {
+    "clusterType": {
+      "additionalProperties": false,
+      "description": "A cluster type definition for categorizing clusters",
+      "properties": {
+        "description": {
+          "description": "Human-readable description of the cluster type",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the cluster type",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/cluster-types.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Cluster type configuration schema for Nautobot virtualization organization",
+  "items": {
+    "$ref": "#/$defs/clusterType"
+  },
+  "minItems": 1,
+  "title": "UnderStack Cluster Types",
+  "type": "array"
+}

@@ -1,0 +1,110 @@
+{
+  "$defs": {
+    "prefix": {
+      "additionalProperties": false,
+      "description": "A network prefix definition for IPAM",
+      "properties": {
+        "date_allocated": {
+          "description": "Date when the prefix was allocated (format: YYYY-MM-DD HH:MM:SS or empty string)",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description of the prefix",
+          "type": "string"
+        },
+        "locations": {
+          "description": "List of location names where this prefix is used",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "description": "Namespace this prefix belongs to (must correspond to a defined namespace)",
+          "minLength": 1,
+          "type": "string"
+        },
+        "prefix": {
+          "description": "Network prefix in CIDR notation (e.g., 10.0.0.0/8)",
+          "minLength": 1,
+          "pattern": "^[0-9a-fA-F.:]+/[0-9]+$",
+          "type": "string"
+        },
+        "rir": {
+          "description": "Regional Internet Registry associated with this prefix",
+          "type": "string"
+        },
+        "role": {
+          "description": "Role assigned to this prefix (must correspond to a defined role)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Operational status of the prefix",
+          "enum": [
+            "Active",
+            "Reserved",
+            "Deprecated",
+            "Container"
+          ],
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags applied to this prefix",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tenant": {
+          "description": "Tenant that owns this prefix",
+          "type": "string"
+        },
+        "tenant_group": {
+          "description": "Tenant group that owns this prefix",
+          "type": "string"
+        },
+        "type": {
+          "description": "Type of prefix",
+          "enum": [
+            "container",
+            "network",
+            "pool"
+          ],
+          "type": "string"
+        },
+        "vlan": {
+          "description": "VLAN associated with this prefix",
+          "type": "string"
+        },
+        "vlan_group": {
+          "description": "VLAN group associated with this prefix",
+          "type": "string"
+        },
+        "vrfs": {
+          "description": "List of VRF names associated with this prefix",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "prefix",
+        "namespace",
+        "type",
+        "status",
+        "description"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/prefixes.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Prefix configuration schema for Nautobot IPAM network prefix management",
+  "items": {
+    "$ref": "#/$defs/prefix"
+  },
+  "minItems": 1,
+  "title": "UnderStack Prefixes",
+  "type": "array"
+}

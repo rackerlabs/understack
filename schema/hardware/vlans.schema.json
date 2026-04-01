@@ -1,0 +1,93 @@
+{
+  "$defs": {
+    "vlan": {
+      "additionalProperties": false,
+      "description": "A VLAN definition for network segmentation",
+      "properties": {
+        "description": {
+          "description": "Human-readable description of the VLAN",
+          "type": "string"
+        },
+        "dynamic_groups": {
+          "description": "List of dynamic group names associated with this VLAN",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "locations": {
+          "description": "List of location names where this VLAN is present",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Unique name of the VLAN",
+          "minLength": 1,
+          "type": "string"
+        },
+        "role": {
+          "description": "Role assigned to this VLAN (must correspond to a defined role)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Operational status of the VLAN",
+          "enum": [
+            "Active",
+            "Reserved",
+            "Deprecated"
+          ],
+          "type": "string"
+        },
+        "tags": {
+          "description": "Tags applied to this VLAN",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tenant": {
+          "description": "Tenant that owns this VLAN",
+          "type": "string"
+        },
+        "tenant_group": {
+          "description": "Tenant group that owns this VLAN",
+          "type": "string"
+        },
+        "vid": {
+          "description": "VLAN ID (1-4094)",
+          "maximum": 4094,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "vlan_group": {
+          "description": "VLAN group this VLAN belongs to (must correspond to a defined VLAN group)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "vid",
+        "status",
+        "role",
+        "description",
+        "locations",
+        "vlan_group",
+        "tenant_group",
+        "tenant",
+        "tags"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/vlans.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "VLAN configuration schema for Nautobot IPAM VLAN management",
+  "items": {
+    "$ref": "#/$defs/vlan"
+  },
+  "minItems": 1,
+  "title": "UnderStack VLANs",
+  "type": "array"
+}

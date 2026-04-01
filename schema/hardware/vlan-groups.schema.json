@@ -1,0 +1,43 @@
+{
+  "$defs": {
+    "vlanGroup": {
+      "additionalProperties": false,
+      "description": "A VLAN group definition for organizing VLANs",
+      "properties": {
+        "location": {
+          "description": "Location associated with this VLAN group (must correspond to a defined location)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the VLAN group",
+          "minLength": 1,
+          "type": "string"
+        },
+        "range": {
+          "description": "VLAN ID range for this group (e.g., '100-199')",
+          "pattern": "^[0-9]+-[0-9]+$",
+          "type": "string"
+        },
+        "ucvni_group_name": {
+          "description": "UCVNI group name for network virtualization integration",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "location",
+        "range"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/vlan-groups.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "VLAN group configuration schema for Nautobot IPAM VLAN organization",
+  "items": {
+    "$ref": "#/$defs/vlanGroup"
+  },
+  "minItems": 1,
+  "title": "UnderStack VLAN Groups",
+  "type": "array"
+}

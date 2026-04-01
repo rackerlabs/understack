@@ -1,0 +1,33 @@
+{
+  "$defs": {
+    "clusterGroup": {
+      "additionalProperties": false,
+      "description": "A cluster group definition for organizing clusters",
+      "properties": {
+        "description": {
+          "description": "Human-readable description of the cluster group",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the cluster group",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/cluster-groups.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Cluster group configuration schema for Nautobot virtualization organization",
+  "items": {
+    "$ref": "#/$defs/clusterGroup"
+  },
+  "minItems": 1,
+  "title": "UnderStack Cluster Groups",
+  "type": "array"
+}

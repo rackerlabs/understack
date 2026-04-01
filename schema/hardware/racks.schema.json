@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "rack": {
+      "additionalProperties": false,
+      "description": "A rack definition for data center infrastructure",
+      "properties": {
+        "description": {
+          "description": "Human-readable description of the rack",
+          "type": "string"
+        },
+        "facility": {
+          "description": "Facility identifier for the rack",
+          "type": "string"
+        },
+        "location": {
+          "description": "Location where the rack is situated (must correspond to a defined location)",
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the rack",
+          "minLength": 1,
+          "type": "string"
+        },
+        "rack_group": {
+          "description": "Rack group this rack belongs to (must correspond to a defined rack group)",
+          "type": "string"
+        },
+        "status": {
+          "description": "Operational status of the rack",
+          "enum": [
+            "Active",
+            "Decommissioning",
+            "Planned",
+            "Retired",
+            "Staging",
+            "Reserved",
+            "Available",
+            "Deprecated"
+          ],
+          "type": "string"
+        },
+        "u_height": {
+          "description": "Height of the rack in rack units",
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "facility",
+        "description",
+        "location",
+        "rack_group",
+        "status",
+        "u_height"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/racks.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Rack configuration schema for Nautobot DCIM rack management",
+  "items": {
+    "$ref": "#/$defs/rack"
+  },
+  "minItems": 1,
+  "title": "UnderStack Racks",
+  "type": "array"
+}
