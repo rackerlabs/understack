@@ -246,6 +246,7 @@ nav:
       - operator-guide/server-firmware-update.md
     - 'Scripts and Tools':
       - operator-guide/scripts.md
+      - operator-guide/understackctl.md
   - 'User Guide':
     - user-guide/index.md
     - user-guide/openstack-cli.md
