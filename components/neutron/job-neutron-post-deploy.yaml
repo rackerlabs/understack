@@ -42,6 +42,16 @@ spec:
           env:
             - name: OS_CLOUD
               value: understack
+            - name: NAUTOBOT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nautobot-token
+                  key: url
+            - name: NAUTOBOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: nautobot-token
+                  key: token
           volumeMounts:
             - name: ansible-inventory
               mountPath: /runner/inventory/

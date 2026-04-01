@@ -1,0 +1,12 @@
+- name: Set Nautobot connection variables from environment
+  ansible.builtin.set_fact:
+    nautobot_url: "{{ lookup('env', 'NAUTOBOT_URL') }}"
+    nautobot_token: "{{ lookup('env', 'NAUTOBOT_TOKEN') }}"
+    nautobot_api_version: "{{ lookup('env', 'NAUTOBOT_API_VERSION') | default('3.0', true) }}"
+
+- name: Assert Nautobot credentials are set
+  ansible.builtin.assert:
+    that:
+      - nautobot_url | length > 0
+      - nautobot_token | length > 0
+    fail_msg: "NAUTOBOT_URL and NAUTOBOT_TOKEN environment variables must be set"
