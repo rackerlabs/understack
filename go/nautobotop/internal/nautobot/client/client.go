@@ -20,6 +20,8 @@ type NautobotClient struct {
 	Username  string
 	Report    map[string][]string
 	Cache     *cache.Cache
+	reqClient *req.Client
+	apiURL    string
 }
 
 // AddReport appends one or more lines to the current reconciliation report.
@@ -33,7 +35,8 @@ func (n *NautobotClient) AddReport(key string, line ...string) {
 // apiURL: The base URL of the Nautobot API (e.g., "http://localhost:8000").
 // authToken: The API token for authentication.
 // cacheMaxSize: The maximum size of the cache (0 uses default of 70,000).
-func NewNautobotClient(apiURL string, username, authToken string, cacheMaxSize int) (*NautobotClient, error) {
+// The username is resolved from the token via ResolveUsername after construction.
+func NewNautobotClient(apiURL string, authToken string, cacheMaxSize int) (*NautobotClient, error) {
 	// Configure req client with retry and backoff
 	reqClient := req.C().
 		SetTimeout(30*time.Second).
@@ -41,9 +44,13 @@ func NewNautobotClient(apiURL string, username, authToken string, cacheMaxSize i
 		SetCommonRetryBackoffInterval(1*time.Second, 5*time.Second).
 		SetCommonRetryCondition(func(resp *req.Response, err error) bool {
 			return err != nil || resp.StatusCode >= 500
-		})
+		}).
+		SetCommonHeader("Authorization", fmt.Sprintf("Token %s", authToken))
 
 	config := nb.NewConfiguration()
+	// reqClient.GetClient() returns the underlying *http.Client for the SDK to use.
+	// The SDK applies auth via config.AddDefaultHeader for its own calls.
+	// Direct calls via reqClient.R() (e.g. ResolveUsername) apply auth via SetCommonHeader above.
 	config.HTTPClient = reqClient.GetClient()
 	config.Servers = nb.ServerConfigurations{
 		{
@@ -58,11 +65,12 @@ func NewNautobotClient(apiURL string, username, authToken string, cacheMaxSize i
 	}
 
 	return &NautobotClient{
-		Username:  username,
 		Config:    config,
 		APIClient: client,
 		Report:    make(map[string][]string),
 		Cache:     c,
+		reqClient: reqClient,
+		apiURL:    apiURL,
 	}, nil
 }
 

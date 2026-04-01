@@ -61,7 +61,6 @@ metadata:
   namespace: nautobotop
 type: Opaque
 stringData:
-  username: admin
   token: your-nautobot-api-token
 ```
 
@@ -90,7 +89,6 @@ spec:
   nautobotSecretRef:
     name: nautobot-token
     namespace: nautobotop
-    usernameKey: username
     tokenKey: token
 
   nautobotServiceRef:
@@ -186,7 +184,7 @@ spec:
 | `requeueAfter` | int | 600 | Seconds between reconciliation attempts |
 | `syncIntervalSeconds` | int | 172800 | Minimum seconds between full syncs |
 | `cacheMaxSize` | int | 70000 | Maximum number of entries in the Nautobot object cache |
-| `nautobotSecretRef` | SecretKeySelector | | Reference to the Secret holding Nautobot credentials |
+| `nautobotSecretRef` | SecretKeySelector | | Reference to the Secret holding the Nautobot API token |
 | `nautobotServiceRef` | ServiceSelector | | Reference to the Nautobot Kubernetes Service |
 | `locationTypesRef` | []ConfigMapRef | | ConfigMaps containing location type definitions |
 | `locationRef` | []ConfigMapRef | | ConfigMaps containing location definitions |

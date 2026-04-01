@@ -15,14 +15,6 @@ type SecretKeySelector struct {
 	// +kubebuilder:validation:Pattern:=^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
 	Namespace *string `json:"namespace,omitempty"`
 
-	// A UsernameKey in the referenced Secret.
-	// Some instances of this field may be defaulted, in others it may be required.
-	// +optional
-	// +kubebuilder:validation:MinLength:=1
-	// +kubebuilder:validation:MaxLength:=253
-	// +kubebuilder:validation:Pattern:=^[-._a-zA-Z0-9]+$
-	UsernameKey string `json:"usernameKey,omitempty"`
-
 	// A key in the referenced Secret.
 	// Some instances of this field may be defaulted, in others it may be required.
 	// +optional
