@@ -48,6 +48,36 @@ func (n *NautobotClient) PreLoadCacheForLookup(ctx context.Context) error {
 		log.Info("pre-load vlan groups cache", "count", len(list.Results))
 	}
 
+	if list, _, err := n.APIClient.IpamAPI.IpamVlansList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("vlans", list.Results)
+		log.Info("pre-load vlans cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.IpamAPI.IpamPrefixesList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("prefixes", list.Results)
+		log.Info("pre-load prefixes cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.IpamAPI.IpamRirsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("rirs", list.Results)
+		log.Info("pre-load rirs cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.IpamAPI.IpamVrfsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("vrfs", list.Results)
+		log.Info("pre-load vrfs cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.ExtrasAPI.ExtrasRolesList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("roles", list.Results)
+		log.Info("pre-load roles cache", "count", len(list.Results))
+	}
+
+	if list, _, err := n.APIClient.ExtrasAPI.ExtrasTagsList(ctx).Depth(2).Execute(); err == nil && list != nil {
+		n.Cache.SetCollection("tags", list.Results)
+		log.Info("pre-load tags cache", "count", len(list.Results))
+	}
+
 	if list, _, err := n.APIClient.VirtualizationAPI.VirtualizationClusterTypesList(ctx).Depth(2).Execute(); err == nil && list != nil {
 		n.Cache.SetCollection("clustertypes", list.Results)
 		log.Info("pre-load cluster types cache", "count", len(list.Results))

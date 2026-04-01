@@ -166,6 +166,20 @@ func (in *NautobotSpec) DeepCopyInto(out *NautobotSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.VlanRef != nil {
+		in, out := &in.VlanRef, &out.VlanRef
+		*out = make([]ConfigMapRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.PrefixRef != nil {
+		in, out := &in.PrefixRef, &out.PrefixRef
+		*out = make([]ConfigMapRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.ClusterTypeRef != nil {
 		in, out := &in.ClusterTypeRef, &out.ClusterTypeRef
 		*out = make([]ConfigMapRef, len(*in))
@@ -189,6 +203,34 @@ func (in *NautobotSpec) DeepCopyInto(out *NautobotSpec) {
 	}
 	if in.NamespaceRef != nil {
 		in, out := &in.NamespaceRef, &out.NamespaceRef
+		*out = make([]ConfigMapRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.RirRef != nil {
+		in, out := &in.RirRef, &out.RirRef
+		*out = make([]ConfigMapRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.RoleRef != nil {
+		in, out := &in.RoleRef, &out.RoleRef
+		*out = make([]ConfigMapRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.TenantGroupRef != nil {
+		in, out := &in.TenantGroupRef, &out.TenantGroupRef
+		*out = make([]ConfigMapRef, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.TenantRef != nil {
+		in, out := &in.TenantRef, &out.TenantRef
 		*out = make([]ConfigMapRef, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])

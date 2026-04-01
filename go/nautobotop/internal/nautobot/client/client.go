@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/log"
+	"github.com/imroc/req/v3"
 	nb "github.com/nautobot/go-nautobot/v3"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/samber/lo"
@@ -30,23 +32,26 @@ func (n *NautobotClient) AddReport(key string, line ...string) {
 // NewNautobotClient creates and configures a new Nautobot API client.
 // apiURL: The base URL of the Nautobot API (e.g., "http://localhost:8000").
 // authToken: The API token for authentication.
-// NewNautobotClient creates and configures a new Nautobot API client.
-// apiURL: The base URL of the Nautobot API (e.g., "http://localhost:8000").
-// authToken: The API token for authentication.
 // cacheMaxSize: The maximum size of the cache (0 uses default of 70,000).
 func NewNautobotClient(apiURL string, username, authToken string, cacheMaxSize int) (*NautobotClient, error) {
+	// Configure req client with retry and backoff
+	reqClient := req.C().
+		SetTimeout(30*time.Second).
+		SetCommonRetryCount(3).
+		SetCommonRetryBackoffInterval(1*time.Second, 5*time.Second).
+		SetCommonRetryCondition(func(resp *req.Response, err error) bool {
+			return err != nil || resp.StatusCode >= 500
+		})
+
 	config := nb.NewConfiguration()
+	config.HTTPClient = reqClient.GetClient()
 	config.Servers = nb.ServerConfigurations{
 		{
 			URL: apiURL,
 		},
 	}
-	// Add Authorization token header
-	if authToken != "" {
-		config.AddDefaultHeader("Authorization", fmt.Sprintf("Token %s", authToken))
-	}
+	config.AddDefaultHeader("Authorization", fmt.Sprintf("Token %s", authToken))
 	client := nb.NewAPIClient(config)
-
 	c, err := cache.New(cacheMaxSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cache: %w", err)

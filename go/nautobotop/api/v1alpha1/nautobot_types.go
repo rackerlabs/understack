@@ -41,10 +41,16 @@ type NautobotSpec struct {
 	RackGroupRef       []ConfigMapRef    `json:"rackGroupRef,omitempty"`
 	RackRef            []ConfigMapRef    `json:"rackRef,omitempty"`
 	VlanGroupRef       []ConfigMapRef    `json:"vlanGroupRef,omitempty"`
+	VlanRef            []ConfigMapRef    `json:"vlanRef,omitempty"`
+	PrefixRef          []ConfigMapRef    `json:"prefixRef,omitempty"`
 	ClusterTypeRef     []ConfigMapRef    `json:"clusterTypeRef,omitempty"`
 	ClusterGroupRef    []ConfigMapRef    `json:"clusterGroupRef,omitempty"`
 	ClusterRef         []ConfigMapRef    `json:"clusterRef,omitempty"`
 	NamespaceRef       []ConfigMapRef    `json:"namespaceRef,omitempty"`
+	RirRef             []ConfigMapRef    `json:"rirRef,omitempty"`
+	RoleRef            []ConfigMapRef    `json:"roleRef,omitempty"`
+	TenantGroupRef     []ConfigMapRef    `json:"tenantGroupRef,omitempty"`
+	TenantRef          []ConfigMapRef    `json:"tenantRef,omitempty"`
 }
 
 // NautobotStatus defines the observed state of Nautobot.
