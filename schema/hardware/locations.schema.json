@@ -1,0 +1,58 @@
+{
+  "$defs": {
+    "location": {
+      "additionalProperties": false,
+      "description": "A location definition with optional nested children",
+      "properties": {
+        "children": {
+          "description": "Child locations nested under this location",
+          "items": {
+            "$ref": "#/$defs/location"
+          },
+          "type": "array"
+        },
+        "description": {
+          "description": "Human-readable description of the location",
+          "type": "string"
+        },
+        "location_type": {
+          "description": "Type of location (must correspond to a defined location type)",
+          "minLength": 1,
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the location",
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "description": "Operational status of the location",
+          "enum": [
+            "Active",
+            "Decommissioning",
+            "Planned",
+            "Retired",
+            "Staging"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "location_type",
+        "status"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/locations.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Hierarchical location configuration schema for Nautobot location organization",
+  "items": {
+    "$ref": "#/$defs/location"
+  },
+  "minItems": 1,
+  "title": "UnderStack Locations",
+  "type": "array"
+}

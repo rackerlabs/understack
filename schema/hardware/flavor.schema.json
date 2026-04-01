@@ -1,0 +1,55 @@
+{
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/flavor.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Hardware flavor configuration schema for matching Ironic nodes to resource classes with trait filtering",
+  "properties": {
+    "description": {
+      "description": "Human-readable description of the flavor shown in Nova",
+      "type": "string"
+    },
+    "name": {
+      "description": "Unique flavor name",
+      "minLength": 1,
+      "type": "string"
+    },
+    "resource_class": {
+      "description": "Ironic resource class to match (must correspond to a device-type resource class)",
+      "minLength": 1,
+      "type": "string"
+    },
+    "traits": {
+      "description": "Hardware traits for node matching (CUSTOM_ prefix added automatically)",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "state": {
+            "description": "Whether the trait must be present (required) or absent",
+            "enum": [
+              "required",
+              "absent"
+            ],
+            "type": "string"
+          },
+          "trait": {
+            "description": "Trait name without CUSTOM_ prefix (e.g., NICX, GPU, NVME)",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trait",
+          "state"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "name",
+    "resource_class"
+  ],
+  "title": "UnderStack Hardware Flavor",
+  "type": "object"
+}

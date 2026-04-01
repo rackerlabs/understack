@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "cluster": {
+      "additionalProperties": false,
+      "description": "A cluster definition representing a compute or virtualization cluster",
+      "properties": {
+        "cluster_group": {
+          "description": "Group the cluster belongs to (must correspond to a defined cluster group)",
+          "type": "string"
+        },
+        "cluster_type": {
+          "description": "Type of cluster (must correspond to a defined cluster type)",
+          "minLength": 1,
+          "type": "string"
+        },
+        "comments": {
+          "description": "Additional comments about the cluster",
+          "type": "string"
+        },
+        "devices": {
+          "description": "List of device names that are members of this cluster",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "location": {
+          "description": "Location where the cluster resides (must correspond to a defined location)",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the cluster",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "comments",
+        "cluster_type",
+        "cluster_group",
+        "location",
+        "devices"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/clusters.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Cluster configuration schema for Nautobot virtualization organization",
+  "items": {
+    "$ref": "#/$defs/cluster"
+  },
+  "minItems": 1,
+  "title": "UnderStack Clusters",
+  "type": "array"
+}

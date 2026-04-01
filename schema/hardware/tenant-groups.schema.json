@@ -1,0 +1,38 @@
+{
+  "$defs": {
+    "tenantGroup": {
+      "additionalProperties": false,
+      "description": "A tenant group definition for organizing tenants",
+      "properties": {
+        "description": {
+          "description": "Human-readable description of the tenant group",
+          "type": "string"
+        },
+        "name": {
+          "description": "Unique name of the tenant group",
+          "minLength": 1,
+          "type": "string"
+        },
+        "parent": {
+          "description": "Parent tenant group name (empty string for top-level groups)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "parent"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://rackerlabs.github.io/understack/schema/hardware/tenant-groups.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Tenant group configuration schema for Nautobot tenancy organization",
+  "items": {
+    "$ref": "#/$defs/tenantGroup"
+  },
+  "minItems": 1,
+  "title": "UnderStack Tenant Groups",
+  "type": "array"
+}
