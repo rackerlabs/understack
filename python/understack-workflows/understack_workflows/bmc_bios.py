@@ -9,8 +9,7 @@ logger = logging.getLogger(__name__)
 def required_bios_settings(pxe_interface: str) -> dict:
     """Return adjusted Bios settings map for BMC."""
     return {
-        "PxeDev1EnDis": "Enabled",
-        "PxeDev1Interface": pxe_interface,
+        "PxeDev1EnDis": "Disabled",
         "HttpDev1EnDis": "Enabled",
         "HttpDev1Interface": pxe_interface,
         # at this time ironic conductor returns http URLs
