@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-alert-wal-archive-failure
+spec:
+  groups:
+    - name: cnpg
+      rules:
+        - alert: CNPGWALArchiveFailure
+          expr: >
+            (cnpg_pg_stat_archiver_last_failed_time - cnpg_pg_stat_archiver_last_archived_time) > 1
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "WAL archiving failures detected on {{ $labels.pod }}"
+            description: >
+              The last WAL archive failure timestamp is more recent than the last
+              successful archive on pod {{ $labels.pod }}. Check cnpg status.

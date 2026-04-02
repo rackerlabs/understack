@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-alert-wal-archive-backlog-critical
+spec:
+  groups:
+    - name: cnpg
+      rules:
+        - alert: CNPGWALArchiveBacklogCritical
+          expr: cnpg_collector_pg_wal_archive_status{value="ready"} > 50
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Critical WAL archive backlog on {{ $labels.pod }}"
+            description: >
+              {{ $value }} WAL files are pending archiving on pod {{ $labels.pod }}.
+              Risk of pg_wal directory filling up and PostgreSQL halting.

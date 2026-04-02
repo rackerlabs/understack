@@ -5,6 +5,9 @@ kind: Kustomization
 resources:
   - namespace.yaml
   - rule-backups-too-old.yaml
+  - rule-wal-archive-backlog-warning.yaml
+  - rule-wal-archive-backlog-critical.yaml
+  - rule-wal-archive-failure.yaml
 
 helmGlobals:
   chartHome: ../../charts/
