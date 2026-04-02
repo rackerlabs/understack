@@ -9,7 +9,6 @@ tokens:
       keys:
         username: username
         email: email
-        password: password
         apiToken: apiToken
     user:
       isSuperuser: false

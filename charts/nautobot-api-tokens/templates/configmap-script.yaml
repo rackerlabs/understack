@@ -8,8 +8,9 @@ data:
   managed.py: |
     import os
 
-    from django.contrib.auth.models import Group
     from django.contrib.auth import get_user_model
+    from django.contrib.auth.hashers import make_password
+    from django.contrib.auth.models import Group
     from nautobot.users.models import Token
 
     MARKER_PREFIX = "nautobot-api-token-managed:"
@@ -38,7 +39,6 @@ data:
 
     username = _required("NAUTOBOT_MANAGED_USERNAME")
     email = _required("NAUTOBOT_MANAGED_EMAIL")
-    password = _required("NAUTOBOT_MANAGED_PASSWORD")
     api_token = _required("NAUTOBOT_MANAGED_API_TOKEN")
     managed_token_name = _required("NAUTOBOT_MANAGED_TOKEN_NAME")
     managed_group_name = _required("NAUTOBOT_MANAGED_GROUP_NAME")
@@ -47,7 +47,13 @@ data:
     is_superuser = _parse_bool(os.getenv("NAUTOBOT_MANAGED_IS_SUPERUSER"), default=False)
 
     User = get_user_model()
-    user, _ = User.objects.get_or_create(username=username, defaults={"email": email})
+    user, _ = User.objects.get_or_create(
+      username=username,
+      defaults={
+        "email": email,
+        "password": make_password(None),
+      },
+    )
 
     if user.email != email:
       user.email = email
@@ -55,8 +61,8 @@ data:
     if user.is_superuser != is_superuser:
       user.is_superuser = is_superuser
 
-    if not user.check_password(password):
-      user.set_password(password)
+    if user.has_usable_password():
+      user.set_unusable_password()
 
     user.validated_save()
 

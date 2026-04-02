@@ -39,7 +39,7 @@ global:
 Required or commonly required items:
 
 - `kustomization.yaml`: Include one Secret manifest per integration that needs an API token.
-- `Per-integration API Secret`: Each integration gets its own explicitly named Secret, and each Secret should expose `username`, `password`, `email`, and `apitoken` so the consuming job or controller can authenticate and identify the token owner.
+- `Per-integration API Secret`: Each integration gets its own explicitly named Secret, and each Secret should expose `username`, `email`, and `apiToken` so the consuming job or controller can authenticate and identify the token owner. Managed users are created with an unusable password and are intended for API-token access only.
 
 Optional additions:
 

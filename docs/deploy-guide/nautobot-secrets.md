@@ -14,11 +14,11 @@ Each job runs `nautobot-server shell --interface python` inside the Nautobot ima
 
 ## How It Works
 
-1. Create or sync a Kubernetes `Secret` in the `nautobot` namespace with the desired username, email, password, and API token.
+1. Create or sync a Kubernetes `Secret` in the `nautobot` namespace with the desired username, email, and API token.
 2. Reference that secret from `nautobot-api-tokens/values.yaml` in your deploy repo.
 3. Argo CD syncs the `nautobot-api-tokens` Application.
 4. The chart runs a PostSync job for each configured entry in `tokens[]`.
-5. Each job creates or updates the Nautobot user, sets the password, ensures group membership, and creates or updates the API token.
+5. Each job creates or updates the Nautobot user, enforces an unusable password for API-only access, ensures group membership, and creates or updates the API token.
 6. The cleanup job removes previously managed tokens that are no longer listed in `tokens[]`. It can also delete managed users when no desired managed tokens remain.
 
 No `Argo Events`, sensor, label trigger, or Ansible playbook is involved in this workflow.
@@ -33,7 +33,6 @@ By default, each token entry expects these keys in the source secret:
 |-----|----------|---------|
 | `username` | yes | Nautobot username to manage |
 | `email` | yes | Nautobot email for that user |
-| `password` | yes | Nautobot password for that user |
 | `apiToken` | yes | Nautobot API token value to enforce |
 
 You can override the key names per token with `sourceSecretRef.keys`.
@@ -60,7 +59,6 @@ spec:
       data:
         username: "&#123;&#123; .username &#125;&#125;"
         email: "&#123;&#123; .email &#125;&#125;"
-        password: "&#123;&#123; index (.password | fromJson) \"password\" &#125;&#125;"
         apiToken: "&#123;&#123; index (.password | fromJson) \"token\" &#125;&#125;"
   dataFrom:
     - extract:
@@ -137,7 +135,6 @@ tokens:
       keys:
         username: username
         email: email
-        password: password
         apiToken: apiToken
     user:
       isSuperuser: false
@@ -152,7 +149,8 @@ tokens:
 For each enabled entry in `tokens[]`, the chart:
 
 - creates the Nautobot user if it does not exist
-- updates email, password, and `isSuperuser` when configured
+- updates email and `isSuperuser` when configured
+- enforces an unusable password for managed users
 - ensures the user is a member of `cleanup.groupName`
 - creates the Nautobot token if it does not exist
 - updates the token key if the desired value changes
