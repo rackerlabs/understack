@@ -1,0 +1,18 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cnpg-alert-wal-archive-backlog-warning
+spec:
+  groups:
+    - name: cnpg
+      rules:
+        - alert: CNPGWALArchiveBacklogWarning
+          expr: cnpg_collector_pg_wal_archive_status{value="ready"} > 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "WAL archive backlog building up on {{ $labels.pod }}"
+            description: >
+              {{ $value }} WAL files are pending archiving on pod {{ $labels.pod }}
+              (cluster {{ $labels.cluster }}). Archiver may be slow or intermittently failing.
