@@ -100,6 +100,10 @@ def enrol(
     )
 
     if raid_configure:
+        # Raid configuration runs a clean step which does a PXE boot.  That
+        # can't work unless we first apply_bios_settings.
+        # TODO: why isn't skip_ramdisk working here?
+        apply_bios_settings(bmc, pxe_interface)
         configure_raid(node, bmc)
     else:
         logger.info("%s RAID configuration was not requested", node.uuid)
