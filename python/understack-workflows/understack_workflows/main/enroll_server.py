@@ -106,19 +106,30 @@ def enrol(
 
     ironic_node.inspect_out_of_band(node)
 
+    # Anecdotally, applying firmware updates can upset the next-boot HTTP, and
+    # potentially even upset the bios-settings configuration job in the iDRAC,
+    # so we do firmware first, which causes a reboot, and only then do we set
+    # the BIOS settings.
+    #
+    # Also, just maybe, the bios setting keys we are trying to set might not be
+    # available in the old version of the bios, in which case we need to boot
+    # the bios before redfish will allow us to set those settings.
     if firmware_update:
         ironic_node.apply_firmware_updates(node)
 
     # Applying BIOS settings on Dell servers requires a reboot which we achieve
     # by initiating agent inspection.  Agent inspection requires BIOS settings
     # (to set boot device).  Therefore these two actions must go hand-in-hand.
+    # 
+    # Note that we may have already applied BIOS settings above.  That is okay,
+    # it is idempotent.
     apply_bios_settings(bmc, pxe_interface)
     ironic_node.inspect(node)
 
-    # After inspection, our node is left in "manageable" state.  All being well,
-    # the "provide" action will transition manageable->cleaning->available.
+    # After successful inspection, our node is left in "manageable" state.  All
+    # being well, the "provide" action will transition manageable -> cleaning ->
+    # available.
     ironic_node.transition(node, target_state="provide", expected_state="available")
-
     logger.info("Completed enrol workflow for bmc_ip_address=%s", ip_address)
 
 
