@@ -1,55 +1,81 @@
+import logging
+
 from understack_workflows.bmc_chassis_info import ChassisInfo
-from understack_workflows.bmc_chassis_info import InterfaceInfo
+
+logger = logging.getLogger(__name__)
 
 # We try not choose interface whose name contains any of these:
 DISQUALIFIED = ["DRAC", "ILO", "NIC.EMBEDDED"]
 
-# A higher number is more likely to be PXE interface:
-NIC_PREFERENCE = {
-    "NIC.Integrated.1-1-1": 100,
-    "NIC.Integrated.1-1": 99,
-    "NIC.Slot.1-1-1": 98,
-    "NIC.Slot.1-1": 97,
-    "NIC.Integrated.1-2-1": 96,
-    "NIC.Integrated.1-2": 95,
-    "NIC.Slot.1-2-1": 94,
-    "NIC.Slot.1-2": 93,
-    "NIC.Slot.1-3-1": 92,
-    "NIC.Slot.1-3": 91,
-    "NIC.Slot.2-1-1": 90,
-    "NIC.Slot.2-1": 89,
-    "NIC.Integrated.2-1-1": 88,
-    "NIC.Integrated.2-1": 87,
-    "NIC.Slot.2-2-1": 86,
-    "NIC.Slot.2-2": 85,
-    "NIC.Integrated.2-2-1": 84,
-    "NIC.Integrated.2-2": 83,
-    "NIC.Slot.3-1-1": 82,
-    "NIC.Slot.3-1": 81,
-    "NIC.Slot.3-2-1": 80,
-    "NIC.Slot.3-2": 79,
-}
+# Preferred interfaces, most likely first
+NIC_PREFERENCE = [
+    "NIC.Integrated.1-1-1",
+    "NIC.Integrated.1-1",
+    "NIC.Slot.1-1-1",
+    "NIC.Slot.1-1",
+    "NIC.Integrated.1-2-1",
+    "NIC.Integrated.1-2",
+    "NIC.Slot.1-2-1",
+    "NIC.Slot.1-2",
+    "NIC.Slot.1-3-1",
+    "NIC.Slot.1-3",
+    "NIC.Slot.2-1-1",
+    "NIC.Slot.2-1",
+    "NIC.Integrated.2-1-1",
+    "NIC.Integrated.2-1",
+    "NIC.Slot.2-2-1",
+    "NIC.Slot.2-2",
+    "NIC.Integrated.2-2-1",
+    "NIC.Integrated.2-2",
+    "NIC.Slot.3-1-1",
+    "NIC.Slot.3-1",
+    "NIC.Slot.3-2-1",
+    "NIC.Slot.3-2",
+]
 
 
-def guess_pxe_interface(device_info: ChassisInfo) -> str:
+def guess_pxe_interface(
+    device_info: ChassisInfo, pxe_switch_macs: set[str] | None = None
+) -> str:
     """Determine most probable PXE interface for BMC."""
-    interface = max(device_info.interfaces, key=_pxe_preference)
-    return interface.name
+    if pxe_switch_macs is None:
+        pxe_switch_macs = set()
 
+    candidate_interfaces = {
+        i
+        for i in device_info.interfaces
+        if not any(q in i.name.upper() for q in DISQUALIFIED)
+    }
+    candidate_interface_names = {i.name for i in candidate_interfaces}
+    connected_interface_names = {
+        i.name for i in candidate_interfaces if i.remote_switch_mac_address
+    }
+    pxe_connected_interface_names = {
+        i.name
+        for i in candidate_interfaces
+        if i.remote_switch_mac_address in pxe_switch_macs
+    }
 
-def _pxe_preference(interface: InterfaceInfo) -> list:
-    """Relative likelihood that interface is used for PXE.
+    for name in NIC_PREFERENCE:
+        if name in pxe_connected_interface_names:
+            logger.info("PXE port is %s, connected to known pxe switch", name)
+            return name
 
-    Prefer names that are not disqualified.
+    for name in NIC_PREFERENCE:
+        if name in connected_interface_names:
+            logger.info("PXE port is %s, the first connected interface", name)
+            return name
 
-    After that, prefer interfaces that have an LLDP neighbor.
+    for name in NIC_PREFERENCE:
+        if name in candidate_interface_names:
+            logger.info("PXE port is %s, preferred eligible interface", name)
+            return name
 
-    Finally, score the interface name according to the list above.
-    """
-    is_eligible = not any(x in interface.name.upper() for x in DISQUALIFIED)
+    if candidate_interface_names:
+        name = min(candidate_interface_names)
+        logger.info("PXE port is %s, first eligible interface", name)
+        return name
 
-    link_detected = interface.remote_switch_port_name is not None
-
-    name_preference = NIC_PREFERENCE.get(interface.name, 0)
-
-    return [is_eligible, link_detected, name_preference]
+    name = device_info.interfaces[0].name
+    logger.info("PXE port is %s, chosen as last resort", name)
+    return name
