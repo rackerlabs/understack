@@ -61,6 +61,26 @@ class ChassisInfo:
             if interface.remote_switch_mac_address
         }
 
+    @property
+    def dump(self) -> list[str]:
+        return [
+            f"{self.manufacturer} {self.model_number} serial {self.serial_number}",
+            f"BIOS VERSION {self.bios_version}",
+            f"BMC IP Address {self.bmc_ip_address}",
+            *self.dump_interfaces,
+            f"Power on {self.power_on}",
+        ]
+
+    @property
+    def dump_interfaces(self) -> list[str]:
+        return [
+            (
+                f"NIC {i.mac_address} {i.name} "
+                f"[LLDP: {i.remote_switch_mac_address} {i.remote_switch_port_name}]"
+            )
+            for i in self.interfaces
+        ]
+
 
 def chassis_info(bmc: Bmc) -> ChassisInfo:
     """Query DRAC for basic system info via redfish.

@@ -48,7 +48,7 @@ def update_dell_drac_settings(bmc: Bmc) -> dict:
         elif key not in current_values:
             logger.warning("%s has no BMC attribute '%s'", bmc, key)
         elif current_values[key] == required_value:
-            logger.warning("%s: '%s' already set to '%s'", bmc, key, required_value)
+            logger.info("%s: '%s' already set to '%s'", bmc, key, required_value)
         else:
             required_changes[key] = VALUES_TO_POST[key]
 
