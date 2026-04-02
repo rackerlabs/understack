@@ -64,6 +64,55 @@ from nautobot.core.settings_funcs import is_truthy
 if DATABASES["default"]["ENGINE"].endswith("mysql"):  # noqa F405
     DATABASES["default"]["OPTIONS"] = {"charset": "utf8mb4"}  # noqa F405
 
+# SSL/mTLS options for PostgreSQL connections.
+# When NAUTOBOT_DB_SSLMODE is set to "verify-ca" or "verify-full", the client
+# certificate, key, and CA root cert must be present at the configured paths.
+_db_sslcert = os.getenv("NAUTOBOT_DB_SSLCERT", "/etc/nautobot/mtls/tls.crt")
+_db_sslkey = os.getenv("NAUTOBOT_DB_SSLKEY", "/etc/nautobot/mtls/tls.key")
+_db_sslrootcert = os.getenv("NAUTOBOT_DB_SSLROOTCERT", "/etc/nautobot/mtls/ca.crt")
+_db_sslmode = os.getenv("NAUTOBOT_DB_SSLMODE", "")
+
+if _db_sslmode in ("verify-ca", "verify-full"):
+    for _path, _label in [
+        (_db_sslcert, "NAUTOBOT_DB_SSLCERT"),
+        (_db_sslkey, "NAUTOBOT_DB_SSLKEY"),
+        (_db_sslrootcert, "NAUTOBOT_DB_SSLROOTCERT"),
+    ]:
+        if not os.path.isfile(_path):
+            raise FileNotFoundError(
+                f"SSL certificate file required by {_label} not found: {_path}"
+            )
+    DATABASES["default"]["OPTIONS"] = {  # noqa F405
+        "sslmode": _db_sslmode,
+        "sslcert": _db_sslcert,
+        "sslkey": _db_sslkey,
+        "sslrootcert": _db_sslrootcert,
+    }
+
+# SSL/mTLS options for Redis connections.
+# When NAUTOBOT_REDIS_SSL env var is "true" (set by Helm `nautobot.redis.ssl`),
+# the Helm chart switches the URL scheme to rediss://.  We still need to tell
+# the Python redis client *which* certs to use for mutual TLS.
+import ssl as _ssl  # noqa: E402
+
+_redis_ca = os.getenv("NAUTOBOT_REDIS_SSL_CA_CERTS", "/etc/nautobot/mtls/ca.crt")
+_redis_cert = os.getenv("NAUTOBOT_REDIS_SSL_CERTFILE", "/etc/nautobot/mtls/tls.crt")
+_redis_key = os.getenv("NAUTOBOT_REDIS_SSL_KEYFILE", "/etc/nautobot/mtls/tls.key")
+
+if os.path.isfile(_redis_ca):
+    _redis_ssl_kwargs = {
+        "ssl_cert_reqs": _ssl.CERT_REQUIRED,
+        "ssl_ca_certs": _redis_ca,
+        "ssl_certfile": _redis_cert,
+        "ssl_keyfile": _redis_key,
+    }
+    CACHES["default"].setdefault("OPTIONS", {})  # noqa F405
+    CACHES["default"]["OPTIONS"].setdefault("CONNECTION_POOL_KWARGS", {})  # noqa F405
+    CACHES["default"]["OPTIONS"]["CONNECTION_POOL_KWARGS"].update(_redis_ssl_kwargs)  # noqa F405
+    CELERY_BROKER_USE_SSL = _redis_ssl_kwargs  # noqa F405
+    CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_kwargs  # noqa F405
+    CELERY_BROKER_TRANSPORT_OPTIONS = {"ssl": _redis_ssl_kwargs}  # noqa F405
+
 # This key is used for secure generation of random numbers and strings. It must never be exposed outside of this file.
 # For optimal security, SECRET_KEY should be at least 50 characters in length and contain a mix of letters, numbers, and
 # symbols. Nautobot will not run without this defined. For more information, see

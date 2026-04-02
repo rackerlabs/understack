@@ -191,6 +191,7 @@ nav:
       - deploy-guide/components/nautobot-site.md
       - deploy-guide/components/nautobot.md
       - deploy-guide/components/nautobotop.md
+      - deploy-guide/components/nautobot-worker.md
       - deploy-guide/components/neutron.md
       - deploy-guide/components/nova.md
       - deploy-guide/components/octavia.md

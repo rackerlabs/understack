@@ -1,0 +1,69 @@
+# Nautobot Worker (site-level)
+#
+# Deploys only Celery workers that connect back to the global Nautobot
+# database and Redis. The web server is disabled because it lives on
+# the global cluster. Redis and PostgreSQL are disabled because the
+# workers reach the global instances over the network.
+---
+
+# Disable the Nautobot web server — workers only
+nautobot:
+  enabled: false
+  replicaCount: 0
+
+  db:
+    engine: "django.db.backends.postgresql"
+    # Override in deploy repo values to point at the global CNPG service
+    host: ""
+    port: 5432
+    name: "app"
+    user: "app"
+    existingSecret: "nautobot-db"
+    existingSecretPasswordKey: "password"
+
+  django:
+    existingSecret: nautobot-django
+
+  superUser:
+    enabled: false
+
+  redis:
+    # Override in deploy repo values to point at the global Redis service
+    host: ""
+    port: 6379
+    ssl: false
+    username: ""
+
+celery:
+  enabled: true
+  concurrency: 2
+  replicaCount: 1
+  extraEnvVarsSecret:
+    - nautobot-django
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 120
+    timeoutSeconds: 60
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 120
+    timeoutSeconds: 60
+
+# Disable celery beat — scheduling runs on the global cluster only
+workers:
+  beat:
+    enabled: false
+
+# Do not deploy local Redis — use the global instance
+redis:
+  enabled: false
+
+# Do not deploy local PostgreSQL — use the global CNPG instance
+postgresql:
+  enabled: false
+
+ingress:
+  enabled: false
+
+metrics:
+  enabled: false
