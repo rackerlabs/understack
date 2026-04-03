@@ -87,6 +87,7 @@ extra_css:
   - stylesheets/rackspace-theme.css
 extra_javascript:
   - assets/mermaid.min.js
+  - assets/mermaid-init.js
 
 plugins:
   - search
