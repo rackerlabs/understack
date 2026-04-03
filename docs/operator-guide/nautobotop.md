@@ -186,7 +186,7 @@ spec:
 | `requeueAfter` | int | 600 | Seconds between reconciliation attempts |
 | `syncIntervalSeconds` | int | 172800 | Minimum seconds between full syncs |
 | `cacheMaxSize` | int | 70000 | Maximum number of entries in the Nautobot object cache |
-| `nautobotSecretRef` | SecretKeySelector | | Reference to the Secret holding Nautobot credentials |
+| `nautobotSecretRef` | SecretKeySelector | | Reference to the Secret holding the Nautobot API token |
 | `nautobotServiceRef` | ServiceSelector | | Reference to the Nautobot Kubernetes Service |
 | `locationTypesRef` | []ConfigMapRef | | ConfigMaps containing location type definitions |
 | `locationRef` | []ConfigMapRef | | ConfigMaps containing location definitions |
@@ -632,6 +632,115 @@ data:
       tags:
         - customer
 ```
+
+## Resource Dependency Graph
+
+Resources are synced in a specific order because some depend on others already existing in Nautobot. The graph below shows which resources are independent and which ones require other resources to be synced first.
+
+```mermaid
+%%{init: {"flowchart": {"defaultRenderer": "elk", "rankSpacing": 200, "nodeSpacing": 50, "curve": "linear"}} }%%
+flowchart TD
+    subgraph S1["1. Independent resources"]
+        direction LR
+        LOC["Locations"]:::blue
+        TGR["Tenant Groups"]:::orange
+        RIR["RIRs"]:::pink
+        ROLE["Roles"]:::green
+        CT["Cluster Types"]:::red
+        CG["Cluster Groups"]:::red
+        LT["Location Types"]:::grey
+        DT["Device Types"]:::grey
+    end
+
+    subgraph S2["2. First-level dependents"]
+        direction LR
+        RG["Rack Groups"]:::teal
+        VG["VLAN Groups"]:::purple
+        TEN["Tenants"]:::amber
+    end
+
+    subgraph S3["3. Second-level dependents"]
+        direction LR
+        RACK["Racks"]:::teal
+        NS["Namespaces"]:::indigo
+        VLAN["VLANs"]:::brown
+        CLUSTER["Clusters"]:::red
+    end
+
+    subgraph S4["4. Final network resources"]
+        direction LR
+        PREFIX["Prefixes"]:::grey
+    end
+
+    %% Location edges (blue)
+    LOC --> RG
+    LOC --> VG
+    LOC --> RACK
+    LOC --> NS
+    LOC --> VLAN
+    LOC --> CLUSTER
+    LOC --> PREFIX
+
+    %% Tenant Group edges (orange)
+    TGR --> TEN
+    TGR --> NS
+    TGR --> VLAN
+    TGR --> PREFIX
+
+    %% Tenant edges (amber)
+    TEN --> NS
+    TEN --> VLAN
+    TEN --> PREFIX
+
+    %% Rack Group edges (teal)
+    RG --> RACK
+
+    %% VLAN Group edges (purple)
+    VG --> VLAN
+    VG --> PREFIX
+
+    %% Role edges (green)
+    ROLE --> VLAN
+    ROLE --> PREFIX
+
+    %% Cluster type/group edges (red)
+    CT --> CLUSTER
+    CG --> CLUSTER
+
+    %% RIR edges (pink)
+    RIR --> PREFIX
+
+    %% Namespace edges (indigo)
+    NS --> PREFIX
+
+    %% VLAN edges (brown)
+    VLAN --> PREFIX
+
+    classDef blue fill:#DBEAFE,stroke:#0969DA,color:#0969DA,stroke-width:2px
+    classDef orange fill:#FFF0E0,stroke:#E5570F,color:#E5570F,stroke-width:2px
+    classDef amber fill:#FEF3C7,stroke:#D4A017,color:#92400E,stroke-width:2px
+    classDef teal fill:#CCFBF1,stroke:#1A8870,color:#1A8870,stroke-width:2px
+    classDef purple fill:#F3E8FF,stroke:#9333EA,color:#9333EA,stroke-width:2px
+    classDef green fill:#DCFCE7,stroke:#16A34A,color:#16A34A,stroke-width:2px
+    classDef red fill:#FEE2E2,stroke:#DC2626,color:#DC2626,stroke-width:2px
+    classDef pink fill:#FCE7F3,stroke:#DB2777,color:#DB2777,stroke-width:2px
+    classDef indigo fill:#E0E7FF,stroke:#4F46E5,color:#4F46E5,stroke-width:2px
+    classDef brown fill:#FDE68A,stroke:#92400E,color:#92400E,stroke-width:2px
+    classDef grey fill:#F3F4F6,stroke:#6B7280,color:#374151,stroke-width:2px
+
+    linkStyle 0,1,2,3,4,5,6 stroke:#0969DA,stroke-width:2px
+    linkStyle 7,8,9,10 stroke:#E5570F,stroke-width:2px
+    linkStyle 11,12,13 stroke:#D4A017,stroke-width:2px
+    linkStyle 14 stroke:#1A8870,stroke-width:2px
+    linkStyle 15,16 stroke:#9333EA,stroke-width:2px
+    linkStyle 17,18 stroke:#16A34A,stroke-width:2px
+    linkStyle 19,20 stroke:#DC2626,stroke-width:2px
+    linkStyle 21 stroke:#DB2777,stroke-width:2px
+    linkStyle 22 stroke:#4F46E5,stroke-width:2px
+    linkStyle 23 stroke:#92400E,stroke-width:2px
+```
+
+The operator syncs independent resources first, then works through the dependent ones in order. If a dependency is missing, the sync for that resource will fail and report the error.
 
 ## How It Works
 
