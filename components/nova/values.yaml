@@ -226,6 +226,9 @@ manifests:
   statefulset_compute_ironic: true
   statefulset_conductor: true
   statefulset_scheduler: true
+  # since conductor and scheduler are stateful, we don't want to periodically
+  # delete any that are down. if they're down its a problem.
+  cron_job_service_cleaner: false
   # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
   # Kubernetes section generation in OpenStack Helm, because we want those
   # to be generated indirectly via ESO as configured in keystoneServiceUsers.enabled
