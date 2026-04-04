@@ -112,7 +112,6 @@ jobs:
           mkdir -p upload
           find . -maxdepth 1 -type f \( -name '*.qcow2' -o -name '*.kernel' -o -name '*.initramfs' \) -exec cp {} upload/ \;
         env:
-          DIB_RELEASE: ${{ env.release }}
           ELEMENTS_PATH: "${{ env.distro == 'ipa-debian' && format('{0}/share/ironic-python-agent-builder/dib:{1}/ironic-images/custom_elements', env.pythonLocation, github.workspace) || ''}}"
 
       - name: Set timestamp environment variable
@@ -126,6 +125,15 @@ jobs:
 
       - name: Copy image artifacts from previous job in to uploads directory
         run: ls -la artifacts && cp -R artifacts/* upload/
+
+      - name: Upload pull request image artifacts
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          name: understack-image-${{ github.event.pull_request.number }}-${{ env.distro }}-${{ env.release }}
+          path: ironic-images/upload/*
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Publish Release
         id: create_release

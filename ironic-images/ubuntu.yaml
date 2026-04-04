@@ -1,4 +1,7 @@
 - imagename: ubuntu-noble
+  environment:
+    DISTRO_NAME: 'ubuntu'
+    DIB_RELEASE: 'noble'
   elements:
   - ubuntu
   - grub2

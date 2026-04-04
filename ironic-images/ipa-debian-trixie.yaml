@@ -1,7 +1,7 @@
-- imagename: ipa-debian-bookworm
+- imagename: ipa-debian-trixie
   environment:
     DISTRO_NAME: 'debian'
-    DIB_RELEASE: 'bookworm'
+    DIB_RELEASE: 'trixie'
   elements:
   - ironic-python-agent-ramdisk
   - debian-minimal
