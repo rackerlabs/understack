@@ -102,6 +102,13 @@ console:
   # connected to QEMU
   console_kind: none
 
+httpRoute:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: external-gateway
+      namespace: envoy-gateway
+
 bootstrap:
   structured:
     flavors:
@@ -294,3 +301,34 @@ annotations:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
+
+extraObjects:
+  - |
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: nova
+    spec:
+      hostnames:
+        - "{{ .Values.endpoints.compute.host_fqdn_override.public.host }}"
+      parentRefs:
+      {{- range .Values.httpRoute.parentRefs }}
+        - group: {{ .group }}
+          kind: {{ .kind }}
+          name: {{ .name }}
+          namespace: {{ .namespace }}
+      {{- end }}
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+          backendRefs:
+            - name: {{ tuple "compute" "internal" . | include "helm-toolkit.endpoints.hostname_short_endpoint_lookup" }}
+              port: {{ tuple "compute" "service" "api" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+      {{- if .Values.httpRoute.timeouts }}
+          timeouts:
+      {{- range $key, $value := .Values.httpRoute.timeouts }}
+            {{ $key }}: {{ $value }}
+      {{- end }}
+      {{- end }}

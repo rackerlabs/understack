@@ -22,7 +22,7 @@ conf:
       # add DriverFilter to the default list so our SVM filtering function gets called
       scheduler_default_filters: DriverFilter,AvailabilityZoneFilter,CapacityFilter,CapabilitiesFilter
   rabbitmq:
-    policies: [] # Override the policy being injected by OSH
+    policies: []  # Override the policy being injected by OSH
   cinder_api_uwsgi:
     uwsgi:
       processes: 2
@@ -175,6 +175,13 @@ pod:
       requests:
         memory: "256Mi"
 
+httpRoute:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: external-gateway
+      namespace: envoy-gateway
+
 dependencies:
   dynamic:
     common:
@@ -295,3 +302,34 @@ annotations:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
+
+extraObjects:
+  - |
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: cinder
+    spec:
+      hostnames:
+        - "{{ .Values.endpoints.volumev3.host_fqdn_override.public.host }}"
+      parentRefs:
+      {{- range .Values.httpRoute.parentRefs }}
+        - group: {{ .group }}
+          kind: {{ .kind }}
+          name: {{ .name }}
+          namespace: {{ .namespace }}
+      {{- end }}
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+          backendRefs:
+            - name: {{ tuple "volumev3" "internal" . | include "helm-toolkit.endpoints.hostname_short_endpoint_lookup" }}
+              port: {{ tuple "volumev3" "service" "api" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+      {{- if .Values.httpRoute.timeouts }}
+          timeouts:
+      {{- range $key, $value := .Values.httpRoute.timeouts }}
+            {{ $key }}: {{ $value }}
+      {{- end }}
+      {{- end }}

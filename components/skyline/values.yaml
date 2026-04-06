@@ -72,6 +72,13 @@ pod:
   resources:
     enabled: true
 
+httpRoute:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: external-gateway
+      namespace: envoy-gateway
+
 annotations:
   # we need to modify the annotations on OpenStack Helm
   # jobs because they use helm.sh/hooks: post-install,post-upgrade
@@ -107,3 +114,34 @@ annotations:
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
       argocd.argoproj.io/sync-wave: "0"
+
+extraObjects:
+  - |
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: skyline
+    spec:
+      hostnames:
+        - "{{ .Values.endpoints.skyline.host_fqdn_override.public.host }}"
+      parentRefs:
+      {{- range .Values.httpRoute.parentRefs }}
+        - group: {{ .group }}
+          kind: {{ .kind }}
+          name: {{ .name }}
+          namespace: {{ .namespace }}
+      {{- end }}
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+          backendRefs:
+            - name: {{ tuple "skyline" "internal" . | include "helm-toolkit.endpoints.hostname_short_endpoint_lookup" }}
+              port: {{ tuple "skyline" "service" "api" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+      {{- if .Values.httpRoute.timeouts }}
+          timeouts:
+      {{- range $key, $value := .Values.httpRoute.timeouts }}
+            {{ $key }}: {{ $value }}
+      {{- end }}
+      {{- end }}

@@ -334,6 +334,13 @@ endpoints:
         default: 5556
     path: ''
 
+httpRoute:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: external-gateway
+      namespace: envoy-gateway
+
 manifests:
   job_credential_cleanup: false
   job_db_init: false
@@ -400,3 +407,34 @@ annotations:
       # relies on services to be up so it can remain post
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
+
+extraObjects:
+  - |
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: HTTPRoute
+    metadata:
+      name: keystone
+    spec:
+      hostnames:
+        - "{{ .Values.endpoints.identity.host_fqdn_override.public.host }}"
+      parentRefs:
+      {{- range .Values.httpRoute.parentRefs }}
+        - group: {{ .group }}
+          kind: {{ .kind }}
+          name: {{ .name }}
+          namespace: {{ .namespace }}
+      {{- end }}
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+          backendRefs:
+            - name: {{ tuple "identity" "internal" . | include "helm-toolkit.endpoints.hostname_short_endpoint_lookup" }}
+              port: {{ tuple "identity" "service" "api" . | include "helm-toolkit.endpoints.endpoint_port_lookup" }}
+      {{- if .Values.httpRoute.timeouts }}
+          timeouts:
+      {{- range $key, $value := .Values.httpRoute.timeouts }}
+            {{ $key }}: {{ $value }}
+      {{- end }}
+      {{- end }}
