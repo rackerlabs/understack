@@ -3,7 +3,7 @@ component: nautobotop
 sources:
   - repoURL: ghcr.io/rackerlabs/charts
     chart: nautobotop
-    targetRevision: 0.0.1
+    targetRevision: 0.0.2
     helm:
       releaseName: nautobotop
       ignoreMissingValueFiles: true
