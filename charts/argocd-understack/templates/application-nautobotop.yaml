@@ -22,7 +22,7 @@ spec:
       valueFiles:
       - $deploy/{{ include "understack.deploy_path" $ }}/nautobotop/values.yaml
     repoURL: ghcr.io/rackerlabs/charts
-    targetRevision: 0.0.1
+    targetRevision: 0.0.2
   - path: {{ include "understack.deploy_path" $ }}/nautobotop
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
