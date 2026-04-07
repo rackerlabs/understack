@@ -6,6 +6,7 @@ from unittest.mock import call
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from ironicclient.v1.node import Node
 
+from understack_workflows.bmc import RedfishRequestError
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import InterfaceInfo
 from understack_workflows.main import enroll_server
@@ -244,6 +245,37 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
     fake_ironic.node.update.assert_called_once()
     patch = fake_ironic.node.update.call_args.args[1]
     assert patch == [{"op": "add", "path": "/inspect_interface", "value": "agent"}]
+
+
+def test_power_on_and_wait_retries_temporary_redfish_503(mocker):
+    initial_info = make_device_info(power_on=False, connected_mac=None)
+    powered_info = make_device_info(
+        power_on=True,
+        connected_mac="AA:BB:CC:DD:EE:FF",
+    )
+    fake_bmc = make_bmc(mocker)
+    sleep = mocker.patch.object(enroll_server.time, "sleep")
+    mocker.patch.object(
+        enroll_server,
+        "chassis_info",
+        side_effect=[
+            RedfishRequestError(
+                "BMC communications failure HTTP 503 Service Unavailable "
+                "Base.1.12.ServiceTemporarilyUnavailable"
+            ),
+            powered_info,
+        ],
+    )
+
+    result = enroll_server.power_on_and_wait(fake_bmc, initial_info)
+
+    assert result is powered_info
+    fake_bmc.redfish_request.assert_called_once_with(
+        path="/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset",
+        payload={"ResetType": "On"},
+        method="POST",
+    )
+    assert sleep.call_args_list == [call(120), call(30)]
 
 
 def test_enrol_existing_failed_node_recovers_and_updates(mocker):

@@ -9,6 +9,7 @@ from ironicclient.v1.node import Node
 
 from understack_workflows import ironic_node
 from understack_workflows.bmc import Bmc
+from understack_workflows.bmc import RedfishRequestError
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.bmc_chassis_info import ChassisInfo
@@ -20,6 +21,10 @@ from understack_workflows.helpers import setup_logger
 from understack_workflows.pxe_port_heuristic import guess_pxe_interfaces
 
 logger = logging.getLogger(__name__)
+
+POST_POWER_ON_WAIT_SECONDS = 120
+POST_POWER_ON_RETRY_SECONDS = 30
+POST_POWER_ON_MAX_RETRIES = 8
 
 
 def main() -> None:
@@ -187,8 +192,30 @@ def power_on_and_wait(bmc: Bmc, device_info: ChassisInfo) -> ChassisInfo:
         payload={"ResetType": "On"},
         method="POST",
     )
-    time.sleep(120)
-    return chassis_info(bmc)
+    time.sleep(POST_POWER_ON_WAIT_SECONDS)
+
+    for attempt in range(POST_POWER_ON_MAX_RETRIES + 1):
+        try:
+            return chassis_info(bmc)
+        except RedfishRequestError as exc:
+            if not _is_temporary_redfish_unavailable(exc):
+                raise
+            if attempt == POST_POWER_ON_MAX_RETRIES:
+                raise
+            logger.warning(
+                "BMC Redfish data is temporarily unavailable after power on for %s. "
+                "Retrying in %s seconds.",
+                bmc.ip_address,
+                POST_POWER_ON_RETRY_SECONDS,
+            )
+            time.sleep(POST_POWER_ON_RETRY_SECONDS)
+
+    raise AssertionError("unreachable")
+
+
+def _is_temporary_redfish_unavailable(exc: RedfishRequestError) -> bool:
+    message = str(exc)
+    return "HTTP 503" in message or "ServiceTemporarilyUnavailable" in message
 
 
 def device_name(device_info: ChassisInfo) -> str:
