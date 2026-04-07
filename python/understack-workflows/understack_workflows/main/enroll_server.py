@@ -16,7 +16,7 @@ from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.helpers import setup_logger
-from understack_workflows.main.bios_settings import update_dell_bios_settings
+from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.pxe_port_heuristic import guess_pxe_interface
 
 logger = logging.getLogger(__name__)
