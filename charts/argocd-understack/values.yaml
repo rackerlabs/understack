@@ -193,6 +193,24 @@ global:
     # @default -- false
     enabled: false
 
+  # -- Rook Ceph Operator (split from main rook application)
+  rook_ceph_operator:
+    # -- Enable/disable deploying the Rook Ceph Operator Helm chart
+    # @default -- false
+    installApp: false
+    # -- Enable/disable deploying site-specific Rook operator configs from the deploy repo
+    # @default -- false
+    installConfigs: false
+
+  # -- Rook Ceph Cluster (split from main rook application)
+  rook_ceph_cluster:
+    # -- Enable/disable deploying the Rook Ceph Cluster Helm chart
+    # @default -- false
+    installApp: false
+    # -- Enable/disable deploying site-specific Rook cluster configs from the deploy repo
+    # @default -- false
+    installConfigs: false
+
   # Sealed Secrets operator
   sealed_secrets:
     # -- Enable/disable deploying sealed secrets
@@ -513,6 +531,24 @@ site:
     # -- Enable/disable deploying Rook
     # @default -- false
     enabled: false
+
+  # -- Rook Ceph Operator (split from main rook application)
+  rook_ceph_operator:
+    # -- Enable/disable deploying the Rook Ceph Operator Helm chart
+    # @default -- false
+    installApp: false
+    # -- Enable/disable deploying site-specific Rook operator configs from the deploy repo
+    # @default -- false
+    installConfigs: false
+
+  # -- Rook Ceph Cluster (split from main rook application)
+  rook_ceph_cluster:
+    # -- Enable/disable deploying the Rook Ceph Cluster Helm chart
+    # @default -- false
+    installApp: false
+    # -- Enable/disable deploying site-specific Rook cluster configs from the deploy repo
+    # @default -- false
+    installConfigs: false
 
   # -- Site-specific workflows and event handlers
   site_workflows:
