@@ -1,3 +1,4 @@
+import json
 import logging
 from collections.abc import Sequence
 
@@ -19,7 +20,7 @@ def create_or_update(
     name: str,
     manufacturer: str,
     external_cmdb_id: str | None = None,
-    enrolled_pxe_port: str | None = None,
+    enrolled_pxe_ports: list[str] | None = None,
 ) -> Node:
     """Find-or-create Node by name, update attributes, set state to Manageable.
 
@@ -63,7 +64,7 @@ def create_or_update(
             driver,
             inspect_interface,
             external_cmdb_id,
-            enrolled_pxe_port,
+            enrolled_pxe_ports,
         )
     except ironicclient.common.apiclient.exceptions.NotFound:
         logger.debug("Baremetal Node with name %s not found in Ironic, creating.", name)
@@ -74,7 +75,7 @@ def create_or_update(
             driver,
             inspect_interface,
             external_cmdb_id,
-            enrolled_pxe_port,
+            enrolled_pxe_ports,
         )
         # All newly-created nodes start out with "enrol" state:
         transition(node, target_state="manage", expected_state="manageable")
@@ -90,7 +91,7 @@ def update_ironic_node(
     driver,
     inspect_interface,
     external_cmdb_id: str | None = None,
-    enrolled_pxe_port: str | None = None,
+    enrolled_pxe_ports: list[str] | None = None,
 ):
     updates = [
         f"name={name}",
@@ -106,8 +107,9 @@ def update_ironic_node(
     # Update external_cmdb_id only when explicitly provided
     if external_cmdb_id:
         updates.append(f"extra/external_cmdb_id={external_cmdb_id}")
-    if enrolled_pxe_port:
-        updates.append(f"extra/enrolled_pxe_port={enrolled_pxe_port}")
+    if enrolled_pxe_ports is not None:
+        payload = json.dumps(enrolled_pxe_ports)
+        updates.append(f"extra/enrolled_pxe_ports={payload}")
 
     patches = args_array_to_patch("add", updates)
     logger.info("Updating Ironic node %s patches=%s", ironic_node.uuid, patches)
@@ -123,7 +125,7 @@ def create_ironic_node(
     driver: str,
     inspect_interface: str,
     external_cmdb_id: str | None = None,
-    enrolled_pxe_port: str | None = None,
+    enrolled_pxe_ports: list[str] | None = None,
 ) -> Node:
     node_data = {
         "name": name,
@@ -137,12 +139,12 @@ def create_ironic_node(
         "boot_interface": "http-ipxe",
         "inspect_interface": inspect_interface,
     }
-    if external_cmdb_id or enrolled_pxe_port:
+    if external_cmdb_id or enrolled_pxe_ports is not None:
         node_data["extra"] = {}
     if external_cmdb_id:
         node_data["extra"]["external_cmdb_id"] = external_cmdb_id
-    if enrolled_pxe_port:
-        node_data["extra"]["enrolled_pxe_port"] = enrolled_pxe_port
+    if enrolled_pxe_ports is not None:
+        node_data["extra"]["enrolled_pxe_ports"] = enrolled_pxe_ports
 
     if driver == "fake-hardware":
         node_data["resource_class"] = "fakehw"

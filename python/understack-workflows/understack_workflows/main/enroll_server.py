@@ -10,14 +10,14 @@ from ironicclient.v1.node import Node
 from understack_workflows import ironic_node
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import bmc_for_ip_address
+from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import chassis_info
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.helpers import setup_logger
-from understack_workflows.bmc_bios import update_dell_bios_settings
-from understack_workflows.pxe_port_heuristic import guess_pxe_interface
+from understack_workflows.pxe_port_heuristic import guess_pxe_interfaces
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ def main() -> None:
     - connect to the BMC using standard password, if that fails then use
       password supplied in --old-bmc-password option, or factory default
 
-    - ensure standard BMC password is set
+    - ensure standard BMC password is set, and other basic BMC settings
 
     -  from BMC, discover basic hardware info:
        - manufacturer, model number, serial number
@@ -38,16 +38,13 @@ def main() -> None:
           - MAC address
           - LLDP connections [{remote_mac, remote_interface_name}]
 
-    - Figure out which NIC to use for PXE
+    - Figure out which NICs to enable for PXE
 
-    -  Using BMC, configure our standard BIOS settings
-       - set PXE boot device
-       - set timezone to UTC
-       - set the hostname
+    - Configure our standard BIOS settings including HTTP boot devices
 
     - Find or create this baremetal node in Ironic
-      - set the name to "{manufacturer}-{servicetag}"
-      - set the driver as appropriate
+      - Set the name to "{manufacturer}-{servicetag}"
+      - Set the driver as appropriate for the manufacturer/model
       - Configure RAID
       - Transition through enrol->manage->inspect->cleaning->provide
     """
@@ -88,22 +85,22 @@ def enrol(
     if insufficient_lldp_data(device_info):
         device_info = power_on_and_wait(bmc, device_info)
 
-    pxe_interface = guess_pxe_interface(device_info, pxe_switch_macs)
-    logger.info("Selected %s as PXE interface", pxe_interface)
+    pxe_interfaces = guess_pxe_interfaces(device_info, pxe_switch_macs)
+    logger.info("Selected %s as PXE interfaces", pxe_interfaces)
 
     node = ironic_node.create_or_update(
         bmc=bmc,
         name=device_name(device_info),
         manufacturer=device_info.manufacturer,
         external_cmdb_id=external_cmdb_id,
-        enrolled_pxe_port=pxe_interface,
+        enrolled_pxe_ports=pxe_interfaces,
     )
 
     if raid_configure:
         # Raid configuration runs a clean step which does a PXE boot.  That
         # can't work unless we first apply_bios_settings.
         # TODO: why isn't skip_ramdisk working here?
-        apply_bios_settings(bmc, pxe_interface)
+        apply_bios_settings(bmc, pxe_interfaces)
         configure_raid(node, bmc)
     else:
         logger.info("%s RAID configuration was not requested", node.uuid)
@@ -124,10 +121,10 @@ def enrol(
     # Applying BIOS settings on Dell servers requires a reboot which we achieve
     # by initiating agent inspection.  Agent inspection requires BIOS settings
     # (to set boot device).  Therefore these two actions must go hand-in-hand.
-    # 
+    #
     # Note that we may have already applied BIOS settings above.  That is okay,
     # it is idempotent.
-    apply_bios_settings(bmc, pxe_interface)
+    apply_bios_settings(bmc, pxe_interfaces)
     ironic_node.inspect(node)
 
     # After successful inspection, our node is left in "manageable" state.  All
@@ -255,8 +252,8 @@ def build_raid_config(controller: str, physical_disks: list[str]):
     return result
 
 
-def apply_bios_settings(bmc: Bmc, pxe_interface: str):
-    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
+def apply_bios_settings(bmc: Bmc, pxe_interfaces: list[str]):
+    update_dell_bios_settings(bmc, pxe_interfaces=pxe_interfaces)
 
 
 def parse_bool(value: str) -> bool:

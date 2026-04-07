@@ -157,9 +157,10 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
     )
     update_dell_drac_settings.assert_called_once_with(fake_bmc)
     bmc_set_hostname.assert_called_once_with(fake_bmc, "None", "Dell-ABC123")
-    update_dell_bios_settings.assert_called_once_with(
+    assert update_dell_bios_settings.call_count == 2
+    update_dell_bios_settings.assert_any_call(
         fake_bmc,
-        pxe_interface="NIC.Integrated.1-1",
+        pxe_interfaces=["NIC.Integrated.1-1"],
     )
     sleep.assert_called_once_with(120)
 
@@ -181,7 +182,7 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
         inspect_interface="idrac-redfish",
         extra={
             "external_cmdb_id": "cmdb-1",
-            "enrolled_pxe_port": "NIC.Integrated.1-1",
+            "enrolled_pxe_ports": ["NIC.Integrated.1-1"],
         },
     )
     fake_ironic.node.set_target_raid_config.assert_called_once_with(
@@ -321,8 +322,8 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
     update_patch = fake_ironic.node.update.call_args_list[0].args[1]
     assert {
         "op": "add",
-        "path": "/extra/enrolled_pxe_port",
-        "value": "NIC.Integrated.1-1",
+        "path": "/extra/enrolled_pxe_ports",
+        "value": ["NIC.Integrated.1-1"],
     } in update_patch
 
 
@@ -405,7 +406,6 @@ def test_guess_pxe_interface_unknown_name_avoids_bmc_interface():
         ],
     )
 
-    assert (
-        enroll_server.guess_pxe_interface(device_info, {"AA:BB:CC:DD:EE:FF"})
-        == "NIC.Custom.9-1"
-    )
+    assert enroll_server.guess_pxe_interfaces(device_info, {"AA:BB:CC:DD:EE:FF"}) == [
+        "NIC.Custom.9-1"
+    ]
