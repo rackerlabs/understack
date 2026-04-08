@@ -31,6 +31,7 @@ dependencies = [
 
 [project.entry-points."neutron.ml2.mechanism_drivers"]
 understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
+undersync = "neutron_understack.undersync_mech:UndersyncMechanismDriver"
 
 [project.entry-points."neutron.ml2.type_drivers"]
 understack_vxlan = "neutron_understack.type_understack_vxlan:UnderstackVxlanTypeDriver"
