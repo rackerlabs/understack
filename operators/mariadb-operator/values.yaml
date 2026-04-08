@@ -2,3 +2,10 @@
 
 metrics:
   enabled: true
+
+config:
+  # stick with OpenStack's officially supported version
+  mariadbDefaultVersion: "11.4"
+  mariadbImage:
+    repository: docker-registry1.mariadb.com/library/mariadb
+    tag: 11.4.10
