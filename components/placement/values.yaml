@@ -1,6 +1,17 @@
 ---
 release_group: null
 
+conf:
+  placement_api_uwsgi:
+    uwsgi:
+      start-time: "%t"
+      # Replace lazy-apps with need-app + close-on-exec per
+      # https://review.opendev.org/c/openstack/devstack/+/983361
+      lazy-apps: false
+      need-app: true
+      close-on-exec: true
+      close-on-exec2: true
+
 network:
   # configure OpenStack Helm to use Undercloud's ingress
   # instead of expecting the ingress controller provided
