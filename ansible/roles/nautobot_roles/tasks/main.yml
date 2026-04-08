@@ -36,5 +36,5 @@
     - {"name": "switch_uplink", "types": ["dcim.interface"], "color": "cddc39"}
     - {"name": "storage-client-leaf", "types": ["dcim.device"], "color": "00ffff"}
     - {"name": "storage-target-leaf", "types": ["dcim.device"], "color": "ff9800"}
-    - {"name": "storage-spine", "types": ["dcim.device"], "color": "4caf50"}
+    - {"name": "storage-spine", "types": ["dcim.device"], "color": "4ca150"}
     - {"name": "storage-array", "types": ["dcim.device"], "color": "9e9e9e"}
