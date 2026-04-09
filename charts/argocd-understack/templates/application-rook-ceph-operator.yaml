@@ -1,0 +1,57 @@
+{{- $installApp := eq (include "understack.componentOptionAny" (list $ "rook_ceph_operator" "installApp" true)) "true" }}
+{{- $installConfigs := eq (include "understack.componentOptionAny" (list $ "rook_ceph_operator" "installConfigs" false)) "true" }}
+{{- if or $installApp $installConfigs }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" $.Release.Name "rook-ceph-operator" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+    argocd.argoproj.io/sync-wave: "0"
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
+spec:
+  destination:
+    namespace: rook-ceph
+    server: {{ $.Values.cluster_server }}
+  project: understack-operators
+  sources:
+  {{- if $installApp }}
+  - chart: rook-ceph
+    helm:
+      ignoreMissingValueFiles: true
+      releaseName: rook-ceph
+      valueFiles:
+      - $understack/operators/rook/values-operator.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/rook-ceph-operator/values.yaml
+    repoURL: https://charts.rook.io/release
+    targetRevision: v1.16.4
+  - path: operators/rook
+    ref: understack
+    repoURL: {{ include "understack.understack_url" $ }}
+    targetRevision: {{ include "understack.understack_ref" $ }}
+  - ref: deploy
+    repoURL: {{ include "understack.deploy_url" $ }}
+    targetRevision: {{ include "understack.deploy_ref" $ }}
+  {{- end }}
+  {{- if $installConfigs }}
+  - path: {{ include "understack.deploy_path" $ }}/rook-ceph-operator
+    repoURL: {{ include "understack.deploy_url" $ }}
+    targetRevision: {{ include "understack.deploy_ref" $ }}
+  {{- end }}
+  syncPolicy:
+    automated:
+      # to avoid data loss do not auto-prune
+      prune: false
+      selfHeal: true
+    managedNamespaceMetadata:
+      annotations:
+        argocd.argoproj.io/sync-options: Delete=false
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+{{- end }}

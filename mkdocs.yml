@@ -207,6 +207,8 @@ nav:
       - deploy-guide/components/placement.md
       - deploy-guide/components/rabbitmq-system.md
       - deploy-guide/components/rook.md
+      - deploy-guide/components/rook-ceph-cluster.md
+      - deploy-guide/components/rook-ceph-operator.md
       - deploy-guide/components/sealed-secrets.md
       - deploy-guide/components/site-workflows.md
       - deploy-guide/components/skyline.md

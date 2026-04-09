@@ -24,6 +24,15 @@ site:
     enabled: false
 ```
 
+For newer components that use separate app/config controls, disable both:
+
+```yaml title="$CLUSTER_NAME/deploy.yaml"
+site:
+  cert_manager:
+    installApp: false
+    installConfigs: false
+```
+
 ### Enabling a Component
 
 Set `enabled: true` for that component key:
@@ -32,6 +41,15 @@ Set `enabled: true` for that component key:
 site:
   monitoring:
     enabled: true
+```
+
+For newer components, enable the appropriate options:
+
+```yaml title="$CLUSTER_NAME/deploy.yaml"
+site:
+  cert_manager:
+    installApp: true     # Deploy the Helm chart
+    installConfigs: true # Deploy site-specific configs
 ```
 
 ## Modifying Helm Values or Kustomize Overlays
@@ -86,6 +104,8 @@ enablement defaults, validation, and troubleshooting notes.
 | [ovn](./ovn.md) | site |
 | [rabbitmq-system](./rabbitmq-system.md) | global, site |
 | [rook](./rook.md) | global, site |
+| [rook-ceph-operator](./rook-ceph-operator.md) | global, site |
+| [rook-ceph-cluster](./rook-ceph-cluster.md) | global, site |
 | [sealed-secrets](./sealed-secrets.md) | global, site |
 | [site-workflows](./site-workflows.md) | site |
 | [snmp-exporter](./snmp-exporter.md) | site |
