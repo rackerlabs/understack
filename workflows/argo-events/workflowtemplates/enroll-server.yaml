@@ -40,7 +40,7 @@ spec:
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
-          - enrol-server
+          - enroll-server
         args:
           - --ip-address
           - "{{workflow.parameters.ip_address}}"
