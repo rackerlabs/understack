@@ -89,6 +89,8 @@ conf:
       post_deploy_get_power_state_retry_interval: 18
     dhcp:
       dhcp_provider: dnsmasq
+    oslo_messaging_notifications:
+      driver: messagingv2
     oslo_messaging_rabbit:
       amqp_durable_queues: true
     pxe:

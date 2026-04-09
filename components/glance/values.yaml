@@ -116,6 +116,8 @@ pod:
 
 conf:
   glance:
+    oslo_messaging_notifications:
+      driver: messagingv2
     oslo_messaging_rabbit:
       amqp_durable_queues: true
   glance_api_uwsgi:
