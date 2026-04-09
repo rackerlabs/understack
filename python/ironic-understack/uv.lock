@@ -460,7 +460,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ironic", specifier = ">=32.0,<33" },
+    { name = "ironic", specifier = ">=32.0,<36" },
     { name = "pyyaml", specifier = "~=6.0" },
     { name = "understack-flavor-matcher", directory = "../understack-flavor-matcher" },
 ]
