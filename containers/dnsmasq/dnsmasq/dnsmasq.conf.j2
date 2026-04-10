@@ -73,7 +73,14 @@ dhcp-option={{ tag }}{{ option_prefix }}{{ option|replace('_', '-')|lower }},{{ 
 {%- endif %}
 {%- endmacro %}
 
+# This DHCP server is allowed to send NAK responses:
 dhcp-authoritative
+# This DHCP server will issue a single IP per client MAC address.  The client-id
+# can be used to differentiate VMs sharing a NIC (and thus requiring multiple
+# IPs for a single MAC address).  We don't have that requirement, and in fact in
+# our case it causes us to assign additional IPs to every server because the
+# different stages of boot (iPXE, linux) use different client-ids:
+dhcp-ignore-clid
 # DHCP ranges to hand out
 {% set dhcp_proxy_list = [] -%}
 {% set dhcp_allowed_srvids_list = [] -%}
