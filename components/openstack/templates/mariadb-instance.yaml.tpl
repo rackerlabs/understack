@@ -32,6 +32,10 @@ spec:
     max_connections=1024
     innodb_flush_log_at_trx_commit=2
     innodb_buffer_pool_size=256M
+    # set charset/collate back to MariaDB 11.4 defaults
+    character-set-server=utf8mb3
+    collation-server=utf8mb3_general_ci
+    character-set-collations=utf8=utf8mb3_general_ci,utf8mb3=utf8mb3_general_ci,utf8mb4=utf8mb4_unicode_ci
 
   metrics:
     enabled: true
