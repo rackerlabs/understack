@@ -37,6 +37,7 @@ nautobot:
 
   extraEnvVarsCM:
     - nautobot-sso
+    - cluster-data
   extraEnvVarsSecret:
     - nautobot-custom-env
 
@@ -61,6 +62,8 @@ celery:
   # https://docs.nautobot.com/projects/core/en/stable/user-guide/administration/guides/celery-queues/#concurrency-setting
   concurrency: 2
   replicaCount: 1
+  extraEnvVarsCM:
+    - cluster-data
   extraEnvVarsSecret:
     - nautobot-django
     - nautobot-custom-env

@@ -10,6 +10,11 @@ resources:
   - rule-nautobot-absent.yaml
 
 configMapGenerator:
+  - name: cluster-data
+    literals:
+      - UNDERSTACK_PARTITION=""
+    options:
+      disableNameSuffixHash: true
   - name: nautobot-sso
     literals:
       # enables SOCIAL_AUTH_PIPELINE to load the group_sync plugin
