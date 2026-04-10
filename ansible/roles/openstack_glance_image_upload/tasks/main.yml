@@ -1,0 +1,135 @@
+---
+
+- name: Ensure download directory exists
+  ansible.builtin.file:
+    path: "{{ image_download_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Look up existing Glance images
+  openstack.cloud.image_info:
+    cloud: "{{ openstack_cloud | default(omit) }}"
+    image: "{{ item.uuid }}"
+  register: existing_image_info
+  loop: "{{ understack_images }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: understack_images | length > 0
+
+- name: Reserve missing Glance image IDs before upload
+  openstack.cloud.image:
+    cloud: "{{ openstack_cloud | default(omit) }}"
+    name: "{{ item.item.name }}"
+    id: "{{ item.item.uuid }}"
+    disk_format: "{{ item.item.disk_format }}"
+    container_format: "{{ item.item.container_format | default('bare') }}"
+    is_public: "{{ item.item.is_public | default(true) }}"
+    is_protected: "{{ item.item.is_protected | default(false) }}"
+    min_disk: "{{ item.item.min_disk | default(0) }}"
+    min_ram: "{{ item.item.min_ram | default(0) }}"
+    properties: "{{ item.item.properties | default({}) }}"
+    tags: "{{ item.item.tags | default([]) }}"
+    state: present
+    wait: false
+  loop: "{{ existing_image_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - understack_images | length > 0
+    - item.images | length == 0
+
+- name: Download images that still need data upload
+  ansible.builtin.get_url:
+    url: "{{ item.item.external_url }}"
+    dest: "{{ image_download_dir }}/{{ item.item.uuid }}.{{ item.item.disk_format }}"
+    checksum: "{{ item.item.checksum | default(omit) }}"
+    mode: '0644'
+  loop: "{{ existing_image_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - understack_images | length > 0
+    - item.images | length == 0 or item.images[0].status == 'queued'
+
+- name: Look up target Glance images after reservation
+  openstack.cloud.image_info:
+    cloud: "{{ openstack_cloud | default(omit) }}"
+    image: "{{ item.uuid }}"
+  register: target_image_info
+  loop: "{{ understack_images }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: understack_images | length > 0
+
+- name: Upload image data to queued Glance images
+  openstack.cloud.image:
+    cloud: "{{ openstack_cloud | default(omit) }}"
+    name: "{{ item.images[0].name }}"
+    id: "{{ item.item.uuid }}"
+    filename: "{{ image_download_dir }}/{{ item.item.uuid }}.{{ item.item.disk_format }}"
+    disk_format: "{{ item.images[0].disk_format }}"
+    container_format: "{{ item.images[0].container_format }}"
+    state: present
+    wait: true
+  loop: "{{ target_image_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - understack_images | length > 0
+    - item.images | length > 0
+    - item.images[0].status == 'queued'
+
+- name: Tell Glance to import the image data (using use_import and glance-direct)
+  openstack.cloud.image:
+    cloud: "{{ openstack_cloud | default(omit) }}"
+    id: "{{ item.item.uuid }}"
+    name: "{{ item.images[0].name }}"
+    use_import: true
+    state: present
+    wait: true
+  loop: "{{ target_image_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when:
+    - understack_images | length > 0
+    - item.images | length > 0
+    - item.images[0].status == 'uploading'
+
+- name: Wait for Glance images to become active
+  openstack.cloud.image_info:
+    cloud: "{{ openstack_cloud | default(omit) }}"
+    image: "{{ item.uuid }}"
+  register: final_image_info
+  loop: "{{ understack_images }}"
+  loop_control:
+    label: "{{ item.name }}"
+  until:
+    - final_image_info.images | length > 0
+    - final_image_info.images[0].status == 'active'
+  retries: 60
+  delay: 10
+  when: understack_images | length > 0
+
+- name: Verify all Glance images are active
+  ansible.builtin.assert:
+    that:
+      - item.images | length > 0
+      - item.images[0].status == 'active'
+    fail_msg: >-
+      Glance image {{ item.item.name }} ({{ item.item.uuid }}) did not become active.
+      Current status: {{ item.images[0].status if (item.images | length > 0) else 'missing' }}
+    success_msg: >-
+      Glance image {{ item.item.name }} ({{ item.item.uuid }}) is active.
+  loop: "{{ final_image_info.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  when: understack_images | length > 0
+
+# - name: Clean up downloaded images
+#   ansible.builtin.file:
+#     path: "{{ image_download_dir }}/{{ item.uuid }}.{{ item.disk_format }}"
+#     state: absent
+#   loop: "{{ understack_images }}"
+#   loop_control:
+#     label: "{{ item.name }}"
+#   when: understack_images | length > 0
