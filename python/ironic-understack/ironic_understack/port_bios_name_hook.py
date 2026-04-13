@@ -67,7 +67,14 @@ class PortBiosNameHook(base.InspectionHook):
 def _enrolled_pxe_nics(task) -> list[str]:
     """Read enrolled PXE NIC names from node.extra, or use broad prefixes."""
     enrolled_pxe_nics = task.node.extra.get("enrolled_pxe_ports")
-    if enrolled_pxe_nics is None:
+    if enrolled_pxe_nics:
+        LOG.info(
+            "Set node %s pxe flag on interfaces from extra.enrolled_pxe_ports %s",
+            task.node.uuid,
+            enrolled_pxe_nics,
+        )
+        return enrolled_pxe_nics
+    else:
         LOG.warning(
             "Node %s extra.enrolled_pxe_ports is missing, "
             "setting pxe flag on all interfaces starting %s.",
@@ -75,13 +82,6 @@ def _enrolled_pxe_nics(task) -> list[str]:
             PXE_BIOS_NAME_PREFIXES,
         )
         return PXE_BIOS_NAME_PREFIXES
-
-    LOG.info(
-        "Set node %s pxe flag on interfaces from extra.enrolled_pxe_ports %s",
-        task.node.uuid,
-        enrolled_pxe_nics,
-    )
-    return enrolled_pxe_nics
 
 
 def _set_port_extra(baremetal_port, mac, required_bios_name):
