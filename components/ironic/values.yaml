@@ -245,6 +245,9 @@ pod:
             mountPath: /var/lib/dnsmasq/
           - name: device-types
             mountPath: /var/lib/understack/device-types
+          - name: ironic-inspection-rules
+            mountPath: /etc/ironic/inspection-rules/
+            readOnly: true
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -255,8 +258,10 @@ pod:
           - name: device-types
             configMap:
               name: device-types
-          - name: pod-usr-share-novnc
-            emptyDir: {}
+          - name: ironic-inspection-rules
+            configMap:
+              name: ironic-inspection-rules
+              optional: true
   lifecycle:
     disruption_budget:
       api:
