@@ -25,6 +25,9 @@
   # - Devices
 
   pre_tasks:
+    - name: Check Nautobot connectivity
+      ansible.builtin.import_tasks: tasks/check_nautobot_auth.yml
+
     - name: Ensure nautobot is up and responding
       ansible.builtin.uri:
         url: "{{ nautobot_url }}/health/"
