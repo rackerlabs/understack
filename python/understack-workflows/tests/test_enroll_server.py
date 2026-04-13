@@ -242,9 +242,12 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
             ),
         ]
     )
-    fake_ironic.node.update.assert_called_once()
-    patch = fake_ironic.node.update.call_args.args[1]
-    assert patch == [{"op": "add", "path": "/inspect_interface", "value": "agent"}]
+    expected_reset = [{"op": "remove", "path": "/inspect_interface"}]
+    expected_agent = [{"op": "add", "path": "/inspect_interface", "value": "agent"}]
+    assert fake_ironic.node.update.call_args_list == [
+        call(created_node.uuid, expected_reset),
+        call(created_node.uuid, expected_agent),
+    ]
 
 
 def test_power_on_and_wait_retries_temporary_redfish_503(mocker):

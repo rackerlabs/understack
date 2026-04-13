@@ -199,17 +199,11 @@ def set_target_raid_config(node: Node, raid_config: dict) -> None:
 
 
 def inspect_out_of_band(node: Node):
-    refreshed_node = refresh(node, fields=["driver"])
-    if refreshed_node.driver == "idrac":
-        inspect_interface = "idrac-redfish"
-    elif refreshed_node.driver == "redfish":
-        inspect_interface = "redfish"
-    else:
-        logger.warning("No out-of-band inspection for driver %s", refreshed_node.driver)
-        return
-
-    logger.info("%s Performing out-of-band inspection", node.uuid)
-    inspect(node, inspect_interface)
+    intf_reset = args_array_to_patch("remove", ["inspect_interface"])
+    logger.info("[node:%s] Resetting to redfish interface", node.uuid)
+    IronicClient().update_node(node.uuid, intf_reset)
+    logger.info("[node:%s] Performing out-of-band inspection", node.uuid)
+    transition(node, target_state="inspect", expected_state="manageable")
 
 
 def inspect(node: Node, inspect_interface: str = "agent"):
