@@ -26,7 +26,7 @@ def guess_pxe_interfaces(
         )
     ]
 
-    return names[0:7]
+    return names[0:8]
 
 
 def disqualified(interface: InterfaceInfo) -> bool:
