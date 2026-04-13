@@ -101,6 +101,11 @@ def enrol(
         enrolled_pxe_ports=pxe_interfaces,
     )
 
+    # Once we've added to the node to Ironic, perform a redfish
+    # inspection immediately to populate the BIOS data and initial
+    # hardware information
+    ironic_node.inspect_out_of_band(node)
+
     if raid_configure:
         # Raid configuration runs a clean step which does a PXE boot.  That
         # can't work unless we first apply_bios_settings.

@@ -211,6 +211,13 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
             ),
             call(
                 created_node.uuid,
+                "inspect",
+                cleansteps=None,
+                runbook=None,
+                disable_ramdisk=None,
+            ),
+            call(
+                created_node.uuid,
                 "clean",
                 cleansteps=[
                     {"interface": "raid", "step": "delete_configuration"},
@@ -245,6 +252,7 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
     expected_reset = [{"op": "remove", "path": "/inspect_interface"}]
     expected_agent = [{"op": "add", "path": "/inspect_interface", "value": "agent"}]
     assert fake_ironic.node.update.call_args_list == [
+        call(created_node.uuid, expected_reset),
         call(created_node.uuid, expected_reset),
         call(created_node.uuid, expected_agent),
     ]
@@ -327,6 +335,13 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
             call(
                 existing_node.uuid,
                 "manage",
+                cleansteps=None,
+                runbook=None,
+                disable_ramdisk=None,
+            ),
+            call(
+                existing_node.uuid,
+                "inspect",
                 cleansteps=None,
                 runbook=None,
                 disable_ramdisk=None,
