@@ -1,55 +1,64 @@
+import logging
+
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import InterfaceInfo
+
+logger = logging.getLogger(__name__)
 
 # We try not choose interface whose name contains any of these:
 DISQUALIFIED = ["DRAC", "ILO", "NIC.EMBEDDED"]
 
-# A higher number is more likely to be PXE interface:
-NIC_PREFERENCE = {
-    "NIC.Integrated.1-1-1": 100,
-    "NIC.Integrated.1-1": 99,
-    "NIC.Slot.1-1-1": 98,
-    "NIC.Slot.1-1": 97,
-    "NIC.Integrated.1-2-1": 96,
-    "NIC.Integrated.1-2": 95,
-    "NIC.Slot.1-2-1": 94,
-    "NIC.Slot.1-2": 93,
-    "NIC.Slot.1-3-1": 92,
-    "NIC.Slot.1-3": 91,
-    "NIC.Slot.2-1-1": 90,
-    "NIC.Slot.2-1": 89,
-    "NIC.Integrated.2-1-1": 88,
-    "NIC.Integrated.2-1": 87,
-    "NIC.Slot.2-2-1": 86,
-    "NIC.Slot.2-2": 85,
-    "NIC.Integrated.2-2-1": 84,
-    "NIC.Integrated.2-2": 83,
-    "NIC.Slot.3-1-1": 82,
-    "NIC.Slot.3-1": 81,
-    "NIC.Slot.3-2-1": 80,
-    "NIC.Slot.3-2": 79,
-}
+
+def guess_pxe_interfaces(
+    device_info: ChassisInfo, pxe_switch_macs: set[str] | None = None
+) -> list[str]:
+    """First 8 interface names, most probable PXE interfaces first."""
+    if pxe_switch_macs is None:
+        pxe_switch_macs = set()
+
+    candidate_interfaces = {i for i in device_info.interfaces if not disqualified(i)}
+
+    names = [
+        i.name
+        for i in sorted(
+            candidate_interfaces,
+            key=lambda i: likelihood(i, pxe_switch_macs),
+        )
+    ]
+
+    return names[0:8]
 
 
-def guess_pxe_interface(device_info: ChassisInfo) -> str:
-    """Determine most probable PXE interface for BMC."""
-    interface = max(device_info.interfaces, key=_pxe_preference)
-    return interface.name
+def disqualified(interface: InterfaceInfo) -> bool:
+    return any(x in interface.name.upper() for x in DISQUALIFIED)
 
 
-def _pxe_preference(interface: InterfaceInfo) -> list:
-    """Relative likelihood that interface is used for PXE.
+def likelihood(interface: InterfaceInfo, pxe_switch_macs: set[str]) -> list[bool | str]:
+    """A value that is sortable.  Lower is better."""
+    return [
+        # python sort order: false is "better" than true
+        not connected_to_known_pxe_switch(interface, pxe_switch_macs),
+        not connected_to_any_switch(interface),
+        nic_port_number(interface),
+        interface.name,  # tiebreaker
+    ]
 
-    Prefer names that are not disqualified.
 
-    After that, prefer interfaces that have an LLDP neighbor.
+def connected_to_known_pxe_switch(interface: InterfaceInfo, pxe_switch_macs) -> bool:
+    return interface.remote_switch_mac_address in pxe_switch_macs
 
-    Finally, score the interface name according to the list above.
+
+def connected_to_any_switch(interface: InterfaceInfo) -> bool:
+    return interface.remote_switch_mac_address is not None
+
+
+def nic_port_number(interface: InterfaceInfo) -> str:
+    """Preference of interface name like NIC.Slot.1-2-1.
+
+    Prefer Lowest partition, then
+    prefer Lowest port, then
+    prefer Lowest slot number, then
+    prefer Integrated over Slot.
     """
-    is_eligible = not any(x in interface.name.upper() for x in DISQUALIFIED)
-
-    link_detected = interface.remote_switch_port_name is not None
-
-    name_preference = NIC_PREFERENCE.get(interface.name, 0)
-
-    return [is_eligible, link_detected, name_preference]
+    reversed_name = interface.name[::-1]
+    return reversed_name

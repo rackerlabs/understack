@@ -36,77 +36,19 @@ spec:
       steps:
         - - name: enroll-server
             template: enroll-server
-        - - name: server-enroll-state
-            template: openstack-state-cmd
-            arguments:
-              parameters:
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
-        - - name: manage-server
-            template: openstack-wait-cmd
-            arguments:
-              parameters:
-                - name: operation
-                  value: "manage"
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
-            when: "{{steps.server-enroll-state.outputs.result}} == enroll"
-        - - name: get-raid-config
-            template: get-raid-config
-            when: "{{workflow.parameters.raid_configure}} == true"
-        - - name: openstack-set-baremetal-node-raid-config
-            template: openstack-set-baremetal-node-raid-config
-            arguments:
-              parameters:
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
-                - name: raid_config
-                  value: "{{steps.get-raid-config.outputs.result}}"
-            when: "{{workflow.parameters.raid_configure}} == true"
-        - - name: server-manage-state
-            template: openstack-state-cmd
-            arguments:
-              parameters:
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
-        - - name: bios-settings
-            template: bios-settings
-        - - name: inspect-server
-            templateRef:
-              name: inspect-server
-              template: inspect-server
-            arguments:
-              parameters:
-                - name: node
-                  value: "{{steps.enroll-server.outputs.result}}"
-            when: "{{steps.server-manage-state.outputs.result}} == manageable"
-        - - name: firmware-update
-            templateRef:
-              name: server-firmware-update
-              template: server-firmware-update
-            arguments:
-              parameters:
-                - name: node
-                  value: "{{steps.enroll-server.outputs.result}}"
-            when: "{{workflow.parameters.firmware_update}} == true"
-        - - name: avail-server
-            template: openstack-wait-cmd
-            arguments:
-              parameters:
-                - name: operation
-                  value: "provide"
-                - name: device_id
-                  value: "{{steps.enroll-server.outputs.result}}"
-            when: "{{steps.server-manage-state.outputs.result}} == manageable"
     - name: enroll-server
       container:
         image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
         command:
           - enroll-server
         args:
-          - --bmc-ip-address
+          - --ip-address
           - "{{workflow.parameters.ip_address}}"
-          - --old-bmc-password
+          - --firmware-update
+          - "{{workflow.parameters.firmware_update}}"
+          - --raid-configure
+          - "{{workflow.parameters.raid_configure}}"
+          - --old-password
           - "{{workflow.parameters.old_password}}"
           - --external-cmdb-id
           - "{{workflow.parameters.external_cmdb_id}}"
@@ -118,157 +60,14 @@ spec:
             name: bmc-master
             readOnly: true
         envFrom:
-        - configMapRef:
-            name: cluster-metadata
+          - configMapRef:
+              name: cluster-metadata
         env:
-        - name: WF_NS
-          value: "{{workflow.namespace}}"
-        - name: WF_NAME
-          value: "{{workflow.name}}"
-        - name: WF_UID
-          value: "{{workflow.uid}}"
-      volumes:
-        - name: bmc-master
-          secret:
-            secretName: bmc-master
-        - name: baremetal-manage
-          secret:
-            secretName: baremetal-manage
-            items:
-              - key: clouds.yaml
-                path: clouds.yaml
-    - name: bios-settings
-      container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
-        command:
-          - bios-settings
-        args:
-          - --bmc-ip-address
-          - "{{workflow.parameters.ip_address}}"
-        volumeMounts:
-          - mountPath: /etc/openstack
-            name: baremetal-manage
-            readOnly: true
-          - mountPath: /etc/bmc_master/
-            name: bmc-master
-            readOnly: true
-        envFrom:
-        - configMapRef:
-            name: cluster-metadata
-        env:
-        - name: WF_NS
-          value: "{{workflow.namespace}}"
-        - name: WF_NAME
-          value: "{{workflow.name}}"
-        - name: WF_UID
-          value: "{{workflow.uid}}"
-      volumes:
-        - name: bmc-master
-          secret:
-            secretName: bmc-master
-    - name: openstack-wait-cmd
-      inputs:
-        parameters:
-          - name: operation
-          - name: device_id
-      container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
-        command:
-          - openstack
-        args:
-          - baremetal
-          - node
-          - "{{inputs.parameters.operation}}"
-          - --wait
-          - "0"
-          - "{{inputs.parameters.device_id}}"
-        env:
+          - name: WF_NS
+            value: "{{workflow.namespace}}"
+          - name: WF_NAME
+            value: "{{workflow.name}}"
+          - name: WF_UID
+            value: "{{workflow.uid}}"
           - name: OS_CLOUD
             value: understack
-        volumeMounts:
-          - mountPath: /etc/openstack
-            name: baremetal-manage
-    - name: get-raid-config
-      container:
-        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
-        command:
-          - get-raid-devices
-        args:
-          - --ip-address
-          - "{{workflow.parameters.ip_address}}"
-        volumeMounts:
-          - mountPath: /etc/openstack
-            name: baremetal-manage
-            readOnly: true
-          - mountPath: /etc/bmc_master/
-            name: bmc-master
-            readOnly: true
-        env:
-        - name: WF_NS
-          value: "{{workflow.namespace}}"
-        - name: WF_NAME
-          value: "{{workflow.name}}"
-        - name: WF_UID
-          value: "{{workflow.uid}}"
-    - name: openstack-set-baremetal-node-raid-config
-      inputs:
-        parameters:
-          - name: device_id
-          - name: raid_config
-      # https://rackerlabs.github.io/understack/user-guide/openstack-ironic/#setting-baremetal-node-flavor
-      script:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
-        command: [sh]
-        source: |
-          echo "setting RAID config for node: {{inputs.parameters.device_id}}"
-          # create the raid-config.json file. I find this easier to read
-          # than passing a big json string on command line
-          cat <<'EOF' >> raid-config.json
-          {{inputs.parameters.raid_config}}
-          EOF
-          # create the initial clean steps which will create a raid config
-          cat <<'EOF' >> raid-clean-steps.json
-          [
-              {
-                  "interface": "raid",
-                  "step": "delete_configuration"
-              },
-              {
-                  "interface": "raid",
-                  "step": "create_configuration"
-              }
-          ]
-          EOF
-          # apply the target raid config to the node
-          openstack baremetal node set {{inputs.parameters.device_id}} --target-raid-config raid-config.json
-          # create the raid config
-          openstack baremetal node clean --wait 0 --clean-steps raid-clean-steps.json --disable-ramdisk {{inputs.parameters.device_id}}
-        env:
-          - name: OS_CLOUD
-            value: understack
-        volumeMounts:
-          - mountPath: /etc/openstack
-            name: baremetal-manage
-    - name: openstack-state-cmd
-      inputs:
-        parameters:
-          - name: device_id
-      container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
-        command:
-          - openstack
-        args:
-          - baremetal
-          - node
-          - show
-          - "-f"
-          - value
-          - "-c"
-          - provision_state
-          - "{{inputs.parameters.device_id}}"
-        env:
-          - name: OS_CLOUD
-            value: understack
-        volumeMounts:
-          - mountPath: /etc/openstack
-            name: baremetal-manage

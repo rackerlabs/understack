@@ -29,6 +29,38 @@ class IronicClient:
     def update_node(self, node_id, patch):
         return self.client.node.update(node_id, patch)
 
+    def set_node_provision_state(
+        self,
+        node_id: str,
+        target: str,
+        clean_steps: list[dict] | None = None,
+        runbook: str | None = None,
+        disable_ramdisk: bool | None = None,
+    ) -> None:
+        self.client.node.set_provision_state(
+            node_id,
+            target,
+            cleansteps=clean_steps,
+            runbook=runbook,
+            disable_ramdisk=disable_ramdisk,
+        )
+
+    def wait_for_node_provision_state(
+        self, node_id: str, expected_state: str, timeout: int = 1800
+    ) -> None:
+        self.client.node.wait_for_provision_state(
+            node_id, expected_state, timeout=timeout
+        )
+
+    def set_node_target_raid_config(self, node_id: str, raid_config: dict) -> None:
+        self.client.node.set_target_raid_config(node_id, raid_config)
+
+    def get_node_traits(self, node_id: str) -> list[str]:
+        return cast(list[str], self.client.node.get_traits(node_id))
+
+    def get_runbook(self, runbook_id: str):
+        return self.client.node.api.runbook.get(runbook_id)
+
     def get_node_inventory(self, node_ident: str) -> dict:
         """Fetch node inventory data from Ironic API.
 

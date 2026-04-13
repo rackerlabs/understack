@@ -6,13 +6,17 @@ from understack_workflows.bmc import RedfishRequestError
 logger = logging.getLogger(__name__)
 
 
-def required_bios_settings(pxe_interface: str) -> dict:
-    """Return adjusted Bios settings map for BMC."""
-    return {
-        "PxeDev1EnDis": "Enabled",
-        "PxeDev1Interface": pxe_interface,
-        "HttpDev1EnDis": "Enabled",
-        "HttpDev1Interface": pxe_interface,
+def required_bios_settings(pxe_interfaces: list[str]) -> dict[str, str]:
+    """Return Bios settings map for BMC.
+
+    Note that we set values like HttpDev8Interface for each of the
+    pxe_interfaces, however dell BIOS has a setting for "number of pxe
+    interfaces" which we currently leave at the default of 4, so we'll never
+    actually attempt pxe on anything but the first 4 interfaces.
+    """
+    settings = {
+        # PXE is enabled by default on DELL, but we don't use it:
+        "PxeDev1EnDis": "Disabled",
         # at this time ironic conductor returns http URLs
         # when its serving data from its own http server
         "HttpDev1TlsMode": "None",
@@ -28,8 +32,61 @@ def required_bios_settings(pxe_interface: str) -> dict:
         "IPMILan.1.Enable": "Disabled",
     }
 
+    for i in range(1, 8):
+        if len(pxe_interfaces) >= i:
+            settings[f"HttpDev{i}EnDis"] = "Enabled"
+            settings[f"HttpDev{i}Interface"] = pxe_interfaces[i - 1]
+        else:
+            settings[f"HttpDev{i}EnDis"] = "Disabled"
 
-def update_dell_bios_settings(bmc: Bmc, pxe_interface: str) -> dict:
+    return settings
+
+
+def required_change_for_bios_setting(
+    key: str,
+    required_value: str,
+    current_settings: dict,
+    pending_settings: dict,
+) -> str | None:
+    active_value = current_settings.get(key)
+    pending_value = pending_settings.get(key)
+
+    if active_value is None:
+        logger.debug("X - BIOS has no %s setting", key)
+        return None
+
+    if pending_value == required_value:
+        logger.debug(
+            "[✓] %s currently %r but already pending update to %r",
+            key,
+            active_value,
+            required_value,
+        )
+        return None
+
+    if pending_value is not None:
+        logger.debug(
+            "⚠ - %s should be set to %r but with pending update to %r, updating",
+            key,
+            required_value,
+            pending_value,
+        )
+        return required_value
+
+    if active_value == required_value:
+        logger.debug("✓ - %s already set to %r", key, required_value)
+        return None
+
+    logger.debug(
+        "→ - %s is currently %r, setting to %r",
+        key,
+        active_value,
+        required_value,
+    )
+    return required_value
+
+
+def update_dell_bios_settings(bmc: Bmc, pxe_interfaces: list[str]) -> dict:
     """Check and update BIOS settings to standard as required.
 
     Any changes take effect on next server reboot.
@@ -37,16 +94,25 @@ def update_dell_bios_settings(bmc: Bmc, pxe_interface: str) -> dict:
     Returns the changes that were made
     """
     current_settings = bmc.redfish_request(bmc.system_path + "/Bios")["Attributes"]
-    required_settings = required_bios_settings(pxe_interface)
+    pending_settings = bmc.redfish_request(bmc.system_path + "/Bios/Settings").get(
+        "Attributes", {}
+    )
+    required_settings = required_bios_settings(pxe_interfaces)
 
-    required_changes = {
-        k: v
-        for k, v in required_settings.items()
-        if (k in current_settings and current_settings[k] != v)
-    }
+    logger.info("%s Checking BIOS settings", bmc)
+    required_changes = {}
+    for key, required_value in required_settings.items():
+        required_change = required_change_for_bios_setting(
+            key,
+            required_value,
+            current_settings,
+            pending_settings,
+        )
+        if required_change is None:
+            continue
+        required_changes[key] = required_change
 
     if required_changes:
-        logger.info("%s Updating BIOS settings: %s", bmc, required_changes)
         patch_bios_settings(bmc, required_changes)
         logger.info("%s BIOS settings will be updated on next server boot.", bmc)
     else:
