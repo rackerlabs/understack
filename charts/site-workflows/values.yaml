@@ -8,7 +8,7 @@ enabled:
   nova: true
 
 rabbitmq:
-  url: amqp://rabbitmq-server-0.rabbitmq-nodes.openstack.svc.cluster.local:5672
+  url: amqp://rabbitmq.openstack.svc.cluster.local:5672
 
 eventsources:
   cinder:
