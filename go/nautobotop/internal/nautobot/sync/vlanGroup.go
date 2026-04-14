@@ -17,16 +17,18 @@ import (
 )
 
 type VlanGroupSync struct {
-	client       *client.NautobotClient
-	vlanGroupSvc *ipam.VlanGroupService
-	locationSvc  *dcim.LocationService
+	client        *client.NautobotClient
+	vlanGroupSvc  *ipam.VlanGroupService
+	locationSvc   *dcim.LocationService
+	ucvniGroupSvc *ipam.UcvniGroupService
 }
 
 func NewVlanGroupSync(nautobotClient *client.NautobotClient) *VlanGroupSync {
 	return &VlanGroupSync{
-		client:       nautobotClient.GetClient(),
-		vlanGroupSvc: ipam.NewVlanGroupService(nautobotClient),
-		locationSvc:  dcim.NewLocationService(nautobotClient.GetClient()),
+		client:        nautobotClient.GetClient(),
+		vlanGroupSvc:  ipam.NewVlanGroupService(nautobotClient),
+		locationSvc:   dcim.NewLocationService(nautobotClient.GetClient()),
+		ucvniGroupSvc: ipam.NewUcvniGroupService(nautobotClient),
 	}
 }
 
@@ -55,13 +57,22 @@ func (s *VlanGroupSync) SyncAll(ctx context.Context, data map[string]string) err
 func (s *VlanGroupSync) syncSingleVlanGroup(ctx context.Context, vlanGroup models.VlanGroup) error {
 	existingVlanGroup := s.vlanGroupSvc.GetByName(ctx, vlanGroup.Name)
 
+	customFields := map[string]interface{}{
+		"range": vlanGroup.Range,
+	}
+	if vlanGroup.UcvniGroup != "" {
+		ucvniGroup := s.ucvniGroupSvc.GetByName(ctx, vlanGroup.UcvniGroup)
+		if ucvniGroup.ID != "" {
+			customFields["ucvni_group"] = ucvniGroup.ID
+		} else {
+			log.Warn("ucvni group not found, skipping field", "name", vlanGroup.UcvniGroup)
+		}
+	}
+
 	vlanGroupRequest := nb.VLANGroupRequest{
-		Name:     vlanGroup.Name,
-		Location: s.buildLocationReference(ctx, vlanGroup.Location),
-		CustomFields: map[string]interface{}{
-			"ucvni_group_name": vlanGroup.UcvniGroupName,
-			"range":            vlanGroup.Range,
-		},
+		Name:         vlanGroup.Name,
+		Location:     s.buildLocationReference(ctx, vlanGroup.Location),
+		CustomFields: customFields,
 	}
 
 	if existingVlanGroup.Id == nil {
