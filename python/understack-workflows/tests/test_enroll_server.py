@@ -1,3 +1,4 @@
+import secrets
 from types import SimpleNamespace
 from typing import cast
 from unittest.mock import MagicMock
@@ -9,7 +10,67 @@ from ironicclient.v1.node import Node
 from understack_workflows.bmc import RedfishRequestError
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import InterfaceInfo
+from understack_workflows.ironic_node import NodeInterface
+from understack_workflows.ironic_node import get_lldp_connected_interfaces
 from understack_workflows.main import enroll_server
+
+
+def random_mac() -> str:
+    return ":".join(f"{b:02x}" for b in secrets.token_bytes(6))
+
+
+DEFAULT_INTERFACE_NAMES = [
+    "NIC.Embedded.1-1-1",
+    "NIC.Embedded.2-1-1",
+    "NIC.Integrated.1-2",
+    "NIC.Integrated.1-1",
+    "NIC.Slot.1-2",
+    "NIC.Slot.1-1",
+]
+
+
+def make_node_inventory(
+    *,
+    interfaces: list[dict] | None = None,
+    serial_number: str = "FL6PC14",
+) -> dict:
+    """Build a realistic Ironic node inventory dict, suitable for mocking.
+
+    Override ``interfaces`` to supply custom name/mac_address/speed_mbps entries.
+    When using the defaults, each interface gets a freshly randomized MAC address
+    so tests don't share state between runs.
+    """
+    if interfaces is None:
+        interfaces = [
+            {"mac_address": random_mac(), "name": name, "speed_mbps": 0}
+            for name in DEFAULT_INTERFACE_NAMES
+        ]
+    all_interfaces = {
+        iface["name"]: {**iface, "pxe_enabled": False, "ipv6_address": None}
+        for iface in interfaces
+    }
+    parsed_lldp = {
+        iface["name"]: {
+            "switch_chassis_id": random_mac(),
+            "switch_port_id": "Ethernet1/1",
+        }
+        for iface in interfaces
+    }
+    return {
+        "inventory": {
+            "interfaces": interfaces,
+            "system_vendor": {
+                "product_name": "PowerEdge R7615",
+                "serial_number": serial_number,
+                "manufacturer": "Dell Inc.",
+            },
+        },
+        "plugin_data": {
+            "all_interfaces": all_interfaces,
+            "parsed_lldp": parsed_lldp,
+            "macs": [iface["mac_address"] for iface in interfaces],
+        },
+    }
 
 
 def make_device_info(
@@ -71,6 +132,7 @@ def make_ironic_client(
     inspect_interfaces: list[str] | None = None,
     traits: list[str] | None = None,
     runbook_ids: dict[str, str] | None = None,
+    inventory: dict | None = None,
 ):
     if inspect_interfaces is None:
         inspect_interfaces = ["idrac-redfish", "idrac-redfish"]
@@ -92,6 +154,8 @@ def make_ironic_client(
     )
     fake_client.node.create.return_value = created_node
     fake_client.node.get_traits.return_value = traits
+    if inventory is not None:
+        fake_client.node.get_inventory.return_value = inventory
 
     def get_node(ident, fields=None):
         if ident == node_name and fields is None:
@@ -459,3 +523,84 @@ def test_guess_pxe_interface_unknown_name_avoids_bmc_interface():
     assert enroll_server.guess_pxe_interfaces(device_info, {"AA:BB:CC:DD:EE:FF"}) == [
         "NIC.Custom.9-1"
     ]
+
+
+def test_get_node_interfaces_parses_inventory(mocker):
+    mac1 = random_mac()
+    mac2 = random_mac()
+    inventory = make_node_inventory(
+        interfaces=[
+            {"name": "NIC.Embedded.1-1-1", "mac_address": mac1, "speed_mbps": 25000},
+            {"name": "NIC.Slot.1-1", "mac_address": mac2, "speed_mbps": 0},
+        ]
+    )
+    fake_ironic, node = make_ironic_client(
+        node_name="Dell-TEST01",
+        node_uuid="node-abc",
+        inventory=inventory,
+    )
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    result = enroll_server.ironic_node.get_node_interfaces(cast(Node, node))
+
+    assert result == [
+        NodeInterface(name="NIC.Embedded.1-1-1", mac_address=mac1, speed_mbps=25000),
+        NodeInterface(name="NIC.Slot.1-1", mac_address=mac2, speed_mbps=0),
+    ]
+    fake_ironic.node.get_inventory.assert_called_once_with("node-abc")
+
+
+def test_get_lldp_connected_interfaces_returns_matched():
+    mac = random_mac()
+    interfaces = [
+        NodeInterface(name="NIC.Embedded.1-1-1", mac_address=mac, speed_mbps=0),
+        NodeInterface(name="NIC.Slot.1-1", mac_address=random_mac(), speed_mbps=0),
+    ]
+    parsed_lldp = {
+        "NIC.Embedded.1-1-1": {
+            "switch_chassis_id": "aa:bb:cc:dd:ee:ff",
+            "switch_port_id": "Ethernet1/5",
+        },
+    }
+
+    result = get_lldp_connected_interfaces(interfaces, parsed_lldp)
+
+    assert result == [
+        NodeInterface(name="NIC.Embedded.1-1-1", mac_address=mac, speed_mbps=0)
+    ]
+
+
+def test_get_lldp_connected_interfaces_excludes_not_available():
+    interfaces = [
+        NodeInterface(name="NIC.Slot.1-1", mac_address=random_mac(), speed_mbps=0),
+        NodeInterface(name="NIC.Slot.1-2", mac_address=random_mac(), speed_mbps=0),
+    ]
+    parsed_lldp = {
+        "NIC.Slot.1-1": {
+            "switch_chassis_id": "Not Available",
+            "switch_port_id": "Not Available",
+        },
+        "NIC.Slot.1-2": {
+            "switch_chassis_id": "Not Available",
+            "switch_port_id": "Not Available",
+        },
+    }
+
+    result = get_lldp_connected_interfaces(interfaces, parsed_lldp)
+
+    assert result == []
+
+
+def test_get_lldp_connected_interfaces_absent_from_lldp():
+    interfaces = [
+        NodeInterface(
+            name="NIC.Embedded.2-1-1", mac_address=random_mac(), speed_mbps=0
+        ),
+    ]
+
+    result = get_lldp_connected_interfaces(interfaces, parsed_lldp={})
+
+    assert result == []

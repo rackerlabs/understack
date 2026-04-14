@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import ironicclient.common.apiclient.exceptions
 from ironicclient.common.utils import args_array_to_patch
@@ -10,6 +11,15 @@ from understack_workflows.bmc import Bmc
 from understack_workflows.ironic.client import IronicClient
 
 FIRMWARE_UPDATE_TRAIT_PREFIX = "CUSTOM_FIRMWARE_UPDATE_"
+
+
+@dataclass
+class NodeInterface:
+    name: str
+    mac_address: str
+    speed_mbps: int
+
+
 ENROLLABLE_STATES = {"clean failed", "inspect failed", "enroll", "manageable"}
 
 logger = logging.getLogger(__name__)
@@ -204,6 +214,41 @@ def inspect_out_of_band(node: Node):
     IronicClient().update_node(node.uuid, intf_reset)
     logger.info("[node:%s] Performing out-of-band inspection", node.uuid)
     transition(node, target_state="inspect", expected_state="manageable")
+
+
+def get_node_inventory(node: Node) -> dict:
+    """Return the raw inventory dict populated by OOB inspection."""
+    return IronicClient().get_node_inventory(node.uuid)
+
+
+def get_node_interfaces(node: Node) -> list[NodeInterface]:
+    """Return interfaces from the inventory populated by OOB inspection."""
+    inventory_data = get_node_inventory(node)
+    interfaces_raw = inventory_data.get("inventory", {}).get("interfaces", [])
+    return [
+        NodeInterface(
+            name=iface["name"],
+            mac_address=iface["mac_address"],
+            speed_mbps=iface.get("speed_mbps", 0),
+        )
+        for iface in interfaces_raw
+    ]
+
+
+def get_lldp_connected_interfaces(
+    interfaces: list[NodeInterface], parsed_lldp: dict
+) -> list[NodeInterface]:
+    """Return interfaces that have a confirmed LLDP switch connection.
+
+    An interface is considered connected when it appears in ``parsed_lldp``
+    with a ``switch_port_id`` that is not ``"Not Available"``.
+    """
+    return [
+        iface
+        for iface in interfaces
+        if parsed_lldp.get(iface.name, {}).get("switch_port_id")
+        not in (None, "Not Available")
+    ]
 
 
 def inspect(node: Node, inspect_interface: str = "agent"):

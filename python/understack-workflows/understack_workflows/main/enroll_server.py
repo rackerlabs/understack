@@ -105,6 +105,26 @@ def enrol(
     # inspection immediately to populate the BIOS data and initial
     # hardware information
     ironic_node.inspect_out_of_band(node)
+    interfaces = ironic_node.get_node_interfaces(node)
+    logger.info(
+        "[node:%s] Found %d interfaces from OOB inspection", node.uuid, len(interfaces)
+    )
+    for iface in interfaces:
+        logger.info(
+            "[node:%s]   %s  mac=%s  speed_mbps=%s",
+            node.uuid,
+            iface.name,
+            iface.mac_address,
+            iface.speed_mbps,
+        )
+    inventory_data = ironic_node.get_node_inventory(node)
+    parsed_lldp = inventory_data.get("plugin_data", {}).get("parsed_lldp", {})
+    lldp_interfaces = ironic_node.get_lldp_connected_interfaces(interfaces, parsed_lldp)
+    logger.info(
+        "[node:%s] %d interfaces with confirmed LLDP switch connections",
+        node.uuid,
+        len(lldp_interfaces),
+    )
 
     if raid_configure:
         # Raid configuration runs a clean step which does a PXE boot.  That
