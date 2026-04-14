@@ -1,5 +1,6 @@
 from typing import ClassVar
 
+from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
 
@@ -34,34 +35,31 @@ class PortBiosNameHook(base.InspectionHook):
             i["mac_address"].upper(): i["name"] for i in inspected_interfaces
         }
 
-        pxe_nics = _enrolled_pxe_nics(task)
+        ports = list(ironic_ports_for_node(task.context, task.node.id))
+        initial_enroll = _is_initial_enroll(ports)
+        pxe_nics = _enrolled_pxe_nics(task) if initial_enroll else []
 
-        for baremetal_port in ironic_ports_for_node(task.context, task.node.id):
+        for baremetal_port in ports:
             mac = baremetal_port.address.upper()
             bios_name = interface_names.get(mac)
 
             _set_port_extra(baremetal_port, mac, bios_name)
             _set_port_name(baremetal_port, mac, bios_name, task.node.name)
 
-            is_pxe = bios_name is not None and any(
-                pxe_nic.startswith(bios_name) or bios_name.startswith(pxe_nic)
-                for pxe_nic in pxe_nics
-            )
-
-            if baremetal_port.pxe_enabled != is_pxe:
-                LOG.info(
-                    "Port %s (%s) pxe_enabled %s -> %s",
-                    mac,
-                    bios_name,
-                    baremetal_port.pxe_enabled,
-                    is_pxe,
+            if initial_enroll:
+                is_pxe = bios_name is not None and any(
+                    pxe_nic.startswith(bios_name) or bios_name.startswith(pxe_nic)
+                    for pxe_nic in pxe_nics
                 )
-                baremetal_port.pxe_enabled = is_pxe
-                baremetal_port.save()
+                _set_port_pxe_enabled(baremetal_port, mac, bios_name, is_pxe)
+            else:
+                is_pxe = baremetal_port.pxe_enabled
 
-            if is_pxe:
+            if initial_enroll and is_pxe:
                 _set_port_physical_network(baremetal_port, mac)
                 _set_port_local_link_connection(baremetal_port, mac)
+
+        _assert_has_pxe_port(task, ports)
 
 
 def _enrolled_pxe_nics(task) -> list[str]:
@@ -82,6 +80,34 @@ def _enrolled_pxe_nics(task) -> list[str]:
             PXE_BIOS_NAME_PREFIXES,
         )
         return PXE_BIOS_NAME_PREFIXES
+
+
+def _is_initial_enroll(ports) -> bool:
+    return all(
+        not port.physical_network or "enrol" in port.physical_network for port in ports
+    )
+
+
+def _set_port_pxe_enabled(baremetal_port, mac, bios_name, is_pxe):
+    if baremetal_port.pxe_enabled != is_pxe:
+        LOG.info(
+            "Port %s (%s) pxe_enabled %s -> %s",
+            mac,
+            bios_name,
+            baremetal_port.pxe_enabled,
+            is_pxe,
+        )
+        baremetal_port.pxe_enabled = is_pxe
+        baremetal_port.save()
+
+
+def _assert_has_pxe_port(task, ports):
+    if any(port.pxe_enabled for port in ports):
+        return
+
+    msg = f"No PXE-enabled ports found for node {task.node.uuid}"
+    LOG.error(msg)
+    raise exception.InvalidNodeInventory(node=task.node.uuid, reason=msg)
 
 
 def _set_port_extra(baremetal_port, mac, required_bios_name):

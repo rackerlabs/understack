@@ -1,5 +1,7 @@
 import logging
 
+import pytest
+from ironic.common import exception
 from oslo_utils import uuidutils
 
 from ironic_understack.port_bios_name_hook import PortBiosNameHook
@@ -137,6 +139,7 @@ def test_retaining_physical_network(mocker, caplog):
     port = _make_port(
         mocker,
         "11:11:11:11:11:11",
+        pxe_enabled=True,
         physical_network="previous_value",
         local_link_connection={
             "port_id": "Ethernet1/19",
@@ -156,13 +159,23 @@ def test_retaining_physical_network(mocker, caplog):
     assert port.local_link_connection["port_id"] == "Ethernet1/19"
 
 
-def test_clears_pxe_on_previously_enabled_port(mocker, caplog):
-    """Port that was pxe_enabled but no longer matches gets cleared."""
+def test_preserves_pxe_on_post_enroll_ports(mocker, caplog):
+    """Post-enrol inspection keeps the existing PXE decision."""
     caplog.set_level(logging.DEBUG)
     task = _make_task(mocker, enrolled_pxe_ports=["NIC.Integrated.1-2-1"])
 
-    port1 = _make_port(mocker, "11:11:11:11:11:11", pxe_enabled=True)
-    port2 = _make_port(mocker, "22:22:22:22:22:22")
+    port1 = _make_port(
+        mocker,
+        "11:11:11:11:11:11",
+        pxe_enabled=True,
+        physical_network="f20-1-network",
+    )
+    port2 = _make_port(
+        mocker,
+        "22:22:22:22:22:22",
+        pxe_enabled=False,
+        physical_network="f20-1-network",
+    )
 
     mocker.patch(
         "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
@@ -171,8 +184,35 @@ def test_clears_pxe_on_previously_enabled_port(mocker, caplog):
 
     PortBiosNameHook().__call__(task, _INVENTORY, {})
 
-    assert port1.pxe_enabled is False
-    assert port2.pxe_enabled is True
+    assert port1.pxe_enabled is True
+    assert port2.pxe_enabled is False
+
+
+def test_errors_if_post_enroll_ports_have_no_pxe_enabled_port(mocker, caplog):
+    """Post-enrol inspection fails if no PXE-enabled port exists."""
+    caplog.set_level(logging.DEBUG)
+    task = _make_task(mocker, enrolled_pxe_ports=["NIC.Integrated.1-1-1"])
+
+    port1 = _make_port(
+        mocker,
+        "11:11:11:11:11:11",
+        pxe_enabled=False,
+        physical_network="f20-1-network",
+    )
+    port2 = _make_port(
+        mocker,
+        "22:22:22:22:22:22",
+        pxe_enabled=False,
+        physical_network="f20-1-network",
+    )
+
+    mocker.patch(
+        "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
+        return_value=[port1, port2],
+    )
+
+    with pytest.raises(exception.InvalidNodeInventory, match="No PXE-enabled ports"):
+        PortBiosNameHook().__call__(task, _INVENTORY, {})
 
 
 def test_removing_bios_name(mocker, caplog):
@@ -180,19 +220,26 @@ def test_removing_bios_name(mocker, caplog):
     caplog.set_level(logging.DEBUG)
     task = _make_task(mocker, enrolled_pxe_ports=["NIC.Integrated.1-1-1"])
 
-    port = _make_port(
+    unknown_port = _make_port(
         mocker,
         "33:33:33:33:33:33",
         extra={"bios_name": "old_name_no_longer_valid"},
         name="original-name",
+        physical_network="f20-1-network",
+    )
+    pxe_port = _make_port(
+        mocker,
+        "11:11:11:11:11:11",
+        pxe_enabled=True,
+        physical_network="f20-1-network",
     )
 
     mocker.patch(
         "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
-        return_value=[port],
+        return_value=[unknown_port, pxe_port],
     )
 
     PortBiosNameHook().__call__(task, _INVENTORY, {})
 
-    assert port.name == "original-name"
-    assert "bios_name" not in port.extra
+    assert unknown_port.name == "original-name"
+    assert "bios_name" not in unknown_port.extra
