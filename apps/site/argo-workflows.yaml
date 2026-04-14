@@ -1,5 +1,0 @@
----
-component: argo
-sources:
-  - ref: understack
-    path: 'components/argo-workflows'
