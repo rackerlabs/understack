@@ -389,7 +389,7 @@ site:
     wave: 2
     # -- Chart version for Placement
     # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.13+d665eb362
+    chartVersion: 2025.2.14+8fa7e4be3
 
   # -- Nova (Compute Service)
   nova:
