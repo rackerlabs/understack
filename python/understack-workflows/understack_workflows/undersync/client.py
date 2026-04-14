@@ -8,7 +8,7 @@ class Undersync:
     def __init__(
         self,
         auth_token: str,
-        api_url="http://undersync-service.undersync.svc.cluster.local:8080",
+        api_url="http://undersync.undersync.svc.cluster.local:8080",
     ) -> None:
         """Simple client for Undersync."""
         self.token = auth_token
