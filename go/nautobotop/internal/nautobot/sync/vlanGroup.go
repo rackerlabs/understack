@@ -57,22 +57,22 @@ func (s *VlanGroupSync) SyncAll(ctx context.Context, data map[string]string) err
 func (s *VlanGroupSync) syncSingleVlanGroup(ctx context.Context, vlanGroup models.VlanGroup) error {
 	existingVlanGroup := s.vlanGroupSvc.GetByName(ctx, vlanGroup.Name)
 
-	customFields := map[string]interface{}{
-		"range": vlanGroup.Range,
+	vlanGroupRequest := nb.VLANGroupRequest{
+		Name:     vlanGroup.Name,
+		Location: s.buildLocationReference(ctx, vlanGroup.Location),
+		Range:    nb.PtrString(vlanGroup.Range),
 	}
+
 	if vlanGroup.UcvniGroup != "" {
 		ucvniGroup := s.ucvniGroupSvc.GetByName(ctx, vlanGroup.UcvniGroup)
 		if ucvniGroup.ID != "" {
-			customFields["ucvni_group"] = ucvniGroup.ID
+			relationships := map[string]nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
+				"ucvnigroup_vlangroup": helpers.BuildRelationshipSource(ucvniGroup.ID),
+			}
+			vlanGroupRequest.Relationships = &relationships
 		} else {
-			log.Warn("ucvni group not found, skipping field", "name", vlanGroup.UcvniGroup)
+			log.Info("ucvni group not found, skipping relationship", "name", vlanGroup.UcvniGroup)
 		}
-	}
-
-	vlanGroupRequest := nb.VLANGroupRequest{
-		Name:         vlanGroup.Name,
-		Location:     s.buildLocationReference(ctx, vlanGroup.Location),
-		CustomFields: customFields,
 	}
 
 	if existingVlanGroup.Id == nil {
