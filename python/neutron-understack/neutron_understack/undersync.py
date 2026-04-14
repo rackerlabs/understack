@@ -22,7 +22,7 @@ class Undersync:
     ) -> None:
         """Simple client for Undersync."""
         self.token = auth_token or self._fetch_undersync_token()
-        self.url = "http://undersync-service.undersync.svc.cluster.local:8080"
+        self.url = "http://undersync.undersync.svc.cluster.local:8080"
         self.api_url = api_url or self.url
         self.timeout = timeout
 
