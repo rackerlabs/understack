@@ -5,6 +5,7 @@ ignore:
   - charts/argocd-understack/templates/
   - charts/nautobot-api-tokens/templates/
   - charts/site-workflows/templates/
+  - charts/undersync/templates/
 
 rules:
   comments:
