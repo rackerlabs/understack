@@ -1,7 +1,0 @@
----
-component: argo-events
-sources:
-  - ref: understack
-    path: 'components/argo-events'
-  - ref: deploy
-    path: '{{.name}}/manifests/argo-events'

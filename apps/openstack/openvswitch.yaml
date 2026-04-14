@@ -1,4 +1,0 @@
----
-component: openvswitch
-repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.1.0

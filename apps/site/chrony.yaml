@@ -1,6 +1,0 @@
----
-component: chrony
-componentNamespace: openstack
-sources:
-  - ref: understack
-    path: 'components/chrony'

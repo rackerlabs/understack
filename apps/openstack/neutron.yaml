@@ -1,4 +1,0 @@
----
-component: neutron
-repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.2.25+3bc47c1e9

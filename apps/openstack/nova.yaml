@@ -1,4 +1,0 @@
----
-component: nova
-repoURL: https://tarballs.opendev.org/openstack/openstack-helm
-chartVersion: 2025.2.22+008600f9e
