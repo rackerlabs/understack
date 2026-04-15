@@ -5,19 +5,19 @@ import (
 	"time"
 )
 
-//Messages in rabbitmq are double nestesd inside oslo. 
+//Messages in rabbitmq are double nested inside oslo.
 
 type OsloEnvelope struct {
 	OsloVersion string `json:"oslo.version"`
 	OsloMessage string `json:"oslo.message"` // inside this our hardware data is stored
 }
 
-//OsloMessage would have this fiormat :
+//OsloMessage would have this format:
 //  "event_type": "hardware.idrac.metrics",
 //     "payload": {"node_uuid": 'test', 
 // 					payload: { {key:value}
 //}}
-// Now we need to define struct to parse this message 
+// Now we need to define struct to parse this message
 //go needs to define the data type before it marshals the json.
 
 type InnerMessage struct{
@@ -33,8 +33,8 @@ type NodePayload struct {
 	Payload SensorPayload `json:"payload"`
 }
 
-// here we ll use map coz we dont know type of  data that would come in 
-//hence map[Sstring]
+// here we ll use map coz we dont know type of data that would come in
+//hence map[string]
 type SensorPayload struct {
 	Fan         map[string]FanSensor         `json:"Fan"`
 	Temperature map[string]TemperatureSensor `json:"Temperature"`
@@ -84,9 +84,9 @@ type HardwareMessage struct {
 	Sensors        SensorPayload
 }
 
-//now a func to parse this message the above 
-// was just the skelton of message we are going to get 
-// []byte ,go way of saying raw_data
+// Parse takes raw bytes from RabbitMQ and returns a clean HardwareMessage.
+// The structs above are the skeleton of the message we are going to get.
+// []byte is Go's way of saying raw data.
 func Parse(body []byte)(*HardwareMessage, error) {
 
 	var envelope OsloEnvelope
