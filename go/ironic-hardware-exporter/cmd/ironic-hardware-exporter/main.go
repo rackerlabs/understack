@@ -1,54 +1,60 @@
 package main
 
 import (
-    "fmt"
-    "os"
-    "github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/parser"
-    "github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/cache"
-    "log"
-    "github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/server"
+	"log"
+	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/cache"
+	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/config"
+	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/parser"
+	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/rabbitmq"
+	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/server"
 )
 //WIP
 //only for debugging now
 func main() {
-    body, _ := os.ReadFile("internal/parser/testdata/hardware_idrac_metrics.json")
-    msg, err := parser.Parse(body)
-    if err != nil {
-        fmt.Println("ERROR:", err)
-        return
-    }
-    if msg == nil {
-        fmt.Println("skipped — not a hardware event")
-        return
-    }
-    // fmt.Println("node:", msg.NodeName)
-    // fmt.Println("uuid:", msg.NodeUUID)
-    // fmt.Println("time:", msg.EventTimestamp)
+	// load config from env vars
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
 
-    store := cache.New()
-    store.Update(msg)
-    nodes := store.GetAll()
-    fmt.Println("nodes in cache:", len(nodes))
-    for _, n := range nodes {
-        fmt.Println("node:", n.NodeName, "last seen:", n.LastSeen)
-        for sensorKey, temp := range n.Sensors.Temperature {
-            if temp.ReadingCelsius != nil {
-                fmt.Println("  temp sensor:", sensorKey, "=", *temp.ReadingCelsius, "°C")
-            }
-        }
-        for sensorKey, psu := range n.Sensors.Power {
-            if psu.LastPowerOutputWatts != nil {
-                fmt.Println("  power sensor:", sensorKey, "=", *psu.LastPowerOutputWatts, "W")
-            }
-        }
-    }
-    // start HTTP server to test formatter output
-    // http://metrics
-    srv := server.New(store, 9608, func() bool { return true })
-    if err := srv.Start(); err != nil {
-        log.Fatal(err)
-    }
+	// create shared cache
+	store := cache.New()
+
+	// onnect to RabbitMQ
+	consumer, err := rabbitmq.New(cfg.RabbitMQ)
+	if err != nil {
+		log.Fatalf("failed to connect to RabbitMQ: %v", err)
+	}
+	defer consumer.Close()
+
+	// start HTTP server in background goroutine
+	// /metrics
+	srv := server.New(store, cfg.Server.Port, consumer.IsReady)
+	go func() {
+		if err := srv.Start(); err != nil {
+			log.Fatalf("HTTP server failed: %v", err)
+		}
+	}()
+
+	// consume messages forever (blocks here)
+	log.Println("waiting for hardware sensor messages...")
+	err = consumer.Consume(func(body []byte) {
+		msg, err := parser.Parse(body)
+		if err != nil {
+			log.Printf("failed to parse message: %v", err)
+			return
+		}
+		if msg == nil {
+			return // not a hardware event, skip
+		}
+		store.Update(msg)
+		log.Printf("cached node=%s", msg.NodeName)
+	})
+	if err != nil {
+		log.Fatalf("consumer stopped: %v", err)
+	}
 }
+
 
 // 
 // nodes in cache: 1
