@@ -2,7 +2,7 @@ asn: "4294967294"
 environment: production
 service:
   type: ClusterIP
-  port: 80
+  port: 8080
 replicaCount: 1
 image:
   repository: ghcr.io/rss-engineering/undersync/undersync
