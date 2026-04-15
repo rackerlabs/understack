@@ -25,7 +25,15 @@
 # so need to do this manually done
 - name: Assign role to group for domain
   ansible.builtin.include_tasks: sso_domain_role.yml
-  loop: "{{ group_item.domain_roles }}"
+  loop: "{{ group_item.domain_roles | default([]) }}"
+  loop_control:
+    loop_var: role_item
+  vars:
+    group_id: "{{ _group.group.id }}"
+
+- name: Assign role to group for project
+  ansible.builtin.include_tasks: sso_project_role.yml
+  loop: "{{ group_item.project_roles | default([]) }}"
   loop_control:
     loop_var: role_item
   vars:

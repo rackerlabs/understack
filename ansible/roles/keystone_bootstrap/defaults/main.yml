@@ -11,6 +11,9 @@ keystone_bootstrap_project_domains:
     description: Sandbox Projects
 
 # these groups live inside the sso domain
+# Each group can have both domain_roles and project_roles:
+# - domain_roles: grants permissions at domain level (can use inherited flag)
+# - project_roles: grants permissions at project level (no inherited flag needed)
 keystone_bootstrap_groups:
   - name: ucadmin
     desc: 'Users Federated with Admin'
@@ -59,3 +62,9 @@ keystone_bootstrap_groups:
       - domain: infra
         role: member
         inherited: true
+    # Example of project-level role assignments (optional)
+    # project_roles:
+    #   - project: baremetal
+    #     role: member
+    #   - project: shared-services
+    #     role: reader
