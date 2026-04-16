@@ -5,8 +5,8 @@ type VlanGroups struct {
 }
 
 type VlanGroup struct {
-	Name           string `json:"name" yaml:"name"`
-	Location       string `json:"location" yaml:"location"`
-	UcvniGroupName string `json:"ucvni_group_name" yaml:"ucvni_group_name"`
-	Range          string `json:"range" yaml:"range"`
+	Name       string `json:"name" yaml:"name"`
+	Location   string `json:"location" yaml:"location"`
+	UcvniGroup string `json:"ucvni_group" yaml:"ucvni_group"`
+	Range      string `json:"range" yaml:"range"`
 }

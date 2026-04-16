@@ -26,6 +26,10 @@ func CompareJSONFields(existing, desired any) bool {
 		return false
 	}
 
+	// Ignore the "relationships" field from comparison
+	// This will ignore too nested deep relationships
+	delete(desiredMap, "relationships")
+
 	return compareJSONMaps(existingMap, desiredMap)
 }
 

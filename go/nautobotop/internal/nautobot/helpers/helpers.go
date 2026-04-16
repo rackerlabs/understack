@@ -53,6 +53,32 @@ func BuildNullableBulkWritablePrefixRequestRir(id string) nb.NullableBulkWritabl
 	return *nb.NewNullableBulkWritablePrefixRequestRir(&rir)
 }
 
+// BuildRelationshipSource builds a relationship value with the given object IDs on the source side.
+func BuildRelationshipSource(ids ...string) nb.ApprovalWorkflowDefinitionRequestRelationshipsValue {
+	objects := make([]nb.ApprovalWorkflowDefinitionRequestRelationshipsValueSourceObjectsInner, len(ids))
+	for i, id := range ids {
+		objects[i] = nb.ApprovalWorkflowDefinitionRequestRelationshipsValueSourceObjectsInner{Id: nb.PtrString(id)}
+	}
+	return nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
+		Source: &nb.ApprovalWorkflowDefinitionRequestRelationshipsValueSource{
+			Objects: objects,
+		},
+	}
+}
+
+// BuildRelationshipDestination builds a relationship value with the given object IDs on the destination side.
+func BuildRelationshipDestination(ids ...string) nb.ApprovalWorkflowDefinitionRequestRelationshipsValue {
+	objects := make([]nb.ApprovalWorkflowDefinitionRequestRelationshipsValueSourceObjectsInner, len(ids))
+	for i, id := range ids {
+		objects[i] = nb.ApprovalWorkflowDefinitionRequestRelationshipsValueSourceObjectsInner{Id: nb.PtrString(id)}
+	}
+	return nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
+		Destination: &nb.ApprovalWorkflowDefinitionRequestRelationshipsValueSource{
+			Objects: objects,
+		},
+	}
+}
+
 // ReadResponseBody safely reads and closes the response body.
 // Returns the body content as a string. If resp is nil, returns empty string.
 func ReadResponseBody(resp *http.Response) string {

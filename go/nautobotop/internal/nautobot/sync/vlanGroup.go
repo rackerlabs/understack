@@ -17,16 +17,18 @@ import (
 )
 
 type VlanGroupSync struct {
-	client       *client.NautobotClient
-	vlanGroupSvc *ipam.VlanGroupService
-	locationSvc  *dcim.LocationService
+	client        *client.NautobotClient
+	vlanGroupSvc  *ipam.VlanGroupService
+	locationSvc   *dcim.LocationService
+	ucvniGroupSvc *ipam.UcvniGroupService
 }
 
 func NewVlanGroupSync(nautobotClient *client.NautobotClient) *VlanGroupSync {
 	return &VlanGroupSync{
-		client:       nautobotClient.GetClient(),
-		vlanGroupSvc: ipam.NewVlanGroupService(nautobotClient),
-		locationSvc:  dcim.NewLocationService(nautobotClient.GetClient()),
+		client:        nautobotClient.GetClient(),
+		vlanGroupSvc:  ipam.NewVlanGroupService(nautobotClient),
+		locationSvc:   dcim.NewLocationService(nautobotClient.GetClient()),
+		ucvniGroupSvc: ipam.NewUcvniGroupService(nautobotClient),
 	}
 }
 
@@ -58,11 +60,18 @@ func (s *VlanGroupSync) syncSingleVlanGroup(ctx context.Context, vlanGroup model
 	vlanGroupRequest := nb.VLANGroupRequest{
 		Name:     vlanGroup.Name,
 		Location: s.buildLocationReference(ctx, vlanGroup.Location),
-		CustomFields: map[string]interface{}{
-			"ucvni_group_name": vlanGroup.UcvniGroupName,
-			"range":            vlanGroup.Range,
-		},
+		Range:    nb.PtrString(vlanGroup.Range),
 	}
+
+	relationships := map[string]nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
+		"ucvnigroup_vlangroup": helpers.BuildRelationshipSource(),
+	}
+	if vlanGroup.UcvniGroup != "" {
+		if id := s.ucvniGroupSvc.GetByName(ctx, vlanGroup.UcvniGroup).ID; id != "" {
+			relationships["ucvnigroup_vlangroup"] = helpers.BuildRelationshipSource(id)
+		}
+	}
+	vlanGroupRequest.Relationships = &relationships
 
 	if existingVlanGroup.Id == nil {
 		return s.createVlanGroup(ctx, vlanGroupRequest)
