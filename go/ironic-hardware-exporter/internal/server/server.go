@@ -37,21 +37,21 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	nodes := s.store.GetAll()
 	output := Format(nodes)
 	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprint(w, output)
+	_, _ = fmt.Fprint(w, output)
 	log.Printf("GET /metrics — served %d nodes", len(nodes))
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, `{"status":"ok"}`)
+	_, _ = fmt.Fprint(w, `{"status":"ok"}`)
 }
 
 func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	if s.isReady != nil && !s.isReady() {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprint(w, `{"status":"not ready"}`)
+		_, _ = fmt.Fprint(w, `{"status":"not ready"}`)
 		return
 	}
 	nodes := s.store.GetAll()
-	fmt.Fprintf(w, `{"status":"ok","nodes":%d}`, len(nodes))
+	_, _ = fmt.Fprintf(w, `{"status":"ok","nodes":%d}`, len(nodes))
 }

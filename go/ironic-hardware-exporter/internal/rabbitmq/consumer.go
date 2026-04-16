@@ -3,7 +3,10 @@ package rabbitmq
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/url"
+	"strconv"
+	"strings"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/config"
@@ -18,15 +21,22 @@ type Consumer struct {
 	cfg     config.RabbitMQConfig
 }
 
+/*Plain string interpolation breaks when passwords containing special characters
+%, :, @, or / , or when host is an IPv6 address.
+url.UserPassword credential escaping, net.JoinHostPort does IPv6.*/
+
+func buildAMQPURL(cfg config.RabbitMQConfig) string {
+	vhost := strings.TrimPrefix(strings.TrimSpace(cfg.VHost), "/")
+	if vhost == "" {
+		vhost = "/"
+	}
+	hostPort := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
+	userInfo := url.UserPassword(cfg.Username, cfg.Password).String()
+	return fmt.Sprintf("amqp://%s@%s/%s", userInfo, hostPort, url.PathEscape(vhost))
+}
+
 func New(cfg config.RabbitMQConfig) (*Consumer, error) {
-	// url.QueryEscape encodes special characters like % in the password
-	rabbitURL := fmt.Sprintf("amqp://%s:%s@%s:%d/%s",
-		url.QueryEscape(cfg.Username),
-		url.QueryEscape(cfg.Password),
-		cfg.Host,
-		cfg.Port,
-		url.PathEscape(cfg.VHost),
-	)
+	rabbitURL := buildAMQPURL(cfg)
 
 	log.Printf("connecting to RabbitMQ at %s:%d vhost=%s", cfg.Host, cfg.Port, cfg.VHost)
 
@@ -37,7 +47,9 @@ func New(cfg config.RabbitMQConfig) (*Consumer, error) {
 
 	ch, err := conn.Channel()
 	if err != nil {
-		conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			log.Printf("error closing connection after channel failure: %v", closeErr)
+		}
 		return nil, fmt.Errorf("failed to open channel: %w", err)
 	}
 
@@ -77,7 +89,9 @@ func (c *Consumer) Consume(handler func(body []byte)) error {
 
 	for d := range msgs {
 		handler(d.Body)
-		d.Ack(false)
+		if err := d.Ack(false); err != nil {
+			log.Printf("failed to ack message: %v", err)
+		}
 	}
 
 	return fmt.Errorf("message channel closed connection lost")
@@ -89,9 +103,13 @@ func (c *Consumer) IsReady() bool {
 
 func (c *Consumer) Close() {
 	if c.channel != nil {
-		c.channel.Close()
+		if err := c.channel.Close(); err != nil {
+			log.Printf("error closing channel: %v", err)
+		}
 	}
 	if c.conn != nil {
-		c.conn.Close()
+		if err := c.conn.Close(); err != nil {
+			log.Printf("error closing connection: %v", err)
+		}
 	}
 }

@@ -104,11 +104,17 @@ func Parse(body []byte) (*HardwareMessage, error) {
 		return nil, nil // nil means "not a hardware event, skip it"
 	}
 
-	// todo : EventTimestamp
+	// parse the timestamp from the payload e.g. "2026-04-13T15:10:42.960073"
+	// if it fails fall back to now so we always have a valid timestamp
+	ts, err := time.Parse("2006-01-02T15:04:05.999999", inner.Payload.Timestamp)
+	if err != nil {
+		ts = time.Now().UTC()
+	}
+
 	return &HardwareMessage{
 		NodeUUID:       inner.Payload.NodeUUID,
 		NodeName:       inner.Payload.NodeName,
-		EventTimestamp: time.Now().UTC(),
+		EventTimestamp: ts,
 		Sensors:        inner.Payload.Payload,
 	}, nil
 
