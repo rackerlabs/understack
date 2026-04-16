@@ -60,7 +60,6 @@ def main() -> None:
         ip_address=args.ip_address,
         old_password=args.old_password,
         firmware_update=args.firmware_update,
-        pxe_switch_macs=parse_maclist(str(args.pxe_switch_macs)),
         raid_configure=args.raid_configure,
         external_cmdb_id=args.external_cmdb_id,
     )
@@ -74,12 +73,10 @@ def enrol(
     ip_address: str,
     firmware_update: bool,
     raid_configure: bool,
-    pxe_switch_macs: set[str],
     old_password: str | None,
     external_cmdb_id: str | None = None,
 ) -> None:
     logger.info("Starting enrol workflow for bmc_ip_address=%s", ip_address)
-    logger.info("  pxe_switch_macs=%s", pxe_switch_macs)
 
     if external_cmdb_id:
         logger.info("  external_cmdb_id=%s", external_cmdb_id)
@@ -90,7 +87,7 @@ def enrol(
     if insufficient_lldp_data(device_info):
         device_info = power_on_and_wait(bmc, device_info)
 
-    pxe_interfaces = guess_pxe_interfaces(device_info, pxe_switch_macs)
+    pxe_interfaces = guess_pxe_interfaces(device_info)
     logger.info("Selected %s as PXE interfaces", pxe_interfaces)
 
     node = ironic_node.create_or_update(
@@ -340,12 +337,6 @@ def argument_parser():
         required=False,
         default="",
         help="External CMDB ID for RXDB integration",
-    )
-    parser.add_argument(
-        "--pxe-switch-macs",
-        required=False,
-        default="",
-        help="Chassis MAC address of switches providing PXE network",
     )
     return parser
 

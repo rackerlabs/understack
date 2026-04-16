@@ -210,7 +210,6 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
         ip_address="10.0.0.10",
         firmware_update=False,
         raid_configure=True,
-        pxe_switch_macs={"AA:BB:CC:DD:EE:FF"},
         old_password="old-password",
         external_cmdb_id="cmdb-1",
     )
@@ -387,7 +386,6 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
         ip_address="10.0.0.10",
         firmware_update=False,
         raid_configure=False,
-        pxe_switch_macs={"AA:BB:CC:DD:EE:FF"},
         old_password=None,
         external_cmdb_id="cmdb-1",
     )
@@ -520,9 +518,7 @@ def test_guess_pxe_interface_unknown_name_avoids_bmc_interface():
         ],
     )
 
-    assert enroll_server.guess_pxe_interfaces(device_info, {"AA:BB:CC:DD:EE:FF"}) == [
-        "NIC.Custom.9-1"
-    ]
+    assert enroll_server.guess_pxe_interfaces(device_info) == ["NIC.Custom.9-1"]
 
 
 def test_get_node_interfaces_parses_inventory(mocker):
