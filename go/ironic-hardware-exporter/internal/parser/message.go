@@ -14,34 +14,33 @@ type OsloEnvelope struct {
 
 //OsloMessage would have this format:
 //  "event_type": "hardware.idrac.metrics",
-//     "payload": {"node_uuid": 'test', 
+//     "payload": {"node_uuid": 'test',
 // 					payload: { {key:value}
 //}}
 // Now we need to define struct to parse this message
 //go needs to define the data type before it marshals the json.
 
-type InnerMessage struct{
-	EventType string `json:"event_type"`
-	Payload NodePayload `json:"payload"`
+type InnerMessage struct {
+	EventType string      `json:"event_type"`
+	Payload   NodePayload `json:"payload"`
 }
 
 type NodePayload struct {
-	NodeUUID string `json:"node_uuid"`
-	NodeName string `json:"node_name"`
-	Timestamp string `json:"timestamp"`
-	EventType string `json:"event_type"`
-	Payload SensorPayload `json:"payload"`
+	NodeUUID  string        `json:"node_uuid"`
+	NodeName  string        `json:"node_name"`
+	Timestamp string        `json:"timestamp"`
+	EventType string        `json:"event_type"`
+	Payload   SensorPayload `json:"payload"`
 }
 
 // here we ll use map coz we dont know type of data that would come in
-//hence map[string]
+// hence map[string]
 type SensorPayload struct {
 	Fan         map[string]FanSensor         `json:"Fan"`
 	Temperature map[string]TemperatureSensor `json:"Temperature"`
 	Power       map[string]PowerSensor       `json:"Power"`
 	Drive       map[string]DriveSensor       `json:"Drive"`
 }
-
 
 // we need * before type  would give me the actual value at this address
 // JSON: "reading_celsius": null  Go sees: nil   (no reading)
@@ -72,11 +71,11 @@ type DriveSensor struct {
 	Health        *string `json:"health"`
 }
 
-//field shape for fan is unknown
-//todo: with real data 
+// field shape for fan is unknown
+// todo: with real data
 type FanSensor struct{}
 
-//collecting all , clean result 
+// collecting all , clean result
 type HardwareMessage struct {
 	NodeUUID       string
 	NodeName       string
@@ -87,7 +86,7 @@ type HardwareMessage struct {
 // Parse takes raw bytes from RabbitMQ and returns a clean HardwareMessage.
 // The structs above are the skeleton of the message we are going to get.
 // []byte is Go's way of saying raw data.
-func Parse(body []byte)(*HardwareMessage, error) {
+func Parse(body []byte) (*HardwareMessage, error) {
 
 	var envelope OsloEnvelope
 	err := json.Unmarshal(body, &envelope)
@@ -101,7 +100,7 @@ func Parse(body []byte)(*HardwareMessage, error) {
 		return nil, err
 	}
 
-	if inner.EventType != "hardware.idrac.metrics"{
+	if inner.EventType != "hardware.idrac.metrics" {
 		return nil, nil // nil means "not a hardware event, skip it"
 	}
 

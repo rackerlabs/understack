@@ -1,27 +1,28 @@
 package cache
 
 import (
-    "sync"
-    "time"
+	"sync"
+	"time"
 
-    "github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/parser"
+	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/parser"
 )
 
 // holds everything we know about one server
 type NodeEntry struct {
-    NodeUUID string
-    NodeName string
-    LastSeen time.Time
-    Sensors  parser.SensorPayload
+	NodeUUID string
+	NodeName string
+	LastSeen time.Time
+	Sensors  parser.SensorPayload
 }
 
 // Store is the in-memory cache, a map protected by a read-write lock
 // mu lock , coz 2 goroutines access this map at same time
 // rabbitmq writes, http reads
 type Store struct {
-    mu    sync.RWMutex
-    nodes map[string]*NodeEntry // key = node_uuid value = NodeEntry
+	mu    sync.RWMutex
+	nodes map[string]*NodeEntry // key = node_uuid value = NodeEntry
 }
+
 /* "b6b6dcec-7d48-48c4-89ff-da04b8af40b7" → NodeEntry{
 NodeUUID: "b6b6dcec-7d48-48c4-89ff-da04b8af40b7"
                                                 NodeName: "Dell-93GSW04"
@@ -40,37 +41,37 @@ NodeUUID: "b6b6dcec-7d48-48c4-89ff-da04b8af40b7"
                                                     }
                                                 }
                                             }*/
-											
+
 // new msg for Dell-93GSW04 would overwrite this entry
 
 // New creates an empty Store
 func New() *Store {
-    return &Store{
-        nodes: make(map[string]*NodeEntry),
-    }
+	return &Store{
+		nodes: make(map[string]*NodeEntry),
+	}
 }
 
 // Update saves the latest data for a node — called by RabbitMQ goroutine
 func (s *Store) Update(msg *parser.HardwareMessage) {
-    s.mu.Lock()
-    defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-    s.nodes[msg.NodeUUID] = &NodeEntry{
-        NodeUUID: msg.NodeUUID,
-        NodeName: msg.NodeName,
-        LastSeen: msg.EventTimestamp,
-        Sensors:  msg.Sensors,
-    }
+	s.nodes[msg.NodeUUID] = &NodeEntry{
+		NodeUUID: msg.NodeUUID,
+		NodeName: msg.NodeName,
+		LastSeen: msg.EventTimestamp,
+		Sensors:  msg.Sensors,
+	}
 }
 
 // GetAll returns a copy of all nodes — called by HTTP server when Prometheus scrapes
 func (s *Store) GetAll() map[string]*NodeEntry {
-    s.mu.RLock()
-    defer s.mu.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-    snapshot := make(map[string]*NodeEntry, len(s.nodes))
-    for k, v := range s.nodes {
-        snapshot[k] = v
-    }
-    return snapshot
+	snapshot := make(map[string]*NodeEntry, len(s.nodes))
+	for k, v := range s.nodes {
+		snapshot[k] = v
+	}
+	return snapshot
 }
