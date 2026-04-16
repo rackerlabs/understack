@@ -166,7 +166,14 @@ def _set_port_attributes(
         if port.category != category:
             port.category = category
 
-        if port.pxe_enabled != pxe_enabled:
+        if port.pxe_enabled == pxe_enabled:
+            LOG.debug(
+                "Node %s port %s pxe_enabled already set to %s",
+                node_uuid,
+                port.id,
+                pxe_enabled,
+            )
+        else:
             LOG.debug(
                 "Updating node %s port %s pxe_enabled from %s to %s",
                 node_uuid,
