@@ -60,7 +60,7 @@ func (n *NautobotClient) IsCreatedByUser(ctx context.Context, objectID string) (
 	if err != nil {
 		return false, err
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 
 	var graphQL GraphQL
 	if err := json.Unmarshal(bodyBytes, &graphQL); err != nil {
