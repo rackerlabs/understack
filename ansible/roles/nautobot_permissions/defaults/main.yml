@@ -10,6 +10,10 @@ nautobot_permissions_groups:
   user-api-tokens:
     - ucadmin
     - ucuser
+  job-execution:
+    - ucadmin
+  sys-admin:
+    - ucadmin
 
 # definition of a permission and the various settings on that permission
 nautobot_permissions_permissions:
@@ -93,3 +97,22 @@ nautobot_permissions_permissions:
       - users.token
     constraints:
       - user: "$user"
+  job-execution:
+    description: Execute diagnostic and maintenance jobs for hardware troubleshooting
+    enabled: true
+    actions:
+      - run
+    object_types:
+      - extras.job
+  sys-admin:
+    description: System administration read access for git repositories and secrets
+    enabled: true
+    actions:
+      - view
+    object_types:
+      # Git repository management - view source control integrations
+      - extras.gitrepository
+      # Secrets management - view system secrets and credentials
+      - extras.secret
+      - extras.secretsgroup
+      - extras.secretsgroupassociation
