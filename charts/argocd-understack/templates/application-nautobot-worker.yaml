@@ -27,8 +27,9 @@ spec:
       - $deploy/{{ include "understack.deploy_path" $ }}/nautobot-worker/values.yaml
       {{- with index $.Values.appLabels "understack.rackspace.com/partition" }}
       values: |
-        celery:
-          taskQueues: {{ . | quote }}
+        workers:
+          default:
+            taskQueues: {{ . | quote }}
       {{- end }}
     repoURL: https://nautobot.github.io/helm-charts/
     targetRevision: 2.5.6

@@ -156,17 +156,26 @@ All resources live in the `nautobot` namespace.
 
 ### Site Clusters
 
-Each site cluster needs:
+Client certificates are issued on the global cluster by cert-manager
+and distributed to site clusters through your external secrets provider.
+The CA private key never leaves the global cluster -- a compromised
+site cannot forge certificates for other sites.
 
-1. The mTLS CA key pair distributed via your external secrets provider
-   (secret name: `mtls-ca-key-pair`)
-2. An `mtls-ca-issuer` Issuer referencing that secret
-3. A `nautobot-mtls-client` Certificate resource that cert-manager uses
-   to issue the client certificate (ECDSA P-256, 1yr duration, 30d
-   auto-renewal)
+Each site needs two credentials from the secrets provider:
 
-The client certificate is mounted into worker pods at
-`/etc/nautobot/mtls/` containing `tls.crt`, `tls.key`, and `ca.crt`.
+| Credential | Content | Scope |
+|---|---|---|
+| Client cert+key | The issued `tls.crt` and `tls.key` for this site | Per-site |
+| CA public cert | The `ca.crt` from the mTLS CA | Shared across all sites |
+
+The ExternalSecret on the site cluster combines these into a single
+`nautobot-mtls-client` secret (type `kubernetes.io/tls`) with `tls.crt`,
+`tls.key`, and `ca.crt`. This secret is mounted into worker pods at
+`/etc/nautobot/mtls/`.
+
+Note: if your secrets provider stores PEM data with `\r\n` line endings,
+the ExternalSecret template must strip carriage returns
+(`| replace "\r" ""`) or OpenSSL will fail to parse the certificates.
 
 ## Adding a New Site
 
@@ -185,74 +194,24 @@ Before starting, ensure the global cluster already has:
 - Redis TLS enabled with `authClients: true`
 - Envoy Gateway TLS passthrough routes on ports 5432 and 6379
 
-You also need the mTLS CA key pair stored in your external secrets
-provider so the site cluster can pull it.
+You also need the pre-issued client certificate stored in your external
+secrets provider (see Step 1).
 
-### Step 1: Create the site directory
+### Step 1: Issue the client certificate on the global cluster
 
-```text
-<site-name>/nautobot-worker/
-```
+Create a cert-manager Certificate resource on the global cluster for
+this site. The `commonName` must match the PostgreSQL database user
+(typically `app`) because `pg_hba cert` maps the certificate CN to the
+DB user.
 
-### Step 2: Create ExternalSecrets for credentials
-
-Create ExternalSecret resources that pull credentials from your secrets
-provider into the `nautobot` namespace. You need four:
-
-| ExternalSecret | Target Secret | Purpose |
-|---|---|---|
-| `externalsecret-nautobot-django.yaml` | `nautobot-django` | Django `SECRET_KEY` -- must match the global instance |
-| `externalsecret-nautobot-db.yaml` | `nautobot-db` | CNPG app user password (satisfies Helm chart requirement) |
-| `externalsecret-nautobot-worker-redis.yaml` | `nautobot-redis` | Redis password |
-| `externalsecret-dockerconfigjson-github-com.yaml` | `dockerconfigjson-github-com` | Container registry credentials |
-
-Each ExternalSecret should reference your `ClusterSecretStore` and map
-the credential into the key format the Nautobot Helm chart expects.
-
-### Step 3: Create the mTLS CA key pair ExternalSecret
-
-Create `externalsecret-mtls-ca-key-pair.yaml` to distribute the mTLS CA
-certificate and private key to this site cluster. The resulting secret
-must be a `kubernetes.io/tls` type with these keys:
-
-| Key | Content |
-|---|---|
-| `tls.crt` | CA certificate (PEM) |
-| `tls.key` | CA private key (PEM) |
-| `ca.crt` | CA certificate (PEM, same as `tls.crt`) |
-
-cert-manager's CA Issuer reads `tls.crt` and `tls.key` from this secret
-to sign client certificates.
-
-### Step 4: Create the cert-manager CA Issuer
-
-Create `issuer-mtls-ca-issuer.yaml`:
-
-```yaml
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: mtls-ca-issuer
-  namespace: nautobot
-spec:
-  ca:
-    secretName: mtls-ca-key-pair
-```
-
-### Step 5: Create the client certificate
-
-Create `certificate-nautobot-mtls.yaml`. The `commonName` must match the
-PostgreSQL database user (typically `app`) because `pg_hba cert` maps
-the certificate CN to the DB user.
-
-```yaml
+```yaml title="global-cluster/nautobot/certificate-nautobot-mtls-client-<site>.yaml"
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: nautobot-mtls-client
+  name: nautobot-mtls-client-<site>
   namespace: nautobot
 spec:
-  secretName: nautobot-mtls-client
+  secretName: nautobot-mtls-client-<site>
   duration: 8760h    # 1 year
   renewBefore: 720h  # 30 days
   commonName: app
@@ -266,7 +225,107 @@ spec:
     kind: Issuer
 ```
 
-### Step 6: Create the kustomization
+Add it to the global nautobot kustomization. After ArgoCD syncs,
+cert-manager issues the certificate into a Kubernetes secret.
+
+Then extract the cert material and upload it to your secrets provider
+as two separate credentials:
+
+```bash
+# Extract the client cert + key (per-site credential)
+kubectl get secret nautobot-mtls-client-<site> -n nautobot \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/tls.crt
+kubectl get secret nautobot-mtls-client-<site> -n nautobot \
+  -o jsonpath='{.data.tls\.key}' | base64 -d > /tmp/tls.key
+
+# Upload to your secrets provider as a single credential with
+# the cert and key concatenated in one field.
+
+# Extract the CA public cert (shared across all sites, one-time)
+kubectl get secret mtls-ca-cert -n nautobot \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/ca.crt
+
+# Upload to your secrets provider as a separate credential.
+# This only needs to be done once -- all sites share the same CA cert.
+```
+
+The CA private key stays in the `mtls-ca-key-pair` secret on the global
+cluster and is never extracted or distributed.
+
+### Step 2: Create the site directory
+
+```text
+<site-name>/nautobot-worker/
+```
+
+### Step 3: Create ExternalSecrets for credentials
+
+Create ExternalSecret resources that pull credentials from your secrets
+provider into the `nautobot` namespace. You need five:
+
+| ExternalSecret | Target Secret | Purpose |
+|---|---|---|
+| `externalsecret-nautobot-django.yaml` | `nautobot-django` | Django `SECRET_KEY` -- must match the global instance |
+| `externalsecret-nautobot-db.yaml` | `nautobot-db` | CNPG app user password (satisfies Helm chart requirement) |
+| `externalsecret-nautobot-worker-redis.yaml` | `nautobot-redis` | Redis password |
+| `externalsecret-dockerconfigjson-github-com.yaml` | `dockerconfigjson-github-com` | Container registry credentials |
+| `externalsecret-nautobot-mtls-client.yaml` | `nautobot-mtls-client` | mTLS client cert + CA cert (two credentials combined) |
+
+The mTLS ExternalSecret pulls from two separate credentials in your
+secrets provider -- the per-site client cert+key and the shared CA
+public cert -- and combines them into a single `kubernetes.io/tls`
+secret with `tls.crt`, `tls.key`, and `ca.crt`.
+
+If both credentials have the same field name (e.g. `password`), use
+`dataFrom` with `rewrite` to prefix the keys and avoid collision:
+
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: nautobot-mtls-client
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: <your-store>
+  target:
+    creationPolicy: Owner
+    deletionPolicy: Retain
+    template:
+      engineVersion: v2
+      type: kubernetes.io/tls
+      data:
+        tls.crt: >-
+          {{ .client_password
+             | regexFind "-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----"
+             | replace "\r" "" }}
+        tls.key: >-
+          {{ .client_password
+             | regexFind "-----BEGIN EC PRIVATE KEY-----[\\s\\S]*?-----END EC PRIVATE KEY-----"
+             | replace "\r" "" }}
+        ca.crt: >-
+          {{ .ca_password | replace "\r" "" }}
+  dataFrom:
+    - extract:
+        key: "<client-cert-credential-id>"
+      rewrite:
+        - regexp:
+            source: "(.*)"
+            target: "client_$1"
+    - extract:
+        key: "<ca-cert-credential-id>"
+      rewrite:
+        - regexp:
+            source: "(.*)"
+            target: "ca_$1"
+```
+
+The `replace "\r" ""` strips carriage returns that some secrets
+providers add to PEM data. Without this, OpenSSL will fail to parse
+the certificates.
+
+### Step 4: Create the kustomization
 
 Create `kustomization.yaml` listing all resources:
 
@@ -278,12 +337,10 @@ resources:
   - externalsecret-nautobot-db.yaml
   - externalsecret-nautobot-worker-redis.yaml
   - externalsecret-dockerconfigjson-github-com.yaml
-  - externalsecret-mtls-ca-key-pair.yaml
-  - issuer-mtls-ca-issuer.yaml
-  - certificate-nautobot-mtls.yaml
+  - externalsecret-nautobot-mtls-client.yaml
 ```
 
-### Step 7: Create the values file
+### Step 5: Create the values file
 
 Create `values.yaml` with the site-specific overrides. Replace
 `<env>` with your environment identifier and `<site-partition>` with
@@ -335,7 +392,7 @@ celery:
       readOnly: true
 ```
 
-### Step 8: Enable in deploy.yaml
+### Step 6: Enable in deploy.yaml
 
 Add `nautobot_worker` to the site's `deploy.yaml`:
 
@@ -345,13 +402,13 @@ site:
     enabled: true
 ```
 
-### Step 9: Verify
+### Step 7: Verify
 
 After ArgoCD syncs, verify the worker is running and connected:
 
 ```bash
-# Check the certificate was issued
-kubectl get certificate nautobot-mtls-client -n nautobot
+# Check the client cert secret was pulled from the secrets provider
+kubectl get secret nautobot-mtls-client -n nautobot
 
 # Check the worker pod is running
 kubectl get pods -n nautobot -l app.kubernetes.io/component=nautobot-celery
@@ -364,16 +421,47 @@ kubectl logs -n nautobot -l app.kubernetes.io/component=nautobot-celery --tail=5
 
 ```text
 <site-name>/nautobot-worker/
-  certificate-nautobot-mtls.yaml
   externalsecret-dockerconfigjson-github-com.yaml
-  externalsecret-mtls-ca-key-pair.yaml
   externalsecret-nautobot-db.yaml
   externalsecret-nautobot-django.yaml
+  externalsecret-nautobot-mtls-client.yaml
   externalsecret-nautobot-worker-redis.yaml
-  issuer-mtls-ca-issuer.yaml
   kustomization.yaml
   values.yaml
 ```
+
+## Certificate Renewal
+
+Client certificates have a 1-year duration with 30-day auto-renewal by
+cert-manager on the global cluster. When cert-manager renews a
+certificate, the updated cert+key must be re-uploaded to your secrets
+provider and the site ExternalSecret will pick it up on its next
+refresh cycle.
+
+This is a manual process by default. Approaches to automate it:
+
+- **PushSecret (External Secrets Operator):** Use a
+  [PushSecret](https://external-secrets.io/latest/guides/pushsecrets/)
+  resource on the global cluster to automatically push the renewed cert
+  to your secrets provider whenever the Kubernetes secret changes. This
+  is event-driven and requires no CronJob.
+
+- **CronJob on the global cluster:** A Kubernetes CronJob that runs
+  periodically, reads the cert secret, and pushes it to your secrets
+  provider via its API.
+
+- **Cross-cluster secret replication:** Use a tool like
+  [Kubernetes Replicator](https://github.com/mittwald/kubernetes-replicator)
+  to copy the cert secret directly from the global cluster to site
+  clusters, bypassing the secrets provider entirely.
+
+- **CertificateRequest from site clusters:** The site cluster creates a
+  cert-manager
+  [CertificateRequest](https://cert-manager.io/docs/usage/certificaterequest/),
+  an operator on the global cluster approves and signs it, and the
+  signed cert is returned. This is similar to how kubelet certificate
+  management works in Kubernetes. Most complex to set up but fully
+  automated with no intermediate secrets provider.
 
 ## Environment Variable Reference
 
@@ -412,9 +500,10 @@ kubectl logs -n nautobot -l app.kubernetes.io/component=nautobot-celery --tail=5
   certificate CN (e.g. `app`) maps directly to the PostgreSQL user, so
   no additional user mapping configuration is needed.
 
-- The CA key pair is distributed to site clusters via the external
-  secrets provider, following the existing credential distribution
-  pattern.
+- Client certificates are issued on the global cluster by cert-manager
+  and distributed to site clusters via the external secrets provider.
+  The CA private key never leaves the global cluster, so a compromised
+  site cannot forge certificates for other sites.
 
 - The `nautobot_config.py` SSL logic is conditional on
   `NAUTOBOT_DB_SSLMODE`, so the same config file works for both global
@@ -447,10 +536,25 @@ kubectl logs -n nautobot -l app.kubernetes.io/component=nautobot-celery --tail=5
   could use cert-manager `trust-manager` Bundle to distribute only the
   CA cert.
 
-- **ExternalSecret regex splitting is fragile.** If your external
-  secrets provider stores the CA cert and key concatenated in a single
-  field, the ExternalSecret template uses regex to split them. Changes
-  to the credential format can break the regex.
+- **ca.crt must be the CA cert, not the client cert.** The `ca.crt`
+  field in the `nautobot-mtls-client` secret must contain the mTLS CA
+  certificate (`CN=understack-mtls-ca`), not the client certificate.
+  If `ca.crt` contains the client cert, the worker will fail with
+  `[SSL: CERTIFICATE_VERIFY_FAILED] self-signed certificate in
+  certificate chain` because it can't verify the server's cert chain.
+  The CA cert credential in your secrets provider is shared across all
+  sites and only needs to be created once.
+
+- **PEM data with carriage returns.** Some secrets providers store text
+  with `\r\n` line endings. PEM certificates with `\r` characters will
+  fail OpenSSL parsing with `[SSL] PEM lib`. The ExternalSecret template
+  must strip carriage returns using `| replace "\r" ""`.
+
+- **ExternalSecret format depends on your secrets provider.** The
+  ExternalSecret for the mTLS client cert on site clusters must produce
+  a `kubernetes.io/tls` secret with `tls.crt`, `tls.key`, and `ca.crt`.
+  How you template this depends on how your secrets provider stores the
+  credential.
 
 - **Redis authClients affects all connections.** Redis
   `authClients: true` requires ALL clients (including global Nautobot
@@ -490,14 +594,13 @@ FileNotFoundError: SSL certificate file required by NAUTOBOT_DB_SSLCERT not foun
 
 Check that:
 
-1. The `certificate-nautobot-mtls.yaml` Certificate resource exists and
-   is in `Ready` state: `kubectl get certificate -n nautobot`
-2. The `nautobot-mtls-client` secret was created by cert-manager:
+1. The `nautobot-mtls-client` secret exists on the site cluster:
    `kubectl get secret nautobot-mtls-client -n nautobot`
-3. The `mtls-ca-key-pair` secret exists (needed by the Issuer):
-   `kubectl get secret mtls-ca-key-pair -n nautobot`
-4. The `mtls-ca-issuer` Issuer is in `Ready` state:
-   `kubectl get issuer -n nautobot`
+2. The ExternalSecret is syncing successfully:
+   `kubectl get externalsecret nautobot-mtls-client -n nautobot`
+3. The secret contains `tls.crt`, `tls.key`, and `ca.crt` keys
+4. On the global cluster, verify the source certificate is issued:
+   `kubectl get certificate -n nautobot | grep mtls-client`
 
 ### PostgreSQL rejects connection with "certificate verify failed"
 
@@ -524,6 +627,21 @@ The connection doesn't match any `pg_hba` rule. Common causes:
   requires `hostssl`
 - The client cert CN doesn't match the DB user (for `cert` auth)
 - The source IP doesn't match any rule's CIDR
+
+### Redis connection refused with "certificate verify failed"
+
+The `ca.crt` mounted in the pod is not the CA that signed the Redis
+server certificate. Verify:
+
+```bash
+# Should show CN=understack-mtls-ca (the CA), NOT CN=app (the client cert)
+kubectl get secret nautobot-mtls-client -n nautobot \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d | openssl x509 -noout -subject
+```
+
+If it shows the client cert CN, the CA cert credential in your secrets
+provider has the wrong content. Update it with the actual CA certificate
+from the global cluster's `mtls-ca-cert` secret.
 
 ### Redis connection refused with TLS error
 
