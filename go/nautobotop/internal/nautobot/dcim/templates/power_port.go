@@ -78,6 +78,16 @@ func (s *PowerPortTemplateService) Create(ctx context.Context, req nb.WritablePo
 }
 
 func (s *PowerPortTemplateService) Update(ctx context.Context, id string, req nb.WritablePowerPortTemplateRequest) (*nb.PowerPortTemplate, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdatePowerPortTemplate", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	powerPort, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesUpdate(ctx, id).WritablePowerPortTemplateRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -89,6 +99,16 @@ func (s *PowerPortTemplateService) Update(ctx context.Context, id string, req nb
 }
 
 func (s *PowerPortTemplateService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyPowerPortTemplate", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

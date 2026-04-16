@@ -76,6 +76,16 @@ func (s *RackGroupService) ListAll(ctx context.Context) []nb.RackGroup {
 }
 
 func (s *RackGroupService) Update(ctx context.Context, id string, req nb.RackGroupRequest) (*nb.RackGroup, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateRackGroup", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	rackGroup, resp, err := s.client.APIClient.DcimAPI.DcimRackGroupsUpdate(ctx, id).RackGroupRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -92,6 +102,16 @@ func (s *RackGroupService) Update(ctx context.Context, id string, req nb.RackGro
 }
 
 func (s *RackGroupService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyRackGroup", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.DcimAPI.DcimRackGroupsDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

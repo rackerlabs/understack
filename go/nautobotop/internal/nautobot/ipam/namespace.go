@@ -76,6 +76,16 @@ func (s *NamespaceService) ListAll(ctx context.Context) []nb.Namespace {
 }
 
 func (s *NamespaceService) Update(ctx context.Context, id string, req nb.NamespaceRequest) (*nb.Namespace, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateNamespace", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	namespace, resp, err := s.client.APIClient.IpamAPI.IpamNamespacesUpdate(ctx, id).NamespaceRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -92,6 +102,16 @@ func (s *NamespaceService) Update(ctx context.Context, id string, req nb.Namespa
 }
 
 func (s *NamespaceService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyNamespace", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.IpamAPI.IpamNamespacesDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

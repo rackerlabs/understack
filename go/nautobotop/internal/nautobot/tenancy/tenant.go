@@ -74,6 +74,16 @@ func (s *TenantService) ListAll(ctx context.Context) []nb.Tenant {
 }
 
 func (s *TenantService) Update(ctx context.Context, id string, req nb.TenantRequest) (*nb.Tenant, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateTenant", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	tenant, resp, err := s.client.APIClient.TenancyAPI.TenancyTenantsUpdate(ctx, id).TenantRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -88,6 +98,16 @@ func (s *TenantService) Update(ctx context.Context, id string, req nb.TenantRequ
 }
 
 func (s *TenantService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyTenant", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.TenancyAPI.TenancyTenantsDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

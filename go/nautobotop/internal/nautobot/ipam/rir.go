@@ -74,6 +74,16 @@ func (s *RirService) ListAll(ctx context.Context) []nb.RIR {
 }
 
 func (s *RirService) Update(ctx context.Context, id string, req nb.RIRRequest) (*nb.RIR, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateRir", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	rir, resp, err := s.client.APIClient.IpamAPI.IpamRirsUpdate(ctx, id).RIRRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -88,6 +98,16 @@ func (s *RirService) Update(ctx context.Context, id string, req nb.RIRRequest) (
 }
 
 func (s *RirService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyRir", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.IpamAPI.IpamRirsDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

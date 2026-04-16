@@ -74,6 +74,16 @@ func (s *TenantGroupService) ListAll(ctx context.Context) []nb.TenantGroup {
 }
 
 func (s *TenantGroupService) Update(ctx context.Context, id string, req nb.TenantGroupRequest) (*nb.TenantGroup, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateTenantGroup", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	tg, resp, err := s.client.APIClient.TenancyAPI.TenancyTenantGroupsUpdate(ctx, id).TenantGroupRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -88,6 +98,16 @@ func (s *TenantGroupService) Update(ctx context.Context, id string, req nb.Tenan
 }
 
 func (s *TenantGroupService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyTenantGroup", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.TenancyAPI.TenancyTenantGroupsDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
