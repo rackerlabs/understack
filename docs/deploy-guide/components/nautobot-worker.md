@@ -58,6 +58,8 @@ Site Cluster                          Global Cluster
 
 The worker pods mount a client certificate (issued by a dedicated
 internal CA via cert-manager) and present it during the TLS handshake.
+See [Certificate Infrastructure](#certificate-infrastructure) for
+details on the CA hierarchy and how certificates are provisioned.
 PostgreSQL and Redis on the global cluster verify the client certificate
 against the same CA before accepting the connection.
 

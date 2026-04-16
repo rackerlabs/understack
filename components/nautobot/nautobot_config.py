@@ -64,7 +64,7 @@ from nautobot.core.settings_funcs import is_truthy
 if DATABASES["default"]["ENGINE"].endswith("mysql"):  # noqa F405
     DATABASES["default"]["OPTIONS"] = {"charset": "utf8mb4"}  # noqa F405
 
-# SSL/mTLS options for PostgreSQL connections.
+# mTLS options for PostgreSQL connections.
 # When NAUTOBOT_DB_SSLMODE is set to "verify-ca" or "verify-full", the client
 # certificate, key, and CA root cert must be present at the configured paths.
 _db_sslcert = os.getenv("NAUTOBOT_DB_SSLCERT", "/etc/nautobot/mtls/tls.crt")
@@ -89,11 +89,11 @@ if _db_sslmode in ("verify-ca", "verify-full"):
         "sslrootcert": _db_sslrootcert,
     }
 
-# SSL/mTLS options for Redis connections.
+# mTLS options for Redis connections.
 # When NAUTOBOT_REDIS_SSL env var is "true" (set by Helm `nautobot.redis.ssl`),
 # the Helm chart switches the URL scheme to rediss://.  We still need to tell
 # the Python redis client *which* certs to use for mutual TLS.
-import ssl as _ssl  # noqa: E402
+from ssl import CERT_REQUIRED  # noqa: E402
 
 _redis_ca = os.getenv("NAUTOBOT_REDIS_SSL_CA_CERTS", "/etc/nautobot/mtls/ca.crt")
 _redis_cert = os.getenv("NAUTOBOT_REDIS_SSL_CERTFILE", "/etc/nautobot/mtls/tls.crt")
@@ -101,7 +101,7 @@ _redis_key = os.getenv("NAUTOBOT_REDIS_SSL_KEYFILE", "/etc/nautobot/mtls/tls.key
 
 if os.path.isfile(_redis_ca):
     _redis_ssl_kwargs = {
-        "ssl_cert_reqs": _ssl.CERT_REQUIRED,
+        "ssl_cert_reqs": CERT_REQUIRED,
         "ssl_ca_certs": _redis_ca,
         "ssl_certfile": _redis_cert,
         "ssl_keyfile": _redis_key,
