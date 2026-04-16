@@ -1,0 +1,50 @@
+[tool.poetry]
+name = "Nautobot API Scraper"
+description = "Simple API to scrape targets from Nautobot for use with other systems"
+version = "0.0.1"
+authors = ["Project Undercloud Developers"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+# App requirements
+requests = "2.32.5"
+fastapi = {version = "0.123.10", extras = ["standard"]}
+
+# test depends
+coverage = { version = "*", optional = true }
+
+[tool.poetry.extras]
+test = ["coverage"]
+
+[tool.ruff]
+line-length = 80
+target-version = "py312"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
+  "ISC",     # flake8-implicit-str-concat
+  "PTH",     # flake8-use-pathlib
+  "RUF100",  # Unused noqa comments
+  "PGH004"   # blanket noqa comments
+]
+
+ignore = [
+  "ISC001",  # avoid formatter issues
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[build-system]
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
