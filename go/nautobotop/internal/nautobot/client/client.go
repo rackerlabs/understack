@@ -17,6 +17,7 @@ import (
 type NautobotClient struct {
 	Config    *nb.Configuration
 	APIClient *nb.APIClient
+	ReqClient *req.Client
 	Username  string
 	Report    map[string][]string
 	Cache     *cache.Cache
@@ -61,6 +62,7 @@ func NewNautobotClient(apiURL string, username, authToken string, cacheMaxSize i
 		Username:  username,
 		Config:    config,
 		APIClient: client,
+		ReqClient: reqClient,
 		Report:    make(map[string][]string),
 		Cache:     c,
 	}, nil

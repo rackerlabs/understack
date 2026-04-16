@@ -63,17 +63,15 @@ func (s *VlanGroupSync) syncSingleVlanGroup(ctx context.Context, vlanGroup model
 		Range:    nb.PtrString(vlanGroup.Range),
 	}
 
+	relationships := map[string]nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
+		"ucvnigroup_vlangroup": helpers.BuildRelationshipSource(),
+	}
 	if vlanGroup.UcvniGroup != "" {
-		ucvniGroup := s.ucvniGroupSvc.GetByName(ctx, vlanGroup.UcvniGroup)
-		if ucvniGroup.ID != "" {
-			relationships := map[string]nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
-				"ucvnigroup_vlangroup": helpers.BuildRelationshipSource(ucvniGroup.ID),
-			}
-			vlanGroupRequest.Relationships = &relationships
-		} else {
-			log.Info("ucvni group not found, skipping relationship", "name", vlanGroup.UcvniGroup)
+		if id := s.ucvniGroupSvc.GetByName(ctx, vlanGroup.UcvniGroup).ID; id != "" {
+			relationships["ucvnigroup_vlangroup"] = helpers.BuildRelationshipSource(id)
 		}
 	}
+	vlanGroupRequest.Relationships = &relationships
 
 	if existingVlanGroup.Id == nil {
 		return s.createVlanGroup(ctx, vlanGroupRequest)
