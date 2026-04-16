@@ -7,9 +7,6 @@
     role: admin
     state: present
 
-- name: Define baremetal
-  ansible.builtin.include_tasks: baremetal.yml
-
 - name: Define SSO
   ansible.builtin.include_tasks: sso.yml
 
