@@ -38,6 +38,8 @@ celery:
   enabled: true
   concurrency: 2
   replicaCount: 1
+  extraEnvVarsCM:
+    - cluster-data
   extraEnvVarsSecret:
     - nautobot-django
   livenessProbe:
