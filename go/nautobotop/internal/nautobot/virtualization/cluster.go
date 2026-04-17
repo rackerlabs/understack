@@ -76,6 +76,16 @@ func (s *ClusterService) ListAll(ctx context.Context) []nb.Cluster {
 }
 
 func (s *ClusterService) Update(ctx context.Context, id string, req nb.ClusterRequest) (*nb.Cluster, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateCluster", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	cluster, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClustersUpdate(ctx, id).ClusterRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -92,6 +102,16 @@ func (s *ClusterService) Update(ctx context.Context, id string, req nb.ClusterRe
 }
 
 func (s *ClusterService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyCluster", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClustersDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

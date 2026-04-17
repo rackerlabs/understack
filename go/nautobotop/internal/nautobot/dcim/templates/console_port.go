@@ -78,6 +78,16 @@ func (s *ConsolePortTemplateService) Create(ctx context.Context, req nb.Writable
 }
 
 func (s *ConsolePortTemplateService) Update(ctx context.Context, id string, req nb.WritableConsolePortTemplateRequest) (*nb.ConsolePortTemplate, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateConsolePortTemplate", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	consolePort, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesUpdate(ctx, id).WritableConsolePortTemplateRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -89,6 +99,16 @@ func (s *ConsolePortTemplateService) Update(ctx context.Context, id string, req 
 }
 
 func (s *ConsolePortTemplateService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyConsolePortTemplate", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

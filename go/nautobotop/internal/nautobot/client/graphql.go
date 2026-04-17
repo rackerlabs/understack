@@ -27,6 +27,54 @@ type GraphQLData struct {
 	ObjectChanges []ObjectChanges `json:"object_changes"`
 }
 
+// IsCreatedByUser checks if a specific object was created by the configured username.
+func (n *NautobotClient) IsCreatedByUser(ctx context.Context, objectID string) (bool, error) {
+	req := nb.GraphQLAPIRequest{
+		Query: `
+		query CheckObjectOwnership($changedObjectId: [String], $userName: [String]) {
+		object_changes(
+			changed_object_id: $changedObjectId
+			user_name: $userName
+            action__ic: ["CREATE"]
+		) {
+			id
+			user_name
+			action
+			changed_object_id
+		}
+		}`,
+		Variables: map[string]any{
+			"changedObjectId": []string{objectID},
+			"userName":        []string{n.Username},
+		},
+	}
+
+	_, resp, err := n.APIClient.GraphqlAPI.GraphqlCreate(ctx).
+		GraphQLAPIRequest(req).
+		Execute()
+	if err != nil {
+		return false, err
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+	resp.Body.Close() //nolint:errcheck
+
+	var graphQL GraphQL
+	if err := json.Unmarshal(bodyBytes, &graphQL); err != nil {
+		return false, err
+	}
+
+	for _, change := range graphQL.Data.ObjectChanges {
+		if change.Action == "CREATE" && change.UserName == n.Username {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (n *NautobotClient) GetCreateChangeList(ctx context.Context, objectType string) ([]ObjectChanges, *http.Response, error) {
 	var allObjectChanges []ObjectChanges
 	var lastResp *http.Response

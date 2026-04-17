@@ -75,6 +75,16 @@ func (s *RackService) ListAll(ctx context.Context) []nb.Rack {
 }
 
 func (s *RackService) Update(ctx context.Context, id string, req nb.WritableRackRequest) (*nb.Rack, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateRack", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	rack, resp, err := s.client.APIClient.DcimAPI.DcimRacksUpdate(ctx, id).WritableRackRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -91,6 +101,16 @@ func (s *RackService) Update(ctx context.Context, id string, req nb.WritableRack
 }
 
 func (s *RackService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyRack", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.DcimAPI.DcimRacksDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

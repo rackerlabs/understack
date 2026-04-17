@@ -76,6 +76,16 @@ func (s *InterfaceTemplateService) Create(ctx context.Context, req nb.WritableIn
 }
 
 func (s *InterfaceTemplateService) Update(ctx context.Context, id string, req nb.WritableInterfaceTemplateRequest) (*nb.InterfaceTemplate, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateInterfaceTemplate", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	consolePort, resp, err := s.client.APIClient.DcimAPI.DcimInterfaceTemplatesUpdate(ctx, id).WritableInterfaceTemplateRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -87,6 +97,16 @@ func (s *InterfaceTemplateService) Update(ctx context.Context, id string, req nb
 }
 
 func (s *InterfaceTemplateService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyInterfaceTemplate", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.DcimAPI.DcimInterfaceTemplatesDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

@@ -76,6 +76,16 @@ func (s *VlanGroupService) ListAll(ctx context.Context) []nb.VLANGroup {
 }
 
 func (s *VlanGroupService) Update(ctx context.Context, id string, req nb.VLANGroupRequest) (*nb.VLANGroup, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateVlanGroup", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	vlanGroup, resp, err := s.client.APIClient.IpamAPI.IpamVlanGroupsUpdate(ctx, id).VLANGroupRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -92,6 +102,16 @@ func (s *VlanGroupService) Update(ctx context.Context, id string, req nb.VLANGro
 }
 
 func (s *VlanGroupService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyVlanGroup", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.IpamAPI.IpamVlanGroupsDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

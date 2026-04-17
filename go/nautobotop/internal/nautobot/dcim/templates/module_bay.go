@@ -78,6 +78,16 @@ func (s *ModuleBayTemplateService) Create(ctx context.Context, req nb.ModuleBayT
 }
 
 func (s *ModuleBayTemplateService) Update(ctx context.Context, id string, req nb.ModuleBayTemplateRequest) (*nb.ModuleBayTemplate, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateModuleBayTemplate", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	consolePort, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesUpdate(ctx, id).ModuleBayTemplateRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -89,6 +99,16 @@ func (s *ModuleBayTemplateService) Update(ctx context.Context, id string, req nb
 }
 
 func (s *ModuleBayTemplateService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyModuleBayTemplate", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

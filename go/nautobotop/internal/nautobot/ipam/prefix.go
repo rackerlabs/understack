@@ -76,6 +76,16 @@ func (s *PrefixService) ListAll(ctx context.Context) []nb.Prefix {
 }
 
 func (s *PrefixService) Update(ctx context.Context, id string, req nb.WritablePrefixRequest) (*nb.Prefix, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdatePrefix", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	prefix, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesUpdate(ctx, id).WritablePrefixRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -92,6 +102,16 @@ func (s *PrefixService) Update(ctx context.Context, id string, req nb.WritablePr
 }
 
 func (s *PrefixService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyPrefix", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.IpamAPI.IpamPrefixesDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

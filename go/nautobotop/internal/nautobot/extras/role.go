@@ -74,6 +74,16 @@ func (s *RoleService) ListAll(ctx context.Context) []nb.Role {
 }
 
 func (s *RoleService) Update(ctx context.Context, id string, req nb.RoleRequest) (*nb.Role, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateRole", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	role, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesUpdate(ctx, id).RoleRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -88,6 +98,16 @@ func (s *RoleService) Update(ctx context.Context, id string, req nb.RoleRequest)
 }
 
 func (s *RoleService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyRole", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

@@ -76,6 +76,16 @@ func (s *LocationTypeService) ListAll(ctx context.Context) []nb.LocationType {
 }
 
 func (s *LocationTypeService) Update(ctx context.Context, id string, req nb.LocationTypeRequest) (*nb.LocationType, error) {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("UpdateLocationType", "failed to check ownership", "id", id, "error", err.Error())
+		return nil, err
+	}
+	if !owned {
+		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
+		return nil, nil
+	}
+
 	locationType, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesUpdate(ctx, id).LocationTypeRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
@@ -91,6 +101,16 @@ func (s *LocationTypeService) Update(ctx context.Context, id string, req nb.Loca
 }
 
 func (s *LocationTypeService) Destroy(ctx context.Context, id string) error {
+	owned, err := s.client.IsCreatedByUser(ctx, id)
+	if err != nil {
+		s.client.AddReport("DestroyLocationType", "failed to check ownership", "id", id, "error", err.Error())
+		return err
+	}
+	if !owned {
+		log.Warn("skipping destroy, object not created by user", "id", id, "user", s.client.Username)
+		return nil
+	}
+
 	resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesDestroy(ctx, id).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
