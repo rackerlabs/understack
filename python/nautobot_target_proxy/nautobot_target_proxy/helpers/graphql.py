@@ -1,7 +1,5 @@
-# Standard Library
 import os
 
-# Third Party
 import requests
 
 
@@ -22,10 +20,12 @@ def query_nautobot_graphql(query, variables=None):
         "Content-Type": "application/json",
         "Accept": "application/json",
     }
+    payload = {"query": query, "variables": variables or {}}
+
     res = requests.post(
         f"{nautobot_url}/api/graphql/",
         headers=headers,
-        json={"query": query, "variables": variables or {}},
+        json=payload,
     )
     res.raise_for_status()
     return res

@@ -3,15 +3,12 @@ An API to obtain data from Nautobot, and format it for use in various external
 systems.
 """
 
-# Standard Library
 import os
 
-# Third Party
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-# First Party
 from nautobot_target_proxy.helpers.graphql import query_nautobot_graphql
 from nautobot_target_proxy.helpers.queries import OOB_TARGET_QUERY
 from nautobot_target_proxy.helpers.schemas import TargetResponse
@@ -40,13 +37,13 @@ def get_oob_targets() -> list[TargetResponse]:
     Obtains a list of targets to monitor from Nautobot, and returns them in a
     format that can be read by the Prometheus `http_sd_config` method.
     """
-    understack_partition = os.environ.get("UNDERSTACK_PARTITION")
-    if not understack_partition:
-        raise RuntimeError("UNDERSTACK_PARTITION is required")
+    nautobot_location = os.environ.get("NAUTOBOT_LOCATION")
+    if not nautobot_location:
+        raise RuntimeError("NAUTOBOT_LOCATION is required")
 
     response = query_nautobot_graphql(
         OOB_TARGET_QUERY,
-        {"understackPartition": [understack_partition]},
+        {"location": [nautobot_location]},
     ).json()
     res = []
     for interface in response["data"]["interfaces"]:

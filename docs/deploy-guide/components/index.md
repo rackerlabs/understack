@@ -91,6 +91,8 @@ enablement defaults, validation, and troubleshooting notes.
 | [nautobot](./nautobot.md) | global |
 | [nautobot-api-tokens](./nautobot-api-tokens.md) | global |
 | [nautobot-job-queues](./nautobot-job-queues.md) | global |
+| [nautobot-target-proxy](./nautobot-target-proxy.md) | site |
+| [nautobot-worker](./nautobot-worker.md) | site |
 | [nautobotop](./nautobotop.md) | global |
 | [openebs](./openebs.md) | global, site |
 | [openstack](./openstack.md) | site |

@@ -46,7 +46,10 @@ args:
 
 nautobot:
   # -- Base URL for the Nautobot instance queried by the proxy.
-  url: ""
+  url: "http://nautobot-default.nautobot.svc.cluster.local"
+
+  # -- Nautobot location name used to filter returned devices.
+  location: "dev"
 
   clusterDataConfigMapRef:
     # -- ConfigMap name containing the UNDERSTACK_PARTITION key.
@@ -56,9 +59,9 @@ nautobot:
 
   tokenSecretRef:
     # -- Secret name containing the Nautobot API token.
-    name: ""
+    name: nautobot-target-proxy-token
     # -- Secret key containing the Nautobot API token.
-    key: NAUTOBOT_TOKEN
+    key: apitoken
 
 resources: {}
 

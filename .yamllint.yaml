@@ -5,6 +5,7 @@ ignore:
   - charts/argocd-understack/templates/
   - charts/nautobot-api-tokens/templates/
   - charts/nautobot-job-queues/templates/
+  - charts/nautobot-target-proxy/templates/
   - charts/site-workflows/templates/
   - charts/undersync/templates/
 
