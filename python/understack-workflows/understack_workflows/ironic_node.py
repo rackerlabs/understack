@@ -126,7 +126,7 @@ def update_ironic_node(
     logger.info("Updating Ironic node %s patches=%s", ironic_node.uuid, patches)
 
     client.update_node(ironic_node.uuid, patches)
-    logger.debug("Ironic node %s Updated.")
+    logger.debug("Ironic node %s Updated.", ironic_node.uuid)
 
 
 def create_ironic_node(
