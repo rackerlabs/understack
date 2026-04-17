@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of pod replicas to run.",
+      "default": 1
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Container image repository."
+        },
+        "tag": {
+          "type": "string",
+          "description": "Container image tag. Defaults to chart appVersion when empty."
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ],
+          "description": "Kubernetes image pull policy.",
+          "default": "IfNotPresent"
+        }
+      },
+      "required": [
+        "repository",
+        "tag",
+        "pullPolicy"
+      ]
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "description": "Optional image pull secrets for private registries.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "default": []
+    },
+    "podAnnotations": {
+      "type": "object",
+      "description": "Annotations applied to pod templates.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "podSecurityContext": {
+      "type": "object",
+      "description": "Pod-level securityContext configuration.",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "securityContext": {
+      "type": "object",
+      "description": "Container-level securityContext configuration.",
+      "additionalProperties": true
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer",
+            "ExternalName"
+          ],
+          "description": "Kubernetes Service type.",
+          "default": "ClusterIP"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Service port exposed for HTTP traffic.",
+          "default": 8000
+        }
+      },
+      "required": [
+        "type",
+        "port"
+      ]
+    },
+    "command": {
+      "type": "array",
+      "description": "Container command override.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "default": [
+        "uvicorn"
+      ]
+    },
+    "args": {
+      "type": "array",
+      "description": "Container args override.",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "app:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ]
+    },
+    "nautobot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Base URL for the Nautobot instance queried by the proxy."
+        },
+        "clusterDataConfigMapRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "ConfigMap name containing the UNDERSTACK_PARTITION key."
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "description": "ConfigMap key used to populate UNDERSTACK_PARTITION."
+            }
+          },
+          "required": [
+            "name",
+            "key"
+          ]
+        },
+        "tokenSecretRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Secret name containing the Nautobot API token."
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Secret key containing the Nautobot API token."
+            }
+          },
+          "required": [
+            "name",
+            "key"
+          ]
+        }
+      },
+      "required": [
+        "url",
+        "clusterDataConfigMapRef",
+        "tokenSecretRef"
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "description": "Container resource requests and limits.",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "nodeSelector": {
+      "type": "object",
+      "description": "Node selector labels for pod scheduling.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "tolerations": {
+      "type": "array",
+      "description": "Node taint tolerations for pod scheduling.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "default": []
+    },
+    "affinity": {
+      "type": "object",
+      "description": "Affinity and anti-affinity rules for pod scheduling.",
+      "additionalProperties": true,
+      "default": {}
+    }
+  },
+  "required": [
+    "replicaCount",
+    "image",
+    "service",
+    "command",
+    "args",
+    "nautobot"
+  ]
+}
