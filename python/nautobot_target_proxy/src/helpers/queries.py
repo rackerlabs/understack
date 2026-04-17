@@ -1,6 +1,10 @@
 OOB_TARGET_QUERY = """
-{
-  interfaces(mgmt_only: true, name: ["iDRAC", "iLO"]) {
+query OobTargetQuery($understackPartition: [String]) {
+  interfaces(
+    mgmt_only: true,
+    name: ["iDRAC", "iLO"],
+    device: {location: {name: $understackPartition}}
+  ) {
     device {
       name
       rack {

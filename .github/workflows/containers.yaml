@@ -11,6 +11,7 @@ on:
       - "containers/ansible/**"
       - "containers/dnsmasq/**"
       - "containers/ironic-nautobot-client/**"
+      - "containers/nautobot-target-proxy/**"
       - "containers/ironic-vnc-client/**"
       - "containers/understack-tests/**"
       - "python/**"
@@ -33,6 +34,8 @@ jobs:
           - name: dnsmasq
             target: prod
           - name: ironic-nautobot-client
+            target: prod
+          - name: nautobot-target-proxy
             target: prod
           - name: understack-tests
             target: prod

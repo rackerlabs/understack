@@ -4,6 +4,7 @@ systems
 """
 
 # Standard Library
+import os
 
 # Third Party
 from fastapi import FastAPI
@@ -39,7 +40,14 @@ def get_oob_targets() -> list[TargetResponse]:
     Obtains a list of targets to monitor from Nautobot, and returns them in a
     format that can be read by the Prometheus `http_sd_config` method.
     """
-    response = query_nautobot_graphql(OOB_TARGET_QUERY).json()
+    understack_partition = os.environ.get("UNDERSTACK_PARTITION")
+    if not understack_partition:
+        raise RuntimeError("UNDERSTACK_PARTITION is required")
+
+    response = query_nautobot_graphql(
+        OOB_TARGET_QUERY,
+        {"understackPartition": [understack_partition]},
+    ).json()
     res = []
     for interface in response["data"]["interfaces"]:
         for device in interface["ip_addresses"]:
