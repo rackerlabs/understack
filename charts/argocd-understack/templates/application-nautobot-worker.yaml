@@ -29,6 +29,9 @@ spec:
       values: |
         workers:
           default:
+            enabled: false
+          {{ . }}:
+            enabled: true
             taskQueues: {{ . | quote }}
       {{- end }}
     repoURL: https://nautobot.github.io/helm-charts/

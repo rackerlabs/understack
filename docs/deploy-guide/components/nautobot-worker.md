@@ -20,6 +20,11 @@ application. The web server, Redis, and PostgreSQL all remain on the
 global cluster -- site workers connect back to those shared services
 over the network.
 
+For details on how Celery task queues are configured per site and how to
+route jobs to site-specific workers, see the
+[Nautobot Celery Queues](../../operator-guide/nautobot-celery-queues.md)
+operator guide.
+
 ## Deployment Scope
 
 - Cluster scope: site
@@ -279,6 +284,8 @@ secret with `tls.crt`, `tls.key`, and `ca.crt`.
 If both credentials have the same field name (e.g. `password`), use
 `dataFrom` with `rewrite` to prefix the keys and avoid collision:
 
+{% raw %}
+
 ```yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -320,6 +327,8 @@ spec:
             source: "(.*)"
             target: "ca_$1"
 ```
+
+{% endraw %}
 
 The `replace "\r" ""` strips carriage returns that some secrets
 providers add to PEM data. Without this, OpenSSL will fail to parse
