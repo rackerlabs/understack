@@ -6,17 +6,9 @@ from understack_workflows.bmc import RedfishRequestError
 logger = logging.getLogger(__name__)
 
 
-def required_bios_settings(pxe_interfaces: list[str]) -> dict[str, str]:
-    """Return Bios settings map for BMC.
-
-    Note that we set values like HttpDev8Interface for each of the
-    pxe_interfaces, however dell BIOS has a setting for "number of pxe
-    interfaces" which we currently leave at the default of 4, so we'll never
-    actually attempt pxe on anything but the first 4 interfaces.
-    """
-    settings = {
-        # PXE is enabled by default on DELL, but we don't use it:
-        "PxeDev1EnDis": "Disabled",
+def required_bios_settings(pxe_interface: str) -> dict[str, str]:
+    """Return Bios settings map for BMC."""
+    return {
         # at this time ironic conductor returns http URLs
         # when its serving data from its own http server
         "HttpDev1TlsMode": "None",
@@ -30,16 +22,15 @@ def required_bios_settings(pxe_interfaces: list[str]) -> dict[str, str]:
         "OS-BMC.1.AdminState": "Disabled",
         # This closes down IPMI, which we don't use anyhow:
         "IPMILan.1.Enable": "Disabled",
+        # PXE is enabled by default on DELL, but we don't use it:
+        "PxeDev1EnDis": "Disabled",
+        # Configure exactly one HTTP port for booting:
+        "HttpDev1Interface": pxe_interface,
+        "HttpDev1EnDis": "Enabled",
+        "HttpDev2EnDis": "Disabled",
+        "HttpDev3EnDis": "Disabled",
+        "HttpDev4EnDis": "Disabled",
     }
-
-    for i in range(1, 8):
-        if len(pxe_interfaces) >= i:
-            settings[f"HttpDev{i}EnDis"] = "Enabled"
-            settings[f"HttpDev{i}Interface"] = pxe_interfaces[i - 1]
-        else:
-            settings[f"HttpDev{i}EnDis"] = "Disabled"
-
-    return settings
 
 
 def required_change_for_bios_setting(
@@ -86,7 +77,7 @@ def required_change_for_bios_setting(
     return required_value
 
 
-def update_dell_bios_settings(bmc: Bmc, pxe_interfaces: list[str]) -> dict:
+def update_dell_bios_settings(bmc: Bmc, pxe_interface: str) -> dict:
     """Check and update BIOS settings to standard as required.
 
     Any changes take effect on next server reboot.
@@ -97,7 +88,7 @@ def update_dell_bios_settings(bmc: Bmc, pxe_interfaces: list[str]) -> dict:
     pending_settings = bmc.redfish_request(bmc.system_path + "/Bios/Settings").get(
         "Attributes", {}
     )
-    required_settings = required_bios_settings(pxe_interfaces)
+    required_settings = required_bios_settings(pxe_interface)
 
     logger.info("%s Checking BIOS settings", bmc)
     required_changes = {}

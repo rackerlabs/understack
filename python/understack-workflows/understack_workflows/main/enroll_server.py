@@ -3,13 +3,11 @@
 import argparse
 import logging
 import os
-import time
 
 from ironicclient.v1.node import Node
 
 from understack_workflows import ironic_node
 from understack_workflows.bmc import Bmc
-from understack_workflows.bmc import RedfishRequestError
 from understack_workflows.bmc import bmc_for_ip_address
 from understack_workflows.bmc_bios import update_dell_bios_settings
 from understack_workflows.bmc_chassis_info import ChassisInfo
@@ -18,40 +16,45 @@ from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.helpers import setup_logger
-from understack_workflows.pxe_port_heuristic import guess_pxe_interfaces
 
 logger = logging.getLogger(__name__)
 
-POST_POWER_ON_WAIT_SECONDS = 120
-POST_POWER_ON_RETRY_SECONDS = 30
-POST_POWER_ON_MAX_RETRIES = 8
+MAX_PXE_INTERFACES = 8
 
 
 def main() -> None:
-    """On-board new or Refresh existing baremetal node.
+    """On-board a new baremetal node, or refresh an existing one.
 
-    - connect to the BMC using standard password, if that fails then use
-      password supplied in --old-bmc-password option, or factory default
+    - Connect to the BMC using standard password, if that fails then use the
+      password supplied in --old-bmc-password option, or factory default.
 
-    - ensure standard BMC password is set, and other basic BMC settings
+    - Ensure standard BMC password is set, and other basic BMC settings.
 
-    -  from BMC, discover basic hardware info:
-       - manufacturer, model number, serial number
-       - CPU model(s), RAM size and local storage
-       - list ethernet interfaces with:
-          - name like BMC or SLOT.NIC.1-1
-          - MAC address
-          - LLDP connections [{remote_mac, remote_interface_name}]
+    - From BMC, discover basic chassis info: manufacturer, model, serial.
 
-    - Figure out which NICs to enable for PXE
+    - Find or create this baremetal node in Ironic:
+      - Set the name to "{manufacturer}-{servicetag}".
+      - Set the driver as appropriate for the manufacturer/model.
+      - Set the node's external_cmdb_id, if one was provided.
 
-    - Configure our standard BIOS settings including HTTP boot devices
+    - Perform agent inspection via virtual-media boot to capture the full
+      hardware inventory and LLDP-confirmed switch topology.
 
-    - Find or create this baremetal node in Ironic
-      - Set the name to "{manufacturer}-{servicetag}"
-      - Set the driver as appropriate for the manufacturer/model
-      - Configure RAID
-      - Transition through enrol->manage->inspect->cleaning->provide
+      Using virtual-media avoids having to configure PXE during the initial
+      phase, however the IPA agent still requires DHCP autoconfiguration, so it
+      needs to be connected to the provisioning VLAN, and it needs at least one
+      port in Neutron to be configured for "enrol".
+
+    - Configure the Dell HTTP-boot BIOS entries using the LLDP-confirmed PXE
+      interfaces, then flip the node back to its final production http-ipxe boot
+      mode for cleaning and provisioning (we prefer PXE-based booting over
+      virtual media, for performance reasons).
+
+    - Optionally configure RAID.
+
+    - Optionally apply firmware updates.
+
+    - Transition the node to the 'available' state (implies cleaning).
     """
     setup_logger()
     args = argument_parser().parse_args()
@@ -63,10 +66,6 @@ def main() -> None:
         raid_configure=args.raid_configure,
         external_cmdb_id=args.external_cmdb_id,
     )
-
-
-def parse_maclist(maclist: str) -> set[str]:
-    return {mac.strip().upper() for mac in maclist.split(",")}
 
 
 def enrol(
@@ -84,81 +83,74 @@ def enrol(
     bmc = bmc_for_ip_address(ip_address)
     device_info = initialize_bmc(bmc, old_password)
 
-    if insufficient_lldp_data(device_info):
-        device_info = power_on_and_wait(bmc, device_info)
-
-    pxe_interfaces = guess_pxe_interfaces(device_info)
-    logger.info("Selected %s as PXE interfaces", pxe_interfaces)
-
     node = ironic_node.create_or_update(
         bmc=bmc,
         name=device_name(device_info),
         manufacturer=device_info.manufacturer,
         external_cmdb_id=external_cmdb_id,
-        enrolled_pxe_ports=pxe_interfaces,
     )
 
-    # Once we've added to the node to Ironic, perform a redfish
-    # inspection immediately to populate the BIOS data and initial
-    # hardware information
+    # Out-of-band redfish inspection populates data including baremetal ports.
+    #
+    # Our hooks augment the ironic baremetal port with the BMC-reported
+    # interface name (e.g. NIC.Integrated.1-1) as well as some placeholder
+    # "enrol" dummy data that is required by Ironic/Neutron to perform agent
+    # inspection.  Neutron needs to assign a port to the provisioning network
+    # and it bails out unless we have ports with pxe_enabled, local_link_info,
+    # etc.
     ironic_node.inspect_out_of_band(node)
-    interfaces = ironic_node.get_node_interfaces(node)
-    logger.info(
-        "[node:%s] Found %d interfaces from OOB inspection", node.uuid, len(interfaces)
-    )
-    for iface in interfaces:
-        logger.info(
-            "[node:%s]   %s  mac=%s  speed_mbps=%s",
-            node.uuid,
-            iface.name,
-            iface.mac_address,
-            iface.speed_mbps,
+
+    # Agent inspection via virtual media gathers LLDP and full hardware
+    # inventory.
+    inspect_via_virtual_media(node)
+
+    pxe_interface = ironic_node.pxe_enabled_bios_name(node)
+    if not pxe_interface:
+        raise RuntimeError(
+            f"[node:{node.uuid}] Agent inspection produced no pxe_enabled ports "
+            "cannot configure HTTP boot."
         )
-    inventory_data = ironic_node.get_node_inventory(node)
-    parsed_lldp = inventory_data.get("plugin_data", {}).get("parsed_lldp", {})
-    lldp_interfaces = ironic_node.get_lldp_connected_interfaces(interfaces, parsed_lldp)
-    logger.info(
-        "[node:%s] %d interfaces with confirmed LLDP switch connections",
-        node.uuid,
-        len(lldp_interfaces),
-    )
+    logger.info("[node:%s] Selected PXE interface %s", node.uuid, pxe_interface)
+
+    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
     if raid_configure:
-        # Raid configuration runs a clean step which does a PXE boot.  That
-        # can't work unless we first apply_bios_settings.
-        # TODO: why isn't skip_ramdisk working here?
-        apply_bios_settings(bmc, pxe_interfaces)
         configure_raid(node, bmc)
+        # RAID reconfiguration changes the disk layout; refresh inventory.
+        ironic_node.inspect_out_of_band(node)
     else:
         logger.info("%s RAID configuration was not requested", node.uuid)
 
-    ironic_node.inspect_out_of_band(node)
-
-    # Anecdotally, applying firmware updates can upset the next-boot HTTP, and
-    # potentially even upset the bios-settings configuration job in the iDRAC,
-    # so we do firmware first, which causes a reboot, and only then do we set
-    # the BIOS settings.
-    #
-    # Also, just maybe, the bios setting keys we are trying to set might not be
-    # available in the old version of the bios, in which case we need to boot
-    # the bios before redfish will allow us to set those settings.
     if firmware_update:
         ironic_node.apply_firmware_updates(node)
 
-    # Applying BIOS settings on Dell servers requires a reboot which we achieve
-    # by initiating agent inspection.  Agent inspection requires BIOS settings
-    # (to set boot device).  Therefore these two actions must go hand-in-hand.
-    #
-    # Note that we may have already applied BIOS settings above.  That is okay,
-    # it is idempotent.
-    apply_bios_settings(bmc, pxe_interfaces)
-    ironic_node.inspect(node)
-
-    # After successful inspection, our node is left in "manageable" state.  All
-    # being well, the "provide" action will transition manageable -> cleaning ->
-    # available.
     ironic_node.transition(node, target_state="provide", expected_state="available")
     logger.info("Completed enrol workflow for bmc_ip_address=%s", ip_address)
+
+
+def inspect_via_virtual_media(node: Node) -> None:
+    """Run agent inspection booted via virtual media.
+
+    The node is temporarily flipped to a virtual-media boot_interface so the
+    agent ramdisk boots from a BMC-attached ISO rather than via PXE.  After
+    inspection the boot_interface is reset to the steady-state value used for
+    cleaning and provisioning.
+    """
+    refreshed = ironic_node.refresh(node, fields=["driver"])
+    vm_boot = ironic_node.virtual_media_boot_interface_for(refreshed.driver)
+
+    logger.info(
+        "[node:%s] Switching boot_interface to %s for agent inspection",
+        node.uuid,
+        vm_boot,
+    )
+    ironic_node.patch(node, [f"boot_interface={vm_boot}"])
+    try:
+        ironic_node.inspect(node)
+    finally:
+        ironic_node.patch(
+            node, [f"boot_interface={ironic_node.STEADY_STATE_BOOT_INTERFACE}"]
+        )
 
 
 def initialize_bmc(bmc: Bmc, old_password: str | None) -> ChassisInfo:
@@ -178,66 +170,6 @@ def initialize_bmc(bmc: Bmc, old_password: str | None) -> ChassisInfo:
 
     bmc_set_hostname(bmc, device_info.bmc_hostname, device_name(device_info))
     return device_info
-
-
-def insufficient_lldp_data(device_info: ChassisInfo) -> bool:
-    """Whether the device_info is populated with switch connections.
-
-    We normally get LLDP data for the BMC's own (out of band) interface but that
-    is not relevant to our investigation so we exclude known BMC interface
-    names.
-
-    If the server has been powered on, we will often get LLDP data for the other
-    ports as well.
-    """
-    for i in device_info.interfaces:
-        if (
-            "DRAC" not in i.name.upper()
-            and "ILO" not in i.name.upper()
-            and i.remote_switch_mac_address
-        ):
-            return False
-
-    return True
-
-
-def power_on_and_wait(bmc: Bmc, device_info: ChassisInfo) -> ChassisInfo:
-    """If power is off, switch on and wait a minute."""
-    if device_info.power_on:
-        logger.debug("Power is on")
-        return device_info
-
-    logger.info("Power is off. Switching on and waiting for links to stabilize")
-    # TODO: figure out how to do this with sushy
-    bmc.redfish_request(
-        path=f"{bmc.get_system_path()}/Actions/ComputerSystem.Reset",
-        payload={"ResetType": "On"},
-        method="POST",
-    )
-    time.sleep(POST_POWER_ON_WAIT_SECONDS)
-
-    for attempt in range(POST_POWER_ON_MAX_RETRIES + 1):
-        try:
-            return chassis_info(bmc)
-        except RedfishRequestError as exc:
-            if not _is_temporary_redfish_unavailable(exc):
-                raise
-            if attempt == POST_POWER_ON_MAX_RETRIES:
-                raise
-            logger.warning(
-                "BMC Redfish data is temporarily unavailable after power on for %s. "
-                "Retrying in %s seconds.",
-                bmc.ip_address,
-                POST_POWER_ON_RETRY_SECONDS,
-            )
-            time.sleep(POST_POWER_ON_RETRY_SECONDS)
-
-    raise AssertionError("unreachable")
-
-
-def _is_temporary_redfish_unavailable(exc: RedfishRequestError) -> bool:
-    message = str(exc)
-    return "HTTP 503" in message or "ServiceTemporarilyUnavailable" in message
 
 
 def device_name(device_info: ChassisInfo) -> str:
@@ -299,10 +231,6 @@ def build_raid_config(controller: str, physical_disks: list[str]):
         ]
     }
     return result
-
-
-def apply_bios_settings(bmc: Bmc, pxe_interfaces: list[str]):
-    update_dell_bios_settings(bmc, pxe_interfaces=pxe_interfaces)
 
 
 def parse_bool(value: str) -> bool:

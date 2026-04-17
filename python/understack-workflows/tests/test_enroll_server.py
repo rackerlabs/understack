@@ -7,7 +7,6 @@ from unittest.mock import call
 from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from ironicclient.v1.node import Node
 
-from understack_workflows.bmc import RedfishRequestError
 from understack_workflows.bmc_chassis_info import ChassisInfo
 from understack_workflows.bmc_chassis_info import InterfaceInfo
 from understack_workflows.ironic_node import NodeInterface
@@ -32,29 +31,27 @@ DEFAULT_INTERFACE_NAMES = [
 def make_node_inventory(
     *,
     interfaces: list[dict] | None = None,
+    connected_interface_names: list[str] | None = None,
     serial_number: str = "FL6PC14",
 ) -> dict:
-    """Build a realistic Ironic node inventory dict, suitable for mocking.
-
-    Override ``interfaces`` to supply custom name/mac_address/speed_mbps entries.
-    When using the defaults, each interface gets a freshly randomized MAC address
-    so tests don't share state between runs.
-    """
+    """Build a realistic Ironic node inventory dict, suitable for mocking."""
     if interfaces is None:
         interfaces = [
             {"mac_address": random_mac(), "name": name, "speed_mbps": 0}
             for name in DEFAULT_INTERFACE_NAMES
         ]
+    if connected_interface_names is None:
+        connected_interface_names = [iface["name"] for iface in interfaces]
     all_interfaces = {
         iface["name"]: {**iface, "pxe_enabled": False, "ipv6_address": None}
         for iface in interfaces
     }
     parsed_lldp = {
-        iface["name"]: {
+        name: {
             "switch_chassis_id": random_mac(),
             "switch_port_id": "Ethernet1/1",
         }
-        for iface in interfaces
+        for name in connected_interface_names
     }
     return {
         "inventory": {
@@ -75,8 +72,7 @@ def make_node_inventory(
 
 def make_device_info(
     *,
-    power_on: bool,
-    connected_mac: str | None = None,
+    power_on: bool = True,
     serial_number: str = "ABC123",
 ) -> ChassisInfo:
     return ChassisInfo(
@@ -90,13 +86,7 @@ def make_device_info(
         cpu="Xeon",
         interfaces=[
             InterfaceInfo("iDRAC", "bmc", "00:00:00:00:00:01"),
-            InterfaceInfo(
-                "NIC.Integrated.1-1",
-                "PXE NIC",
-                "00:00:00:00:00:02",
-                remote_switch_mac_address=connected_mac,
-                remote_switch_port_name="Ethernet1/1" if connected_mac else None,
-            ),
+            InterfaceInfo("NIC.Integrated.1-1", "PXE NIC", "00:00:00:00:00:02"),
         ],
     )
 
@@ -133,9 +123,11 @@ def make_ironic_client(
     traits: list[str] | None = None,
     runbook_ids: dict[str, str] | None = None,
     inventory: dict | None = None,
+    driver: str = "idrac",
+    ports: list | None = None,
 ):
     if inspect_interfaces is None:
-        inspect_interfaces = ["idrac-redfish", "idrac-redfish"]
+        inspect_interfaces = ["idrac-redfish"]
     if traits is None:
         traits = []
     if runbook_ids is None:
@@ -144,7 +136,7 @@ def make_ironic_client(
     created_node = SimpleNamespace(
         uuid=node_uuid,
         provision_state="enroll",
-        driver="idrac",
+        driver=driver,
         inspect_interface="idrac-redfish",
     )
     inspect_interface_iter = iter(inspect_interfaces)
@@ -156,6 +148,7 @@ def make_ironic_client(
     fake_client.node.get_traits.return_value = traits
     if inventory is not None:
         fake_client.node.get_inventory.return_value = inventory
+    fake_client.port.list.return_value = list(ports or [])
 
     def get_node(ident, fields=None):
         if ident == node_name and fields is None:
@@ -163,7 +156,7 @@ def make_ironic_client(
                 raise ironic_exceptions.NotFound()
             return existing_node
         if ident == node_uuid and fields == ["driver"]:
-            return SimpleNamespace(driver="idrac")
+            return SimpleNamespace(driver=driver)
         if ident == node_uuid and fields == ["inspect_interface"]:
             return SimpleNamespace(inspect_interface=next(inspect_interface_iter))
         raise AssertionError(
@@ -174,24 +167,47 @@ def make_ironic_client(
     return fake_client, created_node
 
 
-def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
-    initial_info = make_device_info(power_on=False, connected_mac=None)
-    powered_info = make_device_info(
-        power_on=True,
-        connected_mac="AA:BB:CC:DD:EE:FF",
-    )
+def make_port(*, address: str, pxe_enabled: bool, bios_name: str | None):
+    extra = {"bios_name": bios_name} if bios_name else {}
+    return SimpleNamespace(address=address, pxe_enabled=pxe_enabled, extra=extra)
+
+
+def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
+    device_info = make_device_info()
     fake_bmc = make_bmc(mocker, fake_sushy=make_raid_hardware())
+    inventory = make_node_inventory(
+        connected_interface_names=["NIC.Integrated.1-1", "NIC.Integrated.1-2"],
+    )
+    # port-enrol-config hook has run during agent inspection and flagged
+    # pxe_enabled on LLDP-connected ports.  port-bios-name (OOB) stamped
+    # extra.bios_name earlier.
+    ports = [
+        make_port(
+            address="aa:aa:aa:aa:aa:01",
+            pxe_enabled=True,
+            bios_name="NIC.Integrated.1-1",
+        ),
+        make_port(
+            address="aa:aa:aa:aa:aa:02",
+            pxe_enabled=True,
+            bios_name="NIC.Integrated.1-2",
+        ),
+        make_port(
+            address="aa:aa:aa:aa:aa:03",
+            pxe_enabled=False,
+            bios_name="NIC.Slot.1-1",
+        ),
+    ]
     fake_ironic, created_node = make_ironic_client(
         node_name="Dell-ABC123",
-        inspect_interfaces=["idrac-redfish", "idrac-redfish"],
+        # OOB inspect, agent inspect, OOB inspect (post-RAID).
+        inspect_interfaces=["idrac-redfish", "idrac-redfish", "idrac-redfish"],
+        inventory=inventory,
+        ports=ports,
     )
 
     mocker.patch.object(enroll_server, "bmc_for_ip_address", return_value=fake_bmc)
-    mocker.patch.object(
-        enroll_server,
-        "chassis_info",
-        side_effect=[initial_info, powered_info],
-    )
+    mocker.patch.object(enroll_server, "chassis_info", return_value=device_info)
     set_bmc_password = mocker.patch.object(enroll_server, "set_bmc_password")
     update_dell_drac_settings = mocker.patch.object(
         enroll_server, "update_dell_drac_settings"
@@ -200,7 +216,6 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
     update_dell_bios_settings = mocker.patch.object(
         enroll_server, "update_dell_bios_settings"
     )
-    sleep = mocker.patch.object(enroll_server.time, "sleep")
     mocker.patch(
         "understack_workflows.ironic.client.get_ironic_client",
         return_value=fake_ironic,
@@ -221,18 +236,13 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
     )
     update_dell_drac_settings.assert_called_once_with(fake_bmc)
     bmc_set_hostname.assert_called_once_with(fake_bmc, "None", "Dell-ABC123")
-    assert update_dell_bios_settings.call_count == 2
-    update_dell_bios_settings.assert_any_call(
-        fake_bmc,
-        pxe_interfaces=["NIC.Integrated.1-1"],
-    )
-    sleep.assert_called_once_with(120)
 
-    fake_bmc.redfish_request.assert_called_once_with(
-        path="/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset",
-        payload={"ResetType": "On"},
-        method="POST",
+    # BIOS settings configured exactly once, using pxe_enabled port BIOS names.
+    update_dell_bios_settings.assert_called_once_with(
+        fake_bmc,
+        pxe_interface="NIC.Integrated.1-1",
     )
+
     fake_ironic.node.create.assert_called_once_with(
         name="Dell-ABC123",
         driver="idrac",
@@ -244,11 +254,9 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
         },
         boot_interface="http-ipxe",
         inspect_interface="idrac-redfish",
-        extra={
-            "external_cmdb_id": "cmdb-1",
-            "enrolled_pxe_ports": ["NIC.Integrated.1-1"],
-        },
+        extra={"external_cmdb_id": "cmdb-1"},
     )
+
     fake_ironic.node.set_target_raid_config.assert_called_once_with(
         created_node.uuid,
         {
@@ -263,6 +271,7 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
             ]
         },
     )
+
     fake_ironic.node.set_provision_state.assert_has_calls(
         [
             call(
@@ -274,7 +283,14 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
             ),
             call(
                 created_node.uuid,
-                "inspect",
+                "inspect",  # OOB redfish inspect for bios_name / basic info
+                cleansteps=None,
+                runbook=None,
+                disable_ramdisk=None,
+            ),
+            call(
+                created_node.uuid,
+                "inspect",  # agent inspect via virtual media
                 cleansteps=None,
                 runbook=None,
                 disable_ramdisk=None,
@@ -291,14 +307,7 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
             ),
             call(
                 created_node.uuid,
-                "inspect",
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                created_node.uuid,
-                "inspect",
+                "inspect",  # OOB redfish inspect to refresh disks post-RAID
                 cleansteps=None,
                 runbook=None,
                 disable_ramdisk=None,
@@ -312,63 +321,50 @@ def test_enrol_happy_path_uses_real_ironic_workflow(mocker):
             ),
         ]
     )
+
     expected_reset = [{"op": "remove", "path": "/inspect_interface"}]
+    expected_vm_boot = [
+        {"op": "add", "path": "/boot_interface", "value": "idrac-redfish-virtual-media"}
+    ]
+    expected_ipxe_boot = [
+        {"op": "add", "path": "/boot_interface", "value": "http-ipxe"}
+    ]
     expected_agent = [{"op": "add", "path": "/inspect_interface", "value": "agent"}]
     assert fake_ironic.node.update.call_args_list == [
-        call(created_node.uuid, expected_reset),
-        call(created_node.uuid, expected_reset),
+        call(created_node.uuid, expected_reset),  # OOB inspect prep
+        call(created_node.uuid, expected_vm_boot),
         call(created_node.uuid, expected_agent),
+        call(created_node.uuid, expected_ipxe_boot),
+        call(created_node.uuid, expected_reset),  # Post-RAID OOB inspect prep
     ]
 
 
-def test_power_on_and_wait_retries_temporary_redfish_503(mocker):
-    initial_info = make_device_info(power_on=False, connected_mac=None)
-    powered_info = make_device_info(
-        power_on=True,
-        connected_mac="AA:BB:CC:DD:EE:FF",
-    )
-    fake_bmc = make_bmc(mocker)
-    sleep = mocker.patch.object(enroll_server.time, "sleep")
-    mocker.patch.object(
-        enroll_server,
-        "chassis_info",
-        side_effect=[
-            RedfishRequestError(
-                "BMC communications failure HTTP 503 Service Unavailable "
-                "Base.1.12.ServiceTemporarilyUnavailable"
-            ),
-            powered_info,
-        ],
-    )
-
-    result = enroll_server.power_on_and_wait(fake_bmc, initial_info)
-
-    assert result is powered_info
-    fake_bmc.redfish_request.assert_called_once_with(
-        path="/redfish/v1/Systems/System.Embedded.1/Actions/ComputerSystem.Reset",
-        payload={"ResetType": "On"},
-        method="POST",
-    )
-    assert sleep.call_args_list == [call(120), call(30)]
-
-
 def test_enrol_existing_failed_node_recovers_and_updates(mocker):
-    device_info = make_device_info(
-        power_on=True,
-        connected_mac="AA:BB:CC:DD:EE:FF",
-    )
+    device_info = make_device_info()
     existing_node = SimpleNamespace(
         uuid="node-999",
         provision_state="inspect failed",
         driver="idrac",
         inspect_interface="idrac-redfish",
     )
+    inventory = make_node_inventory(
+        connected_interface_names=["NIC.Integrated.1-1"],
+    )
+    ports = [
+        make_port(
+            address="aa:aa:aa:aa:aa:01",
+            pxe_enabled=True,
+            bios_name="NIC.Integrated.1-1",
+        ),
+    ]
     fake_bmc = make_bmc(mocker)
     fake_ironic, _ = make_ironic_client(
         node_name="Dell-ABC123",
         node_uuid="node-999",
         existing_node=existing_node,
         inspect_interfaces=["idrac-redfish", "idrac-redfish"],
+        inventory=inventory,
+        ports=ports,
     )
 
     mocker.patch.object(enroll_server, "bmc_for_ip_address", return_value=fake_bmc)
@@ -403,21 +399,14 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
             ),
             call(
                 existing_node.uuid,
-                "inspect",
+                "inspect",  # OOB inspect
                 cleansteps=None,
                 runbook=None,
                 disable_ramdisk=None,
             ),
             call(
                 existing_node.uuid,
-                "inspect",
-                cleansteps=None,
-                runbook=None,
-                disable_ramdisk=None,
-            ),
-            call(
-                existing_node.uuid,
-                "inspect",
+                "inspect",  # Agent inspect via virtual media
                 cleansteps=None,
                 runbook=None,
                 disable_ramdisk=None,
@@ -431,12 +420,6 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
             ),
         ]
     )
-    update_patch = fake_ironic.node.update.call_args_list[0].args[1]
-    assert {
-        "op": "add",
-        "path": "/extra/enrolled_pxe_ports",
-        "value": ["NIC.Integrated.1-1"],
-    } in update_patch
 
 
 def test_apply_firmware_updates_runs_traits_in_numeric_order(mocker):
@@ -495,30 +478,6 @@ def test_apply_firmware_updates_runs_traits_in_numeric_order(mocker):
             ),
         ]
     )
-
-
-def test_guess_pxe_interface_unknown_name_avoids_bmc_interface():
-    device_info = ChassisInfo(
-        manufacturer="Dell",
-        model_number="R760",
-        serial_number="ABC123",
-        bmc_ip_address="1.2.3.4",
-        bios_version="1.0.0",
-        power_on=False,
-        memory_gib=0,
-        cpu="cpu",
-        interfaces=[
-            InterfaceInfo("iDRAC", "bmc", "00:00:00:00:00:01"),
-            InterfaceInfo(
-                "NIC.Custom.9-1",
-                "custom nic",
-                "00:00:00:00:00:02",
-                remote_switch_mac_address="AA:BB:CC:DD:EE:FF",
-            ),
-        ],
-    )
-
-    assert enroll_server.guess_pxe_interfaces(device_info) == ["NIC.Custom.9-1"]
 
 
 def test_get_node_interfaces_parses_inventory(mocker):
@@ -588,6 +547,32 @@ def test_get_lldp_connected_interfaces_excludes_not_available():
     result = get_lldp_connected_interfaces(interfaces, parsed_lldp)
 
     assert result == []
+
+
+def test_pxe_enabled_bios_name_filters_pxe_and_bios_name(mocker):
+    fake_ironic, node = make_ironic_client(
+        node_name="Dell-TEST01",
+        node_uuid="node-abc",
+        ports=[
+            make_port(
+                address="aa:01", pxe_enabled=True, bios_name="NIC.Integrated.1-1"
+            ),
+            make_port(address="aa:02", pxe_enabled=False, bios_name="NIC.Slot.1-1"),
+            make_port(address="aa:03", pxe_enabled=True, bios_name=None),
+            make_port(
+                address="aa:04", pxe_enabled=True, bios_name="NIC.Integrated.1-2"
+            ),
+        ],
+    )
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    result = enroll_server.ironic_node.pxe_enabled_bios_name(cast(Node, node))
+
+    assert result == "NIC.Integrated.1-1"
+    fake_ironic.port.list.assert_called_once_with(node="node-abc", detail=True)
 
 
 def test_get_lldp_connected_interfaces_absent_from_lldp():

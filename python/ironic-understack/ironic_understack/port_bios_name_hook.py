@@ -1,6 +1,5 @@
 from typing import ClassVar
 
-from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
 
@@ -14,13 +13,35 @@ PXE_BIOS_NAME_PREFIXES = ["NIC.Integrated", "NIC.Slot"]
 class PortBiosNameHook(base.InspectionHook):
     """Set bios_name, pxe_enabled, local_link_connection and physical_network.
 
-    Populates extra.bios_name and port name from inspection inventory, then
-    determines PXE-enabled ports from node.extra["enrolled_pxe_ports"]
-    (populated during enrolment). If that data is unavailable, all
-    NIC.Integrated.* and NIC.Slot.* ports are treated as PXE-enabled.
+    Runs after the "ports" hook has created a baremetal port for each NIC in the
+    box.
 
-    PXE ports get pxe_enabled=True plus placeholder physical_network and
-    local_link_connection values that neutron requires.
+    We set the `name` and `extra.bios_name` for each port using the BIOS names
+    in the inventory data that was collected by redfish inspection.
+
+    If this node has no PXE ports at all, then we assume that this box has just
+    been enrolled and has not yet undergone a successful agent inspection.
+    Agent inspection will be the next step, and therefore we need to set up the
+    bare minimum that is required by Ironic/Neutron to prepare to boot the IPA
+    image.
+
+    Even though PXE is not in use, the provisioning network is still required,
+    because that is how the agent communicates with Ironic.  Neutron wants to
+    make a port in the provisioning network, and it will error out unless it can
+    find a suitable baremetal port.
+
+    We choose one arbitrary baremetal port and we populate its attributes with
+    dummy data to enable Ironic/Neutron to do an IPA boot:
+
+      - pxe_enabled=True
+      - physical_network="enrol" (placeholder value)
+      - local_link_connection set to dummy data as placeholder
+
+    Note that this only works because neutron is not completely controlling the
+    DHCP server, so it doesn't matter if we choose the wrong port.  If this
+    situation changes then we would need to configure all possible NICs with
+    placeholder data, which would result in a configuration for every single
+    NIC.
     """
 
     dependencies: ClassVar[list[str]] = ["ports"]
@@ -36,8 +57,9 @@ class PortBiosNameHook(base.InspectionHook):
         }
 
         ports = list(ironic_ports_for_node(task.context, task.node.id))
-        initial_enroll = _is_initial_enroll(ports)
-        pxe_nics = _enrolled_pxe_nics(task) if initial_enroll else []
+        if not ports:
+            LOG.error("No baremetal ports in Ironic for node %s", task.node.uuid)
+            return
 
         for baremetal_port in ports:
             mac = baremetal_port.address.upper()
@@ -46,68 +68,23 @@ class PortBiosNameHook(base.InspectionHook):
             _set_port_extra(baremetal_port, mac, bios_name)
             _set_port_name(baremetal_port, mac, bios_name, task.node.name)
 
-            if initial_enroll:
-                is_pxe = bios_name is not None and any(
-                    pxe_nic.startswith(bios_name) or bios_name.startswith(pxe_nic)
-                    for pxe_nic in pxe_nics
-                )
-                _set_port_pxe_enabled(baremetal_port, mac, bios_name, is_pxe)
-            else:
-                is_pxe = baremetal_port.pxe_enabled
-
-            if initial_enroll and is_pxe:
-                _set_port_physical_network(baremetal_port, mac)
-                _set_port_local_link_connection(baremetal_port, mac)
-
-        _assert_has_pxe_port(task, ports)
+        if not any(port.pxe_enabled for port in ports):
+            _set_port_pxe_placeholder(ports[0])
 
 
-def _enrolled_pxe_nics(task) -> list[str]:
-    """Read enrolled PXE NIC names from node.extra, or use broad prefixes."""
-    enrolled_pxe_nics = task.node.extra.get("enrolled_pxe_ports")
-    if enrolled_pxe_nics:
-        LOG.info(
-            "Set node %s pxe flag on interfaces from extra.enrolled_pxe_ports %s",
-            task.node.uuid,
-            enrolled_pxe_nics,
-        )
-        return enrolled_pxe_nics
-    else:
-        LOG.warning(
-            "Node %s extra.enrolled_pxe_ports is missing, "
-            "setting pxe flag on all interfaces starting %s.",
-            task.node.uuid,
-            PXE_BIOS_NAME_PREFIXES,
-        )
-        return PXE_BIOS_NAME_PREFIXES
-
-
-def _is_initial_enroll(ports) -> bool:
-    return all(
-        not port.physical_network or "enrol" in port.physical_network for port in ports
+def _set_port_pxe_placeholder(baremetal_port):
+    LOG.info(
+        "Populating port %s with placeholder PXE data to support enrol.",
+        baremetal_port.address,
     )
-
-
-def _set_port_pxe_enabled(baremetal_port, mac, bios_name, is_pxe):
-    if baremetal_port.pxe_enabled != is_pxe:
-        LOG.info(
-            "Port %s (%s) pxe_enabled %s -> %s",
-            mac,
-            bios_name,
-            baremetal_port.pxe_enabled,
-            is_pxe,
-        )
-        baremetal_port.pxe_enabled = is_pxe
-        baremetal_port.save()
-
-
-def _assert_has_pxe_port(task, ports):
-    if any(port.pxe_enabled for port in ports):
-        return
-
-    msg = f"No PXE-enabled ports found for node {task.node.uuid}"
-    LOG.error(msg)
-    raise exception.InvalidNodeInventory(node=task.node.uuid, reason=msg)
+    baremetal_port.pxe_enabled = True
+    baremetal_port.physical_network = "enrol"
+    baremetal_port.local_link_connection = {
+        "port_id": "None",
+        "switch_id": "00:00:00:00:00:00",
+        "switch_info": "None",
+    }
+    baremetal_port.save()
 
 
 def _set_port_extra(baremetal_port, mac, required_bios_name):
@@ -140,25 +117,3 @@ def _set_port_name(baremetal_port, mac, required_bios_name, node_name):
             )
             baremetal_port.name = required_port_name
             baremetal_port.save()
-
-
-def _set_port_physical_network(baremetal_port, mac):
-    if not baremetal_port.physical_network:
-        LOG.info("Port %s changing physical_network from None to 'enrol'", mac)
-        baremetal_port.physical_network = "enrol"
-        baremetal_port.save()
-
-
-def _set_port_local_link_connection(baremetal_port, mac):
-    if not baremetal_port.local_link_connection:
-        baremetal_port.local_link_connection = {
-            "port_id": "None",
-            "switch_id": "00:00:00:00:00:00",
-            "switch_info": "None",
-        }
-        LOG.info(
-            "Port %s changing local_link_connection from None to %s",
-            mac,
-            baremetal_port.local_link_connection,
-        )
-        baremetal_port.save()

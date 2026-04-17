@@ -17,11 +17,11 @@ def test_update_dell_bios_settings_skips_patch_when_desired_values_are_pending(m
                 "IPMILan.1.Enable": "Enabled",
             }
         },
-        {"Attributes": bmc_bios.required_bios_settings(["NIC.Embedded.1-1-1"])},
+        {"Attributes": bmc_bios.required_bios_settings("NIC.Embedded.1-1-1")},
     ]
     patch_bios_settings = mocker.patch.object(bmc_bios, "patch_bios_settings")
 
-    result = bmc_bios.update_dell_bios_settings(bmc, ["NIC.Embedded.1-1-1"])
+    result = bmc_bios.update_dell_bios_settings(bmc, "NIC.Embedded.1-1-1")
 
     assert result == {}
     patch_bios_settings.assert_not_called()
@@ -54,7 +54,7 @@ def test_update_dell_bios_settings_only_patches_settings_not_already_pending(moc
     ]
     patch_bios_settings = mocker.patch.object(bmc_bios, "patch_bios_settings")
 
-    result = bmc_bios.update_dell_bios_settings(bmc, ["NIC.Embedded.1-1-1"])
+    result = bmc_bios.update_dell_bios_settings(bmc, "NIC.Embedded.1-1-1")
 
     assert result == {
         "HttpDev1EnDis": "Enabled",
