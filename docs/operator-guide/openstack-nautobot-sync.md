@@ -73,6 +73,38 @@ The following events trigger Nautobot updates:
 When Nautobot gets out of sync with OpenStack (e.g., after database restore,
 missed events, or manual changes), you can perform a bulk resync.
 
+### Dry-Run (Diff Preview)
+
+Before running a resync, you can preview what changes would be made using the
+diff workflow. This compares OpenStack and Nautobot data without making changes:
+
+```bash
+argo -n argo-events submit --from workflowtemplate/diff-nautobot
+```
+
+The diff workflow compares:
+
+- Keystone projects ↔ Nautobot tenants
+- Neutron networks ↔ Nautobot UCVNIs
+- Neutron subnets ↔ Nautobot prefixes
+- Ironic nodes ↔ Nautobot devices
+
+You can also run the diff CLI directly:
+
+```bash
+# Compare all projects
+uc-diff projects
+
+# Compare all networks
+uc-diff network
+
+# Compare all subnets
+uc-diff subnets
+
+# Compare all devices
+uc-diff devices
+```
+
 ### Resync Order
 
 The resync workflow runs three steps sequentially in dependency order:
