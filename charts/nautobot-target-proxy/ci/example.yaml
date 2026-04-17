@@ -5,6 +5,7 @@ image:
 
 nautobot:
   url: https://nautobot.example.com
+  location: dev
   clusterDataConfigMapRef:
     name: cluster-data
     key: UNDERSTACK_PARTITION

@@ -501,7 +501,7 @@ site:
 
   # -- Nautobot target proxy service
   nautobot_target_proxy:
-    # -- Enable/disable deploying nautobot-target-proxy
+    # -- Enable/disable deploying the nautobot-target-proxy Helm chart
     # @default -- false
     enabled: false
 

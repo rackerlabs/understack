@@ -47,6 +47,8 @@ spec:
           env:
             - name: NAUTOBOT_URL
               value: {{ required "values.nautobot.url is required" .Values.nautobot.url | quote }}
+            - name: NAUTOBOT_LOCATION
+              value: {{ required "values.nautobot.location is required" .Values.nautobot.location | quote }}
             - name: UNDERSTACK_PARTITION
               valueFrom:
                 configMapKeyRef:

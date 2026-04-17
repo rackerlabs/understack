@@ -4,6 +4,7 @@ ignore:
   - components/etcdbackup/templates/
   - charts/argocd-understack/templates/
   - charts/nautobot-api-tokens/templates/
+  - charts/nautobot-target-proxy/templates/
   - charts/site-workflows/templates/
   - charts/undersync/templates/
 

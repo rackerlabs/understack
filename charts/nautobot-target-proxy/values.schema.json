@@ -144,6 +144,12 @@
           "minLength": 1,
           "description": "Base URL for the Nautobot instance queried by the proxy."
         },
+        "location": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Nautobot location name used to filter returned devices.",
+          "default": "dev"
+        },
         "clusterDataConfigMapRef": {
           "type": "object",
           "additionalProperties": false,
@@ -187,6 +193,7 @@
       },
       "required": [
         "url",
+        "location",
         "clusterDataConfigMapRef",
         "tokenSecretRef"
       ]

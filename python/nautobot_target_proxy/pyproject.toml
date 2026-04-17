@@ -1,24 +1,42 @@
-[tool.poetry]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
 name = "nautobot-target-proxy"
-description = "Simple API to scrape targets from Nautobot for use with other systems"
 version = "0.0.1"
-authors = ["Project Undercloud Developers"]
-license = "MIT"
+description = "Simple API to scrape targets from Nautobot for use with other systems"
+authors = [{ name = "Project Undercloud Developers" }]
+requires-python = "~=3.12.0"
 readme = "README.md"
-packages = [{ include = "nautobot_target_proxy" }]
+license = "Apache-2.0"
+dependencies = [
+    "fastapi[standard]==0.123.10",
+    "requests==2.32.5",
+]
 
-[tool.poetry.dependencies]
-python = "^3.12"
+[dependency-groups]
+test = [
+    "pytest>=9.0.1,<10",
+    "pytest-github-actions-annotate-failures",
+    "pytest-cov>=7,<8",
+]
 
-# App requirements
-requests = "2.32.5"
-fastapi = {version = "0.123.10", extras = ["standard"]}
+[tool.uv]
+default-groups = ["test"]
 
-# test depends
-coverage = { version = "*", optional = true }
+[tool.hatch.build.targets.sdist]
+include = ["nautobot_target_proxy"]
 
-[tool.poetry.extras]
-test = ["coverage"]
+[tool.hatch.build.targets.wheel]
+include = ["nautobot_target_proxy"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra --cov=nautobot_target_proxy"
+testpaths = [
+    "tests",
+]
 
 [tool.ruff]
 line-length = 80
@@ -46,6 +64,7 @@ ignore = [
 [tool.ruff.lint.isort]
 force-single-line = true
 
-[build-system]
-requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning>=1.0.0,<2.0.0"]
-build-backend = "poetry_dynamic_versioning.backend"
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",     # allow 'assert' for pytest
+]

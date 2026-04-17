@@ -15,20 +15,20 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-    - ref: understack
-      path: charts/nautobot-target-proxy
-      repoURL: {{ include "understack.understack_url" $ }}
-      targetRevision: {{ include "understack.understack_ref" $ }}
-      helm:
-        releaseName: nautobot-target-proxy
-        valueFiles:
-          - $understack/charts/nautobot-target-proxy/values.yaml
-          - $deploy/{{ include "understack.deploy_path" $ }}/nautobot-target-proxy/values.yaml
-        ignoreMissingValueFiles: true
-    - ref: deploy
-      repoURL: {{ include "understack.deploy_url" $ }}
-      targetRevision: {{ include "understack.deploy_ref" $ }}
-      path: {{ include "understack.deploy_path" $ }}/nautobot-target-proxy
+  - helm:
+      releaseName: nautobot-target-proxy
+      ignoreMissingValueFiles: true
+      valueFiles:
+      - $understack/components/nautobot-target-proxy/values.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/nautobot-target-proxy/values.yaml
+    path: charts/nautobot-target-proxy
+    ref: understack
+    repoURL: {{ include "understack.understack_url" $ }}
+    targetRevision: {{ include "understack.understack_ref" $ }}
+  - path: {{ include "understack.deploy_path" $ }}/nautobot-target-proxy
+    ref: deploy
+    repoURL: {{ include "understack.deploy_url" $ }}
+    targetRevision: {{ include "understack.deploy_ref" $ }}
   syncPolicy:
     automated:
       prune: true

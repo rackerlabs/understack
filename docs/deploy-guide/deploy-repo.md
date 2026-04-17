@@ -58,7 +58,7 @@ understackctl deploy update my-site
 This creates `<component>/` directories with `kustomization.yaml` and
 `values.yaml` files for each enabled component.
 
-### component directories
+### Component directories
 
 Inside of the `manifests` directory you'll have child directories named after
 each component (using hyphens, e.g., `cert-manager`, `argo-workflows`). These
@@ -130,7 +130,7 @@ disabled components.
     (e.g., `cert-manager`, `argo-workflows`). The `understackctl` tool
     handles this conversion automatically.
 
-### inventory directory
+### Inventory directory
 
 This directory contains an Ansible inventory file along with Ansible
 group_vars that are used as data by Ansible executions within the cluster
