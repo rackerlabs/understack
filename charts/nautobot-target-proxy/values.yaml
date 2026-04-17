@@ -38,7 +38,7 @@ command:
   - uvicorn
 
 args:
-  - app:app
+  - nautobot_target_proxy.app:app
   - --host
   - 0.0.0.0
   - --port

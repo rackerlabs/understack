@@ -1,10 +1,11 @@
 [tool.poetry]
-name = "Nautobot API Scraper"
+name = "nautobot-target-proxy"
 description = "Simple API to scrape targets from Nautobot for use with other systems"
 version = "0.0.1"
 authors = ["Project Undercloud Developers"]
 license = "MIT"
 readme = "README.md"
+packages = [{ include = "nautobot_target_proxy" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"

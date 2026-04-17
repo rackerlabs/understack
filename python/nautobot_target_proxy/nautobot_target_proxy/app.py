@@ -1,6 +1,6 @@
 """
 An API to obtain data from Nautobot, and format it for use in various external
-systems
+systems.
 """
 
 # Standard Library
@@ -12,9 +12,9 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 # First Party
-from helpers.graphql import query_nautobot_graphql
-from helpers.queries import OOB_TARGET_QUERY
-from helpers.schemas import TargetResponse
+from nautobot_target_proxy.helpers.graphql import query_nautobot_graphql
+from nautobot_target_proxy.helpers.queries import OOB_TARGET_QUERY
+from nautobot_target_proxy.helpers.schemas import TargetResponse
 
 app = FastAPI()
 
