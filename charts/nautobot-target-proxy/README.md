@@ -6,7 +6,7 @@ Helm chart that deploys the `nautobot_target_proxy` FastAPI service.
 
 - Runs the proxy as a Kubernetes `Deployment`.
 - Exposes the app internally with a Kubernetes `Service`.
-- Starts the container with `uvicorn app:app --host 0.0.0.0 --port 8000`.
+- Starts the container with `uvicorn nautobot_target_proxy.app:app --host 0.0.0.0 --port 8000`.
 - Injects `NAUTOBOT_URL` directly from values.
 - Injects `UNDERSTACK_PARTITION` from the shared `cluster-data` ConfigMap.
 - Injects `NAUTOBOT_TOKEN` from a referenced Kubernetes Secret.

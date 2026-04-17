@@ -16,7 +16,8 @@ RUN pip3 install -U pip setuptools wheel
 COPY --from=builder /tmp/requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt
 
-COPY python/nautobot_target_proxy/src /src
+COPY python/nautobot_target_proxy /app
+RUN pip3 install --no-deps /app
 
-WORKDIR /src
+WORKDIR /app
 EXPOSE 8000

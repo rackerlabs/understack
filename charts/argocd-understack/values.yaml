@@ -499,6 +499,12 @@ site:
     # @default -- false
     enabled: false
 
+  # -- Nautobot target proxy service
+  nautobot_target_proxy:
+    # -- Enable/disable deploying nautobot-target-proxy
+    # @default -- false
+    enabled: false
+
   # -- OpenEBS
   openebs:
     # -- Enable/disable deploying OpenEBS
