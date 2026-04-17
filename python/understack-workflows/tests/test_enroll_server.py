@@ -84,10 +84,7 @@ def make_device_info(
         power_on=power_on,
         memory_gib=64,
         cpu="Xeon",
-        interfaces=[
-            InterfaceInfo("iDRAC", "bmc", "00:00:00:00:00:01"),
-            InterfaceInfo("NIC.Integrated.1-1", "PXE NIC", "00:00:00:00:00:02"),
-        ],
+        bmc_interface=InterfaceInfo("iDRAC", "bmc", "00:00:00:00:00:01"),
     )
 
 

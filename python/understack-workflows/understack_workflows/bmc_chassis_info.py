@@ -7,7 +7,6 @@ from ipaddress import IPv4Address
 from ipaddress import IPv4Interface
 
 from understack_workflows.bmc import Bmc
-from understack_workflows.interface_normalization import normalize_interface_name
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +22,6 @@ class InterfaceInfo:
     ipv4_address: IPv4Interface | None = None
     ipv4_gateway: IPv4Address | None = None
     dhcp: bool = False
-    remote_switch_mac_address: str | None = None
-    remote_switch_port_name: str | None = None
-    remote_switch_data_stale: bool = False
 
 
 @dataclass(frozen=True)
@@ -38,14 +34,9 @@ class ChassisInfo:
     bmc_ip_address: str
     bios_version: str
     power_on: bool
-    interfaces: list[InterfaceInfo]
+    bmc_interface: InterfaceInfo
     memory_gib: int
     cpu: str
-
-    @property
-    def bmc_interface(self) -> InterfaceInfo:
-        """BMC Interface response."""
-        return self.interfaces[0]
 
     @property
     def bmc_hostname(self) -> str:
@@ -53,32 +44,12 @@ class ChassisInfo:
         return str(self.bmc_interface.hostname)
 
     @property
-    def neighbors(self) -> set:
-        """A set of switch MAC addresses to which this chassis is connected."""
-        return {
-            interface.remote_switch_mac_address
-            for interface in self.interfaces
-            if interface.remote_switch_mac_address
-        }
-
-    @property
     def dump(self) -> list[str]:
         return [
             f"{self.manufacturer} {self.model_number} serial {self.serial_number}",
             f"BIOS VERSION {self.bios_version}",
             f"BMC IP Address {self.bmc_ip_address}",
-            *self.dump_interfaces,
             f"Power on {self.power_on}",
-        ]
-
-    @property
-    def dump_interfaces(self) -> list[str]:
-        return [
-            (
-                f"NIC {i.mac_address} {i.name} "
-                f"[LLDP: {i.remote_switch_mac_address} {i.remote_switch_port_name}]"
-            )
-            for i in self.interfaces
         ]
 
 
@@ -91,7 +62,6 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
 
     """
     chassis_data = bmc.redfish_request(bmc.system_path)
-    interfaces = interface_data(bmc)
 
     return ChassisInfo(
         manufacturer=normalise_manufacturer(chassis_data["Manufacturer"]),
@@ -101,39 +71,12 @@ def chassis_info(bmc: Bmc) -> ChassisInfo:
         power_on=(chassis_data["PowerState"] == "On"),
         bmc_ip_address=bmc.ip_address,
         memory_gib=chassis_data.get("MemorySummary", {}).get("TotalSystemMemoryGiB", 0),
-        interfaces=interfaces,
+        bmc_interface=bmc_interface(bmc),
         cpu=chassis_data.get("ProcessorSummary", {}).get("Model", ""),
     )
 
 
-def interface_data(bmc: Bmc) -> list[InterfaceInfo]:
-    """Interface parsed from BMC outputs."""
-    bmc_interface_info = bmc_interface(bmc)
-    interfaces = [bmc_interface_info, *in_band_interfaces(bmc)]
-    if get_system_vendor(bmc) == "Dell":
-        lldp = lldp_data_by_name(bmc)
-        return [combine_lldp(lldp, interface) for interface in interfaces]
-    else:
-        return [combine_lldp({}, interface) for interface in interfaces]
-
-
-def combine_lldp(lldp, interface) -> InterfaceInfo:
-    """Combined response, LLDP and Interface data."""
-    name = interface["name"]
-    alternate_name = f"{name}-1"
-    lldp_entry = lldp.get(name, lldp.get(alternate_name, {}))
-    if not lldp_entry:
-        logger.info(
-            "LLDP info from BMC is missing for %s or %s,"
-            "we only have LLDP info for %s",
-            name,
-            alternate_name,
-            list(lldp.keys()),
-        )
-    return InterfaceInfo(**interface, **lldp_entry)
-
-
-def bmc_interface(bmc) -> dict:
+def bmc_interface(bmc) -> InterfaceInfo:
     """Retrieve DRAC BMC interface info via redfish API."""
     _interface = bmc.redfish_request(bmc.manager_path + "/EthernetInterfaces/")[
         "Members"
@@ -142,22 +85,25 @@ def bmc_interface(bmc) -> dict:
     ipv4_address, ipv4_gateway, dhcp = parse_ipv4(_data["IPv4Addresses"])
     data = {k.lower(): v for k, v in _data.items()}
     host_name = data.get("hostname")
-    bmc_name = "iDRAC" if get_system_vendor(bmc) == "Dell" else "iLO"
-    bmc_description = (
-        "Dedicated iDRAC interface" if (bmc_name == "iDRAC") else data.get("name")
+
+    if get_system_vendor(bmc) == "Dell":
+        bmc_name = "iDRAC"
+        bmc_description = "Dedicated iDRAC interface"
+    else:
+        bmc_name = "iLO"
+        bmc_description = str(data.get("name"))
+
+    bmc_mac = normalise_mac(str(data.get("macaddress")))
+
+    return InterfaceInfo(
+        name=bmc_name,
+        description=bmc_description,
+        mac_address=bmc_mac,
+        hostname=host_name,
+        ipv4_address=ipv4_address,
+        ipv4_gateway=ipv4_gateway,
+        dhcp=bool(dhcp),
     )
-    bmc_mac = data.get("macaddress")
-    return {
-        "name": bmc_name,
-        "description": bmc_description,
-        "mac_address": normalise_mac(bmc_mac)
-        if (bmc_mac and bmc_mac != "")
-        else bmc_mac,
-        "hostname": host_name,
-        "ipv4_address": ipv4_address,
-        "ipv4_gateway": ipv4_gateway,
-        "dhcp": dhcp,
-    }
 
 
 def parse_ipv4(
@@ -233,67 +179,6 @@ def interface_detail(bmc, path) -> dict:
         "mac_address": normalise_mac(mac_addr) if mac_addr != "" else mac_addr,
         "hostname": hostname,
     }
-
-
-def lldp_data_by_name(bmc) -> dict:
-    """Retrieve LLDP information from DRAC using redfish API.
-
-    Local interface names are standardised
-
-    Remote Switch interface names have abbreviations expanded to cisco standard
-
-    {
-        "iDRAC": {
-            "remote_switch_mac_address" : "C4:4D:04:48:61:80",
-            "remote_switch_port_name" : "GigabitEthernet1/0/3",
-        },
-        'NIC.Slot.1-1': {
-            "remote_switch_mac_address": "C4:7E:E0:E4:32:DF",
-            "remote_switch_port_name": "Ethernet1/6",
-        },
-    }
-
-    The MAC address is from the remote switch - it matches the base MAC that is
-    found in `show version` output on a 2960, on N9k it is one of two things:
-
-    1) On a switch configured with `lldp chassis-id switch` this will be the
-    mac you see in `show mac address-table static | in Lo0` or `sho vdc detail`
-    commands.  Note that this lldp configuration option is only available
-    starting in Nexus version 10.2(3)F
-
-    2) On other nexus, this mac address will be the base mac address plus the
-    port number, for example if the base mac address of the switch is
-    11:11:11:11:11:00 then the LLDP mac address seen on port e1/2 would be
-    11:11:11:11:11:02
-    """
-    _data = bmc.redfish_request(
-        bmc.system_path + "/NetworkPorts/Oem/Dell/DellSwitchConnections/"
-    )
-    ports = _data["Members"]
-    return {server_interface_name(port["Id"]): parse_lldp_port(port) for port in ports}
-
-
-def parse_lldp_port(port_data: dict[str, str]) -> dict:
-    """Adapt the Dell Redfish LLDP fields to our internal format.
-
-    Remote Switch interface names have abbreviations expanded to cisco standard
-    """
-    mac = str(port_data["SwitchConnectionID"]).upper()
-    port_name = normalize_interface_name(port_data["SwitchPortConnectionID"])
-    stale = str(port_data["StaleData"]) != "NotStale"
-
-    if mac in ["NOT AVAILABLE", "NO LINK", "NOT SUPPORTED"]:
-        return {
-            "remote_switch_mac_address": None,
-            "remote_switch_port_name": None,
-            "remote_switch_data_stale": stale,
-        }
-    else:
-        return {
-            "remote_switch_mac_address": normalise_mac(mac),
-            "remote_switch_port_name": port_name,
-            "remote_switch_data_stale": stale,
-        }
 
 
 def get_system_vendor(bmc: Bmc) -> str:
