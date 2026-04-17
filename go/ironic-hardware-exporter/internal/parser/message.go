@@ -2,6 +2,8 @@ package parser
 
 import (
 	"encoding/json"
+	"log"
+	"strings"
 	"time"
 )
 
@@ -100,7 +102,8 @@ func Parse(body []byte) (*HardwareMessage, error) {
 		return nil, err
 	}
 
-	if inner.EventType != "hardware.idrac.metrics" {
+	// match any hardware.<driver>.metrics event e.g. hardware.idrac.metrics, hardware.redfish.metrics
+	if !strings.HasPrefix(inner.EventType, "hardware.") || !strings.HasSuffix(inner.EventType, ".metrics") {
 		return nil, nil // nil means "not a hardware event, skip it"
 	}
 
@@ -108,6 +111,7 @@ func Parse(body []byte) (*HardwareMessage, error) {
 	// if it fails fall back to now so we always have a valid timestamp
 	ts, err := time.Parse("2006-01-02T15:04:05.999999", inner.Payload.Timestamp)
 	if err != nil {
+		log.Printf("warning: could not parse event timestamp %q, falling back to now — Ironic may have changed the timestamp format: %v", inner.Payload.Timestamp, err)
 		ts = time.Now().UTC()
 	}
 
