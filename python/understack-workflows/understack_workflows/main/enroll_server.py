@@ -100,9 +100,18 @@ def enrol(
     # etc.
     ironic_node.inspect_out_of_band(node)
 
-    # Agent inspection via virtual media gathers LLDP and full hardware
-    # inventory.
-    inspect_via_virtual_media(node)
+    # Agent inspection gathers LLDP and full hardware inventory.
+    #
+    # Virtual media boot makes Neutron behave differently to normal HTTP agent
+    # boot - in our normal configuration it fails to set up ports on the
+    # provisioning network.
+    #
+    # Therefore, we only use virtual media during our "enrol" phase, when the
+    # port data is set up in a manner that suits the Neutron algorithm.  If a
+    # normal PXE/HTTP port is available then we use it instead:
+
+    virtual_media = not bool(ironic_node.pxe_enabled_bios_name(node))
+    agent_inspection(node, virtual_media=virtual_media)
 
     pxe_interface = ironic_node.pxe_enabled_bios_name(node)
     if not pxe_interface:
@@ -128,29 +137,33 @@ def enrol(
     logger.info("Completed enrol workflow for bmc_ip_address=%s", ip_address)
 
 
-def inspect_via_virtual_media(node: Node) -> None:
-    """Run agent inspection booted via virtual media.
+def agent_inspection(node: Node, virtual_media=False) -> None:
+    """Run agent inspection booted, optionally via virtual media.
 
-    The node is temporarily flipped to a virtual-media boot_interface so the
-    agent ramdisk boots from a BMC-attached ISO rather than via PXE.  After
-    inspection the boot_interface is reset to the steady-state value used for
-    cleaning and provisioning.
+    If requested,  the node is temporarily flipped to a virtual-media
+    boot_interface so the agent ramdisk boots from a BMC-attached ISO rather
+    than via PXE.  After initial inspection, the boot_interface is set back to
+    the steady-state value used for cleaning and provisioning.
+
+    If cleaning fails we don't reset the boot_interface (as Ironic won't let us
+    change that attribute in the inspect_failed state).
     """
-    refreshed = ironic_node.refresh(node, fields=["driver"])
-    vm_boot = ironic_node.virtual_media_boot_interface_for(refreshed.driver)
+    if virtual_media:
+        refreshed = ironic_node.refresh(node, fields=["driver"])
+        boot_interface = ironic_node.virtual_media_boot_interface_for(refreshed.driver)
+    else:
+        boot_interface = ironic_node.STEADY_STATE_BOOT_INTERFACE
 
     logger.info(
         "[node:%s] Switching boot_interface to %s for agent inspection",
         node.uuid,
-        vm_boot,
+        boot_interface,
     )
-    ironic_node.patch(node, [f"boot_interface={vm_boot}"])
-    try:
-        ironic_node.inspect(node)
-    finally:
-        ironic_node.patch(
-            node, [f"boot_interface={ironic_node.STEADY_STATE_BOOT_INTERFACE}"]
-        )
+    ironic_node.patch(node, [f"boot_interface={boot_interface}"])
+    ironic_node.inspect(node)
+    ironic_node.patch(
+        node, [f"boot_interface={ironic_node.STEADY_STATE_BOOT_INTERFACE}"]
+    )
 
 
 def initialize_bmc(bmc: Bmc, old_password: str | None) -> ChassisInfo:

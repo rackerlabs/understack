@@ -166,7 +166,12 @@ def make_ironic_client(
 
 def make_port(*, address: str, pxe_enabled: bool, bios_name: str | None):
     extra = {"bios_name": bios_name} if bios_name else {}
-    return SimpleNamespace(address=address, pxe_enabled=pxe_enabled, extra=extra)
+    return SimpleNamespace(
+        address=address,
+        pxe_enabled=pxe_enabled,
+        extra=extra,
+        physical_network="abc1234",
+    )
 
 
 def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
@@ -320,16 +325,13 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
     )
 
     expected_reset = [{"op": "remove", "path": "/inspect_interface"}]
-    expected_vm_boot = [
-        {"op": "add", "path": "/boot_interface", "value": "idrac-redfish-virtual-media"}
-    ]
     expected_ipxe_boot = [
         {"op": "add", "path": "/boot_interface", "value": "http-ipxe"}
     ]
     expected_agent = [{"op": "add", "path": "/inspect_interface", "value": "agent"}]
     assert fake_ironic.node.update.call_args_list == [
         call(created_node.uuid, expected_reset),  # OOB inspect prep
-        call(created_node.uuid, expected_vm_boot),
+        call(created_node.uuid, expected_ipxe_boot),
         call(created_node.uuid, expected_agent),
         call(created_node.uuid, expected_ipxe_boot),
         call(created_node.uuid, expected_reset),  # Post-RAID OOB inspect prep

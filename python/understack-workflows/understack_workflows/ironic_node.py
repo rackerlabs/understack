@@ -249,6 +249,9 @@ def list_node_ports(node: Node) -> list:
 def pxe_enabled_bios_name(node: Node) -> str | None:
     """BIOS-reported name of port currently flagged pxe_enabled.
 
+    We don't count a port whose physical_network has the placeholder "enrol"
+    value.
+
     extra.bios_name is populated by the port-bios-name inspection hook during
     out-of-band redfish inspection.
 
@@ -256,7 +259,11 @@ def pxe_enabled_bios_name(node: Node) -> str | None:
     inspection.
     """
     for port in list_node_ports(node):
-        if port.pxe_enabled and port.extra.get("bios_name"):
+        if (
+            port.pxe_enabled
+            and port.extra.get("bios_name")
+            and port.physical_network != "enrol"
+        ):
             return port.extra["bios_name"]
 
 
