@@ -19,6 +19,15 @@ class PortBiosNameHook(base.InspectionHook):
     We set the `name` and `extra.bios_name` for each port using the BIOS names
     in the inventory data that was collected by redfish inspection.
 
+    When the native Ironic "ports" hook runs, it creates any missing ports but
+    lamentably it sets the "pxe" flag on every port it creates.
+
+    We clear that flag, because it causes neutron to do extra work and assign
+    extra IP addresses.  We know that it is a newly-created port and not one
+    that we specifically set to PXE, because newly created ports don't have a
+    physical_network, whereas we always set that property at the same time we
+    set the PXE flag.
+
     If this node has no PXE ports at all, then we assume that this box has just
     been enrolled and has not yet undergone a successful agent inspection.
     Agent inspection will be the next step, and therefore we need to set up the
@@ -67,6 +76,7 @@ class PortBiosNameHook(base.InspectionHook):
 
             _set_port_extra(baremetal_port, mac, bios_name)
             _set_port_name(baremetal_port, mac, bios_name, task.node.name)
+            _clear_unwanted_pxe(baremetal_port)
 
         if not any(port.pxe_enabled for port in ports):
             _set_port_pxe_placeholder(ports[0])
@@ -84,6 +94,18 @@ def _set_port_pxe_placeholder(baremetal_port):
         "switch_id": "00:00:00:00:00:00",
         "switch_info": "None",
     }
+    baremetal_port.save()
+
+
+def _clear_unwanted_pxe(baremetal_port):
+    if baremetal_port.physical_network:
+        return
+
+    if not baremetal_port.pxe_enabled:
+        return
+
+    LOG.info("Clearing port %s PXE flag.", baremetal_port.address)
+    baremetal_port.pxe_enabled = False
     baremetal_port.save()
 
 
