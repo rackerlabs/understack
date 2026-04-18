@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 //strut to hold the config
@@ -36,7 +37,7 @@ func Load() (*Config, error) {
 	return &Config{
 		RabbitMQ: RabbitMQConfig{
 			Host:       getEnv("RABBITMQ_HOST", "localhost"),
-			Port:       5672,
+			Port:       getEnvInt("RABBITMQ_PORT", 5672),
 			VHost:      getEnv("RABBITMQ_VHOST", "ironic"),
 			Username:   getEnv("RABBITMQ_USERNAME", "ironic"),
 			Password:   password,
@@ -45,7 +46,7 @@ func Load() (*Config, error) {
 			RoutingKey: getEnv("RABBITMQ_ROUTING_KEY", "notifications.info"),
 		},
 		Server: ServerConfig{
-			Port: 9608,
+			Port: getEnvInt("SERVER_PORT", 9608),
 		},
 	}, nil
 }
@@ -53,6 +54,15 @@ func Load() (*Config, error) {
 func getEnv(key, defaultValue string) string {
 	if val := os.Getenv(key); val != "" {
 		return val
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if val := os.Getenv(key); val != "" {
+		if n, err := strconv.Atoi(val); err == nil {
+			return n
+		}
 	}
 	return defaultValue
 }
