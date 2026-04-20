@@ -1,0 +1,15 @@
+---
+# Default variables for keystone_domains_projects role
+# This role creates domains and projects inside of them
+
+# Define the domains and their projects
+# Note: projects key is optional - domains can be created without projects
+keystone_domains_projects_list:
+  - domain_name: infra
+    description: 'System Infra'
+    projects:
+      - project_name: baremetal
+        description: 'Ironic resources'
+  # Example of domain without projects:
+  # - domain_name: example
+  #   description: 'Example domain with no projects'

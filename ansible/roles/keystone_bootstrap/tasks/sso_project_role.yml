@@ -1,5 +1,5 @@
 ---
-# Copyright (c) 2025 Rackspace Technology, Inc.
+# Copyright (c) 2026 Rackspace Technology, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -12,15 +12,17 @@
 # WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 # License for the specific language governing permissions and limitations
 # under the License.
+#
 
-- name: Keystone Bootstrap
-  hosts: keystone
-  connection: local
+- name: Create the role if it does not exist
+  openstack.cloud.identity_role:
+    name: "{{ role_item.role }}"
+    state: present
 
-  pre_tasks:
-    - name: Check OpenStack connectivity
-      ansible.builtin.import_tasks: tasks/check_openstack_auth.yml
-
-  roles:
-    - role: keystone_domains_projects
-    - role: keystone_bootstrap
+- name: Assign role to group for project
+  openstack.cloud.role_assignment:
+    group: "{{ group_id }}"
+    project: "{{ role_item.project }}"
+    role: "{{ role_item.role }}"
+    state: present
+  when: dont_set_roles is not defined
