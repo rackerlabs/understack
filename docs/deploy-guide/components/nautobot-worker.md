@@ -78,6 +78,15 @@ that even with a leaked password, connections without a valid client
 certificate are rejected. Traffic is encrypted end-to-end between the
 worker pod and the server.
 
+## Plugin Loading
+
+The shared `nautobot_config.py` supports a generic plugin loading
+mechanism described in the
+[Nautobot Plugin Loading](../../operator-guide/nautobot.md#plugin-loading)
+operator guide. Site workers use the same mechanism -- open-source
+plugins are loaded automatically, and additional plugins can be added
+via the `NAUTOBOT_EXTRA_PLUGINS` environment variable.
+
 ## Connection Security
 
 ### PostgreSQL (CNPG)
@@ -118,22 +127,10 @@ The CNPG `pg_hba` rules are evaluated top-to-bottom:
 
 ### Redis
 
-The global Redis instance has TLS enabled with `authClients: true`
-(Bitnami Redis subchart), requiring client certificates from all
-connections -- including local pods on the global cluster.
-
-The `nautobot_config.py` Redis mTLS logic checks if the CA cert file
-exists at the default path (`/etc/nautobot/mtls/ca.crt`). If present,
-it configures `ssl_cert_reqs`, `ssl_ca_certs`, `ssl_certfile`, and
-`ssl_keyfile` on the Redis connection pool, Celery broker, and Celery
-result backend. Both global and site pods automatically pick up Redis
-mTLS when the cert volume is mounted.
-
-Because `authClients: true` applies to all connections (Redis has no
-equivalent of `pg_hba` to distinguish local vs remote), a
-`nautobot-mtls-client` Certificate resource is also deployed on the
-global cluster so that local Nautobot web and Celery pods can present
-a valid client cert.
+The global Redis mTLS configuration is described in the
+[global nautobot deploy guide](nautobot.md#redis-mtls). Site workers
+use the same auto-detection mechanism -- when the mTLS cert volume is
+mounted, Redis SSL is configured automatically.
 
 ### Envoy Gateway
 
@@ -145,19 +142,8 @@ SNI hostname without terminating TLS, preserving end-to-end mTLS.
 
 ### Global Cluster
 
-The global cluster hosts the mTLS CA hierarchy (managed by cert-manager):
-
-| Resource | Kind | Purpose |
-|---|---|---|
-| `mtls-selfsigned` | Issuer | Bootstraps the self-signed root |
-| `mtls-ca` | Certificate | Root CA (ECDSA P-256, 10yr duration, 1yr renewBefore) |
-| `mtls-ca-issuer` | Issuer | Signs all client and server certificates |
-| `mtls-ca-cert` | Certificate | CA public cert secret used by CNPG and Redis for client verification |
-| `nautobot-cluster-server-tls` | Certificate | PostgreSQL server certificate |
-| `nautobot-redis-server-tls` | Certificate | Redis server certificate |
-| `nautobot-mtls-client` | Certificate | Client certificate for global Nautobot/Celery pods (needed because Redis `authClients: true` applies to all connections) |
-
-All resources live in the `nautobot` namespace.
+The global cluster hosts the mTLS CA hierarchy described in the
+[global nautobot deploy guide](nautobot.md#mtls-certificate-infrastructure).
 
 ### Site Clusters
 
@@ -217,8 +203,8 @@ metadata:
   namespace: nautobot
 spec:
   secretName: nautobot-mtls-client-<site>
-  duration: 8760h    # 1 year
-  renewBefore: 720h  # 30 days
+  duration: 26280h   # 3 years
+  renewBefore: 2160h # 90 days
   commonName: app
   usages:
     - client auth
@@ -374,8 +360,8 @@ celery:
   extraEnvVars:
     - name: NAUTOBOT_CONFIG
       value: /opt/nautobot/nautobot_config.py
-    - name: UC_PARTITION
-      value: <site-partition>
+    - name: NAUTOBOT_EXTRA_PLUGINS
+      value: '<comma-separated list of additional plugin module names>'
     - name: NAUTOBOT_DB_SSLMODE
       value: verify-ca
     - name: NAUTOBOT_REDIS_SSL_CERT_REQS
@@ -441,36 +427,10 @@ kubectl logs -n nautobot -l app.kubernetes.io/component=nautobot-celery --tail=5
 
 ## Certificate Renewal
 
-Client certificates have a 1-year duration with 30-day auto-renewal by
-cert-manager on the global cluster. When cert-manager renews a
-certificate, the updated cert+key must be re-uploaded to your secrets
-provider and the site ExternalSecret will pick it up on its next
-refresh cycle.
-
-This is a manual process by default. Approaches to automate it:
-
-- **PushSecret (External Secrets Operator):** Use a
-  [PushSecret](https://external-secrets.io/latest/guides/pushsecrets/)
-  resource on the global cluster to automatically push the renewed cert
-  to your secrets provider whenever the Kubernetes secret changes. This
-  is event-driven and requires no CronJob.
-
-- **CronJob on the global cluster:** A Kubernetes CronJob that runs
-  periodically, reads the cert secret, and pushes it to your secrets
-  provider via its API.
-
-- **Cross-cluster secret replication:** Use a tool like
-  [Kubernetes Replicator](https://github.com/mittwald/kubernetes-replicator)
-  to copy the cert secret directly from the global cluster to site
-  clusters, bypassing the secrets provider entirely.
-
-- **CertificateRequest from site clusters:** The site cluster creates a
-  cert-manager
-  [CertificateRequest](https://cert-manager.io/docs/usage/certificaterequest/),
-  an operator on the global cluster approves and signs it, and the
-  signed cert is returned. This is similar to how kubelet certificate
-  management works in Kubernetes. Most complex to set up but fully
-  automated with no intermediate secrets provider.
+For details on how mTLS client certificates are renewed and distributed
+to site clusters, see the
+[mTLS Certificate Renewal](../../operator-guide/nautobot-mtls-certificate-renewal.md)
+operator guide.
 
 ## Environment Variable Reference
 
@@ -487,7 +447,9 @@ This is a manual process by default. Approaches to automate it:
 | `SSL_CERT_FILE` | Site worker values | System-wide CA bundle override for outbound HTTPS |
 | `REQUESTS_CA_BUNDLE` | Site worker values | Python requests library CA bundle override |
 | `NAUTOBOT_CONFIG` | Both global and site | Path to `nautobot_config.py` |
-| `UC_PARTITION` | Site worker values | Site partition identifier for Celery task routing |
+| `NAUTOBOT_EXTRA_PLUGINS` | Both global and site values | Comma-separated list of additional plugin module names to load (beyond the open-source defaults). Plugins are loaded only if installed in the container. |
+| `NAUTOBOT_EXTRA_PLUGINS_CONFIG` | Both global and site values | JSON object with plugin configuration. Supports `${ENV_VAR}` syntax for referencing environment variables in string values (useful for secrets). Merged into `PLUGINS_CONFIG`. |
+| `UNDERSTACK_PARTITION` | `cluster-data` ConfigMap (patched by ArgoCD from `appLabels`) | Site partition identifier used by computed fields (e.g. device URN generation). Exposed as a Django setting. |
 
 ## Design Decisions
 

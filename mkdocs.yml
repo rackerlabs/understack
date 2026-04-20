@@ -242,6 +242,7 @@ nav:
       - operator-guide/nautobot.md
       - operator-guide/nautobotop.md
       - operator-guide/nautobot-celery-queues.md
+      - operator-guide/nautobot-mtls-certificate-renewal.md
       - operator-guide/troubleshooting-osh.md
       - operator-guide/logging.md
       - operator-guide/ansible-local-usage.md

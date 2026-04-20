@@ -1,4 +1,7 @@
+import json as _json
 import os
+import re as _re
+from ssl import CERT_REQUIRED
 
 from nautobot.core.settings import *  # noqa F401,F403
 from nautobot.core.settings_funcs import is_truthy
@@ -93,8 +96,6 @@ if _db_sslmode in ("verify-ca", "verify-full"):
 # When NAUTOBOT_REDIS_SSL env var is "true" (set by Helm `nautobot.redis.ssl`),
 # the Helm chart switches the URL scheme to rediss://.  We still need to tell
 # the Python redis client *which* certs to use for mutual TLS.
-from ssl import CERT_REQUIRED  # noqa: E402
-
 _redis_ca = os.getenv("NAUTOBOT_REDIS_SSL_CA_CERTS", "/etc/nautobot/mtls/ca.crt")
 _redis_cert = os.getenv("NAUTOBOT_REDIS_SSL_CERTFILE", "/etc/nautobot/mtls/tls.crt")
 _redis_key = os.getenv("NAUTOBOT_REDIS_SSL_KEYFILE", "/etc/nautobot/mtls/tls.key")
@@ -401,6 +402,11 @@ INSTALLATION_METRICS_ENABLED = is_truthy(
     os.getenv("NAUTOBOT_INSTALLATION_METRICS_ENABLED", "True")
 )
 
+# Partition identifier used by computed fields (e.g. device URN generation).
+# Populated from the cluster-data ConfigMap which is patched by ArgoCD from
+# the appLabels["understack.rackspace.com/partition"] value.
+UNDERSTACK_PARTITION = os.environ.get("UNDERSTACK_PARTITION", "")
+
 # Storage backend to use for Job input files and Job output files.
 #
 # Note: the default is for backwards compatibility and it is recommended to change it if possible for your deployment.
@@ -460,8 +466,32 @@ INSTALLATION_METRICS_ENABLED = is_truthy(
 # PER_PAGE_DEFAULTS = [25, 50, 100, 250, 500, 1000]
 
 # Enable installed plugins. Add the name of each plugin to the list.
+# Use try/except to only load plugins that are installed in this container,
+# since different deployments may have different plugin sets.
 #
-# PLUGINS = []
+PLUGINS = []
+for _plugin_name in [
+    "nautobot_plugin_nornir",
+    "nautobot_golden_config",
+]:
+    try:
+        __import__(_plugin_name)
+        PLUGINS.append(_plugin_name)
+    except ImportError:
+        pass
+
+# Allow additional plugins to be specified via the NAUTOBOT_EXTRA_PLUGINS
+# environment variable (comma-separated list of plugin module names).
+# This lets private deployments add their own plugins without modifying
+# this file.
+_extra_plugins = os.getenv("NAUTOBOT_EXTRA_PLUGINS", "")
+for _plugin_name in (p.strip() for p in _extra_plugins.split(",") if p.strip()):
+    try:
+        __import__(_plugin_name)
+        if _plugin_name not in PLUGINS:
+            PLUGINS.append(_plugin_name)
+    except ImportError:
+        pass
 
 # Plugins configuration settings. These settings are used by various plugins that the user may have installed.
 # Each key in the dictionary is the name of an installed plugin and its value is a dictionary of settings.
@@ -472,13 +502,67 @@ INSTALLATION_METRICS_ENABLED = is_truthy(
 #         'buzz': 'bazz'
 #     }
 # }
-PLUGINS_CONFIG = {
-    "vni_custom_model": {
-        "FORCE_UNIQUE_VLANS": is_truthy(
-            os.getenv("VNI_CUSTOM_MODEL_FORCE_UNIQUE_VLANS", "false")
-        )
+PLUGINS_CONFIG = {}
+
+# Configuration for open-source plugins (only applied when the plugin is loaded).
+if "nautobot_plugin_nornir" in PLUGINS:
+    PLUGINS_CONFIG["nautobot_plugin_nornir"] = {
+        "nornir_settings": {
+            "credentials": "nautobot_plugin_nornir.plugins.credentials.nautobot_secrets.CredentialsNautobotSecrets",
+            "runner": {
+                "plugin": "threaded",
+                "options": {
+                    "num_workers": 20,
+                },
+            },
+        },
+        "use_config_context": {
+            "connection_options": True,
+        },
     }
-}
+
+if "nautobot_golden_config" in PLUGINS:
+    PLUGINS_CONFIG["nautobot_golden_config"] = {
+        "per_feature_bar_width": 0.15,
+        "per_feature_width": 13,
+        "per_feature_height": 4,
+        "enable_backup": True,
+        "enable_compliance": True,
+        "enable_intended": True,
+        "enable_sotagg": True,
+        "sot_agg_transposer": None,
+        "enable_postprocessing": True,
+        "postprocessing_callables": [],
+        "postprocessing_subscribed": [],
+        "platform_slug_map": None,
+    }
+
+
+# Allow plugin configuration via the NAUTOBOT_EXTRA_PLUGINS_CONFIG environment
+# variable. Value must be a JSON object whose keys are plugin names and values
+# are config dicts. Supports ${ENV_VAR} syntax for referencing environment
+# variables in string values (useful for secrets).
+def _interpolate_env(obj):
+    """Recursively replace ${VAR} patterns with environment variable values."""
+    if isinstance(obj, str):
+        return _re.sub(
+            r"\$\{(\w+)\}",
+            lambda m: os.environ.get(m.group(1), ""),
+            obj,
+        )
+    if isinstance(obj, dict):
+        return {k: _interpolate_env(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_interpolate_env(v) for v in obj]
+    return obj
+
+
+_extra_cfg = os.getenv("NAUTOBOT_EXTRA_PLUGINS_CONFIG", "")
+if _extra_cfg:
+    try:
+        PLUGINS_CONFIG.update(_interpolate_env(_json.loads(_extra_cfg)))
+    except (ValueError, TypeError):
+        pass
 
 # Prefer IPv6 addresses or IPv4 addresses in selecting a device's primary IP address?
 #
