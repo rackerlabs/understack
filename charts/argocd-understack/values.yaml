@@ -145,6 +145,10 @@ global:
     # @default -- false
     enabled: false
 
+    # -- config file to use for Nautobot scoped to either $understack or $deploy repo
+    # @default -- $understack/components/nautobot/nautobot_config.py
+    nautobot_config: '$understack/components/nautobot/nautobot_config.py'
+
   # -- Nautobot API token generation jobs
   nautobot_api_tokens:
     # -- Enable/disable deploying
