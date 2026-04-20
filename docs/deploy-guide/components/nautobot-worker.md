@@ -94,36 +94,45 @@ via the `NAUTOBOT_EXTRA_PLUGINS` environment variable.
 The global CNPG cluster is configured with:
 
 - `spec.certificates.serverTLSSecret` and `spec.certificates.serverCASecret`
-  for server-side TLS. PostgreSQL uses the CA in `serverCASecret` to
-  verify client certificates presented during `pg_hba cert` authentication.
-  `clientCASecret` is intentionally NOT set -- CNPG uses that field
-  internally to sign replication client certificates, which requires the
-  CA private key. CNPG manages its own replication client CA.
-- `pg_hba` rules that require `hostssl ... cert` for remote connections
-  and allow `host ... scram-sha-256` for local pods on the global cluster
+  for server-side TLS.
+- `spec.certificates.clientCASecret` set to the CA public cert secret
+  (`mtls-ca-cert`). CNPG uses this to populate PostgreSQL's
+  `ssl_ca_file`, which is what PostgreSQL checks when verifying client
+  certificates during `pg_hba cert` authentication. The secret only
+  needs `ca.crt` (the root CA public cert).
+- `spec.certificates.replicationTLSSecret` set to a cert-manager
+  Certificate (`nautobot-cluster-replication`) with
+  `commonName: streaming_replica`. This provides the client cert CNPG
+  uses for streaming replication between PostgreSQL instances. When
+  `replicationTLSSecret` is provided, CNPG does not need the CA private
+  key in `clientCASecret`, which is why we can use `mtls-ca-cert`
+  (which only has `ca.crt`) instead of `mtls-ca-key-pair`.
+- `pg_hba` rules that require `hostssl ... cert` for all connections,
+  enforcing client certificate authentication over TLS
 
-Site workers connect with `sslmode=verify-ca`, presenting their client
-certificate, key, and the CA root cert via Django's `DATABASES` OPTIONS.
+Both global pods and site workers connect with `sslmode=verify-ca`,
+presenting their client certificate, key, and the CA root cert via
+Django's `DATABASES` OPTIONS.
 
 The `nautobot_config.py` SSL logic is conditional on the
-`NAUTOBOT_DB_SSLMODE` environment variable. When set to `verify-ca` or
-`verify-full`, it reads the cert paths from environment variables (with
-defaults pointing to `/etc/nautobot/mtls/`) and sets
-`DATABASES["default"]["OPTIONS"]`. When the env var is unset or empty
-(as on the global cluster), no SSL options are applied and pods connect
-with password-only auth.
+`NAUTOBOT_DB_SSLMODE` environment variable:
 
-#### pg_hba Rule Order
+- `verify-ca` or `verify-full`: reads cert paths from environment
+  variables (defaults to `/etc/nautobot/mtls/`) and sets full mTLS
+  options on `DATABASES["default"]["OPTIONS"]`. Used by both global
+  pods and site workers.
+- `require`: sets `sslmode=require` only -- encrypts the connection
+  without presenting a client certificate or verifying the server CA.
+- Unset or empty: no SSL options are applied and pods connect with
+  password-only auth over plain TCP.
 
-The CNPG `pg_hba` rules are evaluated top-to-bottom:
+#### pg_hba Rule
 
-1. `host all all 10.0.0.0/8 scram-sha-256` -- local pods on the global
-   cluster connect with password only (no TLS required)
-2. `hostssl all all 0.0.0.0/0 cert` -- remote connections with a valid
-   client certificate are accepted (cert CN maps to DB user)
-3. `hostssl all all 0.0.0.0/0 scram-sha-256` -- transitional rule:
-   remote connections over TLS with password only (no client cert).
-   Remove this rule once all sites have mTLS deployed.
+The CNPG cluster uses a single `pg_hba` rule:
+
+1. `hostssl all all 0.0.0.0/0 cert` -- all connections must use TLS
+   and present a valid client certificate. The certificate CN maps to
+   the PostgreSQL user (must be `app`).
 
 ### Redis
 
@@ -181,7 +190,7 @@ Before starting, ensure the global cluster already has:
 - The mTLS CA hierarchy deployed (issuers, root CA, CA issuer)
 - Server TLS certificates for PostgreSQL and Redis
 - A global `nautobot-mtls-client` certificate (for Redis `authClients`)
-- CNPG configured with `serverTLSSecret`, `serverCASecret`, and `pg_hba`
+- CNPG configured with `serverTLSSecret`, `serverCASecret`, `clientCASecret`, and `pg_hba`
 - Redis TLS enabled with `authClients: true`
 - Envoy Gateway TLS passthrough routes on ports 5432 and 6379
 
@@ -436,7 +445,7 @@ operator guide.
 
 | Variable | Where Set | Purpose |
 |---|---|---|
-| `NAUTOBOT_DB_SSLMODE` | Site worker values | Controls PostgreSQL SSL mode. Set to `verify-ca` for mTLS. Unset on global cluster. |
+| `NAUTOBOT_DB_SSLMODE` | Both global and site values | Controls PostgreSQL SSL mode. Set to `verify-ca` for mTLS on all pods. |
 | `NAUTOBOT_DB_SSLCERT` | Optional override | Path to client cert for PG (default: `/etc/nautobot/mtls/tls.crt`) |
 | `NAUTOBOT_DB_SSLKEY` | Optional override | Path to client key for PG (default: `/etc/nautobot/mtls/tls.key`) |
 | `NAUTOBOT_DB_SSLROOTCERT` | Optional override | Path to CA cert for PG (default: `/etc/nautobot/mtls/ca.crt`) |
@@ -457,11 +466,14 @@ operator guide.
   CA issuer) handles issuance and renewal on both global and site
   clusters without manual intervention.
 
-- CNPG's native TLS support (`serverTLSSecret`, `serverCASecret`)
-  integrates directly with cert-manager secrets. No sidecar proxies or
-  custom TLS termination needed. PostgreSQL verifies external client
-  certificates using the CA chain from `serverCASecret` when processing
-  `pg_hba cert` rules.
+- CNPG's native TLS support (`serverTLSSecret`, `serverCASecret`,
+  `clientCASecret`, `replicationTLSSecret`) integrates directly with
+  cert-manager secrets. No sidecar proxies or custom TLS termination
+  needed. `clientCASecret` populates PostgreSQL's `ssl_ca_file` for
+  client cert verification during `pg_hba cert` auth. It points to the
+  CA public cert secret (`mtls-ca-cert`). `replicationTLSSecret`
+  provides the streaming replication client cert so CNPG does not need
+  the CA private key in `clientCASecret`.
 
 - The `routes.tls` type in the Envoy Gateway template uses a
   `gatewayPort` field to support non-443 ports for TLS passthrough.
@@ -478,7 +490,8 @@ operator guide.
 
 - The `nautobot_config.py` SSL logic is conditional on
   `NAUTOBOT_DB_SSLMODE`, so the same config file works for both global
-  pods (no mTLS) and site workers (mTLS enabled).
+  pods and site workers. All pods set `verify-ca` to present client
+  certificates for `pg_hba cert` authentication.
 
 - The Redis mTLS logic in `nautobot_config.py` auto-detects the CA cert
   file at the default mount path. If the cert volume is mounted, Redis
@@ -486,19 +499,22 @@ operator guide.
 
 ## Known Gotchas
 
-- **clientCASecret is NOT for external client verification.** CNPG's
-  `clientCASecret` field is used internally to sign replication client
-  certificates between PostgreSQL instances. It expects a secret with
-  both `ca.crt` and `ca.key`. Only `serverTLSSecret` and
-  `serverCASecret` should be set. PostgreSQL verifies external client
-  certificates using the CA chain from `serverCASecret` when processing
-  `pg_hba cert` rules.
+- **clientCASecret is required for client cert verification.** CNPG
+  uses `clientCASecret` to populate PostgreSQL's `ssl_ca_file`, which
+  is what verifies client certificates during `pg_hba cert` auth.
+  `serverCASecret` only provides the CA cert sent to clients for server
+  verification -- it does NOT populate `ssl_ca_file`. Without
+  `clientCASecret`, CNPG auto-generates its own internal replication CA
+  and uses that for `ssl_ca_file`, causing `tlsv1 alert unknown ca`
+  errors for external client certs. When providing `clientCASecret`,
+  you must also set `replicationTLSSecret` so CNPG does not need the
+  CA private key (`ca.key`) in the `clientCASecret` secret.
 
-- **SSL config must be conditional.** Setting `sslmode` unconditionally
-  in `nautobot_config.py` would break global cluster pods, which connect
-  to CNPG via local password-only auth. The SSL config is gated on the
-  `NAUTOBOT_DB_SSLMODE` env var -- global pods don't set it, so they
-  are unaffected.
+- **SSL config must be conditional.** The mTLS config in
+  `nautobot_config.py` is gated on the `NAUTOBOT_DB_SSLMODE` env var.
+  Both global pods and site workers must set it to `verify-ca`. If the
+  env var is unset, no SSL options are applied and the connection will
+  be rejected by the `hostssl ... cert` pg_hba rule.
 
 - **mtls-ca-cert secret contains a private key.** cert-manager
   Certificate resources always produce `tls.crt`, `tls.key`, and
@@ -533,11 +549,11 @@ operator guide.
   mount the mTLS client cert into both the web server and celery pods,
   not just site workers.
 
-- **pg_hba rule ordering matters.** The transitional `pg_hba` rules
-  (`hostssl ... cert` and `hostssl ... scram-sha-256` for remote) are
-  ordered so that cert-based auth is tried first. Sites without client
-  certs fall through to password-only over TLS. Once all sites have
-  mTLS deployed, the `scram-sha-256` remote rule should be removed.
+- **pg_hba uses cert auth for all connections.** The single
+  `hostssl all all 0.0.0.0/0 cert` rule requires every connection --
+  local and remote -- to present a valid client certificate over TLS.
+  All pods (global and site workers) must have `NAUTOBOT_DB_SSLMODE`
+  set to `verify-ca` and the mTLS client cert mounted.
 
 - **defaultMode 256 vs 0400.** The `defaultMode: 256` (octal 0400) on
   the cert secret volume mount is correct but easy to get wrong. YAML
@@ -572,6 +588,30 @@ Check that:
 3. The secret contains `tls.crt`, `tls.key`, and `ca.crt` keys
 4. On the global cluster, verify the source certificate is issued:
    `kubectl get certificate -n nautobot | grep mtls-client`
+
+### PostgreSQL rejects connection with "tlsv1 alert unknown ca"
+
+PostgreSQL's `ssl_ca_file` does not contain the CA that signed the
+client certificate. This is a TLS-level rejection that happens before
+`pg_hba` rules are evaluated.
+
+The most common cause is that `clientCASecret` is not set on the CNPG
+Cluster resource. Without it, CNPG auto-generates its own internal
+replication CA and uses that for `ssl_ca_file`. External client certs
+signed by the mTLS CA will be rejected.
+
+Verify what CA PostgreSQL is actually using:
+
+```bash
+kubectl exec -n nautobot nautobot-cluster-1 -c postgres -- \
+  openssl x509 -noout -subject -in /controller/certificates/client-ca.crt
+```
+
+If it shows `CN=nautobot-cluster` (CNPG's internal CA) instead of
+`CN=understack-mtls-ca`, set `clientCASecret` and
+`replicationTLSSecret` on the CNPG Cluster. See the
+[PostgreSQL mTLS](../../operator-guide/nautobot.md#postgresql-mtls)
+operator guide for details.
 
 ### PostgreSQL rejects connection with "certificate verify failed"
 

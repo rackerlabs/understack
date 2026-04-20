@@ -67,9 +67,19 @@ from nautobot.core.settings_funcs import is_truthy
 if DATABASES["default"]["ENGINE"].endswith("mysql"):  # noqa F405
     DATABASES["default"]["OPTIONS"] = {"charset": "utf8mb4"}  # noqa F405
 
-# mTLS options for PostgreSQL connections.
-# When NAUTOBOT_DB_SSLMODE is set to "verify-ca" or "verify-full", the client
-# certificate, key, and CA root cert must be present at the configured paths.
+# SSL/mTLS options for PostgreSQL connections.
+#
+# Supported NAUTOBOT_DB_SSLMODE values:
+#   "require"     -- encrypt the connection but skip server CA and client cert
+#                    verification. Suitable for same-cluster pods that just need
+#                    to satisfy hostssl pg_hba rules.
+#   "verify-ca"   -- encrypt and verify the server certificate against the CA
+#   "verify-full" -- like verify-ca but also checks the server hostname
+#
+# When sslmode is "verify-ca" or "verify-full", the client certificate, key,
+# and CA root cert must be present at the configured paths (full mTLS).
+# When sslmode is "require", only encryption is enforced -- no cert files are
+# needed and no client certificate is presented.
 _db_sslcert = os.getenv("NAUTOBOT_DB_SSLCERT", "/etc/nautobot/mtls/tls.crt")
 _db_sslkey = os.getenv("NAUTOBOT_DB_SSLKEY", "/etc/nautobot/mtls/tls.key")
 _db_sslrootcert = os.getenv("NAUTOBOT_DB_SSLROOTCERT", "/etc/nautobot/mtls/ca.crt")
@@ -90,6 +100,10 @@ if _db_sslmode in ("verify-ca", "verify-full"):
         "sslcert": _db_sslcert,
         "sslkey": _db_sslkey,
         "sslrootcert": _db_sslrootcert,
+    }
+elif _db_sslmode == "require":
+    DATABASES["default"]["OPTIONS"] = {  # noqa F405
+        "sslmode": "require",
     }
 
 # mTLS options for Redis connections.

@@ -33,8 +33,17 @@ spec:
     kind: Issuer
 ```
 
-cert-manager automatically renews the certificate 90 days before
+cert-manager automatically renews the certificate 30 days before
 expiry, updating the Kubernetes secret on the global cluster.
+
+The global cluster also has:
+
+- `nautobot-mtls-client` -- client cert for global Nautobot/Celery pods
+  (`CN=app`). Renewed automatically by cert-manager.
+- `nautobot-cluster-replication` -- streaming replication client cert
+  (`CN=streaming_replica`). Renewed automatically by cert-manager.
+  Required so CNPG does not need the CA private key in
+  `clientCASecret`.
 
 ## The Distribution Problem
 
