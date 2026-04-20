@@ -1,0 +1,4 @@
+{
+  "oslo.version": "2.0",
+  "oslo.message": "{\"event_type\":\"ironic.metrics\",\"payload\":{\"event_type\":\"ironic.metrics.update\",\"payload\":{\"ironic.conductor.manager.ConductorManager._check_deploy_timeouts\":{\"count\":3939,\"sum\":26456.4,\"type\":\"timer\"}}}}"
+}
