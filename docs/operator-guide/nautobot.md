@@ -55,7 +55,8 @@ Key points:
 
 ### How nautobot_config.py Handles SSL
 
-The `nautobot_config.py` SSL logic is gated on the `NAUTOBOT_DB_SSLMODE`
+The shared deploy config's (`$deploy/apps/nautobot-config/nautobot_config.py`)
+SSL logic is gated on the `NAUTOBOT_DB_SSLMODE`
 environment variable:
 
 | Value | Behavior | Use Case |
@@ -206,11 +207,21 @@ for site workers:
 
 ## Configuration Architecture
 
+!!! important "All config changes go in the deploy repo"
+    The public `nautobot_config.py` at `$understack/components/nautobot/nautobot_config.py`
+    is intentionally kept as simple and generic as possible for open-source consumers.
+    It does **not** contain mTLS, plugin loading, UNDERSTACK_PARTITION, or any extra
+    plugins mechanism. **All deployment-specific Nautobot configuration changes MUST be
+    made in the shared deploy config** at `$deploy/apps/nautobot-config/nautobot_config.py`.
+    Do not modify the public config for private deployment needs.
+
 Nautobot requires a `nautobot_config.py` file that defines Django
 settings, plugin loading, database options, and authentication
-backends. In understack, this file lives at
-`components/nautobot/nautobot_config.py` and is injected into pods
-using the Helm chart's `fileParameters` feature.
+backends. For private deployments, this file lives at
+`$deploy/apps/nautobot-config/nautobot_config.py` and is injected into
+pods using the Helm chart's `fileParameters` feature. The public repo
+provides a minimal default at `components/nautobot/nautobot_config.py`
+for non-private deployments.
 
 ### How fileParameters Works
 
@@ -270,15 +281,17 @@ The effective configuration is built from multiple layers:
 
 1. **Nautobot defaults** -- `from nautobot.core.settings import *`
    provides all default Django and Nautobot settings
-2. **Component config** -- `components/nautobot/nautobot_config.py`
-   overrides defaults with understack-specific settings (mTLS, plugin
-   loading, SSO, partition identifier)
+2. **Deploy config** -- `$deploy/apps/nautobot-config/nautobot_config.py`
+   (for private deployments) overrides defaults with all deployment-specific
+   settings: mTLS, plugin loading, SSO, Sentry, production hardening,
+   UNDERSTACK_PARTITION, and verbose logging. For non-private deployments,
+   the public `components/nautobot/nautobot_config.py` provides a minimal
+   default with SSO and basic settings only.
 3. **Helm chart env vars** -- the base `components/nautobot/values.yaml`
    sets database, Redis, and other connection parameters as environment
    variables that the config reads via `os.getenv()`
 4. **Deploy repo values** -- site-specific overrides (hostnames, image
-   tags, extra plugins, credentials) that Helm merges on top of the
-   base values
+   tags, credentials) that Helm merges on top of the base values
 
 ### Important: Helm List Replacement
 
@@ -310,125 +323,12 @@ preserve.
 
 ## Plugin Loading
 
-The shared `nautobot_config.py` (mounted via Helm `fileParameters`)
-uses a generic plugin loading mechanism that works across different
-container images and deployments:
-
-1. Open-source plugins (`nautobot_plugin_nornir`, `nautobot_golden_config`)
-   are loaded automatically if installed in the container image.
-2. Additional plugins can be specified via the `NAUTOBOT_EXTRA_PLUGINS`
-   environment variable (comma-separated module names). Each plugin is
-   loaded only if it's actually installed in the container -- missing
-   plugins are silently skipped.
-3. Plugin configuration is provided via the `NAUTOBOT_EXTRA_PLUGINS_CONFIG`
-   environment variable as a JSON object. This supports `${ENV_VAR}`
-   syntax for referencing environment variables in string values, which
-   is useful for injecting secrets at runtime without hardcoding them in
-   the config.
-
-This design allows the same `nautobot_config.py` to be used by both
-the global Nautobot deployment (which may have additional private
-plugins) and site workers (which may have a different plugin set),
-without any deployment-specific code in the public repository.
-
-Example deploy values for adding custom plugins:
-
-```yaml
-nautobot:
-  extraEnvVars:
-    - name: NAUTOBOT_EXTRA_PLUGINS
-      value: 'my_custom_plugin,another_plugin'
-    - name: NAUTOBOT_EXTRA_PLUGINS_CONFIG
-      value: '{"my_custom_plugin":{"API_KEY":"${MY_API_KEY}"}}'
-```
-
-### Current Limitations
-
-The `NAUTOBOT_EXTRA_PLUGINS_CONFIG` environment variable works but has
-ergonomic drawbacks as the number of plugins grows:
-
-- All plugin config is a single JSON string in the deploy values, which
-  becomes hard to read and review in PRs
-- JSON cannot express Python-native types like `None` or call functions
-  like `is_truthy()` -- only plain JSON types (`null`, `false`, etc.)
-- Adding or removing a plugin means editing a long inline JSON blob
-
-### Future Improvement: Per-Plugin Config Files
-
-A cleaner approach for deployments with many plugins is to store each
-plugin's configuration as a separate JSON file in the deploy repo,
-managed via a Kustomize `configMapGenerator`, and mounted into the pod
-as a directory. The `nautobot_config.py` would then glob that directory
-and load each file into `PLUGINS_CONFIG`.
-
-Example structure in the deploy repo:
-
-```text
-<site>/nautobot/plugin-configs/
-  nautobot_golden_config.json
-  my_custom_plugin.json
-  vni_custom_model.json
-```
-
-Each file contains the plugin's config as a JSON object:
-
-```json title="my_custom_plugin.json"
-{
-  "API_KEY": "${MY_API_KEY}",
-  "TIMEOUT": 30
-}
-```
-
-A Kustomize `configMapGenerator` creates a ConfigMap from the directory:
-
-```yaml title="kustomization.yaml"
-configMapGenerator:
-  - name: nautobot-plugin-configs
-    files:
-      - plugin-configs/nautobot_golden_config.json
-      - plugin-configs/my_custom_plugin.json
-    options:
-      disableNameSuffixHash: true
-```
-
-The deploy values mount it as a volume:
-
-```yaml
-nautobot:
-  extraVolumes:
-    - name: plugin-configs
-      configMap:
-        name: nautobot-plugin-configs
-  extraVolumeMounts:
-    - name: plugin-configs
-      mountPath: /etc/nautobot/plugin-configs
-      readOnly: true
-```
-
-And the `nautobot_config.py` loads all files from the directory:
-
-```python
-import glob, json, os, re
-
-def _interpolate_env(obj):
-    if isinstance(obj, str):
-        return re.sub(r"\$\{(\w+)\}", lambda m: os.environ.get(m.group(1), ""), obj)
-    if isinstance(obj, dict):
-        return {k: _interpolate_env(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_interpolate_env(v) for v in obj]
-    return obj
-
-for _path in sorted(glob.glob("/etc/nautobot/plugin-configs/*.json")):
-    _name = os.path.splitext(os.path.basename(_path))[0]
-    with open(_path) as _f:
-        PLUGINS_CONFIG[_name] = _interpolate_env(json.load(_f))
-```
-
-This gives each plugin its own readable file, makes PRs easy to review,
-and keeps the `${ENV_VAR}` interpolation for secrets. It can be
-implemented alongside the current env var approach without breaking
-existing deployments.
+!!! important "Plugin changes go in the deploy repo config"
+    For private deployments, all plugin configuration is managed in the
+    shared deploy config at `$deploy/apps/nautobot-config/nautobot_config.py`.
+    The public config does not have any plugin loading mechanism -- it only
+    has a static `PLUGINS_CONFIG` entry for `vni_custom_model`. Do not add
+    plugins or plugin config to the public config.
 
 ## Nautobot Django shell
 
