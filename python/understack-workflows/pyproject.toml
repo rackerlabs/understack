@@ -22,7 +22,7 @@ classifiers = [
 dependencies = [
     "pydantic>=2,<3",
     "pynautobot>=3,<4",
-    "python-ironicclient>=5,<6",
+    "python-ironicclient>=5.8.0,<6",
     "sushy>=5.3.0,<6",
     "kubernetes==33.1.0",
     "netapp-ontap==9.17.1.0",
