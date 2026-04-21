@@ -38,6 +38,7 @@ class InspectHookUpdateBaremetalPorts(base.InspectionHook):
         - local_link_info.switch_id (e.g. "aa:bb:cc:dd:ee:ff")
         - local_link_info.switch_info (e.g. "a1-1-1.ord1.rackspace.net")
         - physical_network (e.g. "a1-1-network")
+        - pxe flag (set only for the connection to primary network switch)
 
         We also add or remove node "traits" based on the inventory data.  We
         control the trait "CUSTOM_STORAGE_SWITCH".
@@ -60,7 +61,13 @@ class InspectHookUpdateBaremetalPorts(base.InspectionHook):
             {"node": node_uuid, "groups": vlan_groups},
         )
 
-        _update_port_attrs(task, ports_by_mac, vlan_groups, node_uuid)
+        pxe_switch_names = _pxe_switch_names(vlan_groups)
+        LOG.debug(
+            "Node=%(node)s pxe_switch_names=%(switches)s",
+            {"node": node_uuid, "switches": sorted(pxe_switch_names)},
+        )
+
+        _update_port_attrs(task, ports_by_mac, vlan_groups, pxe_switch_names, node_uuid)
         _set_node_traits(task, {x for x in vlan_groups.values() if x})
 
 
@@ -89,21 +96,30 @@ def _normalise_switch_name(name: str) -> str:
     return name
 
 
-def _update_port_attrs(task, ports_by_mac, vlan_groups, node_uuid):
+def _update_port_attrs(task, ports_by_mac, vlan_groups, pxe_switch_names, node_uuid):
     for baremetal_port in ironic_ports_for_node(task.context, task.node.id):
         inspected_port = ports_by_mac.get(baremetal_port.address)
         if inspected_port:
             vlan_group = vlan_groups.get(inspected_port.switch_system_name)
+            pxe_enabled = inspected_port.switch_system_name in pxe_switch_names
             LOG.info(
-                "Port=%(uuid)s Node=%(node)s is connected %(lldp)s, %(vlan_group)s",
+                "Port=%(uuid)s Node=%(node)s is connected %(lldp)s, "
+                "%(vlan_group)s pxe_enabled=%(pxe_enabled)s",
                 {
                     "uuid": baremetal_port.uuid,
                     "node": node_uuid,
                     "lldp": inspected_port,
                     "vlan_group": vlan_group,
+                    "pxe_enabled": pxe_enabled,
                 },
             )
-            _set_port_attributes(baremetal_port, node_uuid, inspected_port, vlan_group)
+            _set_port_attributes(
+                baremetal_port,
+                node_uuid,
+                inspected_port,
+                vlan_group,
+                pxe_enabled,
+            )
         else:
             LOG.info(
                 "Port=%(uuid)s Node=%(node)s has no LLDP connection",
@@ -117,6 +133,7 @@ def _set_port_attributes(
     node_uuid: str,
     inspected_port: InspectedPort,
     physical_network: str | None,
+    pxe_enabled: bool,
 ):
     category = None
     if physical_network:
@@ -149,6 +166,23 @@ def _set_port_attributes(
         if port.category != category:
             port.category = category
 
+        if port.pxe_enabled == pxe_enabled:
+            LOG.debug(
+                "Node %s port %s pxe_enabled already set to %s",
+                node_uuid,
+                port.id,
+                pxe_enabled,
+            )
+        else:
+            LOG.debug(
+                "Updating node %s port %s pxe_enabled from %s to %s",
+                node_uuid,
+                port.id,
+                port.pxe_enabled,
+                pxe_enabled,
+            )
+            port.pxe_enabled = pxe_enabled
+
         port.save()
     except exception.IronicException as e:
         LOG.warning(
@@ -162,12 +196,35 @@ def _clear_port_attributes(port: Any, node_uuid: str):
         port.local_link_connection = {}
         port.physical_network = None
         port.category = None
+        port.pxe_enabled = False
         port.save()
     except exception.IronicException as e:
         LOG.warning(
             "Failed to clear port %(uuid)s for node %(node)s. Error: %(error)s",
             {"uuid": port.id, "node": node_uuid, "error": e},
         )
+
+
+def _pxe_switch_names(vlan_groups: dict[str, str | None]) -> set[str]:
+    network_groups: dict[str, list[str]] = {}
+
+    for switch_name, vlan_group in vlan_groups.items():
+        if vlan_group and vlan_group.endswith("-network"):
+            network_groups.setdefault(vlan_group, []).append(switch_name)
+
+    return {
+        _natural_sorted_switch_names(switch_names)[0]
+        for switch_names in network_groups.values()
+        if switch_names
+    }
+
+
+def _natural_sorted_switch_names(switch_names: list[str]) -> list[str]:
+    return sorted(switch_names, key=_natural_sort_key)
+
+
+def _natural_sort_key(value: str) -> list[int | str]:
+    return [int(part) if part.isdigit() else part for part in re.split(r"(\d+)", value)]
 
 
 def _set_node_traits(task, vlan_groups: set[str]):

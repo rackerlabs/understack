@@ -1,4 +1,3 @@
-import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -11,6 +10,16 @@ from understack_workflows.bmc import Bmc
 from understack_workflows.ironic.client import IronicClient
 
 FIRMWARE_UPDATE_TRAIT_PREFIX = "CUSTOM_FIRMWARE_UPDATE_"
+
+STEADY_STATE_BOOT_INTERFACE = "http-ipxe"
+
+_VIRTUAL_MEDIA_BOOT_INTERFACE = {
+    "idrac": "idrac-redfish-virtual-media",
+    "redfish": "redfish-virtual-media",
+    "ilo": "ilo-virtual-media",
+    "ilo5": "ilo-virtual-media",
+    "fake-hardware": "fake",
+}
 
 
 @dataclass
@@ -30,7 +39,6 @@ def create_or_update(
     name: str,
     manufacturer: str,
     external_cmdb_id: str | None = None,
-    enrolled_pxe_ports: list[str] | None = None,
 ) -> Node:
     """Find-or-create Node by name, update attributes, set state to Manageable.
 
@@ -40,7 +48,7 @@ def create_or_update(
     If the node exists in a "busy" state then we raise an exception.
 
     If the node does not already exist it is created and then transitioned from
-    enrol->manageable state.
+    enroll->manageable state.
 
     Note interfaces/ports are not synced here, that happens elsewhere.
     """
@@ -58,7 +66,7 @@ def create_or_update(
 
         if node.provision_state not in ENROLLABLE_STATES:
             raise Exception(
-                f"Re-enrol cannot proceed unless node is in one of the states "
+                f"Re-enroll cannot proceed unless node is in one of the states "
                 f"{sorted(ENROLLABLE_STATES)} but node {node.uuid} "
                 f"is in '{node.provision_state}'."
             )
@@ -74,7 +82,6 @@ def create_or_update(
             driver,
             inspect_interface,
             external_cmdb_id,
-            enrolled_pxe_ports,
         )
     except ironicclient.common.apiclient.exceptions.NotFound:
         logger.debug("Baremetal Node with name %s not found in Ironic, creating.", name)
@@ -85,9 +92,8 @@ def create_or_update(
             driver,
             inspect_interface,
             external_cmdb_id,
-            enrolled_pxe_ports,
         )
-        # All newly-created nodes start out with "enrol" state:
+        # All newly-created nodes start out with "enroll" state:
         transition(node, target_state="manage", expected_state="manageable")
 
     return node
@@ -101,7 +107,6 @@ def update_ironic_node(
     driver,
     inspect_interface,
     external_cmdb_id: str | None = None,
-    enrolled_pxe_ports: list[str] | None = None,
 ):
     updates = [
         f"name={name}",
@@ -110,22 +115,18 @@ def update_ironic_node(
         "driver_info/redfish_verify_ca=false",
         f"driver_info/redfish_username={bmc.username}",
         f"driver_info/redfish_password={bmc.password}",
-        "boot_interface=http-ipxe",
+        f"boot_interface={STEADY_STATE_BOOT_INTERFACE}",
         f"inspect_interface={inspect_interface}",
     ]
 
-    # Update external_cmdb_id only when explicitly provided
     if external_cmdb_id:
         updates.append(f"extra/external_cmdb_id={external_cmdb_id}")
-    if enrolled_pxe_ports is not None:
-        payload = json.dumps(enrolled_pxe_ports)
-        updates.append(f"extra/enrolled_pxe_ports={payload}")
 
     patches = args_array_to_patch("add", updates)
     logger.info("Updating Ironic node %s patches=%s", ironic_node.uuid, patches)
 
     client.update_node(ironic_node.uuid, patches)
-    logger.debug("Ironic node %s Updated.")
+    logger.debug("Ironic node %s Updated.", ironic_node.uuid)
 
 
 def create_ironic_node(
@@ -135,7 +136,6 @@ def create_ironic_node(
     driver: str,
     inspect_interface: str,
     external_cmdb_id: str | None = None,
-    enrolled_pxe_ports: list[str] | None = None,
 ) -> Node:
     node_data = {
         "name": name,
@@ -146,15 +146,11 @@ def create_ironic_node(
             "redfish_username": bmc.username,
             "redfish_password": bmc.password,
         },
-        "boot_interface": "http-ipxe",
+        "boot_interface": STEADY_STATE_BOOT_INTERFACE,
         "inspect_interface": inspect_interface,
     }
-    if external_cmdb_id or enrolled_pxe_ports is not None:
-        node_data["extra"] = {}
     if external_cmdb_id:
-        node_data["extra"]["external_cmdb_id"] = external_cmdb_id
-    if enrolled_pxe_ports is not None:
-        node_data["extra"]["enrolled_pxe_ports"] = enrolled_pxe_ports
+        node_data["extra"] = {"external_cmdb_id": external_cmdb_id}
 
     if driver == "fake-hardware":
         node_data["resource_class"] = "fakehw"
@@ -168,6 +164,16 @@ def _driver_for(manufacturer: str) -> tuple[str, str]:
         return ("idrac", "idrac-redfish")
     else:
         return ("redfish", "redfish")
+
+
+def virtual_media_boot_interface_for(driver: str) -> str:
+    """Return the virtual-media boot_interface name for this driver."""
+    try:
+        return _VIRTUAL_MEDIA_BOOT_INTERFACE[driver]
+    except KeyError as exc:
+        raise ValueError(
+            f"No virtual-media boot_interface configured for driver {driver!r}"
+        ) from exc
 
 
 def transition(
@@ -233,6 +239,32 @@ def get_node_interfaces(node: Node) -> list[NodeInterface]:
         )
         for iface in interfaces_raw
     ]
+
+
+def list_node_ports(node: Node) -> list:
+    """Return ironic ports for this node."""
+    return list(IronicClient().list_ports(node.uuid))
+
+
+def pxe_enabled_bios_name(node: Node) -> str | None:
+    """BIOS-reported name of port currently flagged pxe_enabled.
+
+    We don't count a port whose physical_network has the placeholder "enrol"
+    value.
+
+    extra.bios_name is populated by the port-bios-name inspection hook during
+    out-of-band redfish inspection.
+
+    pxe_enabled is populated by the port-enroll-config hook during agent
+    inspection.
+    """
+    for port in list_node_ports(node):
+        if (
+            port.pxe_enabled
+            and port.extra.get("bios_name")
+            and port.physical_network != "enrol"
+        ):
+            return port.extra["bios_name"]
 
 
 def get_lldp_connected_interfaces(
