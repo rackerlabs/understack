@@ -149,7 +149,7 @@ def make_ironic_client(
     )
     inspect_interface_iter = iter(inspect_interfaces)
     fake_client = MagicMock()
-    fake_client.node.api.runbook.get.side_effect = lambda trait: SimpleNamespace(
+    fake_client.runbook.get.side_effect = lambda trait: SimpleNamespace(
         uuid=runbook_ids[trait]
     )
     fake_client.node.create.return_value = created_node
@@ -465,7 +465,7 @@ def test_apply_firmware_updates_runs_traits_in_numeric_order(mocker):
 
     enroll_server.ironic_node.apply_firmware_updates(node)
 
-    fake_ironic.node.api.runbook.get.assert_has_calls(
+    fake_ironic.runbook.get.assert_has_calls(
         [
             call("CUSTOM_FIRMWARE_UPDATE_3_NIC"),
             call("CUSTOM_FIRMWARE_UPDATE_20_BIOS"),
