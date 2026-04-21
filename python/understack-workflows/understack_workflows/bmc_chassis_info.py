@@ -89,8 +89,11 @@ def bmc_interface(bmc) -> InterfaceInfo:
     if get_system_vendor(bmc) == "Dell":
         bmc_name = "iDRAC"
         bmc_description = "Dedicated iDRAC interface"
-    else:
+    elif get_system_vendor(bmc) == "HP":
         bmc_name = "iLO"
+        bmc_description = str(data.get("name"))
+    else:
+        bmc_name = "BMC"
         bmc_description = str(data.get("name"))
 
     bmc_mac = normalise_mac(str(data.get("macaddress")))
