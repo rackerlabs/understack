@@ -99,11 +99,7 @@ Check certificate status on the global cluster:
 
 ```bash
 # List all mTLS client certificates and their expiry
-kubectl get certificate -n nautobot -o custom-columns=\
-NAME:.metadata.name,\
-READY:.status.conditions[0].status,\
-EXPIRY:.status.notAfter,\
-RENEWAL:.status.renewalTime
+kubectl get certificate -n nautobot -o custom-columns='NAME:.metadata.name,READY:.status.conditions[0].status,EXPIRY:.status.notAfter,RENEWAL:.status.renewalTime'
 
 # Check a specific site's certificate
 kubectl describe certificate nautobot-mtls-client-<site> -n nautobot

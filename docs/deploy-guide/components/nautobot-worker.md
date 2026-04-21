@@ -173,9 +173,11 @@ The ExternalSecret on the site cluster combines these into a single
 `tls.key`, and `ca.crt`. This secret is mounted into worker pods at
 `/etc/nautobot/mtls/`.
 
-Note: if your secrets provider stores PEM data with `\r\n` line endings,
-the ExternalSecret template must strip carriage returns
-(`| replace "\r" ""`) or OpenSSL will fail to parse the certificates.
+Note: if your secrets provider stores PEM data with `\r\n` line endings
+or concatenates multiple PEM blocks in a single field, use the
+[`filterPEM`](https://external-secrets.io/latest/guides/templating/#filter-pem-blocks)
+template function to extract specific block types. `filterPEM` handles
+carriage-return stripping automatically.
 
 ## Adding a New Site
 
@@ -298,16 +300,9 @@ spec:
       engineVersion: v2
       type: kubernetes.io/tls
       data:
-        tls.crt: >-
-          {{ .client_password
-             | regexFind "-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----"
-             | replace "\r" "" }}
-        tls.key: >-
-          {{ .client_password
-             | regexFind "-----BEGIN EC PRIVATE KEY-----[\\s\\S]*?-----END EC PRIVATE KEY-----"
-             | replace "\r" "" }}
-        ca.crt: >-
-          {{ .ca_password | replace "\r" "" }}
+        tls.crt: '{{ .client_password | filterPEM "CERTIFICATE" }}'
+        tls.key: '{{ .client_password | filterPEM "EC PRIVATE KEY" }}'
+        ca.crt: '{{ .ca_password | filterPEM "CERTIFICATE" }}'
   dataFrom:
     - extract:
         key: "<client-cert-credential-id>"
@@ -325,9 +320,10 @@ spec:
 
 {% endraw %}
 
-The `replace "\r" ""` strips carriage returns that some secrets
-providers add to PEM data. Without this, OpenSSL will fail to parse
-the certificates.
+The [`filterPEM`](https://external-secrets.io/latest/guides/templating/#filter-pem-blocks)
+function extracts PEM blocks by type and strips carriage returns
+automatically. Pass the PEM block type without the `BEGIN`/`END`
+markers (e.g. `"CERTIFICATE"`, `"EC PRIVATE KEY"`, `"PRIVATE KEY"`).
 
 ### Step 4: Create the kustomization
 
@@ -534,8 +530,11 @@ operator guide.
 
 - **PEM data with carriage returns.** Some secrets providers store text
   with `\r\n` line endings. PEM certificates with `\r` characters will
-  fail OpenSSL parsing with `[SSL] PEM lib`. The ExternalSecret template
-  must strip carriage returns using `| replace "\r" ""`.
+  fail OpenSSL parsing with `[SSL] PEM lib`. Use the
+  [`filterPEM`](https://external-secrets.io/latest/guides/templating/#filter-pem-blocks)
+  template function to extract PEM blocks by type -- it handles
+  carriage-return stripping automatically. Avoid manual `regexFind` +
+  `replace "\r" ""` patterns.
 
 - **ExternalSecret format depends on your secrets provider.** The
   ExternalSecret for the mTLS client cert on site clusters must produce

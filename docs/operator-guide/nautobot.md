@@ -156,17 +156,23 @@ Then force a CNPG reconcile (see above).
 ### Restarting CNPG Pods
 
 If the CNPG pods have not picked up updated certificate secrets (e.g.
-`client-ca.crt` still shows the old CA), restart them one at a time:
+`client-ca.crt` still shows the old CA), use the `cnpg` kubectl plugin
+to perform a rolling restart:
 
 ```bash
-kubectl delete pod -n nautobot nautobot-cluster-2
-# wait for ready
-kubectl delete pod -n nautobot nautobot-cluster-3
-# wait for ready
-kubectl delete pod -n nautobot nautobot-cluster-1
+kubectl cnpg restart nautobot-cluster -n nautobot
 ```
 
-Start with replicas, then the primary, to minimize downtime.
+This performs a rolling restart of all instances, handling replica/primary
+ordering automatically and waiting for each pod to be ready before
+proceeding.
+
+If you only need pods to reload configuration (e.g. updated `pg_hba`
+or PostgreSQL parameters) without a full restart:
+
+```bash
+kubectl cnpg reload nautobot-cluster -n nautobot
+```
 
 ### pg_hba Behavior
 

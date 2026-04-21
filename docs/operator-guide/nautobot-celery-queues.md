@@ -209,10 +209,8 @@ To confirm a site worker is consuming from the correct queue:
 
 ```bash
 # Check the CELERY_TASK_QUEUES env var in the running pod
-kubectl get deploy -n nautobot \
-  -l app.kubernetes.io/component=nautobot-celery-rax-dev \
-  -o jsonpath='{.items[0].spec.template.spec.containers[0].env}' \
-  | python3 -m json.tool | grep -A1 CELERY_TASK_QUEUES
+kubectl -n nautobot get deploy nautobot-worker-celery-rax-dev \
+            -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CELERY_TASK_QUEUES")].value}'
 
 # Check worker logs for the queue binding
 kubectl logs -n nautobot \
