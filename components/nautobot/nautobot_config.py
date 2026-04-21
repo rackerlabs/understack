@@ -1,4 +1,7 @@
+import json as _json
 import os
+import re as _re
+from ssl import CERT_REQUIRED
 
 from nautobot.core.settings import *  # noqa F401,F403
 from nautobot.core.settings_funcs import is_truthy
@@ -63,6 +66,67 @@ from nautobot.core.settings_funcs import is_truthy
 #
 if DATABASES["default"]["ENGINE"].endswith("mysql"):  # noqa F405
     DATABASES["default"]["OPTIONS"] = {"charset": "utf8mb4"}  # noqa F405
+
+# SSL/mTLS options for PostgreSQL connections.
+#
+# Supported NAUTOBOT_DB_SSLMODE values:
+#   "require"     -- encrypt the connection but skip server CA and client cert
+#                    verification. Suitable for same-cluster pods that just need
+#                    to satisfy hostssl pg_hba rules.
+#   "verify-ca"   -- encrypt and verify the server certificate against the CA
+#   "verify-full" -- like verify-ca but also checks the server hostname
+#
+# When sslmode is "verify-ca" or "verify-full", the client certificate, key,
+# and CA root cert must be present at the configured paths (full mTLS).
+# When sslmode is "require", only encryption is enforced -- no cert files are
+# needed and no client certificate is presented.
+_db_sslcert = os.getenv("NAUTOBOT_DB_SSLCERT", "/etc/nautobot/mtls/tls.crt")
+_db_sslkey = os.getenv("NAUTOBOT_DB_SSLKEY", "/etc/nautobot/mtls/tls.key")
+_db_sslrootcert = os.getenv("NAUTOBOT_DB_SSLROOTCERT", "/etc/nautobot/mtls/ca.crt")
+_db_sslmode = os.getenv("NAUTOBOT_DB_SSLMODE", "")
+
+if _db_sslmode in ("verify-ca", "verify-full"):
+    for _path, _label in [
+        (_db_sslcert, "NAUTOBOT_DB_SSLCERT"),
+        (_db_sslkey, "NAUTOBOT_DB_SSLKEY"),
+        (_db_sslrootcert, "NAUTOBOT_DB_SSLROOTCERT"),
+    ]:
+        if not os.path.isfile(_path):
+            raise FileNotFoundError(
+                f"SSL certificate file required by {_label} not found: {_path}"
+            )
+    DATABASES["default"]["OPTIONS"] = {  # noqa F405
+        "sslmode": _db_sslmode,
+        "sslcert": _db_sslcert,
+        "sslkey": _db_sslkey,
+        "sslrootcert": _db_sslrootcert,
+    }
+elif _db_sslmode == "require":
+    DATABASES["default"]["OPTIONS"] = {  # noqa F405
+        "sslmode": "require",
+    }
+
+# mTLS options for Redis connections.
+# When NAUTOBOT_REDIS_SSL env var is "true" (set by Helm `nautobot.redis.ssl`),
+# the Helm chart switches the URL scheme to rediss://.  We still need to tell
+# the Python redis client *which* certs to use for mutual TLS.
+_redis_ca = os.getenv("NAUTOBOT_REDIS_SSL_CA_CERTS", "/etc/nautobot/mtls/ca.crt")
+_redis_cert = os.getenv("NAUTOBOT_REDIS_SSL_CERTFILE", "/etc/nautobot/mtls/tls.crt")
+_redis_key = os.getenv("NAUTOBOT_REDIS_SSL_KEYFILE", "/etc/nautobot/mtls/tls.key")
+
+if os.path.isfile(_redis_ca):
+    _redis_ssl_kwargs = {
+        "ssl_cert_reqs": CERT_REQUIRED,
+        "ssl_ca_certs": _redis_ca,
+        "ssl_certfile": _redis_cert,
+        "ssl_keyfile": _redis_key,
+    }
+    CACHES["default"].setdefault("OPTIONS", {})  # noqa F405
+    CACHES["default"]["OPTIONS"].setdefault("CONNECTION_POOL_KWARGS", {})  # noqa F405
+    CACHES["default"]["OPTIONS"]["CONNECTION_POOL_KWARGS"].update(_redis_ssl_kwargs)  # noqa F405
+    CELERY_BROKER_USE_SSL = _redis_ssl_kwargs  # noqa F405
+    CELERY_REDIS_BACKEND_USE_SSL = _redis_ssl_kwargs  # noqa F405
+    CELERY_BROKER_TRANSPORT_OPTIONS = {"ssl": _redis_ssl_kwargs}  # noqa F405
 
 # This key is used for secure generation of random numbers and strings. It must never be exposed outside of this file.
 # For optimal security, SECRET_KEY should be at least 50 characters in length and contain a mix of letters, numbers, and
@@ -352,6 +416,11 @@ INSTALLATION_METRICS_ENABLED = is_truthy(
     os.getenv("NAUTOBOT_INSTALLATION_METRICS_ENABLED", "True")
 )
 
+# Partition identifier used by computed fields (e.g. device URN generation).
+# Populated from the cluster-data ConfigMap which is patched by ArgoCD from
+# the appLabels["understack.rackspace.com/partition"] value.
+UNDERSTACK_PARTITION = os.environ.get("UNDERSTACK_PARTITION", "")
+
 # Storage backend to use for Job input files and Job output files.
 #
 # Note: the default is for backwards compatibility and it is recommended to change it if possible for your deployment.
@@ -411,8 +480,32 @@ INSTALLATION_METRICS_ENABLED = is_truthy(
 # PER_PAGE_DEFAULTS = [25, 50, 100, 250, 500, 1000]
 
 # Enable installed plugins. Add the name of each plugin to the list.
+# Use try/except to only load plugins that are installed in this container,
+# since different deployments may have different plugin sets.
 #
-# PLUGINS = []
+PLUGINS = []
+for _plugin_name in [
+    "nautobot_plugin_nornir",
+    "nautobot_golden_config",
+]:
+    try:
+        __import__(_plugin_name)
+        PLUGINS.append(_plugin_name)
+    except ImportError:
+        pass
+
+# Allow additional plugins to be specified via the NAUTOBOT_EXTRA_PLUGINS
+# environment variable (comma-separated list of plugin module names).
+# This lets private deployments add their own plugins without modifying
+# this file.
+_extra_plugins = os.getenv("NAUTOBOT_EXTRA_PLUGINS", "")
+for _plugin_name in (p.strip() for p in _extra_plugins.split(",") if p.strip()):
+    try:
+        __import__(_plugin_name)
+        if _plugin_name not in PLUGINS:
+            PLUGINS.append(_plugin_name)
+    except ImportError:
+        pass
 
 # Plugins configuration settings. These settings are used by various plugins that the user may have installed.
 # Each key in the dictionary is the name of an installed plugin and its value is a dictionary of settings.
@@ -423,13 +516,67 @@ INSTALLATION_METRICS_ENABLED = is_truthy(
 #         'buzz': 'bazz'
 #     }
 # }
-PLUGINS_CONFIG = {
-    "vni_custom_model": {
-        "FORCE_UNIQUE_VLANS": is_truthy(
-            os.getenv("VNI_CUSTOM_MODEL_FORCE_UNIQUE_VLANS", "false")
-        )
+PLUGINS_CONFIG = {}
+
+# Configuration for open-source plugins (only applied when the plugin is loaded).
+if "nautobot_plugin_nornir" in PLUGINS:
+    PLUGINS_CONFIG["nautobot_plugin_nornir"] = {
+        "nornir_settings": {
+            "credentials": "nautobot_plugin_nornir.plugins.credentials.nautobot_secrets.CredentialsNautobotSecrets",
+            "runner": {
+                "plugin": "threaded",
+                "options": {
+                    "num_workers": 20,
+                },
+            },
+        },
+        "use_config_context": {
+            "connection_options": True,
+        },
     }
-}
+
+if "nautobot_golden_config" in PLUGINS:
+    PLUGINS_CONFIG["nautobot_golden_config"] = {
+        "per_feature_bar_width": 0.15,
+        "per_feature_width": 13,
+        "per_feature_height": 4,
+        "enable_backup": True,
+        "enable_compliance": True,
+        "enable_intended": True,
+        "enable_sotagg": True,
+        "sot_agg_transposer": None,
+        "enable_postprocessing": True,
+        "postprocessing_callables": [],
+        "postprocessing_subscribed": [],
+        "platform_slug_map": None,
+    }
+
+
+# Allow plugin configuration via the NAUTOBOT_EXTRA_PLUGINS_CONFIG environment
+# variable. Value must be a JSON object whose keys are plugin names and values
+# are config dicts. Supports ${ENV_VAR} syntax for referencing environment
+# variables in string values (useful for secrets).
+def _interpolate_env(obj):
+    """Recursively replace ${VAR} patterns with environment variable values."""
+    if isinstance(obj, str):
+        return _re.sub(
+            r"\$\{(\w+)\}",
+            lambda m: os.environ.get(m.group(1), ""),
+            obj,
+        )
+    if isinstance(obj, dict):
+        return {k: _interpolate_env(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_interpolate_env(v) for v in obj]
+    return obj
+
+
+_extra_cfg = os.getenv("NAUTOBOT_EXTRA_PLUGINS_CONFIG", "")
+if _extra_cfg:
+    try:
+        PLUGINS_CONFIG.update(_interpolate_env(_json.loads(_extra_cfg)))
+    except (ValueError, TypeError):
+        pass
 
 # Prefer IPv6 addresses or IPv4 addresses in selecting a device's primary IP address?
 #

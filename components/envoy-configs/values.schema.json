@@ -180,6 +180,12 @@
                 "type": "string",
                 "description": "Namespace where the httproute will be installed (same as backend service)"
               },
+              "gatewayPort": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "Port exposed on the gateway for this TLS passthrough listener. Defaults to the external gateway port (443) if not specified."
+              },
               "service": {
                 "type": "object",
                 "description": "Kubernetes service backend configuration for the route",

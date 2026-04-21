@@ -35,13 +35,11 @@ spec:
     {{- range .Values.routes.tls }}
     {{- $listenerName := .name | default (index (splitList "." .fqdn) 0) }}
     - name: {{ $listenerName }}
-      port: {{ $.Values.gateways.external.port | default 443 }}
+      port: {{ .gatewayPort | default ($.Values.gateways.external.port | default 443) }}
       protocol: TLS
       hostname: {{ .fqdn | quote }}
       tls:
         mode: Passthrough
-        certificateRefs:
-          - name: {{ $listenerName }}-tls
       allowedRoutes:
         namespaces:
           {{- if .selector }}
@@ -52,6 +50,7 @@ spec:
           from: {{ .from | default "All" }}
           {{- end }}
     {{- end }}
+
   {{- if .Values.gateways.external.serviceAnnotations }}
   infrastructure:
     parametersRef:

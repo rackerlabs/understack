@@ -144,6 +144,9 @@ global:
     # -- Enable/disable deploying Nautobot
     # @default -- false
     enabled: false
+    # -- config file to use for Nautobot scoped to either $understack or $deploy repo
+    # @default -- $understack/components/nautobot/nautobot_config.py
+    nautobot_config: '$understack/components/nautobot/nautobot_config.py'
 
   # -- Nautobot API token generation jobs
   nautobot_api_tokens:
@@ -555,6 +558,15 @@ site:
     # -- Enable/disable deploying site workflows
     # @default -- false
     enabled: false
+
+  # -- Nautobot Celery workers (site-level, connects to global Nautobot)
+  nautobot_worker:
+    # -- Enable/disable deploying Nautobot workers at the site level
+    # @default -- false
+    enabled: false
+    # -- config file to use for Nautobot scoped to either $understack or $deploy repo
+    # @default -- $understack/components/nautobot/nautobot_config.py
+    nautobot_config: '$understack/components/nautobot/nautobot_config.py'
 
   # -- SNMP exporter for network device monitoring
   snmp_exporter:
