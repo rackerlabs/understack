@@ -5,6 +5,7 @@ from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from ironicclient.v1.client import Client as IronicV1Client
 from ironicclient.v1.node import Node
 from ironicclient.v1.port import Port
+from ironicclient.v1.runbook import Runbook
 
 from understack_workflows.openstack.client import get_ironic_client
 
@@ -58,8 +59,17 @@ class IronicClient:
     def get_node_traits(self, node_id: str) -> list[str]:
         return cast(list[str], self.client.node.get_traits(node_id))
 
-    def get_runbook(self, runbook_id: str):
-        return self.client.node.api.runbook.get(runbook_id)
+    def get_runbook(self, runbook_name_or_id: str) -> Runbook:
+        """Get runbook by name or by UUID.
+
+        raises ironicclient.common.apiclient.exceptions.NotFound
+        """
+        runbook = self.client.runbook.get(runbook_name_or_id)
+        # The above raises an error if there was no such runbook.  The following
+        # is just to make the type checker happy:
+        if not runbook:
+            raise ironic_exceptions.NotFound
+        return runbook
 
     def get_node_inventory(self, node_ident: str) -> dict:
         """Fetch node inventory data from Ironic API.
