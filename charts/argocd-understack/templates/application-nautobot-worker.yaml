@@ -19,7 +19,7 @@ spec:
     helm:
       fileParameters:
       - name: nautobot.config
-        path: $understack/components/nautobot/nautobot_config.py
+        path: {{ $.Values.site.nautobot_worker.nautobot_config }}
       ignoreMissingValueFiles: true
       releaseName: nautobot-worker
       valueFiles:
