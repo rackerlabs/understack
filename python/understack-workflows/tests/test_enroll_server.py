@@ -180,7 +180,7 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
     inventory = make_node_inventory(
         connected_interface_names=["NIC.Integrated.1-1", "NIC.Integrated.1-2"],
     )
-    # port-enrol-config hook has run during agent inspection and flagged
+    # port-enroll-config hook has run during agent inspection and flagged
     # pxe_enabled on LLDP-connected ports.  port-bios-name (OOB) stamped
     # extra.bios_name earlier.
     ports = [
@@ -223,7 +223,7 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
         return_value=fake_ironic,
     )
 
-    enroll_server.enrol(
+    enroll_server.enroll(
         ip_address="10.0.0.10",
         firmware_update=False,
         raid_configure=True,
@@ -377,7 +377,7 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
         return_value=fake_ironic,
     )
 
-    enroll_server.enrol(
+    enroll_server.enroll(
         ip_address="10.0.0.10",
         firmware_update=False,
         raid_configure=False,

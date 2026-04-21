@@ -43,7 +43,7 @@ def main() -> None:
       Using virtual-media avoids having to configure PXE during the initial
       phase, however the IPA agent still requires DHCP autoconfiguration, so it
       needs to be connected to the provisioning VLAN, and it needs at least one
-      port in Neutron to be configured for "enrol".
+      port in Neutron to be configured for "enroll".
 
     - Configure the Dell HTTP-boot BIOS entries using the LLDP-confirmed PXE
       interfaces, then flip the node back to its final production http-ipxe boot
@@ -59,7 +59,7 @@ def main() -> None:
     setup_logger()
     args = argument_parser().parse_args()
 
-    enrol(
+    enroll(
         ip_address=args.ip_address,
         old_password=args.old_password,
         firmware_update=args.firmware_update,
@@ -68,14 +68,14 @@ def main() -> None:
     )
 
 
-def enrol(
+def enroll(
     ip_address: str,
     firmware_update: bool,
     raid_configure: bool,
     old_password: str | None,
     external_cmdb_id: str | None = None,
 ) -> None:
-    logger.info("Starting enrol workflow for bmc_ip_address=%s", ip_address)
+    logger.info("Starting enroll workflow for bmc_ip_address=%s", ip_address)
 
     if external_cmdb_id:
         logger.info("  external_cmdb_id=%s", external_cmdb_id)
@@ -106,7 +106,7 @@ def enrol(
     # boot - in our normal configuration it fails to set up ports on the
     # provisioning network.
     #
-    # Therefore, we only use virtual media during our "enrol" phase, when the
+    # Therefore, we only use virtual media during our "enroll" phase, when the
     # port data is set up in a manner that suits the Neutron algorithm.  If a
     # normal PXE/HTTP port is available then we use it instead:
 
@@ -134,7 +134,7 @@ def enrol(
         ironic_node.apply_firmware_updates(node)
 
     ironic_node.transition(node, target_state="provide", expected_state="available")
-    logger.info("Completed enrol workflow for bmc_ip_address=%s", ip_address)
+    logger.info("Completed enroll workflow for bmc_ip_address=%s", ip_address)
 
 
 def agent_inspection(node: Node, virtual_media=False) -> None:
@@ -253,7 +253,7 @@ def parse_bool(value: str) -> bool:
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
-        description="Run the server enrol workflow",
+        description="Run the server enroll workflow",
     )
     parser.add_argument("--ip-address", required=True, help="IP Address of BMC")
     parser.add_argument(

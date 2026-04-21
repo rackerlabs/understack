@@ -111,7 +111,7 @@ def test_retaining_physical_network(mocker, caplog):
 
 
 def test_preserves_pxe_on_post_enroll_ports(mocker, caplog):
-    """Post-enrol inspection keeps the existing PXE decision."""
+    """Post-enroll inspection keeps the existing PXE decision."""
     caplog.set_level(logging.DEBUG)
     task = _make_task(mocker)
 

@@ -43,7 +43,7 @@ class PortBiosNameHook(base.InspectionHook):
     dummy data to enable Ironic/Neutron to do an IPA boot:
 
       - pxe_enabled=True
-      - physical_network="enrol" (placeholder value)
+      - physical_network="enrol" (placeholder value understood by undersync)
       - local_link_connection set to dummy data as placeholder
 
     Note that this only works because neutron is not completely controlling the
@@ -84,10 +84,11 @@ class PortBiosNameHook(base.InspectionHook):
 
 def _set_port_pxe_placeholder(baremetal_port):
     LOG.info(
-        "Populating port %s with placeholder PXE data to support enrol.",
+        "Populating port %s with placeholder PXE data to support enroll.",
         baremetal_port.address,
     )
     baremetal_port.pxe_enabled = True
+    # Note spelling of "enrol" as required by undersync API:
     baremetal_port.physical_network = "enrol"
     baremetal_port.local_link_connection = {
         "port_id": "None",

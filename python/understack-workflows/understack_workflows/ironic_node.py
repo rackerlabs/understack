@@ -48,7 +48,7 @@ def create_or_update(
     If the node exists in a "busy" state then we raise an exception.
 
     If the node does not already exist it is created and then transitioned from
-    enrol->manageable state.
+    enroll->manageable state.
 
     Note interfaces/ports are not synced here, that happens elsewhere.
     """
@@ -66,7 +66,7 @@ def create_or_update(
 
         if node.provision_state not in ENROLLABLE_STATES:
             raise Exception(
-                f"Re-enrol cannot proceed unless node is in one of the states "
+                f"Re-enroll cannot proceed unless node is in one of the states "
                 f"{sorted(ENROLLABLE_STATES)} but node {node.uuid} "
                 f"is in '{node.provision_state}'."
             )
@@ -93,7 +93,7 @@ def create_or_update(
             inspect_interface,
             external_cmdb_id,
         )
-        # All newly-created nodes start out with "enrol" state:
+        # All newly-created nodes start out with "enroll" state:
         transition(node, target_state="manage", expected_state="manageable")
 
     return node
@@ -255,7 +255,7 @@ def pxe_enabled_bios_name(node: Node) -> str | None:
     extra.bios_name is populated by the port-bios-name inspection hook during
     out-of-band redfish inspection.
 
-    pxe_enabled is populated by the port-enrol-config hook during agent
+    pxe_enabled is populated by the port-enroll-config hook during agent
     inspection.
     """
     for port in list_node_ports(node):
