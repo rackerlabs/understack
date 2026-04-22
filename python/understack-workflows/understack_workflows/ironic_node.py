@@ -162,6 +162,17 @@ def create_ironic_node(
     return client.create_node(node_data)
 
 
+def clear_pending_idrac_jobs(node: Node):
+    logger.info("%s performing clear_job_queue clean step", node.uuid)
+    transition(
+        node,
+        target_state="clean",
+        expected_state="manageable",
+        clean_steps=[{"interface": "management", "step": "clear_job_queue"}],
+        disable_ramdisk=True,
+    )
+
+
 def _driver_for(manufacturer: str) -> tuple[str, str]:
     """Answer the (driver, inspect_interface) for this server."""
     if manufacturer.startswith("Dell"):

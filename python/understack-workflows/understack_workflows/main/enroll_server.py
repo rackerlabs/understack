@@ -109,7 +109,6 @@ def enroll(
     # Therefore, we only use virtual media during our "enroll" phase, when the
     # port data is set up in a manner that suits the Neutron algorithm.  If a
     # normal PXE/HTTP port is available then we use it instead:
-
     virtual_media = not bool(ironic_node.pxe_enabled_bios_name(node))
     agent_inspection(node, virtual_media=virtual_media)
 
@@ -120,6 +119,9 @@ def enroll(
             "cannot configure HTTP boot."
         )
     logger.info("[node:%s] Selected PXE interface %s", node.uuid, pxe_interface)
+
+    # Clear the job queue - stale jobs can conflict with the ones we create:
+    ironic_node.clear_pending_idrac_jobs(node)
 
     # This sets the boot device to use for all future HTTP boots:
     if update_dell_bios_settings(bmc, pxe_interface=pxe_interface):
