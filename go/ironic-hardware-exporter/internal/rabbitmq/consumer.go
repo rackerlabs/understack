@@ -85,6 +85,9 @@ func (c *Consumer) Consume(handler func(body []byte)) error {
 		return fmt.Errorf("failed to start consuming: %w", err)
 	}
 
+	closeCh := make(chan *amqp.Error, 1)
+	c.channel.NotifyClose(closeCh)
+
 	log.Printf("waiting for messages from queue: %s", c.cfg.Queue)
 
 	for d := range msgs {
@@ -93,12 +96,18 @@ func (c *Consumer) Consume(handler func(body []byte)) error {
 			log.Printf("failed to ack message: %v", err)
 		}
 	}
-
-	return fmt.Errorf("message channel closed connection lost")
+	// silently exit and  returns a generic "connection lost" error
+	// now we get like this 'states consumer stopped: channel closed: code=406 reason='
+	if amqpErr := <-closeCh; amqpErr != nil {
+		return fmt.Errorf("channel closed: code=%d reason=%s", amqpErr.Code, amqpErr.Reason)
+	}
+	return fmt.Errorf("message channel closed: connection lost")
 }
 
+// if either the connection or the channel is closed, /ready returns 503.
 func (c *Consumer) IsReady() bool {
-	return c != nil && c.conn != nil && !c.conn.IsClosed()
+	return c != nil && c.conn != nil && !c.conn.IsClosed() &&
+		c.channel != nil && !c.channel.IsClosed()
 }
 
 func (c *Consumer) Close() {
