@@ -31,3 +31,8 @@ docs/workflows/
 
 # mkdocs site output
 /site/
+
+# tool artifacts
+.codex_write_check
+.tool-versions
+.codex
