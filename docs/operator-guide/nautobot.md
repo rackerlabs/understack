@@ -8,6 +8,29 @@
   how mTLS client certificates for site workers are renewed and
   distributed across clusters
 
+## mTLS Certificate Resources
+
+All mTLS certificates are managed by cert-manager in the `nautobot`
+namespace. The CA hierarchy bootstraps from a self-signed issuer and
+issues all leaf certificates for PostgreSQL, Redis, and application
+pods automatically.
+
+| Resource | Kind | Key Fields | Purpose |
+|---|---|---|---|
+| `mtls-selfsigned` | Issuer | `selfSigned: {}` | Bootstrap issuer for the CA chain |
+| `mtls-ca` | Certificate | `isCA: true`, CN=`understack-mtls-ca`, ECDSA P-256, 10yr | Root CA for all mTLS certs |
+| `mtls-ca-issuer` | Issuer | `ca: mtls-ca-key-pair` | Signs all leaf certificates |
+| `mtls-ca-cert` | Certificate | secret=`mtls-ca-cert`, label `cnpg.io/reload` | CA public cert for CNPG/Redis verification |
+| `nautobot-cluster-server-tls` | Certificate | CN=`nautobot-cluster-rw.nautobot.svc`, 1yr | PostgreSQL server TLS |
+| `nautobot-cluster-replication` | Certificate | CN=`streaming_replica`, usage=`client auth`, 1yr | CNPG streaming replication |
+| `nautobot-redis-server-tls` | Certificate | CN=`nautobot-redis-master.nautobot.svc`, 1yr | Redis server TLS |
+| `nautobot-mtls-client` | Certificate | CN=`app`, usage=`client auth`, 3yr | Client cert for nautobot/celery pods |
+
+The server certificates (`nautobot-cluster-server-tls` and
+`nautobot-redis-server-tls`) include site-specific dnsNames that vary
+per deployment (e.g. external hostnames for the database and Redis
+endpoints). All other resources are identical across sites.
+
 ## PostgreSQL mTLS
 
 All PostgreSQL connections -- both from global Nautobot pods and
@@ -52,6 +75,23 @@ Key points:
 - Both `clientCASecret` and `serverCASecret` can point to the same
   secret (`mtls-ca-cert`) when the same CA signs both server and client
   certificates.
+- The `replicationTLSSecret` and client Certificate resources both set
+  `usages: [client auth]` in their cert-manager spec. This maps to the
+  X.509 Extended Key Usage (EKU) `id-kp-clientAuth` (OID
+  1.3.6.1.5.5.7.3.2), marking the certificate as valid only for
+  authenticating a client to a server. PostgreSQL's `pg_hba cert` rule
+  requires connecting certificates to carry this EKU -- without it the
+  handshake is rejected. Server certificates (e.g.
+  `nautobot-cluster-server-tls`) omit `usages` so cert-manager applies
+  the default set which includes `server auth`.
+- The `mtls-ca-cert` Certificate resource must have the label
+  `cnpg.io/reload: "true"`. This tells the CNPG operator to watch the
+  resulting Secret for changes and automatically reload PostgreSQL
+  instances when cert-manager renews the CA certificate. Without this
+  label, a CA renewal would require a manual pod restart for CNPG to
+  trust the new certificate. See the
+  [CNPG Labels and Annotations docs](https://cloudnative-pg.io/docs/1.27/labels_annotations)
+  for details.
 
 ### How nautobot_config.py Handles SSL
 
