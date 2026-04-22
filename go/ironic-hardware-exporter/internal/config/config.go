@@ -6,8 +6,8 @@ import (
 	"strconv"
 )
 
-//strut to hold the config
-//funcn to read env vars
+//struct to hold the config
+//function to read env vars
 
 type RabbitMQConfig struct {
 	Host       string

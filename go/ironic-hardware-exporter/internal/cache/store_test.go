@@ -149,7 +149,7 @@ func TestUpdateNodeState_PreservesSensorData(t *testing.T) {
 // would be touching the same memory.
 // when GetAll() returns copies.
 // Changing snapshot has no effect on the store. snapshot2 still shows the original value.
-// The below test is to test this above scenerio
+// The below test is to test this above scenario
 func TestGetAll_ReturnsCopy(t *testing.T) {
 	s := New()
 	s.Update(&parser.HardwareMessage{NodeUUID: "uuid-1", NodeName: "Dell-93GSW04"})

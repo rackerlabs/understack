@@ -35,7 +35,7 @@ type NodePayload struct {
 	Payload   SensorPayload `json:"payload"`
 }
 
-// here we ll use map coz we dont know type of data that would come in
+// here we ll use map because we dont know type of data that would come in
 // hence map[string]
 type SensorPayload struct {
 	Fan         map[string]FanSensor         `json:"Fan"`
