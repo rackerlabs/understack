@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS build
+FROM quay.io/airshipit/venv_builder:2026.1-ubuntu_noble AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -12,8 +12,8 @@ RUN apt-get update && \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # clone source and patch it
-# renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2025.2
-ARG IRONIC_GIT_REF=3800a4d71cad3343f6810ab53a9732e7badcb69f
+# renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2026.1
+ARG IRONIC_GIT_REF=a21904bdcc7b028aa15f5016c8c7c00d17b1f31b
 ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
 RUN git -C /src/ironic fetch --unshallow --tags
 
@@ -21,7 +21,6 @@ COPY python/ironic-understack /src/understack/ironic-understack
 COPY python/understack-flavor-matcher /src/understack/understack-flavor-matcher
 
 ARG OPENSTACK_VERSION="required_argument"
-ARG NOVNC_VERSION=1.6.0
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
       --upgrade \
@@ -34,10 +33,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY containers/ironic/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
     patch -p1 < /tmp/patches/0002-Solve-IPMI-call-issue-results-in-UTF-8-format-error-.patch
-RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
-    patch -p1 < /tmp/patches/0003-Handle-missing-storage-controller-mode-attribute.patch
 
 # download and unpack novnc
+ARG NOVNC_VERSION=1.6.0
 RUN \
    export URL=https://github.com/novnc/noVNC/archive/refs/tags/v${NOVNC_VERSION}.tar.gz && \
    export DEST_FILE=novnc-${NOVNC_VERSION}.tar.gz && \
@@ -51,14 +49,16 @@ COPY containers/ironic/ironic-console-pod.yaml.template /var/lib/openstack/lib/p
 # renovate: datasource=docker depName=ghcr.io/rackerlabs/understack/ironic-ipxe versioning=semver
 FROM ghcr.io/rackerlabs/understack/ironic-ipxe:1.0.0 AS ipxe
 
-ARG OPENSTACK_VERSION="required_argument"
 FROM quay.io/airshipit/ironic:${OPENSTACK_VERSION}-ubuntu_noble AS final
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-RUN wget -qO- https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
-    chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg && \
-    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' > /etc/apt/sources.list.d/kubernetes.list && \
-    chmod 644 /etc/apt/sources.list.d/kubernetes.list
+ENV PATH="/var/lib/openstack/bin:$PATH"
+
+RUN <<EOF bash -xe
+wget -qO- https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.35/deb/ /' > /etc/apt/sources.list.d/kubernetes.list
+chmod 644 /etc/apt/sources.list.d/kubernetes.list
+EOF
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -66,7 +66,6 @@ RUN apt-get update && \
         isolinux \
         kubectl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
 
 COPY --from=build --link /var/lib/openstack /var/lib/openstack
 COPY --from=build /usr/share/novnc /usr/share/novnc
