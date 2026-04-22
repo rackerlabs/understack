@@ -427,6 +427,7 @@ class TestAssignIpToInterface:
 
         mock_nautobot.ipam.ip_addresses.create.assert_called_once_with(
             address=ip_address,
+            namespace="Rackspace",
             status="Active",
         )
         mock_nautobot.ipam.ip_address_to_interface.create.assert_called_once()
