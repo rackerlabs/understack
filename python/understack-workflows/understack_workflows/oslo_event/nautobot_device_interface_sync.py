@@ -159,6 +159,7 @@ def _assign_ip_to_interface(
         try:
             new_ip = nautobot_client.ipam.ip_addresses.create(
                 address=ip_address,
+                namespace="Rackspace",
                 status="Active",
             )
             ip_id = getattr(new_ip, "id", None)
