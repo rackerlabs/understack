@@ -26,7 +26,7 @@ type NodeEntry struct {
 }
 
 // Store is the in-memory cache, a map protected by a read-write lock
-// mu lock , coz 2 goroutines access this map at same time
+// mu lock , because 2 goroutines access this map at same time
 // rabbitmq writes, http reads
 type Store struct {
 	mu    sync.RWMutex

@@ -91,7 +91,7 @@ func TestParseNodeState_SkipsStartEvents(t *testing.T) {
 
 // TestParseNodeState_Timestamp checks the timestamp is parsed from the payload.
 // versioned notifications use space separator: "2026-04-19 00:42:40.397328" (not T)
-// we need this coz sensor data uses T separator
+// we need this because sensor data uses T separator
 func TestParseNodeState_Timestamp(t *testing.T) {
 	body := readTestData(t, "baremetal_node_power_set.json")
 
