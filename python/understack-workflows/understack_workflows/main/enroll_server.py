@@ -121,7 +121,10 @@ def enroll(
         )
     logger.info("[node:%s] Selected PXE interface %s", node.uuid, pxe_interface)
 
-    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
+    # This sets the boot device to use for all future HTTP boots:
+    if update_dell_bios_settings(bmc, pxe_interface=pxe_interface):
+        logger.info("%s performing second inspection write BIOS settings", node.uuid)
+        agent_inspection(node)
 
     if raid_configure:
         configure_raid(node, bmc)

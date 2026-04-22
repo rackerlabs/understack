@@ -202,8 +202,12 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
     ]
     fake_ironic, created_node = make_ironic_client(
         node_name="Dell-ABC123",
-        # OOB inspect, agent inspect, OOB inspect (post-RAID).
-        inspect_interfaces=["idrac-redfish", "idrac-redfish", "idrac-redfish"],
+        inspect_interfaces=[
+            "idrac-redfish",
+            "idrac-redfish",
+            "idrac-redfish",
+            "idrac-redfish",
+        ],
         inventory=inventory,
         ports=ports,
     )
@@ -216,7 +220,7 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
     )
     bmc_set_hostname = mocker.patch.object(enroll_server, "bmc_set_hostname")
     update_dell_bios_settings = mocker.patch.object(
-        enroll_server, "update_dell_bios_settings"
+        enroll_server, "update_dell_bios_settings", return_value={"changed": True}
     )
     mocker.patch(
         "understack_workflows.ironic.client.get_ironic_client",
@@ -300,6 +304,20 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
             call(
                 created_node.uuid,
                 "clean",
+                cleansteps=[{"interface": "management", "step": "clear_job_queue"}],
+                runbook=None,
+                disable_ramdisk=True,
+            ),
+            call(
+                created_node.uuid,
+                "inspect",  # second agent inspect to apply BIOS changes
+                cleansteps=None,
+                runbook=None,
+                disable_ramdisk=None,
+            ),
+            call(
+                created_node.uuid,
+                "clean",
                 cleansteps=[
                     {"interface": "raid", "step": "delete_configuration"},
                     {"interface": "raid", "step": "create_configuration"},
@@ -331,6 +349,9 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
     expected_agent = [{"op": "add", "path": "/inspect_interface", "value": "agent"}]
     assert fake_ironic.node.update.call_args_list == [
         call(created_node.uuid, expected_reset),  # OOB inspect prep
+        call(created_node.uuid, expected_ipxe_boot),
+        call(created_node.uuid, expected_agent),
+        call(created_node.uuid, expected_ipxe_boot),
         call(created_node.uuid, expected_ipxe_boot),
         call(created_node.uuid, expected_agent),
         call(created_node.uuid, expected_ipxe_boot),
@@ -371,7 +392,9 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
     mocker.patch.object(enroll_server, "set_bmc_password")
     mocker.patch.object(enroll_server, "update_dell_drac_settings")
     mocker.patch.object(enroll_server, "bmc_set_hostname")
-    mocker.patch.object(enroll_server, "update_dell_bios_settings")
+    mocker.patch.object(
+        enroll_server, "update_dell_bios_settings", return_value={"changed": True}
+    )
     mocker.patch(
         "understack_workflows.ironic.client.get_ironic_client",
         return_value=fake_ironic,
@@ -406,6 +429,20 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
             call(
                 existing_node.uuid,
                 "inspect",  # Agent inspect via virtual media
+                cleansteps=None,
+                runbook=None,
+                disable_ramdisk=None,
+            ),
+            call(
+                existing_node.uuid,
+                "clean",
+                cleansteps=[{"interface": "management", "step": "clear_job_queue"}],
+                runbook=None,
+                disable_ramdisk=True,
+            ),
+            call(
+                existing_node.uuid,
+                "inspect",  # second agent inspect to apply BIOS changes
                 cleansteps=None,
                 runbook=None,
                 disable_ramdisk=None,
