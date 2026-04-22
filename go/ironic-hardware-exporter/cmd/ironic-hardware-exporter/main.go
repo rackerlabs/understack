@@ -10,49 +10,73 @@ import (
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/server"
 )
 
-// WIP
-// only for debugging now
 func main() {
-	// load config from env vars
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	// create shared cache
 	store := cache.New()
 
-	// onnect to RabbitMQ
-	consumer, err := rabbitmq.New(cfg.RabbitMQ)
+	// consumer 1: sensor data (hardware.idrac.*.metrics / hardware.redfish.*.metrics)
+	sensorConsumer, err := rabbitmq.New(cfg.RabbitMQ)
 	if err != nil {
-		log.Fatalf("failed to connect to RabbitMQ: %v", err)
+		log.Fatalf("failed to connect sensor consumer to RabbitMQ: %v", err)
 	}
-	defer consumer.Close()
+	defer sensorConsumer.Close()
 
-	// start HTTP server in background goroutine
-	// /metrics
-	srv := server.New(store, cfg.Server.Port, consumer.IsReady)
+	// consumer 2: node state events (baremetal.node.power_set.end, provision_set.end/success)
+	// uses a separate private queue bound to the versioned notifications routing key
+	statesCfg := cfg.RabbitMQ
+	statesCfg.Queue = cfg.RabbitMQ.StatesQueue
+	statesCfg.RoutingKey = cfg.RabbitMQ.StatesRoutingKey
+	statesConsumer, err := rabbitmq.New(statesCfg)
+	if err != nil {
+		log.Fatalf("failed to connect states consumer to RabbitMQ: %v", err)
+	}
+	defer statesConsumer.Close()
+
+	srv := server.New(store, cfg.Server.Port, sensorConsumer.IsReady)
 	go func() {
 		if err := srv.Start(); err != nil {
 			log.Fatalf("HTTP server failed: %v", err)
 		}
 	}()
 
-	// consume messages forever (blocks here)
+	// states consumer runs in background goroutine
+	go func() {
+		log.Println("waiting for node state messages...")
+		if err := statesConsumer.Consume(func(body []byte) {
+			stateMsg, err := parser.ParseNodeState(body)
+			if err != nil {
+				log.Printf("failed to parse node state message: %v", err)
+				return
+			}
+			if stateMsg == nil {
+				return
+			}
+			store.UpdateNodeState(stateMsg)
+			log.Printf("cached state node=%s power=%v provision=%v",
+				stateMsg.NodeName, stateMsg.PowerState, stateMsg.ProvisionState)
+		}); err != nil {
+			log.Printf("states consumer stopped: %v", err)
+		}
+	}()
+
+	// sensor consumer blocks main goroutine
 	log.Println("waiting for hardware sensor messages...")
-	err = consumer.Consume(func(body []byte) {
+	if err := sensorConsumer.Consume(func(body []byte) {
 		msg, err := parser.Parse(body)
 		if err != nil {
-			log.Printf("failed to parse message: %v", err)
+			log.Printf("failed to parse hardware message: %v", err)
 			return
 		}
 		if msg == nil {
-			return // not a hardware event, skip
+			return
 		}
 		store.Update(msg)
-		log.Printf("cached node=%s", msg.NodeName)
-	})
-	if err != nil {
-		log.Fatalf("consumer stopped: %v", err)
+		log.Printf("cached sensors node=%s", msg.NodeName)
+	}); err != nil {
+		log.Fatalf("sensor consumer stopped: %v", err)
 	}
 }

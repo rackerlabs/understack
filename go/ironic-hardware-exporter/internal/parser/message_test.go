@@ -133,9 +133,15 @@ func TestParse_NullReadingsAreNil(t *testing.T) {
 	}
 }
 
+// todo: circle back here for parsing
 // TestParse_HardwareRedfishMetrics checks that hardware.redfish.metrics is accepted (not just idrac).
 // Note: no real redfish nodes exist in the current cluster (all nodes use idrac driver),
 // so this uses synthetic test data to verify the broader event type filter works.
+// https://docs.openstack.org/ironic/latest/admin/drivers/redfish/metrics.html
+// official redfish payload uses lowercase state values like "state": "enabled"
+// while iDRAC uses "state": "Enabled" ,
+//  so if a real redfish node came in, the drive metric would always show 0 even if the drive is enabled
+
 func TestParse_HardwareRedfishMetrics(t *testing.T) {
 	body := readTestData(t, "hardware_redfish_metrics.json")
 
