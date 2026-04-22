@@ -21,6 +21,10 @@ _VIRTUAL_MEDIA_BOOT_INTERFACE = {
     "fake-hardware": "fake",
 }
 
+# When performing a "clean" or "provide" operation, how long do we wait for
+# Ironic to move the node its final state:
+NODE_STATE_TIMEOUT_SECS = 90 * 60
+
 
 @dataclass
 class NodeInterface:
@@ -200,7 +204,9 @@ def transition(
             node.uuid,
             expected_state,
         )
-        client.wait_for_node_provision_state(node.uuid, expected_state, timeout=1800)
+        client.wait_for_node_provision_state(
+            node.uuid, expected_state, timeout=NODE_STATE_TIMEOUT_SECS
+        )
 
 
 def patch(node: Node, updates: Sequence[str]) -> None:
