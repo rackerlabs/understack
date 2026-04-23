@@ -107,7 +107,7 @@ UnderStack deploys two shared Gateways in the `envoy-gateway` namespace:
 
 ### Route Configuration
 
-Routes are managed through the `envoy-configs` Helm chart, which generates HTTPRoute and TLSRoute resources based on declarative configuration.
+Routes are managed through the `envoy-configs` Helm chart, which generates HTTPRoute, TLSRoute, and TCPRoute resources based on declarative configuration.
 
 #### HTTP Routes
 
@@ -146,6 +146,27 @@ routes:
 ```
 
 Used when the backend service handles TLS itself (like Argo Workflows with HTTPS).
+
+#### TCP Routes
+
+TCP routes forward raw TCP streams without TLS inspection or
+termination:
+
+```yaml
+routes:
+  tcp:
+    - name: nautobot-db
+      fqdn: nautobot-db.example.com
+      namespace: nautobot
+      gatewayPort: 5432
+      service:
+        name: nautobot-cluster-rw
+        port: 5432
+```
+
+Use this for protocols such as PostgreSQL that do not start with a TLS
+ClientHello and therefore cannot be routed correctly by `TLSRoute`
+passthrough.
 
 #### HTTPS Backends
 
@@ -266,6 +287,20 @@ routes:
         name: argo-server
         port: 2746
         backendType: tls
+  tcp:
+    - fqdn: nautobot-db.example.com
+      namespace: nautobot
+      gatewayPort: 5432
+      service:
+        name: nautobot-cluster-rw
+        port: 5432
+  tls:
+    - fqdn: nautobot-redis.example.com
+      namespace: nautobot
+      gatewayPort: 6379
+      service:
+        name: nautobot-redis-master
+        port: 6379
 ```
 
 Create empty `envoy-configs/kustomization.yaml`:
@@ -511,6 +546,16 @@ routes:
     - name: string              # Route name (optional)
       fqdn: string              # Fully qualified domain name
       namespace: string         # Namespace for the TLSRoute resource
+      gatewayPort: integer      # Optional: gateway listener port for passthrough traffic
+      service:
+        name: string            # Backend service name
+        port: integer           # Backend service port
+
+  tcp:
+    - name: string              # Route name (optional)
+      fqdn: string              # Fully qualified domain name used for naming and DNS
+      namespace: string         # Namespace for the TCPRoute resource
+      gatewayPort: integer      # Optional: gateway listener port for raw TCP traffic
       service:
         name: string            # Backend service name
         port: integer           # Backend service port

@@ -50,6 +50,21 @@ spec:
           from: {{ .from | default "All" }}
           {{- end }}
     {{- end }}
+    {{- range .Values.routes.tcp }}
+    {{- $listenerName := .name | default (index (splitList "." .fqdn) 0) }}
+    - name: {{ $listenerName }}
+      port: {{ .gatewayPort | default ($.Values.gateways.external.port | default 443) }}
+      protocol: TCP
+      allowedRoutes:
+        namespaces:
+          {{- if .selector }}
+          from: Selector
+          selector:
+            {{- .selector | toYaml | nindent 12 }}
+          {{- else }}
+          from: {{ .from | default "All" }}
+          {{- end }}
+    {{- end }}
 
   {{- if .Values.gateways.external.serviceAnnotations }}
   infrastructure:

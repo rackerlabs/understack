@@ -1,4 +1,5 @@
 gateways: {}
 routes:
   http: []
+  tcp: []
   tls: []

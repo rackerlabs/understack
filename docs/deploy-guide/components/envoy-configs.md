@@ -42,6 +42,10 @@ site:
 Required or commonly required items:
 
 - `values.yaml`: Provide the configuration values consumed by the shared Envoy config base.
+  The shared chart supports `routes.http`, `routes.tls`, and `routes.tcp`.
+  Use `routes.tls` for direct TLS passthrough backends that send a TLS
+  ClientHello immediately, and `routes.tcp` for raw TCP protocols such
+  as PostgreSQL STARTTLS on dedicated ports.
 - `kustomization.yaml`: Add any extra Gateway API, EnvoyPatchPolicy, or ConfigMap resources that your environment requires.
 
 Optional additions:

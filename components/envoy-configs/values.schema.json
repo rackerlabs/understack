@@ -69,7 +69,7 @@
     },
     "routes": {
       "type": "object",
-      "description": "HTTP and TLS routes configurations for Understack services",
+      "description": "HTTP, TCP, and TLS route configurations for Understack services",
       "properties": {
         "http": {
           "type": "array",
@@ -154,6 +154,74 @@
               "alsoInternal": {
                 "type": "boolean",
                 "description": "Also attach this route to the internal (plain HTTP) gateway. Useful for clients that do not support HTTP/2 or TLS 1.3."
+              }
+            },
+            "required": [
+              "fqdn",
+              "service"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "tcp": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fqdn": {
+                "type": "string",
+                "description": "Fully qualified domain name for the route. Used for operator context and naming, but not rendered into the TCPRoute."
+              },
+              "name": {
+                "type": "string",
+                "description": "Name identifier for the route. If not defined, first part of fqdn is used."
+              },
+              "namespace": {
+                "type": "string",
+                "description": "Namespace where the tcproute will be installed (same as backend service)"
+              },
+              "gatewayPort": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "Port exposed on the gateway for this TCP listener. Defaults to the external gateway port (443) if not specified."
+              },
+              "service": {
+                "type": "object",
+                "description": "Kubernetes service backend configuration for the route",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the Kubernetes service"
+                  },
+                  "port": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 65535,
+                    "description": "Numeric port of the service (not target port)"
+                  }
+                },
+                "required": [
+                  "name",
+                  "port"
+                ],
+                "additionalProperties": false
+              },
+              "selector": {
+                "type": "object",
+                "description": "Kubernetes-style label selector (key-value pairs)",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "from": {
+                "type": "string",
+                "enum": [
+                  "Same",
+                  "All",
+                  "Selector"
+                ],
+                "description": "Specifies where traffic can originate from"
               }
             },
             "required": [

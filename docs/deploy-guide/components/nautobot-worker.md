@@ -143,9 +143,11 @@ mounted, Redis SSL is configured automatically.
 
 ### Envoy Gateway
 
-Both PostgreSQL (port 5432) and Redis (port 6379) use `routes.tls`
-entries with TLS passthrough mode. The gateway routes traffic based on
-SNI hostname without terminating TLS, preserving end-to-end mTLS.
+PostgreSQL (port 5432) uses a `routes.tcp` entry so Envoy forwards raw
+TCP and PostgreSQL can complete its STARTTLS negotiation normally.
+Redis (port 6379) uses a `routes.tls` entry with TLS passthrough mode,
+because Redis sends a TLS ClientHello immediately and can be routed by
+SNI without terminating TLS. Both paths preserve end-to-end mTLS.
 
 ## Certificate Infrastructure
 
@@ -471,9 +473,10 @@ operator guide.
   provides the streaming replication client cert so CNPG does not need
   the CA private key in `clientCASecret`.
 
-- The `routes.tls` type in the Envoy Gateway template uses a
-  `gatewayPort` field to support non-443 ports for TLS passthrough.
-  PostgreSQL (5432) and Redis (6379) both use this route type.
+- The Envoy Gateway templates use a `gatewayPort` field on both
+  `routes.tls` and `routes.tcp` to support dedicated non-443 listeners.
+  Redis (6379) uses `routes.tls`; PostgreSQL (5432) uses `routes.tcp`
+  because PostgreSQL STARTTLS is incompatible with `TLSRoute`.
 
 - The `pg_hba cert` method with CN-to-user mapping means the client
   certificate CN (e.g. `app`) maps directly to the PostgreSQL user, so
@@ -668,10 +671,12 @@ backend:
 # Check gateway status
 kubectl get gateway -n envoy-gateway -o yaml
 
-# Check TLSRoute status
+# Check route status
 kubectl get tlsroute -n nautobot -o yaml
+kubectl get tcproute -n nautobot -o yaml
 ```
 
-Verify the `fqdn` in the TLS route matches the SNI hostname the client
-is connecting to. For PostgreSQL, the `nautobot.db.host` in the worker
-values must match the `fqdn` in the envoy-configs route.
+Verify the route type matches the backend protocol. Redis should appear
+as a `TLSRoute`, and PostgreSQL should appear as a `TCPRoute`. The
+`nautobot.db.host` and `nautobot.redis.host` values in the worker
+configuration must still match the route FQDNs used for DNS.
