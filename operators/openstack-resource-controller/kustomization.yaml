@@ -3,4 +3,4 @@ kind: Kustomization
 
 resources:
   - secret-openstack-resource-controller.yaml
-  - https://github.com/k-orc/openstack-resource-controller/releases/download/v2.4.0/install.yaml
+  - https://github.com/k-orc/openstack-resource-controller/releases/download/v2.5.0/install.yaml
