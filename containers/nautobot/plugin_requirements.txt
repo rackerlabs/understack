@@ -2,4 +2,4 @@
 # them are not running on python 3.12 yet.
 nautobot[sso]==3.1.0
 nautobot-golden-config==3.0.5
-nautobot-plugin-nornir==3.0.0
+nautobot-plugin-nornir==3.2.0
