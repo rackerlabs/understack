@@ -55,12 +55,15 @@ def parse_controller_details(client: Sushy) -> dict:
     """Parse available RAID controller details for execution."""
     result = {"controller": None, "physical_disks": []}
     system_objects = client.get_system_collection().get_members()
-    system = system_objects[0]
+    system = system_objects.pop()
     for c in system.storage.get_members():
-        if "RAID" in c.identity:
+        if "RAID" in c.identity.upper():
             result["controller"] = c.identity
             for d in c.drives:
-                result["physical_disks"].append(d.identity)
+                capacity = d.capacity_bytes / (10**9)
+                result["physical_disks"].append(
+                    {"name": d.identity, "size_gb": f"{capacity:.0f}"}
+                )
             break
     return result
 
@@ -75,19 +78,28 @@ def get_raid_type(disk_count: int) -> int:
 
 def build_raid_config(raid_config: dict):
     """Return a raid config supported by ironic for cleanup tasks."""
-    raid_level = get_raid_type(len(raid_config["physical_disks"]))
-    result = {
-        "logical_disks": [
+    sizes = sorted({int(d["size_gb"]) for d in raid_config["physical_disks"]})
+    base_config = {"logical_disks": []}
+    for size in sizes:
+        _root_vol = bool(size == sizes[0]) or bool(
+            len(sizes) == 1
+        )  # First size or only size.
+        disks = [
+            d["name"]
+            for d in raid_config["physical_disks"]
+            if int(d["size_gb"]) == size
+        ]
+        raid_level = get_raid_type(len(disks))
+        base_config["logical_disks"].append(
             {
                 "controller": raid_config["controller"],
-                "is_root_volume": True,
-                "physical_disks": raid_config["physical_disks"],
+                "is_root_volume": _root_vol,
+                "physical_disks": disks,
                 "raid_level": str(raid_level),
                 "size_gb": "MAX",
             }
-        ]
-    }
-    return result
+        )
+    return base_config
 
 
 if __name__ == "__main__":
