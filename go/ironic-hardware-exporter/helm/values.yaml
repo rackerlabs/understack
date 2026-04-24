@@ -1,0 +1,79 @@
+image:
+  repository: ghcr.io/rackerlabs/understack/ironic-hardware-exporter
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+podAnnotations: {}
+
+podLabels: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+# RabbitMQ connection settings.
+# RABBITMQ_PASSWORD must come from an existing Secret set existingSecret to its name.
+rabbitmq:
+  host: localhost
+  # port defaults to 5672 (plain) or 5671 (TLS) when left empty
+  port: ""
+  vhost: ironic
+  username: ironic
+  exchange: ironic
+  queue: ironic-hardware-exporter
+  routingKey: notifications.info
+  statesQueue: ironic-hardware-exporter-states
+  statesRoutingKey: ironic_versioned_notifications.info
+
+  # Name of a Secret that contains the RabbitMQ password.
+  # The Secret must have a key matching passwordSecretKey (default: "password").
+  existingSecret: ""
+  passwordSecretKey: password
+
+  tls:
+    enabled: false
+    # Name of a Secret containing the CA certificate PEM (key: ca.crt).
+    # Required when tls.enabled is true and the broker uses a private CA.
+    caSecretName: ""
+    caSecretKey: ca.crt
+    # Override the TLS server name (SNI) when RABBITMQ_HOST is an IP or alias.
+    serverName: ""
+
+service:
+  type: ClusterIP
+  port: 9608
+
+
+serviceMonitor:
+  enabled: false
+  interval: 60s
+  scrapeTimeout: 30s
+
+resources: {}
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 20
+  timeoutSeconds: 5
+  failureThreshold: 5
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+volumes: []
+volumeMounts: []
+nodeSelector: {}
+tolerations: []
+affinity: {}

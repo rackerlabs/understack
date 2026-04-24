@@ -1,0 +1,11 @@
+ironic-hardware-exporter has been deployed.
+
+Prometheus metrics:
+  kubectl port-forward svc/{{ include "ironic-hardware-exporter.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  curl http://localhost:{{ .Values.service.port }}/metrics
+
+Health check:
+  curl http://localhost:{{ .Values.service.port }}/health
+
+Readiness check (503 if RabbitMQ connection is lost):
+  curl http://localhost:{{ .Values.service.port }}/ready
