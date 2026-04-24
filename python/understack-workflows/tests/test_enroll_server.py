@@ -289,6 +289,13 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
             ),
             call(
                 created_node.uuid,
+                "clean",
+                cleansteps=[{"interface": "management", "step": "clear_job_queue"}],
+                runbook=None,
+                disable_ramdisk=True,
+            ),
+            call(
+                created_node.uuid,
                 "inspect",  # OOB redfish inspect for bios_name / basic info
                 cleansteps=None,
                 runbook=None,
@@ -296,17 +303,10 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
             ),
             call(
                 created_node.uuid,
-                "inspect",  # agent inspect via virtual media
+                "inspect",  # agent inspect
                 cleansteps=None,
                 runbook=None,
                 disable_ramdisk=None,
-            ),
-            call(
-                created_node.uuid,
-                "clean",
-                cleansteps=[{"interface": "management", "step": "clear_job_queue"}],
-                runbook=None,
-                disable_ramdisk=True,
             ),
             call(
                 created_node.uuid,
@@ -421,6 +421,13 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
             ),
             call(
                 existing_node.uuid,
+                "clean",
+                cleansteps=[{"interface": "management", "step": "clear_job_queue"}],
+                runbook=None,
+                disable_ramdisk=True,
+            ),
+            call(
+                existing_node.uuid,
                 "inspect",  # OOB inspect
                 cleansteps=None,
                 runbook=None,
@@ -428,17 +435,10 @@ def test_enrol_existing_failed_node_recovers_and_updates(mocker):
             ),
             call(
                 existing_node.uuid,
-                "inspect",  # Agent inspect via virtual media
+                "inspect",  # Agent inspect
                 cleansteps=None,
                 runbook=None,
                 disable_ramdisk=None,
-            ),
-            call(
-                existing_node.uuid,
-                "clean",
-                cleansteps=[{"interface": "management", "step": "clear_job_queue"}],
-                runbook=None,
-                disable_ramdisk=True,
             ),
             call(
                 existing_node.uuid,
