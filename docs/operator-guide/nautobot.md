@@ -110,6 +110,10 @@ All pods (global and site) must set `NAUTOBOT_DB_SSLMODE=verify-ca` in
 their `extraEnvVars` and have the mTLS client cert volume mounted at
 `/etc/nautobot/mtls/`.
 
+`NAUTOBOT_DB_SSLNEGOTIATION` is optional. If set to `direct`, the shared
+config passes `sslnegotiation=direct` to libpq. This requires
+PostgreSQL/libpq 17+ and `NAUTOBOT_DB_SSLMODE=require` or stronger.
+
 ### Verifying the Certificate Chain
 
 To confirm the CNPG cluster is using the correct CA for client cert
