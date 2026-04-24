@@ -36,7 +36,11 @@ func main() {
 	}
 	defer statesConsumer.Close()
 
-	srv := server.New(store, cfg.Server.Port, sensorConsumer.IsReady)
+	// both consumers must be up for the pod to be considered ready
+	bothReady := func() bool {
+		return sensorConsumer.IsReady() && statesConsumer.IsReady()
+	}
+	srv := server.New(store, cfg.Server.Port, bothReady)
 	go func() {
 		if err := srv.Start(); err != nil {
 			log.Fatalf("HTTP server failed: %v", err)

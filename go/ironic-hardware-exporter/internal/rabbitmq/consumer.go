@@ -1,10 +1,13 @@
 package rabbitmq
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"log"
 	"net"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 
@@ -32,15 +35,53 @@ func buildAMQPURL(cfg config.RabbitMQConfig) string {
 	}
 	hostPort := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	userInfo := url.UserPassword(cfg.Username, cfg.Password).String()
-	return fmt.Sprintf("amqp://%s@%s/%s", userInfo, hostPort, url.PathEscape(vhost))
+	scheme := "amqp"
+	if cfg.TLSEnabled {
+		scheme = "amqps"
+	}
+	return fmt.Sprintf("%s://%s@%s/%s", scheme, userInfo, hostPort, url.PathEscape(vhost))
+}
+
+func buildTLSConfig(cfg config.RabbitMQConfig) (*tls.Config, error) {
+	tlsCfg := &tls.Config{}
+
+	if cfg.CAPath != "" {
+		caCert, err := os.ReadFile(cfg.CAPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA cert %s: %w", cfg.CAPath, err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA cert from %s", cfg.CAPath)
+		}
+		tlsCfg.RootCAs = pool
+	}
+
+	if cfg.ServerName != "" {
+		tlsCfg.ServerName = cfg.ServerName
+	}
+
+	return tlsCfg, nil
 }
 
 func New(cfg config.RabbitMQConfig) (*Consumer, error) {
 	rabbitURL := buildAMQPURL(cfg)
 
-	log.Printf("connecting to RabbitMQ at %s:%d vhost=%s", cfg.Host, cfg.Port, cfg.VHost)
+	log.Printf("connecting to RabbitMQ at %s:%d vhost=%s tls=%v", cfg.Host, cfg.Port, cfg.VHost, cfg.TLSEnabled)
 
-	conn, err := amqp.Dial(rabbitURL)
+	var conn *amqp.Connection
+	var err error
+
+	if cfg.TLSEnabled {
+		tlsCfg, tlsErr := buildTLSConfig(cfg)
+		if tlsErr != nil {
+			return nil, fmt.Errorf("failed to build TLS config: %w", tlsErr)
+		}
+		conn, err = amqp.DialConfig(rabbitURL, amqp.Config{TLSClientConfig: tlsCfg})
+	} else {
+		conn, err = amqp.Dial(rabbitURL)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
