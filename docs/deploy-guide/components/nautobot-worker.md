@@ -442,6 +442,7 @@ operator guide.
 | Variable | Where Set | Purpose |
 |---|---|---|
 | `NAUTOBOT_DB_SSLMODE` | Both global and site values | Controls PostgreSQL SSL mode. Set to `verify-ca` for mTLS on all pods. |
+| `NAUTOBOT_DB_SSLNEGOTIATION` | Optional in global and site values | If set to `direct`, starts the TLS handshake immediately after TCP connect. Requires PostgreSQL/libpq 17+ and `NAUTOBOT_DB_SSLMODE=require` or stronger. |
 | `NAUTOBOT_DB_SSLCERT` | Optional override | Path to client cert for PG (default: `/etc/nautobot/mtls/tls.crt`) |
 | `NAUTOBOT_DB_SSLKEY` | Optional override | Path to client key for PG (default: `/etc/nautobot/mtls/tls.key`) |
 | `NAUTOBOT_DB_SSLROOTCERT` | Optional override | Path to CA cert for PG (default: `/etc/nautobot/mtls/ca.crt`) |
