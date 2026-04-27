@@ -316,7 +316,7 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
                     {"interface": "raid", "step": "create_configuration"},
                 ],
                 runbook=None,
-                disable_ramdisk=True,
+                disable_ramdisk=False,
             ),
             call(
                 created_node.uuid,

@@ -46,7 +46,7 @@ def configure_raid(node: Node, inventory: dict):
             {"interface": "raid", "step": "delete_configuration"},
             {"interface": "raid", "step": "create_configuration"},
         ],
-        disable_ramdisk=True,
+        disable_ramdisk=False,
     )
 
 
