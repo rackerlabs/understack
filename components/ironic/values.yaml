@@ -126,6 +126,9 @@ conf:
       expire_console_session_interval: 1800
       token_timeout: 1800
       #  kubernetes_container_template: $pybasedir/console/container/ironic-console-pod.yaml.template
+  ironic_api_uwsgi:
+    uwsgi:
+      processes: 4
 
 endpoints:
   oslo_messaging:
@@ -222,8 +225,6 @@ manifests:
   # that is later consumed via components/openstack helm chart
   secret_keystone: false
   secret_ks_etc: false
-  # Use our custom configmap-ironic-bin.yaml with uWSGI instead of upstream's ironic-api
-  configmap_bin: false
 
 pod:
   # Use etcSources to mount the ironic-ks-etc secret at /etc/ironic/ironic.conf.d/
