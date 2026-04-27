@@ -1,5 +1,5 @@
 # Build iPXE separately to avoid rebuilding on every Ironic change
-FROM docker.io/debian:13 AS ipxe-builder
+FROM docker.io/debian:trixie-20260421 AS ipxe-builder
 
 # example --build-arg IPXE_FLAGS="DEBUG=tcp:3,xfer:3,netdevice:2,ipv4:2,httpcore:2,httpconn:2"
 ARG IPXE_FLAGS=""
