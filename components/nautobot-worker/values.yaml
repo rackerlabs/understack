@@ -42,6 +42,7 @@ celery:
     - cluster-data
   extraEnvVarsSecret:
     - nautobot-django
+    - nautobot-custom-env
   livenessProbe:
     initialDelaySeconds: 60
     periodSeconds: 120
