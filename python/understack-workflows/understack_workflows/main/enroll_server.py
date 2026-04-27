@@ -16,6 +16,7 @@ from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
 from understack_workflows.helpers import setup_logger
+from understack_workflows.raid import configure_raid
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,7 @@ def enroll(
     # and it bails out unless we have ports with pxe_enabled, local_link_info,
     # etc.
     ironic_node.inspect_out_of_band(node)
+    inventory = ironic_node.get_node_inventory(node)
 
     # Agent inspection gathers LLDP and full hardware inventory.
     #
@@ -124,7 +126,7 @@ def enroll(
     update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
 
     if raid_configure:
-        configure_raid(node, bmc)
+        configure_raid(node, inventory)
         # RAID reconfiguration changes the disk layout; refresh inventory.
         ironic_node.inspect_out_of_band(node)
     else:
@@ -187,63 +189,6 @@ def initialize_bmc(bmc: Bmc, old_password: str | None) -> ChassisInfo:
 
 def device_name(device_info: ChassisInfo) -> str:
     return f"{device_info.manufacturer}-{device_info.serial_number}"
-
-
-def configure_raid(node: Node, bmc: Bmc):
-    raid_details = discover_controller_details(bmc)
-    if not raid_details:
-        logger.info("%s No RAID hardware found in node", node.uuid)
-        return
-
-    logger.info("%s Applying RAID configuration", node.uuid)
-    raid_config = build_raid_config(**raid_details)
-    ironic_node.set_target_raid_config(node, raid_config)
-    ironic_node.transition(
-        node,
-        target_state="clean",
-        expected_state="manageable",
-        clean_steps=[
-            {"interface": "raid", "step": "delete_configuration"},
-            {"interface": "raid", "step": "create_configuration"},
-        ],
-        disable_ramdisk=True,
-    )
-
-
-def discover_controller_details(bmc: Bmc) -> dict | None:
-    """Parse available RAID controller details for execution."""
-    system_objects = bmc.sushy().get_system_collection().get_members()
-    system = system_objects[0]
-    for controller in system.storage.get_members():
-        if "RAID" in controller.identity:
-            return {
-                "controller": controller.identity,
-                "physical_disks": [d.identity for d in controller.drives],
-            }
-    return None
-
-
-def build_raid_config(controller: str, physical_disks: list[str]):
-    """Return a raid config supported by ironic for cleanup tasks."""
-    if len(physical_disks) < 2:
-        raid_level = "0"
-    elif len(physical_disks) > 2:
-        raid_level = "5"
-    else:
-        raid_level = "1"
-
-    result = {
-        "logical_disks": [
-            {
-                "controller": controller,
-                "is_root_volume": True,
-                "physical_disks": physical_disks,
-                "raid_level": raid_level,
-                "size_gb": "MAX",
-            }
-        ]
-    }
-    return result
 
 
 def parse_bool(value: str) -> bool:

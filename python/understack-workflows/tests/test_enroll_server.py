@@ -33,6 +33,7 @@ def make_node_inventory(
     interfaces: list[dict] | None = None,
     connected_interface_names: list[str] | None = None,
     serial_number: str = "FL6PC14",
+    storage_controllers: list[dict] | None = None,
 ) -> dict:
     """Build a realistic Ironic node inventory dict, suitable for mocking."""
     if interfaces is None:
@@ -56,6 +57,7 @@ def make_node_inventory(
     return {
         "inventory": {
             "interfaces": interfaces,
+            "storage_controllers": storage_controllers or [],
             "system_vendor": {
                 "product_name": "PowerEdge R7615",
                 "serial_number": serial_number,
@@ -179,6 +181,15 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
     fake_bmc = make_bmc(mocker, fake_sushy=make_raid_hardware())
     inventory = make_node_inventory(
         connected_interface_names=["NIC.Integrated.1-1", "NIC.Integrated.1-2"],
+        storage_controllers=[
+            {
+                "id": "RAID.Integrated.1-1",
+                "drives": [
+                    {"id": "Disk1", "size": 479559942144},
+                    {"id": "Disk2", "size": 479559942144},
+                ],
+            }
+        ],
     )
     # port-enroll-config hook has run during agent inspection and flagged
     # pxe_enabled on LLDP-connected ports.  port-bios-name (OOB) stamped
