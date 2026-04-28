@@ -13,7 +13,7 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-- name: "Create project {{ project_item.project_name }}"
+- name: "Create keystone project"
   openstack.cloud.project:
     name: "{{ project_item.project_name }}"
     domain: "{{ domain.domain_name }}"
@@ -22,3 +22,4 @@
   loop: "{{ domain.projects }}"
   loop_control:
     loop_var: project_item
+    label: "{{ domain.domain_name }}:{{ project_item.project_name }}"
