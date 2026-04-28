@@ -20,9 +20,11 @@
     state: present
   loop: "{{ keystone_domains_projects_list }}"
 
-- name: "Create projects for domain {{ item.domain_name }}"
+- name: "Create projects for domain {{ domain_item.domain_name }}"
   ansible.builtin.include_tasks: projects.yml
   vars:
-    domain: "{{ item }}"
+    domain: "{{ domain_item }}"
   loop: "{{ keystone_domains_projects_list }}"
-  when: item.projects is defined and item.projects | length > 0
+  loop_control:
+    loop_var: domain_item
+  when: domain_item.projects is defined and domain_item.projects | length > 0

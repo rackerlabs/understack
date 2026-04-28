@@ -13,10 +13,12 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-- name: "Create project {{ item.project_name }}"
+- name: "Create project {{ project_item.project_name }}"
   openstack.cloud.project:
-    name: "{{ item.project_name }}"
+    name: "{{ project_item.project_name }}"
     domain: "{{ domain.domain_name }}"
-    description: "{{ item.description }}"
+    description: "{{ project_item.description }}"
     state: present
   loop: "{{ domain.projects }}"
+  loop_control:
+    loop_var: project_item
