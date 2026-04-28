@@ -13,18 +13,22 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-- name: "Create domain {{ item.domain_name }}"
+- name: "Create keystone domain"
   openstack.cloud.identity_domain:
-    name: "{{ item.domain_name }}"
-    description: "{{ item.description }}"
+    name: "{{ domain_item.domain_name }}"
+    description: "{{ domain_item.description }}"
     state: present
   loop: "{{ keystone_domains_projects_list }}"
+  loop_control:
+    loop_var: domain_item
+    label: "{{ domain_item.domain_name }}"
 
-- name: "Create projects for domain {{ domain_item.domain_name }}"
+- name: "Create projects for domain"
   ansible.builtin.include_tasks: projects.yml
   vars:
     domain: "{{ domain_item }}"
   loop: "{{ keystone_domains_projects_list }}"
   loop_control:
     loop_var: domain_item
+    label: "{{ domain_item.domain_name }}"
   when: domain_item.projects is defined and domain_item.projects | length > 0
