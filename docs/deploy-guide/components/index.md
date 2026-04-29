@@ -90,7 +90,6 @@ enablement defaults, validation, and troubleshooting notes.
 | [monitoring](./monitoring.md) | global, site |
 | [nautobot](./nautobot.md) | global |
 | [nautobot-api-tokens](./nautobot-api-tokens.md) | global |
-| [nautobot-site](./nautobot-site.md) | site |
 | [nautobotop](./nautobotop.md) | global |
 | [openebs](./openebs.md) | global, site |
 | [openstack](./openstack.md) | site |

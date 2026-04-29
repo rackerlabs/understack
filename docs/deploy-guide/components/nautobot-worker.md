@@ -45,6 +45,24 @@ site:
     enabled: true
 ```
 
+## Configuration Architecture
+
+The worker uses the same Helm chart `fileParameters` mechanism as the
+global Nautobot deployment. The default config path is
+`$understack/components/nautobot/nautobot_config.py`, but site
+deployments can override it with `site.nautobot_worker.nautobot_config`.
+A site deployment can point this value at a shared deploy-repo config:
+
+```yaml title="$CLUSTER_NAME/deploy.yaml"
+site:
+  nautobot_worker:
+    nautobot_config: '$deploy/apps/nautobot-config/nautobot_config.py'
+```
+
+Use the same deploy-specific config for global Nautobot and site workers
+when they must share mTLS, plugin, SSO, and production-hardening
+behavior.
+
 ## Architecture
 
 Site workers connect to the global cluster's PostgreSQL (CNPG) and Redis
@@ -80,12 +98,13 @@ worker pod and the server.
 
 ## Plugin Loading
 
-The shared `nautobot_config.py` supports a generic plugin loading
-mechanism described in the
+Deployment-specific plugin configuration can live in the shared deploy
+`nautobot_config.py`, with credentials supplied by `nautobot-custom-env`.
+Site workers use the same config as global Nautobot, so plugin changes
+belong in the shared deploy config, not in worker-only values. For
+details, see the
 [Nautobot Plugin Loading](../../operator-guide/nautobot.md#plugin-loading)
-operator guide. Site workers use the same mechanism -- open-source
-plugins are loaded automatically, and additional plugins can be added
-via the `NAUTOBOT_EXTRA_PLUGINS` environment variable.
+operator guide.
 
 ## Connection Security
 
@@ -147,6 +166,53 @@ Both PostgreSQL (port 5432) and Redis (port 6379) use `routes.tls`
 entries with TLS passthrough mode. The gateway routes traffic based on
 SNI hostname without terminating TLS, preserving end-to-end mTLS.
 
+#### Firewall Requirements
+
+Site workers reach the global PostgreSQL and Redis services through the
+Envoy Gateway LoadBalancer address. Because these are separate
+`routes.tls` listeners, HTTPS access to the Nautobot web endpoint is not
+enough. The network path must allow the database and Redis listener
+ports as well.
+
+For each site, request or configure firewall/security policy with:
+
+| Field | Value |
+|---|---|
+| Source | Site worker egress CIDRs, such as node CIDRs, pod CIDRs, or NAT ranges |
+| Destination | Envoy Gateway LoadBalancer/VIP for the global cluster |
+| Services | TCP/5432 and TCP/6379 |
+| Protocol handling | TLS/SSL passthrough if the firewall requires an application/protocol match |
+| Action | Allow |
+
+The Envoy config should have TLS routes similar to:
+
+```yaml
+routes:
+  tls:
+    - name: nautobot-db
+      fqdn: nautobot-db.<env>.example.com
+      gatewayPort: 5432
+      namespace: nautobot
+      service:
+        name: nautobot-cluster-rw
+        port: 5432
+    - name: nautobot-redis
+      fqdn: nautobot-redis.<env>.example.com
+      gatewayPort: 6379
+      namespace: nautobot
+      service:
+        name: nautobot-redis-master
+        port: 6379
+```
+
+Both FQDNs must resolve to the Envoy Gateway LoadBalancer/VIP. From a
+site worker pod, verify routing before debugging mTLS:
+
+```bash
+kubectl exec -n nautobot deploy/nautobot-worker-celery-site-dc -- sh -lc \
+  'nc -vz nautobot-db.<env>.example.com 5432 && nc -vz nautobot-redis.<env>.example.com 6379'
+```
+
 ## Certificate Infrastructure
 
 ### Global Cluster
@@ -161,6 +227,12 @@ and distributed to site clusters through your external secrets provider.
 The CA private key never leaves the global cluster -- a compromised
 site cannot forge certificates for other sites.
 
+The site worker mounts only the site-local Secret named
+`nautobot-mtls-client`. ExternalSecret creates that Secret from the
+secrets provider. The provider data should come from the per-site source
+Secret issued on the global cluster, named
+`nautobot-mtls-client-<site>`.
+
 Each site needs two credentials from the secrets provider:
 
 | Credential | Content | Scope |
@@ -171,7 +243,8 @@ Each site needs two credentials from the secrets provider:
 The ExternalSecret on the site cluster combines these into a single
 `nautobot-mtls-client` secret (type `kubernetes.io/tls`) with `tls.crt`,
 `tls.key`, and `ca.crt`. This secret is mounted into worker pods at
-`/etc/nautobot/mtls/`.
+`/etc/nautobot/mtls/`. The shared `nautobot_config.py` uses those stable
+file paths for both global pods and site workers.
 
 Note: if your secrets provider stores PEM data with `\r\n` line endings
 or concatenates multiple PEM blocks in a single field, use the
@@ -195,6 +268,8 @@ Before starting, ensure the global cluster already has:
 - CNPG configured with `serverTLSSecret`, `serverCASecret`, `clientCASecret`, and `pg_hba`
 - Redis TLS enabled with `authClients: true`
 - Envoy Gateway TLS passthrough routes on ports 5432 and 6379
+- Firewall/security policy allowing TCP/5432 and TCP/6379 from the site
+  worker egress CIDRs to the Envoy Gateway LoadBalancer/VIP
 
 You also need the pre-issued client certificate stored in your external
 secrets provider (see Step 1).
@@ -215,7 +290,7 @@ metadata:
 spec:
   secretName: nautobot-mtls-client-<site>
   duration: 26280h   # 3 years
-  renewBefore: 2160h # 90 days
+  renewBefore: 720h  # 30 days
   commonName: app
   usages:
     - client auth
@@ -263,15 +338,18 @@ cluster and is never extracted or distributed.
 ### Step 3: Create ExternalSecrets for credentials
 
 Create ExternalSecret resources that pull credentials from your secrets
-provider into the `nautobot` namespace. You need five:
+provider into the `nautobot` namespace. A deployment-specific config
+that reads additional environment variables also needs
+`nautobot-custom-env`:
 
 | ExternalSecret | Target Secret | Purpose |
 |---|---|---|
 | `externalsecret-nautobot-django.yaml` | `nautobot-django` | Django `SECRET_KEY` -- must match the global instance |
 | `externalsecret-nautobot-db.yaml` | `nautobot-db` | CNPG app user password (satisfies Helm chart requirement) |
-| `externalsecret-nautobot-worker-redis.yaml` | `nautobot-redis` | Redis password |
+| `externalsecret-nautobot-worker-redis.yaml` | `nautobot-worker-redis` | Redis password |
 | `externalsecret-dockerconfigjson-github-com.yaml` | `dockerconfigjson-github-com` | Container registry credentials |
 | `externalsecret-nautobot-mtls-client.yaml` | `nautobot-mtls-client` | mTLS client cert + CA cert (two credentials combined) |
+| `externalsecret-nautobot-custom-env.yaml` | `nautobot-custom-env` | Deployment-specific integration credentials or runtime settings |
 
 The mTLS ExternalSecret pulls from two separate credentials in your
 secrets provider -- the per-site client cert+key and the shared CA
@@ -338,20 +416,21 @@ resources:
   - externalsecret-nautobot-worker-redis.yaml
   - externalsecret-dockerconfigjson-github-com.yaml
   - externalsecret-nautobot-mtls-client.yaml
+  - externalsecret-nautobot-custom-env.yaml
 ```
 
 ### Step 5: Create the values file
 
-Create `values.yaml` with the site-specific overrides. Replace
-`<env>` with your environment identifier and `<site-partition>` with
-the site's partition name.
+Create `values.yaml` with the site-specific overrides.
+The Celery worker name and queue are rendered by ArgoCD Application from the
+`understack.rackspace.com/site` app label.
 
 ```yaml
 nautobot:
   db:
-    host: "nautobot-db.<env>.undercloud.rackspace.net"
+    host: "nautobot-db.<env>.example.com"
   redis:
-    host: "nautobot-redis.<env>.undercloud.rackspace.net"
+    host: "nautobot-redis.<env>.example.com"
     ssl: true
   image:
     registry: "ghcr.io"
@@ -365,10 +444,10 @@ celery:
   extraEnvVars:
     - name: NAUTOBOT_CONFIG
       value: /opt/nautobot/nautobot_config.py
-    - name: NAUTOBOT_EXTRA_PLUGINS
-      value: '<comma-separated list of additional plugin module names>'
     - name: NAUTOBOT_DB_SSLMODE
       value: verify-ca
+    - name: NAUTOBOT_DB_SSLNEGOTIATION
+      value: direct
     - name: NAUTOBOT_REDIS_SSL_CERT_REQS
       value: required
     - name: NAUTOBOT_REDIS_SSL_CA_CERTS
@@ -377,10 +456,6 @@ celery:
       value: /etc/nautobot/mtls/tls.crt
     - name: NAUTOBOT_REDIS_SSL_KEYFILE
       value: /etc/nautobot/mtls/tls.key
-    - name: SSL_CERT_FILE
-      value: /etc/nautobot/mtls/ca.crt
-    - name: REQUESTS_CA_BUNDLE
-      value: /etc/nautobot/mtls/ca.crt
   extraVolumes:
     - name: mtls-certs
       secret:
@@ -400,6 +475,7 @@ Add `nautobot_worker` to the site's `deploy.yaml`:
 site:
   nautobot_worker:
     enabled: true
+    nautobot_config: '$deploy/apps/nautobot-config/nautobot_config.py'
 ```
 
 ### Step 7: Verify
@@ -425,6 +501,7 @@ kubectl logs -n nautobot -l app.kubernetes.io/component=nautobot-celery --tail=5
   externalsecret-nautobot-db.yaml
   externalsecret-nautobot-django.yaml
   externalsecret-nautobot-mtls-client.yaml
+  externalsecret-nautobot-custom-env.yaml
   externalsecret-nautobot-worker-redis.yaml
   kustomization.yaml
   values.yaml
@@ -450,18 +527,19 @@ operator guide.
 | `NAUTOBOT_REDIS_SSL_CA_CERTS` | Site worker values | Path to CA cert for Redis |
 | `NAUTOBOT_REDIS_SSL_CERTFILE` | Site worker values | Path to client cert for Redis |
 | `NAUTOBOT_REDIS_SSL_KEYFILE` | Site worker values | Path to client key for Redis |
-| `SSL_CERT_FILE` | Site worker values | System-wide CA bundle override for outbound HTTPS |
-| `REQUESTS_CA_BUNDLE` | Site worker values | Python requests library CA bundle override |
+| `SSL_CERT_FILE` | Optional site value | System-wide CA bundle override for outbound HTTPS |
+| `REQUESTS_CA_BUNDLE` | Optional site value | Python requests library CA bundle override |
 | `NAUTOBOT_CONFIG` | Both global and site | Path to `nautobot_config.py` |
-| `NAUTOBOT_EXTRA_PLUGINS` | Both global and site values | Comma-separated list of additional plugin module names to load (beyond the open-source defaults). Plugins are loaded only if installed in the container. |
-| `NAUTOBOT_EXTRA_PLUGINS_CONFIG` | Both global and site values | JSON object with plugin configuration. Supports `${ENV_VAR}` syntax for referencing environment variables in string values (useful for secrets). Merged into `PLUGINS_CONFIG`. |
 | `UNDERSTACK_PARTITION` | `cluster-data` ConfigMap (patched by ArgoCD from `appLabels`) | Site partition identifier used by computed fields (e.g. device URN generation). Exposed as a Django setting. |
+| `UNDERSTACK_SITE` | `cluster-data` ConfigMap (patched by ArgoCD from `appLabels`) | Site identifier available to worker pods. The same app label is used by ArgoCD to render the worker name and Celery queue. |
+| Deployment-specific integration variables | `nautobot-custom-env` secret | Extra credentials and runtime settings consumed by the selected `nautobot_config.py`. |
 
 ## Design Decisions
 
 - The cert-manager CA hierarchy (self-signed bootstrap -> root CA ->
-  CA issuer) handles issuance and renewal on both global and site
-  clusters without manual intervention.
+  CA issuer) handles issuance and renewal on the global cluster. Site
+  clusters receive the issued client certificate through their external
+  secrets provider.
 
 - CNPG's native TLS support (`serverTLSSecret`, `serverCASecret`,
   `clientCASecret`, `replicationTLSSecret`) integrates directly with
@@ -488,7 +566,9 @@ operator guide.
 - The `nautobot_config.py` SSL logic is conditional on
   `NAUTOBOT_DB_SSLMODE`, so the same config file works for both global
   pods and site workers. All pods set `verify-ca` to present client
-  certificates for `pg_hba cert` authentication.
+  certificates for `pg_hba cert` authentication. If a deployment sets
+  `NAUTOBOT_DB_SSLNEGOTIATION=direct`, keep that setting paired with
+  PostgreSQL/libpq 17 or newer.
 
 - The Redis mTLS logic in `nautobot_config.py` auto-detects the CA cert
   file at the default mount path. If the cert volume is mounted, Redis
@@ -512,6 +592,11 @@ operator guide.
   Both global pods and site workers must set it to `verify-ca`. If the
   env var is unset, no SSL options are applied and the connection will
   be rejected by the `hostssl ... cert` pg_hba rule.
+
+- **Deploy-specific configs may expect nautobot-custom-env.** If the
+  selected deploy config reads extra environment variables from the
+  `nautobot-custom-env` secret, keep the ExternalSecret in the site
+  worker kustomization.
 
 - **mtls-ca-cert secret contains a private key.** cert-manager
   Certificate resources always produce `tls.crt`, `tls.key`, and

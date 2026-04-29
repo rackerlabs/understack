@@ -36,16 +36,26 @@ global:
 
 ## Configuration Architecture
 
-The `nautobot_config.py` file is managed in git at
-`components/nautobot/nautobot_config.py` and injected into pods via the
-Helm chart's `fileParameters` feature. ArgoCD reads the file, the Helm
-chart creates a ConfigMap, and pods mount it at
-`/opt/nautobot/nautobot_config.py`. The `NAUTOBOT_CONFIG` environment
-variable tells Nautobot to load from that path.
+The `nautobot_config.py` file is injected into pods via the Helm chart's
+`fileParameters` feature. The default path is
+`$understack/components/nautobot/nautobot_config.py`, but deployments can
+override it with `global.nautobot.nautobot_config`. A deployment can
+point this value at a shared deploy-repo config:
+
+```yaml title="$CLUSTER_NAME/deploy.yaml"
+global:
+  nautobot:
+    nautobot_config: '$deploy/apps/nautobot-config/nautobot_config.py'
+```
+
+ArgoCD reads the selected file, the Helm chart creates a ConfigMap, and
+pods mount it at `/opt/nautobot/nautobot_config.py`. The
+`NAUTOBOT_CONFIG` environment variable tells Nautobot to load from that
+path.
 
 The effective configuration is built from four layers: Nautobot defaults,
-the component config, Helm chart env vars from the base values, and
-deploy repo value overrides.
+the selected `nautobot_config.py`, Helm chart env vars from the base
+values, and deploy repo value overrides.
 
 For the full details on how `fileParameters` works, why the baked-in
 image config is not used, config layering, and the Helm list replacement
@@ -55,8 +65,9 @@ operator guide.
 
 ## Plugin Loading
 
-For details on how plugins are loaded, configured via environment
-variables, and how to add custom plugins, see the
+Deployment-specific plugin configuration can live in the shared deploy
+`nautobot_config.py`, with credentials supplied by `nautobot-custom-env`.
+For details, see the
 [Plugin Loading](../../operator-guide/nautobot.md#plugin-loading)
 operator guide.
 
@@ -75,8 +86,18 @@ used by both the global Nautobot deployment and site-level workers:
 | `nautobot-cluster-replication` | Certificate | Streaming replication client certificate (`CN=streaming_replica`). Required so CNPG does not need the CA private key in `clientCASecret`. |
 | `nautobot-redis-server-tls` | Certificate | Redis server certificate |
 | `nautobot-mtls-client` | Certificate | Client certificate for global Nautobot/Celery pods (`CN=app`). Used for both PostgreSQL `pg_hba cert` auth and Redis `authClients`. |
+| `nautobot-mtls-client-<site>` | Certificate | Per-site worker client certificate (`CN=app`) issued on the global cluster and distributed to the site cluster through the secrets provider. |
 
 All resources live in the `nautobot` namespace.
+
+Client certificate naming:
+
+- Global cluster `nautobot-mtls-client` is mounted directly by global
+  Nautobot web and Celery pods.
+- Global cluster `nautobot-mtls-client-<site>` is the source Secret for
+  one site. Its cert/key are copied to the secrets provider.
+- Site cluster `nautobot-mtls-client` is created by ExternalSecret from
+  the provider data for that site and mounted by site workers.
 
 For certificate renewal and distribution to site clusters, see the
 [mTLS Certificate Renewal](../../operator-guide/nautobot-mtls-certificate-renewal.md)
@@ -133,6 +154,10 @@ Both global Nautobot pods and site workers set
 (`CN=app`) during the TLS handshake. The `pg_hba cert` rule maps the
 certificate CN to the PostgreSQL user.
 
+Deployments may also set `NAUTOBOT_DB_SSLNEGOTIATION=direct` for both
+global Nautobot pods and site workers. Only use `direct` when both
+PostgreSQL and libpq are 17 or newer.
+
 ## Deployment Repo Content
 
 {{ secrets_disclaimer }}
@@ -143,13 +168,13 @@ Required or commonly required items:
 - `nautobot-django` Secret: Provide a `NAUTOBOT_SECRET_KEY` value.
 - `nautobot-redis` Secret: Provide a `NAUTOBOT_REDIS_PASSWORD` value.
 - `nautobot-superuser` Secret: Provide `username`, `password`, `email`, and `apitoken` for the initial administrative account.
+- `nautobot-custom-env` Secret: Required when using a deploy-specific config that reads additional integration credentials or runtime settings from environment variables.
 
 Optional additions:
 
 - `nautobot-sso` Secret: Provide `client-id`, `client-secret`, and `issuer` when Nautobot authenticates through an external identity provider.
 - `aws-s3-backup` Secret: Provide `access-key-id` and `secret-access-key` when scheduled backups are pushed to object storage.
 - `dockerconfigjson-github-com` Secret: Provide `.dockerconfigjson` if Nautobot images or plugins come from a private registry.
-- `nautobot-custom-env` Secret: Add any extra environment variables the deployment should inject into Nautobot, such as integration credentials or DSNs.
 - `Database cluster and backup manifests`: Add a CloudNativePG cluster, backup schedule, or similar database resources if this deployment owns its own PostgreSQL cluster.
 - `Catalog and bootstrap content`: Add app definitions, device types, location types, locations, rack groups, or racks if you want Nautobot preloaded with inventory metadata.
 

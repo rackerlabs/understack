@@ -2,20 +2,20 @@
 
 This guide covers how Celery task queues work in the understack
 nautobot-worker deployment, how the queue name is derived from the
-site partition, and how to route jobs to site-specific queues
+site name, and how to route jobs to site-specific queues
 programmatically.
 
 ## How the Queue Name is Set
 
 The ArgoCD Application template for `nautobot-worker` automatically
-sets the Celery queue name to match the site's partition label
-(`understack.rackspace.com/partition`). The relevant section in
+sets the Celery queue name to match the site label
+(`understack.rackspace.com/site`). The relevant section in
 `application-nautobot-worker.yaml`:
 
 {% raw %}
 
 ```yaml
-{{- with index $.Values.appLabels "understack.rackspace.com/partition" }}
+{{- with index $.Values.appLabels "understack.rackspace.com/site" }}
 values: |
   workers:
     default:
@@ -28,20 +28,23 @@ values: |
 
 {% endraw %}
 
-For a site with partition `rax-dev`, this renders as:
+For a site label `site-dc`, this renders as:
 
 ```yaml
 workers:
   default:
     enabled: false
-  rax-dev:
+  site-dc:
     enabled: true
-    taskQueues: "rax-dev"
+    taskQueues: "site-dc"
 ```
 
-This produces a Deployment named `nautobot-worker-celery-rax-dev` with
-the label `app.kubernetes.io/component: nautobot-celery-rax-dev` and
-the environment variable `CELERY_TASK_QUEUES=rax-dev`.
+This produces a Deployment named `nautobot-worker-celery-site-dc` with
+the label `app.kubernetes.io/component: nautobot-celery-site-dc` and
+the environment variable `CELERY_TASK_QUEUES=site-dc`.
+
+The queue name comes from the ArgoCD Application label
+`understack.rackspace.com/site`.
 
 ### Why workers.default must be disabled
 
@@ -62,7 +65,7 @@ request with a validation error.
 
 Navigate to Jobs > Job Queues > Add and create a queue with:
 
-- Name: `rax-dev` (must match the worker's `taskQueues` value)
+- Name: `site-dc` (must match the worker's `taskQueues` value)
 - Queue Type: `celery`
 
 ### Create via the REST API
@@ -72,7 +75,7 @@ curl -X POST \
   -H "Authorization: Token $TOKEN" \
   -H "Content-Type: application/json" \
   https://nautobot.example.com/api/extras/job-queues/ \
-  --data '{"name": "rax-dev", "queue_type": "celery"}'
+  --data '{"name": "site-dc", "queue_type": "celery"}'
 ```
 
 ### Create via pynautobot
@@ -81,18 +84,18 @@ curl -X POST \
 import pynautobot
 
 nb = pynautobot.api("https://nautobot.example.com", token="your-token")
-nb.extras.job_queues.create(name="rax-dev", queue_type="celery")
+nb.extras.job_queues.create(name="site-dc", queue_type="celery")
 ```
 
 ### Automate via Ansible
 
-The `ansible/roles/jobs/tasks/main.yml` role enables Rackspace jobs
-but does not currently create JobQueues. You can extend it:
+The `ansible/roles/jobs/tasks/main.yml` role enables jobs but does not
+currently create JobQueues. You can extend it:
 
 {% raw %}
 
 ```yaml
-- name: "Ensure partition JobQueue exists"
+- name: "Ensure site JobQueue exists"
   ansible.builtin.uri:
     url: "{{ nautobot_url }}/api/extras/job-queues/"
     method: POST
@@ -100,7 +103,7 @@ but does not currently create JobQueues. You can extend it:
       Authorization: "Token {{ nautobot_token }}"
     body_format: json
     body:
-      name: "{{ partition }}"
+      name: "{{ site }}"
       queue_type: "celery"
     status_code: [200, 201, 400]
 ```
@@ -123,7 +126,7 @@ from nautobot.apps.jobs import Job
 class SyncSiteConfig(Job):
     class Meta:
         name = "Sync Site Config"
-        task_queues = ["rax-dev", "default"]
+        task_queues = ["site-dc", "default"]
 ```
 
 ### Option 2: Via the Nautobot UI
@@ -141,7 +144,7 @@ curl -X PATCH \
   -H "Content-Type: application/json" \
   https://nautobot.example.com/api/extras/jobs/$JOB_ID/ \
   --data '{
-    "job_queues": [{"name": "rax-dev"}, {"name": "default"}],
+    "job_queues": [{"name": "site-dc"}, {"name": "default"}],
     "job_queues_override": true
   }'
 ```
@@ -157,8 +160,8 @@ nb = pynautobot.api("https://nautobot.example.com", token="your-token")
 
 job = nb.extras.jobs.get(name="my_app.jobs.SyncSiteConfig")
 
-# Run on the rax-dev site worker
-result = job.run(data={"device": "server-01"}, task_queue="rax-dev")
+# Run on the site worker
+result = job.run(data={"device": "server-01"}, task_queue="site-dc")
 ```
 
 The `task_queue` parameter (or `job_queue` -- both are accepted in
@@ -174,7 +177,7 @@ curl -X POST \
   https://nautobot.example.com/api/extras/jobs/$JOB_ID/run/ \
   --data '{
     "data": {"device": "server-01"},
-    "task_queue": "rax-dev"
+    "task_queue": "site-dc"
   }'
 ```
 
@@ -196,7 +199,7 @@ Nautobot validates two things before accepting a job run request:
 
 1. The requested queue must be in the job's allowed queues list.
    If not, the API returns:
-   `{"task_queue": ["\"rax-dev\" is not a valid choice."]}`
+   `{"task_queue": ["\"site-dc\" is not a valid choice."]}`
 
 2. At least one Celery worker must be actively listening on the
    requested queue. If no worker is found, the API returns a
@@ -209,20 +212,20 @@ To confirm a site worker is consuming from the correct queue:
 
 ```bash
 # Check the CELERY_TASK_QUEUES env var in the running pod
-kubectl -n nautobot get deploy nautobot-worker-celery-rax-dev \
+kubectl -n nautobot get deploy nautobot-worker-celery-site-dc \
             -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="CELERY_TASK_QUEUES")].value}'
 
 # Check worker logs for the queue binding
 kubectl logs -n nautobot \
-  -l app.kubernetes.io/component=nautobot-celery-rax-dev \
+  -l app.kubernetes.io/component=nautobot-celery-site-dc \
   --tail=20 | grep "ready"
 ```
 
 ## Multiple Sites
 
-Each site gets its own queue named after its partition. For example:
+Each site gets its own queue named after its site label. For example:
 
-| Site | Partition | Queue Name | Deployment |
+| Site | Site Label | Queue Name | Deployment |
 |---|---|---|---|
 | DC1 Staging | dc1-staging | dc1-staging | nautobot-worker-celery-dc1-staging |
 | DC1 Prod | dc1-prod | dc1-prod | nautobot-worker-celery-dc1-prod |
@@ -247,12 +250,12 @@ The job does not have the requested queue in its allowed queues. Either:
 No worker is listening on the requested queue. Check:
 
 - The site's nautobot-worker ArgoCD Application is synced and healthy
-- The worker pod is running: `kubectl get pods -n nautobot -l app.kubernetes.io/component=nautobot-celery-<partition>`
+- The worker pod is running: `kubectl get pods -n nautobot -l app.kubernetes.io/component=nautobot-celery-<site>`
 - The `CELERY_TASK_QUEUES` env var matches the queue name
 
 ### Job runs but nothing happens
 
 The job was dispatched to a queue that no worker is consuming. This
 can happen if `task_queue` was not specified and the job defaulted to
-`"default"`, but the site worker is listening on `"rax-dev"`. Always
+`"default"`, but the site worker is listening on `"site-dc"`. Always
 pass `task_queue` explicitly when targeting a site worker.

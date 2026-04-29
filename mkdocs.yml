@@ -188,7 +188,6 @@ nav:
       - deploy-guide/components/mariadb-operator.md
       - deploy-guide/components/monitoring.md
       - deploy-guide/components/nautobot-api-tokens.md
-      - deploy-guide/components/nautobot-site.md
       - deploy-guide/components/nautobot.md
       - deploy-guide/components/nautobotop.md
       - deploy-guide/components/nautobot-worker.md
