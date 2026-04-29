@@ -11,12 +11,10 @@ REQUIRED_VALUES = {
     "SNMP.1.AgentCommunity": "public",
     "SNMP.1.AlertPort": 161,
     "SwitchConnectionView.1.Enable": "Enabled",
-    "NTPConfigGroup.1.NTPEnable": "Enabled",
+    "NTPConfigGroup.1.NTPEnable": "Disabled",
     "Time.1.Timezone": "UTC",
     "IPv4.1.DNS1": os.getenv("DNS_SERVER_IPV4_ADDR_1"),
     "IPv4.1.DNS2": os.getenv("DNS_SERVER_IPV4_ADDR_2"),
-    "NTPConfigGroup.1.NTP1": os.getenv("NTP_SERVER_IPV4_ADDR_1"),
-    "NTPConfigGroup.1.NTP2": os.getenv("NTP_SERVER_IPV4_ADDR_2"),
 }
 
 # When we GET Enum-type keys we can expect a string like "Enabled".
