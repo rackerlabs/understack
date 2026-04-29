@@ -1,0 +1,70 @@
+# -- Override chart name for generated resource names.
+nameOverride: ""
+
+# -- Override fully-qualified release name.
+fullnameOverride: ""
+
+replicaCount: 1
+
+image:
+  # -- Container image repository for nautobot-target-proxy.
+  repository: ghcr.io/rackerlabs/understack/nautobot-target-proxy
+  # -- Image tag to deploy. If empty, chart appVersion is used.
+  tag: ""
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+
+#  Example
+#  imagePullSecrets:
+#  - name: dockerconfigjson-github-com
+imagePullSecrets: []
+
+podAnnotations: {}
+podSecurityContext: {}
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8000
+
+command:
+  - uvicorn
+
+args:
+  - nautobot_target_proxy.app:app
+  - --host
+  - 0.0.0.0
+  - --port
+  - "8000"
+
+nautobot:
+  # -- Base URL for the Nautobot instance queried by the proxy.
+  url: "http://nautobot-default.nautobot.svc.cluster.local"
+
+  # -- Nautobot location name used to filter returned devices.
+  location: "dev"
+
+  clusterDataConfigMapRef:
+    # -- ConfigMap name containing the UNDERSTACK_PARTITION key.
+    name: cluster-data
+    # -- ConfigMap key used to populate UNDERSTACK_PARTITION.
+    key: UNDERSTACK_PARTITION
+
+  tokenSecretRef:
+    # -- Secret name containing the Nautobot API token.
+    name: nautobot-target-proxy-token
+    # -- Secret key containing the Nautobot API token.
+    key: apitoken
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

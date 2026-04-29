@@ -1,0 +1,8 @@
+apiVersion: v2
+name: nautobot-target-proxy
+description: FastAPI service that exposes Nautobot GraphQL targets for Prometheus HTTP service discovery
+type: application
+version: 0.1.0
+appVersion: "0.0.1"
+maintainers:
+  - name: rackerlabs

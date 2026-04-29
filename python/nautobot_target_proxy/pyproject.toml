@@ -1,0 +1,70 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nautobot-target-proxy"
+version = "0.0.1"
+description = "Simple API to scrape targets from Nautobot for use with other systems"
+authors = [{ name = "Project Undercloud Developers" }]
+requires-python = "~=3.12.0"
+readme = "README.md"
+license = "Apache-2.0"
+dependencies = [
+    "fastapi[standard]==0.123.10",
+    "requests==2.32.5",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=9.0.1,<10",
+    "pytest-github-actions-annotate-failures",
+    "pytest-cov>=7,<8",
+]
+
+[tool.uv]
+default-groups = ["test"]
+
+[tool.hatch.build.targets.sdist]
+include = ["nautobot_target_proxy"]
+
+[tool.hatch.build.targets.wheel]
+include = ["nautobot_target_proxy"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra --cov=nautobot_target_proxy"
+testpaths = [
+    "tests",
+]
+
+[tool.ruff]
+line-length = 80
+target-version = "py312"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
+  "ISC",     # flake8-implicit-str-concat
+  "PTH",     # flake8-use-pathlib
+  "RUF100",  # Unused noqa comments
+  "PGH004"   # blanket noqa comments
+]
+
+ignore = [
+  "ISC001",  # avoid formatter issues
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "S101",     # allow 'assert' for pytest
+]

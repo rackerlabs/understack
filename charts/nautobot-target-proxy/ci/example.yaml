@@ -1,0 +1,14 @@
+image:
+  repository: ghcr.io/rackerlabs/understack/nautobot-target-proxy
+  tag: "0.0.1"
+  pullPolicy: IfNotPresent
+
+nautobot:
+  url: https://nautobot.example.com
+  location: dev
+  clusterDataConfigMapRef:
+    name: cluster-data
+    key: UNDERSTACK_PARTITION
+  tokenSecretRef:
+    name: nautobot-env
+    key: NAUTOBOT_TOKEN
