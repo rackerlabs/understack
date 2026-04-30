@@ -2,6 +2,7 @@
   environment:
     DISTRO_NAME: 'debian'
     DIB_RELEASE: 'trixie'
+    DIB_DEBIAN_COMPONENTS: 'main,non-free-firmware'
   elements:
   - ironic-python-agent-ramdisk
   - debian-minimal
