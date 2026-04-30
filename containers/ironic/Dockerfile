@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG OPENSTACK_VERSION="required_argument"
-FROM quay.io/airshipit/venv_builder:2026.1-ubuntu_noble AS build
+FROM quay.io/airshipit/venv_builder:${OPENSTACK_VERSION}-ubuntu_noble AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
@@ -11,11 +11,16 @@ RUN apt-get update && \
         patch \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# clone source and patch it
 # renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2026.1
 ARG IRONIC_GIT_REF=b804ca2f641a6d0e8b2235b5a07725909c4667ed
 ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
 RUN git -C /src/ironic fetch --unshallow --tags
+
+# renovate: name=openstack/sushy repo=https://github.com/openstack/sushy.git branch=stable/2026.1
+ARG SUSHY_GIT_REF=eaf1dfb807cdc40f9b192bc892a4ab54c71198fe
+ADD --keep-git-dir=true https://github.com/openstack/sushy.git#${SUSHY_GIT_REF} /src/sushy
+RUN git -C /src/sushy fetch --unshallow --tags && \
+    sed -i '/sushy==.*/d' /upper-constraints.txt
 
 COPY python/ironic-understack /src/understack/ironic-understack
 COPY python/understack-flavor-matcher /src/understack/understack-flavor-matcher
@@ -24,8 +29,9 @@ ARG OPENSTACK_VERSION="required_argument"
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
       --upgrade \
-      --constraint https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} \
+      --constraint /upper-constraints.txt \
         /src/ironic \
+        /src/sushy \
         /src/understack/ironic-understack \
         /src/understack/understack-flavor-matcher \
         proliantutils==2.16.3
