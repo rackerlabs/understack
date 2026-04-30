@@ -27,16 +27,6 @@ mech_understack_opts = [
         ),
     ),
     cfg.BoolOpt(
-        "undersync_use_keystone_auth",
-        default=False,
-        help=(
-            "Use Keystone authentication for Undersync. "
-            "If True, the driver will use the existing Neutron service token "
-            "from the [keystone_authtoken] config section instead of the "
-            "static JWT token."
-        ),
-    ),
-    cfg.BoolOpt(
         "undersync_dry_run", default=True, help="Call Undersync with dry-run mode"
     ),
     cfg.StrOpt(
