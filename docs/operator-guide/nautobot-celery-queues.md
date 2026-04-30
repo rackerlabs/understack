@@ -61,54 +61,18 @@ Before any job can be dispatched to a site queue, a `JobQueue` record
 must exist in Nautobot's database. Without it, the API rejects the
 request with a validation error.
 
-### Create via the UI
-
-Navigate to Jobs > Job Queues > Add and create a queue with:
-
-- Name: `site-dc` (must match the worker's `taskQueues` value)
-- Queue Type: `celery`
-
-### Create via the REST API
-
-```bash
-curl -X POST \
-  -H "Authorization: Token $TOKEN" \
-  -H "Content-Type: application/json" \
-  https://nautobot.example.com/api/extras/job-queues/ \
-  --data '{"name": "site-dc", "queue_type": "celery"}'
-```
-
-### Create via pynautobot
-
-```python
-import pynautobot
-
-nb = pynautobot.api("https://nautobot.example.com", token="your-token")
-nb.extras.job_queues.create(name="site-dc", queue_type="celery")
-```
-
-### Automate via Ansible
-
-The `ansible/roles/jobs/tasks/main.yml` role enables jobs but does not
-currently create JobQueues. You can extend it:
-
-{% raw %}
+For understack-managed environments, declare the desired queues in the
+global deploy repo path:
 
 ```yaml
-- name: "Ensure site JobQueue exists"
-  ansible.builtin.uri:
-    url: "{{ nautobot_url }}/api/extras/job-queues/"
-    method: POST
-    headers:
-      Authorization: "Token {{ nautobot_token }}"
-    body_format: json
-    body:
-      name: "{{ site }}"
-      queue_type: "celery"
-    status_code: [200, 201, 400]
+# rax-dev-global/nautobot-job-queues/values.yaml
+queues:
+  - site-dc
 ```
 
-{% endraw %}
+The `nautobot-job-queues` ArgoCD application runs in the global
+cluster and ensures these records exist in the shared Nautobot
+database.
 
 ## Assigning Jobs to Queues
 

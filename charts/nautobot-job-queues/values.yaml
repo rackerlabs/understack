@@ -1,0 +1,8 @@
+# -- Secret reference used to set NAUTOBOT_DB_PASSWORD on the managed job container.
+dbPasswordSecretRef:
+  name: nautobot-env
+  key: NAUTOBOT_DB_PASSWORD
+
+# -- Nautobot JobQueue names to ensure.
+queues: []
+# - site-dc

@@ -1,0 +1,12 @@
+apiVersion: v2
+name: nautobot-job-queues
+description: Ensure Nautobot Celery JobQueue records from Helm values
+
+type: application
+
+version: 0.1.0
+# renovate: datasource=docker depName=networktocode/nautobot versioning=semver
+appVersion: "3.0.7"
+
+maintainers:
+  - name: rackerlabs

@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nautobot-job-queues.scriptConfigMapName" . }}
+  labels:
+    {{- include "nautobot-job-queues.labels" . | nindent 4 }}
+data:
+  ensure.py: |
+    import json
+
+    from django.apps import apps
+
+
+    def _load_desired(path):
+      with open(path, "r", encoding="utf-8") as fp:
+        raw = json.load(fp)
+      if not isinstance(raw, list):
+        raise RuntimeError(f"expected a JSON list in {path}")
+      for index, name in enumerate(raw):
+        if not isinstance(name, str) or not name:
+          raise RuntimeError(f"queue entry {index} must be a non-empty string")
+      return raw
+
+
+    JobQueue = apps.get_model("extras", "JobQueue")
+
+    queue_type = "celery"
+    created = 0
+    updated = 0
+    unchanged = 0
+
+    for name in _load_desired("/desired/job-queues.json"):
+      job_queue = JobQueue.objects.filter(name=name).first()
+
+      if job_queue is None:
+        job_queue = JobQueue.objects.create(name=name, queue_type=queue_type)
+        created += 1
+        print(f"Created Nautobot JobQueue '{job_queue.name}' ({job_queue.queue_type})")
+        continue
+
+      if job_queue.queue_type != queue_type:
+        old_queue_type = job_queue.queue_type
+        job_queue.queue_type = queue_type
+        job_queue.save(update_fields=["queue_type"])
+        updated += 1
+        print(
+          f"Updated Nautobot JobQueue '{job_queue.name}' queue_type "
+          f"from '{old_queue_type}' to '{job_queue.queue_type}'"
+        )
+        continue
+
+      unchanged += 1
+      print(f"Nautobot JobQueue '{job_queue.name}' already exists")
+
+    print(
+      "Nautobot JobQueue ensure complete: "
+      f"{created} created, {updated} updated, {unchanged} unchanged"
+    )
