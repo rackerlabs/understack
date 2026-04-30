@@ -66,6 +66,7 @@ def main() -> None:
         firmware_update=args.firmware_update,
         raid_configure=args.raid_configure,
         external_cmdb_id=args.external_cmdb_id,
+        reset_idrac=args.reset_idrac,
     )
 
 
@@ -75,6 +76,7 @@ def enroll(
     raid_configure: bool,
     old_password: str | None,
     external_cmdb_id: str | None = None,
+    reset_idrac: bool = False,
 ) -> None:
     logger.info("Starting enroll workflow for bmc_ip_address=%s", ip_address)
 
@@ -90,6 +92,13 @@ def enroll(
         manufacturer=device_info.manufacturer,
         external_cmdb_id=external_cmdb_id,
     )
+
+    # Clear stale iDRAC jobs before virtual-media inspection, or optionally
+    # reset the controller to a broader known-good state.
+    if reset_idrac:
+        ironic_node.reset_idrac_to_known_good_state(node)
+    else:
+        ironic_node.clear_pending_idrac_jobs(node)
 
     # Out-of-band redfish inspection populates data including baremetal ports.
     #
@@ -111,7 +120,6 @@ def enroll(
     # Therefore, we only use virtual media during our "enroll" phase, when the
     # port data is set up in a manner that suits the Neutron algorithm.  If a
     # normal PXE/HTTP port is available then we use it instead:
-
     virtual_media = not bool(ironic_node.pxe_enabled_bios_name(node))
     agent_inspection(node, virtual_media=virtual_media)
 
@@ -123,7 +131,10 @@ def enroll(
         )
     logger.info("[node:%s] Selected PXE interface %s", node.uuid, pxe_interface)
 
-    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
+    # This sets the boot device to use for all future HTTP boots:
+    if update_dell_bios_settings(bmc, pxe_interface=pxe_interface):
+        logger.info("%s performing second inspection write BIOS settings", node.uuid)
+        agent_inspection(node)
 
     if raid_configure:
         configure_raid(node, inventory)
@@ -217,6 +228,12 @@ def argument_parser():
         type=parse_bool,
         default=True,
         help="Configure RAID before inspection",
+    )
+    parser.add_argument(
+        "--reset-idrac",
+        type=parse_bool,
+        default=False,
+        help="Reset iDRAC to known_good_state instead of clear_job_queue",
     )
     parser.add_argument(
         "--external-cmdb-id",

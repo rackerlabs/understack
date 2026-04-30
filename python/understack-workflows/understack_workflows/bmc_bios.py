@@ -24,6 +24,9 @@ def required_bios_settings(pxe_interface: str) -> dict[str, str]:
         "IPMILan.1.Enable": "Disabled",
         # PXE is enabled by default on DELL, but we don't use it:
         "PxeDev1EnDis": "Disabled",
+        "PxeDev2EnDis": "Disabled",
+        "PxeDev3EnDis": "Disabled",
+        "PxeDev4EnDis": "Disabled",
         # Configure exactly one HTTP port for booting:
         "HttpDev1Interface": pxe_interface,
         "HttpDev1EnDis": "Enabled",
