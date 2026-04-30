@@ -2,8 +2,8 @@
 
 ## Related Guides
 
-- [Nautobot Celery Queues](nautobot-celery-queues.md) -- configuring
-  per-site Celery task queues and routing jobs to site-specific workers
+- [nautobot-job-queues](../deploy-guide/components/nautobot-job-queues.md) --
+  reconciling Nautobot JobQueue records and assigning Jobs to queues
 - [mTLS Certificate Renewal](nautobot-mtls-certificate-renewal.md) --
   how mTLS client certificates for site workers are renewed and
   distributed across clusters

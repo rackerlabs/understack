@@ -1,0 +1,563 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nautobot-job-queues.scriptConfigMapName" . }}
+  labels:
+    {{- include "nautobot-job-queues.labels" . | nindent 4 }}
+data:
+  nautobot_api.py: |
+    import json
+    import os
+    from urllib import error
+    from urllib import parse
+    from urllib import request
+
+
+    def object_id(value):
+        if isinstance(value, dict):
+            return value.get("id") or value.get("pk")
+        return value
+
+
+    def object_name(value):
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            return value.get("name")
+        return None
+
+
+    class NautobotAPI:
+        def __init__(self):
+            self.base_url = os.environ["NAUTOBOT_URL"].rstrip("/")
+            self.headers = {
+                "Accept": "application/json",
+                "Authorization": f"Token {os.environ['NAUTOBOT_TOKEN']}",
+                "Content-Type": "application/json",
+            }
+
+        def url(self, path_or_url, params=None):
+            if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+                url = path_or_url
+            else:
+                url = f"{self.base_url}{path_or_url}"
+
+            if not params:
+                return url
+
+            separator = "&" if "?" in url else "?"
+            return f"{url}{separator}{parse.urlencode(params)}"
+
+        def request(self, method, path_or_url, body=None, expected=(200,)):
+            payload = None
+            if body is not None:
+                payload = json.dumps(body).encode("utf-8")
+
+            req = request.Request(
+                self.url(path_or_url),
+                data=payload,
+                headers=self.headers,
+                method=method,
+            )
+
+            try:
+                with request.urlopen(req, timeout=30) as response:
+                    response_body = response.read()
+                    status = response.getcode()
+            except error.HTTPError as exc:
+                response_body = exc.read().decode("utf-8", errors="replace")
+                message = f"{method} {path_or_url} failed with HTTP {exc.code}: {response_body}"
+                raise RuntimeError(message) from exc
+
+            if status not in expected:
+                decoded = response_body.decode("utf-8", errors="replace")
+                raise RuntimeError(f"{method} {path_or_url} returned HTTP {status}: {decoded}")
+
+            if not response_body:
+                return None
+            return json.loads(response_body)
+
+        def list(self, path, params=None):
+            results = []
+            next_url = self.url(path, params)
+
+            while next_url:
+                response = self.request("GET", next_url)
+                if isinstance(response, list):
+                    results.extend(response)
+                    break
+
+                if not isinstance(response, dict) or "results" not in response:
+                    raise RuntimeError(f"unexpected list response from {path}: {response!r}")
+
+                results.extend(response["results"])
+                next_url = response.get("next")
+
+            return results
+
+        def post(self, path, body):
+            return self.request("POST", path, body, expected=(200, 201))
+
+        def patch(self, path, body):
+            return self.request("PATCH", path, body, expected=(200,))
+
+        def delete(self, path):
+            return self.request("DELETE", path, expected=(200, 202, 204))
+
+  desired_state.py: |
+    import json
+
+
+    QUEUES_PATH = "/desired/job-queues.json"
+    JOBS_PATH = "/desired/jobs.json"
+
+
+    def dedupe(items):
+        seen = set()
+        result = []
+        for item in items:
+            if item in seen:
+                continue
+            seen.add(item)
+            result.append(item)
+        return result
+
+
+    def load_json(path):
+        with open(path, "r", encoding="utf-8") as fp:
+            return json.load(fp)
+
+
+    def load_queues(path=QUEUES_PATH):
+        raw = load_json(path)
+        if not isinstance(raw, list):
+            raise RuntimeError(f"expected a JSON list in {path}")
+
+        queues = []
+        for index, name in enumerate(raw):
+            if not isinstance(name, str) or not name:
+                raise RuntimeError(f"queue entry {index} must be a non-empty string")
+            queues.append(name)
+        return queues
+
+
+    def load_jobs(path=JOBS_PATH):
+        raw = load_json(path)
+        if not isinstance(raw, dict):
+            raise RuntimeError(f"expected a JSON object in {path}")
+        return raw
+
+
+    class DesiredState:
+        def __init__(self, queues, jobs):
+            self.queues = queues
+            self.jobs = jobs
+
+        @classmethod
+        def load(cls):
+            return cls(load_queues(), load_jobs())
+
+        @property
+        def fail_on_missing(self):
+            return self.jobs.get("failOnMissing", True)
+
+        @property
+        def wait_config(self):
+            return self.jobs.get("waitFor", {})
+
+        @property
+        def enable(self):
+            return self.jobs.get("enable", {})
+
+        @property
+        def assignments(self):
+            return self.jobs.get("queueAssignments", [])
+
+        @property
+        def requested_job_names(self):
+            names = list(self.enable.get("names", []))
+            for assignment in self.assignments:
+                names.extend(assignment.get("names", []))
+            return dedupe(names)
+
+        @property
+        def required_queue_names(self):
+            return dedupe(self.queues)
+
+  reconcile.py: |
+    import time
+
+    from desired_state import DesiredState
+    from desired_state import dedupe
+    from nautobot_api import NautobotAPI
+    from nautobot_api import object_id
+    from nautobot_api import object_name
+
+
+    QUEUE_TYPE = "celery"
+
+
+    def job_key(job):
+        return job.get("id") or job.get("pk") or job.get("url")
+
+
+    def missing_job_names(all_jobs, names):
+        existing_names = {job.get("name") for job in all_jobs}
+        return [name for name in names if name not in existing_names]
+
+
+    def wait_for_named_jobs(api, names, wait_config, fail_on_missing=True):
+        attempts = wait_config.get("attempts", 1)
+        delay_seconds = wait_config.get("delaySeconds", 0)
+
+        for attempt in range(1, attempts + 1):
+            all_jobs = api.list("/api/extras/jobs/")
+            missing = missing_job_names(all_jobs, names)
+            if not missing:
+                return all_jobs
+
+            if attempt < attempts:
+                print(
+                    "Waiting for Nautobot Jobs to be registered "
+                    f"(attempt {attempt}/{attempts}); missing: {', '.join(missing)}"
+                )
+                time.sleep(delay_seconds)
+                continue
+
+            message = (
+                "missing Nautobot Jobs after waiting: "
+                f"{', '.join(missing)}. This chart configures existing Nautobot Job records; "
+                "the job code must be installed or synced before these records can be enabled."
+            )
+            if fail_on_missing:
+                raise RuntimeError(message)
+
+            print(message)
+            return all_jobs
+
+
+    def ensure_queues(api, queue_names):
+        queue_by_name = {queue["name"]: queue for queue in api.list("/api/extras/job-queues/")}
+        created = 0
+        updated = 0
+        unchanged = 0
+
+        for name in queue_names:
+            queue = queue_by_name.get(name)
+            if queue is None:
+                queue_by_name[name] = api.post(
+                    "/api/extras/job-queues/",
+                    {"name": name, "queue_type": QUEUE_TYPE},
+                )
+                created += 1
+                print(f"Created Nautobot JobQueue '{name}' ({QUEUE_TYPE})")
+                continue
+
+            if queue.get("queue_type") != QUEUE_TYPE:
+                queue_by_name[name] = api.patch(
+                    f"/api/extras/job-queues/{queue['id']}/",
+                    {"queue_type": QUEUE_TYPE},
+                )
+                updated += 1
+                print(f"Updated Nautobot JobQueue '{name}' queue_type to '{QUEUE_TYPE}'")
+                continue
+
+            unchanged += 1
+            print(f"Nautobot JobQueue '{name}' already exists")
+
+        return queue_by_name, created, updated, unchanged
+
+
+    def resolve_jobs(all_jobs, names=None, groupings=None, fail_on_missing=True):
+        names = names or []
+        groupings = groupings or []
+        by_name = {job.get("name"): job for job in all_jobs}
+        matches = []
+        missing = []
+
+        for name in names:
+            job = by_name.get(name)
+            if job is None:
+                missing.append(name)
+                continue
+            matches.append(job)
+
+        for grouping in groupings:
+            grouping_matches = [job for job in all_jobs if job.get("grouping") == grouping]
+            if not grouping_matches:
+                print(f"No Nautobot Jobs found for grouping '{grouping}'")
+            matches.extend(grouping_matches)
+
+        if missing and fail_on_missing:
+            raise RuntimeError(f"missing Nautobot Jobs: {', '.join(missing)}")
+
+        if missing:
+            print(f"Skipping missing Nautobot Jobs: {', '.join(missing)}")
+
+        jobs_by_key = {}
+        for job in matches:
+            jobs_by_key[job_key(job)] = job
+        return list(jobs_by_key.values())
+
+
+    def enable_jobs(api, jobs):
+        enabled = 0
+        unchanged = 0
+
+        for job in jobs:
+            name = job.get("name")
+            if job.get("enabled") is True:
+                unchanged += 1
+                print(f"Nautobot Job '{name}' already enabled")
+                continue
+
+            api.patch(f"/api/extras/jobs/{job['id']}/", {"enabled": True})
+            job["enabled"] = True
+            enabled += 1
+            print(f"Enabled Nautobot Job '{name}'")
+
+        return enabled, unchanged
+
+
+    def get_queue_assignments(api, job_id):
+        return api.list("/api/extras/job-queue-assignments/", {"job": job_id})
+
+
+    def set_queue_override(api, job, override):
+        if job.get("job_queues_override") == override:
+            return False
+
+        updated_job = api.patch(
+            f"/api/extras/jobs/{job['id']}/",
+            {"job_queues_override": override},
+        )
+        job["job_queues_override"] = updated_job.get("job_queues_override", override)
+        return True
+
+
+    def queue_names_by_id(queue_by_name):
+        return {
+            str(object_id(queue)): name
+            for name, queue in queue_by_name.items()
+            if object_id(queue)
+        }
+
+
+    def queue_name_from_reference(value, queue_by_name):
+        name = object_name(value)
+        if name in queue_by_name:
+            return name
+
+        ref_id = object_id(value)
+        if ref_id is None:
+            return None
+
+        return queue_names_by_id(queue_by_name).get(str(ref_id))
+
+
+    def queue_id_for_name(queue_name, queue_by_name):
+        queue = queue_by_name.get(queue_name)
+        if queue is None:
+            return None
+        queue_id = object_id(queue)
+        if queue_id is None:
+            return None
+        return str(queue_id)
+
+
+    def desired_queue_names_for_job(job, assignment, existing_queue_names, queue_by_name):
+        desired_queues = assignment.get("queues", [])
+        include_existing = assignment.get("includeExistingQueues", True)
+
+        queue_names = list(desired_queues)
+        if include_existing:
+            queue_names = list(existing_queue_names) + desired_queues
+
+        default_queue = queue_name_from_reference(job.get("default_job_queue"), queue_by_name)
+        if default_queue:
+            queue_names.append(default_queue)
+
+        return dedupe(queue_names), default_queue
+
+
+    def existing_assignments_by_queue_id(assignments):
+        return {
+            str(object_id(item.get("job_queue"))): item
+            for item in assignments
+            if object_id(item.get("job_queue"))
+        }
+
+
+    def existing_queue_names(existing_by_queue_id, queue_by_name):
+        names_by_id = queue_names_by_id(queue_by_name)
+        names = []
+        for queue_id in existing_by_queue_id:
+            name = names_by_id.get(queue_id)
+            if name:
+                names.append(name)
+        return names
+
+
+    def assert_queues_exist(job_name, queue_names, queue_by_name):
+        missing = [queue_name for queue_name in queue_names if queue_name not in queue_by_name]
+        if missing:
+            raise RuntimeError(
+                f"cannot assign Nautobot Job '{job_name}' to missing JobQueues: {', '.join(missing)}"
+            )
+
+
+    def create_missing_assignments(api, job, queue_names, existing_by_queue_id, queue_by_name):
+        changed = False
+
+        for queue_name in queue_names:
+            queue_id = queue_id_for_name(queue_name, queue_by_name)
+            if queue_id in existing_by_queue_id:
+                continue
+
+            try:
+                api.post(
+                    "/api/extras/job-queue-assignments/",
+                    {
+                        "job": job["id"],
+                        "job_queue": queue_id,
+                    },
+                )
+            except RuntimeError as exc:
+                if "must make a unique set" not in str(exc):
+                    raise
+                print(f"Nautobot Job '{job.get('name')}' is already assigned to JobQueue '{queue_name}'")
+                continue
+
+            changed = True
+            print(f"Assigned Nautobot Job '{job.get('name')}' to JobQueue '{queue_name}'")
+
+        return changed
+
+
+    def remove_extra_assignments(api, job, existing_by_queue_id, desired_queue_names, default_queue, queue_by_name):
+        changed = False
+        desired_queue_ids = {
+            queue_id_for_name(queue_name, queue_by_name)
+            for queue_name in desired_queue_names
+        }
+        names_by_id = queue_names_by_id(queue_by_name)
+
+        for queue_id, existing_assignment in existing_by_queue_id.items():
+            queue_name = names_by_id.get(queue_id, queue_id)
+            if queue_id in desired_queue_ids:
+                continue
+            if queue_name == default_queue:
+                continue
+
+            api.delete(f"/api/extras/job-queue-assignments/{object_id(existing_assignment)}/")
+            changed = True
+            print(f"Removed Nautobot Job '{job.get('name')}' from JobQueue '{queue_name}'")
+
+        return changed
+
+
+    def reconcile_job_queue_assignment(api, job, assignment, queue_by_name):
+        job_name = job.get("name")
+        existing = existing_assignments_by_queue_id(get_queue_assignments(api, job["id"]))
+        existing_names = existing_queue_names(existing, queue_by_name)
+        desired_queue_names, default_queue = desired_queue_names_for_job(
+            job,
+            assignment,
+            existing_names,
+            queue_by_name,
+        )
+        assert_queues_exist(job_name, desired_queue_names, queue_by_name)
+
+        desired_queue_ids = {
+            queue_id_for_name(queue_name, queue_by_name)
+            for queue_name in desired_queue_names
+        }
+        existing_matches = set(existing) == desired_queue_ids
+        override_changed = set_queue_override(api, job, assignment.get("override", True))
+        if existing_matches and not override_changed:
+            print(f"Nautobot Job '{job_name}' already has desired JobQueue assignment")
+            return False
+
+        changed = create_missing_assignments(api, job, desired_queue_names, existing, queue_by_name)
+        if not assignment.get("includeExistingQueues", True):
+            changed = remove_extra_assignments(
+                api,
+                job,
+                existing,
+                desired_queue_names,
+                default_queue,
+                queue_by_name,
+            ) or changed
+
+        if changed or override_changed:
+            print(f"Updated Nautobot Job '{job_name}' JobQueue assignment to {desired_queue_names}")
+            return True
+
+        print(f"Nautobot Job '{job_name}' already has desired JobQueue assignment")
+        return False
+
+
+    def assign_queues(api, all_jobs, queue_by_name, assignments, fail_on_missing=True):
+        updated = 0
+        unchanged = 0
+
+        for assignment in assignments:
+            jobs = resolve_jobs(
+                all_jobs,
+                names=assignment.get("names", []),
+                groupings=assignment.get("groupings", []),
+                fail_on_missing=fail_on_missing,
+            )
+
+            for job in jobs:
+                changed = reconcile_job_queue_assignment(api, job, assignment, queue_by_name)
+                if changed:
+                    updated += 1
+                else:
+                    unchanged += 1
+
+        return updated, unchanged
+
+
+    def main():
+        api = NautobotAPI()
+        desired = DesiredState.load()
+
+        queue_by_name, queues_created, queues_updated, queues_unchanged = ensure_queues(
+            api,
+            desired.required_queue_names,
+        )
+
+        all_jobs = wait_for_named_jobs(
+            api,
+            desired.requested_job_names,
+            desired.wait_config,
+            fail_on_missing=desired.fail_on_missing,
+        )
+
+        jobs_to_enable = resolve_jobs(
+            all_jobs,
+            names=desired.enable.get("names", []),
+            groupings=desired.enable.get("groupings", []),
+            fail_on_missing=desired.fail_on_missing,
+        )
+        jobs_enabled, jobs_unchanged = enable_jobs(api, jobs_to_enable)
+
+        assignments_updated, assignments_unchanged = assign_queues(
+            api,
+            all_jobs,
+            queue_by_name,
+            desired.assignments,
+            fail_on_missing=desired.fail_on_missing,
+        )
+
+        print(
+            "Nautobot reconciliation complete: "
+            f"queues {queues_created} created, {queues_updated} updated, {queues_unchanged} unchanged; "
+            f"jobs {jobs_enabled} enabled, {jobs_unchanged} already enabled; "
+            f"assignments {assignments_updated} updated, {assignments_unchanged} unchanged"
+        )
+
+
+    if __name__ == "__main__":
+        main()

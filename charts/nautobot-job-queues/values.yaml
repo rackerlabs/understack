@@ -1,0 +1,41 @@
+# -- Nautobot API connection used by the managed reconciliation job.
+api:
+  # -- In-cluster Nautobot API base URL.
+  url: http://nautobot-default.nautobot.svc.cluster.local
+  # -- Secret reference containing a Nautobot API token.
+  tokenSecretRef:
+    name: nautobot-superuser
+    key: apitoken
+
+# -- Nautobot JobQueue names to ensure.
+queues: []
+# - site-dc
+
+# -- Nautobot Job records to reconcile.
+jobs:
+  # -- Fail reconciliation when a requested job name cannot be found.
+  failOnMissing: true
+  # -- Wait for requested named jobs to be registered in Nautobot before failing.
+  waitFor:
+    attempts: 12
+    delaySeconds: 10
+
+  # -- Jobs to enable.
+  enable:
+    # -- Enable all jobs matching these Nautobot groupings.
+    groupings: []
+    # - Rackspace
+
+    # -- Enable jobs matching these exact Nautobot names.
+    names: []
+    # - Backup Configurations
+
+  # -- Optional JobQueue assignments for jobs.
+  queueAssignments: []
+  # - names:
+  #     - Backup Configurations
+  #   groupings: []
+  #   queues:
+  #     - site-dc
+  #   includeExistingQueues: true
+  #   override: true

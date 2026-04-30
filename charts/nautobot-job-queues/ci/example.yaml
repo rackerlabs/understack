@@ -1,0 +1,22 @@
+queues:
+  - site-dc
+
+jobs:
+  enable:
+    groupings:
+      - Rackspace
+    names:
+      - Backup Configurations
+      - Deploy Config Plan (Job Button Receiver)
+      - Deploy Config Plans
+      - Generate Intended Configurations
+      - Perform Configuration Compliance
+  queueAssignments:
+    - names:
+        - Backup Configurations
+        - Deploy Config Plan (Job Button Receiver)
+        - Deploy Config Plans
+        - Generate Intended Configurations
+        - Perform Configuration Compliance
+      queues:
+        - site-dc

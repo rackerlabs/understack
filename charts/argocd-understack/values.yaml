@@ -154,6 +154,12 @@ global:
     # @default -- false
     enabled: false
 
+  # -- Nautobot Celery JobQueue bootstrap jobs
+  nautobot_job_queues:
+    # -- Enable/disable deploying
+    # @default -- false
+    enabled: false
+
   # -- Nautobot Operator for Kubernetes
   nautobotop:
     # -- Enable/disable deploying Nautobot Operator
