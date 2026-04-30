@@ -1,8 +1,6 @@
 import logging
 from uuid import UUID
 
-from keystoneauth1 import loading as ks_loading
-from keystoneauth1 import session as ks_session
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
@@ -39,58 +37,10 @@ class UnderstackDriver(MechanismDriver):
     def initialize(self):
         config.register_ml2_understack_opts(cfg.CONF)
         conf = cfg.CONF.ml2_understack
-
-        if conf.undersync_use_keystone_auth:
-            auth_token = self._get_keystone_service_token()
-            self.undersync = Undersync(
-                auth_token=auth_token,
-                api_url=conf.undersync_url,
-                use_keystone_auth=True,
-            )
-        else:
-            self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
-
+        self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
         self.ironic_client = IronicClient()
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         self.subscribe()
-
-    def _get_keystone_service_token(self) -> str:
-        """Get a service token from Keystone using the Neutron service credentials.
-
-        This uses the existing [keystone_authtoken] configuration section
-        to obtain a token for authenticating with Undersync.
-
-        Returns:
-            str: The Keystone service token.
-
-        Raises:
-            Exception: If unable to obtain a token from Keystone.
-        """
-        try:
-            # Load credentials from the [keystone_authtoken] section
-            auth = ks_loading.load_auth_from_conf_options(
-                cfg.CONF, "keystone_authtoken"
-            )
-            # Create session manually to avoid missing config options
-            sess = ks_session.Session(auth=auth, timeout=30)
-
-            token = sess.get_token()
-            if not token:
-                raise ValueError("Obtained token is empty")
-
-            LOG.info(
-                "Successfully obtained Keystone service token for Undersync "
-                "authentication"
-            )
-            return token
-
-        except Exception as e:
-            LOG.error(
-                "Failed to obtain Keystone service token: %(error)s. "
-                "Please check your [keystone_authtoken] configuration.",
-                {"error": e},
-            )
-            raise
 
     def subscribe(self):
         registry.subscribe(
@@ -316,7 +266,7 @@ class UnderstackDriver(MechanismDriver):
         current_vlan_segment = utils.vlan_segment_for_physnet(context, vlan_group_name)
         if current_vlan_segment:
             LOG.info(
-                "vlan segment: %(segment)s already preset for physnet: %(physnet)s",
+                "vlan segment: %(segment)s already preset for physnet: " "%(physnet)s",
                 {"segment": current_vlan_segment, "physnet": vlan_group_name},
             )
             dynamic_segment = current_vlan_segment
