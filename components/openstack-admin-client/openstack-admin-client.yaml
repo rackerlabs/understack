@@ -6,12 +6,19 @@ metadata:
 spec:
   restartPolicy: Always
   containers:
-    - name: "image-ks-service-registration"
+    - name: client
       image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
       imagePullPolicy: IfNotPresent
       command:
-        - sleep
-        - "infinity"
+        - /bin/sh
+        - -c
+        - |
+          trap 'echo "Received signal, shutting down..."; exit 0' TERM INT
+          echo "OpenStack admin client pod starting..."
+          while true; do
+            sleep 30 &
+            wait $!
+          done
       resources:
         limits:
           cpu: "1"
@@ -22,60 +29,9 @@ spec:
       env:
         - name: OS_IDENTITY_API_VERSION
           value: "3"
-        - name: OS_AUTH_URL
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_AUTH_URL
-        - name: OS_REGION_NAME
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_REGION_NAME
-        - name: OS_INTERFACE
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_INTERFACE
-        - name: OS_ENDPOINT_TYPE
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_INTERFACE
-        - name: OS_PROJECT_DOMAIN_NAME
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_PROJECT_DOMAIN_NAME
-        - name: OS_PROJECT_NAME
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_PROJECT_NAME
-        - name: OS_USER_DOMAIN_NAME
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_USER_DOMAIN_NAME
-        - name: OS_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_USERNAME
-        - name: OS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_PASSWORD
-        - name: OS_DEFAULT_DOMAIN
-          valueFrom:
-            secretKeyRef:
-              name: keystone-keystone-admin
-              key: OS_DEFAULT_DOMAIN
-        - name: OS_SERVICE_NAME
-          value: "keystone"
-        - name: OS_SERVICE_TYPE
-          value: "image"
+      envFrom:
+        - secretRef:
+            name: keystone-keystone-admin
   volumes:
     - name: pod-tmp
       emptyDir: {}
