@@ -2,7 +2,6 @@ package templates
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
@@ -22,29 +21,16 @@ func NewModuleBayTemplateService(nautobotClient *client.NautobotClient) *ModuleB
 }
 
 func (s *ModuleBayTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.ModuleBayTemplate {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.modulebaytemplate", deviceTypeID)
-
-	// Define the API call function for this specific endpoint
-	apiCall := func(ctx context.Context, batchIds []string) ([]nb.ModuleBayTemplate, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
-		if err != nil {
-			return nil, resp, err
-		}
-		if list == nil {
-			return []nb.ModuleBayTemplate{}, resp, nil
-		}
-		return list.Results, resp, nil
+	list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Limit(10000).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("ListAllModuleBayTemplateByDeviceType", "failed to list", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
+		return []nb.ModuleBayTemplate{}
 	}
-
-	// Use the helper function for pagination
-	return helpers.PaginatedListWithIDs(
-		ctx,
-		ids,
-		apiCall,
-		s.client.AddReport,
-		"ListAllModuleBayTemplateByDeviceType",
-		"device_type_id", deviceTypeID,
-	)
+	if list == nil {
+		return []nb.ModuleBayTemplate{}
+	}
+	return list.Results
 }
 
 func (s *ModuleBayTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.ModuleBayTemplate {

@@ -80,8 +80,7 @@ func (s *RoleService) GetByID(ctx context.Context, id string) nb.Role {
 }
 
 func (s *RoleService) ListAll(ctx context.Context) []nb.Role {
-	ids := s.client.GetChangeObjectIDS(ctx, "extras.role")
-	list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllRoles", "failed to list", "error", err.Error(), "response_body", bodyString)

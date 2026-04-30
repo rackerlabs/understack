@@ -80,8 +80,7 @@ func (s *RirService) GetByID(ctx context.Context, id string) nb.RIR {
 }
 
 func (s *RirService) ListAll(ctx context.Context) []nb.RIR {
-	ids := s.client.GetChangeObjectIDS(ctx, "ipam.rir")
-	list, resp, err := s.client.APIClient.IpamAPI.IpamRirsList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.IpamAPI.IpamRirsList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllRirs", "failed to list", "error", err.Error(), "response_body", bodyString)

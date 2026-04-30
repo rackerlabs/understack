@@ -81,8 +81,7 @@ func (s *DeviceTypeService) GetByID(ctx context.Context, id string) nb.DeviceTyp
 }
 
 func (s *DeviceTypeService) ListAll(ctx context.Context) []nb.DeviceType {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.devicetype")
-	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Id(ids).Depth(10).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Limit(10000).Depth(10).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllDeviceTypes", "failed to list", "error", err.Error(), "response_body", bodyString)

@@ -81,8 +81,7 @@ func (s *ClusterGroupService) GetByID(ctx context.Context, id string) nb.Cluster
 }
 
 func (s *ClusterGroupService) ListAll(ctx context.Context) []nb.ClusterGroup {
-	ids := s.client.GetChangeObjectIDS(ctx, "virtualization.clustergroup")
-	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClusterGroupsList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClusterGroupsList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllClusterGroups", "failed to list", "error", err.Error(), "response_body", bodyString)

@@ -81,8 +81,7 @@ func (s *NamespaceService) GetByID(ctx context.Context, id string) nb.Namespace 
 }
 
 func (s *NamespaceService) ListAll(ctx context.Context) []nb.Namespace {
-	ids := s.client.GetChangeObjectIDS(ctx, "ipam.namespace")
-	list, resp, err := s.client.APIClient.IpamAPI.IpamNamespacesList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.IpamAPI.IpamNamespacesList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllNamespaces", "failed to list", "error", err.Error(), "response_body", bodyString)
