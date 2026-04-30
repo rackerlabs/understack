@@ -24,5 +24,8 @@ metadata:
 spec:
   schedule: "0 0 0 * * *"
   backupOwnerReference: self
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
   cluster:
     name: nautobot-cluster
