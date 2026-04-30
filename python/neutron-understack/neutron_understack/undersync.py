@@ -20,6 +20,7 @@ class Undersync:
         api_url: str | None = None,
         timeout: int = 90,
         use_keystone_auth: bool = False,
+        session=None,
     ) -> None:
         """Simple client for Undersync.
 
@@ -33,8 +34,11 @@ class Undersync:
             use_keystone_auth: If True, use X-Auth-Token header for Keystone
                              authentication. Otherwise, use Authorization:
                              Bearer header for JWT authentication.
+            session: Keystone session object for automatic token refresh.
+                    If provided, takes precedence over auth_token for Keystone auth.
         """
-        self.token = auth_token or self._fetch_undersync_token()
+        self.session = session
+        self.token = auth_token or (self._fetch_undersync_token() if not session else None)
         self.url = "http://undersync.undersync.svc.cluster.local:8080"
         self.api_url = api_url or self.url
         self.timeout = timeout
@@ -62,12 +66,17 @@ class Undersync:
         else:
             return self.sync(vlan_group)
 
-    @cached_property
+    @property
     def client(self):
         session = requests.Session()
         session.headers = {"Content-Type": "application/json"}
 
-        if self.use_keystone_auth:
+        if self.use_keystone_auth and self.session:
+            # Get fresh token from session for each request (enables refresh)
+            token = self.session.get_token()
+            session.headers["X-Auth-Token"] = token
+        elif self.use_keystone_auth:
+            # Fallback to stored token for backward compatibility
             session.headers["X-Auth-Token"] = self.token
         else:
             session.headers["Authorization"] = f"Bearer {self.token}"
