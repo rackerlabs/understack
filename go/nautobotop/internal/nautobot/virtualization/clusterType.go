@@ -81,8 +81,7 @@ func (s *ClusterTypeService) GetByID(ctx context.Context, id string) nb.ClusterT
 }
 
 func (s *ClusterTypeService) ListAll(ctx context.Context) []nb.ClusterType {
-	ids := s.client.GetChangeObjectIDS(ctx, "virtualization.clustertype")
-	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClusterTypesList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClusterTypesList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllClusterTypes", "failed to list", "error", err.Error(), "response_body", bodyString)

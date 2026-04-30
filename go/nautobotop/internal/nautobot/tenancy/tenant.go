@@ -80,8 +80,7 @@ func (s *TenantService) GetByID(ctx context.Context, id string) nb.Tenant {
 }
 
 func (s *TenantService) ListAll(ctx context.Context) []nb.Tenant {
-	ids := s.client.GetChangeObjectIDS(ctx, "tenancy.tenant")
-	list, resp, err := s.client.APIClient.TenancyAPI.TenancyTenantsList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.TenancyAPI.TenancyTenantsList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllTenants", "failed to list", "error", err.Error(), "response_body", bodyString)

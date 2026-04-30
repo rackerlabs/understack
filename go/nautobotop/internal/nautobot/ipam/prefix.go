@@ -81,8 +81,7 @@ func (s *PrefixService) GetByID(ctx context.Context, id string) nb.Prefix {
 }
 
 func (s *PrefixService) ListAll(ctx context.Context) []nb.Prefix {
-	ids := s.client.GetChangeObjectIDS(ctx, "ipam.prefix")
-	list, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllPrefixes", "failed to list", "error", err.Error(), "response_body", bodyString)

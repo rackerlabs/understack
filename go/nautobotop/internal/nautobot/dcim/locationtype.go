@@ -81,8 +81,7 @@ func (s *LocationTypeService) GetByID(ctx context.Context, id string) nb.Locatio
 }
 
 func (s *LocationTypeService) ListAll(ctx context.Context) []nb.LocationType {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.locationtype")
-	list, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesList(ctx).Id(ids).Depth(10).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesList(ctx).Limit(10000).Depth(10).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllLocationTypes", "failed to list", "error", err.Error(), "response_body", bodyString)

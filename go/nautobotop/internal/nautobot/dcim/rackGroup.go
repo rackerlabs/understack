@@ -81,8 +81,7 @@ func (s *RackGroupService) GetByID(ctx context.Context, id string) nb.RackGroup 
 }
 
 func (s *RackGroupService) ListAll(ctx context.Context) []nb.RackGroup {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.rackgroup")
-	list, resp, err := s.client.APIClient.DcimAPI.DcimRackGroupsList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimRackGroupsList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllRackGroups", "failed to list", "error", err.Error(), "response_body", bodyString)

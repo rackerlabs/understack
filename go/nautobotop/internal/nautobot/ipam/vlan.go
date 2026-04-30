@@ -81,8 +81,7 @@ func (s *VlanService) GetByID(ctx context.Context, id string) nb.VLAN {
 }
 
 func (s *VlanService) ListAll(ctx context.Context) []nb.VLAN {
-	ids := s.client.GetChangeObjectIDS(ctx, "ipam.vlan")
-	list, resp, err := s.client.APIClient.IpamAPI.IpamVlansList(ctx).Id(ids).Depth(2).Execute()
+	list, resp, err := s.client.APIClient.IpamAPI.IpamVlansList(ctx).Limit(10000).Depth(2).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("ListAllVlans", "failed to list", "error", err.Error(), "response_body", bodyString)

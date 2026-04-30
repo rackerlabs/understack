@@ -2,7 +2,6 @@ package templates
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
@@ -22,27 +21,16 @@ func NewInterfaceTemplateService(nautobotClient *client.NautobotClient) *Interfa
 }
 
 func (s *InterfaceTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.InterfaceTemplate {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.interfacetemplate", deviceTypeID)
-
-	// Define the API call function for this specific endpoint
-	apiCall := func(ctx context.Context, batchIds []string) ([]nb.InterfaceTemplate, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimInterfaceTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
-		if err != nil {
-			return nil, resp, err
-		}
-		if list == nil {
-			return []nb.InterfaceTemplate{}, resp, nil
-		}
-		return list.Results, resp, nil
+	list, resp, err := s.client.APIClient.DcimAPI.DcimInterfaceTemplatesList(ctx).Limit(10000).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("ListAllInterfaceTemplateByDeviceType", "failed to list", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
+		return []nb.InterfaceTemplate{}
 	}
-	return helpers.PaginatedListWithIDs(
-		ctx,
-		ids,
-		apiCall,
-		s.client.AddReport,
-		"ListAllInterfaceTemplateByDeviceType",
-		"device_type_id", deviceTypeID,
-	)
+	if list == nil {
+		return []nb.InterfaceTemplate{}
+	}
+	return list.Results
 }
 
 func (s *InterfaceTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.InterfaceTemplate {

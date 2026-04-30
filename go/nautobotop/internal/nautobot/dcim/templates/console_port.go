@@ -2,7 +2,6 @@ package templates
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
@@ -22,29 +21,16 @@ func NewConsolePortTemplateService(nautobotClient *client.NautobotClient) *Conso
 }
 
 func (s *ConsolePortTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.ConsolePortTemplate {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.consoleporttemplate", deviceTypeID)
-
-	// Define the API call function for this specific endpoint
-	apiCall := func(ctx context.Context, batchIds []string) ([]nb.ConsolePortTemplate, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
-		if err != nil {
-			return nil, resp, err
-		}
-		if list == nil {
-			return []nb.ConsolePortTemplate{}, resp, nil
-		}
-		return list.Results, resp, nil
+	list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Limit(10000).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("ListAllConsolePortTemplateByDeviceType", "failed to list", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
+		return []nb.ConsolePortTemplate{}
 	}
-
-	// Use the helper function for pagination
-	return helpers.PaginatedListWithIDs(
-		ctx,
-		ids,
-		apiCall,
-		s.client.AddReport,
-		"ListAllConsolePortTemplateByDeviceType",
-		"device_type_id", deviceTypeID,
-	)
+	if list == nil {
+		return []nb.ConsolePortTemplate{}
+	}
+	return list.Results
 }
 
 func (s *ConsolePortTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.ConsolePortTemplate {

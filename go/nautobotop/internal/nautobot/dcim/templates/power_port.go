@@ -2,7 +2,6 @@ package templates
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
@@ -22,29 +21,16 @@ func NewPowerPortTemplateService(nautobotClient *client.NautobotClient) *PowerPo
 }
 
 func (s *PowerPortTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.PowerPortTemplate {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.powerporttemplate", deviceTypeID)
-
-	// Define the API call function for this specific endpoint
-	apiCall := func(ctx context.Context, batchIds []string) ([]nb.PowerPortTemplate, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Id(batchIds).Depth(1).DeviceType([]string{deviceTypeID}).Execute()
-		if err != nil {
-			return nil, resp, err
-		}
-		if list == nil {
-			return []nb.PowerPortTemplate{}, resp, nil
-		}
-		return list.Results, resp, nil
+	list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Limit(10000).Depth(1).DeviceType([]string{deviceTypeID}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("ListAllPowerPortTemplate", "failed to list", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
+		return []nb.PowerPortTemplate{}
 	}
-
-	// Use the helper function for pagination
-	return helpers.PaginatedListWithIDs(
-		ctx,
-		ids,
-		apiCall,
-		s.client.AddReport,
-		"ListAllPowerPortTemplate",
-		"device_type_id", deviceTypeID,
-	)
+	if list == nil {
+		return []nb.PowerPortTemplate{}
+	}
+	return list.Results
 }
 
 func (s *PowerPortTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.PowerPortTemplate {
