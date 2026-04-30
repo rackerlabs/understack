@@ -66,4 +66,6 @@ target-version = "py312"
     "S311",     # allow non-cryptographic secure bits for test data
     "S101",
     "RUF012",   # test fixture classes often use mutable class-level data
+    "S105",     # allow hardcoded passwords for testing
+    "S106",     # allow hardcoded passwords for testing
 ]
