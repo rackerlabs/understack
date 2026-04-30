@@ -41,9 +41,9 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
 
         if conf.undersync_use_keystone_auth:
-            auth_token = self._get_keystone_service_token()
+            session = self._get_keystone_session()
             self.undersync = Undersync(
-                auth_token=auth_token,
+                session=session,
                 api_url=conf.undersync_url,
                 use_keystone_auth=True,
             )
@@ -54,17 +54,17 @@ class UnderstackDriver(MechanismDriver):
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         self.subscribe()
 
-    def _get_keystone_service_token(self) -> str:
-        """Get a service token from Keystone using the Neutron service credentials.
+    def _get_keystone_session(self) -> ks_session.Session:
+        """Get a Keystone session using the Neutron service credentials.
 
         This uses the existing [keystone_authtoken] configuration section
-        to obtain a token for authenticating with Undersync.
+        to create a session that can automatically refresh tokens.
 
         Returns:
-            str: The Keystone service token.
+            ks_session.Session: The Keystone session for authenticating with Undersync.
 
         Raises:
-            Exception: If unable to obtain a token from Keystone.
+            Exception: If unable to create session from Keystone.
         """
         try:
             # Load credentials from the [keystone_authtoken] section
@@ -74,19 +74,19 @@ class UnderstackDriver(MechanismDriver):
             # Create session manually to avoid missing config options
             sess = ks_session.Session(auth=auth, timeout=30)
 
+            # Verify we can get a token (test session is working)
             token = sess.get_token()
             if not token:
-                raise ValueError("Obtained token is empty")
+                raise ValueError("Unable to obtain initial token from session")
 
             LOG.info(
-                "Successfully obtained Keystone service token for Undersync "
-                "authentication"
+                "Successfully created Keystone session for Undersync " "authentication"
             )
-            return token
+            return sess
 
         except Exception as e:
             LOG.error(
-                "Failed to obtain Keystone service token: %(error)s. "
+                "Failed to create Keystone session: %(error)s. "
                 "Please check your [keystone_authtoken] configuration.",
                 {"error": e},
             )

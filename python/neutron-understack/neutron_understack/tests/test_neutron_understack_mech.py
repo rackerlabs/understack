@@ -128,7 +128,7 @@ class TestKeystoneAuthentication:
         mock_session_class.assert_called_once()
         mock_get_token.assert_called_once()
         assert driver.undersync.use_keystone_auth is True
-        assert driver.undersync.token == "test_service_token"
+        assert driver.undersync.session == mock_session_instance
 
     def test_initialize_with_jwt_auth(self, mocker, oslo_config):
         """Test that driver initializes with JWT auth only."""
