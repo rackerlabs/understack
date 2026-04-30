@@ -66,7 +66,7 @@ func (s *VlanSync) SyncAll(ctx context.Context, data map[string]string) error {
 
 // syncSingleVlan handles the create/update logic for a single VLAN
 func (s *VlanSync) syncSingleVlan(ctx context.Context, vlan models.Vlan) error {
-	existingVlan := s.vlanSvc.GetByName(ctx, vlan.Name)
+	existingVlan := s.vlanSvc.GetByID(ctx, vlan.ID)
 
 	// Build status reference (required)
 	statusRef, err := s.buildStatusReference(ctx, vlan.Status)
@@ -75,6 +75,7 @@ func (s *VlanSync) syncSingleVlan(ctx context.Context, vlan models.Vlan) error {
 	}
 
 	vlanRequest := nb.VLANRequest{
+		Id:     optionalID(vlan.ID),
 		Vid:    int32(vlan.Vid),
 		Name:   vlan.Name,
 		Status: statusRef,

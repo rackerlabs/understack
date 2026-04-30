@@ -62,8 +62,9 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 			manufacturer = *cm
 		}
 
-		deviceType := s.deviceTypeSvc.GetByName(context.Background(), yml.Model)
+		deviceType := s.deviceTypeSvc.GetByID(ctx, yml.ID)
 		deviceTypeRequest := nb.WritableDeviceTypeRequest{
+			Id:           optionalID(yml.ID),
 			Model:        yml.Model,
 			PartNumber:   nb.PtrString(yml.PartNumber),
 			UHeight:      nb.PtrInt32(int32(yml.UHeight)),

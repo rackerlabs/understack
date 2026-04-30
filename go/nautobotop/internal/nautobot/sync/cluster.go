@@ -59,7 +59,7 @@ func (s *ClusterSync) SyncAll(ctx context.Context, data map[string]string) error
 
 // syncSingleCluster handles the create/update logic for a single cluster and its devices
 func (s *ClusterSync) syncSingleCluster(ctx context.Context, cluster models.Cluster) error {
-	existingCluster := s.clusterSvc.GetByName(ctx, cluster.Name)
+	existingCluster := s.clusterSvc.GetByID(ctx, cluster.ID)
 
 	// Build cluster type reference (required)
 	clusterTypeRef, err := s.buildClusterTypeReference(ctx, cluster.ClusterType)
@@ -68,6 +68,7 @@ func (s *ClusterSync) syncSingleCluster(ctx context.Context, cluster models.Clus
 	}
 
 	clusterRequest := nb.ClusterRequest{
+		Id:          optionalID(cluster.ID),
 		Name:        cluster.Name,
 		Comments:    nb.PtrString(cluster.Comments),
 		ClusterType: clusterTypeRef,

@@ -5,6 +5,7 @@ type DeviceTypes struct {
 }
 
 type DeviceType struct {
+	ID            string          `yaml:"id"`
 	Manufacturer  string          `yaml:"manufacturer"`
 	PartNumber    string          `yaml:"part_number"`
 	Model         string          `yaml:"model"`

@@ -5,6 +5,7 @@ type Vlans struct {
 }
 
 type Vlan struct {
+	ID            string   `json:"id" yaml:"id"`
 	Name          string   `json:"name" yaml:"name"`
 	Vid           int      `json:"vid" yaml:"vid"`
 	Status        string   `json:"status" yaml:"status"`

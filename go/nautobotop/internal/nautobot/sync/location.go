@@ -70,15 +70,24 @@ func (s *LocationSync) syncLocationRecursive(ctx context.Context, location model
 
 // syncSingleLocation handles the create/update logic for a single location
 func (s *LocationSync) syncSingleLocation(ctx context.Context, location models.Location, parentID *string) (*string, error) {
-	existingLocation := s.locationSvc.GetByName(ctx, location.Name)
+	existingLocation := s.locationSvc.GetByID(ctx, location.ID)
+	locationTypeRef, err := s.buildLocationTypeReference(ctx, location.LocationType)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build location type reference for location %s: %w", location.Name, err)
+	}
+	statusRef, err := s.buildStatusReference(ctx, location.Status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build status reference for location %s: %w", location.Name, err)
+	}
 
 	locationRequest := nb.LocationRequest{
+		Id:   optionalID(location.ID),
 		Name: location.Name,
 
 		Description:  nb.PtrString(location.Description),
 		Parent:       buildParentReference(parentID),
-		LocationType: s.buildLocationTypeReference(ctx, location.LocationType),
-		Status:       s.buildStatusReference(ctx, location.Status),
+		LocationType: locationTypeRef,
+		Status:       statusRef,
 	}
 
 	if existingLocation.Id == nil {
@@ -189,12 +198,18 @@ func (s *LocationSync) getParentID(locationType nb.Location) string {
 	}
 	return ""
 }
-func (s *LocationSync) buildStatusReference(ctx context.Context, name string) nb.ApprovalWorkflowStageResponseApprovalWorkflowStage {
+func (s *LocationSync) buildStatusReference(ctx context.Context, name string) (nb.ApprovalWorkflowStageResponseApprovalWorkflowStage, error) {
 	locationType := s.statusSvc.GetByName(ctx, name)
-	return helpers.BuildApprovalWorkflowStageResponseApprovalWorkflowStage(*locationType.Id)
+	if locationType.Id == nil {
+		return nb.ApprovalWorkflowStageResponseApprovalWorkflowStage{}, fmt.Errorf("status %q not found in Nautobot", name)
+	}
+	return helpers.BuildApprovalWorkflowStageResponseApprovalWorkflowStage(*locationType.Id), nil
 }
 
-func (s *LocationSync) buildLocationTypeReference(ctx context.Context, name string) nb.ApprovalWorkflowStageResponseApprovalWorkflowStage {
+func (s *LocationSync) buildLocationTypeReference(ctx context.Context, name string) (nb.ApprovalWorkflowStageResponseApprovalWorkflowStage, error) {
 	locationType := s.locationTypes.GetByName(ctx, name)
-	return helpers.BuildApprovalWorkflowStageResponseApprovalWorkflowStage(*locationType.Id)
+	if locationType.Id == nil {
+		return nb.ApprovalWorkflowStageResponseApprovalWorkflowStage{}, fmt.Errorf("location type %q not found in Nautobot", name)
+	}
+	return helpers.BuildApprovalWorkflowStageResponseApprovalWorkflowStage(*locationType.Id), nil
 }

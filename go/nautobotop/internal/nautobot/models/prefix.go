@@ -5,6 +5,7 @@ type Prefixes struct {
 }
 
 type Prefix struct {
+	ID            string   `json:"id" yaml:"id"`
 	Prefix        string   `json:"prefix" yaml:"prefix"`
 	Namespace     string   `json:"namespace" yaml:"namespace"`
 	Type          string   `json:"type" yaml:"type"`

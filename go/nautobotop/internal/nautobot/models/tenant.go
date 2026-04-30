@@ -5,6 +5,7 @@ type Tenants struct {
 }
 
 type Tenant struct {
+	ID          string   `json:"id" yaml:"id"`
 	Name        string   `json:"name" yaml:"name"`
 	Description string   `json:"description" yaml:"description"`
 	Comments    string   `json:"comments" yaml:"comments"`

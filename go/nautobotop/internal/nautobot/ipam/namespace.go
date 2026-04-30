@@ -57,6 +57,29 @@ func (s *NamespaceService) GetByName(ctx context.Context, name string) nb.Namesp
 	return list.Results[0]
 }
 
+func (s *NamespaceService) GetByID(ctx context.Context, id string) nb.Namespace {
+	if id == "" {
+		return nb.Namespace{}
+	}
+	if ns, ok := cache.FindByID(s.client.Cache, "namespaces", id, func(n nb.Namespace) *string {
+		return n.Id
+	}); ok {
+		return ns
+	}
+
+	list, resp, err := s.client.APIClient.IpamAPI.IpamNamespacesList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetNamespaceByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.Namespace{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.Namespace{}
+	}
+
+	return list.Results[0]
+}
+
 func (s *NamespaceService) ListAll(ctx context.Context) []nb.Namespace {
 	ids := s.client.GetChangeObjectIDS(ctx, "ipam.namespace")
 	list, resp, err := s.client.APIClient.IpamAPI.IpamNamespacesList(ctx).Id(ids).Depth(2).Execute()
@@ -76,16 +99,6 @@ func (s *NamespaceService) ListAll(ctx context.Context) []nb.Namespace {
 }
 
 func (s *NamespaceService) Update(ctx context.Context, id string, req nb.NamespaceRequest) (*nb.Namespace, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateNamespace", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	namespace, resp, err := s.client.APIClient.IpamAPI.IpamNamespacesUpdate(ctx, id).NamespaceRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

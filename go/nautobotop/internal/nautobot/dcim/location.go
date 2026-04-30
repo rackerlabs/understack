@@ -58,6 +58,29 @@ func (s *LocationService) GetByName(ctx context.Context, name string) nb.Locatio
 	return list.Results[0]
 }
 
+func (s *LocationService) GetByID(ctx context.Context, id string) nb.Location {
+	if id == "" {
+		return nb.Location{}
+	}
+	if location, ok := cache.FindByID(s.client.Cache, "locations", id, func(l nb.Location) *string {
+		return l.Id
+	}); ok {
+		return location
+	}
+
+	list, resp, err := s.client.APIClient.DcimAPI.DcimLocationsList(ctx).Depth(10).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetLocationByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.Location{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.Location{}
+	}
+
+	return list.Results[0]
+}
+
 func (s *LocationService) ListAll(ctx context.Context) []nb.Location {
 	ids := s.client.GetChangeObjectIDS(ctx, "dcim.location")
 	list, resp, err := s.client.APIClient.DcimAPI.DcimLocationsList(ctx).Id(ids).Depth(10).Execute()
@@ -77,16 +100,6 @@ func (s *LocationService) ListAll(ctx context.Context) []nb.Location {
 }
 
 func (s *LocationService) Update(ctx context.Context, id string, req nb.LocationRequest) (*nb.Location, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateLocation", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	location, resp, err := s.client.APIClient.DcimAPI.DcimLocationsUpdate(ctx, id).LocationRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

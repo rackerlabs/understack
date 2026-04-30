@@ -56,6 +56,29 @@ func (s *RoleService) GetByName(ctx context.Context, name string) nb.Role {
 	return list.Results[0]
 }
 
+func (s *RoleService) GetByID(ctx context.Context, id string) nb.Role {
+	if id == "" {
+		return nb.Role{}
+	}
+	if role, ok := cache.FindByID(s.client.Cache, "roles", id, func(r nb.Role) *string {
+		return r.Id
+	}); ok {
+		return role
+	}
+
+	list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetRoleByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.Role{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.Role{}
+	}
+
+	return list.Results[0]
+}
+
 func (s *RoleService) ListAll(ctx context.Context) []nb.Role {
 	ids := s.client.GetChangeObjectIDS(ctx, "extras.role")
 	list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).Id(ids).Depth(2).Execute()
@@ -74,16 +97,6 @@ func (s *RoleService) ListAll(ctx context.Context) []nb.Role {
 }
 
 func (s *RoleService) Update(ctx context.Context, id string, req nb.RoleRequest) (*nb.Role, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateRole", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	role, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesUpdate(ctx, id).RoleRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

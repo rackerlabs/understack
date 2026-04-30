@@ -50,9 +50,10 @@ func (s *ClusterGroupSync) SyncAll(ctx context.Context, data map[string]string) 
 
 // syncSingleClusterGroup handles the create/update logic for a single cluster group
 func (s *ClusterGroupSync) syncSingleClusterGroup(ctx context.Context, clusterGroup models.ClusterGroup) error {
-	existingClusterGroup := s.clusterGroupSvc.GetByName(ctx, clusterGroup.Name)
+	existingClusterGroup := s.clusterGroupSvc.GetByID(ctx, clusterGroup.ID)
 
 	clusterGroupRequest := nb.ClusterGroupRequest{
+		Id:          optionalID(clusterGroup.ID),
 		Name:        clusterGroup.Name,
 		Description: nb.PtrString(clusterGroup.Description),
 	}

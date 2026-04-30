@@ -75,7 +75,7 @@ func (s *PrefixSync) SyncAll(ctx context.Context, data map[string]string) error 
 
 // syncSinglePrefix handles the create/update logic for a single prefix
 func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix) error {
-	existingPrefix := s.prefixSvc.GetByPrefix(ctx, prefix.Prefix)
+	existingPrefix := s.prefixSvc.GetByID(ctx, prefix.ID)
 
 	// Build status reference (required)
 	statusRef, err := s.buildStatusReference(ctx, prefix.Status)
@@ -84,6 +84,7 @@ func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix)
 	}
 
 	prefixRequest := nb.WritablePrefixRequest{
+		Id:     optionalID(prefix.ID),
 		Prefix: prefix.Prefix,
 		Status: statusRef,
 	}
