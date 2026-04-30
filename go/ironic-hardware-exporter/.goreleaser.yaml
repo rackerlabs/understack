@@ -1,0 +1,95 @@
+project_name: "ironic-hardware-exporter"
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+env:
+  - CUSTOM_TAG={{ .Env.CUSTOM_TAG }}
+  - GIT_REPO={{ .Env.GIT_REPO }}
+
+builds:
+  - main: main.go
+    dir: ./cmd/ironic-hardware-exporter
+    binary: ironic-hardware-exporter
+    goos: ["linux"]
+    goarch: ["amd64", "arm64"]
+    flags:
+      - -trimpath
+    ldflags:
+      - -s
+      - -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+    env:
+      - CGO_ENABLED=0
+
+changelog:
+  disable: true
+
+dockers:
+  - skip_push: false
+    use: buildx
+    dockerfile: .goreleaser.Dockerfile
+    image_templates:
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+    build_flag_templates:
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
+      - --label=org.opencontainers.image.revision={{ .Commit }}
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.description=Prometheus exporter for Ironic bare-metal hardware metrics
+      - --label=org.opencontainers.image.vendor=rackspace
+      - --label=org.opencontainers.image.licenses=Apache License 2.0
+      - --label=org.opencontainers.image.source=https://rackspace.com/
+      - --label=org.opencontainers.image.authors=Rackspace
+  - skip_push: false
+    goarch: arm64
+    use: buildx
+    dockerfile: .goreleaser.Dockerfile
+    image_templates:
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+    build_flag_templates:
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
+      - --label=org.opencontainers.image.revision={{ .Commit }}
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.created={{ .Date }}
+      - --label=org.opencontainers.image.description=Prometheus exporter for Ironic bare-metal hardware metrics
+      - --label=org.opencontainers.image.vendor=rackspace
+      - --label=org.opencontainers.image.licenses=Apache License 2.0
+      - --label=org.opencontainers.image.source=https://rackspace.com/
+      - --label=org.opencontainers.image.authors=Rackspace
+
+docker_manifests:
+  - name_template: ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}
+    image_templates:
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+  - name_template: ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:latest
+    image_templates:
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    output: true
+    artifacts: checksum
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - --yes
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - "sign"
+      - "--oidc-provider=github-actions"
+      - "${artifact}@${digest}"
+      - --yes
