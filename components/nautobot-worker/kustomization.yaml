@@ -6,5 +6,6 @@ configMapGenerator:
   - name: cluster-data
     literals:
       - UNDERSTACK_PARTITION=""
+      - UNDERSTACK_SITE=""
     options:
       disableNameSuffixHash: true

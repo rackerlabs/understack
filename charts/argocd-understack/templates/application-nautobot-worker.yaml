@@ -25,7 +25,7 @@ spec:
       valueFiles:
       - $understack/components/nautobot-worker/values.yaml
       - $deploy/{{ include "understack.deploy_path" $ }}/nautobot-worker/values.yaml
-      {{- with index $.Values.appLabels "understack.rackspace.com/partition" }}
+      {{- with index $.Values.appLabels "understack.rackspace.com/site" }}
       values: |
         workers:
           default:
@@ -47,6 +47,9 @@ spec:
             - op: replace
               path: /data/UNDERSTACK_PARTITION
               value: "{{ index $.Values.appLabels "understack.rackspace.com/partition" | default "" }}"
+            - op: replace
+              path: /data/UNDERSTACK_SITE
+              value: "{{ index $.Values.appLabels "understack.rackspace.com/site" | default "" }}"
           target:
             kind: ConfigMap
             name: cluster-data
