@@ -177,7 +177,6 @@ Components deployed on site clusters:
 | argo-workflows | `site.argo_workflows` | Workflow engine |
 | chrony | `site.chrony` | NTP service |
 | envoy-configs | `site.envoy_configs` | Gateway configs |
-| nautobot-site | `site.nautobot_site` | Site Nautobot config |
 | openstack-exporter | `site.openstack_exporter` | Metrics exporter |
 | openstack-memcached | `site.openstack_memcached` | Caching |
 | site-workflows | `site.site_workflows` | Site workflows |

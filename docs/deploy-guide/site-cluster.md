@@ -383,7 +383,6 @@ Enable these as needed for your deployment.
 | Envoy configs | `site.envoy_configs` | Gateway routes and policies |
 | etcd backup | `site.etcdbackup` | etcd backup |
 | Monitoring | `site.monitoring` | Prometheus/Grafana |
-| Nautobot site | `site.nautobot_site` | Site-specific Nautobot resources |
 | OpenEBS | `site.openebs` | Storage (if using OpenEBS) |
 | OpenStack exporter | `site.openstack_exporter` | Prometheus metrics for OpenStack |
 | OpenStack Resource Controller | `site.openstack_resource_controller` | OpenStack resource operator |

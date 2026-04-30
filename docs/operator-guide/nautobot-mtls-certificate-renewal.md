@@ -9,8 +9,18 @@ see the [nautobot-worker deploy guide](../deploy-guide/components/nautobot-worke
 ## How Certificates Are Issued
 
 Client certificates are issued by cert-manager on the global cluster
-using the `mtls-ca-issuer` (backed by a self-signed root CA). Each site
-gets its own Certificate resource:
+using the `mtls-ca-issuer` (backed by a self-signed root CA).
+
+There are three relevant Secret names:
+
+- Global cluster `nautobot-mtls-client`: mounted by global Nautobot web
+  and Celery pods.
+- Global cluster `nautobot-mtls-client-<site>`: source Secret for one
+  site. Its cert/key are copied to the secrets provider.
+- Site cluster `nautobot-mtls-client`: created by ExternalSecret from
+  the provider data for that site and mounted by the site worker.
+
+Each site gets its own per-site Certificate resource:
 
 ```yaml
 apiVersion: cert-manager.io/v1
@@ -36,6 +46,17 @@ spec:
 cert-manager automatically renews the certificate 30 days before
 expiry, updating the Kubernetes secret on the global cluster.
 
+For example, the global cluster issues `nautobot-mtls-client-<site>`
+from its `nautobot/` overlay. Operators or automation copy that Secret's
+cert/key into the secrets provider for the site. The site worker does
+not mount the global Secret directly; it mounts the site-local
+`nautobot-mtls-client` Secret created by ExternalSecret.
+
+Global pods and site workers both mount
+`/etc/nautobot/mtls/tls.crt`, `/etc/nautobot/mtls/tls.key`, and
+`/etc/nautobot/mtls/ca.crt`, but the Kubernetes Secret behind those
+paths is local to each cluster.
+
 The global cluster also has:
 
 - `nautobot-mtls-client` -- client cert for global Nautobot/Celery pods
@@ -56,6 +77,11 @@ ExternalSecret picks it up on its next refresh cycle.
 
 By default, this is a manual process: an operator extracts the renewed
 cert from the global cluster and uploads it to the secrets provider.
+Site workers consume the provider data through an ExternalSecret named
+`nautobot-mtls-client`. That ExternalSecret combines the per-site client
+cert/key credential and the shared CA credential into one
+`kubernetes.io/tls` secret with `tls.crt`, `tls.key`, and `ca.crt` using
+`filterPEM`, then refreshes on the configured interval.
 
 ## Automation Approaches
 
@@ -128,4 +154,6 @@ To recover, manually extract the renewed cert from the global cluster
 and upload it to your secrets provider. The site ExternalSecret will
 pick it up on the next refresh cycle, and the worker pods will
 automatically get the new cert on their next restart (or when the
-secret volume is refreshed by kubelet).
+secret volume is refreshed by kubelet). If the worker does not recover
+after the ExternalSecret reports synced, restart the site worker
+Deployment so the Celery process reopens the mounted certificate files.
