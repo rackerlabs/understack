@@ -68,9 +68,10 @@ func (s *RackGroupSync) syncRackGroupRecursive(ctx context.Context, rackGroup mo
 
 // syncSingleRackGroup handles the create/update logic for a single location
 func (s *RackGroupSync) syncSingleRackGroup(ctx context.Context, rackGroup models.RackGroup, parentID *string) (*string, error) {
-	existingRackGroup := s.rackGroupSvc.GetByName(ctx, rackGroup.Name)
+	existingRackGroup := s.rackGroupSvc.GetByID(ctx, rackGroup.ID)
 
 	rackGroupRequest := nb.RackGroupRequest{
+		Id:          optionalID(rackGroup.ID),
 		Name:        rackGroup.Name,
 		Description: nb.PtrString(rackGroup.Description),
 		Parent:      buildParentReference(parentID),
@@ -86,7 +87,7 @@ func (s *RackGroupSync) syncSingleRackGroup(ctx context.Context, rackGroup model
 	}
 
 	log.Info("rackGroup is unchanged, skipping update", "name", rackGroupRequest.Name)
-	return rackGroupRequest.Id, nil
+	return existingRackGroup.Id, nil
 }
 
 // createRackGroup creates a new location  in Nautobot

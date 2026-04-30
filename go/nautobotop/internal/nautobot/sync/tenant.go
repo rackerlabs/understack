@@ -52,9 +52,10 @@ func (s *TenantSync) SyncAll(ctx context.Context, data map[string]string) error 
 }
 
 func (s *TenantSync) syncSingleTenant(ctx context.Context, tenant models.Tenant) error {
-	existing := s.tenantSvc.GetByName(ctx, tenant.Name)
+	existing := s.tenantSvc.GetByID(ctx, tenant.ID)
 
 	tenantRequest := nb.TenantRequest{
+		Id:   optionalID(tenant.ID),
 		Name: tenant.Name,
 	}
 	if tenant.Description != "" {

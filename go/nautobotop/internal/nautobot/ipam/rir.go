@@ -56,6 +56,29 @@ func (s *RirService) GetByName(ctx context.Context, name string) nb.RIR {
 	return list.Results[0]
 }
 
+func (s *RirService) GetByID(ctx context.Context, id string) nb.RIR {
+	if id == "" {
+		return nb.RIR{}
+	}
+	if rir, ok := cache.FindByID(s.client.Cache, "rirs", id, func(r nb.RIR) *string {
+		return r.Id
+	}); ok {
+		return rir
+	}
+
+	list, resp, err := s.client.APIClient.IpamAPI.IpamRirsList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetRirByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.RIR{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.RIR{}
+	}
+
+	return list.Results[0]
+}
+
 func (s *RirService) ListAll(ctx context.Context) []nb.RIR {
 	ids := s.client.GetChangeObjectIDS(ctx, "ipam.rir")
 	list, resp, err := s.client.APIClient.IpamAPI.IpamRirsList(ctx).Id(ids).Depth(2).Execute()
@@ -74,16 +97,6 @@ func (s *RirService) ListAll(ctx context.Context) []nb.RIR {
 }
 
 func (s *RirService) Update(ctx context.Context, id string, req nb.RIRRequest) (*nb.RIR, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateRir", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	rir, resp, err := s.client.APIClient.IpamAPI.IpamRirsUpdate(ctx, id).RIRRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

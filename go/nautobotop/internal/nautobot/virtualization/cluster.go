@@ -57,6 +57,29 @@ func (s *ClusterService) GetByName(ctx context.Context, name string) nb.Cluster 
 	return list.Results[0]
 }
 
+func (s *ClusterService) GetByID(ctx context.Context, id string) nb.Cluster {
+	if id == "" {
+		return nb.Cluster{}
+	}
+	if cluster, ok := cache.FindByID(s.client.Cache, "clusters", id, func(c nb.Cluster) *string {
+		return c.Id
+	}); ok {
+		return cluster
+	}
+
+	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClustersList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetClusterByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.Cluster{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.Cluster{}
+	}
+
+	return list.Results[0]
+}
+
 func (s *ClusterService) ListAll(ctx context.Context) []nb.Cluster {
 	ids := s.client.GetChangeObjectIDS(ctx, "virtualization.cluster")
 	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClustersList(ctx).Id(ids).Depth(2).Execute()
@@ -76,16 +99,6 @@ func (s *ClusterService) ListAll(ctx context.Context) []nb.Cluster {
 }
 
 func (s *ClusterService) Update(ctx context.Context, id string, req nb.ClusterRequest) (*nb.Cluster, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateCluster", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	cluster, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClustersUpdate(ctx, id).ClusterRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

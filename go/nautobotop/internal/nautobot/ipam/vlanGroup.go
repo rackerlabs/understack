@@ -57,6 +57,29 @@ func (s *VlanGroupService) GetByName(ctx context.Context, name string) nb.VLANGr
 	return list.Results[0]
 }
 
+func (s *VlanGroupService) GetByID(ctx context.Context, id string) nb.VLANGroup {
+	if id == "" {
+		return nb.VLANGroup{}
+	}
+	if vlanGroup, ok := cache.FindByID(s.client.Cache, "vlangroups", id, func(vg nb.VLANGroup) *string {
+		return vg.Id
+	}); ok {
+		return vlanGroup
+	}
+
+	list, resp, err := s.client.APIClient.IpamAPI.IpamVlanGroupsList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetVlanGroupByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.VLANGroup{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.VLANGroup{}
+	}
+
+	return list.Results[0]
+}
+
 func (s *VlanGroupService) ListAll(ctx context.Context) []nb.VLANGroup {
 	ids := s.client.GetChangeObjectIDS(ctx, "ipam.vlangroup")
 	list, resp, err := s.client.APIClient.IpamAPI.IpamVlanGroupsList(ctx).Id(ids).Depth(2).Execute()
@@ -76,16 +99,6 @@ func (s *VlanGroupService) ListAll(ctx context.Context) []nb.VLANGroup {
 }
 
 func (s *VlanGroupService) Update(ctx context.Context, id string, req nb.VLANGroupRequest) (*nb.VLANGroup, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateVlanGroup", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	vlanGroup, resp, err := s.client.APIClient.IpamAPI.IpamVlanGroupsUpdate(ctx, id).VLANGroupRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

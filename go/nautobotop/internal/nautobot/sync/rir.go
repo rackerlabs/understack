@@ -47,9 +47,10 @@ func (s *RirSync) SyncAll(ctx context.Context, data map[string]string) error {
 }
 
 func (s *RirSync) syncSingleRir(ctx context.Context, rir models.Rir) error {
-	existingRir := s.rirSvc.GetByName(ctx, rir.Name)
+	existingRir := s.rirSvc.GetByID(ctx, rir.ID)
 
 	rirRequest := nb.RIRRequest{
+		Id:        optionalID(rir.ID),
 		Name:      rir.Name,
 		IsPrivate: nb.PtrBool(rir.IsPrivate),
 	}

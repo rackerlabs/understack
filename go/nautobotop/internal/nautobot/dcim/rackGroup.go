@@ -57,6 +57,29 @@ func (s *RackGroupService) GetByName(ctx context.Context, name string) nb.RackGr
 	return list.Results[0]
 }
 
+func (s *RackGroupService) GetByID(ctx context.Context, id string) nb.RackGroup {
+	if id == "" {
+		return nb.RackGroup{}
+	}
+	if rackGroup, ok := cache.FindByID(s.client.Cache, "rackgroups", id, func(rg nb.RackGroup) *string {
+		return rg.Id
+	}); ok {
+		return rackGroup
+	}
+
+	list, resp, err := s.client.APIClient.DcimAPI.DcimRackGroupsList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetRackGroupByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.RackGroup{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.RackGroup{}
+	}
+
+	return list.Results[0]
+}
+
 func (s *RackGroupService) ListAll(ctx context.Context) []nb.RackGroup {
 	ids := s.client.GetChangeObjectIDS(ctx, "dcim.rackgroup")
 	list, resp, err := s.client.APIClient.DcimAPI.DcimRackGroupsList(ctx).Id(ids).Depth(2).Execute()
@@ -76,16 +99,6 @@ func (s *RackGroupService) ListAll(ctx context.Context) []nb.RackGroup {
 }
 
 func (s *RackGroupService) Update(ctx context.Context, id string, req nb.RackGroupRequest) (*nb.RackGroup, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateRackGroup", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	rackGroup, resp, err := s.client.APIClient.DcimAPI.DcimRackGroupsUpdate(ctx, id).RackGroupRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

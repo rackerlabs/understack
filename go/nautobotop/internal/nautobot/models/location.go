@@ -5,6 +5,7 @@ type Locations struct {
 }
 
 type Location struct {
+	ID           string     `json:"id" yaml:"id"`
 	Name         string     `json:"name" yaml:"name"`
 	Description  string     `json:"description" yaml:"description"`
 	LocationType string     `json:"string" yaml:"location_type"`

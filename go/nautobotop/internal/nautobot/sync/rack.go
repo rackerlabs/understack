@@ -56,7 +56,7 @@ func (s *RackSync) SyncAll(ctx context.Context, data map[string]string) error {
 
 // syncSingleRack handles the create/update logic for a single rack
 func (s *RackSync) syncSingleRack(ctx context.Context, rack models.Rack) error {
-	existingRack := s.rackSvc.GetByName(ctx, rack.Name)
+	existingRack := s.rackSvc.GetByID(ctx, rack.ID)
 
 	// Build location reference
 	locationRef, err := s.buildLocationReference(ctx, rack.Location)
@@ -71,6 +71,7 @@ func (s *RackSync) syncSingleRack(ctx context.Context, rack models.Rack) error {
 	}
 
 	rackRequest := nb.WritableRackRequest{
+		Id:       optionalID(rack.ID),
 		Name:     rack.Name,
 		Comments: nb.PtrString(rack.Description),
 		Location: locationRef,

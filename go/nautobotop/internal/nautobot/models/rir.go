@@ -5,6 +5,7 @@ type Rirs struct {
 }
 
 type Rir struct {
+	ID          string `json:"id" yaml:"id"`
 	Name        string `json:"name" yaml:"name"`
 	IsPrivate   bool   `json:"is_private" yaml:"is_private"`
 	Description string `json:"description" yaml:"description"`

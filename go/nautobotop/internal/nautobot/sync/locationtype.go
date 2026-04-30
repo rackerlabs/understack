@@ -66,9 +66,10 @@ func (s *LocationTypeSync) syncLocationTypeRecursive(ctx context.Context, locati
 
 // syncSingleLocationType handles the create/update logic for a single location type
 func (s *LocationTypeSync) syncSingleLocationType(ctx context.Context, locationType models.LocationType, parentID *string) (*string, error) {
-	existingLocationType := s.locationTypeSvc.GetByName(ctx, locationType.Name)
+	existingLocationType := s.locationTypeSvc.GetByID(ctx, locationType.ID)
 
 	locationTypeRequest := nb.LocationTypeRequest{
+		Id:           optionalID(locationType.ID),
 		ContentTypes: locationType.ContentTypes,
 		Name:         locationType.Name,
 		Description:  nb.PtrString(locationType.Description),

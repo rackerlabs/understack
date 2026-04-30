@@ -57,6 +57,29 @@ func (s *DeviceTypeService) GetByName(ctx context.Context, name string) nb.Devic
 	return list.Results[0]
 }
 
+func (s *DeviceTypeService) GetByID(ctx context.Context, id string) nb.DeviceType {
+	if id == "" {
+		return nb.DeviceType{}
+	}
+	if deviceType, ok := cache.FindByID(s.client.Cache, "devicetypes", id, func(dt nb.DeviceType) *string {
+		return dt.Id
+	}); ok {
+		return deviceType
+	}
+
+	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Depth(10).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetDeviceTypeByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.DeviceType{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.DeviceType{}
+	}
+
+	return list.Results[0]
+}
+
 func (s *DeviceTypeService) ListAll(ctx context.Context) []nb.DeviceType {
 	ids := s.client.GetChangeObjectIDS(ctx, "dcim.devicetype")
 	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Id(ids).Depth(10).Execute()
@@ -76,16 +99,6 @@ func (s *DeviceTypeService) ListAll(ctx context.Context) []nb.DeviceType {
 }
 
 func (s *DeviceTypeService) Update(ctx context.Context, id string, req nb.WritableDeviceTypeRequest) (*nb.DeviceType, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateDeviceType", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	deviceType, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesUpdate(ctx, id).WritableDeviceTypeRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

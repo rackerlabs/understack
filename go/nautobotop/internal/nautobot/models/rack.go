@@ -5,6 +5,7 @@ type Racks struct {
 }
 
 type Rack struct {
+	ID          string `json:"id" yaml:"id"`
 	Name        string `json:"name" yaml:"name"`
 	Facility    string `json:"facility" yaml:"facility"`
 	Description string `json:"description" yaml:"description"`
