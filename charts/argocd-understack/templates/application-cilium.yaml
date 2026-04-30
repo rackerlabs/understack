@@ -13,7 +13,7 @@ spec:
   destination:
     namespace: cilium
     server: {{ $.Values.cluster_server }}
-  project: understack-infra
+  project: understack
   sources:
   - path: {{ include "understack.deploy_path" $ }}/cilium
     ref: deploy

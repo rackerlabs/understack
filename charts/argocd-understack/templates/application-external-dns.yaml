@@ -13,7 +13,7 @@ spec:
   destination:
     namespace: external-dns
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack
   sources:
   - chart: external-dns-rackspace
     helm:

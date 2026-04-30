@@ -13,7 +13,7 @@ spec:
   destination:
     namespace: mariadb-operator
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack
   sources:
   - path: operators/mariadb-operator
     ref: understack

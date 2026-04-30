@@ -13,7 +13,7 @@ spec:
   destination:
     namespace: cnpg-system
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack
   sources:
   - path: operators/cnpg-system
     ref: understack
