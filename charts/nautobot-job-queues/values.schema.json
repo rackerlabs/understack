@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tokenSecretRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "name",
+            "key"
+          ]
+        }
+      },
+      "required": [
+        "url",
+        "tokenSecretRef"
+      ]
+    },
+    "queues": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "failOnMissing": {
+          "type": "boolean"
+        },
+        "waitFor": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "attempts": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "delaySeconds": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "attempts",
+            "delaySeconds"
+          ]
+        },
+        "enable": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "groupings": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "names": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "groupings",
+            "names"
+          ]
+        },
+        "queueAssignments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "names": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "groupings": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "queues": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "includeExistingQueues": {
+                "type": "boolean"
+              },
+              "override": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "queues"
+            ]
+          }
+        }
+      },
+      "required": [
+        "failOnMissing",
+        "waitFor",
+        "enable",
+        "queueAssignments"
+      ]
+    }
+  },
+  "required": [
+    "api",
+    "queues",
+    "jobs"
+  ]
+}

@@ -41,7 +41,6 @@
 
   roles:
     - role: nautobot_permissions
-    - role: jobs
     - role: secrets
     - role: git_repos
     - role: nautobot_roles

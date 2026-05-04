@@ -188,6 +188,7 @@ nav:
       - deploy-guide/components/mariadb-operator.md
       - deploy-guide/components/monitoring.md
       - deploy-guide/components/nautobot-api-tokens.md
+      - deploy-guide/components/nautobot-job-queues.md
       - deploy-guide/components/nautobot.md
       - deploy-guide/components/nautobotop.md
       - deploy-guide/components/nautobot-worker.md
@@ -240,7 +241,6 @@ nav:
       - operator-guide/rook-ceph.md
       - operator-guide/nautobot.md
       - operator-guide/nautobotop.md
-      - operator-guide/nautobot-celery-queues.md
       - operator-guide/nautobot-mtls-certificate-renewal.md
       - operator-guide/troubleshooting-osh.md
       - operator-guide/logging.md

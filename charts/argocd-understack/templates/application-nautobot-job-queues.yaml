@@ -1,14 +1,14 @@
-{{- if eq (include "understack.isEnabled" (list $.Values.global "nautobot_api_tokens")) "true" }}
+{{- if eq (include "understack.isEnabled" (list $.Values.global "nautobot_job_queues")) "true" }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ printf "%s-%s" $.Release.Name "nautobot-api-tokens" }}
+  name: {{ printf "%s-%s" $.Release.Name "nautobot-job-queues" }}
   finalizers:
   - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "2"
 {{- include "understack.appLabelsBlock" $ | nindent 2 }}
 spec:
   destination:
@@ -18,12 +18,12 @@ spec:
   sources:
   - repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
-    path: charts/nautobot-api-tokens
+    path: charts/nautobot-job-queues
     helm:
       ignoreMissingValueFiles: true
       valueFiles:
-      - $deploy/{{ include "understack.deploy_path" $ }}/nautobot-api-tokens/values.yaml
-  - path: {{ include "understack.deploy_path" $ }}/nautobot-api-tokens
+      - $deploy/{{ include "understack.deploy_path" $ }}/nautobot-job-queues/values.yaml
+  - path: {{ include "understack.deploy_path" $ }}/nautobot-job-queues
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}

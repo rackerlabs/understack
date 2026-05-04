@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "nautobot-job-queues.jobName" . }}
+  labels:
+    {{- include "nautobot-job-queues.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/hook: "PostSync"
+    argocd.argoproj.io/hook-delete-policy: "BeforeHookCreation"
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        {{- include "nautobot-job-queues.selectorLabels" . | nindent 8 }}
+        nautobot-job-queues/job: "ensure"
+    spec:
+      serviceAccountName: nautobot
+      restartPolicy: OnFailure
+      containers:
+        - name: ensure
+          image: {{ printf "ghcr.io/nautobot/nautobot:%s" .Chart.AppVersion | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /usr/local/bin/python
+          args:
+            - /scripts/reconcile.py
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: NAUTOBOT_URL
+              value: {{ .Values.api.url | quote }}
+            - name: NAUTOBOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.api.tokenSecretRef.name | quote }}
+                  key: {{ .Values.api.tokenSecretRef.key | quote }}
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+            - name: desired
+              mountPath: /desired
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: {{ include "nautobot-job-queues.scriptConfigMapName" . }}
+        - name: desired
+          configMap:
+            name: {{ include "nautobot-job-queues.desiredConfigMapName" . }}

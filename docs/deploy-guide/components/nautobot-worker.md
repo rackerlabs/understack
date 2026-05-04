@@ -20,10 +20,9 @@ application. The web server, Redis, and PostgreSQL all remain on the
 global cluster -- site workers connect back to those shared services
 over the network.
 
-For details on how Celery task queues are configured per site and how to
-route jobs to site-specific workers, see the
-[Nautobot Celery Queues](../../operator-guide/nautobot-celery-queues.md)
-operator guide.
+The matching Nautobot `JobQueue` records and Job assignments are
+reconciled by the
+[nautobot-job-queues](./nautobot-job-queues.md) component.
 
 ## Deployment Scope
 
