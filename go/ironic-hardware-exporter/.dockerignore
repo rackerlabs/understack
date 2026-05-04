@@ -1,0 +1,22 @@
+# compiled binary
+/ironic-hardware-exporter
+bin/
+dist/
+
+# test output
+*.test
+*.out
+
+# local dev harness
+local/
+
+# docs
+*.md
+ARCHITECTURE.md
+
+# editor and IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

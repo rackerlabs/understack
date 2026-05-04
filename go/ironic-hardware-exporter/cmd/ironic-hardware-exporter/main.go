@@ -63,7 +63,7 @@ func main() {
 			log.Printf("cached state node=%s power=%v provision=%v",
 				stateMsg.NodeName, stateMsg.PowerState, stateMsg.ProvisionState)
 		}); err != nil {
-			log.Printf("states consumer stopped: %v", err)
+			log.Fatalf("states consumer stopped: %v", err)
 		}
 	}()
 
