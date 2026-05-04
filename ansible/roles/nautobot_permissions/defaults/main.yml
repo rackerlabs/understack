@@ -139,4 +139,3 @@ nautobot_permissions_permissions:
       - extras.secret
       - extras.secretsgroup
       - extras.secretsgroupassociation
-
