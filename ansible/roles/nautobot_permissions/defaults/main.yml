@@ -110,7 +110,7 @@ nautobot_permissions_permissions:
     object_types:
       - extras.job
       - extras.jobqueue
-  storage-admin
+  storage-admin:
     description: System admin read/change access for storage items
     enabled: true
     actions:
