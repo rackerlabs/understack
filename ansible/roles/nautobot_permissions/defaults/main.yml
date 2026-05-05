@@ -127,6 +127,7 @@ nautobot_permissions_permissions:
       - view
     object_types:
       - extras.graphqlquery
+      - extras.joblogentry
   sys-admin:
     description: System administration read access for git repositories and secrets
     enabled: true
