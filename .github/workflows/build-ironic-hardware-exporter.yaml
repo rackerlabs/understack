@@ -3,9 +3,14 @@ name: build-ironic-hardware-exporter-images
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (X.Y.Z, without the v prefix)'
+        required: true
+        type: string
   push:
     tags:
-      - ironic-hardware-exporter-v*
+      - "ironic-hardware-exporter/v*"
     paths:
       - "go/ironic-hardware-exporter/**"
 
@@ -16,6 +21,8 @@ jobs:
       packages: write
       contents: write
       id-token: write
+    outputs:
+      version: ${{ steps.extract_tag.outputs.tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -48,9 +55,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract tag name
+      - name: Validate tag format
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          if [[ ! "$GITHUB_REF" =~ ^refs/tags/ironic-hardware-exporter/v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "Invalid tag: $GITHUB_REF — expected refs/tags/ironic-hardware-exporter/vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Extract release version
         id: extract_tag
-        run: echo "tag=${GITHUB_REF#refs/tags/ironic-hardware-exporter-v}" >> $GITHUB_OUTPUT
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${GITHUB_REF_NAME#ironic-hardware-exporter/v}" >> $GITHUB_OUTPUT
+          fi
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
@@ -61,7 +81,7 @@ jobs:
           workdir: go/ironic-hardware-exporter
         env:
           GIT_REPO: ${{ github.repository }}
-          CUSTOM_TAG: ${{ steps.extract_tag.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.extract_tag.outputs.tag }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   chart:
@@ -80,9 +100,8 @@ jobs:
       - name: Package and push Helm chart
         working-directory: go/ironic-hardware-exporter
         env:
-          PKG_VER: '${{ github.ref_name }}'
+          PKG_VER: '${{ needs.build-ironic-hardware-exporter.outputs.version }}'
         run: |
-          PKG_VER=${PKG_VER#ironic-hardware-exporter-v}
           yq -i ".version = \"${PKG_VER}\"" helm/Chart.yaml
           yq -i ".appVersion = \"${PKG_VER}\"" helm/Chart.yaml
           yq helm/Chart.yaml

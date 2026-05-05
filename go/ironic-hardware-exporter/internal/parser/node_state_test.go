@@ -106,6 +106,89 @@ func TestParseNodeState_Timestamp(t *testing.T) {
 	}
 }
 
+// TestParseNodeState_MaintenanceSet checks that maintenance.set events are accepted.
+// These events can change the maintenance field without any power/provision state change.
+func TestParseNodeState_MaintenanceSet(t *testing.T) {
+	body := wrapInOslo(t, versionedMessage{
+		EventType: "baremetal.node.maintenance.set",
+		Payload: versionedPayload{
+			Data: nodeStateData{UUID: "test-uuid", Name: "test-node", Maintenance: true},
+		},
+		Timestamp: "2026-04-19 00:42:40.000000",
+	})
+
+	msg, err := ParseNodeState(body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msg == nil {
+		t.Fatal("expected a NodeStateMessage for maintenance.set, got nil")
+	}
+	if !msg.Maintenance {
+		t.Errorf("expected maintenance=true, got false")
+	}
+}
+
+// TestParseNodeState_PowerStateCorrected checks that power_state_corrected events are accepted.
+func TestParseNodeState_PowerStateCorrected(t *testing.T) {
+	state := "power on"
+	body := wrapInOslo(t, versionedMessage{
+		EventType: "baremetal.node.power_state_corrected",
+		Payload: versionedPayload{
+			Data: nodeStateData{UUID: "test-uuid", Name: "test-node", PowerState: &state},
+		},
+		Timestamp: "2026-04-19 00:42:40.000000",
+	})
+
+	msg, err := ParseNodeState(body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msg == nil {
+		t.Fatal("expected a NodeStateMessage for power_state_corrected, got nil")
+	}
+	if msg.PowerState == nil || *msg.PowerState != "power on" {
+		t.Errorf("expected power_state=power on, got %v", msg.PowerState)
+	}
+}
+
+// TestParseNodeState_UpdateEnd checks that update.end events are accepted.
+// Nautobot sync already treats this as a node-state event source.
+func TestParseNodeState_UpdateEnd(t *testing.T) {
+	provision := "manageable"
+	fault := "clean failed"
+	body := wrapInOslo(t, versionedMessage{
+		EventType: "baremetal.node.update.end",
+		Payload: versionedPayload{
+			Data: nodeStateData{
+				UUID:           "test-uuid",
+				Name:           "test-node",
+				ProvisionState: &provision,
+				Maintenance:    true,
+				Fault:          &fault,
+			},
+		},
+		Timestamp: "2026-04-19 00:42:40.000000",
+	})
+
+	msg, err := ParseNodeState(body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if msg == nil {
+		t.Fatal("expected a NodeStateMessage for update.end, got nil")
+	}
+	if msg.ProvisionState == nil || *msg.ProvisionState != "manageable" {
+		t.Errorf("expected provision_state=manageable, got %v", msg.ProvisionState)
+	}
+	if !msg.Maintenance {
+		t.Errorf("expected maintenance=true, got false")
+	}
+	if msg.Fault == nil || *msg.Fault != "clean failed" {
+		t.Errorf("expected fault=clean failed, got %v", msg.Fault)
+	}
+}
+
 // TestParseNodeState_InvalidJSON checks that malformed JSON returns an error.
 func TestParseNodeState_InvalidJSON(t *testing.T) {
 	_, err := ParseNodeState([]byte(`not valid json`))

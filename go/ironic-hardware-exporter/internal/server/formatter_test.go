@@ -143,6 +143,26 @@ func TestFormat_FaultMetric(t *testing.T) {
 	}
 }
 
+// nodes created by a state event before any sensor event arrives have a zero LastSeen.
+// emitting that as a Unix timestamp produces -62135596800, so we skip it.
+func TestFormat_SkipsZeroLastSeen(t *testing.T) {
+	nodes := map[string]*cache.NodeEntry{
+		"uuid-1": {
+			NodeUUID:       "uuid-1",
+			NodeName:       "Dell-Test",
+			ConductorHost:  "ironic-conductor.host1",
+			PowerState:     strPtr("power on"),
+			ProvisionState: strPtr("active"),
+			// LastSeen is zero — no sensor event has arrived yet
+		},
+	}
+	output := Format(nodes)
+
+	if strings.Contains(output, "ironic_node_last_seen_timestamp_seconds{") {
+		t.Errorf("last_seen metric should not appear for zero LastSeen:\n%s", output)
+	}
+}
+
 // when node has only sensor data ironic_node_maintenance n ironic_node_fault
 // do NOT appear in the output.
 func TestFormat_SkipsStateMetricsWhenNoStateData(t *testing.T) {

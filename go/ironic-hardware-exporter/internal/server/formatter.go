@@ -18,6 +18,9 @@ func writeSensorMetrics(b *strings.Builder, nodes map[string]*cache.NodeEntry) {
 	fmt.Fprintf(b, "# HELP ironic_node_last_seen_timestamp_seconds Unix timestamp of the last hardware metrics event received for this node\n")
 	fmt.Fprintf(b, "# TYPE ironic_node_last_seen_timestamp_seconds gauge\n")
 	for _, n := range nodes {
+		if n.LastSeen.IsZero() {
+			continue
+		}
 		fmt.Fprintf(b, "ironic_node_last_seen_timestamp_seconds{node_uuid=%q,node_name=%q} %d\n",
 			n.NodeUUID, n.NodeName, n.LastSeen.Unix())
 	}

@@ -41,21 +41,12 @@ type NodeStateMessage struct {
 	Fault          *string
 }
 
-// nodeStateEventPrefixes are the baremetal.node events .
-// we use .end and .success variants so we  capture final state
-var nodeStateEventPrefixes = []string{
-	"baremetal.node.power_set.end",
-	"baremetal.node.provision_set.end",
-	"baremetal.node.provision_set.success",
-}
-
+// isNodeStateEvent accepts any baremetal.node event except .start variants.
+// .start events carry intermediate state; .end, .success, maintenance.set/unset,
+// power_state_corrected, and update.end all carry final state for the fields we export.
 func isNodeStateEvent(eventType string) bool {
-	for _, prefix := range nodeStateEventPrefixes {
-		if strings.EqualFold(eventType, prefix) {
-			return true
-		}
-	}
-	return false
+	lower := strings.ToLower(eventType)
+	return strings.HasPrefix(lower, "baremetal.node.") && !strings.HasSuffix(lower, ".start")
 }
 
 // ParseNodeState parses versioned Ironic notifications for node power/provision state.

@@ -6,8 +6,11 @@ before:
     - go mod tidy
 
 env:
-  - CUSTOM_TAG={{ .Env.CUSTOM_TAG }}
+  - RELEASE_VERSION={{ .Env.RELEASE_VERSION }}
   - GIT_REPO={{ .Env.GIT_REPO }}
+
+release:
+  name_template: "ironic-hardware-exporter v{{ .Env.RELEASE_VERSION }}"
 
 builds:
   - main: main.go
@@ -33,10 +36,10 @@ dockers:
     use: buildx
     dockerfile: .goreleaser.Dockerfile
     image_templates:
-      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.RELEASE_VERSION }}-amd64
     build_flag_templates:
       - --platform=linux/amd64
-      - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
+      - --label=org.opencontainers.image.version={{ .Env.RELEASE_VERSION }}
       - --label=org.opencontainers.image.revision={{ .Commit }}
       - --label=org.opencontainers.image.title={{ .ProjectName }}
       - --label=org.opencontainers.image.created={{ .Date }}
@@ -50,10 +53,10 @@ dockers:
     use: buildx
     dockerfile: .goreleaser.Dockerfile
     image_templates:
-      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.RELEASE_VERSION }}-arm64
     build_flag_templates:
       - --platform=linux/arm64
-      - --label=org.opencontainers.image.version={{ .Env.CUSTOM_TAG }}
+      - --label=org.opencontainers.image.version={{ .Env.RELEASE_VERSION }}
       - --label=org.opencontainers.image.revision={{ .Commit }}
       - --label=org.opencontainers.image.title={{ .ProjectName }}
       - --label=org.opencontainers.image.created={{ .Date }}
@@ -64,14 +67,14 @@ dockers:
       - --label=org.opencontainers.image.authors=Rackspace
 
 docker_manifests:
-  - name_template: ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}
+  - name_template: ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.RELEASE_VERSION }}
     image_templates:
-      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
-      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.RELEASE_VERSION }}-amd64
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.RELEASE_VERSION }}-arm64
   - name_template: ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:latest
     image_templates:
-      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-amd64
-      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.CUSTOM_TAG }}-arm64
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.RELEASE_VERSION }}-amd64
+      - ghcr.io/{{ .Env.GIT_REPO }}/{{ .ProjectName }}:{{ .Env.RELEASE_VERSION }}-arm64
 
 signs:
   - cmd: cosign

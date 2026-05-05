@@ -125,7 +125,6 @@ internal/
   cache/      thread-safe NodeEntry store
   server/     HTTP server (/metrics, /health, /ready) and formatter
 helm/         Helm chart for Kubernetes deployment
-local/        local RabbitMQ TLS validation harness
 ```
 
 ## How To Build
@@ -161,6 +160,18 @@ Release automation is defined in:
 - `.goreleaser.yaml`
 - `../../.github/workflows/build-ironic-hardware-exporter.yaml`
 
+Merging a PR does not trigger a build. To publish a new image and Helm chart,
+push a tag in the form `ironic-hardware-exporter/vX.Y.Z`:
+
+```bash
+git tag ironic-hardware-exporter/v0.2.0
+git push origin ironic-hardware-exporter/v0.2.0
+```
+
+The workflow builds the container image and pushes the Helm chart to GHCR.
+There is no ArgoCD template for this component yet, so after the build you
+must deploy manually with `helm upgrade --install` (see How To Deploy below).
+
 ## How To Validate
 
 ### Local tests
@@ -168,33 +179,6 @@ Release automation is defined in:
 ```bash
 GOCACHE=/tmp/gocache go test ./...
 ```
-
-### Local RabbitMQ smoke test
-
-The self-contained local environment lives under:
-
-- `local/rabbitmq/`
-
-Run a single TLS case:
-
-```bash
-GOCACHE=/tmp/gocache ./local/rabbitmq/smoke.sh tls
-```
-
-Run the full matrix:
-
-```bash
-GOCACHE=/tmp/gocache ./local/rabbitmq/smoke.sh all
-```
-
-This validates:
-
-- plain AMQP
-- TLS
-- SNI override
-- wrong CA failure
-- wrong server-name failure
-- end-to-end message flow to `/metrics`
 
 ### Manual checks
 
