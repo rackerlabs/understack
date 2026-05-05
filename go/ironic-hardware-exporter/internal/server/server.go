@@ -5,8 +5,11 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/labstack/echo/v4"
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/cache"
 )
+
+const contentTypePrometheus = "text/plain; version=0.0.4; charset=utf-8"
 
 type Server struct {
 	store   *cache.Store
@@ -14,44 +17,39 @@ type Server struct {
 	isReady func() bool
 }
 
-// when Prometheus scrapes /metrics, the server reads from this to get the latest sensor data.
 func New(store *cache.Store, port int, isReady func() bool) *Server {
-	return &Server{
-		store:   store,
-		port:    port,
-		isReady: isReady,
-	}
+	return &Server{store: store, port: port, isReady: isReady}
 }
 
 func (s *Server) Start() error {
-	http.HandleFunc("/metrics", s.handleMetrics)
-	http.HandleFunc("/health", s.handleHealth)
-	http.HandleFunc("/ready", s.handleReady)
+	e := echo.New()
+	e.HideBanner = true
+
+	e.GET("/metrics", s.handleMetrics)
+	e.GET("/health", s.handleHealth)
+	e.GET("/ready", s.handleReady)
 
 	addr := fmt.Sprintf(":%d", s.port)
 	log.Printf("HTTP server listening on %s", addr)
-	return http.ListenAndServe(addr, nil)
+	return e.Start(addr)
 }
 
-func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleMetrics(c echo.Context) error {
 	nodes := s.store.GetAll()
-	output := Format(nodes)
-	w.Header().Set("Content-Type", "text/plain")
-	_, _ = fmt.Fprint(w, output)
+	families := Transform(nodes)
+	output := Render(families)
 	log.Printf("GET /metrics — served %d nodes", len(nodes))
+	return c.Blob(http.StatusOK, contentTypePrometheus, []byte(output))
 }
 
-func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprint(w, `{"status":"ok"}`)
+func (s *Server) handleHealth(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleReady(c echo.Context) error {
 	if s.isReady != nil && !s.isReady() {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = fmt.Fprint(w, `{"status":"not ready"}`)
-		return
+		return c.JSON(http.StatusServiceUnavailable, map[string]string{"status": "not ready"})
 	}
 	nodes := s.store.GetAll()
-	_, _ = fmt.Fprintf(w, `{"status":"ok","nodes":%d}`, len(nodes))
+	return c.JSON(http.StatusOK, map[string]any{"status": "ok", "nodes": len(nodes)})
 }

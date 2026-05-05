@@ -25,8 +25,9 @@ type nodeStateData struct {
 	Name           string  `json:"name"`
 	PowerState     *string `json:"power_state"`
 	ProvisionState *string `json:"provision_state"`
-	Maintenance    bool    `json:"maintenance"`
-	Fault          *string `json:"fault"`
+	// *bool so we can distinguish "field absent" (nil) from "explicitly false".
+	Maintenance *bool   `json:"maintenance"`
+	Fault       *string `json:"fault"`
 }
 
 // NodeStateMessage is the clean result returned from ParseNodeState.
@@ -37,8 +38,9 @@ type NodeStateMessage struct {
 	EventTimestamp time.Time
 	PowerState     *string
 	ProvisionState *string
-	Maintenance    bool
-	Fault          *string
+	// nil means the event did not carry this field; &false and &true are explicit values.
+	Maintenance *bool
+	Fault       *string
 }
 
 // isNodeStateEvent accepts any baremetal.node event except .start variants.

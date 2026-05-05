@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 //struct to hold the config
@@ -31,6 +32,13 @@ type RabbitMQConfig struct {
 
 type ServerConfig struct {
 	Port int
+	// NodeTTL is how long a node stays in cache after its last event.
+	// Nodes that stop sending are evicted after this duration.
+	NodeTTL time.Duration
+	// CacheMaxNodes is the hard upper bound on cached nodes.
+	// When full, otter evicts least-frequently-used entries (TinyLFU) before TTL.
+	// Set this higher than your expected node count to avoid premature eviction.
+	CacheMaxNodes int
 }
 
 type Config struct {
@@ -67,7 +75,9 @@ func Load() (*Config, error) {
 			ServerName:       getEnv("RABBITMQ_TLS_SERVER_NAME", ""),
 		},
 		Server: ServerConfig{
-			Port: getEnvInt("SERVER_PORT", 9608),
+			Port:          getEnvInt("SERVER_PORT", 9608),
+			NodeTTL:       time.Duration(getEnvInt("NODE_TTL_HOURS", 1)) * time.Hour,
+			CacheMaxNodes: getEnvInt("CACHE_MAX_NODES", 100_000),
 		},
 	}, nil
 }

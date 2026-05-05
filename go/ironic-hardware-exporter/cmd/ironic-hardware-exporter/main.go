@@ -16,7 +16,10 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	store := cache.New()
+	store, err := cache.New(cfg.Server.NodeTTL, cfg.Server.CacheMaxNodes)
+	if err != nil {
+		log.Fatalf("failed to create cache: %v", err)
+	}
 
 	// consumer 1: sensor data (hardware.idrac.*.metrics / hardware.redfish.*.metrics)
 	sensorConsumer, err := rabbitmq.New(cfg.RabbitMQ)

@@ -366,8 +366,6 @@ helm upgrade --install ironic-hardware-exporter \
   -f values-ironic-hardware-exporter.yaml
 ```
 
-Adjust the GHCR owner if the chart is published under a different repository
-owner.
 
 ### Post-install checks
 
@@ -416,9 +414,11 @@ Do not scale it horizontally.
 ### Staleness model
 
 The exporter retains the last known values in memory until a newer event
-updates them.
+updates them or the node TTL expires.
 
-There is no TTL-based expiry today.
+Nodes that stop sending events are evicted from the cache after `NODE_TTL_HOURS`
+(default: 1 hour). The hard cap on cached nodes is `CACHE_MAX_NODES`
+(default: 100,000); when full, the least-frequently-used nodes are evicted first.
 
 ### No RBAC requirement
 

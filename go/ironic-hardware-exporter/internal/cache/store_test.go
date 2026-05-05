@@ -11,10 +11,20 @@ import (
 const powerOn = "power on"
 
 func strPtr(s string) *string { return &s }
+func boolPtr(b bool) *bool    { return &b }
+
+func mustNew(t *testing.T) *Store {
+	t.Helper()
+	s, err := New(time.Hour, 1000)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+	return s
+}
 
 // Call Update(), then GetAll(), verify NodeName and LastSeen are stored correctly
 func TestUpdate_StoresNode(t *testing.T) {
-	s := New()
+	s := mustNew(t)
 	ts := time.Unix(1776287267, 0)
 
 	s.Update(&parser.HardwareMessage{
@@ -39,7 +49,7 @@ func TestUpdate_StoresNode(t *testing.T) {
 // call Update() twice for the same node with different names.
 // Verifies the second one wins for sensor fields.
 func TestUpdate_OverwritesSensorData(t *testing.T) {
-	s := New()
+	s := mustNew(t)
 
 	s.Update(&parser.HardwareMessage{NodeUUID: "uuid-1", NodeName: "old-name"})
 	s.Update(&parser.HardwareMessage{NodeUUID: "uuid-1", NodeName: "new-name"})
@@ -53,7 +63,7 @@ func TestUpdate_OverwritesSensorData(t *testing.T) {
 // State event arrives first (sets PowerState, ConductorHost), then sensor flood arrives.
 // Verifies PowerState and ConductorHost are still there after Update().
 func TestUpdate_PreservesStateFields(t *testing.T) {
-	s := New()
+	s := mustNew(t)
 
 	// state arrives first
 	s.UpdateNodeState(&parser.NodeStateMessage{
@@ -62,7 +72,7 @@ func TestUpdate_PreservesStateFields(t *testing.T) {
 		ConductorHost:  "ironic-conductor.host1",
 		PowerState:     strPtr(powerOn),
 		ProvisionState: strPtr("active"),
-		Maintenance:    false,
+		Maintenance:    boolPtr(false),
 		Fault:          strPtr("none"),
 	})
 
@@ -82,7 +92,7 @@ func TestUpdate_PreservesStateFields(t *testing.T) {
 // state event arrives before any sensor data.
 // Verifies UpdateNodeState() creates a new entry and sets PowerState, ProvisionState correctly.
 func TestUpdateNodeState_CreatesEntryWhenMissing(t *testing.T) {
-	s := New()
+	s := mustNew(t)
 
 	s.UpdateNodeState(&parser.NodeStateMessage{
 		NodeUUID:       "uuid-1",
@@ -108,7 +118,7 @@ func TestUpdateNodeState_CreatesEntryWhenMissing(t *testing.T) {
 // Sensor data arrives first (sets temperature reading), then state event arrives.
 // Verifies the temperature reading is still there after UpdateNodeState()
 func TestUpdateNodeState_PreservesSensorData(t *testing.T) {
-	s := New()
+	s := mustNew(t)
 	reading := 26.0
 
 	// first update brings sensor data
@@ -151,7 +161,7 @@ func TestUpdateNodeState_PreservesSensorData(t *testing.T) {
 // Changing snapshot has no effect on the store. snapshot2 still shows the original value.
 // The below test is to test this above scenario
 func TestGetAll_ReturnsCopy(t *testing.T) {
-	s := New()
+	s := mustNew(t)
 	s.Update(&parser.HardwareMessage{NodeUUID: "uuid-1", NodeName: "Dell-93GSW04"})
 
 	snapshot := s.GetAll()
@@ -164,9 +174,65 @@ func TestGetAll_ReturnsCopy(t *testing.T) {
 	}
 }
 
+// A maintenance.set event may omit power_state and provision_state.
+// Verifies those fields are not cleared by the partial update.
+func TestUpdateNodeState_PartialUpdate_PreservesPowerState(t *testing.T) {
+	s := mustNew(t)
+
+	// first event: full state
+	s.UpdateNodeState(&parser.NodeStateMessage{
+		NodeUUID:       "uuid-1",
+		NodeName:       "Dell-93GSW04",
+		PowerState:     strPtr(powerOn),
+		ProvisionState: strPtr("active"),
+		Maintenance:    boolPtr(false),
+	})
+
+	// maintenance event: power_state and provision_state are nil (omitted by Ironic)
+	s.UpdateNodeState(&parser.NodeStateMessage{
+		NodeUUID:    "uuid-1",
+		NodeName:    "Dell-93GSW04",
+		PowerState:  nil,
+		Maintenance: boolPtr(true),
+	})
+
+	nodes := s.GetAll()
+	n := nodes["uuid-1"]
+	if n.PowerState == nil || *n.PowerState != powerOn {
+		t.Error("partial update cleared PowerState")
+	}
+	if n.ProvisionState == nil || *n.ProvisionState != "active" {
+		t.Error("partial update cleared ProvisionState")
+	}
+	if !n.Maintenance {
+		t.Error("maintenance not updated to true")
+	}
+}
+
+// HasStateData must be true after the first UpdateNodeState call,
+// so the transformer emits maintenance/fault metrics even when
+// power/provision state is still nil.
+func TestUpdateNodeState_SetsHasStateData(t *testing.T) {
+	s := mustNew(t)
+
+	s.UpdateNodeState(&parser.NodeStateMessage{
+		NodeUUID:    "uuid-1",
+		NodeName:    "Dell-93GSW04",
+		Maintenance: boolPtr(true),
+	})
+
+	nodes := s.GetAll()
+	if !nodes["uuid-1"].HasStateData {
+		t.Error("HasStateData should be true after UpdateNodeState")
+	}
+	if nodes["uuid-1"].PowerState != nil {
+		t.Error("PowerState should remain nil for maintenance-only event")
+	}
+}
+
 // Fresh store, no nodes.
 func TestGetAll_EmptyStore(t *testing.T) {
-	s := New()
+	s := mustNew(t)
 	nodes := s.GetAll()
 	if len(nodes) != 0 {
 		t.Errorf("expected empty map, got %d nodes", len(nodes))
@@ -182,7 +248,7 @@ func TestGetAll_EmptyStore(t *testing.T) {
 // the test will fails  with a race condition error.
 func TestConcurrentUpdateAndGetAll(t *testing.T) {
 	// run with -race to catch data races
-	s := New()
+	s := mustNew(t)
 	var wg sync.WaitGroup
 
 	for i := 0; i < 50; i++ {
@@ -209,7 +275,7 @@ func TestConcurrentUpdateAndGetAll(t *testing.T) {
 // Verifies the two writers and one reader don't corrupt each other
 func TestConcurrentUpdateAndUpdateNodeState(t *testing.T) {
 	// run with -race to verify Update and UpdateNodeState don't race on same entry
-	s := New()
+	s := mustNew(t)
 	s.Update(&parser.HardwareMessage{NodeUUID: "uuid-1", NodeName: "Dell-93GSW04"})
 
 	var wg sync.WaitGroup

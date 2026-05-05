@@ -7,6 +7,8 @@ import (
 
 const powerStateOn = "power on"
 
+func boolPtr(b bool) *bool { return &b }
+
 // TestParseNodeState_PowerSetEnd checks that a power_set.end event is parsed correctly.
 func TestParseNodeState_PowerSetEnd(t *testing.T) {
 	body := readTestData(t, "baremetal_node_power_set.json")
@@ -31,7 +33,7 @@ func TestParseNodeState_PowerSetEnd(t *testing.T) {
 	if msg.ProvisionState == nil || *msg.ProvisionState != "deleting" {
 		t.Errorf("expected provision_state=deleting, got %v", msg.ProvisionState)
 	}
-	if msg.Maintenance != false {
+	if msg.Maintenance == nil || *msg.Maintenance {
 		t.Errorf("expected maintenance=false, got %v", msg.Maintenance)
 	}
 	if msg.Fault != nil {
@@ -114,7 +116,7 @@ func TestParseNodeState_MaintenanceSet(t *testing.T) {
 	body := wrapInOslo(t, versionedMessage{
 		EventType: "baremetal.node.maintenance.set",
 		Payload: versionedPayload{
-			Data: nodeStateData{UUID: "test-uuid", Name: "test-node", Maintenance: true},
+			Data: nodeStateData{UUID: "test-uuid", Name: "test-node", Maintenance: boolPtr(true)},
 		},
 		Timestamp: "2026-04-19 00:42:40.000000",
 	})
@@ -126,7 +128,7 @@ func TestParseNodeState_MaintenanceSet(t *testing.T) {
 	if msg == nil {
 		t.Fatal("expected a NodeStateMessage for maintenance.set, got nil")
 	}
-	if !msg.Maintenance {
+	if msg.Maintenance == nil || !*msg.Maintenance {
 		t.Errorf("expected maintenance=true, got false")
 	}
 }
@@ -166,7 +168,7 @@ func TestParseNodeState_UpdateEnd(t *testing.T) {
 				UUID:           "test-uuid",
 				Name:           "test-node",
 				ProvisionState: &provision,
-				Maintenance:    true,
+				Maintenance:    boolPtr(true),
 				Fault:          &fault,
 			},
 		},
@@ -183,7 +185,7 @@ func TestParseNodeState_UpdateEnd(t *testing.T) {
 	if msg.ProvisionState == nil || *msg.ProvisionState != "manageable" {
 		t.Errorf("expected provision_state=manageable, got %v", msg.ProvisionState)
 	}
-	if !msg.Maintenance {
+	if msg.Maintenance == nil || !*msg.Maintenance {
 		t.Errorf("expected maintenance=true, got false")
 	}
 	if msg.Fault == nil || *msg.Fault != "clean failed" {
