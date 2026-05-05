@@ -38,7 +38,9 @@ RabbitMQ  (ironic exchange)
 
 ## Two Consumers, One Cache
 
-Both consumers share one `cache.Store`, protected by a read-write mutex.
+Both consumers share one `cache.Store`, backed by an in-memory `otter` cache.
+Writes are serialized so the two consumers cannot overwrite each other's
+changes, and reads use snapshot copies from the cache.
 
 - `Update()` writes sensor fields
 - `UpdateNodeState()` writes state fields
@@ -88,8 +90,9 @@ Readiness reflects both consumers:
 
 ## Metrics Exposed
 
-Formatting lives in:
+Metric shaping and rendering live in:
 
+- `internal/server/transformer.go`
 - `internal/server/formatter.go`
 
 Key metric families:
@@ -122,8 +125,8 @@ internal/
   config/     env-var loading, RabbitMQConfig and ServerConfig
   parser/     Oslo envelope parsing for both sensor and state events
   rabbitmq/   AMQP consumer (connect, declare queue, bind, consume loop)
-  cache/      thread-safe NodeEntry store
-  server/     HTTP server (/metrics, /health, /ready) and formatter
+  cache/      NodeEntry cache with TTL/size-based eviction
+  server/     HTTP server (/metrics, /health, /ready), transformer, formatter
 helm/         Helm chart for Kubernetes deployment
 ```
 

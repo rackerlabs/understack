@@ -133,7 +133,6 @@ func TestParse_NullReadingsAreNil(t *testing.T) {
 	}
 }
 
-// todo: circle back here for parsing
 // TestParse_HardwareRedfishMetrics checks that hardware.redfish.metrics is accepted (not just idrac).
 // Note: no real redfish nodes exist in the current cluster (all nodes use idrac driver),
 // so this uses synthetic test data to verify the broader event type filter works.
