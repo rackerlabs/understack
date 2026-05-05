@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const powerStateOn = "power on"
+
 // TestParseNodeState_PowerSetEnd checks that a power_set.end event is parsed correctly.
 func TestParseNodeState_PowerSetEnd(t *testing.T) {
 	body := readTestData(t, "baremetal_node_power_set.json")
@@ -52,7 +54,7 @@ func TestParseNodeState_ProvisionSetEnd(t *testing.T) {
 	if msg.ProvisionState == nil || *msg.ProvisionState != "active" {
 		t.Errorf("expected provision_state=active, got %v", msg.ProvisionState)
 	}
-	if msg.PowerState == nil || *msg.PowerState != "power on" {
+	if msg.PowerState == nil || *msg.PowerState != powerStateOn {
 		t.Errorf("expected power_state=power on, got %v", msg.PowerState)
 	}
 }
@@ -131,7 +133,7 @@ func TestParseNodeState_MaintenanceSet(t *testing.T) {
 
 // TestParseNodeState_PowerStateCorrected checks that power_state_corrected events are accepted.
 func TestParseNodeState_PowerStateCorrected(t *testing.T) {
-	state := "power on"
+	state := powerStateOn
 	body := wrapInOslo(t, versionedMessage{
 		EventType: "baremetal.node.power_state_corrected",
 		Payload: versionedPayload{
@@ -147,7 +149,7 @@ func TestParseNodeState_PowerStateCorrected(t *testing.T) {
 	if msg == nil {
 		t.Fatal("expected a NodeStateMessage for power_state_corrected, got nil")
 	}
-	if msg.PowerState == nil || *msg.PowerState != "power on" {
+	if msg.PowerState == nil || *msg.PowerState != powerStateOn {
 		t.Errorf("expected power_state=power on, got %v", msg.PowerState)
 	}
 }
