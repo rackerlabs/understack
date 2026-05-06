@@ -80,7 +80,7 @@ class UnderstackDriver(MechanismDriver):
                 raise ValueError("Unable to obtain initial token from session")
 
             LOG.info(
-                "Successfully created Keystone session for Undersync " "authentication"
+                "Successfully created Keystone session for Undersync authentication"
             )
             return sess
 
