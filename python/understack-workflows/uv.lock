@@ -1,6 +1,6 @@
 version = 1
-revision = 2
-requires-python = ">=3.12.0, <3.13"
+revision = 3
+requires-python = "==3.12.*"
 
 [[package]]
 name = "annotated-types"
@@ -815,7 +815,7 @@ wheels = [
 
 [[package]]
 name = "python-ironicclient"
-version = "5.14.0"
+version = "6.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cliff" },
@@ -831,9 +831,9 @@ dependencies = [
     { name = "requests" },
     { name = "stevedore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/59/be/311283b658a03e92132fecd9c512b0b9a09cf5845485b00111211d2a0377/python_ironicclient-5.14.0.tar.gz", hash = "sha256:a0718beb15a496b6f949fa18fd68e02946362c32a9feaa19f02a924666689585", size = 226166, upload-time = "2025-11-18T09:33:01.578Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/35/42/5c41c9b0705e3f3ae500dc14d8466d9d68a979c47ccc733882221ee9be16/python_ironicclient-6.0.0.tar.gz", hash = "sha256:6b96e715ec8766ec54fc54e02d23fc55aabd54b0ea10ae987559ad832952458f", size = 230466, upload-time = "2026-02-25T10:57:20.688Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/86/37/378e41804f72c45e852b5040d80d070ae7a3820cbbdcc23ade2d21cf7b1e/python_ironicclient-5.14.0-py3-none-any.whl", hash = "sha256:1857f343cfe23fbd8f323dd255fef6829764ba391a82d81683ee997de6d58b5f", size = 246889, upload-time = "2025-11-18T09:33:00.214Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/92/cdc5558f3f910866844d0a89014cdab075c3ef7ca0cd1f6416fd591c2ffd/python_ironicclient-6.0.0-py3-none-any.whl", hash = "sha256:4ae61cab95453db196123574601a8f84b520c6459d39a1bfbbaf502841d2a6d0", size = 248148, upload-time = "2026-02-25T10:57:19.227Z" },
 ]
 
 [[package]]
@@ -1100,7 +1100,7 @@ requires-dist = [
     { name = "netapp-ontap", specifier = "==9.17.1.0" },
     { name = "pydantic", specifier = ">=2,<3" },
     { name = "pynautobot", specifier = ">=3,<4" },
-    { name = "python-ironicclient", specifier = ">=5.8.0,<6" },
+    { name = "python-ironicclient", specifier = ">=6,<7" },
     { name = "sushy", specifier = ">=5.3.0,<6" },
     { name = "tenacity", specifier = ">=8.0.0" },
 ]
