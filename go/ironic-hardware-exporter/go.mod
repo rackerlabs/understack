@@ -3,7 +3,7 @@ module github.com/rackerlabs/understack/go/ironic-hardware-exporter
 go 1.25.0
 
 require (
-	github.com/labstack/echo/v4 v4.15.2
+	github.com/labstack/echo/v4 v4.13.4
 	github.com/maypok86/otter v1.2.4
 	github.com/rabbitmq/amqp091-go v1.10.0
 )

@@ -1,5 +1,5 @@
 BINARY    := ironic-hardware-exporter
-CMD       := ./cmd/ironic-hardware-exporter
+CMD       := ./cmd
 IMG       ?= ironic-hardware-exporter:dev
 
 CONTAINER_TOOL ?= docker
@@ -55,9 +55,3 @@ docker-build: ## Build the container image.
 .PHONY: docker-push
 docker-push: ## Push the container image.
 	$(CONTAINER_TOOL) push $(IMG)
-
-##@ Validation
-
-.PHONY: smoke
-smoke: ## Run the local RabbitMQ smoke test (all cases).
-	GOCACHE=/tmp/gocache ./local/rabbitmq/smoke.sh all

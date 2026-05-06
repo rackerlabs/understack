@@ -75,6 +75,10 @@ spec:
             {{- end }}
             - name: SERVER_PORT
               value: {{ .Values.service.port | quote }}
+            - name: NODE_TTL_HOURS
+              value: {{ .Values.server.nodeTTLHours | quote }}
+            - name: CACHE_MAX_NODES
+              value: {{ .Values.server.cacheMaxNodes | quote }}
             - name: RABBITMQ_PASSWORD
               valueFrom:
                 secretKeyRef:

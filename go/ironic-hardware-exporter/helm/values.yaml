@@ -42,6 +42,12 @@ rabbitmq:
     # Override the TLS server name (SNI) when RABBITMQ_HOST is an IP or alias.
     serverName: ""
 
+server:
+  # How long a node stays in cache after its last event (hours).
+  nodeTTLHours: 1
+  # Hard upper bound on cached nodes; oldest least-used entries are evicted first.
+  cacheMaxNodes: 100000
+
 service:
   type: ClusterIP
   port: 9608

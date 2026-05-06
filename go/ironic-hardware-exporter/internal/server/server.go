@@ -7,6 +7,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/cache"
+	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/metrics"
 )
 
 const contentTypePrometheus = "text/plain; version=0.0.4; charset=utf-8"
@@ -36,8 +37,8 @@ func (s *Server) Start() error {
 
 func (s *Server) handleMetrics(c echo.Context) error {
 	nodes := s.store.GetAll()
-	families := Transform(nodes)
-	output := Render(families)
+	families := metrics.Transform(nodes)
+	output := metrics.Render(families)
 	log.Printf("GET /metrics — served %d nodes", len(nodes))
 	return c.Blob(http.StatusOK, contentTypePrometheus, []byte(output))
 }

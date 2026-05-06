@@ -92,8 +92,8 @@ Readiness reflects both consumers:
 
 Metric shaping and rendering live in:
 
-- `internal/server/transformer.go`
-- `internal/server/formatter.go`
+- `internal/metrics/transformer.go`
+- `internal/metrics/formatter.go`
 
 Key metric families:
 
@@ -120,13 +120,14 @@ State metrics also carry:
 ## Package Layout
 
 ```text
-cmd/ironic-hardware-exporter/   entry point, wires consumers + cache + server
+cmd/                            entry point, wires consumers + cache + server
 internal/
   config/     env-var loading, RabbitMQConfig and ServerConfig
   parser/     Oslo envelope parsing for both sensor and state events
   rabbitmq/   AMQP consumer (connect, declare queue, bind, consume loop)
   cache/      NodeEntry cache with TTL/size-based eviction
-  server/     HTTP server (/metrics, /health, /ready), transformer, formatter
+  metrics/    metric transformation and Prometheus text rendering
+  server/     HTTP server (/metrics, /health, /ready)
 helm/         Helm chart for Kubernetes deployment
 ```
 
@@ -135,7 +136,7 @@ helm/         Helm chart for Kubernetes deployment
 ### Binary
 
 ```bash
-go build ./cmd/ironic-hardware-exporter/
+go build ./cmd/
 ```
 
 ### Run tests
@@ -285,6 +286,8 @@ The most important keys are:
 - `rabbitmq.tls.caSecretName`
 - `rabbitmq.tls.caSecretKey`
 - `rabbitmq.tls.serverName`
+- `server.nodeTTLHours`
+- `server.cacheMaxNodes`
 - `service.port`
 - `serviceMonitor.enabled`
 
@@ -342,6 +345,10 @@ rabbitmq:
     caSecretName: ironic-hardware-exporter-rabbitmq-ca
     caSecretKey: ca.crt
     serverName: rabbitmq.openstack.svc.cluster.local
+
+server:
+  nodeTTLHours: 1
+  cacheMaxNodes: 100000
 
 serviceMonitor:
   enabled: true

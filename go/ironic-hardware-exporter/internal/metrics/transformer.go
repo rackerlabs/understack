@@ -1,4 +1,4 @@
-package server
+package metrics
 
 import (
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/cache"

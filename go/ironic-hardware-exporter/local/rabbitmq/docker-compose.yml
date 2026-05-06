@@ -1,0 +1,20 @@
+services:
+  rabbitmq-tls:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ironic
+      RABBITMQ_DEFAULT_PASS: ironic-secret
+      RABBITMQ_DEFAULT_VHOST: ironic
+    ports:
+      - "5672:5672"
+      - "5671:5671"
+      - "15672:15672"
+    volumes:
+      - ./config/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./config/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./certs:/etc/rabbitmq/tls:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20

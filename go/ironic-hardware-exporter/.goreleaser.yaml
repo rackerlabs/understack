@@ -14,7 +14,7 @@ release:
 
 builds:
   - main: main.go
-    dir: ./cmd/ironic-hardware-exporter
+    dir: ./cmd
     binary: ironic-hardware-exporter
     goos: ["linux"]
     goarch: ["amd64", "arm64"]
