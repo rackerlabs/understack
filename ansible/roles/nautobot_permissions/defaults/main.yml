@@ -16,8 +16,6 @@ nautobot_permissions_groups:
     - ucadmin
   storage-admin:
     - ucadmin
-  storage-graphql-read:
-    - ucadmin
 
 # definition of a permission and the various settings on that permission
 nautobot_permissions_permissions:
@@ -48,6 +46,7 @@ nautobot_permissions_permissions:
       - extras.customfield
       - extras.dynamicgroup
       - extras.gitrepository
+      - extras.graphqlquery
       - extras.job
       - extras.jobresult
       - extras.note
@@ -120,14 +119,6 @@ nautobot_permissions_permissions:
       - nautobot_golden_config.goldenconfigsetting
       - virtualization.virtualmachine
       - virtualization.vminterface
-  storage-graphql-read:
-    description: Read access for graphql queries
-    enabled: true
-    actions:
-      - view
-    object_types:
-      - extras.graphqlquery
-      - extras.joblogentry
   sys-admin:
     description: System administration read access for git repositories and secrets
     enabled: true
@@ -136,6 +127,7 @@ nautobot_permissions_permissions:
     object_types:
       # Git repository management - view source control integrations
       - extras.gitrepository
+      - extras.joblogentry
       # Secrets management - view system secrets and credentials
       - extras.secret
       - extras.secretsgroup
