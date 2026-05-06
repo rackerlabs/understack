@@ -1,0 +1,4 @@
+{
+  "oslo.version": "2.0",
+  "oslo.message": "{\"message_id\": \"6af3a53b-0723-42a5-9de9-77af3198e72a\", \"publisher_id\": \"ironic-conductor.1327175-hp3\", \"event_type\": \"baremetal.node.power_set.end\", \"priority\": \"INFO\", \"payload\": {\"ironic_object.name\": \"NodeSetPowerStatePayload\", \"ironic_object.namespace\": \"ironic\", \"ironic_object.version\": \"1.17\", \"ironic_object.data\": {\"uuid\": \"a8a8548c-fc07-4d9c-a5f2-5f2c6fe7992c\", \"name\": \"Dell-24GSW04\", \"power_state\": \"power off\", \"maintenance\": false, \"maintenance_reason\": null, \"fault\": null, \"provision_state\": \"deleting\", \"target_provision_state\": \"available\", \"last_error\": null, \"driver\": \"idrac\"}}, \"timestamp\": \"2026-04-19 00:42:40.397328\"}"
+}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ironic-hardware-exporter
+description: Prometheus exporter for Ironic bare-metal hardware metrics via RabbitMQ
+type: application
+version: 0.1.0
+appVersion: 0.1.0

@@ -1,0 +1,22 @@
+# compiled binary
+/ironic-hardware-exporter
+
+# test and coverage output
+*.test
+*.out
+cover.out
+
+# build artifacts
+bin/
+dist/
+
+# Go workspace
+go.work
+vendor/
+
+# editor and IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

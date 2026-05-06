@@ -4,74 +4,115 @@ import (
 	"sync"
 	"time"
 
+	"github.com/maypok86/otter"
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/parser"
 )
 
-// holds everything we know about one server
+// NodeEntry holds everything we know about one physical server.
+// Sensor data (temp, power, drive) comes from hardware.idrac.metrics events.
+// Node state (power_state, provision_state, maintenance, fault) comes from baremetal.node.* notifications.
+// Both are stored together, keyed by node_uuid.
 type NodeEntry struct {
 	NodeUUID string
 	NodeName string
 	LastSeen time.Time
 	Sensors  parser.SensorPayload
+
+	// node state — updated from versioned notifications (baremetal.node.*)
+	// HasStateData is true once any state event has been received for this node.
+	HasStateData   bool
+	ConductorHost  string
+	PowerState     *string
+	ProvisionState *string
+	Maintenance    bool
+	Fault          *string
 }
 
-// Store is the in-memory cache, a map protected by a read-write lock
-// mu lock , coz 2 goroutines access this map at same time
-// rabbitmq writes, http reads
+// Store is the in-memory node cache backed by otter.
+// mu serialises write sequences (get → copy → modify → set) so two
+// concurrent writers cannot overwrite each other's changes.
+// GetAll is lock-free: otter's Range sees immutable pointers because
+// writers always store a fresh copy, never mutate an entry in place.
 type Store struct {
-	mu    sync.RWMutex
-	nodes map[string]*NodeEntry // key = node_uuid value = NodeEntry
+	mu      sync.Mutex
+	cache   otter.CacheWithVariableTTL[string, *NodeEntry]
+	nodeTTL time.Duration
 }
 
-/* "b6b6dcec-7d48-48c4-89ff-da04b8af40b7" → NodeEntry{
-NodeUUID: "b6b6dcec-7d48-48c4-89ff-da04b8af40b7"
-                                                NodeName: "Dell-93GSW04"
-                                                LastSeen: 2026-04-13 15:10:42
-                                                Sensors: {
-                                                    Temperature: {
-                                                        "1@System.Embedded.1": {reading: 26°C}
-                                                    }
-                                                    Power: {
-                                                        "0:Power@System.Embedded.1": {watts: 9}
-                                                        "1:Power@System.Embedded.1": {watts: 0}
-                                                    }
-                                                    Drive: {
-                                                        "Solid State Disk 0:1:0:...": {state: Enabled}
-                                                        "Solid State Disk 0:1:1:...": {state: Enabled}
-                                                    }
-                                                }
-                                            }*/
-
-// new msg for Dell-93GSW04 would overwrite this entry
-
-// New creates an empty Store
-func New() *Store {
-	return &Store{
-		nodes: make(map[string]*NodeEntry),
+// New creates a Store with the given per-node TTL.
+// A node that stops sending events will be evicted after nodeTTL elapses.
+func New(nodeTTL time.Duration, maxNodes int) (*Store, error) {
+	c, err := otter.MustBuilder[string, *NodeEntry](maxNodes).
+		WithVariableTTL().
+		Build()
+	if err != nil {
+		return nil, err
 	}
+	return &Store{cache: c, nodeTTL: nodeTTL}, nil
 }
 
-// Update saves the latest data for a node — called by RabbitMQ goroutine
+// Update saves the latest sensor data for a node, called by the sensor consumer goroutine.
+// Preserves existing state fields so sensor floods do not overwrite state from versioned notifications.
 func (s *Store) Update(msg *parser.HardwareMessage) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.nodes[msg.NodeUUID] = &NodeEntry{
-		NodeUUID: msg.NodeUUID,
-		NodeName: msg.NodeName,
-		LastSeen: msg.EventTimestamp,
-		Sensors:  msg.Sensors,
+	var entry NodeEntry
+	if existing, ok := s.cache.Get(msg.NodeUUID); ok {
+		entry = *existing // copy — never mutate the value otter holds
+	} else {
+		entry = NodeEntry{NodeUUID: msg.NodeUUID}
 	}
+
+	entry.NodeName = msg.NodeName
+	entry.LastSeen = msg.EventTimestamp
+	entry.Sensors = msg.Sensors
+	s.cache.Set(msg.NodeUUID, &entry, s.nodeTTL)
 }
 
-// GetAll returns a copy of all nodes — called by HTTP server when Prometheus scrapes
-func (s *Store) GetAll() map[string]*NodeEntry {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+// UpdateNodeState saves the latest power/provision/maintenance/fault state for a node.
+// Only overwrites PowerState and ProvisionState when the incoming value is non-nil,
+// so a maintenance event that omits those fields cannot clear what was already cached.
+func (s *Store) UpdateNodeState(msg *parser.NodeStateMessage) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	snapshot := make(map[string]*NodeEntry, len(s.nodes))
-	for k, v := range s.nodes {
-		snapshot[k] = v
+	var entry NodeEntry
+	if existing, ok := s.cache.Get(msg.NodeUUID); ok {
+		entry = *existing
+	} else {
+		entry = NodeEntry{NodeUUID: msg.NodeUUID, NodeName: msg.NodeName}
 	}
+
+	entry.HasStateData = true
+	entry.ConductorHost = msg.ConductorHost
+	// Only overwrite each field when the incoming value is non-nil.
+	// Events that omit a field produce nil for pointer types (*string, *bool),
+	// so nil means "absent from this event" — not a valid new value.
+	if msg.PowerState != nil {
+		entry.PowerState = msg.PowerState
+	}
+	if msg.ProvisionState != nil {
+		entry.ProvisionState = msg.ProvisionState
+	}
+	if msg.Maintenance != nil {
+		entry.Maintenance = *msg.Maintenance
+	}
+	if msg.Fault != nil {
+		entry.Fault = msg.Fault
+	}
+	s.cache.Set(msg.NodeUUID, &entry, s.nodeTTL)
+}
+
+// GetAll returns a snapshot of all nodes for the HTTP handler.
+// Lock-free: otter's Range is internally thread-safe and entries stored
+// in the cache are never modified after being written.
+func (s *Store) GetAll() map[string]*NodeEntry {
+	snapshot := make(map[string]*NodeEntry)
+	s.cache.Range(func(key string, value *NodeEntry) bool {
+		e := *value // struct copy so the caller cannot race with future writes
+		snapshot[key] = &e
+		return true
+	})
 	return snapshot
 }
