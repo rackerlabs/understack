@@ -280,7 +280,7 @@ def ironic_client(mocker) -> IronicClient:
 @pytest.fixture
 def understack_driver(oslo_config, ironic_client) -> UnderstackDriver:
     driver = UnderstackDriver()
-    driver.undersync = Undersync("auth_token", "api_url")
+    driver.undersync = Undersync("auth_token", "api_url", use_keystone_auth=False)
     driver.ironic_client = ironic_client
     return driver
 
