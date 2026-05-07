@@ -23,7 +23,7 @@ spec:
       - $understack/components/dex/values.yaml
       - $deploy/{{ include "understack.deploy_path" $ }}/dex/values.yaml
     repoURL: https://charts.dexidp.io
-    targetRevision: 0.16.0
+    targetRevision: 0.24.0
   - path: components/dex
     ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
