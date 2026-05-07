@@ -345,17 +345,19 @@ The enrollment flow is implemented in
 
 Operator-level flow:
 
-```text
-BMC discovery
-Ironic node create/update
-out-of-band inspection
-agent inspection
-BIOS/PXE setup
-optional RAID
-optional firmware update runbooks
-provide
-available
-```
+```mermaid
+flowchart TD
+    A[BMC discovery]
+    B[Ironic node create/update]
+    C[out-of-band inspection]
+    D[agent inspection]
+    E[BIOS/PXE setup]
+    F[optional RAID]
+    G[optional firmware update runbooks]
+    H[provide]
+    I[available]
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I
 
 The final state transition in code is:
 
