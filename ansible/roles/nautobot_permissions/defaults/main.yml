@@ -106,6 +106,7 @@ nautobot_permissions_permissions:
     actions:
       - run
       - change
+      - view
     object_types:
       - extras.job
       - extras.jobqueue
