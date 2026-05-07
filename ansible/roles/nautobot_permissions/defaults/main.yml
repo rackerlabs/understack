@@ -14,6 +14,8 @@ nautobot_permissions_groups:
     - ucadmin
   sys-admin:
     - ucadmin
+  storage-admin:
+    - ucadmin
 
 # definition of a permission and the various settings on that permission
 nautobot_permissions_permissions:
@@ -44,6 +46,7 @@ nautobot_permissions_permissions:
       - extras.customfield
       - extras.dynamicgroup
       - extras.gitrepository
+      - extras.graphqlquery
       - extras.job
       - extras.jobresult
       - extras.note
@@ -102,8 +105,20 @@ nautobot_permissions_permissions:
     enabled: true
     actions:
       - run
+      - change
     object_types:
       - extras.job
+      - extras.jobqueue
+  storage-admin:
+    description: System admin read/change access for storage items
+    enabled: true
+    actions:
+      - view
+      - change
+    object_types:
+      - nautobot_golden_config.goldenconfigsetting
+      - virtualization.virtualmachine
+      - virtualization.vminterface
   sys-admin:
     description: System administration read access for git repositories and secrets
     enabled: true
@@ -112,6 +127,7 @@ nautobot_permissions_permissions:
     object_types:
       # Git repository management - view source control integrations
       - extras.gitrepository
+      - extras.joblogentry
       # Secrets management - view system secrets and credentials
       - extras.secret
       - extras.secretsgroup
