@@ -23,7 +23,7 @@
     enabled: "{{ item.value.enabled }}"
     actions: "{{ item.value.actions }}"
     object_types: "{{ item.value.object_types }}"
-    groups: "{{ nautobot_permissions_groups[item.key] | default(list) }}"
+    groups: "{{ nautobot_permissions_groups[item.key] | default([]) }}"
     constraints: "{{ item.value.constraints | default('') }}"
     state: present
   loop: "{{ nautobot_permissions_permissions | dict2items }}"
