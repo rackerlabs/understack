@@ -3,7 +3,8 @@
 #
 
 image:
-  tag: v2.44.0
+  # renovate: datasource=docker depName=ghcr.io/dexidp/dex versioning=docker
+  tag: v2.45.1
 
 replicaCount: 1
 config:
