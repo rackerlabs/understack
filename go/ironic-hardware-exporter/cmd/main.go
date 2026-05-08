@@ -10,6 +10,13 @@ import (
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/server"
 )
 
+func derefStr(s *string) string {
+	if s == nil {
+		return "<nil>"
+	}
+	return *s
+}
+
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
@@ -63,8 +70,8 @@ func main() {
 				return
 			}
 			store.UpdateNodeState(stateMsg)
-			log.Printf("cached state node=%s power=%v provision=%v",
-				stateMsg.NodeName, stateMsg.PowerState, stateMsg.ProvisionState)
+			log.Printf("cached state node=%s power=%s provision=%s",
+				stateMsg.NodeName, derefStr(stateMsg.PowerState), derefStr(stateMsg.ProvisionState))
 		}); err != nil {
 			log.Fatalf("states consumer stopped: %v", err)
 		}

@@ -1,0 +1,44 @@
+{{- if eq (include "understack.isEnabled" (list $.Values.site "ironic_hardware_exporter")) "true" }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" $.Release.Name "ironic-hardware-exporter" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
+spec:
+  destination:
+    namespace: openstack
+    server: {{ $.Values.cluster_server }}
+  project: understack
+  sources:
+    - ref: understack
+      path: 'go/ironic-hardware-exporter/helm'
+      repoURL: {{ include "understack.understack_url" $ }}
+      targetRevision: {{ include "understack.understack_ref" $ }}
+      helm:
+        releaseName: ironic-hardware-exporter
+        valueFiles:
+          - $understack/go/ironic-hardware-exporter/helm/values.yaml
+          - $deploy/{{ include "understack.deploy_path" $ }}/ironic-hardware-exporter/values.yaml
+        ignoreMissingValueFiles: true
+    - ref: deploy
+      repoURL: {{ include "understack.deploy_url" $ }}
+      targetRevision: {{ include "understack.deploy_ref" $ }}
+      path: {{ include "understack.deploy_path" $ }}/ironic-hardware-exporter
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      annotations:
+        argocd.argoproj.io/sync-options: Delete=false
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+{{- end }}

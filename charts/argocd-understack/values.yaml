@@ -574,6 +574,12 @@ site:
     # @default -- $understack/components/nautobot/nautobot_config.py
     nautobot_config: '$understack/components/nautobot/nautobot_config.py'
 
+  # -- Ironic hardware exporter for bare-metal hardware metrics via RabbitMQ
+  ironic_hardware_exporter:
+    # -- Enable/disable deploying ironic-hardware-exporter
+    # @default -- false
+    enabled: false
+
   # -- SNMP exporter for network device monitoring
   snmp_exporter:
     # -- Enable/disable deploying SNMP exporter
