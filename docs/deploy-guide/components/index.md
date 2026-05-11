@@ -114,6 +114,7 @@ enablement defaults, validation, and troubleshooting notes.
 | [glance](./glance.md) | site |
 | [cinder](./cinder.md) | site |
 | [ironic](./ironic.md) | site |
+| [ironic-hardware-exporter](./ironic-hardware-exporter.md) | site |
 | [neutron](./neutron.md) | site |
 | [placement](./placement.md) | site |
 | [nova](./nova.md) | site |

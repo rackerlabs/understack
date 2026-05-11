@@ -183,6 +183,7 @@ nav:
       - deploy-guide/components/horizon.md
       - deploy-guide/components/ingress-nginx.md
       - deploy-guide/components/ironic.md
+      - deploy-guide/components/ironic-hardware-exporter.md
       - deploy-guide/components/karma.md
       - deploy-guide/components/keystone.md
       - deploy-guide/components/mariadb-operator.md
