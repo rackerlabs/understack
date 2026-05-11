@@ -192,6 +192,11 @@ PLUGINS_CONFIG = {
                 },
             },
         },
+        "network_driver_mappings": {
+            "napalm": {
+                "cisco_nxos": "nxos_ssh",
+            },
+        },
     },
     "nautobot_golden_config": {
         "per_feature_bar_width": 0.15,
