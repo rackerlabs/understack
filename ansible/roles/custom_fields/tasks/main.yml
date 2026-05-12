@@ -69,3 +69,18 @@
     weight: 100
     content_types: dcim.device
     filter_logic: exact
+
+- name: Create Custom Field Interface Extras
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: Field to account for j2 items not indexed in NB by default
+    label: interface details
+    key: interface_config_items
+    type: json
+    required: false
+    weight: 100
+    content_types:
+      - dcim.interface
+    filter_logic: exact
