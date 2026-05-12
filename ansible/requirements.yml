@@ -2,6 +2,9 @@ collections:
   - name: community.general
     version: "==12.2.0"
   - name: openstack.cloud
-    version: "==2.5.0"
+    # releases are not happening at a cadence we need for fixes so install from source
+    source: https://opendev.org/openstack/ansible-collections-openstack.git
+    type: git
+    version: "2.5.0-36-gbcac650"
   - name: networktocode.nautobot
     version: "==6.1.1"
