@@ -1,0 +1,129 @@
+---
+# nautobot constance Configuration job
+# -----------------
+# Built to enforce proper mapping for cisco_nxos to use netmiko
+# resolves issues where workers using napalm were falling
+# back to nxapi
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nautobot-constance-config
+  namespace: nautobot
+  labels:
+    app.kubernetes.io/name: nautobot
+    app.kubernetes.io/component: constance-config
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      restartPolicy: OnFailure
+      serviceAccountName: nautobot
+      imagePullSecrets:
+        - name: dockerconfigjson-github-com
+      containers:
+      - name: configure-constance
+        image: ghcr.io/rss-engineering/nautobot-rackspace:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          readOnlyRootFilesystem: false
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+        envFrom:
+          - secretRef:
+              name: nautobot-django
+          - secretRef:
+              name: nautobot-redis
+          - configMapRef:
+              name: cluster-data
+          - configMapRef:
+              name: nautobot-env
+
+        env:
+          - name: NAUTOBOT_CONFIG
+            value: /opt/nautobot/nautobot_config.py
+          # Database password from CNPG secret
+          - name: NAUTOBOT_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: nautobot-cluster-app
+                key: password
+          # Database SSL settings (from environment-specific values)
+          - name: NAUTOBOT_DB_SSLMODE
+            value: verify-ca
+          - name: NAUTOBOT_DB_SSLNEGOTIATION
+            value: direct
+
+        volumeMounts:
+          - mountPath: /opt/nautobot/nautobot_config.py
+            name: nautobot-config
+            subPath: nautobot_config.py
+          - mountPath: /etc/nautobot/mtls
+            name: mtls-certs
+            readOnly: true
+
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+
+          echo "Waiting for Nautobot to be ready..."
+          # Wait for Nautobot to be fully initialized
+          timeout 300 bash -c 'until nautobot-server health_check 2>/dev/null; do sleep 5; done'
+
+          echo "Configuring Golden Config Constance settings..."
+
+          # Use nautobot-server shell to access Django/Nautobot environment
+          nautobot-server shell <<'EOF'
+          from constance import config
+
+          config.nautobot_golden_config__DEFAULT_FRAMEWORK = {
+              "cisco_nxos": "netmiko",
+              "all": "napalm",
+          }
+
+          config.nautobot_golden_config__GET_CONFIG_FRAMEWORK = {
+              "cisco_nxos": "netmiko",
+              "all": "napalm",
+          }
+
+          print("=" * 60)
+          print("Golden Config Constance framework settings configured")
+          print("=" * 60)
+          print("DEFAULT_FRAMEWORK:", config.nautobot_golden_config__DEFAULT_FRAMEWORK)
+          print("GET_CONFIG_FRAMEWORK:", config.nautobot_golden_config__GET_CONFIG_FRAMEWORK)
+          print("=" * 60)
+          EOF
+
+          echo "Configuration complete"
+
+      volumes:
+        - name: nautobot-config
+          configMap:
+            name: nautobot-config
+        - name: mtls-certs
+          secret:
+            secretName: nautobot-mtls-client
+            defaultMode: 256
