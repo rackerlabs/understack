@@ -15,14 +15,14 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack-operators
   sources:
-  - chart: external-dns-rackspace
+  - chart: external-dns
     helm:
       ignoreMissingValueFiles: true
-      releaseName: external-dns-rackspace
+      releaseName: external-dns
       valueFiles:
       - $deploy/{{ include "understack.deploy_path" $ }}/external-dns/values.yaml
-    repoURL: ghcr.io/rackerlabs/charts
-    targetRevision: 0.2.2
+    repoURL: https://kubernetes-sigs.github.io/external-dns
+    targetRevision: 1.21.1
   - path: {{ include "understack.deploy_path" $ }}/external-dns
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
