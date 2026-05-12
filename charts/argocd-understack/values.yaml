@@ -169,6 +169,12 @@ global:
     # @default -- 0.0.3
     chartVersion: 0.0.3
 
+  # -- OIDC RBAC (ClusterRoleBindings for OIDC service account issuer discovery)
+  oidc_rbac:
+    # -- Enable/disable deploying OIDC RBAC
+    # @default -- false
+    enabled: false
+
   # -- OpenEBS
   openebs:
     # -- Enable/disable deploying OpenEBS
@@ -505,6 +511,12 @@ site:
   # -- Monitoring via kube-prometheus-stack
   monitoring:
     # -- Enable/disable deploying kube-prometheus-stack
+    # @default -- false
+    enabled: false
+
+  # -- OIDC RBAC (ClusterRoleBindings for OIDC service account issuer discovery)
+  oidc_rbac:
+    # -- Enable/disable deploying OIDC RBAC
     # @default -- false
     enabled: false
 
