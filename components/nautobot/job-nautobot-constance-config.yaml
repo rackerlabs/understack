@@ -42,13 +42,16 @@ spec:
             drop:
               - ALL
           readOnlyRootFilesystem: false
+        # Resource limits for ephemeral job
+        # Higher limits since nautobot-server shell loads all models (memory intensive)
+        # Single-threaded execution, so 1 CPU is sufficient
         resources:
           requests:
             cpu: "100m"
             memory: "256Mi"
           limits:
-            cpu: "500m"
-            memory: "512Mi"
+            cpu: "1000m"
+            memory: "2Gi"
 
         envFrom:
           - secretRef:
