@@ -5,12 +5,15 @@ FROM quay.io/airshipit/octavia:${OPENSTACK_VERSION}-ubuntu_noble AS build
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+COPY python/keystoneauth-kubeservicetoken /src/keystoneauth-kubeservicetoken
+
 ARG OPENSTACK_VERSION="required_argument"
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
       --constraint https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} \
         ovn-octavia-provider \
-        ovsdbapp
+        ovsdbapp \
+        /src/keystoneauth-kubeservicetoken
 
 ARG OPENSTACK_VERSION="required_argument"
 FROM quay.io/airshipit/octavia:${OPENSTACK_VERSION}-ubuntu_noble AS final

@@ -12,12 +12,14 @@ RUN apt-get update && \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY python/cinder-understack /src/cinder-understack
+COPY python/keystoneauth-kubeservicetoken /src/keystoneauth-kubeservicetoken
 
 ARG OPENSTACK_VERSION="required_argument"
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
       --constraint https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} \
-        /src/cinder-understack
+        /src/cinder-understack \
+        /src/keystoneauth-kubeservicetoken
 
 COPY containers/cinder/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
