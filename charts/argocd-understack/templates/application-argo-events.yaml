@@ -22,6 +22,18 @@ spec:
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
+    kustomize:
+      patches:
+        - patch: |
+            - op: add
+              path: /data/UNDERSTACK_PARTITION
+              value: "{{ index $.Values.appLabels "understack.rackspace.com/partition" | default "" }}"
+            - op: add
+              path: /data/UNDERSTACK_SITE
+              value: "{{ index $.Values.appLabels "understack.rackspace.com/site" | default "" }}"
+          target:
+            kind: ConfigMap
+            name: cluster-metadata
   syncPolicy:
     automated:
       prune: true
