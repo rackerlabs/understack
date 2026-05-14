@@ -51,7 +51,7 @@ data:
 {{- range $serviceName, $users := .Values.keystoneServiceUsers.services }}
 {{- range $_, $user := $users }}
 
-{{- if eq $user "keystone" }}
+{{- if eq $serviceName "keystone" }}
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
