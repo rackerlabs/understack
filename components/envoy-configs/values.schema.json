@@ -222,6 +222,41 @@
                   "Selector"
                 ],
                 "description": "Specifies where traffic can originate from"
+              },
+              "clientTrafficPolicy": {
+                "type": "object",
+                "description": "Optional Envoy ClientTrafficPolicy attached to this TLS listener.",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Override name for the generated ClientTrafficPolicy."
+                  },
+                  "namespace": {
+                    "type": "string",
+                    "description": "Override namespace for the generated ClientTrafficPolicy. Defaults to external gateway namespace."
+                  },
+                  "tcpKeepalive": {
+                    "type": "object",
+                    "description": "TCP keepalive settings for downstream client connections.",
+                    "properties": {
+                      "idleTime": {
+                        "type": "string",
+                        "description": "Maximum idle time before the first keepalive probe (for example, 120s)."
+                      },
+                      "interval": {
+                        "type": "string",
+                        "description": "Time between keepalive probes when no ACK is received (for example, 30s)."
+                      },
+                      "probes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Number of unacknowledged probes before declaring the connection dead."
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "required": [
