@@ -135,15 +135,15 @@ pod:
   mounts:
     keystone_api:
       init_container:
-        - name: custom-config-generator
-          image: ghcr.io/rackerlabs/understack/keystone:2025.2
-          command: ["python3", "/scripts/generate_configs.py"]
-          volumeMounts:
-            - name: oidc-gen-providers
-              mountPath: /scripts
-              readOnly: true
-            - name: oidc-gen-output
-              mountPath: /srv/generated
+        - name: oidc-gen-providers
+          mountPath: /scripts
+          readOnly: true
+        - name: oidc-gen-output
+          mountPath: /srv/generated
+        # - name: custom-config-generator
+        #   image: ghcr.io/rackerlabs/understack/keystone:2025.2
+        #   command: ["python3", "/scripts/generate_configs.py"]
+        #   volumeMounts:
       keystone_api:
         volumeMounts:
           - name: keystone-sso
