@@ -36,3 +36,6 @@ docs/workflows/
 .codex_write_check
 .tool-versions
 .codex
+
+# miscellaneous
+.local/
