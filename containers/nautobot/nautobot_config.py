@@ -183,11 +183,6 @@ PLUGINS_CONFIG = {
         "use_config_context": {
             "connection_options": True,
         },
-        "connection_options": {s": {
-            "netutils_parser": {
-                "cisco_nxos": "cisco_nxos",
-            },
-        },
         "connection_options": {
             "napalm": {
                 "extras": {
@@ -195,6 +190,11 @@ PLUGINS_CONFIG = {
                         "port": 41268,
                     },
                 },
+            },
+        },
+        "network_driver_mappings": {
+            "napalm": {
+                "cisco_nxos": "nxos_ssh",
             },
         },
     },
