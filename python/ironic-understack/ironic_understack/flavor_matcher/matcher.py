@@ -1,6 +1,6 @@
-from flavor_matcher.device_type import DeviceType
-from flavor_matcher.device_type import ResourceClass
-from flavor_matcher.machine import Machine
+from ironic_understack.flavor_matcher.device_type import DeviceType
+from ironic_understack.flavor_matcher.device_type import ResourceClass
+from ironic_understack.flavor_matcher.machine import Machine
 
 
 class Matcher:

@@ -1,4 +1,4 @@
-from flavor_matcher.machine import Machine
+from ironic_understack.flavor_matcher.machine import Machine
 
 
 def test_memory_gb_property():

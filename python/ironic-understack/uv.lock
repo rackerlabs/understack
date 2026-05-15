@@ -447,7 +447,6 @@ source = { editable = "." }
 dependencies = [
     { name = "ironic" },
     { name = "pyyaml" },
-    { name = "understack-flavor-matcher" },
 ]
 
 [package.dev-dependencies]
@@ -462,7 +461,6 @@ test = [
 requires-dist = [
     { name = "ironic", specifier = ">=32.0,<36" },
     { name = "pyyaml", specifier = "~=6.0" },
-    { name = "understack-flavor-matcher", directory = "../understack-flavor-matcher" },
 ]
 
 [package.metadata.requires-dev]
@@ -1630,24 +1628,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/95/32/1a225d6164441be760d75c2c42e2780dc0873fe382da3e98a2e1e48361e5/tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9", size = 196380, upload-time = "2025-03-23T13:54:43.652Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/23/c7abc0ca0a1526a0774eca151daeb8de62ec457e77262b66b359c3c7679e/tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8", size = 347839, upload-time = "2025-03-23T13:54:41.845Z" },
-]
-
-[[package]]
-name = "understack-flavor-matcher"
-version = "0.0.0"
-source = { directory = "../understack-flavor-matcher" }
-dependencies = [
-    { name = "pyyaml" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "pyyaml", specifier = "~=6.0" }]
-
-[package.metadata.requires-dev]
-test = [
-    { name = "pytest", specifier = ">=9.0.1,<10" },
-    { name = "pytest-cov", specifier = ">=7,<8" },
-    { name = "pytest-github-actions-annotate-failures" },
 ]
 
 [[package]]

@@ -1,6 +1,6 @@
 import pytest
 
-from flavor_matcher.device_type import DeviceType
+from ironic_understack.flavor_matcher.device_type import DeviceType
 
 
 @pytest.fixture

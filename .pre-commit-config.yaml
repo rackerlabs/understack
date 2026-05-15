@@ -76,9 +76,6 @@ repos:
         name: neutron-understack
         args: ["-D", "python/neutron-understack"]
       - id: uv-lock
-        name: understack-flavor-matcher
-        args: ["-D", "python/understack-flavor-matcher"]
-      - id: uv-lock
         name: understack-workflows
         args: ["-D", "python/understack-workflows"]
   - repo: https://github.com/renovatebot/pre-commit-hooks
@@ -92,9 +89,6 @@ repos:
       files: '^python/understack-workflows/'
       args: ["--threads", "python/understack-workflows"]
       additional_dependencies:
-        # python-pyright stupidly does not allow local paths
-        # https://github.com/pre-commit/pre-commit/issues/1752#issuecomment-754252663
-        - "git+https://github.com/rackerlabs/understack.git@main#subdirectory=python/understack-flavor-matcher"
         - "kubernetes"
         - "pydantic"
         - "pynautobot"
