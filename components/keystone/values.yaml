@@ -134,16 +134,6 @@ pod:
             timeoutSeconds: 15
   mounts:
     keystone_api:
-      init_container:
-        - name: oidc-gen-providers
-          mountPath: /scripts
-          readOnly: true
-        - name: oidc-gen-output
-          mountPath: /srv/generated
-        # - name: custom-config-generator
-        #   image: ghcr.io/rackerlabs/understack/keystone:2025.2
-        #   command: ["python3", "/scripts/generate_configs.py"]
-        #   volumeMounts:
       keystone_api:
         volumeMounts:
           - name: keystone-sso
@@ -152,11 +142,8 @@ pod:
           - name: oidc-secret
             mountPath: /etc/oidc-secret
             readOnly: true
-          - name: oidc-gen-providers
-            mountPath: /scripts
+          - name: oidc-metadata
             readOnly: true
-          - name: oidc-gen-output
-            mountPath: /etc/mod_auth_openidc/metadata
         volumes:
           - name: keystone-sso
             secret:
@@ -164,12 +151,10 @@ pod:
           - name: oidc-secret
             secret:
               secretName: sso-passphrase
-          - name: oidc-gen-output
+          - name: oidc-metadata
             configMap:
-              name: keystone-gen-oidc-metadata
+              name: keystone-oidc-metadata
               defaultMode: 0555
-          - name: oidc-gen-providers
-            emptyDir: {}
     keystone_bootstrap:
       keystone_bootstrap:
         volumeMounts:
@@ -423,53 +408,12 @@ annotations:
       # relies on services to be up so it can remain post
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
+
 extraObjects:
   - apiVersion: v1
     kind: ConfigMap
     metadata:
-      name: keystone-gen-oidc-metadata
+      name: keystone-oidc-metadata
       namespace: openstack
     data:
-      generate_configs.py: |
-       #!/usr/bin/env python3
-
-        import json
-        import ssl
-        import urllib.parse
-        import urllib.request
-        from pathlib import Path
-
-        METADATA_DIR = Path("/srv/generated")
-        CLIENT_ID = "https://kubernetes.default.svc.cluster.local"
-
-        CLUSTERS = {
-            "rax-dev-iad3-dev": "https://uc-iad.dev.undercloud.rackspace.net:6443",
-            "rax-dev-global":   "https://uc-dev-global.k8s-api.pvceng.rax.io:443",
-        }
-
-        METADATA_DIR.mkdir(parents=True, exist_ok=True)
-
-        # Skip TLS verification — replace with a real SSLContext if you have the CA bundles
-        ctx = ssl._create_unverified_context()
-
-        for site, issuer in CLUSTERS.items():
-            encoded = urllib.parse.quote(issuer, safe="")
-            base = METADATA_DIR / encoded
-
-            print(f"Generating metadata for {site} ({issuer})")
-
-            discovery_url = f"{issuer}/.well-known/openid-configuration"
-            with urllib.request.urlopen(discovery_url, context=ctx) as resp:
-                provider_metadata = json.load(resp)
-
-            (base.with_suffix(".provider")).write_text(json.dumps(provider_metadata, indent=2))
-
-            (base.with_suffix(".client")).write_text(json.dumps({
-                "client_id":     CLIENT_ID,
-                "client_secret": "not-used",
-            }, indent=2))
-
-            (base.with_suffix(".conf")).write_text(json.dumps({
-                "response_type": "id_token",
-                "scope":         "openid",
-            }, indent=2))
+      # Define your OIDC providers metadata in deploy repo
