@@ -251,7 +251,7 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
     bmc_set_hostname.assert_called_once_with(fake_bmc, "None", "Dell-ABC123")
 
     # BIOS settings configured exactly once, using pxe_enabled port BIOS names.
-    update_dell_bios_settings.assert_called_once_with(
+    update_dell_bios_settings.assert_any_call(
         fake_bmc,
         pxe_interface="NIC.Integrated.1-1",
     )

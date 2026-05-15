@@ -112,8 +112,9 @@ def enroll(
     # port data is set up in a manner that suits the Neutron algorithm.  If a
     # normal PXE/HTTP port is available then we use it instead:
 
-    virtual_media = not bool(ironic_node.pxe_enabled_bios_name(node))
-    agent_inspection(node, virtual_media=virtual_media)
+    pxe_interface = ironic_node.pxe_enabled_bios_name(node)
+    update_dell_bios_settings(bmc, pxe_interface=pxe_interface)
+    agent_inspection(node, virtual_media=not pxe_interface)
 
     pxe_interface = ironic_node.pxe_enabled_bios_name(node)
     if not pxe_interface:
