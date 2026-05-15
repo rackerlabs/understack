@@ -45,4 +45,4 @@ docs: $(ACTIVATE) wftmpls component-docs-check ## Builds the documentation
 
 .PHONY: docs-local
 docs-local: $(ACTIVATE) wftmpls component-docs-check ## Build and locally host the documentation
-	$(MKDOCS) serve --strict
+	$(MKDOCS) serve --strict --livereload
