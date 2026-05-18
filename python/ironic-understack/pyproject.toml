@@ -13,7 +13,6 @@ license = "MIT"
 dependencies = [
     "ironic>=32.0,<36",
     "pyyaml~=6.0",
-    "understack-flavor-matcher",
 ]
 
 # REMOVE ME: delete this once we move away from patching a venv or we upgrade to a newer ironic base version
@@ -44,9 +43,6 @@ test = [
 
 [tool.uv]
 default-groups = ["test"]
-
-[tool.uv.sources]
-understack-flavor-matcher = { path = "../understack-flavor-matcher" }
 
 [tool.hatch.build.targets.sdist]
 include = ["ironic_understack"]

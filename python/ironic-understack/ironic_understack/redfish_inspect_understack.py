@@ -14,9 +14,6 @@
 import re
 from pathlib import Path
 
-from flavor_matcher.device_type import DeviceType
-from flavor_matcher.machine import Machine
-from flavor_matcher.matcher import Matcher
 from ironic.drivers.drac import IDRACHardware
 from ironic.drivers.modules.drac.inspect import DracRedfishInspect
 from ironic.drivers.modules.inspect_utils import get_inspection_data
@@ -26,6 +23,9 @@ from oslo_log import log
 from oslo_utils import units
 
 from ironic_understack.conf import CONF
+from ironic_understack.flavor_matcher.device_type import DeviceType
+from ironic_understack.flavor_matcher.machine import Machine
+from ironic_understack.flavor_matcher.matcher import Matcher
 
 LOG = log.getLogger(__name__)
 DEVICE_TYPES = DeviceType.from_directory(Path(CONF.ironic_understack.device_types_dir))

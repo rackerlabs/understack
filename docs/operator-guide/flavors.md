@@ -410,7 +410,7 @@ If nodes aren't matching the expected flavor:
 1. Check Ironic node traits: `openstack baremetal node show <node> -f json -c traits`
 2. Verify trait names have the `CUSTOM_` prefix in Ironic
 3. Confirm inspection code is properly adding traits to nodes
-4. Review flavor-matcher logs for matching errors
+4. Review Ironic conductor logs for inspection hook errors
 
 ### Schema Validation in Editor
 
@@ -503,15 +503,13 @@ name: m1.small
 resource_class: m1.small
 ```
 
-The flavor-matcher service:
+The Nova flavor sync Ansible role reads both ConfigMaps and creates a Nova flavor:
 
-1. Reads the flavor definition
-2. Queries Ironic for nodes with `resource_class=m1.small`
-3. Looks up the device-type `m1.small` resource class
-4. Creates a Nova flavor with:
-    * vcpus: 16 (from `cpu.cores`)
-    * ram: 131072 MB (from `memory.size`)
-    * disk: 480 GB (from `drives[0].size`)
+* vcpus: 16 (from `cpu.cores`)
+* ram: 131072 MB (from `memory.size`)
+* disk: 480 GB (from `drives[0].size`)
+
+Ironic inspection hooks set `resource_class=m1.small` on matching nodes at inspection time. Nova Placement then uses the resource class and traits to schedule instances to nodes via the standard Nova/Ironic scheduling path.
 
 This separation allows you to:
 

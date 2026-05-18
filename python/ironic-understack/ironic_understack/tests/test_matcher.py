@@ -1,12 +1,12 @@
 import pytest
 
-from flavor_matcher.device_type import CpuSpec
-from flavor_matcher.device_type import DeviceType
-from flavor_matcher.device_type import DriveSpec
-from flavor_matcher.device_type import MemorySpec
-from flavor_matcher.device_type import ResourceClass
-from flavor_matcher.machine import Machine
-from flavor_matcher.matcher import Matcher
+from ironic_understack.flavor_matcher.device_type import CpuSpec
+from ironic_understack.flavor_matcher.device_type import DeviceType
+from ironic_understack.flavor_matcher.device_type import DriveSpec
+from ironic_understack.flavor_matcher.device_type import MemorySpec
+from ironic_understack.flavor_matcher.device_type import ResourceClass
+from ironic_understack.flavor_matcher.machine import Machine
+from ironic_understack.flavor_matcher.matcher import Matcher
 
 
 @pytest.fixture

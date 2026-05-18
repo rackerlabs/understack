@@ -23,7 +23,6 @@ RUN git -C /src/sushy fetch --unshallow --tags && \
     sed -i '/sushy==.*/d' /upper-constraints.txt
 
 COPY python/ironic-understack /src/understack/ironic-understack
-COPY python/understack-flavor-matcher /src/understack/understack-flavor-matcher
 
 ARG OPENSTACK_VERSION="required_argument"
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -33,7 +32,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         /src/ironic \
         /src/sushy \
         /src/understack/ironic-understack \
-        /src/understack/understack-flavor-matcher \
         proliantutils==2.16.3
 
 COPY containers/ironic/patches /tmp/patches/

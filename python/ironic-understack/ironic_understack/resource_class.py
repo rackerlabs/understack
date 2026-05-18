@@ -1,14 +1,14 @@
 # from ironic.drivers.modules.inspector.hooks import base
 from pathlib import Path
 
-from flavor_matcher.device_type import DeviceType
-from flavor_matcher.machine import Machine
-from flavor_matcher.matcher import Matcher
 from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
 
 from ironic_understack.conf import CONF
+from ironic_understack.flavor_matcher.device_type import DeviceType
+from ironic_understack.flavor_matcher.machine import Machine
+from ironic_understack.flavor_matcher.matcher import Matcher
 
 LOG = logging.getLogger(__name__)
 
