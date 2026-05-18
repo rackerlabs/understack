@@ -9,7 +9,6 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # copy in the code
 COPY python/understack-workflows /tmp/understack/python/understack-workflows
-COPY python/understack-flavor-matcher /tmp/understack/python/understack-flavor-matcher
 
 # install our requirements and our packages
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -18,8 +17,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --python /opt/venv/bin/python \
     netifaces \
     psutil==6.1.1 \
-    /tmp/understack/python/understack-workflows \
-    /tmp/understack/python/understack-flavor-matcher
+    /tmp/understack/python/understack-workflows
 
 FROM python:3.12-slim AS prod
 LABEL org.opencontainers.image.description="UnderStack Workflows"
