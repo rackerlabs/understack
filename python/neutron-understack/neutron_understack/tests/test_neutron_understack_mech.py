@@ -26,11 +26,16 @@ class TestBindPort:
         mocker.patch.object(
             port_context, "allocate_dynamic_segment", return_value=vlan_network_segment
         )
+        mocker.patch.object(port_context, "continue_binding")
+        type(port_context).segments_to_bind = mocker.PropertyMock(
+            return_value=port_context.network.network_segments
+        )
 
         understack_driver.bind_port(port_context)
         understack_driver.trunk_driver = understack_trunk_driver
 
         port_context.allocate_dynamic_segment.assert_called_once()
+        port_context.continue_binding.assert_called_once()
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
     def test_with_trunk_details(
@@ -39,11 +44,16 @@ class TestBindPort:
         mocker.patch(
             "neutron_understack.utils.fetch_subport_network_id", return_value="112233"
         )
+        mocker.patch.object(port_context, "continue_binding")
+        type(port_context).segments_to_bind = mocker.PropertyMock(
+            return_value=port_context.network.network_segments
+        )
 
         understack_driver.trunk_driver = understack_trunk_driver
         mocker.patch.object(understack_driver.trunk_driver, "configure_trunk")
         understack_driver.bind_port(port_context)
         understack_driver.trunk_driver.configure_trunk.assert_called_once()
+        port_context.continue_binding.assert_called_once()
 
 
 class TestCreateNetworkPostCommit:
