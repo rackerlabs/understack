@@ -130,12 +130,12 @@ During bare metal enrollment:
 
 1. Hardware is inspected via Ironic to collect CPU, memory, drive, and network
    interface data
-2. The `understack-flavor-matcher` service compares inspection data against
-   device type resource class definitions
+2. A custom Ironic inspection hook (in `python/ironic-understack`) compares
+   inspection data against device type resource class definitions
 3. When a match is found, the resource class name is set on the Ironic node's
    `resource_class` property
-4. Nova flavors are created or updated based on the resource class, making the
-   hardware available for workload scheduling
+4. Other inspection hooks set `CUSTOM_` traits on the node based on discovered
+   hardware capabilities (NICs, GPUs, storage controllers, etc.)
 
 **Multiple Resource Classes**: Define multiple resource classes for the same
 device type when you have common build variations of the same chassis. For

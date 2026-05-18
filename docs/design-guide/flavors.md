@@ -17,10 +17,9 @@ Flavors enable operators to:
 
 ### Workflow
 
-1. **Inspection Phase**: Custom inspection code adds traits to Ironic nodes based on discovered hardware capabilities (NICs, GPUs, storage controllers, etc.)
-2. **Device-Type Matching**: Hardware inspection data is matched against device-type definitions, setting the node's `resource_class` property
-3. **Flavor Matching**: Flavor definitions match nodes by `resource_class` first, then filter by trait requirements
-4. **Nova Flavor Creation**: Matched flavors use the CPU, memory, and drive specifications from the device-type resource class to create Nova flavors
+1. **Inspection Phase**: Custom Ironic inspection hooks set the node's `resource_class` by matching discovered hardware against device-type definitions, and add `CUSTOM_` traits based on discovered capabilities (NICs, GPUs, storage controllers, etc.)
+2. **Nova Flavor Sync**: An Ansible role reads flavor and device-type definitions from ConfigMaps and creates/updates Nova flavors with the appropriate `extra_specs` for Placement-based scheduling
+3. **Scheduling**: When a user requests an instance with a flavor, Nova Placement finds matching Ironic nodes by `resource_class` and traits — this is the standard Nova/Ironic scheduling path
 
 ### Data Flow
 
@@ -345,7 +344,6 @@ Validation happens at:
 
 * **Editor time**: YAML language server validates against schema URL
 * **CLI time**: `understackctl flavor add` and `validate` commands perform full schema validation
-* **Runtime**: Flavor-matcher validates ConfigMap contents before processing
 
 ## Relationship to Device-Types
 
@@ -388,7 +386,7 @@ name: m1.small
 resource_class: m1.small  # Links to device-type resource class
 ```
 
-The flavor-matcher looks up `m1.small` in device-type definitions to find the CPU (16 cores), memory (131072 MB), and drives (480 GB) when creating the Nova flavor.
+The Nova flavor sync Ansible role looks up `m1.small` in device-type definitions to find the CPU (16 cores), memory (131072 MB), and drives (480 GB) when creating the Nova flavor.
 
 **Important**: Resource class names must be unique across all device types. Each resource class name should only be defined in one device type to avoid conflicts and ensure predictable Nova flavor creation. Validation checks enforce this constraint.
 
