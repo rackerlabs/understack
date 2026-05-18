@@ -69,7 +69,7 @@ class IronicClient:
         # is just to make the type checker happy:
         if not runbook:
             raise ironic_exceptions.NotFound
-        return runbook
+        return cast(Runbook, runbook)
 
     def get_node_inventory(self, node_ident: str) -> dict:
         """Fetch node inventory data from Ironic API.
