@@ -279,7 +279,7 @@ class UnderstackDriver(MechanismDriver):
             LOG.debug("Refusing to bind due to unsupported vnic_type: %s", vnic_type)
             return
 
-        for segment in context.network.network_segments:
+        for segment in context.segments_to_bind:
             if segment[api.NETWORK_TYPE] == p_const.TYPE_VXLAN:
                 self._bind_port_segment(context, segment)
                 return
@@ -335,12 +335,10 @@ class UnderstackDriver(MechanismDriver):
         if trunk_details:
             self.trunk_driver.configure_trunk(trunk_details, port_id)
 
-        LOG.debug("set_binding for segment: %s", segment)
-        context.set_binding(
-            segment_id=dynamic_segment[api.ID],
-            vif_type=portbindings.VIF_TYPE_OTHER,
-            vif_details={},
-            status=p_const.PORT_STATUS_ACTIVE,
+        LOG.debug("continue_binding for segment: %s", segment)
+        context.continue_binding(
+            segment_id=segment[api.ID],
+            next_segments_to_bind=[dynamic_segment],
         )
 
     def invoke_undersync(self, vlan_group_name: str):
