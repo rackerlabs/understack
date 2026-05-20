@@ -89,10 +89,13 @@ class Undersync:
         response = self.client.post(
             f"{self.api_url}/v1/vlan-group/{vlan_group}/{action}", timeout=self.timeout
         )
-        LOG.debug(
-            "undersync %(action)s resp: %(resp)s",
-            {"resp": response.json(), "action": action},
-        )
+        try:
+            LOG.debug(
+                "undersync %(action)s resp: %(resp)s",
+                {"resp": response.json(), "action": action},
+            )
+        except requests.exceptions.JSONDecodeError:
+            LOG.debug("undersync %s non-JSON resp: %s", action, response.text)
         self._log_and_raise_for_status(response)
         return response
 
