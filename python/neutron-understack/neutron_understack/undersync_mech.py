@@ -12,7 +12,7 @@ LOG = logging.getLogger(__name__)
 SUPPORTED_VNIC_TYPES = [portbindings.VNIC_BAREMETAL, portbindings.VNIC_NORMAL]
 
 
-class UnderstackUndersyncDriver(MechanismDriver):
+class UndersyncDriver(MechanismDriver):
     @property
     def connectivity(self):  # type: ignore
         return portbindings.CONNECTIVITY_L2

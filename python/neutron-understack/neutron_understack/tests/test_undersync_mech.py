@@ -5,12 +5,12 @@ from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
 
-from neutron_understack.undersync_mech import UnderstackUndersyncDriver
+from neutron_understack.undersync_mech import UndersyncDriver
 
 
 @pytest.fixture
 def driver():
-    d = UnderstackUndersyncDriver()
+    d = UndersyncDriver()
     d.initialize()
     return d
 
@@ -50,7 +50,7 @@ def vxlan_segment():
     return _make
 
 
-class TestUnderstackUndersyncDriverBindPort:
+class TestUndersyncDriverBindPort:
     def test_binds_vlan_segment(self, driver, vlan_segment):
         seg = vlan_segment()
         ctx = _make_context(segments=[seg])
