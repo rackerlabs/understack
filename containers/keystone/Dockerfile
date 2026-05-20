@@ -26,6 +26,7 @@ RUN apt-get update && \
         /tmp/liboauth2_${LIBOAUTH2_VERSION}-1.noble_amd64.deb \
         /tmp/liboauth2-apache_${LIBOAUTH2_VERSION}-1.noble_amd64.deb \
         /tmp/libapache2-mod-oauth2_${MOD_OAUTH2_VERSION}-1.noble_amd64.deb \
-    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*.deb
+    && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*.deb \
+    && ldconfig
 
 RUN a2enmod oauth2
