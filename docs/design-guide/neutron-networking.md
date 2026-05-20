@@ -10,7 +10,7 @@ To enable this we are using the following plugins/features of Neutron:
 - [OVN driver][ovn-driver] for general [OVN][ovn] support
 - [networking-baremetal][networking-baremetal] to have Neutron aware of the physical
   networks of Ironic baremetal ports.
-- our custom mechanism driver called `understack`
+- our custom mechanism drivers `understack` and `undersync` (both must be loaded)
 - [ovn-router][ovn-admin] as the L3 router plugin
 - [trunk plugin][neutron-trunk] service plugin
 - [network segment range][neutron-network-segment-range] service plugin
@@ -376,7 +376,23 @@ The names and the IDs all match, along with the VLAN ID of the segment where the
 
 ## ML2 Mechanism Operations
 
-Our ML2 mechanism is responsible for the following:
+Our ML2 mechanism is split across two drivers that must both be present in
+`mechanism_drivers`:
+
+- `understack` — the primary driver responsible for allocating dynamic VLAN
+  segments on VXLAN networks (`bind_port()`), releasing them when ports are
+  removed (`delete_port_postcommit()`), and triggering switch configuration
+  updates (`update_port_postcommit()`)
+- `undersync` — handles level-1 binding by calling `set_binding()`
+  on the VLAN segment that `understack` allocated via `continue_binding()`;
+  without it port binding fails at level 1
+
+The binding flow is: `understack` handles the VXLAN segment at level 0 and
+calls `continue_binding()` with a dynamically allocated VLAN segment, then
+`undersync` finalises the binding at level 1 by calling
+`set_binding()` on that VLAN segment.
+
+Together they are responsible for:
 
 - creating dynamic VLAN segments on VXLAN networks via port binding operations via `bind_port()`
 - deleting dynamic VLAN segments on VXLAN networks when ports are removed via `delete_port_postcommit()`
