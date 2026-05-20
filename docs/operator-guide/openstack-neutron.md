@@ -17,7 +17,7 @@ conf:
         # replacing so you'll need to pay attention
         # to any changes your environment might have
         # from the default
-        mechanism_drivers: "logger,understack,ovn"
+        mechanism_drivers: "logger,understack,undersync,ovn"
   logging:
     loggers:
       # for 'keys' we are attempt to append 'mechanism_logger'
