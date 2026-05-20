@@ -43,9 +43,10 @@ conf:
     ml2_conf:
       ml2:
         extension_drivers: 'port_security'
-        # set the default ml2 backend to our plugin, neutron_understack
-        # we'll need to use the ovn ML2 plugin to hook the routers to our network
-        mechanism_drivers: "understack,undersync,ovn"
+        # ovn is listed first so it creates virtual ports for routers before
+        # our baremetal drivers run, matching the recommended ordering from
+        # https://docs.openstack.org/networking-baremetal/latest/
+        mechanism_drivers: "ovn,understack,baremetal,undersync"
         tenant_network_types: "vxlan"
         type_drivers: "vlan,vxlan"
       ml2_type_vxlan:
