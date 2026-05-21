@@ -7,10 +7,13 @@ many of these features can be achieved.
 
 To enable this we are using the following plugins/features of Neutron:
 
-- [OVN driver][ovn-driver] for general [OVN][ovn] support
+- [OVN driver][ovn-driver] for general [OVN][ovn] support — loaded first so it
+  creates virtual ports for routers before the baremetal drivers run, as
+  recommended by [networking-baremetal][networking-baremetal]
 - [networking-baremetal][networking-baremetal] to have Neutron aware of the physical
   networks of Ironic baremetal ports.
-- our custom mechanism drivers `understack` and `undersync` (both must be loaded)
+- our custom mechanism drivers `understack` and `undersync` (both must be loaded,
+  with `baremetal` from [networking-baremetal][networking-baremetal] loaded between them)
 - [ovn-router][ovn-admin] as the L3 router plugin
 - [trunk plugin][neutron-trunk] service plugin
 - [network segment range][neutron-network-segment-range] service plugin
@@ -377,12 +380,15 @@ The names and the IDs all match, along with the VLAN ID of the segment where the
 ## ML2 Mechanism Operations
 
 Our ML2 mechanism is split across two drivers that must both be present in
-`mechanism_drivers`:
+`mechanism_drivers`, with the `baremetal` driver from
+[networking-baremetal][networking-baremetal] loaded between them:
 
 - `understack` — the primary driver responsible for allocating dynamic VLAN
   segments on VXLAN networks (`bind_port()`), releasing them when ports are
   removed (`delete_port_postcommit()`), and triggering switch configuration
   updates (`update_port_postcommit()`)
+- `baremetal` — the [networking-baremetal][networking-baremetal] driver that
+  makes Neutron aware of the physical networks of Ironic baremetal ports
 - `undersync` — handles level-1 binding by calling `set_binding()`
   on the VLAN segment that `understack` allocated via `continue_binding()`;
   without it port binding fails at level 1

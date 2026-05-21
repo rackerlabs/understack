@@ -5,19 +5,19 @@ from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
 
-from neutron_understack.undersync_mech import UnderstackUndersyncDriver
+from neutron_understack.undersync_mech import UndersyncDriver
 
 
 @pytest.fixture
 def driver():
-    d = UnderstackUndersyncDriver()
+    d = UndersyncDriver()
     d.initialize()
     return d
 
 
 def _make_context(vnic_type=portbindings.VNIC_BAREMETAL, segments=None):
     context = MagicMock()
-    context.current = {portbindings.VNIC_TYPE: vnic_type}
+    context.current = {"id": "port-1", portbindings.VNIC_TYPE: vnic_type}
     context.segments_to_bind = segments or []
     return context
 
@@ -50,7 +50,7 @@ def vxlan_segment():
     return _make
 
 
-class TestUnderstackUndersyncDriverBindPort:
+class TestUndersyncDriverBindPort:
     def test_binds_vlan_segment(self, driver, vlan_segment):
         seg = vlan_segment()
         ctx = _make_context(segments=[seg])
@@ -99,6 +99,21 @@ class TestUnderstackUndersyncDriverBindPort:
         driver.bind_port(ctx)
 
         ctx.set_binding.assert_called_once()
+
+    def test_binds_vlan_when_preceded_by_vxlan(
+        self, driver, vxlan_segment, vlan_segment
+    ):
+        vlan = vlan_segment()
+        ctx = _make_context(segments=[vxlan_segment(), vlan])
+
+        driver.bind_port(ctx)
+
+        ctx.set_binding.assert_called_once_with(
+            segment_id=vlan[api.ID],
+            vif_type=portbindings.VIF_TYPE_OTHER,
+            vif_details={},
+            status=p_const.PORT_STATUS_ACTIVE,
+        )
 
     def test_empty_segments_to_bind(self, driver):
         ctx = _make_context(segments=[])

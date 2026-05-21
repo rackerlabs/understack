@@ -16,6 +16,56 @@ class TestUpdatePortPostCommit:
 
 @pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
 class TestBindPort:
+    def test_does_not_bind_vlan_only_segments(
+        self,
+        mocker,
+        port_context,
+        understack_driver,
+        vlan_network_segment,
+    ):
+        """At level 1 understack receives only the VLAN segment and should do nothing.
+
+        undersync is responsible for that binding.
+        """
+        port_context._prepare_to_bind([vlan_network_segment])
+        mocker.patch.object(port_context, "continue_binding")
+
+        understack_driver.bind_port(port_context)
+
+        port_context.continue_binding.assert_not_called()
+
+    def test_uses_existing_vlan_segment(
+        self,
+        mocker,
+        port_context,
+        understack_driver,
+        vlan_network_segment,
+    ):
+        """When a VLAN segment already exists for the physnet, reuse it.
+
+        It should not allocate a new dynamic segment.
+        """
+        mocker.patch.object(port_context, "allocate_dynamic_segment")
+        mocker.patch.object(port_context, "continue_binding")
+        mocker.patch(
+            "neutron_understack.neutron_understack_mech.utils.vlan_segment_for_physnet",
+            return_value=vlan_network_segment,
+        )
+        port_context._prepare_to_bind(port_context.network.network_segments)
+
+        understack_driver.bind_port(port_context)
+
+        port_context.allocate_dynamic_segment.assert_not_called()
+        vxlan_segment = next(
+            s
+            for s in port_context.network.network_segments
+            if s[api.NETWORK_TYPE] == "vxlan"
+        )
+        port_context.continue_binding.assert_called_once_with(
+            segment_id=vxlan_segment[api.ID],
+            next_segments_to_bind=[vlan_network_segment],
+        )
+
     def test_with_no_trunk(
         self,
         mocker,
