@@ -16,7 +16,6 @@ spec:
   project: understack-operators
   sources:
   - path: operators/mariadb-operator
-    ref: understack
     repoURL: {{ include "understack.understack_url" $ }}
     targetRevision: {{ include "understack.understack_ref" $ }}
   syncPolicy:
