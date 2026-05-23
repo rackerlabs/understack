@@ -31,8 +31,8 @@ class Tenant(Adapter):
             self.add(
                 self.project(
                     id=_remove_hyphens(tenant.get("id")),
-                    name=tenant.get("name"),
-                    description=tenant.get("description"),
+                    name=tenant.get("name", ""),
+                    description=tenant.get("description") or "",
                 )
             )
 
@@ -57,7 +57,7 @@ class Tenants(Adapter):
             self.add(
                 self.project(
                     id=_remove_hyphens(tenant.get("id")),
-                    name=tenant.get("name"),
-                    description=tenant.get("description"),
+                    name=tenant.get("name", ""),
+                    description=tenant.get("description") or "",
                 )
             )

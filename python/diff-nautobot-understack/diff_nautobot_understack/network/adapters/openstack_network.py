@@ -21,8 +21,7 @@ class Network(Adapter):
                 self.network(
                     id=network.id,
                     name=network.name,
-                    status=network.status.lower(),
-                    provider_physical_network=network.provider_physical_network,
-                    vni_id=network.provider_segmentation_id,
+                    tenant_id=network.project_id,
+                    ucvni_id=network.provider_segmentation_id,
                 )
             )
