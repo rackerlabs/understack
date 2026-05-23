@@ -1,0 +1,180 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nova-service-cleaner-postsync
+  namespace: openstack
+  labels:
+    app.kubernetes.io/component: service-cleaner
+    app.kubernetes.io/instance: nova
+    app.kubernetes.io/name: nova
+    application: nova
+    component: service-cleaner
+    release_group: nova
+  annotations:
+    # Run once after Argo finishes syncing nova resources
+    argocd.argoproj.io/hook: PostSync
+    # Allow re-running on every sync by deleting any prior successful hook job,
+    # and clean up after success.
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    # Ensure this runs after the nova Deployments/StatefulSets/etc.
+    argocd.argoproj.io/sync-wave: "60"
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: service-cleaner
+        app.kubernetes.io/instance: nova
+        app.kubernetes.io/name: nova
+        application: nova
+        component: service-cleaner
+        release_group: nova
+    spec:
+      nodeSelector:
+        openstack-control-plane: enabled
+
+      serviceAccountName: nova-service-cleaner
+      serviceAccount: nova-service-cleaner
+
+      restartPolicy: OnFailure
+      securityContext:
+        runAsUser: 42424
+
+      initContainers:
+        - name: init
+          image: quay.io/airshipit/kubernetes-entrypoint:latest-ubuntu_focal
+          imagePullPolicy: Always
+          command:
+            - kubernetes-entrypoint
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: INTERFACE_NAME
+              value: eth0
+            - name: PATH
+              value: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/
+            - name: DEPENDENCY_SERVICE
+              value: openstack:rabbitmq-nodes,openstack:mariadb,openstack:keystone-api,openstack:nova-api
+            - name: DEPENDENCY_JOBS
+              value: nova-db-sync
+            - name: DEPENDENCY_DAEMONSET
+            - name: DEPENDENCY_CONTAINER
+            - name: DEPENDENCY_POD_JSON
+            - name: DEPENDENCY_CUSTOM_RESOURCE
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 65534
+
+      containers:
+        - name: nova-service-cleaner
+          image: docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy
+          imagePullPolicy: Always
+          command:
+            - /tmp/nova-service-cleaner.sh
+          env:
+            - name: OS_IDENTITY_API_VERSION
+              value: "3"
+            - name: OS_AUTH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_AUTH_URL
+            - name: OS_REGION_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_REGION_NAME
+            - name: OS_INTERFACE
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_INTERFACE
+            - name: OS_ENDPOINT_TYPE
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_INTERFACE
+            - name: OS_PROJECT_DOMAIN_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_PROJECT_DOMAIN_NAME
+            - name: OS_PROJECT_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_PROJECT_NAME
+            - name: OS_USER_DOMAIN_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_USER_DOMAIN_NAME
+            - name: OS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_USERNAME
+            - name: OS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_PASSWORD
+            - name: OS_DEFAULT_DOMAIN
+              valueFrom:
+                secretKeyRef:
+                  name: nova-keystone-user
+                  key: OS_DEFAULT_DOMAIN
+
+          resources:
+            limits:
+              cpu: "2"
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+
+          volumeMounts:
+            - name: pod-tmp
+              mountPath: /tmp
+            - name: nova-bin
+              mountPath: /tmp/nova-service-cleaner.sh
+              subPath: nova-service-cleaner.sh
+              readOnly: true
+            - name: etcnova
+              mountPath: /etc/nova
+            - name: nova-etc-snippets
+              mountPath: /etc/nova/nova.conf.d/
+              readOnly: true
+
+      volumes:
+        - name: pod-tmp
+          emptyDir: {}
+        - name: etcnova
+          emptyDir: {}
+        - name: nova-etc
+          secret:
+            secretName: nova-etc
+            defaultMode: 292
+        - name: nova-bin
+          configMap:
+            name: nova-bin
+            defaultMode: 365
+        - name: nova-etc-snippets
+          projected:
+            defaultMode: 420
+            sources:
+              - secret:
+                  name: nova-ks-etc
