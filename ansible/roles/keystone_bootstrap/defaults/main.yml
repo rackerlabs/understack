@@ -68,3 +68,22 @@ keystone_bootstrap_groups:
     #     role: member
     #   - project: shared-services
     #     role: reader
+
+# k8s service account groups and their project role assignments
+# Each group can have project_roles with an optional domain to scope the project lookup
+keystone_bootstrap_k8s_groups:
+  - name: k8s-serviceaccounts
+    desc: 'Kubernetes Service Accounts'
+    project_roles:
+      - project: service
+        domain: service
+        role: admin
+      - project: service
+        domain: service
+        role: service
+      - project: baremetal
+        domain: infra
+        role: admin
+      - project: baremetal
+        domain: infra
+        role: service
