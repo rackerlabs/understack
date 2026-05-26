@@ -26,9 +26,6 @@
               name: k8s-serviceaccounts
         remote:
           - type: HTTP_OIDC_SUB
-          - type: HTTP_OIDC_AUD
-            any_one_of:
-              - keystone
 
 - name: Create k8s identity providers
   openstack.cloud.federation_idp:
