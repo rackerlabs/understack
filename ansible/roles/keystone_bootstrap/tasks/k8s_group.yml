@@ -16,6 +16,7 @@
 - name: Create k8s group
   openstack.cloud.identity_group:
     name: "{{ group_item.name }}"
+    domain_id: "{{ _k8s_group_domain.domains[0].id }}"
     description: "{{ group_item.desc }}"
     state: present
   register: _k8s_group

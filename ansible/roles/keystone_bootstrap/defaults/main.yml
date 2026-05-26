@@ -69,6 +69,9 @@ keystone_bootstrap_groups:
     #   - project: shared-services
     #     role: reader
 
+# domain in which k8s service account groups are created
+keystone_bootstrap_k8s_group_domain: service
+
 # k8s identity providers; override with your cluster issuers
 keystone_k8s_identity:
   providers: []
