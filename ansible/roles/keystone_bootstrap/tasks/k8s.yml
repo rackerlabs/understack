@@ -13,6 +13,23 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+- name: Create k8s mapping
+  openstack.cloud.federation_mapping:
+    name: k8s-mapping
+    rules:
+      - local:
+          - user:
+              name: '{0}'
+            group:
+              domain:
+                name: service
+              name: k8s-serviceaccounts
+        remote:
+          - type: HTTP_OIDC_SUB
+          - type: HTTP_OIDC_AUD
+            any_one_of:
+              - keystone
+
 - name: Create k8s service account group mappings
   ansible.builtin.include_tasks: k8s_group.yml
   loop: "{{ keystone_bootstrap_k8s_groups }}"
