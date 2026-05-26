@@ -42,6 +42,11 @@
     mapping: k8s-mapping
   loop: "{{ keystone_k8s_identity.providers }}"
 
+- name: Get k8s group domain info
+  openstack.cloud.identity_domain_info:
+    name: "{{ keystone_bootstrap_k8s_group_domain }}"
+  register: _k8s_group_domain
+
 - name: Create k8s service account group mappings
   ansible.builtin.include_tasks: k8s_group.yml
   loop: "{{ keystone_bootstrap_k8s_groups }}"
