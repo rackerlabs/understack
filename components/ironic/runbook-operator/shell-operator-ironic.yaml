@@ -17,7 +17,7 @@ spec:
       restartPolicy: Always
       containers:
       - name: shell-operator
-        image: ghcr.io/rackerlabs/understack/shell-operator-ironic:latest
+        image: ghcr.io/rackerlabs/understack/shell-operator-ironic:pr-2051
         imagePullPolicy: Always
         env:
           - name: OS_CLOUD
