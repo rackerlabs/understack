@@ -41,11 +41,25 @@ spec:
                 - steps
               properties:
                 runbookName:
-                  description: 'RunbookName is the unique name of the runbook (REQUIRED). Must match trait naming convention, typically CUSTOM_*. This name is used to match runbooks to nodes via traits.'
+                  description: 'RunbookName is the unique name of the runbook (REQUIRED). From API microversion 1.112+, this is a logical identifier and can be any string of 1-255 characters. Node eligibility is determined by the traits field instead.'
                   type: string
-                  pattern: '^CUSTOM_[A-Z0-9_]+$'
+                  pattern: '^[a-zA-Z0-9._-]+$'
                   minLength: 1
                   maxLength: 255
+                description:
+                  description: 'Description is a human-readable description of the runbook (OPTIONAL). Consistent with other Ironic objects. Available from API microversion 1.112 onwards.'
+                  type: string
+                  nullable: true
+                  maxLength: 1000
+                traits:
+                  description: 'Traits is a list of traits that determine which nodes are permitted to use this runbook (OPTIONAL). Decouples runbook eligibility from the runbook name. Each trait must follow the CUSTOM_* naming convention. Available from API microversion 1.112 onwards. Default: []'
+                  type: array
+                  default: []
+                  items:
+                    type: string
+                    pattern: '^CUSTOM_[A-Z0-9_]+$'
+                    minLength: 1
+                    maxLength: 255
                 steps:
                   description: 'Steps is an ordered list of operations to execute (REQUIRED). Minimum 1 step required.'
                   type: array
@@ -164,8 +178,13 @@ spec:
       additionalPrinterColumns:
         - name: Runbook Name
           type: string
-          description: The runbook name used for trait matching
+          description: The runbook name
           jsonPath: .spec.runbookName
+        - name: Description
+          type: string
+          description: Human-readable description of the runbook
+          jsonPath: .spec.description
+          priority: 1
         - name: Steps
           type: integer
           description: Number of steps in the runbook

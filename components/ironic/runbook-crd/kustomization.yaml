@@ -7,3 +7,4 @@ namespace: openstack
 # Create namespace if it doesn't exist
 resources:
   - bases/baremetal.ironicproject.org_runbooks.yaml
+  - runbooks/runbook_bmc_maintenance.yaml
