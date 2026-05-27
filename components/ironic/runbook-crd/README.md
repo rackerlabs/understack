@@ -90,6 +90,52 @@ spec:
 | `runbook_disk_cleaning.yaml` | Node Reuse | Secure disk erasure |
 | `runbook_gpu_node_setup.yaml` | ML/AI | GPU node configuration |
 
+## Running a Runbook
+
+Once the operator syncs the CRD into Ironic, you execute a runbook by
+transitioning a node into the `clean` provisioning state with the runbook
+specified. The node must be in `manageable` state before you can trigger
+cleaning.
+
+### OpenStack CLI
+
+```bash
+# Run a runbook by name
+openstack baremetal node clean <node-uuid> --runbook CUSTOM_BMC_MAINTENANCE
+
+# Check node state while cleaning runs
+openstack baremetal node show <node-uuid> -f value -c provision_state
+```
+
+### Python SDK
+
+```python
+from understack_workflows.ironic_node import transition
+
+# node must already be in manageable state
+transition(
+    node,
+    "clean",
+    expected_state="manageable",
+    runbook=runbook_uuid,
+)
+```
+
+The `transition` helper calls `set_node_provision_state` and waits for the
+node to return to `manageable` once all steps complete.
+
+### Trait-Based Automatic Execution
+
+Runbooks can also be triggered automatically by matching node traits. Add the
+runbook name as a trait on the node:
+
+```bash
+openstack baremetal node add trait <node-uuid> CUSTOM_BMC_MAINTENANCE
+```
+
+Workflow code (e.g. `apply_firmware_updates` in `ironic_node.py`) can then
+discover matching traits and execute the corresponding runbooks in order.
+
 ## Support
 
 - **Ironic Documentation**: https://docs.openstack.org/ironic/latest/
