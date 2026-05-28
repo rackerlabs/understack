@@ -13,7 +13,7 @@ helmCharts:
   namespace: mariadb-operator
   valuesFile: values.yaml
   releaseName: mariadb-operator
-  version: 25.8.4
+  version: 25.10.4
   repo: https://mariadb-operator.github.io/mariadb-operator
   valuesInline:
     crds:
