@@ -75,4 +75,4 @@ def _extract_manufacturer(node, inventory: dict) -> str:
 
 def _trait_name(manufacturer: str, chassis_model: str) -> str:
     """The node trait that should be present on this node."""
-    return f"{manufacturer}_#{chassis_model}".upper().replace(" ", "_")
+    return f"{manufacturer}_{chassis_model}".upper().replace(" ", "_")
