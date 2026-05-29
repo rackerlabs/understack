@@ -32,7 +32,7 @@ KEY=`kubectl -n understack-cdn get secrets firmware-images -o jsonpath='{.data.A
 I was able to manage the bucket using the minio CLI client called "mc".
 
 ``` sh
-mc alias set myrook https://object-storage.dev.undercloud.rackspace.net/firmware-images/ $KEY_ID $KEY
+mc alias set myrook https://object-storage.iad3-dev.undercloud.rackspace.net/ $KEY_ID $KEY
 mc anonymous set download myrook/firmware-images
 mc cp DELL/R7615/BIOS_H3TGJ_WN64_1.15.3.EXE myrook/firmware-images/DELL/R7615/
 mc anonymous set download myrook/firmware-images/DELL/R7615/BIOS_H3TGJ_WN64_1.15.3.EXE
@@ -40,7 +40,7 @@ mc anonymous set download myrook/firmware-images/DELL/R7615/BIOS_H3TGJ_WN64_1.15
 
 ## Testing with curl
 
-curl https://cdn.dev.undercloud.rackspace.net/firmware-images/DELL/R7615/BIOS_H3TGJ_WN64_1.15.3.EXE | shasum
+curl https://cdn.iad3-dev.undercloud.rackspace.net/firmware-images/DELL/R7615/BIOS_H3TGJ_WN64_1.15.3.EXE | shasum
 
 ## See nginx logs to check that it is Caching
 

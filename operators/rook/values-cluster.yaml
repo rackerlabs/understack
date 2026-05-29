@@ -130,6 +130,9 @@ cephObjectStores:
           dataChunks: 2
           codingChunks: 1
       preservePoolsOnDelete: true
+      hosting:
+        dnsNames:
+          - object-storage.iad3-dev.undercloud.rackspace.net
       gateway:
         port: 80
         resources:
