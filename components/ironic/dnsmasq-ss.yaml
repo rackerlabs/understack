@@ -34,16 +34,7 @@ spec:
         application: ironic-dnsmasq
     spec:
       nodeSelector:
-        ironic_role: conductor
-
-      affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchLabels:
-                  application: ironic
-                  component: conductor
+        dhcp_role: server
       hostNetwork: true
       containers:
         - name: dnsmasq
