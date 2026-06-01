@@ -285,6 +285,12 @@ pod:
       limits:
         memory: "2048Mi"
         cpu: "1000m"
+  affinity:
+    anti:
+      type:
+        default: requiredDuringSchedulingIgnoredDuringExecution
+      topologyKey:
+        default: kubernetes.io/hostname
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
