@@ -7,7 +7,8 @@ metadata:
   namespace: openstack
 spec:
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
+  storageClassName: ceph-fs-ec
   resources:
     requests:
       storage: 16Mi
@@ -21,7 +22,8 @@ metadata:
   namespace: openstack
 spec:
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
+  storageClassName: ceph-fs-ec
   resources:
     requests:
       storage: 16Mi
