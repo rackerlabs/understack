@@ -82,7 +82,8 @@ conf:
       verify_step_priority_override: management.clear_job_queue:90
       # (nicholas.kuechler) tuning for idrac hardware type
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#nodes-go-into-maintenance-mode
-      sync_power_state_interval: 70
+      sync_power_state_interval: 300
+      sync_power_state_workers: 20
     agent:
       # (nicholas.kuechler) tuning for idrac hardware type
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#timeout-when-powering-off
@@ -284,7 +285,7 @@ pod:
         cpu: "100m"
       limits:
         memory: "2048Mi"
-        cpu: "1000m"
+        cpu: "8000m"
   affinity:
     anti:
       type:
