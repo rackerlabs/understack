@@ -797,8 +797,12 @@ data:
 
     # Manage user password (we do this in a separate step to ensure the password is updated if required)
     set +x
-    echo "Setting user password via: openstack user set --password=xxxxxxx ${USER_ID}"
-    openstack user set --password="${SERVICE_OS_PASSWORD}" "${USER_ID}"
+    if OS_USERNAME="${SERVICE_OS_USERNAME}" OS_PASSWORD="${SERVICE_OS_PASSWORD}" OS_USER_DOMAIN_NAME="" OS_USER_DOMAIN_ID="${USER_DOMAIN_ID}" OS_PROJECT_NAME="" OS_PROJECT_DOMAIN_NAME="" OS_PROJECT_ID="${USER_PROJECT_ID}" openstack token issue > /dev/null 2>&1; then
+      echo "Password for ${USER_ID} is already correct, skipping update."
+    else
+      echo "Setting user password via: openstack user set --password=xxxxxxx ${USER_ID}"
+      openstack user set --password="${SERVICE_OS_PASSWORD}" "${USER_ID}"
+    fi
     set -x
 
     function ks_assign_user_role () {
