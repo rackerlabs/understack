@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 import pytest
+from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
 from oslo_config import cfg
 
@@ -12,6 +13,22 @@ class TestUpdatePortPostCommit:
         understack_driver.update_port_postcommit(port_context)
 
         understack_driver.undersync.sync_devices.assert_called_once()
+
+    def test_skips_non_baremetal_port(self, understack_driver, port_context):
+        port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_NORMAL
+
+        understack_driver.update_port_postcommit(port_context)
+
+        understack_driver.undersync.sync_devices.assert_not_called()
+
+
+class TestDeletePortPostCommit:
+    def test_skips_non_baremetal_port(self, understack_driver, port_context):
+        port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_NORMAL
+
+        understack_driver.delete_port_postcommit(port_context)
+
+        understack_driver.undersync.sync_devices.assert_not_called()
 
 
 @pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
@@ -93,6 +110,31 @@ class TestBindPort:
             segment_id=vxlan_segment[api.ID],
             next_segments_to_bind=[vlan_network_segment],
         )
+
+    def test_refuses_unsupported_vnic_type(
+        self, mocker, port_context, understack_driver
+    ):
+        port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_DIRECT
+        mocker.patch.object(port_context, "continue_binding")
+        port_context._prepare_to_bind(port_context.network.network_segments)
+
+        understack_driver.bind_port(port_context)
+
+        port_context.continue_binding.assert_not_called()
+
+    @pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
+    def test_does_not_bind_when_physical_network_not_found(
+        self, mocker, port_context, understack_driver
+    ):
+        understack_driver.ironic_client.baremetal_port_physical_network.return_value = (
+            None
+        )
+        mocker.patch.object(port_context, "continue_binding")
+        port_context._prepare_to_bind(port_context.network.network_segments)
+
+        understack_driver.bind_port(port_context)
+
+        port_context.continue_binding.assert_not_called()
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
     def test_with_trunk_details(
