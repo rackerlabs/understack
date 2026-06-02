@@ -92,13 +92,14 @@ class TestUndersyncDriverBindPort:
 
         ctx.set_binding.assert_not_called()
 
-    def test_normal_vnic_type_is_supported(self, driver, vlan_segment):
-        seg = vlan_segment()
-        ctx = _make_context(vnic_type=portbindings.VNIC_NORMAL, segments=[seg])
+    def test_normal_vnic_type_is_not_supported(self, driver, vlan_segment):
+        ctx = _make_context(
+            vnic_type=portbindings.VNIC_NORMAL, segments=[vlan_segment()]
+        )
 
         driver.bind_port(ctx)
 
-        ctx.set_binding.assert_called_once()
+        ctx.set_binding.assert_not_called()
 
     def test_binds_vlan_when_preceded_by_vxlan(
         self, driver, vxlan_segment, vlan_segment
@@ -120,4 +121,23 @@ class TestUndersyncDriverBindPort:
 
         driver.bind_port(ctx)
 
+        ctx.set_binding.assert_not_called()
+
+    def test_skips_direct_vnic_type(self, driver, vlan_segment):
+        ctx = _make_context(
+            vnic_type=portbindings.VNIC_DIRECT, segments=[vlan_segment()]
+        )
+
+        driver.bind_port(ctx)
+
+        ctx.set_binding.assert_not_called()
+
+    def test_logs_warning_when_no_vlan_segment_found(
+        self, driver, vxlan_segment, caplog
+    ):
+        ctx = _make_context(segments=[vxlan_segment()])
+
+        driver.bind_port(ctx)
+
+        assert "no VLAN segment found" in caplog.text
         ctx.set_binding.assert_not_called()

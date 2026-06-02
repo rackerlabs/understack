@@ -9,7 +9,7 @@ from .ml2_type_annotations import PortContext
 
 LOG = logging.getLogger(__name__)
 
-SUPPORTED_VNIC_TYPES = [portbindings.VNIC_BAREMETAL, portbindings.VNIC_NORMAL]
+SUPPORTED_VNIC_TYPES = [portbindings.VNIC_BAREMETAL]
 
 
 class UndersyncDriver(MechanismDriver):
