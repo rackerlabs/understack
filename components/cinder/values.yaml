@@ -5,20 +5,28 @@ conf:
   backends:
     # disable the hardcoded one in the OpenStack Helm values.yaml
     rbd1: null
-    netapp_nvme:
+    data-svm1:
       netapp_server_port: "443"
       netapp_storage_family: ontap_cluster
       netapp_storage_protocol: nvme
       netapp_transport_type: https
-      netapp_use_legacy_client: false
-      volume_backend_name: netapp_nvme
-      volume_driver: cinder_understack.dynamic_netapp_driver.NetappCinderDynamicDriver
+      netapp_nic_slot_prefix: e4
+      volume_backend_name: data-svm1
+      volume_driver: cinder.volume.drivers.netapp.dataontap.nvme_library.NetAppNVMeStorageLibrary
+      netapp_vserver: data-svm1
+    data-svm2:
+      netapp_server_port: "443"
+      netapp_storage_family: ontap_cluster
+      netapp_storage_protocol: nvme
+      netapp_transport_type: https
+      netapp_nic_slot_prefix: e4
+      volume_backend_name: data-svm2
+      volume_driver: cinder.volume.drivers.netapp.dataontap.nvme_library.NetAppNVMeStorageLibrary
+      netapp_vserver: data-svm2
   cinder:
     DEFAULT:
-      enabled_backends: netapp_nvme
+      enabled_backends: data-svm1,data-svm2
       default_volume_type: __DEFAULT__
-      # add DriverFilter to the default list so our SVM filtering function gets called
-      scheduler_default_filters: DriverFilter,AvailabilityZoneFilter,CapacityFilter,CapabilitiesFilter
     oslo_messaging_notifications:
       driver: messagingv2
     oslo_messaging_rabbit:
