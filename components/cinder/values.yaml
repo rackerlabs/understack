@@ -3,26 +3,25 @@ release_group: null
 
 conf:
   backends:
-    # disable the hardcoded one in the OpenStack Helm values.yaml
     rbd1: null
     data-svm1:
-      netapp_server_port: "443"
-      netapp_storage_family: ontap_cluster
-      netapp_storage_protocol: nvme
-      netapp_transport_type: https
-      netapp_nic_slot_prefix: e4
+      volume_driver: cinder.volume.drivers.netapp.common.NetAppDriver
       volume_backend_name: data-svm1
-      volume_driver: cinder.volume.drivers.netapp.dataontap.nvme_library.NetAppNVMeStorageLibrary
-      netapp_vserver: data-svm1
-    data-svm2:
-      netapp_server_port: "443"
       netapp_storage_family: ontap_cluster
       netapp_storage_protocol: nvme
+      netapp_server_port: "443"
       netapp_transport_type: https
+      netapp_vserver: data-svm1
       netapp_nic_slot_prefix: e4
+    data-svm2:
+      volume_driver: cinder.volume.drivers.netapp.common.NetAppDriver
       volume_backend_name: data-svm2
-      volume_driver: cinder.volume.drivers.netapp.dataontap.nvme_library.NetAppNVMeStorageLibrary
+      netapp_storage_family: ontap_cluster
+      netapp_storage_protocol: nvme
+      netapp_server_port: "443"
+      netapp_transport_type: https
       netapp_vserver: data-svm2
+      netapp_nic_slot_prefix: e4
   cinder:
     DEFAULT:
       enabled_backends: data-svm1,data-svm2
