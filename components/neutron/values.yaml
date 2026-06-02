@@ -226,6 +226,7 @@ manifests:
   secret_keystone: false
   secret_ks_etc: false
   ingress_server: false
+  configmap_bin: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
