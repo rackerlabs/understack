@@ -66,6 +66,14 @@ network:
   use_external_ingress_controller: true
 
 pod:
+  etcSources:
+    cinder_volume:
+      - secret:
+        name: cinder-ks-etc
+      - secret:
+        name: cinder-netapp-config
+        optional: true
+
   mounts:
     cinder_volume:
       cinder_volume:
@@ -77,14 +85,6 @@ pod:
         volumes:
           - name: var-lib-cinder
             emptyDir: {}
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-                - secret:
-                    name: cinder-netapp-config
-                    optional: true
   lifecycle:
     disruption_budget:
       deployments:
