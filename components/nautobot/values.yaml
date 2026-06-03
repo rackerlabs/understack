@@ -97,3 +97,6 @@ metrics:
   enabled: true
   prometheusRule:
     enabled: true
+  serviceMonitor:
+    scrapeProtocols:
+      - OpenMetricsText1.0.0
