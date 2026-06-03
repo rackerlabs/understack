@@ -4,11 +4,6 @@ kind: Kustomization
 
 resources:
   - job-nautobot-post-deploy.yaml
-  - job-nautobot-constance-config.yaml
-  # https://rackspace.atlassian.net/browse/PUC-1485
-  - servicemonitor-celery.yaml
-  - servicemonitor-default.yaml
-  - rule-nautobot-absent.yaml
 
 configMapGenerator:
   - name: cluster-data
