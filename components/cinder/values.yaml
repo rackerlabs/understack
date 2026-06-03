@@ -3,28 +3,14 @@ release_group: null
 
 conf:
   backends:
+    # disable the hardcoded rbd backend from OpenStack Helm values.yaml
     rbd1: null
-    data-svm1:
-      volume_driver: cinder.volume.drivers.netapp.common.NetAppDriver
-      volume_backend_name: data-svm1
-      netapp_storage_family: ontap_cluster
-      netapp_storage_protocol: nvme
-      netapp_server_port: "443"
-      netapp_transport_type: https
-      netapp_vserver: data-svm1
-      netapp_nic_slot_prefix: e4
-    data-svm2:
-      volume_driver: cinder.volume.drivers.netapp.common.NetAppDriver
-      volume_backend_name: data-svm2
-      netapp_storage_family: ontap_cluster
-      netapp_storage_protocol: nvme
-      netapp_server_port: "443"
-      netapp_transport_type: https
-      netapp_vserver: data-svm2
-      netapp_nic_slot_prefix: e4
+    # Environment-specific NetApp backends (e.g., data-svm1, data-svm2) are defined in:
+    # undercloud-deploy/<env>/cinder/values.yaml
+    # Each environment defines its own SVMs and backend configuration.
   cinder:
     DEFAULT:
-      enabled_backends: data-svm1,data-svm2
+      # enabled_backends is set per-environment in undercloud-deploy/<env>/cinder/values.yaml
       default_volume_type: __DEFAULT__
     oslo_messaging_notifications:
       driver: messagingv2
