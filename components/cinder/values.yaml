@@ -17,6 +17,7 @@ conf:
     DEFAULT:
       enabled_backends: netapp_nvme
       default_volume_type: __DEFAULT__
+      backup_driver: "cinder.backup.drivers.posix.PosixBackupDriver"
       # add DriverFilter to the default list so our SVM filtering function gets called
       scheduler_default_filters: DriverFilter,AvailabilityZoneFilter,CapacityFilter,CapabilitiesFilter
     oslo_messaging_notifications:
