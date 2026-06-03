@@ -36,7 +36,9 @@ jobs:
           - cinder
           - glance
           - horizon
+          - ironic
           - keystone
+          - neutron
           - nova
           - octavia
           - openstack-client
@@ -47,24 +49,5 @@ jobs:
     with:
       container_name: ${{ matrix.project }}
       dockerfile_path: containers/${{ matrix.project }}/Dockerfile
-      build_args: OPENSTACK_VERSION=2025.2
-      latest_name: "2025.2"
-
-  neutron:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: neutron
-      dockerfile_path: containers/neutron/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
-
-  ironic:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: ironic
-      dockerfile_path: containers/ironic/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
-      target: final
