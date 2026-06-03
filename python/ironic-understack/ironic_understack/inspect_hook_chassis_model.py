@@ -26,6 +26,7 @@ def _set_node_traits(task, prefix: str, required_trait: str):
     """Manage the subset of node traits whose names begin with `prefix`."""
     node = task.node
     existing_traits = node.traits.get_trait_names()
+    required_trait = prefix + required_trait
 
     required_traits = {x for x in existing_traits if not x.startswith(prefix)}
     required_traits.add(required_trait)
