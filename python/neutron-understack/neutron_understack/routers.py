@@ -280,7 +280,7 @@ def fetch_shared_router_port(segment: NetworkSegment) -> Port | None:
 
     if not shared_ports:
         LOG.error(
-            "No router shared ports found for segment %(segment)s", {"segment", segment}
+            "No router shared ports found for segment %(segment)s", {"segment": segment}
         )
         return
     LOG.debug("Router shared ports found %(ports)s", {"ports": shared_ports})
