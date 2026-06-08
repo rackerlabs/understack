@@ -289,7 +289,8 @@ pod:
   affinity:
     anti:
       type:
-        default: requiredDuringSchedulingIgnoredDuringExecution
+        default: preferredDuringSchedulingIgnoredDuringExecution
+        conductor: requiredDuringSchedulingIgnoredDuringExecution
       topologyKey:
         default: kubernetes.io/hostname
 
