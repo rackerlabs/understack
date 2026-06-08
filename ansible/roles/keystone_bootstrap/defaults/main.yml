@@ -94,3 +94,6 @@ keystone_bootstrap_k8s_groups:
       - project: baremetal
         domain: infra
         role: service
+      - project: admin
+        domain: Default
+        role: admin
