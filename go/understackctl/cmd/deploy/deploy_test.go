@@ -284,7 +284,7 @@ func TestDeployCheck(t *testing.T) {
 	kustomPath := filepath.Join(keystoneDir, "kustomization.yaml")
 	valuesPath := filepath.Join(keystoneDir, "values.yaml")
 
-	if err := os.WriteFile(kustomPath, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(kustomPath, []byte(kustomizationContent), 0644); err != nil {
 		t.Fatalf("failed to write kustomization.yaml: %v", err)
 	}
 
