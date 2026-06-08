@@ -6,7 +6,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ (printf "%s-keystone-%s" $serviceName $user.usage) | quote }}
-data:
+stringData:
   OS_AUTH_TYPE: v3oidcaccesstokenfile
   OS_AUTH_URL: {{ $.Values.keystoneUrl | quote }}
   OS_DEFAULT_DOMAIN: "default"
@@ -27,7 +27,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ (printf "%s-ks-etc" $serviceName) | quote }}
-data:
+stringData:
   {{ (printf "%s_auth.conf" $serviceName) | quote }}: |
   {{- range $_, $user := $users }}
   {{- $section := $user.section | default $user.usage }}
