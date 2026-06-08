@@ -78,12 +78,17 @@ pod:
           - name: glance-etc-snippets
             mountPath: /etc/glance/glance.conf.d/
             readOnly: true
+          - name: glance-staging
+            mountPath: /var/lib/glance/tmp/
         volumes:
           - name: glance-etc-snippets
             projected:
               sources:
                 - secret:
                     name: glance-ks-etc
+          - name: glance-staging
+            persistentVolumeClaim:
+              claimName: glance-staging
   lifecycle:
     disruption_budget:
       api:

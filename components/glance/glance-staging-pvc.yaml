@@ -1,0 +1,15 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  labels:
+    undercloud.local/purpose: glance-staging
+  name: glance-staging
+  namespace: openstack
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ceph-fs-ec
+  resources:
+    requests:
+      storage: 20Gi

@@ -45,17 +45,29 @@
     - understack_images | length > 0
     - item.images | length == 0
 
-- name: Build list of images that were successfully reserved (newly created)
+- name: Build list of images that need data upload (newly reserved or incomplete)
   ansible.builtin.set_fact:
     _reserved_image_uuids: >-
-      {{ reserve_result.results
+      {{
+        (reserve_result.results
          | default([])
          | selectattr('changed', 'defined')
          | selectattr('changed')
          | map(attribute='item')
          | map(attribute='item')
          | map(attribute='uuid')
-         | list }}
+         | list)
+        +
+        (existing_image_info.results
+         | default([])
+         | selectattr('images', 'defined')
+         | selectattr('images')
+         | map(attribute='images')
+         | map('first')
+         | selectattr('status', 'in', ['queued', 'uploading'])
+         | map(attribute='id')
+         | list)
+      }}
 
 - name: Download images that still need data upload
   ansible.builtin.get_url:
@@ -83,7 +95,7 @@
     - understack_images | length > 0
     - item.uuid in _reserved_image_uuids
 
-- name: Upload image data to queued Glance images
+- name: Upload image data to queued or uploading Glance images
   openstack.cloud.image:
     cloud: "{{ openstack_cloud | default(omit) }}"
     name: "{{ item.images[0].name }}"
@@ -100,7 +112,20 @@
     - understack_images | length > 0
     - item is not skipped
     - item.images | length > 0
-    - item.images[0].status == 'queued'
+    - item.images[0].status in ['queued', 'uploading']
+
+- name: Look up target Glance images after uploading data
+  openstack.cloud.image_info:
+    cloud: "{{ openstack_cloud | default(omit) }}"
+    filters:
+      id: "{{ item.uuid }}"
+  register: target_image_info_2
+  loop: "{{ understack_images }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when:
+    - understack_images | length > 0
+    - item.uuid in _reserved_image_uuids
 
 - name: Tell Glance to import the image data (using use_import and glance-direct)
   openstack.cloud.image:
@@ -110,7 +135,7 @@
     use_import: true
     state: present
     wait: true
-  loop: "{{ target_image_info.results | default([]) }}"
+  loop: "{{ target_image_info_2.results | default([]) }}"
   loop_control:
     label: "{{ item.item.name }}"
   when:
