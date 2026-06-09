@@ -47,7 +47,7 @@ def create_neutron_port_for_segment(
             "device_id": "",
             "fixed_ips": [],
             "admin_state_up": True,
-            "tenant_id": "",
+            "project_id": "",
         }
     }
     if not core_plugin:
