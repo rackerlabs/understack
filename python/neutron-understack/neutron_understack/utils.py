@@ -42,10 +42,6 @@ def create_neutron_port_for_segment(
         "port": {
             "name": f"uplink-{segment['id']}",
             "network_id": context.current["network_id"],
-            "mac_address": "",
-            "device_owner": "",
-            "device_id": "",
-            "fixed_ips": [],
             "admin_state_up": True,
             "project_id": "",
         }
