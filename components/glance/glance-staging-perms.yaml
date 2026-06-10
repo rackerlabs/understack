@@ -1,0 +1,29 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: glance-staging-perms
+  namespace: openstack
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-options: Force=true
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: glance-staging-perms
+          image: busybox:stable
+          command:
+            - chown
+            - -R
+            - "42424:"
+            - /var/lib/glance/tmp
+          volumeMounts:
+            - name: glance-staging
+              mountPath: /var/lib/glance/tmp
+      volumes:
+        - name: glance-staging
+          persistentVolumeClaim:
+            claimName: glance-staging

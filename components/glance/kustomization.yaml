@@ -5,3 +5,5 @@ kind: Kustomization
 resources:
   - glance-mariadb-db.yaml
   - glance-rabbitmq-queue.yaml
+  - glance-staging-pvc.yaml
+  - glance-staging-perms.yaml
