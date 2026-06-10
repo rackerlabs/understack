@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""convert.py - Convert a 512-byte-sector raw disk image to a 4096-byte-sector
-(4Kn) layout, producing a new raw image.
+"""convert.py - Convert a 512-byte-sector disk image to a 4096-byte-sector (4Kn) layout.
 
-The new image preserves the byte offset and size of every partition, so the
-filesystems inside copy across unchanged. Only the partition table is rebuilt
-for 4096-byte logical sectors. Works directly on image files: no loop devices,
-no root.
+Accepts a raw image or a qcow2 image; the output format mirrors the input. For
+qcow2 input the image is decompressed to a temporary raw file, converted, and
+re-encoded as qcow2 on output (the temporaries are removed afterwards).
+
+The conversion preserves the byte offset and size of every partition, so the
+filesystems inside copy across unchanged -- only the partition table is rebuilt
+for 4096-byte logical sectors. The raw path uses no loop devices and no root.
 
 Usage:
     convert.py <source.img> <output.img>
 
 Requires: python3, sfdisk (util-linux 2.26+), dd (GNU coreutils).
-This is a Python port of convert.sh; it shells out to sfdisk/dd for the table
-write and the copy, and does the sizing and LBA rescaling in Python.
+          qemu-img is additionally required only for qcow2 input.
 """
 
 import os
@@ -20,6 +21,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 SRC_SECTOR = 512
 DST_SECTOR = 4096
@@ -87,10 +89,10 @@ def partition_ranges(dump):
 
 
 # Known disk-image container formats, keyed by a magic signature at offset 0.
-# A raw image has no such magic, so we only *reject* recognized containers and
-# otherwise treat the input as raw (sfdisk validates the partition table later).
+# A raw image has no such magic, so we only *recognize* containers and otherwise
+# treat the input as raw (sfdisk validates the partition table later).
 _CONTAINER_MAGICS = (
-    (b"QFI\xfb", "qcow2/qcow"),
+    (b"QFI\xfb", "qcow2"),
     (b"KDMV", "vmdk (monolithicSparse)"),
     (b"# Disk DescriptorFile", "vmdk (descriptor)"),
     (b"vhdxfile", "vhdx"),
@@ -108,38 +110,17 @@ def detect_container_format(path):
     return None
 
 
-def main(argv):
-    if len(argv) != 2:
-        die(f"Usage: {os.path.basename(sys.argv[0])} <source.img> <output.img>")
-    src, dst = argv
-    if not os.path.isfile(src):
-        die(f"Source image not found: {src}")
-    if os.path.abspath(src) == os.path.abspath(dst):
-        die("Source and destination must differ")
-    for cmd in ("sfdisk", "dd"):
-        if shutil.which(cmd) is None:
-            die(f"Missing required command: {cmd}")
-
-    # We operate on raw images, whose partitions sit at literal byte offsets.
-    # A qcow2/vmdk/etc. container would make sfdisk read container metadata as a
-    # (bogus) partition table and os.path.getsize report the compressed size.
-    fmt = detect_container_format(src)
-    if fmt:
-        prog = os.path.basename(sys.argv[0])
-        die(
-            f"Input looks like a {fmt} image, not raw. Convert it first:\n"
-            f"    qemu-img convert -O raw '{src}' '{src}.raw'\n"
-            f"  then re-run:\n"
-            f"    {prog} '{src}.raw' '{dst}'"
-        )
-
+def convert_raw(src, dst):
+    """Rescale a RAW 512-byte-sector image into a RAW 4096-byte-sector image."""
     src_size = os.path.getsize(src)
     # Round the size up to a whole 4096-byte sector: a 4Kn device's total size
     # must be an exact multiple of its sector size. Adding (DST_SECTOR - 1)
     # before the floor-division turns the truncation into a round-up.
     dst_size = (src_size + HEADROOM + DST_SECTOR - 1) // DST_SECTOR * DST_SECTOR
-    info(f"Source:      {src} ({src_size} bytes, {SRC_SECTOR}-byte sectors)")
-    info(f"Destination: {dst} ({dst_size} bytes, {DST_SECTOR}-byte sectors)")
+    info(
+        f"Raw image: {src_size} bytes ({SRC_SECTOR}-byte sectors) "
+        f"-> {dst_size} bytes ({DST_SECTOR}-byte sectors)"
+    )
 
     # -- Rebuild the partition table for 4096-byte sectors --------------------
     # `sfdisk -d` dumps start=/size= in source-sector (512) units. Dividing each
@@ -196,12 +177,57 @@ def main(argv):
         what="sfdisk --verify",
     )
 
+
+def convert_qcow2(src, dst):
+    """Convert a qcow2 image: decompress to raw, rescale, re-encode as qcow2."""
+    if shutil.which("qemu-img") is None:
+        die("Missing required command: qemu-img (needed to handle qcow2 input)")
+
+    outdir = os.path.dirname(os.path.abspath(dst))
+    base = os.path.basename(dst)
+    tmp_in = _mktemp(outdir, base + ".in-", ".raw")
+    tmp_out = _mktemp(outdir, base + ".out-", ".raw")
+    try:
+        info("Decompressing qcow2 input to a temporary raw image...")
+        run(
+            ["qemu-img", "convert", "-O", "raw", src, tmp_in],
+            what="qemu-img convert (qcow2 -> raw)",
+        )
+        convert_raw(tmp_in, tmp_out)
+        info(f"Re-encoding the 4Kn raw result as qcow2: {dst}")
+        if os.path.exists(dst):
+            os.remove(dst)
+        run(
+            ["qemu-img", "convert", "-O", "qcow2", tmp_out, dst],
+            what="qemu-img convert (raw -> qcow2)",
+        )
+    finally:
+        for tmp in (tmp_in, tmp_out):
+            try:
+                os.remove(tmp)
+            except FileNotFoundError:
+                pass
+
+
+def _mktemp(directory, prefix, suffix):
+    """Create an empty temp file in `directory` and return its path."""
+    fd, path = tempfile.mkstemp(dir=directory, prefix=prefix, suffix=suffix)
+    os.close(fd)
+    return path
+
+
+def print_notes(dst, out_fmt):
     info("")
     info(f"Done: {dst}")
     info("")
-    info(
-        f"Write to the 4Kn device with:  dd if='{dst}' of=/dev/<disk> bs=8M conv=fsync"
-    )
+    if out_fmt == "qcow2":
+        info(
+            f"Write to a 4Kn device with:  qemu-img convert -O raw '{dst}' /dev/<disk>"
+        )
+    else:
+        info(
+            f"Write to the 4Kn device with:  dd if='{dst}' of=/dev/<disk> bs=8M conv=fsync"
+        )
     info("")
     info("Partition contents are copied verbatim; filesystems and boot code are not")
     info("modified beyond rewriting the partition table. Two things to know:")
@@ -219,6 +245,40 @@ def main(argv):
     info(
         f"     virt-customize -a '{dst}' --run-command 'grub-install --target=i386-pc /dev/sda'"
     )
+
+
+def main(argv):
+    if len(argv) != 2:
+        die(f"Usage: {os.path.basename(sys.argv[0])} <source.img> <output.img>")
+    src, dst = argv
+    if not os.path.isfile(src):
+        die(f"Source image not found: {src}")
+    if os.path.abspath(src) == os.path.abspath(dst):
+        die("Source and destination must differ")
+    for cmd in ("sfdisk", "dd"):
+        if shutil.which(cmd) is None:
+            die(f"Missing required command: {cmd}")
+
+    fmt = detect_container_format(src)
+
+    if fmt is None:  # raw in -> raw out
+        info(f"Source:      {src} (raw, {SRC_SECTOR}-byte sectors)")
+        info(f"Destination: {dst} (raw, {DST_SECTOR}-byte sectors)")
+        convert_raw(src, dst)
+        print_notes(dst, "raw")
+    elif fmt == "qcow2":  # qcow2 in -> qcow2 out
+        info(f"Source:      {src} (qcow2)")
+        info(f"Destination: {dst} (qcow2, 4Kn)")
+        convert_qcow2(src, dst)
+        print_notes(dst, "qcow2")
+    else:
+        prog = os.path.basename(sys.argv[0])
+        die(
+            f"Input is a {fmt} image; automatic handling covers raw and qcow2 "
+            f"only. Convert it to raw first:\n"
+            f"    qemu-img convert -O raw '{src}' '{src}.raw'\n"
+            f"  then re-run:  {prog} '{src}.raw' '{dst}'"
+        )
 
 
 if __name__ == "__main__":
