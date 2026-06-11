@@ -61,7 +61,6 @@ metadata:
   namespace: nautobotop
 type: Opaque
 stringData:
-  username: admin
   token: your-nautobot-api-token
 ```
 
@@ -90,7 +89,6 @@ spec:
   nautobotSecretRef:
     name: nautobot-token
     namespace: nautobotop
-    usernameKey: username
     tokenKey: token
 
   nautobotServiceRef:

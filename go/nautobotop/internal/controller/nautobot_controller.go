@@ -45,7 +45,8 @@ import (
 // NautobotReconciler reconciles a Nautobot object
 type NautobotReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme           *runtime.Scheme
+	resolvedUsername string
 }
 
 // +kubebuilder:rbac:groups=sync.rax.io,resources=nautobots,verbs=get;list;watch;create;update;patch;delete
@@ -143,16 +144,25 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// Create Nautobot client
-	username, token, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
+	token, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
 	if err != nil {
 		log.Error(err, "failed to get nautobot auth token")
 		return ctrl.Result{}, err
 	}
 	nautobotURL := fmt.Sprintf("http://%s.%s.svc.cluster.local/api", nautobotCR.Spec.NautobotServiceRef.Name, nautobotCR.Spec.NautobotServiceRef.Namespace)
-	nautobotClient, err := nbClient.NewNautobotClient(nautobotURL, username, token, nautobotCR.Spec.CacheMaxSize)
+	nautobotClient, err := nbClient.NewNautobotClient(nautobotURL, token, nautobotCR.Spec.CacheMaxSize)
 	if err != nil {
 		log.Error(err, "failed to create nautobot client")
 		return ctrl.Result{}, err
+	}
+	if r.resolvedUsername != "" {
+		nautobotClient.Username = r.resolvedUsername
+	} else {
+		if err := nautobotClient.ResolveUsername(ctx); err != nil {
+			log.Error(err, "failed to resolve nautobot username from token")
+			return ctrl.Result{}, err
+		}
+		r.resolvedUsername = nautobotClient.Username
 	}
 
 	if err := nautobotClient.PreLoadCacheForLookup(ctx); err != nil {
@@ -470,27 +480,17 @@ func (r *NautobotReconciler) syncTenant(ctx context.Context,
 	return nil
 }
 
-// getAuthTokenFromSecretRef: this will fetch Nautobot auth token from the given refer.
-func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (string, string, error) {
-	var username, token string
+// getAuthTokenFromSecretRef fetches the Nautobot API token from the referenced Kubernetes Secret.
+func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (string, error) {
 	secret := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.NautobotSecretRef.Name, Namespace: *nautobotCR.Spec.NautobotSecretRef.Namespace}, secret)
 	if err != nil {
-		return "", "", err
-	}
-	// Read the secret value
-	if valBytes, ok := secret.Data[nautobotCR.Spec.NautobotSecretRef.UsernameKey]; ok {
-		username = string(valBytes)
+		return "", err
 	}
 	if valBytes, ok := secret.Data[nautobotCR.Spec.NautobotSecretRef.TokenKey]; ok {
-		token = string(valBytes)
+		return string(valBytes), nil
 	}
-
-	if username != "" || token != "" {
-		return username, token, nil
-	}
-
-	return "", "", fmt.Errorf("secret keys not found in provide secret")
+	return "", fmt.Errorf("token key %q not found in secret %s", nautobotCR.Spec.NautobotSecretRef.TokenKey, nautobotCR.Spec.NautobotSecretRef.Name)
 }
 
 // SetupWithManager sets up the controller with the Manager.
