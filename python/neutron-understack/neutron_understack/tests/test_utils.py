@@ -12,6 +12,7 @@ from sqlalchemy.orm import scoped_session
 from sqlalchemy.orm import sessionmaker
 
 from neutron_understack import utils
+from neutron_understack.utils import create_neutron_port_for_segment
 
 
 class TestParentPortIsBound:
@@ -687,3 +688,78 @@ class TestUndersyncAuthentication:
         assert session.headers["Content-Type"] == "application/json"
         assert session.headers["Authorization"] == "Bearer test_token"
         assert "X-Auth-Token" not in session.headers
+
+
+class TestCreateNeutronPortForSegment:
+    def test_uses_project_id_not_tenant_id(self, mocker):
+        """Port dict must use project_id — tenant_id is deprecated in neutron 2026.1."""
+        segment = {"id": "seg-123"}
+        project_id = "test-project-id"
+        context = MagicMock()
+        context.current = {"network_id": "net-123", "project_id": project_id}
+        context.plugin_context = MagicMock()
+
+        mock_core_plugin = MagicMock()
+        mock_core_plugin.create_port.return_value = {"id": "new-port-id"}
+        mocker.patch(
+            "neutron_understack.utils.directory.get_plugin",
+            return_value=mock_core_plugin,
+        )
+
+        create_neutron_port_for_segment(segment, context)
+
+        call_args = mock_core_plugin.create_port.call_args
+        port_dict = call_args[0][1]["port"]
+
+        assert "tenant_id" not in port_dict, "tenant_id is deprecated, use project_id"
+        assert "project_id" in port_dict
+
+    def test_port_name_uses_segment_id(self, mocker):
+        """Port name must be uplink-<segment_id>."""
+        segment = {"id": "seg-abc-123"}
+        context = MagicMock()
+        context.current = {"network_id": "net-123", "project_id": "proj-123"}
+        context.plugin_context = MagicMock()
+
+        mock_core_plugin = MagicMock()
+        mock_core_plugin.create_port.return_value = {"id": "new-port-id"}
+        mocker.patch(
+            "neutron_understack.utils.directory.get_plugin",
+            return_value=mock_core_plugin,
+        )
+
+        create_neutron_port_for_segment(segment, context)
+
+        call_args = mock_core_plugin.create_port.call_args
+        port_dict = call_args[0][1]["port"]
+
+        assert port_dict["name"] == "uplink-seg-abc-123"
+
+    def test_rbac_sensitive_fields_are_not_set(self, mocker):
+        """device_owner, mac_address, fixed_ips must not be explicitly set.
+
+        neutron 2026.1 tightened RBAC on create_port:device_owner,
+        create_port:mac_address and create_port:fixed_ips — they now require
+        NET_OWNER_MEMBER or ADMIN role. Passing empty values still triggers
+        the policy check. Let neutron set defaults instead.
+        """
+        segment = {"id": "seg-123"}
+        context = MagicMock()
+        context.current = {"network_id": "net-123", "project_id": "proj-123"}
+        context.plugin_context = MagicMock()
+
+        mock_core_plugin = MagicMock()
+        mock_core_plugin.create_port.return_value = {"id": "new-port-id"}
+        mocker.patch(
+            "neutron_understack.utils.directory.get_plugin",
+            return_value=mock_core_plugin,
+        )
+
+        create_neutron_port_for_segment(segment, context)
+
+        call_args = mock_core_plugin.create_port.call_args
+        port_dict = call_args[0][1]["port"]
+
+        assert "device_owner" not in port_dict, "device_owner triggers RBAC check in 2026.1"
+        assert "mac_address" not in port_dict, "mac_address triggers RBAC check in 2026.1"
+        assert "fixed_ips" not in port_dict, "fixed_ips triggers RBAC check in 2026.1"

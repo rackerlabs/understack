@@ -4,6 +4,7 @@ from neutron_lib import constants as p_const
 from neutron_understack.routers import add_subport_to_trunk
 from neutron_understack.routers import create_port_postcommit
 from neutron_understack.routers import fetch_or_create_router_segment
+from neutron_understack.routers import fetch_shared_router_port
 from neutron_understack.routers import handle_router_interface_removal
 from neutron_understack.routers import handle_subport_removal
 
@@ -202,3 +203,37 @@ class TestCreatePortPostcommit:
         create_uplink_port.assert_called_once_with(
             fake_segment, port_context.current["network_id"]
         )
+
+
+class TestFetchSharedRouterPort:
+    def test_no_shared_ports_returns_none_without_type_error(self, mocker):
+        """LOG.error with set literal {segment, "segment"} raises TypeError.
+
+        This test catches the bug where {"segment", segment} (a set) was passed
+        to LOG.error instead of {"segment": segment} (a dict), causing
+        TypeError('format requires a mapping') and crashing create_port_postcommit.
+        """
+        fake_segment = mocker.MagicMock()
+        fake_segment.__getitem__ = mocker.Mock(return_value="seg-123")
+
+        mocker.patch("neutron_lib.context.get_admin_context", return_value="admin_ctx")
+        mocker.patch("neutron.objects.ports.Port.get_objects", return_value=[])
+
+        result = fetch_shared_router_port(fake_segment)
+
+        assert result is None
+
+    def test_returns_first_shared_port_when_found(self, mocker, port_object):
+        """Returns first port when shared ports exist."""
+        fake_segment = mocker.MagicMock()
+        fake_segment.__getitem__ = mocker.Mock(return_value="seg-123")
+
+        mocker.patch("neutron_lib.context.get_admin_context", return_value="admin_ctx")
+        mocker.patch(
+            "neutron.objects.ports.Port.get_objects",
+            return_value=[port_object],
+        )
+
+        result = fetch_shared_router_port(fake_segment)
+
+        assert result is port_object
