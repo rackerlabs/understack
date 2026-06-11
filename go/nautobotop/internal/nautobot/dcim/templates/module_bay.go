@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
@@ -21,16 +22,27 @@ func NewModuleBayTemplateService(nautobotClient *client.NautobotClient) *ModuleB
 }
 
 func (s *ModuleBayTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.ModuleBayTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Limit(10000).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllModuleBayTemplateByDeviceType", "failed to list", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
-		return []nb.ModuleBayTemplate{}
-	}
-	if list == nil {
-		return []nb.ModuleBayTemplate{}
-	}
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.ModuleBayTemplate, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				DeviceType([]string{deviceTypeID}).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllModuleBayTemplateByDeviceType",
+		"device_type_id", deviceTypeID,
+	)
 }
 
 func (s *ModuleBayTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.ModuleBayTemplate {

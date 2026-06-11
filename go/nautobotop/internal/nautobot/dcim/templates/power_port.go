@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
@@ -21,16 +22,27 @@ func NewPowerPortTemplateService(nautobotClient *client.NautobotClient) *PowerPo
 }
 
 func (s *PowerPortTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.PowerPortTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Limit(10000).Depth(1).DeviceType([]string{deviceTypeID}).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllPowerPortTemplate", "failed to list", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
-		return []nb.PowerPortTemplate{}
-	}
-	if list == nil {
-		return []nb.PowerPortTemplate{}
-	}
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.PowerPortTemplate, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(1).
+				DeviceType([]string{deviceTypeID}).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllPowerPortTemplate",
+		"device_type_id", deviceTypeID,
+	)
 }
 
 func (s *PowerPortTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.PowerPortTemplate {

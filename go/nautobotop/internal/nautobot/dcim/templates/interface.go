@@ -2,6 +2,7 @@ package templates
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 
@@ -21,16 +22,27 @@ func NewInterfaceTemplateService(nautobotClient *client.NautobotClient) *Interfa
 }
 
 func (s *InterfaceTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.InterfaceTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimInterfaceTemplatesList(ctx).Limit(10000).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllInterfaceTemplateByDeviceType", "failed to list", "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)
-		return []nb.InterfaceTemplate{}
-	}
-	if list == nil {
-		return []nb.InterfaceTemplate{}
-	}
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.InterfaceTemplate, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimInterfaceTemplatesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				DeviceType([]string{deviceTypeID}).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllInterfaceTemplateByDeviceType",
+		"device_type_id", deviceTypeID,
+	)
 }
 
 func (s *InterfaceTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.InterfaceTemplate {
