@@ -21,11 +21,24 @@ type NautobotClient struct {
 	Cache     *cache.Cache
 }
 
+// maxReportLinesPerKey bounds the report stored in the CR status; etcd
+// rejects objects over ~1.5 MB, which would wedge every status update.
+const maxReportLinesPerKey = 20
+
 // AddReport appends one or more lines to the current reconciliation report.
+// Every line is logged, but only the first maxReportLinesPerKey lines per key
+// are kept in the report.
 func (n *NautobotClient) AddReport(key string, line ...string) {
 	combined := strings.Join(line, " ")
-	n.Report[key] = append(n.Report[key], combined)
 	log.Error(key, combined)
+
+	if len(n.Report[key]) >= maxReportLinesPerKey {
+		if len(n.Report[key]) == maxReportLinesPerKey {
+			n.Report[key] = append(n.Report[key], "further errors suppressed, see operator logs")
+		}
+		return
+	}
+	n.Report[key] = append(n.Report[key], combined)
 }
 
 // NewNautobotClient creates and configures a new Nautobot API client.
