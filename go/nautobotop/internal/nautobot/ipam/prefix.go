@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -81,20 +82,25 @@ func (s *PrefixService) GetByID(ctx context.Context, id string) nb.Prefix {
 }
 
 func (s *PrefixService) ListAll(ctx context.Context) []nb.Prefix {
-	list, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesList(ctx).Limit(10000).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllPrefixes", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.Prefix{}
-	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.Prefix{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.Prefix{}
-	}
-
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.Prefix, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllPrefixes",
+	)
 }
 
 func (s *PrefixService) Update(ctx context.Context, id string, req nb.WritablePrefixRequest) (*nb.Prefix, error) {

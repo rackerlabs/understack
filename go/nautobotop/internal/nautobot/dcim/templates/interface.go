@@ -46,7 +46,7 @@ func (s *InterfaceTemplateService) ListByDeviceType(ctx context.Context, deviceT
 }
 
 func (s *InterfaceTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.InterfaceTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimInterfaceTemplatesList(ctx).Limit(10000).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimInterfaceTemplatesList(ctx).Depth(10).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetInterfaceTemplateByName", "failed to get interface template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)

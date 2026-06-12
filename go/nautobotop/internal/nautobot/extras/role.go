@@ -2,6 +2,7 @@ package extras
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -80,19 +81,25 @@ func (s *RoleService) GetByID(ctx context.Context, id string) nb.Role {
 }
 
 func (s *RoleService) ListAll(ctx context.Context) []nb.Role {
-	list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).Limit(10000).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllRoles", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.Role{}
-	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.Role{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.Role{}
-	}
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.Role, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllRoles",
+	)
 }
 
 func (s *RoleService) Update(ctx context.Context, id string, req nb.RoleRequest) (*nb.Role, error) {

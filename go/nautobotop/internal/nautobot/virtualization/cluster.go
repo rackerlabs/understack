@@ -2,6 +2,7 @@ package virtualization
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -81,20 +82,25 @@ func (s *ClusterService) GetByID(ctx context.Context, id string) nb.Cluster {
 }
 
 func (s *ClusterService) ListAll(ctx context.Context) []nb.Cluster {
-	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClustersList(ctx).Limit(10000).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllClusters", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.Cluster{}
-	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.Cluster{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.Cluster{}
-	}
-
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.Cluster, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClustersList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllClusters",
+	)
 }
 
 func (s *ClusterService) Update(ctx context.Context, id string, req nb.ClusterRequest) (*nb.Cluster, error) {

@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -81,20 +82,25 @@ func (s *VlanGroupService) GetByID(ctx context.Context, id string) nb.VLANGroup 
 }
 
 func (s *VlanGroupService) ListAll(ctx context.Context) []nb.VLANGroup {
-	list, resp, err := s.client.APIClient.IpamAPI.IpamVlanGroupsList(ctx).Limit(10000).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllVlanGroups", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.VLANGroup{}
-	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.VLANGroup{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.VLANGroup{}
-	}
-
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.VLANGroup, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.IpamAPI.IpamVlanGroupsList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllVlanGroups",
+	)
 }
 
 func (s *VlanGroupService) Update(ctx context.Context, id string, req nb.VLANGroupRequest) (*nb.VLANGroup, error) {
