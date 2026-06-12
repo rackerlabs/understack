@@ -22,25 +22,23 @@ func NewConsolePortTemplateService(nautobotClient *client.NautobotClient) *Conso
 }
 
 func (s *ConsolePortTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.ConsolePortTemplate {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.consoleporttemplate", deviceTypeID)
-
-	// Define the API call function for this specific endpoint
-	apiCall := func(ctx context.Context, batchIds []string) ([]nb.ConsolePortTemplate, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
-		if err != nil {
-			return nil, resp, err
-		}
-		if list == nil {
-			return []nb.ConsolePortTemplate{}, resp, nil
-		}
-		return list.Results, resp, nil
-	}
-
-	// Use the helper function for pagination
-	return helpers.PaginatedListWithIDs(
+	return helpers.PaginatedList(
 		ctx,
-		ids,
-		apiCall,
+		func(ctx context.Context, limit, offset int32) ([]nb.ConsolePortTemplate, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				DeviceType([]string{deviceTypeID}).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
 		s.client.AddReport,
 		"ListAllConsolePortTemplateByDeviceType",
 		"device_type_id", deviceTypeID,
@@ -48,7 +46,7 @@ func (s *ConsolePortTemplateService) ListByDeviceType(ctx context.Context, devic
 }
 
 func (s *ConsolePortTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.ConsolePortTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Limit(10000).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetConsolePortTemplateByName", "failed to get console port template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)

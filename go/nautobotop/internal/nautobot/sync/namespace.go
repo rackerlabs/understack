@@ -56,9 +56,10 @@ func (s *NamespaceSync) SyncAll(ctx context.Context, data map[string]string) err
 }
 
 func (s *NamespaceSync) syncSingleNamespace(ctx context.Context, namespace models.Namespace) error {
-	existingNamespace := s.namespaceSvc.GetByName(ctx, namespace.Name)
+	existingNamespace := s.namespaceSvc.GetByID(ctx, namespace.ID)
 
 	nsRequest := nb.NamespaceRequest{
+		Id:          optionalID(namespace.ID),
 		Name:        namespace.Name,
 		Description: nb.PtrString(namespace.Description),
 	}

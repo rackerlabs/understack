@@ -47,9 +47,10 @@ func (s *TenantGroupSync) SyncAll(ctx context.Context, data map[string]string) e
 }
 
 func (s *TenantGroupSync) syncSingleTenantGroup(ctx context.Context, tg models.TenantGroup) error {
-	existing := s.tenantGroupSvc.GetByName(ctx, tg.Name)
+	existing := s.tenantGroupSvc.GetByID(ctx, tg.ID)
 
 	tgRequest := nb.TenantGroupRequest{
+		Id:   optionalID(tg.ID),
 		Name: tg.Name,
 	}
 	if tg.Description != "" {

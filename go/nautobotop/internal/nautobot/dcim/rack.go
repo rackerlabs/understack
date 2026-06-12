@@ -2,6 +2,7 @@ package dcim
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -56,35 +57,52 @@ func (s *RackService) GetByName(ctx context.Context, name string) nb.Rack {
 	return list.Results[0]
 }
 
-func (s *RackService) ListAll(ctx context.Context) []nb.Rack {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.rack")
-	list, resp, err := s.client.APIClient.DcimAPI.DcimRacksList(ctx).Id(ids).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllRacks", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.Rack{}
+func (s *RackService) GetByID(ctx context.Context, id string) nb.Rack {
+	if id == "" {
+		return nb.Rack{}
 	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.Rack{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.Rack{}
+	if rack, ok := cache.FindByID(s.client.Cache, "racks", id, func(r nb.Rack) *string {
+		return r.Id
+	}); ok {
+		return rack
 	}
 
-	return list.Results
+	list, resp, err := s.client.APIClient.DcimAPI.DcimRacksList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetRackByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.Rack{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.Rack{}
+	}
+
+	return list.Results[0]
+}
+
+func (s *RackService) ListAll(ctx context.Context) []nb.Rack {
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.Rack, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimRacksList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllRacks",
+	)
 }
 
 func (s *RackService) Update(ctx context.Context, id string, req nb.WritableRackRequest) (*nb.Rack, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateRack", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	rack, resp, err := s.client.APIClient.DcimAPI.DcimRacksUpdate(ctx, id).WritableRackRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

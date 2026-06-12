@@ -23,25 +23,22 @@ func NewManufacturerService(nautobotClient *client.NautobotClient) *Manufacturer
 }
 
 func (s *ManufacturerService) ListAll(ctx context.Context) []nb.Manufacturer {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.manufacturer")
-
-	// Define the API call function for this specific endpoint
-	apiCall := func(ctx context.Context, batchIds []string) ([]nb.Manufacturer, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimManufacturersList(ctx).Id(batchIds).Depth(10).Execute()
-		if err != nil {
-			return nil, resp, err
-		}
-		if list == nil {
-			return []nb.Manufacturer{}, resp, nil
-		}
-		return list.Results, resp, nil
-	}
-
-	// Use the helper function for pagination
-	return helpers.PaginatedListWithIDs(
+	return helpers.PaginatedList(
 		ctx,
-		ids,
-		apiCall,
+		func(ctx context.Context, limit, offset int32) ([]nb.Manufacturer, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimManufacturersList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(10).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
 		s.client.AddReport,
 		"ListAllManufacturers",
 	)
@@ -53,7 +50,7 @@ func (s *ManufacturerService) GetByName(ctx context.Context, name string) nb.Man
 	}); ok {
 		return manufacturer
 	}
-	list, resp, err := s.client.APIClient.DcimAPI.DcimManufacturersList(ctx).Limit(10000).Depth(2).Name([]string{name}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimManufacturersList(ctx).Depth(2).Name([]string{name}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetManufacturerByName", "failed to get manufacturer by name", "name", name, "error", err.Error(), "response_body", bodyString)

@@ -2,6 +2,7 @@ package dcim
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -57,35 +58,52 @@ func (s *LocationTypeService) GetByName(ctx context.Context, name string) nb.Loc
 	return list.Results[0]
 }
 
-func (s *LocationTypeService) ListAll(ctx context.Context) []nb.LocationType {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.locationtype")
-	list, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesList(ctx).Id(ids).Depth(10).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllLocationTypes", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.LocationType{}
+func (s *LocationTypeService) GetByID(ctx context.Context, id string) nb.LocationType {
+	if id == "" {
+		return nb.LocationType{}
 	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.LocationType{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.LocationType{}
+	if locationType, ok := cache.FindByID(s.client.Cache, "locationtypes", id, func(lt nb.LocationType) *string {
+		return lt.Id
+	}); ok {
+		return locationType
 	}
 
-	return list.Results
+	list, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesList(ctx).Depth(10).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetLocationTypeByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.LocationType{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.LocationType{}
+	}
+
+	return list.Results[0]
+}
+
+func (s *LocationTypeService) ListAll(ctx context.Context) []nb.LocationType {
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.LocationType, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(10).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllLocationTypes",
+	)
 }
 
 func (s *LocationTypeService) Update(ctx context.Context, id string, req nb.LocationTypeRequest) (*nb.LocationType, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateLocationType", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	locationType, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesUpdate(ctx, id).LocationTypeRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

@@ -2,6 +2,7 @@ package extras
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -56,34 +57,52 @@ func (s *RoleService) GetByName(ctx context.Context, name string) nb.Role {
 	return list.Results[0]
 }
 
-func (s *RoleService) ListAll(ctx context.Context) []nb.Role {
-	ids := s.client.GetChangeObjectIDS(ctx, "extras.role")
-	list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).Id(ids).Depth(2).Execute()
+func (s *RoleService) GetByID(ctx context.Context, id string) nb.Role {
+	if id == "" {
+		return nb.Role{}
+	}
+	if role, ok := cache.FindByID(s.client.Cache, "roles", id, func(r nb.Role) *string {
+		return r.Id
+	}); ok {
+		return role
+	}
+
+	list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).Depth(2).Id([]string{id}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllRoles", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.Role{}
+		s.client.AddReport("GetRoleByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.Role{}
 	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.Role{}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.Role{}
 	}
-	if list.Results[0].Id == nil {
-		return []nb.Role{}
-	}
-	return list.Results
+
+	return list.Results[0]
+}
+
+func (s *RoleService) ListAll(ctx context.Context) []nb.Role {
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.Role, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllRoles",
+	)
 }
 
 func (s *RoleService) Update(ctx context.Context, id string, req nb.RoleRequest) (*nb.Role, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateRole", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	role, resp, err := s.client.APIClient.ExtrasAPI.ExtrasRolesUpdate(ctx, id).RoleRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

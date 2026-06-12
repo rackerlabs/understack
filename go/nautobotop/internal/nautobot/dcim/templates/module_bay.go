@@ -22,25 +22,23 @@ func NewModuleBayTemplateService(nautobotClient *client.NautobotClient) *ModuleB
 }
 
 func (s *ModuleBayTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.ModuleBayTemplate {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.modulebaytemplate", deviceTypeID)
-
-	// Define the API call function for this specific endpoint
-	apiCall := func(ctx context.Context, batchIds []string) ([]nb.ModuleBayTemplate, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Id(batchIds).Depth(2).DeviceType([]string{deviceTypeID}).Execute()
-		if err != nil {
-			return nil, resp, err
-		}
-		if list == nil {
-			return []nb.ModuleBayTemplate{}, resp, nil
-		}
-		return list.Results, resp, nil
-	}
-
-	// Use the helper function for pagination
-	return helpers.PaginatedListWithIDs(
+	return helpers.PaginatedList(
 		ctx,
-		ids,
-		apiCall,
+		func(ctx context.Context, limit, offset int32) ([]nb.ModuleBayTemplate, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				DeviceType([]string{deviceTypeID}).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
 		s.client.AddReport,
 		"ListAllModuleBayTemplateByDeviceType",
 		"device_type_id", deviceTypeID,
@@ -48,7 +46,7 @@ func (s *ModuleBayTemplateService) ListByDeviceType(ctx context.Context, deviceT
 }
 
 func (s *ModuleBayTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.ModuleBayTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Limit(10000).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimModuleBayTemplatesList(ctx).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetModuleBayTemplateByName", "failed to get module bay template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)

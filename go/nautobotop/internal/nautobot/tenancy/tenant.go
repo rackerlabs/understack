@@ -2,6 +2,7 @@ package tenancy
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -56,34 +57,52 @@ func (s *TenantService) GetByName(ctx context.Context, name string) nb.Tenant {
 	return list.Results[0]
 }
 
-func (s *TenantService) ListAll(ctx context.Context) []nb.Tenant {
-	ids := s.client.GetChangeObjectIDS(ctx, "tenancy.tenant")
-	list, resp, err := s.client.APIClient.TenancyAPI.TenancyTenantsList(ctx).Id(ids).Depth(2).Execute()
+func (s *TenantService) GetByID(ctx context.Context, id string) nb.Tenant {
+	if id == "" {
+		return nb.Tenant{}
+	}
+	if tenant, ok := cache.FindByID(s.client.Cache, "tenants", id, func(t nb.Tenant) *string {
+		return t.Id
+	}); ok {
+		return tenant
+	}
+
+	list, resp, err := s.client.APIClient.TenancyAPI.TenancyTenantsList(ctx).Depth(2).Id([]string{id}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllTenants", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.Tenant{}
+		s.client.AddReport("GetTenantByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.Tenant{}
 	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.Tenant{}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.Tenant{}
 	}
-	if list.Results[0].Id == nil {
-		return []nb.Tenant{}
-	}
-	return list.Results
+
+	return list.Results[0]
+}
+
+func (s *TenantService) ListAll(ctx context.Context) []nb.Tenant {
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.Tenant, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.TenancyAPI.TenancyTenantsList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllTenants",
+	)
 }
 
 func (s *TenantService) Update(ctx context.Context, id string, req nb.TenantRequest) (*nb.Tenant, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateTenant", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	tenant, resp, err := s.client.APIClient.TenancyAPI.TenancyTenantsUpdate(ctx, id).TenantRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

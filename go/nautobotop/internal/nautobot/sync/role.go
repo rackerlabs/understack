@@ -47,9 +47,10 @@ func (s *RoleSync) SyncAll(ctx context.Context, data map[string]string) error {
 }
 
 func (s *RoleSync) syncSingleRole(ctx context.Context, role models.Role) error {
-	existing := s.roleSvc.GetByName(ctx, role.Name)
+	existing := s.roleSvc.GetByID(ctx, role.ID)
 
 	roleRequest := nb.RoleRequest{
+		Id:           optionalID(role.ID),
 		Name:         role.Name,
 		ContentTypes: role.ContentTypes,
 	}

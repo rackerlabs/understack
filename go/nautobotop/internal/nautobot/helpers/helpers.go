@@ -79,8 +79,13 @@ func BuildRelationshipDestination(ids ...string) nb.ApprovalWorkflowDefinitionRe
 	}
 }
 
+// maxResponseBodyBytes bounds how much of a response body is kept for error
+// reports, since report lines end up in the CR status stored in etcd.
+const maxResponseBodyBytes = 2048
+
 // ReadResponseBody safely reads and closes the response body.
-// Returns the body content as a string. If resp is nil, returns empty string.
+// Returns the body content as a string, truncated to maxResponseBodyBytes.
+// If resp is nil, returns empty string.
 func ReadResponseBody(resp *http.Response) string {
 	if resp == nil || resp.Body == nil {
 		return "nil or empty body from remote"
@@ -92,9 +97,12 @@ func ReadResponseBody(resp *http.Response) string {
 		}
 	}(resp.Body)
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes+1))
 	if err != nil {
 		return fmt.Sprintf("failed to read response body: %v", err)
+	}
+	if len(bodyBytes) > maxResponseBodyBytes {
+		return string(bodyBytes[:maxResponseBodyBytes]) + "...(truncated)"
 	}
 	return string(bodyBytes)
 }

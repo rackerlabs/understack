@@ -14,7 +14,6 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/ipam"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/models"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/tenancy"
-	"github.com/samber/lo"
 	"go.yaml.in/yaml/v3"
 )
 
@@ -63,27 +62,40 @@ func (s *PrefixSync) SyncAll(ctx context.Context, data map[string]string) error 
 		prefixes.Prefix = append(prefixes.Prefix, yml...)
 	}
 
+	syncedIDs := make(map[string]struct{}, len(prefixes.Prefix))
 	for _, prefix := range prefixes.Prefix {
-		if err := s.syncSinglePrefix(ctx, prefix); err != nil {
+		id, err := s.syncSinglePrefix(ctx, prefix)
+		if err != nil {
 			return err
 		}
+		if id != "" {
+			syncedIDs[id] = struct{}{}
+		}
 	}
-	s.deleteObsoletePrefixes(ctx, prefixes)
+	s.deleteObsoletePrefixes(ctx, syncedIDs)
 
 	return nil
 }
 
-// syncSinglePrefix handles the create/update logic for a single prefix
-func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix) error {
-	existingPrefix := s.prefixSvc.GetByPrefix(ctx, prefix.Prefix)
+// syncSinglePrefix handles the create/update logic for a single prefix.
+// It returns the Nautobot ID of the prefix it created, updated, or matched,
+// so the caller can distinguish synced objects from obsolete ones by ID.
+func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix) (string, error) {
+	existingPrefix := s.prefixSvc.GetByID(ctx, prefix.ID)
+	if existingPrefix.Id == nil && prefix.ID == "" {
+		// No ID in YAML: adopt an existing prefix by its natural key instead
+		// of attempting a duplicate create.
+		existingPrefix = s.prefixSvc.GetByPrefix(ctx, prefix.Prefix)
+	}
 
 	// Build status reference (required)
 	statusRef, err := s.buildStatusReference(ctx, prefix.Status)
 	if err != nil {
-		return fmt.Errorf("failed to build status reference for prefix %s: %w", prefix.Prefix, err)
+		return "", fmt.Errorf("failed to build status reference for prefix %s: %w", prefix.Prefix, err)
 	}
 
 	prefixRequest := nb.WritablePrefixRequest{
+		Id:     optionalID(prefix.ID),
 		Prefix: prefix.Prefix,
 		Status: statusRef,
 	}
@@ -100,7 +112,7 @@ func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix)
 	if prefix.Namespace != "" {
 		nsRef, err := s.buildNamespaceReference(ctx, prefix.Namespace)
 		if err != nil {
-			return fmt.Errorf("failed to build namespace reference for prefix %s: %w", prefix.Prefix, err)
+			return "", fmt.Errorf("failed to build namespace reference for prefix %s: %w", prefix.Prefix, err)
 		}
 		prefixRequest.Namespace = nsRef
 	}
@@ -108,7 +120,7 @@ func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix)
 	if prefix.Role != "" {
 		roleRef, err := s.buildRoleReference(ctx, prefix.Role)
 		if err != nil {
-			return fmt.Errorf("failed to build role reference for prefix %s: %w", prefix.Prefix, err)
+			return "", fmt.Errorf("failed to build role reference for prefix %s: %w", prefix.Prefix, err)
 		}
 		prefixRequest.Role = roleRef
 	}
@@ -116,7 +128,7 @@ func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix)
 	if prefix.Rir != "" {
 		rirRef, err := s.buildRirReference(ctx, prefix.Rir)
 		if err != nil {
-			return fmt.Errorf("failed to build rir reference for prefix %s: %w", prefix.Prefix, err)
+			return "", fmt.Errorf("failed to build rir reference for prefix %s: %w", prefix.Prefix, err)
 		}
 		prefixRequest.Rir = rirRef
 	}
@@ -124,7 +136,7 @@ func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix)
 	if prefix.DateAllocated != "" {
 		dateRef, err := s.parseDateAllocated(prefix.DateAllocated)
 		if err != nil {
-			return fmt.Errorf("failed to parse date_allocated for prefix %s: %w", prefix.Prefix, err)
+			return "", fmt.Errorf("failed to parse date_allocated for prefix %s: %w", prefix.Prefix, err)
 		}
 		prefixRequest.DateAllocated = *nb.NewNullableTime(&dateRef)
 	}
@@ -132,7 +144,7 @@ func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix)
 	if len(prefix.Locations) > 0 {
 		locationRef, err := s.buildLocationReference(ctx, prefix.Locations[0])
 		if err != nil {
-			return fmt.Errorf("failed to build location reference for prefix %s: %w", prefix.Prefix, err)
+			return "", fmt.Errorf("failed to build location reference for prefix %s: %w", prefix.Prefix, err)
 		}
 		prefixRequest.Location = locationRef
 	}
@@ -171,21 +183,27 @@ func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix)
 	}
 
 	if !helpers.CompareJSONFields(existingPrefix, prefixRequest) {
-		return s.updatePrefix(ctx, *existingPrefix.Id, prefixRequest)
+		if err := s.updatePrefix(ctx, *existingPrefix.Id, prefixRequest); err != nil {
+			return "", err
+		}
+		return *existingPrefix.Id, nil
 	}
 
 	log.Info("prefix unchanged, skipping update", "prefix", prefixRequest.Prefix)
-	return nil
+	return *existingPrefix.Id, nil
 }
 
-// createPrefix creates a new prefix in Nautobot
-func (s *PrefixSync) createPrefix(ctx context.Context, request nb.WritablePrefixRequest) error {
+// createPrefix creates a new prefix in Nautobot and returns its ID
+func (s *PrefixSync) createPrefix(ctx context.Context, request nb.WritablePrefixRequest) (string, error) {
 	createdPrefix, err := s.prefixSvc.Create(ctx, request)
 	if err != nil || createdPrefix == nil {
-		return fmt.Errorf("failed to create prefix %s: %w", request.Prefix, err)
+		return "", fmt.Errorf("failed to create prefix %s: %w", request.Prefix, err)
 	}
 	log.Info("prefix created", "prefix", request.Prefix)
-	return nil
+	if createdPrefix.Id == nil {
+		return "", nil
+	}
+	return *createdPrefix.Id, nil
 }
 
 // updatePrefix updates an existing prefix in Nautobot
@@ -198,24 +216,20 @@ func (s *PrefixSync) updatePrefix(ctx context.Context, id string, request nb.Wri
 	return nil
 }
 
-// deleteObsoletePrefixes removes prefixes that are not defined in YAML
-func (s *PrefixSync) deleteObsoletePrefixes(ctx context.Context, prefixes models.Prefixes) {
-	desiredPrefixes := make(map[string]models.Prefix)
-	for _, prefix := range prefixes.Prefix {
-		desiredPrefixes[prefix.Prefix] = prefix
-	}
-
-	existingPrefixes := s.prefixSvc.ListAll(ctx)
-	existingMap := make(map[string]nb.Prefix, len(existingPrefixes))
-	for _, prefix := range existingPrefixes {
-		existingMap[prefix.Prefix] = prefix
-	}
-
-	obsoletePrefixes := lo.OmitByKeys(existingMap, lo.Keys(desiredPrefixes))
-	for _, prefix := range obsoletePrefixes {
-		if prefix.Id != nil {
-			_ = s.prefixSvc.Destroy(ctx, *prefix.Id)
+// deleteObsoletePrefixes removes prefixes that were not created, updated, or
+// matched during the sync pass. Matching by ID (rather than by prefix string)
+// keeps this immune to server-side normalization of the prefix value.
+// The ownership check in Destroy still protects objects not created by the
+// operator's user.
+func (s *PrefixSync) deleteObsoletePrefixes(ctx context.Context, syncedIDs map[string]struct{}) {
+	for _, prefix := range s.prefixSvc.ListAll(ctx) {
+		if prefix.Id == nil {
+			continue
 		}
+		if _, ok := syncedIDs[*prefix.Id]; ok {
+			continue
+		}
+		_ = s.prefixSvc.Destroy(ctx, *prefix.Id)
 	}
 }
 
