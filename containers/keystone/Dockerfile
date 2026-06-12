@@ -11,4 +11,7 @@ ADD --checksum=sha256:${MOD_AUTH_OPENIDC_SHA256} https://github.com/OpenIDC/mod_
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         /tmp/libapache2-mod-auth-openidc_${MOD_AUTH_OPENIDC_VERSION}-1.noble_amd64.deb \
+        libapache2-mod-oauth2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/*.deb
+
+RUN a2enmod oauth2

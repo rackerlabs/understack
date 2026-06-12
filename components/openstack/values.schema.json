@@ -317,6 +317,16 @@
           "default": "internal",
           "description": "OpenStack service catalog interface to use"
         },
+        "keystoneIdentityProvider": {
+          "type": "string",
+          "default": "undefined",
+          "description": "Keystone Identity provider name"
+        },
+        "accessTokenFile": {
+          "type": "string",
+          "default": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+          "description": "Path to a file with Kubernetes token"
+        },
         "services": {
           "type": "object",
           "description": "Service users organized by service name",

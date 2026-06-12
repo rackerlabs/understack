@@ -197,6 +197,7 @@ nav:
       - deploy-guide/components/neutron.md
       - deploy-guide/components/nova.md
       - deploy-guide/components/octavia.md
+      - deploy-guide/components/oidc-rbac.md
       - deploy-guide/components/openebs.md
       - deploy-guide/components/openstack-exporter.md
       - deploy-guide/components/openstack-helm.md
