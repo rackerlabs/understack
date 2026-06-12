@@ -46,7 +46,7 @@ func (s *ConsolePortTemplateService) ListByDeviceType(ctx context.Context, devic
 }
 
 func (s *ConsolePortTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.ConsolePortTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Limit(10000).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimConsolePortTemplatesList(ctx).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetConsolePortTemplateByName", "failed to get console port template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)

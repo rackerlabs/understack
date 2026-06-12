@@ -2,6 +2,7 @@ package dcim
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -81,20 +82,25 @@ func (s *DeviceTypeService) GetByID(ctx context.Context, id string) nb.DeviceTyp
 }
 
 func (s *DeviceTypeService) ListAll(ctx context.Context) []nb.DeviceType {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Limit(10000).Depth(10).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllDeviceTypes", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.DeviceType{}
-	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.DeviceType{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.DeviceType{}
-	}
-
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.DeviceType, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(10).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllDeviceTypes",
+	)
 }
 
 func (s *DeviceTypeService) Update(ctx context.Context, id string, req nb.WritableDeviceTypeRequest) (*nb.DeviceType, error) {

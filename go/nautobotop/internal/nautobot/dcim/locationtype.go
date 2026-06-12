@@ -2,6 +2,7 @@ package dcim
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -81,20 +82,25 @@ func (s *LocationTypeService) GetByID(ctx context.Context, id string) nb.Locatio
 }
 
 func (s *LocationTypeService) ListAll(ctx context.Context) []nb.LocationType {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesList(ctx).Limit(10000).Depth(10).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllLocationTypes", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.LocationType{}
-	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.LocationType{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.LocationType{}
-	}
-
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.LocationType, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimLocationTypesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(10).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllLocationTypes",
+	)
 }
 
 func (s *LocationTypeService) Update(ctx context.Context, id string, req nb.LocationTypeRequest) (*nb.LocationType, error) {

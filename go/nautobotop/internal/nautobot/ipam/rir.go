@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -80,19 +81,25 @@ func (s *RirService) GetByID(ctx context.Context, id string) nb.RIR {
 }
 
 func (s *RirService) ListAll(ctx context.Context) []nb.RIR {
-	list, resp, err := s.client.APIClient.IpamAPI.IpamRirsList(ctx).Limit(10000).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllRirs", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.RIR{}
-	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.RIR{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.RIR{}
-	}
-	return list.Results
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.RIR, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.IpamAPI.IpamRirsList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllRirs",
+	)
 }
 
 func (s *RirService) Update(ctx context.Context, id string, req nb.RIRRequest) (*nb.RIR, error) {
