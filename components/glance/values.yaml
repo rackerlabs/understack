@@ -39,6 +39,14 @@ storage: pvc
 volume:
   class_name: ''
 
+# volume details for the image staging directory
+# https://github.com/openstack/openstack-helm/blob/master/glance/values.yaml#L289-L295
+volume_staging:
+  class_name: ceph-fs-ec
+  size: 20Gi
+  accessModes:
+    - ReadWriteMany
+
 # disable the default image additions
 bootstrap:
   structured:
@@ -59,42 +67,20 @@ dependencies:
         - glance-ks-endpoints
 
 pod:
-  mounts:
-    glance_db_sync:
-      glance_db_sync:
-        volumeMounts:
-          - name: glance-etc-snippets
-            mountPath: /etc/glance/glance.conf.d/
-            readOnly: true
-        volumes:
-          - name: glance-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: glance-ks-etc
+  etcSources:
     glance_api:
-      glance_api:
-        volumeMounts:
-          - name: glance-etc-snippets
-            mountPath: /etc/glance/glance.conf.d/
-            readOnly: true
-          - name: glance-staging
-            mountPath: /var/lib/glance/tmp/
-        volumes:
-          - name: glance-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: glance-ks-etc
-          - name: glance-staging
-            persistentVolumeClaim:
-              claimName: glance-staging
+      - secret:
+          name: glance-ks-etc
+    glance_db_sync:
+      - secret:
+          name: glance-ks-etc
+    glance_metadefs_load: []
+  replicas:
+    api: 2
   lifecycle:
     disruption_budget:
       api:
-        # this should be set to no more than (pod.replicas.api - 1)
-        # usually set on per-deployment basis.
-        min_available: 0
+        min_available: 1
   resources:
     enabled: true
     api:
