@@ -41,6 +41,8 @@ stringData:
     protocol=openid
     access_token_file=/var/run/secrets/kubernetes.io/serviceaccount/token
     region_name={{ $.Values.regionName }}
+    project_domain_name={{ include "openstack.serviceuser.project_domain_name" $user }}
+    project_name={{ include "openstack.serviceuser.project_name" $user  }}
   {{- end }}
   {{- end }}
 {{- end }}
