@@ -37,7 +37,7 @@ stringData:
     [{{ $section }}]
     auth_type=v3oidcaccesstokenfile
     auth_url={{ $.Values.keystoneUrl }}
-    identity_provider={{ $.Values.identityProvider }}
+    identity_provider={{ $.Values.keystoneServiceUsers.keystoneIdentityProvider }}
     protocol=openid
     access_token_file=/var/run/secrets/kubernetes.io/serviceaccount/token
     region_name={{ $.Values.regionName }}
