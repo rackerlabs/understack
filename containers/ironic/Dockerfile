@@ -23,6 +23,7 @@ RUN git -C /src/sushy fetch --unshallow --tags && \
     sed -i '/sushy==.*/d' /upper-constraints.txt
 
 COPY python/ironic-understack /src/understack/ironic-understack
+COPY python/keystoneauth-kubeservicetoken /src/keystoneauth-kubeservicetoken
 
 ARG OPENSTACK_VERSION="required_argument"
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -32,7 +33,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         /src/ironic \
         /src/sushy \
         /src/understack/ironic-understack \
-        proliantutils==2.16.3
+        /src/keystoneauth-kubeservicetoken \
+    proliantutils==2.16.3
 
 COPY containers/ironic/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
