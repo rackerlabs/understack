@@ -165,6 +165,9 @@ global:
     # -- Enable/disable deploying Nautobot Operator
     # @default -- false
     enabled: false
+    # -- Chart version for Nautobot Operator
+    # @default -- 0.0.3
+    chartVersion: 0.0.3
 
   # -- OpenEBS
   openebs:
