@@ -19,23 +19,6 @@ mech_understack_opts = [
         "undersync_url",
         help="Undersync URL",
     ),
-    cfg.StrOpt(
-        "undersync_token",
-        help=(
-            "Undersync API token. If not provided, "
-            "the '/etc/undersync/token' will be read instead."
-        ),
-    ),
-    cfg.BoolOpt(
-        "undersync_use_keystone_auth",
-        default=False,
-        help=(
-            "Use Keystone authentication for Undersync. "
-            "If True, the driver will use the existing Neutron service token "
-            "from the [keystone_authtoken] config section instead of the "
-            "static JWT token."
-        ),
-    ),
     cfg.BoolOpt(
         "undersync_dry_run", default=True, help="Call Undersync with dry-run mode"
     ),

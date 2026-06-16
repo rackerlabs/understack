@@ -208,13 +208,8 @@ class TestCreateNetworkPostCommit:
 
 
 class TestKeystoneAuthentication:
-    def test_initialize_with_keystone_auth(self, mocker, oslo_config):
-        """Test that driver initializes with Keystone authentication when enabled."""
-        oslo_config.config(
-            undersync_use_keystone_auth=True,
-            group="ml2_understack",
-        )
-
+    def test_initialize_with_keystone_auth(self, mocker):
+        """Test that driver initializes with Keystone authentication."""
         mock_auth = mocker.patch("keystoneauth1.loading.load_auth_from_conf_options")
         mock_session_class = mocker.patch(
             "neutron_understack.neutron_understack_mech.ks_session.Session"
@@ -234,30 +229,4 @@ class TestKeystoneAuthentication:
         mock_auth.assert_called_once_with(cfg.CONF, "keystone_authtoken")
         mock_session_class.assert_called_once()
         mock_get_token.assert_called_once()
-        assert driver.undersync.use_keystone_auth is True
         assert driver.undersync.session == mock_session_instance
-
-    def test_initialize_with_jwt_auth(self, mocker, oslo_config):
-        """Test that driver initializes with JWT auth only."""
-        oslo_config.config(
-            undersync_use_keystone_auth=False,
-            undersync_token="test_jwt_token",
-            group="ml2_understack",
-        )
-
-        mock_auth = mocker.patch("keystoneauth1.loading.load_auth_from_conf_options")
-        mock_session = mocker.patch(
-            "keystoneauth1.loading.load_session_from_conf_options"
-        )
-
-        # Mock IronicClient to avoid config issues
-        mocker.patch("neutron_understack.neutron_understack_mech.IronicClient")
-
-        driver = UnderstackDriver()
-        driver.initialize()
-
-        # Should not call Keystone auth functions
-        mock_auth.assert_not_called()
-        mock_session.assert_not_called()
-        assert driver.undersync.use_keystone_auth is False
-        assert driver.undersync.token == "test_jwt_token"

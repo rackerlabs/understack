@@ -7,7 +7,7 @@ from neutron_understack.neutron_understack_mech import UnderstackDriver
 class TestKeystoneTokenRefresh:
     """Test that Keystone tokens can be refreshed when they expire."""
 
-    def test_undersync_refreshes_expired_keystone_token(self, mocker, oslo_config):
+    def test_undersync_refreshes_expired_keystone_token(self, mocker):
         """Test that Undersync can handle token expiration by refreshing the token.
 
         This test simulates a scenario where:
@@ -18,11 +18,6 @@ class TestKeystoneTokenRefresh:
 
         This proves the session can refresh tokens automatically.
         """
-        oslo_config.config(
-            undersync_use_keystone_auth=True,
-            group="ml2_understack",
-        )
-
         # Mock the keystone session to simulate token refresh
         mock_session = Mock()
         # Use cycle to provide different tokens on each call (simulating refresh)
