@@ -6,6 +6,7 @@ from keystoneauth1 import session as ks_session
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
+from neutron_lib.callbacks import priority_group
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib.plugins.ml2 import api
@@ -98,6 +99,15 @@ class UnderstackDriver(MechanismDriver):
             resources.PORT,
             events.PRECOMMIT_DELETE,
             cancellable=True,
+        )
+        # Runs after neutron's OVN handler (PRIORITY_DEFAULT) has created the
+        # internal LRP, so the unified network HCG and the LRP both exist.
+        # Smaller priority is called earlier, so use a larger value to run later.
+        registry.subscribe(
+            routers.link_vxlan_network_ha_chassis_group,
+            resources.ROUTER_INTERFACE,
+            events.AFTER_CREATE,
+            priority=priority_group.PRIORITY_DEFAULT + 1000,
         )
 
     def create_network_precommit(self, context):
