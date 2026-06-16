@@ -44,6 +44,7 @@ def create_port_postcommit(context: PortContext) -> None:
     In situation 2, we don't have to do anything.
     """
     network_id = context.current["network_id"]
+
     if not is_only_router_port_on_network(
         network_id=network_id, transaction_context=context.plugin_context
     ):
@@ -183,6 +184,103 @@ def create_uplink_port(segment: NetworkSegment, network_id: str, txn=None) -> No
         options=options,
     )
     ovn_client()._transaction([cmd], txn=txn)
+
+
+def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) -> None:
+    """Populate the unified network HCG (and anchor the internal LRP) for vxlan.
+
+    Workaround for a neutron bug exposed in 2026.1. For a router with a vxlan-type
+    external gateway, neutron pins the Logical_Router to a single
+    chassis via ``options:chassis`` and creates a per-router HA_Chassis_Group
+    (neutron-<router_id>) carrying that chassis, but it never sets
+    ha_chassis_group on the gateway LRP. neutron's link_network_ha_chassis_group
+    (fired when the internal LRP is created) bails out at its
+    ``if not gw_lrps[0].ha_chassis_group`` check, so it never copies the chassis
+    into the per-network unified HCG (neutron-<network_id>). External/baremetal
+    ports on that network reference the empty network HCG, so no chassis owns
+    them and routing/ARP breaks.
+
+    We do what link_network_ha_chassis_group would have done, but source the
+    chassis from the router HCG instead of the (empty) gateway LRP: populate the
+    unified network HCG with sync_ha_chassis_group_network_unified, then anchor
+    the internal router-interface LRP to that same HCG. External ports already
+    reference the unified network HCG, so populating it fixes them.
+
+    Subscribed to ROUTER_INTERFACE/AFTER_CREATE at a priority that runs after
+    neutron's OVN handler, so the LRP (lrp-<port_id>) already exists by now.
+    """
+    router_id = payload.states[0].id
+    port = payload.metadata["port"]
+    port_id = port["id"]
+    network_id = port["network_id"]
+
+    try:
+        client = ovn_client()
+        if not client:
+            return
+        nb_idl = client._nb_idl
+
+        # Vxlan-gateway signal: the per-router HCG exists with chassis.
+        # VLAN/FLAT gateways have no router HCG and are handled by neutron.
+        router_hcg = nb_idl.lookup(
+            "HA_Chassis_Group", ovn_utils.ovn_name(router_id), default=None
+        )
+        if not router_hcg or not router_hcg.ha_chassis:
+            LOG.debug(
+                "No HA_Chassis_Group with chassis found for router %(router)s",
+                {"router": router_id},
+            )
+            return
+
+        chassis_prio = {hc.chassis_name: hc.priority for hc in router_hcg.ha_chassis}
+        lrp_name = ovn_utils.ovn_lrouter_port_name(port_id)
+
+        LOG.info(
+            "Linking unified HCG for network %(net)s (router %(router)s) with "
+            "chassis %(chassis)s and anchoring internal LRP %(lrp)s",
+            {
+                "net": network_id,
+                "router": router_id,
+                "chassis": list(chassis_prio),
+                "lrp": lrp_name,
+            },
+        )
+
+        admin_context = n_context.get_admin_context()
+        with nb_idl.transaction(check_error=True) as txn:
+            # Populate the per-network unified HCG with the gateway chassis.
+            # This is what fixes the external (baremetal) ports, which already
+            # reference neutron-<network_id>.
+            hcg, _ = ovn_utils.sync_ha_chassis_group_network_unified(
+                admin_context,
+                nb_idl,
+                client._sb_idl,
+                network_id,
+                router_id,
+                chassis_prio,
+                txn,
+            )
+
+            # Anchor the internal router-interface LRP to the same unified HCG.
+            if nb_idl.lookup("Logical_Router_Port", lrp_name, default=None):
+                txn.add(
+                    nb_idl.db_set(
+                        "Logical_Router_Port",
+                        lrp_name,
+                        ("ha_chassis_group", hcg),
+                    )
+                )
+    except Exception as err:
+        LOG.error(
+            "Failed linking HA_Chassis_Group for network %(net)s port "
+            "%(port)s (router %(router)s): %(error)s",
+            {
+                "net": network_id,
+                "port": port_id,
+                "router": router_id,
+                "error": err,
+            },
+        )
 
 
 def delete_uplink_port(segment: NetworkSegment, network_id: str) -> None:
