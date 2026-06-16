@@ -5,11 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/log"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -83,24 +83,33 @@ func runResync(opts *resyncOpts) error {
 		return err
 	}
 
-	if err := confirmWithUser(crName); err != nil {
-		return err
-	}
-
-	if err := clearCRStatus(client, crName); err != nil {
-		return err
-	}
-
 	operatorRef, err := resolveOperatorDeployment(client, opts.operatorName)
 	if err != nil {
 		return err
 	}
 
-	if err := rolloutRestartDeployment(client, operatorRef); err != nil {
+	if err := confirmWithUser(crName); err != nil {
 		return err
 	}
 
-	log.Printf("resync complete: %s", crName)
+	// Scale down the operator first to prevent the running pod from
+	// racing with the new pod when we clear the CR status.
+	if err := scaleDeployment(client, operatorRef, 0); err != nil {
+		return err
+	}
+
+	if err := clearCRStatus(client, crName); err != nil {
+		// Attempt to restore the operator on failure.
+		_ = scaleDeployment(client, operatorRef, 1)
+		return err
+	}
+
+	// Bring the operator back up so a single fresh pod reconciles.
+	if err := scaleDeployment(client, operatorRef, 1); err != nil {
+		return err
+	}
+
+	log.Info("resync complete", "cr", crName)
 	return nil
 }
 
@@ -123,7 +132,7 @@ func resolveCRName(client dynamic.Interface, explicit string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Printf("using nautobot CR: %s", selected)
+	log.Info("using nautobot CR", "name", selected)
 	return selected, nil
 }
 
@@ -162,7 +171,7 @@ func resolveOperatorDeployment(client dynamic.Interface, explicit string) (names
 	}
 
 	ref, _ := parseNamespacedName(selected)
-	log.Printf("using operator deployment: %s", ref)
+	log.Info("using operator deployment", "ref", ref.String())
 	return ref, nil
 }
 
@@ -175,7 +184,7 @@ func parseNamespacedName(s string) (namespacedName, error) {
 }
 
 func clearCRStatus(client dynamic.Interface, crName string) error {
-	log.Printf("clearing status: %s", crName)
+	log.Info("clearing status", "cr", crName)
 
 	cr, err := client.Resource(nautobotGVR).Get(context.TODO(), crName, metav1.GetOptions{})
 	if err != nil {
@@ -190,30 +199,60 @@ func clearCRStatus(client dynamic.Interface, crName string) error {
 	return nil
 }
 
-func rolloutRestartDeployment(client dynamic.Interface, ref namespacedName) error {
-	log.Printf("restarting deployment: %s", ref)
+func scaleDeployment(client dynamic.Interface, ref namespacedName, replicas int32) error {
+	log.Info("scaling deployment", "ref", ref.String(), "replicas", replicas)
 
 	patch, err := json.Marshal(map[string]any{
 		"spec": map[string]any{
-			"template": map[string]any{
-				"metadata": map[string]any{
-					"annotations": map[string]any{
-						"understackctl/restartedAt": time.Now().Format(time.RFC3339),
-					},
-				},
-			},
+			"replicas": replicas,
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("marshalling restart patch: %w", err)
+		return fmt.Errorf("marshalling scale patch: %w", err)
 	}
 
 	if _, err = client.Resource(deploymentGVR).Namespace(ref.Namespace).Patch(
 		context.TODO(), ref.Name, types.MergePatchType, patch, metav1.PatchOptions{},
 	); err != nil {
-		return fmt.Errorf("restarting deployment %s: %w", ref, err)
+		return fmt.Errorf("scaling deployment %s: %w", ref, err)
+	}
+
+	if replicas == 0 {
+		if err := waitForScaleDown(client, ref); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func waitForScaleDown(client dynamic.Interface, ref namespacedName) error {
+	log.Info("waiting for pods to terminate", "ref", ref.String())
+	timeout := time.After(2 * time.Minute)
+	tick := time.NewTicker(2 * time.Second)
+	defer tick.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timed out waiting for %s to scale down", ref)
+		case <-tick.C:
+			dep, err := client.Resource(deploymentGVR).Namespace(ref.Namespace).Get(
+				context.TODO(), ref.Name, metav1.GetOptions{},
+			)
+			if err != nil {
+				return fmt.Errorf("checking deployment %s: %w", ref, err)
+			}
+			status, ok := dep.Object["status"].(map[string]any)
+			if !ok {
+				continue
+			}
+			readyReplicas, _ := status["readyReplicas"].(int64)
+			if readyReplicas == 0 {
+				log.Info("deployment scaled to 0", "ref", ref.String())
+				return nil
+			}
+		}
+	}
 }
 
 func confirmWithUser(crName string) error {
@@ -224,8 +263,13 @@ func confirmWithUser(crName string) error {
 		return fmt.Errorf("loading kubeconfig: %w", err)
 	}
 
-	fmt.Printf("\n  Cluster:  %s\n  Resource: %s\n\n", raw.CurrentContext, crName)
-	fmt.Print("  Proceed with resync? [y/N]: ")
+	fmt.Fprintln(os.Stderr)
+	log.Warn("Double check the cluster and resource we are going to update")
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprintf(os.Stderr, "  Cluster:  %s\n", raw.CurrentContext)
+	fmt.Fprintf(os.Stderr, "  Resource: %s\n", crName)
+	fmt.Fprintln(os.Stderr)
+	fmt.Fprint(os.Stderr, "Proceed with resync? [y/N]: ")
 
 	line, err := stdinReader.ReadString('\n')
 	if err != nil {
@@ -245,11 +289,11 @@ func pickOne(kind string, items []string) (string, error) {
 		return items[0], nil
 	}
 
-	fmt.Printf("Multiple %s resources found:\n", kind)
+	fmt.Fprintf(os.Stderr, "Multiple %s resources found:\n", kind)
 	for i, item := range items {
-		fmt.Printf("  [%d] %s\n", i+1, item)
+		fmt.Fprintf(os.Stderr, "  [%d] %s\n", i+1, item)
 	}
-	fmt.Print("Select number: ")
+	fmt.Fprint(os.Stderr, "Select number: ")
 
 	line, err := stdinReader.ReadString('\n')
 	if err != nil {
