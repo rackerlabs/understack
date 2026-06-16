@@ -44,26 +44,80 @@ def create_port_postcommit(context: PortContext) -> None:
     In situation 2, we don't have to do anything.
     """
     network_id = context.current["network_id"]
+    port_id = context.current["id"]
+    router_id = context.current.get("device_id")
 
     if not is_only_router_port_on_network(
         network_id=network_id, transaction_context=context.plugin_context
     ):
-        LOG.debug(
-            "Creating only a router port %(port)s for a network %(network)s "
-            "as there are already other routers on the same network.",
-            {"port": context.current["id"], "network": network_id},
+        LOG.info(
+            "Router port %(port)s on router %(router)s: network %(network)s "
+            "already has another router interface — VLAN infrastructure already "
+            "exists, nothing to do",
+            {"port": port_id, "router": router_id, "network": network_id},
         )
         return
 
+    LOG.info(
+        "Router port %(port)s on router %(router)s: first router on network "
+        "%(network)s — starting VLAN/trunk/OVN setup",
+        {"port": port_id, "router": router_id, "network": network_id},
+    )
+
+    # Step 1: allocate dynamic VLAN segment for the network node physnet
+    LOG.debug(
+        "Step 1: allocating dynamic VLAN segment for network %(net)s",
+        {"net": network_id},
+    )
     segment = fetch_or_create_router_segment(context)
+    LOG.info(
+        "Step 1 done: dynamic segment %(seg)s VLAN %(vlan)s allocated for "
+        "network %(net)s",
+        {
+            "seg": segment["id"],
+            "vlan": segment.get("segmentation_id"),
+            "net": network_id,
+        },
+    )
 
-    # Trunk
+    # Step 2: create shared Neutron port on the network node for this VLAN
+    LOG.debug(
+        "Step 2: creating shared Neutron port for segment %(seg)s",
+        {"seg": segment["id"]},
+    )
     shared_port = utils.create_neutron_port_for_segment(segment, context)
-    add_subport_to_trunk(shared_port, segment)
+    LOG.info(
+        "Step 2 done: shared Neutron port %(port)s created on network %(network)s",
+        {"port": shared_port["id"], "network": network_id},
+    )
 
-    # OVN
+    # Step 3: add the shared port as a subport on the network node trunk
+    LOG.debug(
+        "Step 3: adding port %(port)s as subport (VLAN %(vlan)s) to network node trunk",
+        {"port": shared_port["id"], "vlan": segment.get("segmentation_id")},
+    )
+    add_subport_to_trunk(shared_port, segment)
+    LOG.info("Step 3 done: subport added to trunk")
+
+    # Step 4: create OVN localnet port to wire OVN to the physical VLAN
     segment_obj = utils.network_segment_by_id(segment["id"])
+    LOG.debug(
+        "Step 4: creating OVN localnet port uplink-%(seg)s for network %(net)s",
+        {"seg": segment["id"], "net": network_id},
+    )
     create_uplink_port(segment_obj, network_id)
+    LOG.info(
+        "Step 4 done: OVN localnet port uplink-%(seg)s created for router "
+        "%(router)s — network=%(network)s shared_port=%(port)s vlan=%(vlan)s. "
+        "Undersync will push SVI config to physical switch",
+        {
+            "seg": segment["id"],
+            "router": router_id,
+            "network": network_id,
+            "port": shared_port["id"],
+            "vlan": segment.get("segmentation_id"),
+        },
+    )
 
 
 def is_only_router_port_on_network(
@@ -78,7 +132,15 @@ def is_only_router_port_on_network(
         device_owner=ROUTER_INTERFACE_AND_GW,
     )
 
-    LOG.debug("Router ports found: %(ports)s", {"ports": other_router_ports})
+    router_port_ids = [getattr(port, "id", None) for port in other_router_ports]
+    LOG.info(
+        "Router-owned ports on network %(network)s: count=%(count)d ids=%(ports)s",
+        {
+            "network": network_id,
+            "count": len(other_router_ports),
+            "ports": router_port_ids,
+        },
+    )
     return not len(other_router_ports) > 1
 
 
@@ -96,13 +158,44 @@ def add_subport_to_trunk(shared_port: PortDict, segment: NetworkSegmentDict) -> 
             },
         ]
     }
-    trunk_id = utils.fetch_network_node_trunk_id()
+    try:
+        trunk_id = utils.fetch_network_node_trunk_id()
+    except Exception:
+        LOG.exception(
+            "add_subport_to_trunk: failed to find network node trunk for "
+            "shared port %(port)s VLAN %(vlan)s",
+            {
+                "port": shared_port["id"],
+                "vlan": segment["segmentation_id"],
+            },
+        )
+        raise
 
-    utils.fetch_trunk_plugin().add_subports(
-        context=n_context.get_admin_context(),
-        trunk_id=trunk_id,
-        subports=subports,
+    LOG.debug(
+        "add_subport_to_trunk: trunk %(trunk)s port %(port)s VLAN %(vlan)s",
+        {
+            "trunk": trunk_id,
+            "port": shared_port["id"],
+            "vlan": segment["segmentation_id"],
+        },
     )
+    try:
+        utils.fetch_trunk_plugin().add_subports(
+            context=n_context.get_admin_context(),
+            trunk_id=trunk_id,
+            subports=subports,
+        )
+    except Exception:
+        LOG.exception(
+            "add_subport_to_trunk: failed adding shared port %(port)s as "
+            "VLAN %(vlan)s subport to trunk %(trunk)s",
+            {
+                "port": shared_port["id"],
+                "vlan": segment["segmentation_id"],
+                "trunk": trunk_id,
+            },
+        )
+        raise
 
 
 def fetch_or_create_router_segment(context: PortContext) -> NetworkSegmentDict:
@@ -114,14 +207,29 @@ def fetch_or_create_router_segment(context: PortContext) -> NetworkSegmentDict:
     network_id = context.current["network_id"]
     physnet = cfg.CONF.ml2_understack.network_node_switchport_physnet
     if not physnet:
+        LOG.error(
+            "Router dynamic segment allocation failed for network %(network)s: "
+            "ml2_understack.network_node_switchport_physnet is not configured",
+            {"network": network_id},
+        )
         raise ValueError(
             "please configure ml2_understack.network_node_switchport_physnet"
         )
+    LOG.info(
+        "Fetching or allocating router dynamic segment: network=%(network)s "
+        "physnet=%(physnet)s",
+        {"network": network_id, "physnet": physnet},
+    )
     segment = utils.allocate_dynamic_segment(
         network_id=network_id,
         physnet=physnet,
     )
     if not segment:
+        LOG.error(
+            "Router dynamic segment allocation returned no segment: "
+            "network=%(network)s physnet=%(physnet)s",
+            {"network": network_id, "physnet": physnet},
+        )
         raise Exception(
             "failed allocating dynamic segment for"
             "network_id=%(network_id)s physnet=%(physnet)s",
@@ -174,8 +282,21 @@ def create_uplink_port(segment: NetworkSegment, network_id: str, txn=None) -> No
         ovn_const.LSP_OPTIONS_MCAST_FLOOD: ovs_conf.get_igmp_flood(),
         ovn_const.LSP_OPTIONS_LOCALNET_LEARN_FDB: fdb_enabled,
     }
-    cmd = ovn_client()._nb_idl.create_lswitch_port(
-        lport_name=f"uplink-{segment['id']}",
+    port_name = f"uplink-{segment['id']}"
+    LOG.info(
+        "Creating OVN localnet port %(port)s: network=%(network)s "
+        "physnet=%(physnet)s vlan=%(vlan)s options=%(options)s",
+        {
+            "port": port_name,
+            "network": network_id,
+            "physnet": physnet,
+            "vlan": tag,
+            "options": options,
+        },
+    )
+    client = ovn_client()
+    cmd = client._nb_idl.create_lswitch_port(
+        lport_name=port_name,
         lswitch_name=ovn_utils.ovn_name(network_id),
         addresses=[ovn_const.UNKNOWN_ADDR],
         external_ids={},
@@ -183,7 +304,20 @@ def create_uplink_port(segment: NetworkSegment, network_id: str, txn=None) -> No
         tag=tag,
         options=options,
     )
-    ovn_client()._transaction([cmd], txn=txn)
+    try:
+        client._transaction([cmd], txn=txn)
+    except Exception:
+        LOG.exception(
+            "Failed creating OVN localnet port %(port)s: network=%(network)s "
+            "physnet=%(physnet)s vlan=%(vlan)s",
+            {
+                "port": port_name,
+                "network": network_id,
+                "physnet": physnet,
+                "vlan": tag,
+            },
+        )
+        raise
 
 
 def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) -> None:
@@ -325,17 +459,43 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
     if port.device_owner not in ROUTER_INTERFACE_AND_GW:
         return
 
+    LOG.info(
+        "Router interface removal: port %(port)s router %(router)s network "
+        "%(network)s owner %(owner)s",
+        {
+            "port": port.id,
+            "router": port.device_id,
+            "network": network_id,
+            "owner": port.device_owner,
+        },
+    )
+
     if not is_only_router_port_on_network(network_id):
-        LOG.debug(
-            "Deleting only Router port %(port)s as there are other"
-            " router ports using the same network",
-            {"port": port},
+        LOG.info(
+            "Router interface removal: port %(port)s router %(router)s on "
+            "network %(network)s is not the last router interface, skipping "
+            "shared infrastructure cleanup",
+            {
+                "port": port.id,
+                "router": port.device_id,
+                "network": network_id,
+            },
         )
         return
 
     segment = fetch_router_network_segment(network_id)
     if not segment:
         return
+
+    LOG.info(
+        "Router interface removal: last router interface on network %(network)s "
+        "— cleaning shared infrastructure for segment %(segment)s vlan %(vlan)s",
+        {
+            "network": network_id,
+            "segment": segment["id"],
+            "vlan": segment.get("segmentation_id"),
+        },
+    )
 
     shared_port = fetch_shared_router_port(segment)
     if not shared_port:
@@ -344,13 +504,25 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
     handle_subport_removal(shared_port)
     delete_uplink_port(segment, network_id)
     shared_port.delete()
+    LOG.info(
+        "Router interface removal complete: network %(network)s segment "
+        "%(segment)s shared_port %(port)s cleaned up",
+        {
+            "network": network_id,
+            "segment": segment["id"],
+            "port": shared_port["id"],
+        },
+    )
 
 
 def handle_subport_removal(port: Port) -> None:
     """Removes router's subport from a network node trunk."""
     trunk_id = utils.fetch_network_node_trunk_id()
-    LOG.debug("Router, Removing subport: %s(port)s", {"port": port})
     port_id = port["id"]
+    LOG.info(
+        "Removing router shared subport %(port)s from trunk %(trunk)s",
+        {"port": port_id, "trunk": trunk_id},
+    )
     try:
         utils.remove_subport_from_trunk(trunk_id, port_id)
     except Exception as err:
