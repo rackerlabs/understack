@@ -64,8 +64,8 @@ images:
     nova_service_cleaner: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
     # placement
-    placement: "ghcr.io/rackerlabs/understack/placement:2025.2"
-    placement_db_sync: "ghcr.io/rackerlabs/understack/placement:2025.2"
+    placement: "ghcr.io/rackerlabs/understack/placement:2026.1"
+    placement_db_sync: "ghcr.io/rackerlabs/understack/placement:2026.1"
 
     # openvswitch
     openvswitch_db_server: "docker.io/openstackhelm/openvswitch:ubuntu_jammy-dpdk-20250127"
