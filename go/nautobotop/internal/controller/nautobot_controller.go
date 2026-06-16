@@ -34,9 +34,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	syncv1alpha1 "github.com/rackerlabs/understack/go/nautobotop/api/v1alpha1"
@@ -160,7 +162,9 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 	defer func() {
 		nautobotClient.Cache.Clear()
-		log.Info("cleared cache after reconcile")
+		nautobotClient.Cache.Close()
+		nautobotClient.ReqClient.GetClient().CloseIdleConnections()
+		log.Info("released cache and idle connections after reconcile")
 	}()
 
 	// Sync resources that need updating
@@ -197,6 +201,9 @@ func (r *NautobotReconciler) aggregateDataFromConfigMap(ctx context.Context, ref
 	dataMap := make(map[string]string)
 
 	for _, ref := range refs {
+		if ref.ConfigMapSelector.Namespace == nil || *ref.ConfigMapSelector.Namespace == "" {
+			return nil, fmt.Errorf("configMapSelector %q is missing a namespace", ref.ConfigMapSelector.Name)
+		}
 		var configMap corev1.ConfigMap
 		namespacedName := types.NamespacedName{
 			Name:      ref.ConfigMapSelector.Name,
@@ -473,6 +480,9 @@ func (r *NautobotReconciler) syncTenant(ctx context.Context,
 // getAuthTokenFromSecretRef: this will fetch Nautobot auth token from the given refer.
 func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (string, string, error) {
 	var username, token string
+	if nautobotCR.Spec.NautobotSecretRef.Namespace == nil || *nautobotCR.Spec.NautobotSecretRef.Namespace == "" {
+		return "", "", fmt.Errorf("nautobotSecretRef %q is missing a namespace", nautobotCR.Spec.NautobotSecretRef.Name)
+	}
 	secret := &corev1.Secret{}
 	err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.NautobotSecretRef.Name, Namespace: *nautobotCR.Spec.NautobotSecretRef.Namespace}, secret)
 	if err != nil {
@@ -497,6 +507,7 @@ func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, naut
 func (r *NautobotReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&syncv1alpha1.Nautobot{}).
+		WithOptions(controller.Options{RecoverPanic: ptr.To(true)}).
 		Named("nautobot").
 		Complete(r)
 }

@@ -55,23 +55,23 @@ func (s *VlanGroupSync) SyncAll(ctx context.Context, data map[string]string) err
 
 // syncSingleVlanGroup handles the create/update logic for a single vlan group
 func (s *VlanGroupSync) syncSingleVlanGroup(ctx context.Context, vlanGroup models.VlanGroup) error {
-	existingVlanGroup := s.vlanGroupSvc.GetByName(ctx, vlanGroup.Name)
+	existingVlanGroup := s.vlanGroupSvc.GetByID(ctx, vlanGroup.ID)
 
 	vlanGroupRequest := nb.VLANGroupRequest{
+		Id:       optionalID(vlanGroup.ID),
 		Name:     vlanGroup.Name,
 		Location: s.buildLocationReference(ctx, vlanGroup.Location),
 		Range:    nb.PtrString(vlanGroup.Range),
 	}
 
-	relationships := map[string]nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
-		"ucvnigroup_vlangroup": helpers.BuildRelationshipSource(),
-	}
 	if vlanGroup.UcvniGroup != "" {
 		if id := s.ucvniGroupSvc.GetByName(ctx, vlanGroup.UcvniGroup).ID; id != "" {
-			relationships["ucvnigroup_vlangroup"] = helpers.BuildRelationshipSource(id)
+			relationships := map[string]nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
+				"ucvnigroup_vlangroup": helpers.BuildRelationshipSource(id),
+			}
+			vlanGroupRequest.Relationships = &relationships
 		}
 	}
-	vlanGroupRequest.Relationships = &relationships
 
 	if existingVlanGroup.Id == nil {
 		return s.createVlanGroup(ctx, vlanGroupRequest)

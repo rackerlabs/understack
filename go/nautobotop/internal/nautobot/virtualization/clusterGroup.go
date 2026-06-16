@@ -2,6 +2,7 @@ package virtualization
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -57,35 +58,52 @@ func (s *ClusterGroupService) GetByName(ctx context.Context, name string) nb.Clu
 	return list.Results[0]
 }
 
-func (s *ClusterGroupService) ListAll(ctx context.Context) []nb.ClusterGroup {
-	ids := s.client.GetChangeObjectIDS(ctx, "virtualization.clustergroup")
-	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClusterGroupsList(ctx).Id(ids).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllClusterGroups", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.ClusterGroup{}
+func (s *ClusterGroupService) GetByID(ctx context.Context, id string) nb.ClusterGroup {
+	if id == "" {
+		return nb.ClusterGroup{}
 	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.ClusterGroup{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.ClusterGroup{}
+	if clusterGroup, ok := cache.FindByID(s.client.Cache, "clustergroups", id, func(cg nb.ClusterGroup) *string {
+		return cg.Id
+	}); ok {
+		return clusterGroup
 	}
 
-	return list.Results
+	list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClusterGroupsList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetClusterGroupByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.ClusterGroup{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.ClusterGroup{}
+	}
+
+	return list.Results[0]
+}
+
+func (s *ClusterGroupService) ListAll(ctx context.Context) []nb.ClusterGroup {
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.ClusterGroup, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClusterGroupsList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllClusterGroups",
+	)
 }
 
 func (s *ClusterGroupService) Update(ctx context.Context, id string, req nb.ClusterGroupRequest) (*nb.ClusterGroup, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateClusterGroup", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	clusterGroup, resp, err := s.client.APIClient.VirtualizationAPI.VirtualizationClusterGroupsUpdate(ctx, id).ClusterGroupRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

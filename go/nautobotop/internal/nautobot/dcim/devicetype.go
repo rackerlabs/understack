@@ -2,6 +2,7 @@ package dcim
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -57,35 +58,52 @@ func (s *DeviceTypeService) GetByName(ctx context.Context, name string) nb.Devic
 	return list.Results[0]
 }
 
-func (s *DeviceTypeService) ListAll(ctx context.Context) []nb.DeviceType {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.devicetype")
-	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Id(ids).Depth(10).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllDeviceTypes", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.DeviceType{}
+func (s *DeviceTypeService) GetByID(ctx context.Context, id string) nb.DeviceType {
+	if id == "" {
+		return nb.DeviceType{}
 	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.DeviceType{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.DeviceType{}
+	if deviceType, ok := cache.FindByID(s.client.Cache, "devicetypes", id, func(dt nb.DeviceType) *string {
+		return dt.Id
+	}); ok {
+		return deviceType
 	}
 
-	return list.Results
+	list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).Depth(10).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetDeviceTypeByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.DeviceType{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.DeviceType{}
+	}
+
+	return list.Results[0]
+}
+
+func (s *DeviceTypeService) ListAll(ctx context.Context) []nb.DeviceType {
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.DeviceType, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(10).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllDeviceTypes",
+	)
 }
 
 func (s *DeviceTypeService) Update(ctx context.Context, id string, req nb.WritableDeviceTypeRequest) (*nb.DeviceType, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateDeviceType", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	deviceType, resp, err := s.client.APIClient.DcimAPI.DcimDeviceTypesUpdate(ctx, id).WritableDeviceTypeRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

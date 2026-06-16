@@ -62,8 +62,9 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 			manufacturer = *cm
 		}
 
-		deviceType := s.deviceTypeSvc.GetByName(context.Background(), yml.Model)
+		deviceType := s.deviceTypeSvc.GetByID(ctx, yml.ID)
 		deviceTypeRequest := nb.WritableDeviceTypeRequest{
+			Id:           optionalID(yml.ID),
 			Model:        yml.Model,
 			PartNumber:   nb.PtrString(yml.PartNumber),
 			UHeight:      nb.PtrInt32(int32(yml.UHeight)),
@@ -88,6 +89,11 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 			log.Info("device type unchanged, skipping update", "model", yml.Model)
 		}
 
+		if deviceType.Id == nil {
+			s.client.AddReport("syncDeviceTypes", "device type has no ID, skipping template sync", "model", yml.Model)
+			continue
+		}
+
 		s.syncInterfaceTemplates(ctx, yml, deviceType)
 		s.syncConsolePortTemplates(ctx, yml, deviceType)
 		s.syncPowerPortTemplates(ctx, yml, deviceType)
@@ -106,7 +112,9 @@ func (s *DeviceTypeSync) SyncAll(ctx context.Context, data map[string]string) er
 	}
 	obsoleteDeviceTypes := lo.OmitByKeys(existingMap, lo.Keys(desiredDeviceTypes))
 	for _, obsoleteDeviceType := range obsoleteDeviceTypes {
-		_ = s.deviceTypeSvc.Destroy(ctx, *obsoleteDeviceType.Id)
+		if obsoleteDeviceType.Id != nil {
+			_ = s.deviceTypeSvc.Destroy(ctx, *obsoleteDeviceType.Id)
+		}
 	}
 
 	log.Info("SyncAllDevice Completed")
@@ -129,7 +137,11 @@ func (s *DeviceTypeSync) syncPowerPortTemplates(ctx context.Context, yml models.
 
 	// Process each desired power port: create new or update existing
 	for name, desiredPort := range desiredPorts {
-		powerPortTypeChoice, _ := nb.NewPowerPortTypeChoicesFromValue(desiredPort.Type)
+		powerPortTypeChoice, err := nb.NewPowerPortTypeChoicesFromValue(desiredPort.Type)
+		if err != nil {
+			s.client.AddReport("syncPowerPortTemplates", "invalid power port type, skipping", "name", desiredPort.Name, "type", desiredPort.Type, "error", err.Error())
+			continue
+		}
 
 		var maximumDraw nb.NullableInt32
 		if desiredPort.MaximumDraw > 0 {
@@ -141,7 +153,11 @@ func (s *DeviceTypeSync) syncPowerPortTemplates(ctx context.Context, yml models.
 			allocatedDraw = *nb.NewNullableInt32(nb.PtrInt32(int32(desiredPort.AllocatedDraw)))
 		}
 
-		powerPortType, _ := nb.NewPatchedWritablePowerPortTemplateRequestTypeFromValue(string(*powerPortTypeChoice))
+		powerPortType, err := nb.NewPatchedWritablePowerPortTemplateRequestTypeFromValue(string(*powerPortTypeChoice))
+		if err != nil {
+			s.client.AddReport("syncPowerPortTemplates", "invalid power port type, skipping", "name", desiredPort.Name, "type", desiredPort.Type, "error", err.Error())
+			continue
+		}
 
 		templateRequest := nb.WritablePowerPortTemplateRequest{
 			Name:          desiredPort.Name,
@@ -162,7 +178,9 @@ func (s *DeviceTypeSync) syncPowerPortTemplates(ctx context.Context, yml models.
 
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredPorts))
 	for _, obsolete := range obsoletes {
-		_ = s.powerPortTemplateSvc.Destroy(ctx, *obsolete.Id)
+		if obsolete.Id != nil {
+			_ = s.powerPortTemplateSvc.Destroy(ctx, *obsolete.Id)
+		}
 	}
 }
 
@@ -180,8 +198,16 @@ func (s *DeviceTypeSync) syncConsolePortTemplates(ctx context.Context, yml model
 	}
 
 	for name, desiredPort := range desiredPorts {
-		consolePortTypeChoice, _ := nb.NewConsolePortTypeChoicesFromValue(desiredPort.Type)
-		consolePortType, _ := nb.NewPatchedWritableConsolePortTemplateRequestTypeFromValue(string(*consolePortTypeChoice))
+		consolePortTypeChoice, err := nb.NewConsolePortTypeChoicesFromValue(desiredPort.Type)
+		if err != nil {
+			s.client.AddReport("syncConsolePortTemplates", "invalid console port type, skipping", "name", desiredPort.Name, "type", desiredPort.Type, "error", err.Error())
+			continue
+		}
+		consolePortType, err := nb.NewPatchedWritableConsolePortTemplateRequestTypeFromValue(string(*consolePortTypeChoice))
+		if err != nil {
+			s.client.AddReport("syncConsolePortTemplates", "invalid console port type, skipping", "name", desiredPort.Name, "type", desiredPort.Type, "error", err.Error())
+			continue
+		}
 
 		templateRequest := nb.WritableConsolePortTemplateRequest{
 			Name:       name,
@@ -198,7 +224,9 @@ func (s *DeviceTypeSync) syncConsolePortTemplates(ctx context.Context, yml model
 	}
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredPorts))
 	for _, obsolete := range obsoletes {
-		_ = s.consolePortTemplateSvc.Destroy(ctx, *obsolete.Id)
+		if obsolete.Id != nil {
+			_ = s.consolePortTemplateSvc.Destroy(ctx, *obsolete.Id)
+		}
 	}
 }
 
@@ -215,7 +243,11 @@ func (s *DeviceTypeSync) syncInterfaceTemplates(ctx context.Context, yml models.
 		existingMap[template.Name] = template
 	}
 	for name, interfaceTmpl := range desiredInterfaceTemplate {
-		interfaceTemplateChoice, _ := nb.NewInterfaceTypeChoicesFromValue(interfaceTmpl.Type)
+		interfaceTemplateChoice, err := nb.NewInterfaceTypeChoicesFromValue(interfaceTmpl.Type)
+		if err != nil {
+			s.client.AddReport("syncInterfaceTemplates", "invalid interface type, skipping", "name", interfaceTmpl.Name, "type", interfaceTmpl.Type, "error", err.Error())
+			continue
+		}
 
 		templateRequest := nb.WritableInterfaceTemplateRequest{
 			Name:       name,
@@ -234,7 +266,9 @@ func (s *DeviceTypeSync) syncInterfaceTemplates(ctx context.Context, yml models.
 	}
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredInterfaceTemplate))
 	for _, obsolete := range obsoletes {
-		_ = s.interfaceTemplateSvc.Destroy(ctx, *obsolete.Id)
+		if obsolete.Id != nil {
+			_ = s.interfaceTemplateSvc.Destroy(ctx, *obsolete.Id)
+		}
 	}
 }
 
@@ -271,6 +305,8 @@ func (s *DeviceTypeSync) syncModuleBayTemplates(ctx context.Context, yml models.
 
 	obsoletes := lo.OmitByKeys(existingMap, lo.Keys(desiredModuleBays))
 	for _, obsolete := range obsoletes {
-		_ = s.moduleBayTemplateSvc.Destroy(ctx, *obsolete.Id)
+		if obsolete.Id != nil {
+			_ = s.moduleBayTemplateSvc.Destroy(ctx, *obsolete.Id)
+		}
 	}
 }

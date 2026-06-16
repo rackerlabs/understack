@@ -22,25 +22,23 @@ func NewPowerPortTemplateService(nautobotClient *client.NautobotClient) *PowerPo
 }
 
 func (s *PowerPortTemplateService) ListByDeviceType(ctx context.Context, deviceTypeID string) []nb.PowerPortTemplate {
-	ids := s.client.GetChangeObjectIDS(ctx, "dcim.powerporttemplate", deviceTypeID)
-
-	// Define the API call function for this specific endpoint
-	apiCall := func(ctx context.Context, batchIds []string) ([]nb.PowerPortTemplate, *http.Response, error) {
-		list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Id(batchIds).Depth(1).DeviceType([]string{deviceTypeID}).Execute()
-		if err != nil {
-			return nil, resp, err
-		}
-		if list == nil {
-			return []nb.PowerPortTemplate{}, resp, nil
-		}
-		return list.Results, resp, nil
-	}
-
-	// Use the helper function for pagination
-	return helpers.PaginatedListWithIDs(
+	return helpers.PaginatedList(
 		ctx,
-		ids,
-		apiCall,
+		func(ctx context.Context, limit, offset int32) ([]nb.PowerPortTemplate, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(1).
+				DeviceType([]string{deviceTypeID}).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
 		s.client.AddReport,
 		"ListAllPowerPortTemplate",
 		"device_type_id", deviceTypeID,
@@ -48,7 +46,7 @@ func (s *PowerPortTemplateService) ListByDeviceType(ctx context.Context, deviceT
 }
 
 func (s *PowerPortTemplateService) GetByName(ctx context.Context, name, deviceTypeID string) nb.PowerPortTemplate {
-	list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Limit(10000).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
+	list, resp, err := s.client.APIClient.DcimAPI.DcimPowerPortTemplatesList(ctx).Depth(2).Name([]string{name}).DeviceType([]string{deviceTypeID}).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)
 		s.client.AddReport("GetPowerPortTemplateByName", "failed to get power port template by name", "name", name, "device_type_id", deviceTypeID, "error", err.Error(), "response_body", bodyString)

@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -57,35 +58,52 @@ func (s *VlanService) GetByName(ctx context.Context, name string) nb.VLAN {
 	return list.Results[0]
 }
 
-func (s *VlanService) ListAll(ctx context.Context) []nb.VLAN {
-	ids := s.client.GetChangeObjectIDS(ctx, "ipam.vlan")
-	list, resp, err := s.client.APIClient.IpamAPI.IpamVlansList(ctx).Id(ids).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllVlans", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.VLAN{}
+func (s *VlanService) GetByID(ctx context.Context, id string) nb.VLAN {
+	if id == "" {
+		return nb.VLAN{}
 	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.VLAN{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.VLAN{}
+	if vlan, ok := cache.FindByID(s.client.Cache, "vlans", id, func(v nb.VLAN) *string {
+		return v.Id
+	}); ok {
+		return vlan
 	}
 
-	return list.Results
+	list, resp, err := s.client.APIClient.IpamAPI.IpamVlansList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetVlanByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.VLAN{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.VLAN{}
+	}
+
+	return list.Results[0]
+}
+
+func (s *VlanService) ListAll(ctx context.Context) []nb.VLAN {
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.VLAN, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.IpamAPI.IpamVlansList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllVlans",
+	)
 }
 
 func (s *VlanService) Update(ctx context.Context, id string, req nb.VLANRequest) (*nb.VLAN, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdateVlan", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	vlan, resp, err := s.client.APIClient.IpamAPI.IpamVlansUpdate(ctx, id).VLANRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

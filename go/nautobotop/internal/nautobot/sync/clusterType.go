@@ -50,9 +50,10 @@ func (s *ClusterTypeSync) SyncAll(ctx context.Context, data map[string]string) e
 
 // syncSingleClusterType handles the create/update logic for a single cluster type
 func (s *ClusterTypeSync) syncSingleClusterType(ctx context.Context, clusterType models.ClusterType) error {
-	existingClusterType := s.clusterTypeSvc.GetByName(ctx, clusterType.Name)
+	existingClusterType := s.clusterTypeSvc.GetByID(ctx, clusterType.ID)
 
 	clusterTypeRequest := nb.ClusterTypeRequest{
+		Id:          optionalID(clusterType.ID),
 		Name:        clusterType.Name,
 		Description: nb.PtrString(clusterType.Description),
 	}

@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"github.com/imroc/req/v3"
 	nb "github.com/nautobot/go-nautobot/v3"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
-	"github.com/samber/lo"
 )
 
 // NautobotClient holds the Nautobot API client and configuration.
@@ -23,11 +21,24 @@ type NautobotClient struct {
 	Cache     *cache.Cache
 }
 
+// maxReportLinesPerKey bounds the report stored in the CR status; etcd
+// rejects objects over ~1.5 MB, which would wedge every status update.
+const maxReportLinesPerKey = 20
+
 // AddReport appends one or more lines to the current reconciliation report.
+// Every line is logged, but only the first maxReportLinesPerKey lines per key
+// are kept in the report.
 func (n *NautobotClient) AddReport(key string, line ...string) {
 	combined := strings.Join(line, " ")
-	n.Report[key] = append(n.Report[key], combined)
 	log.Error(key, combined)
+
+	if len(n.Report[key]) >= maxReportLinesPerKey {
+		if len(n.Report[key]) == maxReportLinesPerKey {
+			n.Report[key] = append(n.Report[key], "further errors suppressed, see operator logs")
+		}
+		return
+	}
+	n.Report[key] = append(n.Report[key], combined)
 }
 
 // NewNautobotClient creates and configures a new Nautobot API client.
@@ -71,33 +82,4 @@ func NewNautobotClient(apiURL string, username, authToken string, cacheMaxSize i
 // GetClient returns the Nautobot API client
 func (n *NautobotClient) GetClient() *NautobotClient {
 	return n
-}
-
-// GetChangeObjectIDS adapts GetCreateChangeList to the expected signature
-// It filters out changed_object_id values where CREATE count equals DELETE count
-// If relatedObjectID is provided, it filters ObjectChanges to only include those with matching RelatedObjectID
-func (n *NautobotClient) GetChangeObjectIDS(ctx context.Context, objectType string, relatedObjectID ...string) []string {
-	changes, _, err := n.GetCreateChangeList(ctx, objectType)
-	if err != nil {
-		return []string{}
-	}
-
-	// Filter by relatedObjectID if provided
-	if len(relatedObjectID) != 0 {
-		changes = lo.Filter(changes, func(change ObjectChanges, _ int) bool {
-			return lo.Contains(relatedObjectID, change.RelatedObjectID)
-		})
-	}
-
-	// Group changes by changed_object_id
-	grouped := lo.GroupBy(changes, func(c ObjectChanges) string {
-		return c.ChangedObjectID
-	})
-
-	// Filter and extract IDs where CREATE count does not equal DELETE count
-	return lo.FilterMap(lo.Keys(grouped), func(id string, _ int) (string, bool) {
-		createCount := lo.CountBy(grouped[id], func(c ObjectChanges) bool { return c.Action == "CREATE" })
-		deleteCount := lo.CountBy(grouped[id], func(c ObjectChanges) bool { return c.Action == "DELETE" })
-		return id, createCount != deleteCount
-	})
 }

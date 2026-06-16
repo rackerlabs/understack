@@ -2,6 +2,7 @@ package ipam
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/cache"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
@@ -57,35 +58,52 @@ func (s *PrefixService) GetByPrefix(ctx context.Context, prefix string) nb.Prefi
 	return list.Results[0]
 }
 
-func (s *PrefixService) ListAll(ctx context.Context) []nb.Prefix {
-	ids := s.client.GetChangeObjectIDS(ctx, "ipam.prefix")
-	list, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesList(ctx).Id(ids).Depth(2).Execute()
-	if err != nil {
-		bodyString := helpers.ReadResponseBody(resp)
-		s.client.AddReport("ListAllPrefixes", "failed to list", "error", err.Error(), "response_body", bodyString)
-		return []nb.Prefix{}
+func (s *PrefixService) GetByID(ctx context.Context, id string) nb.Prefix {
+	if id == "" {
+		return nb.Prefix{}
 	}
-	if list == nil || len(list.Results) == 0 {
-		return []nb.Prefix{}
-	}
-	if list.Results[0].Id == nil {
-		return []nb.Prefix{}
+	if prefix, ok := cache.FindByID(s.client.Cache, "prefixes", id, func(p nb.Prefix) *string {
+		return p.Id
+	}); ok {
+		return prefix
 	}
 
-	return list.Results
+	list, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesList(ctx).Depth(2).Id([]string{id}).Execute()
+	if err != nil {
+		bodyString := helpers.ReadResponseBody(resp)
+		s.client.AddReport("GetPrefixByID", "failed to get", "id", id, "error", err.Error(), "response_body", bodyString)
+		return nb.Prefix{}
+	}
+	if list == nil || len(list.Results) == 0 || list.Results[0].Id == nil {
+		return nb.Prefix{}
+	}
+
+	return list.Results[0]
+}
+
+func (s *PrefixService) ListAll(ctx context.Context) []nb.Prefix {
+	return helpers.PaginatedList(
+		ctx,
+		func(ctx context.Context, limit, offset int32) ([]nb.Prefix, int32, *http.Response, error) {
+			list, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesList(ctx).
+				Limit(limit).
+				Offset(offset).
+				Depth(2).
+				Execute()
+			if err != nil {
+				return nil, 0, resp, err
+			}
+			if list == nil {
+				return nil, 0, resp, nil
+			}
+			return list.Results, list.Count, resp, nil
+		},
+		s.client.AddReport,
+		"ListAllPrefixes",
+	)
 }
 
 func (s *PrefixService) Update(ctx context.Context, id string, req nb.WritablePrefixRequest) (*nb.Prefix, error) {
-	owned, err := s.client.IsCreatedByUser(ctx, id)
-	if err != nil {
-		s.client.AddReport("UpdatePrefix", "failed to check ownership", "id", id, "error", err.Error())
-		return nil, err
-	}
-	if !owned {
-		log.Warn("skipping update, object not created by user", "id", id, "user", s.client.Username)
-		return nil, nil
-	}
-
 	prefix, resp, err := s.client.APIClient.IpamAPI.IpamPrefixesUpdate(ctx, id).WritablePrefixRequest(req).Execute()
 	if err != nil {
 		bodyString := helpers.ReadResponseBody(resp)

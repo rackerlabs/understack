@@ -5,6 +5,7 @@ type Clusters struct {
 }
 
 type Cluster struct {
+	ID           string   `json:"id" yaml:"id"`
 	Name         string   `json:"name" yaml:"name"`
 	Comments     string   `json:"comments" yaml:"comments"`
 	ClusterType  string   `json:"cluster_type" yaml:"cluster_type"`
