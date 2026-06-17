@@ -52,7 +52,7 @@ def create_port_postcommit(context: PortContext) -> None:
     ):
         LOG.info(
             "Router port %(port)s on router %(router)s: network %(network)s "
-            "already has another router interface — VLAN infrastructure already "
+            "already has another router interface - VLAN infrastructure already "
             "exists, nothing to do",
             {"port": port_id, "router": router_id, "network": network_id},
         )
@@ -60,7 +60,7 @@ def create_port_postcommit(context: PortContext) -> None:
 
     LOG.info(
         "Router port %(port)s on router %(router)s: first router on network "
-        "%(network)s — starting VLAN/trunk/OVN setup",
+        "%(network)s - starting VLAN/trunk/OVN setup",
         {"port": port_id, "router": router_id, "network": network_id},
     )
 
@@ -108,7 +108,7 @@ def create_port_postcommit(context: PortContext) -> None:
     create_uplink_port(segment_obj, network_id)
     LOG.info(
         "Step 4 done: OVN localnet port uplink-%(seg)s created for router "
-        "%(router)s — network=%(network)s shared_port=%(port)s vlan=%(vlan)s. "
+        "%(router)s - network=%(network)s shared_port=%(port)s vlan=%(vlan)s. "
         "Undersync will push SVI config to physical switch",
         {
             "seg": segment["id"],
@@ -489,7 +489,7 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
 
     LOG.info(
         "Router interface removal: last router interface on network %(network)s "
-        "— cleaning shared infrastructure for segment %(segment)s vlan %(vlan)s",
+        "- cleaning shared infrastructure for segment %(segment)s vlan %(vlan)s",
         {
             "network": network_id,
             "segment": segment["id"],
