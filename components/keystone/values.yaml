@@ -142,6 +142,8 @@ pod:
           - name: oidc-secret
             mountPath: /etc/oidc-secret
             readOnly: true
+          - name: oidc-metadata
+            readOnly: true
         volumes:
           - name: keystone-sso
             secret:
@@ -149,6 +151,10 @@ pod:
           - name: oidc-secret
             secret:
               secretName: sso-passphrase
+          - name: oidc-metadata
+            configMap:
+              name: keystone-oidc-metadata
+              defaultMode: 0555
     keystone_bootstrap:
       keystone_bootstrap:
         volumeMounts:
@@ -402,3 +408,12 @@ annotations:
       # relies on services to be up so it can remain post
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
+
+extraObjects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: keystone-oidc-metadata
+      namespace: openstack
+    data:
+      # Define your OIDC providers metadata in deploy repo
