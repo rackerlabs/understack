@@ -1,6 +1,8 @@
 from oslo_config import cfg
 
-mech_understack_opts = [
+_OPT_GRP_ML2_UNDERSTACK = "ml2_understack"
+
+_mech_understack_opts = [
     cfg.StrOpt(
         "nb_url",
         help="Nautobot URL",
@@ -71,7 +73,9 @@ mech_understack_opts = [
     ),
 ]
 
-l3_svc_cisco_asa_opts = [
+_OPT_GRP_L3_SVC_CISCO_ASA = "l3_service_cisco_asa"
+
+_l3_svc_cisco_asa_opts = [
     cfg.StrOpt(
         "user_agent",
         help="User-Agent for requests to Cisco ASA",
@@ -93,9 +97,21 @@ l3_svc_cisco_asa_opts = [
 ]
 
 
+def list_understack_opts():
+    return [
+        (_OPT_GRP_ML2_UNDERSTACK, _mech_understack_opts),
+    ]
+
+
+def list_cisco_asa_opts():
+    return [
+        (_OPT_GRP_L3_SVC_CISCO_ASA, _l3_svc_cisco_asa_opts),
+    ]
+
+
 def register_ml2_understack_opts(config):
-    config.register_opts(mech_understack_opts, "ml2_understack")
+    config.register_opts(_mech_understack_opts, _OPT_GRP_ML2_UNDERSTACK)
 
 
 def register_l3_svc_cisco_asa_opts(config):
-    config.register_opts(l3_svc_cisco_asa_opts, "l3_service_cisco_asa")
+    config.register_opts(_l3_svc_cisco_asa_opts, _OPT_GRP_L3_SVC_CISCO_ASA)

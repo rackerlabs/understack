@@ -29,6 +29,10 @@ dependencies = [
     "neutron>=27,<29",
 ]
 
+[project.entry-points."oslo.config.opts"]
+understack = "neutron_understack.config:list_understack_opts"
+cisco-asa = "neutron_understack.config:list_cisco_asa_opts"
+
 [project.entry-points."neutron.ml2.mechanism_drivers"]
 understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
 undersync = "neutron_understack.undersync_mech:UndersyncDriver"
