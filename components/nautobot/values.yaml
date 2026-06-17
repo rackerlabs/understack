@@ -34,7 +34,9 @@ nautobot:
     - name: nautobot-sso
       mountPath: /opt/nautobot/sso/
       readOnly: true
-
+  extraVars:
+    - name: NAUTOBOT_DB_USER
+      value: app
   extraEnvVarsCM:
     - nautobot-sso
     - cluster-data
