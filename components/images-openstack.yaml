@@ -82,9 +82,9 @@ images:
     horizon_db_sync: "ghcr.io/rackerlabs/understack/horizon:2025.2"
 
     # glance
-    glance_api: "ghcr.io/rackerlabs/understack/glance:2025.2"
-    glance_db_sync: "ghcr.io/rackerlabs/understack/glance:2025.2"
-    glance_metadefs_load: "ghcr.io/rackerlabs/understack/glance:2025.2"
+    glance_api: "ghcr.io/rackerlabs/understack/glance:2026.1"
+    glance_db_sync: "ghcr.io/rackerlabs/understack/glance:2026.1"
+    glance_metadefs_load: "ghcr.io/rackerlabs/understack/glance:2026.1"
     glance_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
     # skyline
