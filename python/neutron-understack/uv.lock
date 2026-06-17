@@ -771,8 +771,12 @@ name = "neutron-understack"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "keystoneauth1" },
     { name = "neutron" },
     { name = "neutron-lib" },
+    { name = "openstacksdk" },
+    { name = "oslo-config" },
+    { name = "oslo-log" },
     { name = "requests" },
 ]
 
@@ -781,12 +785,17 @@ test = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-mock" },
+    { name = "sqlalchemy" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "keystoneauth1", specifier = ">=3.14.0" },
     { name = "neutron", specifier = ">=27,<29" },
     { name = "neutron-lib", specifier = ">=3,<4" },
+    { name = "openstacksdk", specifier = ">=4.9.0" },
+    { name = "oslo-config", specifier = ">=9.7.1" },
+    { name = "oslo-log", specifier = ">=7.1.0" },
     { name = "requests", specifier = ">=2,<3" },
 ]
 
@@ -795,11 +804,12 @@ test = [
     { name = "pytest", specifier = ">=9.0.1,<10" },
     { name = "pytest-cov", specifier = ">=7,<8" },
     { name = "pytest-mock", specifier = ">=3.14.0,<4" },
+    { name = "sqlalchemy" },
 ]
 
 [[package]]
 name = "openstacksdk"
-version = "4.8.0"
+version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -814,12 +824,10 @@ dependencies = [
     { name = "platformdirs" },
     { name = "psutil" },
     { name = "pyyaml" },
-    { name = "requestsexceptions" },
-    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/46/24/1167097740136e302c74043c1c6feecf8d757b052d7b457960e0dc60fa03/openstacksdk-4.8.0.tar.gz", hash = "sha256:4dc038e1c17d893005f3a0a8951456afd9d148f3f65d448f94adcceb278d7f31", size = 1309981, upload-time = "2025-11-13T13:59:59.614Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/43/49b126e9ccfa19647d2f0aff26321caded607522d29c3d9495d44f4b9471/openstacksdk-4.16.0.tar.gz", hash = "sha256:466640c6d2b813b782d4ad58a4f2960633e8e58f147ec0baa2019454de190d30", size = 1397114, upload-time = "2026-06-17T08:43:22.774Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/45/87fa873f35abdf191d66d4821fe965f781e2d3e37e58883c6e23e95fa794/openstacksdk-4.8.0-py3-none-any.whl", hash = "sha256:7f7c438d418a4ee0c8737b1ac0859b3c1e8e21401677782415d21bce3324b9dd", size = 1849694, upload-time = "2025-11-13T13:59:57.634Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/ea/60a4a274c4991847a085ac4a36b19d09f44f04a22adcfda6ca631763322b/openstacksdk-4.16.0-py3-none-any.whl", hash = "sha256:0469939bd7fc1b80979e4440dd8f8026eea302bdd979fac5437b56ada3780a62", size = 1982817, upload-time = "2026-06-17T08:43:21.148Z" },
 ]
 
 [[package]]
@@ -1773,15 +1781,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5f/a4/98b9c7c6428a668bf7e42ebb7c79d576a1c3c1e3ae2d47e674b468388871/requests-2.33.1.tar.gz", hash = "sha256:18817f8c57c6263968bc123d237e3b8b08ac046f5456bd1e307ee8f4250d3517", size = 134120, upload-time = "2026-03-30T16:09:15.531Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d7/8e/7540e8a2036f79a125c1d2ebadf69ed7901608859186c856fa0388ef4197/requests-2.33.1-py3-none-any.whl", hash = "sha256:4e6d1ef462f3626a1f0a0a9c42dd93c63bad33f9f1c1937509b8c5c8718ab56a", size = 64947, upload-time = "2026-03-30T16:09:13.83Z" },
-]
-
-[[package]]
-name = "requestsexceptions"
-version = "1.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/82/ed/61b9652d3256503c99b0b8f145d9c8aa24c514caff6efc229989505937c1/requestsexceptions-1.4.0.tar.gz", hash = "sha256:b095cbc77618f066d459a02b137b020c37da9f46d9b057704019c9f77dba3065", size = 6880, upload-time = "2018-02-01T17:04:45.294Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/8c/49ca60ea8c907260da4662582c434bec98716177674e88df3fd340acf06d/requestsexceptions-1.4.0-py2.py3-none-any.whl", hash = "sha256:3083d872b6e07dc5c323563ef37671d992214ad9a32b0ca4a3d7f5500bf38ce3", size = 3802, upload-time = "2018-02-01T17:04:39.07Z" },
 ]
 
 [[package]]

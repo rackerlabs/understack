@@ -27,6 +27,10 @@ dependencies = [
     "requests>=2,<3",
     "neutron-lib>=3,<4",
     "neutron>=27,<29",
+    "oslo.config>=9.7.1",
+    "oslo.log>=7.1.0",
+    "openstacksdk>=4.9.0",
+    "keystoneauth1>=3.14.0",
 ]
 
 [project.entry-points."oslo.config.opts"]
@@ -48,6 +52,7 @@ test = [
     "pytest>=9.0.1,<10",
     "pytest-cov>=7,<8",
     "pytest-mock>=3.14.0,<4",
+    "sqlalchemy",
 ]
 
 [tool.uv]
