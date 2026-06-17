@@ -20,8 +20,6 @@ from understack_workflows.oslo_event import ironic_port
 from understack_workflows.oslo_event import ironic_portgroup
 from understack_workflows.oslo_event import keystone_project
 from understack_workflows.oslo_event import nautobot_device_sync
-from understack_workflows.oslo_event import neutron_network
-from understack_workflows.oslo_event import neutron_subnet
 
 logger = logging.getLogger(__name__)
 
@@ -79,12 +77,6 @@ _event_handlers: dict[str, EventHandler | list[EventHandler]] = {
     "volume_type_project.access.remove": (
         cinder_volume_type.handle_volume_type_access_removed
     ),
-    "network.create.end": neutron_network.handle_network_create_or_update,
-    "network.update.end": neutron_network.handle_network_create_or_update,
-    "network.delete.end": neutron_network.handle_network_delete,
-    "subnet.create.end": neutron_subnet.handle_subnet_create_or_update,
-    "subnet.update.end": neutron_subnet.handle_subnet_create_or_update,
-    "subnet.delete.end": neutron_subnet.handle_subnet_delete,
 }
 
 

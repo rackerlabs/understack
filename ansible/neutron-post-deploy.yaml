@@ -25,4 +25,5 @@
 
   roles:
     - role: neutron_segment_range
+    - role: openstack_subnet_pools
     - role: openstack_network

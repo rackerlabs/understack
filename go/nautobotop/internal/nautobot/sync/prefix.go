@@ -170,6 +170,11 @@ func (s *PrefixSync) syncSinglePrefix(ctx context.Context, prefix models.Prefix)
 	if len(prefix.Locations) > 1 {
 		customFields["locations"] = s.buildLocationIDs(ctx, prefix.Locations[1:])
 	}
+	if prefix.CustomFields != nil {
+		for k, v := range prefix.CustomFields {
+			customFields[k] = v
+		}
+	}
 	if len(customFields) > 0 {
 		prefixRequest.CustomFields = customFields
 	}

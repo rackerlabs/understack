@@ -36,3 +36,8 @@ instance_tags:
       - "ipam.prefix"
       - "vni_custom_model.ucvni"
     color: "ff9800"
+  - name: "openstack-subnet-pool"
+    content_types:
+      - "ipam.prefix"
+    color: "2196f3"
+    description: "Prefix is used for OpenStack subnet pool allocation"

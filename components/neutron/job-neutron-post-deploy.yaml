@@ -52,6 +52,11 @@ spec:
                 secretKeyRef:
                   name: nautobot-token
                   key: token
+            - name: UNDERSTACK_SITE
+              valueFrom:
+                configMapKeyRef:
+                  name: cluster-data
+                  key: UNDERSTACK_SITE
           volumeMounts:
             - name: ansible-inventory
               mountPath: /runner/inventory/
