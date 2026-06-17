@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: ansible
-          image: ghcr.io/rackerlabs/understack/ansible:latest
+          image: ghcr.io/rackerlabs/understack/ansible:pr-2081
           imagePullPolicy: Always
           command: ["ansible-runner", "run", "/runner", "--playbook", "nautobot-post-deploy.yaml"]
           resources:

@@ -84,3 +84,69 @@
     content_types:
       - dcim.interface
     filter_logic: exact
+
+- name: Create Custom Field Subnet Pool Name
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: Name of the OpenStack subnet pool to create from this prefix
+    label: Subnet Pool Name
+    key: subnet_pool_name
+    type: text
+    required: false
+    weight: 100
+    content_types:
+      - ipam.prefix
+    filter_logic: exact
+
+- name: Create Custom Field Subnet Pool Default Prefixlen
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: Default prefix length for subnets created from this pool
+    label: Default Prefixlen
+    key: subnet_pool_default_prefixlen
+    type: integer
+    required: false
+    weight: 100
+    content_types:
+      - ipam.prefix
+    validation_minimum: 1
+    validation_maximum: 32
+    filter_logic: exact
+
+- name: Create Custom Field Subnet Pool Min Prefixlen
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: Minimum prefix length for subnets created from this pool
+    label: Min Prefixlen
+    key: subnet_pool_min_prefixlen
+    type: integer
+    required: false
+    weight: 100
+    content_types:
+      - ipam.prefix
+    validation_minimum: 1
+    validation_maximum: 32
+    filter_logic: exact
+
+- name: Create Custom Field Subnet Pool Max Prefixlen
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: Maximum prefix length for subnets created from this pool
+    label: Max Prefixlen
+    key: subnet_pool_max_prefixlen
+    type: integer
+    required: false
+    weight: 100
+    content_types:
+      - ipam.prefix
+    validation_minimum: 1
+    validation_maximum: 32
+    filter_logic: exact
