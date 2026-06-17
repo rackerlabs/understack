@@ -41,15 +41,8 @@ class UnderstackDriver(MechanismDriver):
         config.register_ml2_understack_opts(cfg.CONF)
         conf = cfg.CONF.ml2_understack
 
-        if conf.undersync_use_keystone_auth:
-            session = self._get_keystone_session()
-            self.undersync = Undersync(
-                session=session,
-                api_url=conf.undersync_url,
-                use_keystone_auth=True,
-            )
-        else:
-            self.undersync = Undersync(conf.undersync_token, conf.undersync_url)
+        session = self._get_keystone_session()
+        self.undersync = Undersync(session, conf.undersync_url)
 
         self.ironic_client = IronicClient()
         self.trunk_driver = UnderStackTrunkDriver.create(self)

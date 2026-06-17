@@ -12,6 +12,7 @@ from sqlalchemy.orm import scoped_session
 from sqlalchemy.orm import sessionmaker
 
 from neutron_understack import utils
+from neutron_understack.undersync import Undersync
 
 
 class TestParentPortIsBound:
@@ -639,51 +640,14 @@ class TestFetchNetworkNodeTrunkId:
 
 class TestUndersyncAuthentication:
     def test_undersync_with_keystone_auth(self, mocker):
-        """Test that Undersync client uses X-Auth-Token header when enabled."""
-        from neutron_understack.undersync import Undersync
+        """Test that Undersync client uses X-Auth-Token header from session."""
+        mock_session = MagicMock()
+        mock_session.get_token.return_value = "test_token"
 
-        client = Undersync(
-            auth_token="test_token",
-            api_url="http://test.api",
-            use_keystone_auth=True,
-        )
+        client = Undersync(mock_session, "http://test.api")
 
-        # Access the client property to trigger its creation
         session = client.client
 
         assert session.headers["Content-Type"] == "application/json"
         assert session.headers["X-Auth-Token"] == "test_token"
         assert "Authorization" not in session.headers
-
-    def test_undersync_with_jwt_auth(self, mocker):
-        """Test that Undersync client uses Authorization Bearer header with JWT."""
-        from neutron_understack.undersync import Undersync
-
-        client = Undersync(
-            auth_token="test_jwt_token",
-            api_url="http://test.api",
-            use_keystone_auth=False,
-        )
-
-        # Access the client property to trigger its creation
-        session = client.client
-
-        assert session.headers["Content-Type"] == "application/json"
-        assert session.headers["Authorization"] == "Bearer test_jwt_token"
-        assert "X-Auth-Token" not in session.headers
-
-    def test_undersync_default_to_jwt_auth(self, mocker):
-        """Test that Undersync client defaults to JWT auth when not specified."""
-        from neutron_understack.undersync import Undersync
-
-        client = Undersync(
-            auth_token="test_token",
-            api_url="http://test.api",
-        )
-
-        # Access the client property to trigger its creation
-        session = client.client
-
-        assert session.headers["Content-Type"] == "application/json"
-        assert session.headers["Authorization"] == "Bearer test_token"
-        assert "X-Auth-Token" not in session.headers

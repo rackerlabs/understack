@@ -2,6 +2,7 @@ import copy
 import json
 import random
 import uuid
+from unittest.mock import MagicMock
 
 import pytest
 from neutron.db.models.segment import NetworkSegment
@@ -280,7 +281,9 @@ def ironic_client(mocker) -> IronicClient:
 @pytest.fixture
 def understack_driver(oslo_config, ironic_client) -> UnderstackDriver:
     driver = UnderstackDriver()
-    driver.undersync = Undersync("auth_token", "api_url", use_keystone_auth=False)
+    mock_session = MagicMock()
+    mock_session.get_token.return_value = "auth_token"
+    driver.undersync = Undersync(mock_session, "api_url")
     driver.ironic_client = ironic_client
     return driver
 
