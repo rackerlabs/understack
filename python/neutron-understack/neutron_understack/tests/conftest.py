@@ -281,9 +281,7 @@ def ironic_client(mocker) -> IronicClient:
 @pytest.fixture
 def understack_driver(oslo_config, ironic_client) -> UnderstackDriver:
     driver = UnderstackDriver()
-    mock_session = MagicMock()
-    mock_session.get_token.return_value = "auth_token"
-    driver.undersync = Undersync(mock_session, "api_url")
+    driver.undersync = MagicMock(spec_set=Undersync)
     driver.ironic_client = ironic_client
     return driver
 
@@ -300,11 +298,6 @@ def _ironic_baremetal_port_physical_network(mocker, understack_driver) -> None:
         "baremetal_port_physical_network",
         return_value="physnet",
     )
-
-
-@pytest.fixture(autouse=True)
-def _undersync_sync_devices_patch(mocker, understack_driver) -> None:
-    mocker.patch.object(understack_driver.undersync, "sync_devices")
 
 
 @pytest.fixture

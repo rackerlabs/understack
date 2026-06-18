@@ -643,10 +643,11 @@ class TestUndersyncAuthentication:
         """Test that Undersync client uses X-Auth-Token header from session."""
         mock_session = MagicMock()
         mock_session.get_token.return_value = "test_token"
+        mocker.patch("neutron_understack.config.get_session", return_value=mock_session)
 
-        client = Undersync(mock_session, "http://test.api")
+        undersync = Undersync("http://test.api")
 
-        session = client.client
+        session = undersync.client
 
         assert session.headers["Content-Type"] == "application/json"
         assert session.headers["X-Auth-Token"] == "test_token"

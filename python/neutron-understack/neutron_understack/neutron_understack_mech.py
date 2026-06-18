@@ -1,8 +1,6 @@
 import logging
 from uuid import UUID
 
-from keystoneauth1 import loading as ks_loading
-from keystoneauth1 import session as ks_session
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
@@ -41,50 +39,10 @@ class UnderstackDriver(MechanismDriver):
         config.register_ml2_understack_opts(cfg.CONF)
         conf = cfg.CONF.ml2_understack
 
-        session = self._get_keystone_session()
-        self.undersync = Undersync(session, conf.undersync_url)
-
+        self.undersync = Undersync(conf.undersync_url)
         self.ironic_client = IronicClient()
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         self.subscribe()
-
-    def _get_keystone_session(self) -> ks_session.Session:
-        """Get a Keystone session using the Neutron service credentials.
-
-        This uses the existing [keystone_authtoken] configuration section
-        to create a session that can automatically refresh tokens.
-
-        Returns:
-            ks_session.Session: The Keystone session for authenticating with Undersync.
-
-        Raises:
-            Exception: If unable to create session from Keystone.
-        """
-        try:
-            # Load credentials from the [keystone_authtoken] section
-            auth = ks_loading.load_auth_from_conf_options(
-                cfg.CONF, "keystone_authtoken"
-            )
-            # Create session manually to avoid missing config options
-            sess = ks_session.Session(auth=auth, timeout=30)
-
-            # Verify we can get a token (test session is working)
-            token = sess.get_token()
-            if not token:
-                raise ValueError("Unable to obtain initial token from session")
-
-            LOG.info(
-                "Successfully created Keystone session for Undersync authentication"
-            )
-            return sess
-
-        except Exception as e:
-            LOG.error(
-                "Failed to create Keystone session: %(error)s. "
-                "Please check your [keystone_authtoken] configuration.",
-                {"error": e},
-            )
-            raise
 
     def subscribe(self):
         registry.subscribe(

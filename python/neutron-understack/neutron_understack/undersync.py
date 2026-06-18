@@ -1,8 +1,11 @@
 import urllib.parse
 
 import requests
+from oslo_config import cfg
 from oslo_log import log
 from requests.models import HTTPError
+
+from neutron_understack import config
 
 LOG = log.getLogger(__name__)
 
@@ -12,16 +15,21 @@ class UndersyncError(Exception):
 
 
 class Undersync:
+    _session = None
+
     def __init__(
         self,
-        session,
         api_url: str | None = None,
         timeout: int = 90,
     ) -> None:
-        self.session = session
         self.url = "http://undersync.undersync.svc.cluster.local:8080"
         self.api_url = api_url or self.url
         self.timeout = timeout
+
+        # we use the [ironic] group here since we don't need to duplicate
+        # the credentials
+        config.register_ironic_opts(cfg.CONF)
+        self._session = config.get_session(config._OPT_GRP_IRONIC)
 
     def _log_and_raise_for_status(self, response: requests.Response):
         try:
@@ -44,7 +52,7 @@ class Undersync:
     def client(self):
         session = requests.Session()
         session.headers = {"Content-Type": "application/json"}
-        session.headers["X-Auth-Token"] = self.session.get_token()
+        session.headers["X-Auth-Token"] = self._session.get_token()
         return session
 
     def _undersync_post(self, action: str, vlan_group: str) -> requests.Response:
