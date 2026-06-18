@@ -508,6 +508,18 @@ site:
     # @default -- false
     enabled: false
 
+  # -- Cluster metadata sync to Prometheus via Pushgateway
+  cluster_metadata:
+    # -- Enable/disable syncing cluster-metadata ConfigMap to Prometheus
+    # @default -- true
+    enabled: true
+
+  # -- Prometheus Pushgateway for batch job metrics
+  prometheus_pushgateway:
+    # -- Enable/disable deploying Prometheus Pushgateway
+    # @default -- true
+    enabled: true
+
   # -- OpenEBS
   openebs:
     # -- Enable/disable deploying OpenEBS
