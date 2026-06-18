@@ -200,11 +200,14 @@ def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) ->
     ports on that network reference the empty network HCG, so no chassis owns
     them and routing/ARP breaks.
 
-    We do what link_network_ha_chassis_group would have done, but source the
-    chassis from the router HCG instead of the (empty) gateway LRP: populate the
-    unified network HCG with sync_ha_chassis_group_network_unified, then anchor
-    the internal router-interface LRP to that same HCG. External ports already
-    reference the unified network HCG, so populating it fixes them.
+    We do what link_network_ha_chassis_group would have done: populate the unified
+    network HCG with sync_ha_chassis_group_network_unified, then anchor the internal
+    router-interface LRP to that same HCG. The gateway chassis is sourced from the
+    global HA_Chassis table (all records must share one chassis_name) so the fix
+    fires even before the external gateway port is attached.
+
+    For VLAN/FLAT networks neutron's handler already populates the network HCG
+    correctly; we detect that and return early.
 
     Subscribed to ROUTER_INTERFACE/AFTER_CREATE at a priority that runs after
     neutron's OVN handler, so the LRP (lrp-<port_id>) already exists by now.
@@ -220,19 +223,28 @@ def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) ->
             return
         nb_idl = client._nb_idl
 
-        # Vxlan-gateway signal: the per-router HCG exists with chassis.
-        # VLAN/FLAT gateways have no router HCG and are handled by neutron.
-        router_hcg = nb_idl.lookup(
-            "HA_Chassis_Group", ovn_utils.ovn_name(router_id), default=None
+        # Skip if the per-network HCG is already populated — neutron handled it
+        # (VLAN/FLAT gateways).  For vxlan the HCG is empty due to the neutron bug.
+        network_hcg = nb_idl.lookup(
+            "HA_Chassis_Group", ovn_utils.ovn_name(network_id), default=None
         )
-        if not router_hcg or not router_hcg.ha_chassis:
+        if network_hcg and network_hcg.ha_chassis:
+            return
+
+        # Derive the gateway chassis from every HA_Chassis row in the NB database.
+        # If exactly one distinct chassis_name exists, that is our gateway chassis.
+        # This avoids requiring the per-router HCG to exist first.
+        all_ha_chassis = nb_idl.db_list_rows("HA_Chassis").execute(check_error=True)
+        chassis_names = {row.chassis_name for row in all_ha_chassis}
+        if len(chassis_names) != 1:
             LOG.debug(
-                "No HA_Chassis_Group with chassis found for router %(router)s",
-                {"router": router_id},
+                "Cannot determine unique gateway chassis for network %(net)s "
+                "(router %(router)s): found %(n)d distinct chassis name(s)",
+                {"net": network_id, "router": router_id, "n": len(chassis_names)},
             )
             return
 
-        chassis_prio = {hc.chassis_name: hc.priority for hc in router_hcg.ha_chassis}
+        chassis_prio = {chassis_names.pop(): 32767}
         lrp_name = ovn_utils.ovn_lrouter_port_name(port_id)
 
         LOG.info(
