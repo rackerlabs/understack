@@ -141,14 +141,12 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def create_port_precommit(self, context: PortContext):
-        # Early SVI address scope check — fires before port is committed and
+        # Early SVI address scope check fires before port is committed and
         # before create_port_postcommit, so invalid subnets never reach the
         # VLAN allocation / trunk / Undersync steps.
-        # Note: exceptions here are wrapped by _call_on_drivers as
-        # MechanismDriverError → HTTP 500. The error message is still clear.
+        # Neutron surfaces the BadRequest back through the router-interface API.
         # The ROUTER_INTERFACE BEFORE_CREATE callback in svi.py acts as a
-        # second safety net and returns the correct HTTP 409 if postcommit
-        # somehow ran first.
+        # second safety net if postcommit somehow ran first.
         if utils.is_router_interface(context):
             LOG.info(
                 "create_port_precommit: SVI scope check for router port %s "
@@ -156,16 +154,29 @@ class UnderstackDriver(MechanismDriver):
                 context.current["id"],
                 context.current.get("device_id"),
             )
-            svi_router.validate_svi_router_port(context.plugin_context, context.current)
-            LOG.info(
-                "create_port_precommit: SVI scope check passed for port %(port)s "
-                "network %(network)s router %(router)s",
-                {
-                    "port": context.current["id"],
-                    "network": context.current.get("network_id"),
-                    "router": context.current.get("device_id"),
-                },
+            checked = svi_router.validate_svi_router_port(
+                context.plugin_context, context.current
             )
+            if checked:
+                LOG.info(
+                    "create_port_precommit: SVI scope check passed for port %(port)s "
+                    "network %(network)s router %(router)s",
+                    {
+                        "port": context.current["id"],
+                        "network": context.current.get("network_id"),
+                        "router": context.current.get("device_id"),
+                    },
+                )
+            else:
+                LOG.debug(
+                    "create_port_precommit: SVI scope check not applicable for "
+                    "port %(port)s owner %(owner)s router %(router)s",
+                    {
+                        "port": context.current["id"],
+                        "owner": context.current.get("device_owner"),
+                        "router": context.current.get("device_id"),
+                    },
+                )
 
     def create_port_postcommit(self, context: PortContext) -> None:
         # Provide network node(s) with connectivity to the networks where this
@@ -181,7 +192,7 @@ class UnderstackDriver(MechanismDriver):
             LOG.info(
                 "Router interface port %(port)s detected on network %(net)s "
                 "device_id=%(router)s owner=%(owner)s fixed_ips=%(fixed_ips)s "
-                "— handing off to routers.create_port_postcommit",
+                "- handing off to routers.create_port_postcommit",
                 {
                     "port": port["id"],
                     "net": port["network_id"],
