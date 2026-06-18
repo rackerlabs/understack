@@ -15,8 +15,6 @@ class UndersyncError(Exception):
 
 
 class Undersync:
-    _session = None
-
     def __init__(
         self,
         api_url: str | None = None,
@@ -48,16 +46,9 @@ class Undersync:
         else:
             return self.sync(vlan_group)
 
-    @property
-    def client(self):
-        session = requests.Session()
-        session.headers = {"Content-Type": "application/json"}
-        session.headers["X-Auth-Token"] = self._session.get_token()
-        return session
-
     def _undersync_post(self, action: str, vlan_group: str) -> requests.Response:
         vlan_group = urllib.parse.quote(vlan_group, safe="")
-        response = self.client.post(
+        response = self._session.post(
             f"{self.api_url}/v1/vlan-group/{vlan_group}/{action}", timeout=self.timeout
         )
         try:

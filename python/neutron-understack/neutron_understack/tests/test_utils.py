@@ -12,7 +12,6 @@ from sqlalchemy.orm import scoped_session
 from sqlalchemy.orm import sessionmaker
 
 from neutron_understack import utils
-from neutron_understack.undersync import Undersync
 
 
 class TestParentPortIsBound:
@@ -636,19 +635,3 @@ class TestFetchNetworkNodeTrunkId:
 
         assert result == "trunk-456"
         mock_ironic.baremetal_node_uuid.assert_called_once_with("gateway-host-1")
-
-
-class TestUndersyncAuthentication:
-    def test_undersync_with_keystone_auth(self, mocker):
-        """Test that Undersync client uses X-Auth-Token header from session."""
-        mock_session = MagicMock()
-        mock_session.get_token.return_value = "test_token"
-        mocker.patch("neutron_understack.config.get_session", return_value=mock_session)
-
-        undersync = Undersync("http://test.api")
-
-        session = undersync.client
-
-        assert session.headers["Content-Type"] == "application/json"
-        assert session.headers["X-Auth-Token"] == "test_token"
-        assert "Authorization" not in session.headers
