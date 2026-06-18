@@ -1,3 +1,4 @@
+import importlib.metadata
 import urllib.parse
 
 import requests
@@ -24,10 +25,14 @@ class Undersync:
         self.api_url = api_url or self.url
         self.timeout = timeout
 
+        version = importlib.metadata.version("neutron_understack")
+
         # we use the [ironic] group here since we don't need to duplicate
         # the credentials
         config.register_ironic_opts(cfg.CONF)
         self._session = config.get_session(config._OPT_GRP_IRONIC)
+        self._session.app_name = "neutron_understack"
+        self._session.app_version = version
 
     def _log_and_raise_for_status(self, response: requests.Response):
         try:

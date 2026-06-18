@@ -1,3 +1,5 @@
+import importlib.metadata
+
 from openstack import connection
 from openstack.baremetal.baremetal_service import BaremetalService
 from openstack.baremetal.v1.port import Port as BaremetalPort
@@ -14,8 +16,14 @@ class IronicClient:
     def _get_ironic_client(self) -> BaremetalService:
         session = config.get_session(config._OPT_GRP_IRONIC)
 
+        version = importlib.metadata.version("neutron_understack")
+
         return connection.Connection(
-            session=session, oslo_conf=cfg.CONF, connect_retries=cfg.CONF.http_retries
+            session=session,
+            oslo_conf=cfg.CONF,
+            connect_retries=cfg.CONF.http_retries,
+            app_name="neutron_understack",
+            app_version=version,
         ).baremetal
 
     def baremetal_port_physical_network(self, local_link_info: dict) -> str | None:
