@@ -34,6 +34,7 @@ dependencies = [
 ]
 
 [project.entry-points."oslo.config.opts"]
+ironic = "neutron_understack.config:list_ironic_opts"
 understack = "neutron_understack.config:list_understack_opts"
 cisco-asa = "neutron_understack.config:list_cisco_asa_opts"
 
