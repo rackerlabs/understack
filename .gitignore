@@ -24,6 +24,9 @@ __pycache__
 # see .github/workflows/mkdocs.yaaml
 docs/workflows/
 
+# auto-generated neutron-understack sample config docs
+docs/design-guide/neutron-understack-config-sample.md
+
 # devbox's envrc
 .envrc
 .direnv
