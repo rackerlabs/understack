@@ -241,12 +241,6 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             subport_binding_level = self._delete_binding_level(subport["port_id"], host)
             self._delete_unused_segment(subport_binding_level.segment_id)
 
-    def _trigger_undersync(self, vlan_group_name: str) -> None:
-        self.undersync.sync_devices(
-            vlan_group=vlan_group_name,
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
-
     def _handle_subports_removal(
         self,
         binding_profile: dict,
@@ -257,7 +251,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
     ) -> None:
         self._handle_segment_deallocation(subports, binding_host)
         if invoke_undersync and vlan_group_name:
-            self._trigger_undersync(vlan_group_name)
+            self.undersync.sync(vlan_group_name)
 
     def subports_added(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
@@ -277,7 +271,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
                     local_link_info
                 )
             LOG.debug("subports_added_post found vlan_group_name=%s", vlan_group_name)
-            self._trigger_undersync(vlan_group_name)
+            self.undersync.sync(vlan_group_name)
 
     def subports_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]

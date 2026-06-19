@@ -3,7 +3,6 @@ from dataclasses import dataclass
 import pytest
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
-from oslo_config import cfg
 
 from neutron_understack.neutron_understack_mech import UnderstackDriver
 
@@ -12,14 +11,14 @@ class TestUpdatePortPostCommit:
     def test_with_simple_port(self, understack_driver, port_context):
         understack_driver.update_port_postcommit(port_context)
 
-        understack_driver.undersync.sync_devices.assert_called_once()
+        understack_driver.undersync.sync.assert_called_once()
 
     def test_skips_non_baremetal_port(self, understack_driver, port_context):
         port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_NORMAL
 
         understack_driver.update_port_postcommit(port_context)
 
-        understack_driver.undersync.sync_devices.assert_not_called()
+        understack_driver.undersync.sync.assert_not_called()
 
 
 class TestDeletePortPostCommit:
@@ -28,7 +27,7 @@ class TestDeletePortPostCommit:
 
         understack_driver.delete_port_postcommit(port_context)
 
-        understack_driver.undersync.sync_devices.assert_not_called()
+        understack_driver.undersync.sync.assert_not_called()
 
 
 @pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
@@ -209,24 +208,16 @@ class TestCreateNetworkPostCommit:
 
 class TestKeystoneAuthentication:
     def test_initialize_with_keystone_auth(self, mocker):
-        """Test that driver initializes with Keystone authentication."""
-        mock_auth = mocker.patch("keystoneauth1.loading.load_auth_from_conf_options")
-        mock_session_class = mocker.patch(
-            "neutron_understack.neutron_understack_mech.ks_session.Session"
-        )
-        mock_get_token = mocker.MagicMock(return_value="test_service_token")
-
+        """Test that Undersync creates its own session using the ironic auth config."""
         mock_session_instance = mocker.MagicMock()
-        mock_session_instance.get_token = mock_get_token
-        mock_session_class.return_value = mock_session_instance
-
-        # Mock IronicClient to avoid config issues
+        mock_get_session = mocker.patch(
+            "neutron_understack.config.get_session",
+            return_value=mock_session_instance,
+        )
         mocker.patch("neutron_understack.neutron_understack_mech.IronicClient")
 
         driver = UnderstackDriver()
         driver.initialize()
 
-        mock_auth.assert_called_once_with(cfg.CONF, "keystone_authtoken")
-        mock_session_class.assert_called_once()
-        mock_get_token.assert_called_once()
-        assert driver.undersync.session == mock_session_instance
+        mock_get_session.assert_called_once_with("ironic")
+        assert driver.undersync._session == mock_session_instance

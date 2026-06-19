@@ -1,6 +1,5 @@
 import pytest
 from neutron.plugins.ml2.driver_context import portbindings
-from oslo_config import cfg
 
 from neutron_understack import utils
 from neutron_understack.trunk import SubportSegmentationIDError
@@ -116,10 +115,7 @@ class Test_HandleTenantVlanIDAndSwitchportConfig:
             None, None, None, mocker.Mock(states=[trunk])
         )
 
-        understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
-            vlan_group="physnet",
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
+        understack_trunk_driver.undersync.sync.assert_called_once_with("physnet")
 
     def test_when_parent_port_is_unbound(
         self, mocker, understack_trunk_driver, trunk, subport, port_object
@@ -210,10 +206,7 @@ class Test_CleanParentPortSwitchportConfig:
 
         understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
 
-        understack_trunk_driver.undersync.sync_devices.assert_called_once_with(
-            vlan_group="physnet",
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
-        )
+        understack_trunk_driver.undersync.sync.assert_called_once_with("physnet")
 
     def test_when_parent_port_is_unbound(
         self, mocker, understack_trunk_driver, port_object, trunk, subport

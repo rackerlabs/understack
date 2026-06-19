@@ -17,6 +17,8 @@ else
 	ACTIVATE := $(VENV_DIR)/bin/activate
 endif
 
+NEUTRON_SAMPLE_CONFIG := docs/design-guide/neutron-understack-config-sample.md
+
 WFTMPLS := $(wildcard components/*-workflows/*/workflowtemplates/*.yaml)
 
 .PHONY: help
@@ -39,10 +41,17 @@ wftmpls: $(WFTMPLS) $(ACTIVATE)
 component-docs-check: ## Validate component docs coverage for ArgoCD app templates
 	@$(PYTHON) scripts/check-component-docs.py
 
+$(NEUTRON_SAMPLE_CONFIG): ## Generate neutron-understack sample configuration docs
+	@mkdir -p docs/design-guide
+	@{ printf '# neutron-understack Sample Configuration\n\n```ini\n'; \
+	   uv run --directory python/neutron-understack oslo-config-generator \
+	       --config-file tools/config/neutron-understack-config-generator.conf; \
+	   printf '\n```\n'; } > $(NEUTRON_SAMPLE_CONFIG)
+
 .PHONY: docs
-docs: $(ACTIVATE) wftmpls component-docs-check ## Builds the documentation
+docs: $(ACTIVATE) wftmpls $(NEUTRON_SAMPLE_CONFIG) component-docs-check ## Builds the documentation
 	NO_MKDOCS_2_WARNING=1 $(MKDOCS) build --strict
 
 .PHONY: docs-local
-docs-local: $(ACTIVATE) wftmpls component-docs-check ## Build and locally host the documentation
+docs-local: $(ACTIVATE) wftmpls $(NEUTRON_SAMPLE_CONFIG) component-docs-check ## Build and locally host the documentation
 	$(MKDOCS) serve --strict --livereload
