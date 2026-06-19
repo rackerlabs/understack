@@ -6,6 +6,7 @@ from neutron.conf.agent import ovs_conf
 from neutron.objects.network import NetworkSegment
 from neutron.objects.ports import Port
 from neutron.plugins.ml2.drivers.ovn.mech_driver.ovsdb.ovn_client import OVNClient
+from neutron.services.trunk import exceptions as trunk_exc
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
@@ -98,11 +99,18 @@ def add_subport_to_trunk(shared_port: PortDict, segment: NetworkSegmentDict) -> 
     }
     trunk_id = utils.fetch_network_node_trunk_id()
 
-    utils.fetch_trunk_plugin().add_subports(
-        context=n_context.get_admin_context(),
-        trunk_id=trunk_id,
-        subports=subports,
-    )
+    try:
+        utils.fetch_trunk_plugin().add_subports(
+            context=n_context.get_admin_context(),
+            trunk_id=trunk_id,
+            subports=subports,
+        )
+    except trunk_exc.DuplicateSubPort:
+        LOG.debug(
+            "subport with segmentation_id %(seg_id)s already exists on trunk "
+            "%(trunk_id)s, skipping",
+            {"seg_id": segment["segmentation_id"], "trunk_id": trunk_id},
+        )
 
 
 def fetch_or_create_router_segment(context: PortContext) -> NetworkSegmentDict:
