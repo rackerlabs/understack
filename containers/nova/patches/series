@@ -1,2 +1,3 @@
 0001_trunk_details_metadata.patch
 ironic-attach-debug.patch
+0002_network_group_affinity_policy.patch
