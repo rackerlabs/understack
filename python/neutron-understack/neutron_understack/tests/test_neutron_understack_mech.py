@@ -11,14 +11,14 @@ class TestUpdatePortPostCommit:
     def test_with_simple_port(self, understack_driver, port_context):
         understack_driver.update_port_postcommit(port_context)
 
-        understack_driver.undersync.sync_devices.assert_called_once()
+        understack_driver.undersync.sync.assert_called_once()
 
     def test_skips_non_baremetal_port(self, understack_driver, port_context):
         port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_NORMAL
 
         understack_driver.update_port_postcommit(port_context)
 
-        understack_driver.undersync.sync_devices.assert_not_called()
+        understack_driver.undersync.sync.assert_not_called()
 
 
 class TestDeletePortPostCommit:
@@ -27,7 +27,7 @@ class TestDeletePortPostCommit:
 
         understack_driver.delete_port_postcommit(port_context)
 
-        understack_driver.undersync.sync_devices.assert_not_called()
+        understack_driver.undersync.sync.assert_not_called()
 
 
 @pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")

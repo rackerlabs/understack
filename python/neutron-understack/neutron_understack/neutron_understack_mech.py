@@ -142,9 +142,9 @@ class UnderstackDriver(MechanismDriver):
         if current_vif_unbound and original_vif_other:
             self._tenant_network_port_cleanup(context)
             if vlan_group_name:
-                self.invoke_undersync(vlan_group_name)
+                self.undersync.sync(vlan_group_name)
         elif current_vif_other and vlan_group_name:
-            self.invoke_undersync(vlan_group_name)
+            self.undersync.sync(vlan_group_name)
 
     def _tenant_network_port_cleanup(self, context: PortContext):
         """Tenant network port cleanup in the UnderCloud infrastructure.
@@ -205,7 +205,7 @@ class UnderstackDriver(MechanismDriver):
         if vlan_group_name and is_provisioning_network(port["network_id"]):
             # Signals end of the provisioning / cleaning cycle, so we
             # put the port back to its normal tenant mode:
-            self.invoke_undersync(vlan_group_name)
+            self.undersync.sync(vlan_group_name)
 
     def bind_port(self, context: PortContext) -> None:
         """Bind the VXLAN network segment and allocate dynamic VLAN segments.
@@ -300,12 +300,6 @@ class UnderstackDriver(MechanismDriver):
         context.continue_binding(
             segment_id=segment[api.ID],
             next_segments_to_bind=[dynamic_segment],
-        )
-
-    def invoke_undersync(self, vlan_group_name: str):
-        self.undersync.sync_devices(
-            vlan_group=vlan_group_name,
-            dry_run=cfg.CONF.ml2_understack.undersync_dry_run,
         )
 
     def check_vlan_transparency(self, context):

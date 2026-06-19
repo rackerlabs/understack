@@ -18,13 +18,13 @@ class TestKeystoneTokenRefresh:
     """Test that each Undersync request goes through the keystoneauth1 session."""
 
     def test_undersync_uses_session_per_request(self, undersync):
-        """Test that sync_devices calls _session.post, for token refresh.
+        """Test that sync calls _session.post, for token refresh.
 
         By calling _session.post directly, keystoneauth1 handles token refresh
         transparently rather than us caching a token manually.
         """
-        result1 = undersync.sync_devices("vlan-group-1")
-        result2 = undersync.sync_devices("vlan-group-2")
+        result1 = undersync.sync("vlan-group-1")
+        result2 = undersync.sync("vlan-group-2")
 
         assert undersync._session.post.call_count == 2
         assert result1.status_code == 200
