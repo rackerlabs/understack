@@ -13,7 +13,7 @@ spec:
   destination:
     namespace: kube-system
     server: {{ $.Values.cluster_server }}
-  project: understack-infra
+  project: understack
   sources:
   - helm:
       ignoreMissingValueFiles: true

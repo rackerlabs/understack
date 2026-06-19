@@ -3,4 +3,4 @@ kind: Kustomization
 resources:
 - appsets/project-understack-infra.yaml
 - appsets/project-understack-operators.yaml
-- appsets/project-understack.yaml
+- ../bootstrap/argocd-understack/appproject-understack.yaml
