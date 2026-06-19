@@ -26,6 +26,10 @@ def required_bios_settings(pxe_interface: str | None) -> dict[str, str]:
         "SecureBoot": "Disabled",
         # PXE is enabled by default on DELL, but we don't use it:
         "PxeDev1EnDis": "Disabled",
+        "PxeDev2EnDis": "Disabled",
+        "PxeDev3EnDis": "Disabled",
+        "PxeDev4EnDis": "Disabled",
+        # Enable one HTTP port for booting:
         "HttpDev1EnDis": "Enabled",
         "HttpDev2EnDis": "Disabled",
         "HttpDev3EnDis": "Disabled",
