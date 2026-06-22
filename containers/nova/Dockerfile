@@ -13,3 +13,4 @@ COPY containers/nova/patches /tmp/patches/
 RUN cd /var/lib/openstack/lib/python3.12/site-packages && \
     QUILT_PATCHES=/tmp/patches quilt push -a
 COPY python/nova-understack/ironic_understack  /var/lib/openstack/lib/python3.12/site-packages/nova/virt/ironic_understack
+COPY python/nova-understack/nova_understack_filters  /var/lib/openstack/lib/python3.12/site-packages/nova/scheduler/filters/understack

@@ -91,6 +91,7 @@ conf:
         - ServerGroupAntiAffinityFilter
         - ServerGroupAffinityFilter
         - JsonFilter
+        - TraitRequiredFilter
   nova_api_uwsgi:
     uwsgi:
       processes: 2
