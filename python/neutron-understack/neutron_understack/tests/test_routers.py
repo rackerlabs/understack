@@ -1,9 +1,11 @@
 import pytest
 from neutron_lib import constants as p_const
+from neutron_lib.callbacks.events import DBEventPayload
 
 from neutron_understack.routers import add_subport_to_trunk
 from neutron_understack.routers import create_port_postcommit
 from neutron_understack.routers import fetch_or_create_router_segment
+from neutron_understack.routers import handle_router_interface_after_delete
 from neutron_understack.routers import handle_router_interface_removal
 from neutron_understack.routers import handle_subport_removal
 from neutron_understack.routers import link_vxlan_network_ha_chassis_group
@@ -203,6 +205,59 @@ class TestCreatePortPostcommit:
         create_uplink_port.assert_called_once_with(
             fake_segment, port_context.current["network_id"]
         )
+
+
+@pytest.fixture
+def ri_after_delete_payload(network_id) -> DBEventPayload:
+    metadata = {
+        "port": {
+            "id": "port-uuid",
+            "device_owner": p_const.DEVICE_OWNER_ROUTER_GW,
+            "network_id": str(network_id),
+        }
+    }
+    return DBEventPayload("context", metadata=metadata)
+
+
+class TestHandleRouterInterfaceAfterDelete:
+    def test_non_router_port_skips_cleanup(self, mocker, ri_after_delete_payload):
+        mock_cleanup = mocker.patch("neutron_understack.routers._do_uplink_cleanup")
+        ri_after_delete_payload.metadata["port"]["device_owner"] = "network:dhcp"
+
+        handle_router_interface_after_delete(None, None, None, ri_after_delete_payload)
+
+        mock_cleanup.assert_not_called()
+
+    def test_remaining_router_ports_skips_cleanup(self, mocker, ri_after_delete_payload):
+        mock_cleanup = mocker.patch("neutron_understack.routers._do_uplink_cleanup")
+        mocker.patch("neutron_understack.routers.n_context.get_admin_context")
+        mocker.patch("neutron_understack.routers.Port.get_objects", return_value=["port1"])
+
+        handle_router_interface_after_delete(None, None, None, ri_after_delete_payload)
+
+        mock_cleanup.assert_not_called()
+
+    def test_last_port_removed_triggers_cleanup(
+        self, mocker, ri_after_delete_payload, network_id
+    ):
+        mock_cleanup = mocker.patch("neutron_understack.routers._do_uplink_cleanup")
+        mocker.patch("neutron_understack.routers.n_context.get_admin_context")
+        mocker.patch("neutron_understack.routers.Port.get_objects", return_value=[])
+
+        handle_router_interface_after_delete(None, None, None, ri_after_delete_payload)
+
+        mock_cleanup.assert_called_once_with(str(network_id))
+
+    def test_cleanup_error_is_logged_not_raised(self, mocker, ri_after_delete_payload):
+        mocker.patch("neutron_understack.routers.n_context.get_admin_context")
+        mocker.patch("neutron_understack.routers.Port.get_objects", return_value=[])
+        mocker.patch(
+            "neutron_understack.routers._do_uplink_cleanup",
+            side_effect=Exception("ovsdb down"),
+        )
+
+        # Must not raise
+        handle_router_interface_after_delete(None, None, None, ri_after_delete_payload)
 
 
 class TestLinkVxlanNetworkHaChassisGroup:

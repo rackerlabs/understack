@@ -292,8 +292,24 @@ def delete_uplink_port(segment: NetworkSegment, network_id: str) -> None:
     ovn_client()._transaction([cmd])
 
 
+def _do_uplink_cleanup(network_id: str) -> None:
+    """Remove the trunk subport, OVN uplink LSP, and shared Neutron port."""
+    segment = fetch_router_network_segment(network_id)
+    if not segment:
+        return
+
+    shared_port = fetch_shared_router_port(segment)
+    if not shared_port:
+        # Already cleaned up (e.g. by the PORT PRECOMMIT_DELETE handler).
+        return
+
+    handle_subport_removal(shared_port)
+    delete_uplink_port(segment, network_id)
+    shared_port.delete()
+
+
 def handle_router_interface_removal(_resource, _event, trigger, payload) -> None:
-    """Handles the removal of a router interface.
+    """Handles PORT PRECOMMIT_DELETE — fires when delete_router() deletes ports directly.
 
     When router interface port is deleted, we remove the corresponding subport
     from the trunk and delete OVN localnet port.
@@ -333,17 +349,52 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
         )
         return
 
-    segment = fetch_router_network_segment(network_id)
-    if not segment:
+    _do_uplink_cleanup(network_id)
+
+
+def handle_router_interface_after_delete(
+    _resource, _event, trigger, payload
+) -> None:
+    """Handles ROUTER_INTERFACE AFTER_DELETE — fires on explicit remove_router_interface().
+
+    remove_router_interface() fires ROUTER_INTERFACE AFTER_DELETE but does not
+    reliably trigger PORT PRECOMMIT_DELETE (the ML2 plugin only publishes
+    PRECOMMIT_DELETE when the port has an ACTIVE binding, which is not guaranteed
+    for router interface ports in all OVN flavours). This handler covers the
+    subnet-detachment case; the existing PORT PRECOMMIT_DELETE handler covers
+    direct port deletion during router deletion.
+
+    At AFTER_DELETE time the interface port is already removed from the DB, so
+    we check count == 0 (no remaining router ports) rather than count <= 1.
+    _do_uplink_cleanup is idempotent: if the PRECOMMIT_DELETE handler already
+    ran, fetch_shared_router_port returns None and cleanup exits silently.
+    """
+    port = payload.metadata["port"]
+    network_id = port["network_id"]
+
+    if port.get("device_owner") not in ROUTER_INTERFACE_AND_GW:
         return
 
-    shared_port = fetch_shared_router_port(segment)
-    if not shared_port:
+    # Port is already removed from DB; check whether any router ports remain.
+    remaining = Port.get_objects(
+        n_context.get_admin_context(),
+        network_id=network_id,
+        device_owner=ROUTER_INTERFACE_AND_GW,
+    )
+    if remaining:
+        LOG.debug(
+            "Router ports still present on network %(net)s, skipping uplink cleanup",
+            {"net": network_id},
+        )
         return
 
-    handle_subport_removal(shared_port)
-    delete_uplink_port(segment, network_id)
-    shared_port.delete()
+    try:
+        _do_uplink_cleanup(network_id)
+    except Exception as err:
+        LOG.error(
+            "Failed uplink cleanup for network %(net)s: %(error)s",
+            {"net": network_id, "error": err},
+        )
 
 
 def handle_subport_removal(port: Port) -> None:
