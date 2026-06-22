@@ -15,6 +15,7 @@ from neutron_understack import config
 from neutron_understack import routers
 from neutron_understack import utils
 from neutron_understack.ironic import IronicClient
+from neutron_understack.l3_router import svi as svi_router
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
 
@@ -25,6 +26,14 @@ LOG = logging.getLogger(__name__)
 
 
 SUPPORTED_VNIC_TYPES = [portbindings.VNIC_BAREMETAL, portbindings.VNIC_NORMAL]
+ROUTER_INTERFACE_OWNERS = (
+    p_const.DEVICE_OWNER_ROUTER_INTF,
+    p_const.DEVICE_OWNER_ROUTER_GW,
+)
+
+
+def _is_router_interface_port(port):
+    return port.get("device_owner") in ROUTER_INTERFACE_OWNERS
 
 
 class UnderstackDriver(MechanismDriver):
@@ -98,7 +107,41 @@ class UnderstackDriver(MechanismDriver):
         pass
 
     def create_port_precommit(self, context: PortContext):
-        pass
+        # Early SVI address scope check fires before port is committed and
+        # before create_port_postcommit, so invalid subnets never reach the
+        # VLAN allocation / trunk / Undersync steps.
+        # Neutron surfaces the BadRequest back through the router-interface API.
+        # update_port_precommit covers existing-port attaches.
+        if utils.is_router_interface(context):
+            LOG.info(
+                "create_port_precommit: checking SVI scope validation for "
+                "router port %s device_id=%s",
+                context.current["id"],
+                context.current.get("device_id"),
+            )
+            checked = svi_router.validate_svi_router_port(
+                context.plugin_context, context.current
+            )
+            if checked:
+                LOG.info(
+                    "create_port_precommit: SVI scope check passed for port %(port)s "
+                    "network %(network)s router %(router)s",
+                    {
+                        "port": context.current["id"],
+                        "network": context.current.get("network_id"),
+                        "router": context.current.get("device_id"),
+                    },
+                )
+            else:
+                LOG.debug(
+                    "create_port_precommit: SVI scope check not applicable for "
+                    "port %(port)s owner %(owner)s router %(router)s",
+                    {
+                        "port": context.current["id"],
+                        "owner": context.current.get("device_owner"),
+                        "router": context.current.get("device_id"),
+                    },
+                )
 
     def create_port_postcommit(self, context: PortContext) -> None:
         # Provide network node(s) with connectivity to the networks where this
@@ -111,10 +154,92 @@ class UnderstackDriver(MechanismDriver):
         )
 
         if utils.is_router_interface(context):
-            routers.create_port_postcommit(context)
+            LOG.info(
+                "Router interface port %(port)s detected on network %(net)s "
+                "device_id=%(router)s owner=%(owner)s fixed_ips=%(fixed_ips)s "
+                "- handing off to routers.create_port_postcommit",
+                {
+                    "port": port["id"],
+                    "net": port["network_id"],
+                    "router": port.get("device_id"),
+                    "owner": port.get("device_owner"),
+                    "fixed_ips": port.get("fixed_ips", []),
+                },
+            )
+            try:
+                routers.create_port_postcommit(context)
+            except Exception:
+                LOG.exception(
+                    "Router interface postcommit failed for port %(port)s "
+                    "network %(network)s router %(router)s owner %(owner)s "
+                    "fixed_ips=%(fixed_ips)s",
+                    {
+                        "port": port["id"],
+                        "network": port["network_id"],
+                        "router": port.get("device_id"),
+                        "owner": port.get("device_owner"),
+                        "fixed_ips": port.get("fixed_ips", []),
+                    },
+                )
+                raise
 
-    def update_port_precommit(self, context):
-        pass
+    def update_port_precommit(self, context: PortContext):
+        if not utils.is_router_interface(context):
+            return
+
+        original = context.original
+        current = context.current
+        became_router_interface = not _is_router_interface_port(
+            original
+        ) and _is_router_interface_port(current)
+        fixed_ips_changed = original.get("fixed_ips", []) != current.get(
+            "fixed_ips", []
+        )
+
+        if not (became_router_interface or fixed_ips_changed):
+            LOG.debug(
+                "update_port_precommit: SVI scope check not needed for port "
+                "%(port)s owner %(owner)s router %(router)s",
+                {
+                    "port": current["id"],
+                    "owner": current.get("device_owner"),
+                    "router": current.get("device_id"),
+                },
+            )
+            return
+
+        LOG.info(
+            "update_port_precommit: checking SVI scope validation for router "
+            "port %(port)s device_id=%(router)s became_router_interface=%(became)s "
+            "fixed_ips_changed=%(fixed_ips_changed)s",
+            {
+                "port": current["id"],
+                "router": current.get("device_id"),
+                "became": became_router_interface,
+                "fixed_ips_changed": fixed_ips_changed,
+            },
+        )
+        checked = svi_router.validate_svi_router_port(context.plugin_context, current)
+        if checked:
+            LOG.info(
+                "update_port_precommit: SVI scope check passed for port %(port)s "
+                "network %(network)s router %(router)s",
+                {
+                    "port": current["id"],
+                    "network": current.get("network_id"),
+                    "router": current.get("device_id"),
+                },
+            )
+        else:
+            LOG.debug(
+                "update_port_precommit: SVI scope check not applicable for "
+                "port %(port)s owner %(owner)s router %(router)s",
+                {
+                    "port": current["id"],
+                    "owner": current.get("device_owner"),
+                    "router": current.get("device_id"),
+                },
+            )
 
     def update_port_postcommit(self, context: PortContext) -> None:
         if utils.is_baremetal_port(context):
