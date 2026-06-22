@@ -446,6 +446,125 @@ Neutron based on certain data provided to port creation and update API calls.
 - the port has a binding host
 - the port is either unbound or has previously failed to bind
 
+### Router Interface Lifecycle
+
+When a subnet is attached to a router, the understack ML2 driver sets up a path
+so that the Network Node — the host running OVN — can forward traffic on that
+network over the physical fabric. This is done through an **uplink port**.
+
+#### The uplink port
+
+The uplink is a Neutron port plus a matching OVN localnet Logical Switch Port
+(LSP) named `uplink-<segment_id>`. It sits on the Network Node's leaf VLAN
+segment and gives OVN a way to send and receive that network's traffic over the
+Network Node's trunk connection.
+
+The VLAN tag carried on the trunk is *local to the leaf where the Network Node
+is connected*. Baremetal nodes connected to different leaves each get their own
+per-leaf VLAN segments, which will typically have different VLAN IDs. The
+`uplink-<segment_id>` name encodes the segment ID of the Network Node's leaf
+segment, making it possible to distinguish it from segments allocated for other
+leaves.
+
+```mermaid
+flowchart LR
+    BM1["Baremetal node<br/>(leaf-1, VLAN 1800)"]
+    BM2["Baremetal node<br/>(leaf-2, VLAN 1801)"]
+    NN["Network Node / OVN<br/>(leaf-1, VLAN 1802)"]
+    LS["OVN Logical Switch<br/>neutron-NETWORK_ID"]
+
+    BM1 -->|"provnet-SEG1<br/>(localnet, tag 1800)"| LS
+    BM2 -->|"provnet-SEG2<br/>(localnet, tag 1801)"| LS
+    NN -->|"uplink-SEG3<br/>(localnet, tag 1802)"| LS
+```
+
+#### Creating the uplink
+
+When `openstack router add subnet` is issued, Neutron creates a router interface
+port. The understack driver's `create_port_postcommit()` intercepts this and, if
+no other router port already exists on the network, it:
+
+1. Allocates a dynamic VLAN segment on the network-node physnet (the leaf the
+   Network Node is connected to)
+2. Creates a Neutron port named `uplink-<segment_id>` on that segment
+3. Adds that port as a tagged subport on the Network Node's trunk
+4. Creates an OVN localnet LSP `uplink-<segment_id>` on the network's logical switch
+
+For VXLAN-type networks a second step runs via the `ROUTER_INTERFACE AFTER_CREATE`
+subscription (at `PRIORITY_DEFAULT + 1000`, after OVN's own handler).
+`link_vxlan_network_ha_chassis_group()` populates the per-network
+`HA_Chassis_Group` from the router's own HCG. This is a workaround for a
+Neutron 2026.1 regression where VXLAN gateway networks leave that group empty,
+causing ARP and routing to break for baremetal ports on the network.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Neutron
+    participant Understack as UnderstackDriver
+    participant OVN
+
+    Client->>Neutron: openstack router add subnet
+    Neutron->>Understack: create_port_postcommit(router interface port)
+    Understack->>Neutron: allocate dynamic VLAN segment (network-node physnet)
+    Understack->>Neutron: create Neutron port uplink-SEGMENT_ID
+    Understack->>Neutron: add uplink port as trunk subport (tagged VLAN)
+    Understack->>OVN: create localnet LSP uplink-SEGMENT_ID
+
+    Note over Neutron,OVN: VXLAN networks only
+    Neutron-->>Understack: ROUTER_INTERFACE AFTER_CREATE (priority +1000)
+    Understack->>OVN: sync_ha_chassis_group_network_unified
+    Understack->>OVN: anchor internal LRP to network HA_Chassis_Group
+```
+
+#### Removing the uplink
+
+Cleanup must handle two different Neutron code paths depending on the operation:
+
+| Operation | Neutron internal path | Event received by understack |
+|-----------|----------------------|------------------------------|
+| `openstack router remove subnet` | `remove_router_interface()` | `ROUTER_INTERFACE AFTER_DELETE` |
+| `openstack router delete` | `delete_router()` → `delete_port()` per port | `PORT PRECOMMIT_DELETE` |
+
+`remove_router_interface()` does call `_core_plugin.delete_port()` internally
+(see [`l3_db.py#_remove_interface_by_subnet`][l3-db-remove-intf]), but the ML2
+plugin only publishes `PORT PRECOMMIT_DELETE` when the port has an ACTIVE
+binding record. Router interface ports are not guaranteed to be in that state
+at the point `delete_port` is invoked, so the event may silently not fire.
+`ROUTER_INTERFACE AFTER_DELETE` is always published by `remove_router_interface()`
+regardless of binding state, making it the reliable signal for this path. Both
+events are subscribed and both call the shared `_do_uplink_cleanup()` helper.
+
+`_do_uplink_cleanup()` is idempotent: if the shared port is already gone it
+returns immediately, so both handlers can fire without double-cleanup.
+
+```mermaid
+flowchart TD
+    A["openstack router remove subnet"] --> B["ROUTER_INTERFACE<br/>AFTER_DELETE"]
+    C["openstack router delete"] --> D["PORT<br/>PRECOMMIT_DELETE"]
+    B --> E{Any router ports<br/>still on network?}
+    D --> E
+    E -- yes --> F([skip — another<br/>router uses this network])
+    E -- no --> G["_do_uplink_cleanup()"]
+    G --> H["remove trunk subport"]
+    G --> I["delete uplink-SEGMENT_ID<br/>OVN localnet LSP"]
+    G --> J["delete Neutron port<br/>uplink-SEGMENT_ID"]
+```
+
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD046 -->
+!!! note "Count semantics differ between the two handlers"
+
+    Both handlers check whether any router ports remain on the network before
+    cleaning up. The threshold differs because the deleted port's DB lifetime
+    differs by code path:
+
+    - **`PORT PRECOMMIT_DELETE`**: the port is still in the DB at event time,
+      so it counts toward the total — cleanup runs when `count ≤ 1`.
+    - **`ROUTER_INTERFACE AFTER_DELETE`**: the port is already removed from the
+      DB at event time — cleanup runs when `count == 0`.
+<!-- markdownlint-restore -->
+
 [networking-baremetal]: <https://docs.openstack.org/networking-baremetal/latest/>
 [ovn]: <https://docs.ovn.org/en/latest/>
 [ovn-driver]: <https://docs.openstack.org/neutron/latest/ovn/index.html>
@@ -458,3 +577,4 @@ Neutron based on certain data provided to port creation and update API calls.
 [networking-generic-switch]: <https://docs.openstack.org/networking-generic-switch/latest/>
 [ironic-vif-attachment]: <https://docs.openstack.org/ironic/latest/admin/networking.html#vif-attachment-flow>
 [ironic-spec-dpa]: <https://review.opendev.org/c/openstack/ironic-specs/+/945642>
+[l3-db-remove-intf]: <https://github.com/openstack/neutron/blob/28.0.0/neutron/db/l3_db.py#L1175>
