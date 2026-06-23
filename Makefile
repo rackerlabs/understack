@@ -6,14 +6,14 @@ ifeq ($(GITHUB_ACTIONS), true)
 	VENV_DIR :=
 	PIP := pip
 	PYTHON := python
-	MKDOCS := mkdocs
+	PROPERDOCS := properdocs
 	# throw away to ensure we always run this
 	ACTIVATE := .activate
 else
 	VENV_DIR := .venv
 	PIP := $(VENV_DIR)/bin/pip
 	PYTHON := $(VENV_DIR)/bin/python
-	MKDOCS := $(VENV_DIR)/bin/mkdocs
+	PROPERDOCS := $(VENV_DIR)/bin/properdocs
 	ACTIVATE := $(VENV_DIR)/bin/activate
 endif
 
@@ -50,8 +50,8 @@ $(NEUTRON_SAMPLE_CONFIG): ## Generate neutron-understack sample configuration do
 
 .PHONY: docs
 docs: $(ACTIVATE) wftmpls $(NEUTRON_SAMPLE_CONFIG) component-docs-check ## Builds the documentation
-	NO_MKDOCS_2_WARNING=1 $(MKDOCS) build --strict
+	$(PROPERDOCS) build --strict
 
 .PHONY: docs-local
 docs-local: $(ACTIVATE) wftmpls $(NEUTRON_SAMPLE_CONFIG) component-docs-check ## Build and locally host the documentation
-	$(MKDOCS) serve --strict --livereload
+	$(PROPERDOCS) serve --strict --livereload
