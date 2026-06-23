@@ -5,14 +5,14 @@ on:
     branches:
       - main
     paths:
-      - "mkdocs.yml"
+      - "properdocs.yml"
       - "docs/**"
-      - ".github/workflows/mkdocs.yml"
+      - ".github/workflows/properdocs.yaml"
   pull_request:
     paths:
-      - "mkdocs.yml"
+      - "properdocs.yml"
       - "docs/**"
-      - ".github/workflows/mkdocs.yml"
+      - ".github/workflows/properdocs.yaml"
   workflow_dispatch:
   merge_group:
     types: [checks_requested]

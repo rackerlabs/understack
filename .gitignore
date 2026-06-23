@@ -21,7 +21,7 @@ __pycache__
 .DS_Store
 
 # auto-generated argo-workflows docs
-# see .github/workflows/mkdocs.yaaml
+# see .github/workflows/properdocs.yaml
 docs/workflows/
 
 # auto-generated neutron-understack sample config docs
