@@ -454,9 +454,17 @@ network over the physical fabric. This is done through an **uplink port**.
 
 #### The uplink port
 
-The uplink is a Neutron port plus a matching OVN localnet Logical Switch Port
-(LSP) named `uplink-<segment_id>`. It sits on the Network Node's leaf VLAN
-segment and gives OVN a way to send and receive that network's traffic over the
+The uplink is a Neutron port named `uplink-<segment_id>`. Creating it causes
+the OVN mechanism driver to create two OVN Logical Switch Ports (LSPs) on the
+network's logical switch:
+
+- `uplink-<segment_id>` — a `localnet`-type LSP created explicitly by understack;
+  it connects the logical switch to the physical network via the Network Node's
+  trunk VLAN
+- `<port-uuid>` — a regular LSP created automatically by the OVN mechanism driver
+  when the Neutron port is created
+
+Together they give OVN a way to send and receive that network's traffic over the
 Network Node's trunk connection.
 
 The VLAN tag carried on the trunk is *local to the leaf where the Network Node
@@ -548,7 +556,8 @@ flowchart TD
     E -- no --> G["_do_uplink_cleanup()"]
     G --> H["remove trunk subport"]
     G --> I["delete uplink-SEGMENT_ID<br/>OVN localnet LSP"]
-    G --> J["delete Neutron port<br/>uplink-SEGMENT_ID"]
+    G --> I2["delete shared-port OVN LSP<br/>(port UUID)"]
+    G --> J["delete Neutron port DB row<br/>uplink-SEGMENT_ID"]
 ```
 
 <!-- markdownlint-capture -->
