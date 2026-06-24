@@ -111,6 +111,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		{name: "vlan", configRefs: nautobotCR.Spec.VlanRef, syncFunc: r.syncVlan},
 		// depends on: namespace, rir, location, vlanGroup, vlan, tenant, tenantGroup, role
 		{name: "prefix", configRefs: nautobotCR.Spec.PrefixRef, syncFunc: r.syncPrefix},
+		{name: "device", configRefs: nautobotCR.Spec.DeviceRef, syncFunc: r.syncDevice},
 	}
 
 	// Aggregate data and check sync decisions for all resources
@@ -473,6 +474,22 @@ func (r *NautobotReconciler) syncTenant(ctx context.Context,
 	syncSvc := sync.NewTenantSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, tenantData); err != nil {
 		return fmt.Errorf("failed to sync tenants: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncDevice(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	deviceData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing devices", "count", len(deviceData))
+	if len(deviceData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewDeviceSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, deviceData); err != nil {
+		return fmt.Errorf("failed to sync devices: %w", err)
 	}
 	return nil
 }
