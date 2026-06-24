@@ -24,3 +24,15 @@ instance_tags:
       - "vni_custom_model.ucvni"
       - "ipam.vrf"
     color: "3f51b5"
+  - name: "partition"
+    content_types:
+      - "ipam.namespace"
+      - "ipam.prefix"
+      - "vni_custom_model.ucvni"
+    color: "2196f3"
+  - name: "site"
+    content_types:
+      - "ipam.namespace"
+      - "ipam.prefix"
+      - "vni_custom_model.ucvni"
+    color: "ff9800"
