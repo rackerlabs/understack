@@ -1,10 +1,139 @@
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
+from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
 
 from neutron_understack.neutron_understack_mech import UnderstackDriver
+
+
+def _port_update_context(original, current):
+    return SimpleNamespace(
+        original=original,
+        current=current,
+        plugin_context="plugin-context",
+    )
+
+
+class TestUpdatePortPreCommit:
+    def test_validates_when_port_becomes_router_interface(
+        self, mocker, understack_driver
+    ):
+        original = {
+            "id": "port-a",
+            "network_id": "network-a",
+            "device_owner": "",
+            "device_id": "",
+            "fixed_ips": [{"subnet_id": "subnet-a"}],
+        }
+        current = {
+            **original,
+            "device_owner": p_const.DEVICE_OWNER_ROUTER_INTF,
+            "device_id": "router-a",
+        }
+        validate = mocker.patch(
+            "neutron_understack.neutron_understack_mech."
+            "svi_router.validate_svi_router_port",
+            return_value=True,
+        )
+
+        understack_driver.update_port_precommit(_port_update_context(original, current))
+
+        validate.assert_called_once_with("plugin-context", current)
+
+    def test_validates_when_router_interface_fixed_ips_change(
+        self, mocker, understack_driver
+    ):
+        original = {
+            "id": "port-a",
+            "network_id": "network-a",
+            "device_owner": p_const.DEVICE_OWNER_ROUTER_INTF,
+            "device_id": "router-a",
+            "fixed_ips": [{"subnet_id": "subnet-a"}],
+        }
+        current = {
+            **original,
+            "fixed_ips": [
+                {"subnet_id": "subnet-a"},
+                {"subnet_id": "subnet-b"},
+            ],
+        }
+        validate = mocker.patch(
+            "neutron_understack.neutron_understack_mech."
+            "svi_router.validate_svi_router_port",
+            return_value=True,
+        )
+
+        understack_driver.update_port_precommit(_port_update_context(original, current))
+
+        validate.assert_called_once_with("plugin-context", current)
+
+    def test_validates_remaining_subnets_when_fixed_ip_removed(
+        self, mocker, understack_driver
+    ):
+        original = {
+            "id": "port-a",
+            "network_id": "network-a",
+            "device_owner": p_const.DEVICE_OWNER_ROUTER_INTF,
+            "device_id": "router-a",
+            "fixed_ips": [
+                {"subnet_id": "subnet-a"},
+                {"subnet_id": "subnet-b"},
+            ],
+        }
+        current = {
+            **original,
+            "fixed_ips": [{"subnet_id": "subnet-a"}],
+        }
+        validate = mocker.patch(
+            "neutron_understack.neutron_understack_mech."
+            "svi_router.validate_svi_router_port",
+            return_value=True,
+        )
+
+        understack_driver.update_port_precommit(_port_update_context(original, current))
+
+        validate.assert_called_once_with("plugin-context", current)
+
+    def test_skips_router_interface_without_relevant_update(
+        self, mocker, understack_driver
+    ):
+        original = {
+            "id": "port-a",
+            "network_id": "network-a",
+            "device_owner": p_const.DEVICE_OWNER_ROUTER_INTF,
+            "device_id": "router-a",
+            "fixed_ips": [{"subnet_id": "subnet-a"}],
+        }
+        current = {**original, "name": "new-name"}
+        validate = mocker.patch(
+            "neutron_understack.neutron_understack_mech."
+            "svi_router.validate_svi_router_port"
+        )
+
+        understack_driver.update_port_precommit(_port_update_context(original, current))
+
+        validate.assert_not_called()
+
+    def test_skips_non_router_interface_update(self, mocker, understack_driver):
+        original = {
+            "id": "port-a",
+            "network_id": "network-a",
+            "device_owner": "",
+            "device_id": "",
+            "fixed_ips": [{"subnet_id": "subnet-a"}],
+        }
+        current = {**original, "fixed_ips": [{"subnet_id": "subnet-b"}]}
+        validate = mocker.patch(
+            "neutron_understack.neutron_understack_mech."
+            "svi_router.validate_svi_router_port"
+        )
+
+        understack_driver.update_port_precommit(_port_update_context(original, current))
+
+        validate.assert_not_called()
 
 
 class TestUpdatePortPostCommit:
