@@ -37,7 +37,6 @@ jobs:
           - glance
           - horizon
           - keystone
-          - nova
           - octavia
           - openstack-client
           - skyline
@@ -55,6 +54,15 @@ jobs:
     with:
       container_name: placement
       dockerfile_path: containers/placement/Dockerfile
+      build_args: OPENSTACK_VERSION=2026.1
+      latest_name: "2026.1"
+
+  nova:
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: nova
+      dockerfile_path: containers/nova/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
 
