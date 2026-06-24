@@ -8,11 +8,6 @@ metadata:
   - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
-  {{/*
-  {{- with $app.wave }}
-    argocd.argoproj.io/sync-wave: {{ quote . }}
-  {{- end }}
-  */}}
 {{- include "understack.appLabelsBlock" $ | nindent 2 }}
 spec:
   destination:
@@ -32,6 +27,18 @@ spec:
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
     targetRevision: {{ include "understack.deploy_ref" $ }}
+    kustomize:
+      patches:
+        - patch: |
+            - op: add
+              path: /data/UNDERSTACK_PARTITION
+              value: "{{ index $.Values.appLabels "understack.rackspace.com/partition" | default "" }}"
+            - op: add
+              path: /data/UNDERSTACK_SITE
+              value: "{{ index $.Values.appLabels "understack.rackspace.com/site" | default "" }}"
+          target:
+            kind: ConfigMap
+            name: cluster-data
   syncPolicy:
     automated:
       prune: true
