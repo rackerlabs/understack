@@ -1,0 +1,27 @@
+{{- if eq (include "understack.isEnabled" (list $.Values.site "cluster_metadata")) "true" }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" $.Release.Name "cluster-metadata" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
+spec:
+  destination:
+    namespace: openstack
+    server: {{ $.Values.cluster_server }}
+  project: understack
+  sources:
+  - path: components/cluster-metadata
+    repoURL: {{ include "understack.understack_url" $ }}
+    targetRevision: {{ include "understack.understack_ref" $ }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+{{- end }}
