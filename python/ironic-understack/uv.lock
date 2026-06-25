@@ -385,7 +385,7 @@ wheels = [
 
 [[package]]
 name = "ironic"
-version = "32.0.0"
+version = "35.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -400,6 +400,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "keystoneauth1" },
     { name = "keystonemiddleware" },
+    { name = "lark" },
     { name = "microversion-parse" },
     { name = "netaddr" },
     { name = "openstacksdk" },
@@ -435,9 +436,9 @@ dependencies = [
     { name = "websockify" },
     { name = "zeroconf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4e/ff/0d28d00d1b565c25e155d895226f0bb03b06ea7f6be94d3753a77015038d/ironic-32.0.0.tar.gz", hash = "sha256:92cacdfb6793c3ce39e3ab808b6b7e890a710a49816e1faab49950603b2f2cea", size = 2969350, upload-time = "2025-09-11T12:45:06.984Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a0/24/0714b1c7358a8b169595964acfa25ede6efe164741af2717ac56bab84e7f/ironic-35.0.1.tar.gz", hash = "sha256:c15ec1e71c6ad2a9bf83d30804c413ab147dffa29ee2aa7825be1757f04f53fd", size = 3256541, upload-time = "2026-05-06T09:18:02.924Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/6e/4204df18b448d029882e00a3e936537a3bdc16900adceb6eb9d50e118f6a/ironic-32.0.0-py3-none-any.whl", hash = "sha256:fae4bb972e108d854786e1816d273bce3cc8aa72d117d9d2d9d9348b2ce875fc", size = 2332148, upload-time = "2025-09-11T12:45:05.084Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/b1/2e1df7b9d3bac8e9dac8012f2e1a2647fa3b6b6abb3686a13500a8ccfdea/ironic-35.0.1-py3-none-any.whl", hash = "sha256:fdf367ff829e2d9a4af3e6a593ca8aefc4daf4be3fc0502ca5b6bdc2c7b3675d", size = 2571470, upload-time = "2026-05-06T09:18:00.953Z" },
 ]
 
 [[package]]
@@ -459,7 +460,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ironic", specifier = ">=32.0,<36" },
+    { name = "ironic", specifier = ">=35.0,<36" },
     { name = "pyyaml", specifier = "~=6.0" },
 ]
 
@@ -632,6 +633,15 @@ wheels = [
 ]
 
 [[package]]
+name = "lark"
+version = "1.3.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/34/28fff3ab31ccff1fd4f6c7c7b0ceb2b6968d8ea4950663eadcb5720591a0/lark-1.3.1.tar.gz", hash = "sha256:b426a7a6d6d53189d318f2b6236ab5d6429eaf09259f1ca33eb716eed10d2905", size = 382732, upload-time = "2025-10-27T18:25:56.653Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/3d/14ce75ef66813643812f3093ab17e46d3a206942ce7376d31ec2d36229e7/lark-1.3.1-py3-none-any.whl", hash = "sha256:c629b661023a014c37da873b4ff58a817398d12635d3bbb2c5a03be7fe5d1e12", size = 113151, upload-time = "2025-10-27T18:25:54.882Z" },
+]
+
+[[package]]
 name = "mako"
 version = "1.3.10"
 source = { registry = "https://pypi.org/simple" }
@@ -729,7 +739,7 @@ wheels = [
 
 [[package]]
 name = "openstacksdk"
-version = "4.8.0"
+version = "4.16.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -744,12 +754,10 @@ dependencies = [
     { name = "platformdirs" },
     { name = "psutil" },
     { name = "pyyaml" },
-    { name = "requestsexceptions" },
-    { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/46/24/1167097740136e302c74043c1c6feecf8d757b052d7b457960e0dc60fa03/openstacksdk-4.8.0.tar.gz", hash = "sha256:4dc038e1c17d893005f3a0a8951456afd9d148f3f65d448f94adcceb278d7f31", size = 1309981, upload-time = "2025-11-13T13:59:59.614Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b8/43/49b126e9ccfa19647d2f0aff26321caded607522d29c3d9495d44f4b9471/openstacksdk-4.16.0.tar.gz", hash = "sha256:466640c6d2b813b782d4ad58a4f2960633e8e58f147ec0baa2019454de190d30", size = 1397114, upload-time = "2026-06-17T08:43:22.774Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/45/87fa873f35abdf191d66d4821fe965f781e2d3e37e58883c6e23e95fa794/openstacksdk-4.8.0-py3-none-any.whl", hash = "sha256:7f7c438d418a4ee0c8737b1ac0859b3c1e8e21401677782415d21bce3324b9dd", size = 1849694, upload-time = "2025-11-13T13:59:57.634Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/ea/60a4a274c4991847a085ac4a36b19d09f44f04a22adcfda6ca631763322b/openstacksdk-4.16.0-py3-none-any.whl", hash = "sha256:0469939bd7fc1b80979e4440dd8f8026eea302bdd979fac5437b56ada3780a62", size = 1982817, upload-time = "2026-06-17T08:43:21.148Z" },
 ]
 
 [[package]]
@@ -1411,15 +1419,6 @@ wheels = [
 ]
 
 [[package]]
-name = "requestsexceptions"
-version = "1.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/82/ed/61b9652d3256503c99b0b8f145d9c8aa24c514caff6efc229989505937c1/requestsexceptions-1.4.0.tar.gz", hash = "sha256:b095cbc77618f066d459a02b137b020c37da9f46d9b057704019c9f77dba3065", size = 6880, upload-time = "2018-02-01T17:04:45.294Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/01/8c/49ca60ea8c907260da4662582c434bec98716177674e88df3fd340acf06d/requestsexceptions-1.4.0-py2.py3-none-any.whl", hash = "sha256:3083d872b6e07dc5c323563ef37671d992214ad9a32b0ca4a3d7f5500bf38ce3", size = 3802, upload-time = "2018-02-01T17:04:39.07Z" },
-]
-
-[[package]]
 name = "rfc3986"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1539,7 +1538,7 @@ wheels = [
 
 [[package]]
 name = "sushy"
-version = "5.8.0"
+version = "5.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pbr" },
@@ -1547,9 +1546,9 @@ dependencies = [
     { name = "requests" },
     { name = "stevedore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d2/62/9799fcf51deb1eedac05f12a82ee0173150d9cf368d5bb45189c843a4ec2/sushy-5.8.0.tar.gz", hash = "sha256:084c601aafe6c87dd6f6aff46ff2f3a57e4435b8300b222401e762fe97c6f4e8", size = 291830, upload-time = "2025-11-13T13:56:43.604Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/70/6c/927b6264334679d93f3ab3f35aaf92f678e2e89e55fc8fda902a862a79f7/sushy-5.11.0.tar.gz", hash = "sha256:146d5bbc3cb9696d350422f6a4559559e2b6ad08d236bda6a4411e921f2de375", size = 304545, upload-time = "2026-05-05T12:03:10.538Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/89/fb/9fc06845523ef7806e8a84c9f10a5eacd68b848ffc9831dd50df3e0c705e/sushy-5.8.0-py3-none-any.whl", hash = "sha256:9c844dd81a8eacc601ebc53db998df056459053f5a11ff95e693988bd83dd565", size = 434619, upload-time = "2025-11-13T13:56:42.049Z" },
+    { url = "https://files.pythonhosted.org/packages/31/94/d73df55b572f254087304c19c03c1471f7bdf67d34f9030db0ca2ddf5e02/sushy-5.11.0-py3-none-any.whl", hash = "sha256:e70f5cf59998813e8462e5ff54a005803cc50b6f6a4f661b145560e0aa0bdc89", size = 445698, upload-time = "2026-05-05T12:03:08.853Z" },
 ]
 
 [[package]]

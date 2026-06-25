@@ -134,6 +134,7 @@ nav:
       - design-guide/device-types.md
       - design-guide/hardware-traits.md
       - design-guide/flavors.md
+    - design-guide/ironic.md
     - design-guide/neutron-networking.md
     - design-guide/neutron-understack-config-sample.md
     - design-guide/argo-workflows.md
