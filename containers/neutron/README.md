@@ -1,17 +1,17 @@
-# Ironic Patches
+# Neutron Patches
 
 Patches are derived from cherry-picking patches to the stable series we follow.
 
-[https://github.com/rackerlabs/ironic]
+[https://github.com/rackerlabs/neutron]
 
 The branch for these are `understack/$OPENSTACK_VERSION`
 
 ## To clone everything down do the following
 
 ```bash
-git clone https://github.com/openstack/ironic
+git clone https://github.com/openstack/neutron
 git checkout --track origin/stable/2026.1
-git remote add rackerlabs https://github.com/rackerlabs/ironic
+git remote add rackerlabs https://github.com/rackerlabs/neutron
 git fetch rackerlabs
 git checkout --track rackerlabs/understack/2026.1
 ```
@@ -54,7 +54,7 @@ git show
 To backport a patch from upstream master (or another branch) to understack/2026.1:
 
 ```bash
-# Fetch all branches from upstream (openstack/ironic)
+# Fetch all branches from upstream (openstack/neutron)
 # This fetches master, stable branches, and all other refs
 git fetch origin
 
@@ -78,7 +78,7 @@ git push rackerlabs understack/2026.1
 
 ### Example workflow for a specific PR
 
-Following the backporting workflow above results in a PR like https://github.com/rackerlabs/ironic/pull/4:
+Following the backporting workflow above results in a PR like https://github.com/rackerlabs/neutron/pull/XXX:
 
 1. Find the commit hash from upstream master
 2. Cherry-pick it to the branch: `git cherry-pick <COMMIT_HASH>`
@@ -89,55 +89,5 @@ Following the backporting workflow above results in a PR like https://github.com
 ### Note on patch sources
 
 Patches can come from:
-- OpenStack upstream master branch (`openstack/ironic` - origin/master)
+- OpenStack upstream master branch (`openstack/neutron` - origin/master)
 - Other branches or forks that have fixes needed
-
-## iPXE
-
-We have experienced problems with OSH stock iPXE firmware image and its
-compatibility with Nexus switches.
-
-The changed version disables IPv6, LACP and EAPOL.
-Customised EFI image is built as part of the Ironic container build.
-
-For debugging purposes, it can also be built manually.
-
-### Manually Compiling iPXE firmware for UnderStack
-
-## Steps
-
-- Run the debian 12 container:
-
-```bash
-docker run -it --name ipxe_compiler -v $(pwd):/src -w /src debian:13 bash
-```
-
-- Install build dependencies inside that container
-
-```bash
-apt update && apt install -y git build-essential bison flex libssl-dev
-```
-
-- Compile (DEBUG version)
-
-```bash
-cd /src
-make bin-x86_64-efi/snponly.efi DEBUG=tcp:3,xfer:3,netdevice:2,ipv4:2,httpcore:2,httpconn:2
-```
-
-- Compile (standard version)
-
-```bash
-cd /src
-make bin-x86_64-efi/snponly.efi
-```
-
-- Upload
-
-```bash
-kubectl cp bin-x86_64-efi/snponly.efi -c ironic-conductor-http ironic-conductor-0:/var/lib/openstack-helm/httpboot/snponly.efi
-```
-
-> [!NOTE]
-> This upload is just an example for quick hacking in dev environment. Use
-> appropriate method for staging and production releases.
