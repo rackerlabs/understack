@@ -236,16 +236,28 @@ def _set_node_traits(task, vlan_groups: set[str]):
     For example, a connection to VLAN Group whose name ends in "-storage" will
     result in a trait being added to the node called "CUSTOM_STORAGE_SWITCH".
 
+    We also add a CUSTOM_NETGROUP_<name> trait for each "-network" VLAN group
+    the node is connected to. This trait is used by the Nova scheduler's
+    NetworkGroupAffinityFilter and NetworkGroupAntiAffinityFilter to constrain
+    instance placement to specific cabinet switch pairs.
+
     We remove pre-existing traits if the node does not have the required
     connections.
 
-    Traits other than CUSTOM_*_SWITCH are left alone.
+    Traits other than CUSTOM_*_SWITCH and CUSTOM_NETGROUP_* are left alone.
     """
     node = task.node
     existing_traits = set(node.traits.get_trait_names())
     vlan_group_traits = {_trait_name(x) for x in vlan_groups if x}
+    network_group_traits = {
+        _network_group_trait_name(x)
+        for x in vlan_groups
+        if x and x.endswith("-network")
+    }
     irrelevant_existing_traits = {x for x in existing_traits if not _is_our_trait(x)}
-    required_traits = irrelevant_existing_traits.union(vlan_group_traits)
+    required_traits = irrelevant_existing_traits.union(vlan_group_traits).union(
+        network_group_traits
+    )
 
     if existing_traits == required_traits:
         LOG.debug(
@@ -269,5 +281,22 @@ def _trait_name(vlan_group_name: str) -> str:
     return f"CUSTOM_{suffix}_SWITCH"
 
 
+def _network_group_trait_name(vlan_group_name: str) -> str:
+    """Convert a VLAN group name to a CUSTOM_NETGROUP_* trait.
+
+    This trait is consumed by Nova's NetworkGroupAffinityFilter and
+    NetworkGroupAntiAffinityFilter to constrain scheduling to nodes
+    within a specific cabinet / switch pair.
+
+    Example: "a1-1-network" -> "CUSTOM_NETGROUP_A1_1_NETWORK"
+    Example: "a11-12/a11-13-network" -> "CUSTOM_NETGROUP_A11_12_A11_13_NETWORK"
+    """
+    normalised = vlan_group_name.upper().replace("-", "_").replace("/", "_")
+    return f"CUSTOM_NETGROUP_{normalised}"
+
+
 def _is_our_trait(name: str) -> bool:
-    return bool(re.match(r"^CUSTOM_[A-Z0-9]+_SWITCH$", name))
+    return bool(
+        re.match(r"^CUSTOM_[A-Z0-9]+_SWITCH$", name)
+        or re.match(r"^CUSTOM_NETGROUP_[A-Z0-9_]+$", name)
+    )
