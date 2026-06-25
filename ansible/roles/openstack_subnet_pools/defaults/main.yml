@@ -1,0 +1,5 @@
+---
+# Default variables for openstack_subnet_pools role
+
+# Tag to filter prefixes for subnet pool creation
+subnet_pool_tag: openstack-subnet-pool
