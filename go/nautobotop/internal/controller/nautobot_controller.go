@@ -63,9 +63,9 @@ type NautobotReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
-// resourceConfig defines configuration for a single resource type
 type resourceConfig struct {
 	name       string
+	dependsOn  []string
 	configRefs []syncv1alpha1.ConfigMapRef
 	syncFunc   func(context.Context, *nbClient.NautobotClient, map[string]string) error
 }
@@ -86,31 +86,59 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 	syncInterval := time.Duration(nautobotCR.Spec.SyncIntervalSeconds) * time.Second
 
-	// Define all resources to sync
+	// Define all resources to sync with explicit dependency declarations.
+	// Order in this slice does NOT matter — topological sort determines execution order.
 	resources := []resourceConfig{
-		// No Dependencies, these need to be run first and are independent.
+		// No dependencies
 		{name: "locationTypes", configRefs: nautobotCR.Spec.LocationTypesRef, syncFunc: r.syncLocationTypes},
-		{name: "location", configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
 		{name: "rir", configRefs: nautobotCR.Spec.RirRef, syncFunc: r.syncRir},
 		{name: "role", configRefs: nautobotCR.Spec.RoleRef, syncFunc: r.syncRole},
 		{name: "deviceType", configRefs: nautobotCR.Spec.DeviceTypesRef, syncFunc: r.syncDeviceTypes},
+		{name: "tenantGroup", configRefs: nautobotCR.Spec.TenantGroupRef, syncFunc: r.syncTenantGroup},
 		{name: "clusterType", configRefs: nautobotCR.Spec.ClusterTypeRef, syncFunc: r.syncClusterType},
 		{name: "clusterGroup", configRefs: nautobotCR.Spec.ClusterGroupRef, syncFunc: r.syncClusterGroup},
-		{name: "cluster", configRefs: nautobotCR.Spec.ClusterRef, syncFunc: r.syncCluster},
-		// depends on: location
-		{name: "rackGroup", configRefs: nautobotCR.Spec.RackGroupRef, syncFunc: r.syncRackGroup},
-		{name: "vlanGroup", configRefs: nautobotCR.Spec.VlanGroupRef, syncFunc: r.syncVlanGroup},
-		// depends on: location, rackGroup
-		{name: "rack", configRefs: nautobotCR.Spec.RackRef, syncFunc: r.syncRack},
-		// tenancy tenantGroup before tenant
-		{name: "tenantGroup", configRefs: nautobotCR.Spec.TenantGroupRef, syncFunc: r.syncTenantGroup},
-		{name: "tenant", configRefs: nautobotCR.Spec.TenantRef, syncFunc: r.syncTenant},
-		// depends on: location, tenant, tenantGroup
-		{name: "namespace", configRefs: nautobotCR.Spec.NamespaceRef, syncFunc: r.syncNamespace},
-		// depends on: vlanGroup, location, tenant, tenantGroup, role
-		{name: "vlan", configRefs: nautobotCR.Spec.VlanRef, syncFunc: r.syncVlan},
-		// depends on: namespace, rir, location, vlanGroup, vlan, tenant, tenantGroup, role
-		{name: "prefix", configRefs: nautobotCR.Spec.PrefixRef, syncFunc: r.syncPrefix},
+		// Depends on: locationTypes
+		{name: "location", dependsOn: []string{"locationTypes"}, configRefs: nautobotCR.Spec.LocationRef, syncFunc: r.syncLocation},
+		// Depends on: tenantGroup
+		{name: "tenant", dependsOn: []string{"tenantGroup"}, configRefs: nautobotCR.Spec.TenantRef, syncFunc: r.syncTenant},
+		// Depends on: location
+		{name: "rackGroup", dependsOn: []string{"location"}, configRefs: nautobotCR.Spec.RackGroupRef, syncFunc: r.syncRackGroup},
+		{name: "vlanGroup", dependsOn: []string{"location"}, configRefs: nautobotCR.Spec.VlanGroupRef, syncFunc: r.syncVlanGroup},
+		// Depends on: location, rackGroup
+		{name: "rack", dependsOn: []string{"location", "rackGroup"}, configRefs: nautobotCR.Spec.RackRef, syncFunc: r.syncRack},
+		// Depends on: location, tenant
+		{name: "namespace", dependsOn: []string{"location", "tenant"}, configRefs: nautobotCR.Spec.NamespaceRef, syncFunc: r.syncNamespace},
+		// Depends on: deviceType, location, rack, role, tenant
+		{name: "device", dependsOn: []string{"deviceType", "location", "rack", "role", "tenant"}, configRefs: nautobotCR.Spec.DeviceRef, syncFunc: r.syncDevice},
+		// Depends on: vlanGroup, location, tenant, role
+		{name: "vlan", dependsOn: []string{"vlanGroup", "location", "tenant", "role"}, configRefs: nautobotCR.Spec.VlanRef, syncFunc: r.syncVlan},
+		// Depends on: clusterType, clusterGroup, location, device
+		{name: "cluster", dependsOn: []string{"clusterType", "clusterGroup", "location", "device"}, configRefs: nautobotCR.Spec.ClusterRef, syncFunc: r.syncCluster},
+		// Depends on: namespace, rir, location, vlan, tenant, role
+		{name: "prefix", dependsOn: []string{"namespace", "rir", "location", "vlan", "tenant", "role"}, configRefs: nautobotCR.Spec.PrefixRef, syncFunc: r.syncPrefix},
+	}
+
+	// Resolve execution order using topological sort (Kahn's algorithm)
+	dagNodes := make([]ResourceNode, len(resources))
+	for i, res := range resources {
+		dagNodes[i] = ResourceNode{Name: res.name, DependsOn: res.dependsOn}
+	}
+	topologicalSort, err := topologicalSort(dagNodes)
+	if err != nil {
+		log.Error(err, "failed to resolve resource sync order")
+		return ctrl.Result{}, err
+	}
+
+	// Build lookup for quick access by name
+	resourceByName := make(map[string]resourceConfig, len(resources))
+	for _, res := range resources {
+		resourceByName[res.name] = res
+	}
+
+	// Reorder resources according to topological sort result
+	orderedResources := make([]resourceConfig, 0, len(topologicalSort))
+	for _, name := range topologicalSort {
+		orderedResources = append(orderedResources, resourceByName[name])
 	}
 
 	// Aggregate data and check sync decisions for all resources
@@ -167,8 +195,8 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		log.Info("released cache and idle connections after reconcile")
 	}()
 
-	// Sync resources that need updating
-	for _, res := range resources {
+	// Sync resources that need updating (in topologically sorted order)
+	for _, res := range orderedResources {
 		if dataMap, ok := resourcesToSync[res.name]; ok {
 			if err := res.syncFunc(ctx, nautobotClient, dataMap); err != nil {
 				log.Error(err, "failed to sync resource", "resource", res.name)
@@ -473,6 +501,22 @@ func (r *NautobotReconciler) syncTenant(ctx context.Context,
 	syncSvc := sync.NewTenantSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, tenantData); err != nil {
 		return fmt.Errorf("failed to sync tenants: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncDevice(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	deviceData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing devices", "count", len(deviceData))
+	if len(deviceData) == 0 {
+		return nil
+	}
+	syncSvc := sync.NewDeviceSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, deviceData); err != nil {
+		return fmt.Errorf("failed to sync devices: %w", err)
 	}
 	return nil
 }
