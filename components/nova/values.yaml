@@ -289,10 +289,12 @@ annotations:
       argocd.argoproj.io/sync-options: Force=true
       argocd.argoproj.io/sync-wave: "0"
     nova_cell_setup:
-      argocd.argoproj.io/hook: PostSync
+      argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
+      argocd.argoproj.io/sync-wave: "1"
     nova_bootstrap:
       argocd.argoproj.io/hook: Sync
       argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
       argocd.argoproj.io/sync-options: Force=true
+      argocd.argoproj.io/sync-wave: "2"
