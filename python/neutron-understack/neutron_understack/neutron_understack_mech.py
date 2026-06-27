@@ -69,6 +69,16 @@ class UnderstackDriver(MechanismDriver):
             events.AFTER_CREATE,
             priority=priority_group.PRIORITY_DEFAULT + 1000,
         )
+        # Handles uplink cleanup when a subnet is explicitly detached from a
+        # router (remove_router_interface). This path does not reliably fire
+        # PORT PRECOMMIT_DELETE, so we subscribe to the ROUTER_INTERFACE event
+        # directly. The PORT PRECOMMIT_DELETE handler remains for the router-
+        # deletion path (delete_router skips ROUTER_INTERFACE events).
+        registry.subscribe(
+            routers.handle_router_interface_after_delete,
+            resources.ROUTER_INTERFACE,
+            events.AFTER_DELETE,
+        )
 
     def create_network_precommit(self, context):
         pass
