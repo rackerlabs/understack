@@ -407,12 +407,13 @@ class TestLinkVxlanNetworkHaChassisGroup:
         )
 
     @staticmethod
-    def _client(mocker, router_hcg, lrp):
+    def _client(mocker, ha_chassis_rows, lrp, network_hcg=None):
         nb_idl = mocker.MagicMock()
+        nb_idl.db_list_rows.return_value.execute.return_value = ha_chassis_rows
 
         def lookup(table, _name, default=None):
             if table == "HA_Chassis_Group":
-                return router_hcg
+                return network_hcg  # None by default (unpopulated vxlan HCG)
             if table == "Logical_Router_Port":
                 return lrp
             return default
@@ -432,19 +433,18 @@ class TestLinkVxlanNetworkHaChassisGroup:
         )
 
     def test_populates_network_hcg_and_anchors_lrp(self, mocker):
-        hc = mocker.Mock(chassis_name="chassis-1", priority=10)
-        router_hcg = mocker.Mock(ha_chassis=[hc], name="neutron-router-1")
+        hc = mocker.Mock(chassis_name="chassis-1")
         lrp = mocker.Mock(ha_chassis_group=[])
-        client, nb_idl = self._client(mocker, router_hcg, lrp)
+        client, nb_idl = self._client(mocker, ha_chassis_rows=[hc], lrp=lrp)
         sync = self._patch_sync(mocker)
         mocker.patch("neutron_understack.routers.ovn_client", return_value=client)
 
         link_vxlan_network_ha_chassis_group(None, None, None, self._payload(mocker))
 
-        # Network HCG is populated from the router's chassis.
+        # Network HCG is populated using the chassis derived from the global table.
         assert sync.call_args.args[3] == "net-1"  # network_id
         assert sync.call_args.args[4] == "router-1"  # router_id
-        assert sync.call_args.args[5] == {"chassis-1": 10}  # chassis_prio
+        assert sync.call_args.args[5] == {"chassis-1": 32767}  # chassis_prio
         # Internal LRP is anchored to the unified network HCG.
         nb_idl.db_set.assert_called_once_with(
             "Logical_Router_Port",
@@ -452,8 +452,8 @@ class TestLinkVxlanNetworkHaChassisGroup:
             ("ha_chassis_group", "net-hcg-uuid"),
         )
 
-    def test_no_router_hcg(self, mocker):
-        client, nb_idl = self._client(mocker, router_hcg=None, lrp=None)
+    def test_empty_ha_chassis_table(self, mocker):
+        client, nb_idl = self._client(mocker, ha_chassis_rows=[], lrp=None)
         sync = self._patch_sync(mocker)
         mocker.patch("neutron_understack.routers.ovn_client", return_value=client)
 
@@ -462,9 +462,25 @@ class TestLinkVxlanNetworkHaChassisGroup:
         sync.assert_not_called()
         nb_idl.db_set.assert_not_called()
 
-    def test_router_hcg_without_chassis(self, mocker):
-        router_hcg = mocker.Mock(ha_chassis=[])
-        client, nb_idl = self._client(mocker, router_hcg, lrp=None)
+    def test_multiple_chassis_names(self, mocker):
+        hc1 = mocker.Mock(chassis_name="chassis-1")
+        hc2 = mocker.Mock(chassis_name="chassis-2")
+        client, nb_idl = self._client(mocker, ha_chassis_rows=[hc1, hc2], lrp=None)
+        sync = self._patch_sync(mocker)
+        mocker.patch("neutron_understack.routers.ovn_client", return_value=client)
+
+        link_vxlan_network_ha_chassis_group(None, None, None, self._payload(mocker))
+
+        sync.assert_not_called()
+        nb_idl.db_set.assert_not_called()
+
+    def test_network_hcg_already_populated(self, mocker):
+        # VLAN/FLAT: neutron already populated the per-network HCG — we skip.
+        existing_hcg = mocker.Mock(ha_chassis=[mocker.Mock(chassis_name="chassis-1")])
+        hc = mocker.Mock(chassis_name="chassis-1")
+        client, nb_idl = self._client(
+            mocker, ha_chassis_rows=[hc], lrp=None, network_hcg=existing_hcg
+        )
         sync = self._patch_sync(mocker)
         mocker.patch("neutron_understack.routers.ovn_client", return_value=client)
 
@@ -474,9 +490,8 @@ class TestLinkVxlanNetworkHaChassisGroup:
         nb_idl.db_set.assert_not_called()
 
     def test_lrp_missing_still_populates_network_hcg(self, mocker):
-        hc = mocker.Mock(chassis_name="chassis-1", priority=10)
-        router_hcg = mocker.Mock(ha_chassis=[hc], name="neutron-router-1")
-        client, nb_idl = self._client(mocker, router_hcg, lrp=None)
+        hc = mocker.Mock(chassis_name="chassis-1")
+        client, nb_idl = self._client(mocker, ha_chassis_rows=[hc], lrp=None)
         sync = self._patch_sync(mocker)
         mocker.patch("neutron_understack.routers.ovn_client", return_value=client)
 
