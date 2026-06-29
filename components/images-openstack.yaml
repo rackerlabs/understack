@@ -13,13 +13,13 @@ images:
     ks_endpoints: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
 
     # keystone
-    keystone_api: "ghcr.io/rackerlabs/understack/keystone:2025.2"
-    keystone_credential_rotate: "ghcr.io/rackerlabs/understack/keystone:2025.2"
-    keystone_credential_setup: "ghcr.io/rackerlabs/understack/keystone:2025.2"
-    keystone_db_sync: "ghcr.io/rackerlabs/understack/keystone:2025.2"
-    keystone_domain_manage: "ghcr.io/rackerlabs/understack/keystone:2025.2"
-    keystone_fernet_rotate: "ghcr.io/rackerlabs/understack/keystone:2025.2"
-    keystone_fernet_setup: "ghcr.io/rackerlabs/understack/keystone:2025.2"
+    keystone_api: "ghcr.io/rackerlabs/understack/keystone:2026.1"
+    keystone_credential_rotate: "ghcr.io/rackerlabs/understack/keystone:2026.1"
+    keystone_credential_setup: "ghcr.io/rackerlabs/understack/keystone:2026.1"
+    keystone_db_sync: "ghcr.io/rackerlabs/understack/keystone:2026.1"
+    keystone_domain_manage: "ghcr.io/rackerlabs/understack/keystone:2026.1"
+    keystone_fernet_rotate: "ghcr.io/rackerlabs/understack/keystone:2026.1"
+    keystone_fernet_setup: "ghcr.io/rackerlabs/understack/keystone:2026.1"
 
     # ironic
     ironic_api: "ghcr.io/rackerlabs/understack/ironic:2026.1"

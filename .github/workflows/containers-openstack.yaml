@@ -36,7 +36,6 @@ jobs:
           - cinder
           - glance
           - horizon
-          - keystone
           - octavia
           - openstack-client
           - skyline
@@ -84,3 +83,12 @@ jobs:
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
       target: final
+
+  keystone:
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: keystone
+      dockerfile_path: containers/keystone/Dockerfile
+      build_args: OPENSTACK_VERSION=2026.1
+      latest_name: "2026.1"
