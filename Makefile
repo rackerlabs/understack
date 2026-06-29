@@ -43,6 +43,7 @@ component-docs-check: ## Validate component docs coverage for ArgoCD app templat
 
 $(NEUTRON_SAMPLE_CONFIG): ## Generate neutron-understack sample configuration docs
 	@mkdir -p docs/design-guide
+	@uv sync --directory python/neutron-understack
 	@{ printf '# neutron-understack Sample Configuration\n\n```ini\n'; \
 	   uv run --directory python/neutron-understack oslo-config-generator \
 	       --config-file tools/config/neutron-understack-config-generator.conf; \
