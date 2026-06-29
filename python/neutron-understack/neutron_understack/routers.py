@@ -9,6 +9,7 @@ from neutron.plugins.ml2.drivers.ovn.mech_driver.ovsdb.ovn_client import OVNClie
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
+from neutron_lib.plugins import constants as plugin_constants
 from neutron_lib.plugins import directory
 from oslo_config import cfg
 
@@ -24,6 +25,13 @@ ROUTER_INTERFACE_AND_GW = [
     p_const.DEVICE_OWNER_ROUTER_INTF,
     p_const.DEVICE_OWNER_ROUTER_GW,
 ]
+
+
+def _router_has_flavor(ctx, router_id: str) -> bool:
+    l3_plugin = directory.get_plugin(plugin_constants.L3)
+    router = l3_plugin.get_router(ctx, router_id)
+    flavor_id = router.get("flavor_id")
+    return bool(flavor_id) and flavor_id is not p_const.ATTR_NOT_SPECIFIED
 
 
 def create_port_postcommit(context: PortContext) -> None:
@@ -52,6 +60,15 @@ def create_port_postcommit(context: PortContext) -> None:
             "Creating only a router port %(port)s for a network %(network)s "
             "as there are already other routers on the same network.",
             {"port": context.current["id"], "network": network_id},
+        )
+        return
+
+    router_id = context.current.get("device_id")
+    if router_id and _router_has_flavor(context.plugin_context, router_id):
+        LOG.debug(
+            "Skipping uplink creation for flavored router %(router)s "
+            "on network %(net)s",
+            {"router": router_id, "net": network_id},
         )
         return
 
