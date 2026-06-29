@@ -146,7 +146,16 @@ def verify_ovn_matches_openstack(network_id: str, kubectl_base: list[str]) -> No
     """
     result = subprocess.run(
         kubectl_base
-        + ["exec", "-n", OVN_NAMESPACE, OVN_POD, "--", "ovn-nbctl", "show", network_id],
+        + [
+            "exec",
+            "-n",
+            OVN_NAMESPACE,
+            OVN_POD,
+            "--",
+            "ovn-nbctl",
+            "show",
+            f"neutron-{network_id}",
+        ],
         capture_output=True,
         text=True,
     )
