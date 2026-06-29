@@ -283,17 +283,43 @@ def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) ->
         )
 
 
-def delete_uplink_port(segment: NetworkSegment, network_id: str) -> None:
+def delete_uplink_port(segment_id: str, network_id: str) -> None:
     """Remove a localnet uplink port from a network node."""
-    port_to_del = f"uplink-{segment['id']}"
     cmd = ovn_client()._nb_idl.delete_lswitch_port(
-        lport_name=port_to_del, lswitch_name=ovn_utils.ovn_name(network_id)
+        lport_name=f"uplink-{segment_id}", lswitch_name=ovn_utils.ovn_name(network_id)
     )
     ovn_client()._transaction([cmd])
 
 
+def delete_shared_port_lsp(port_id: str, network_id: str) -> None:
+    """Remove the OVN LSP (named by port id) for the shared uplink port.
+
+    OVO .delete() only removes the DB row; this removes the LSP explicitly.
+    """
+    cmd = ovn_client()._nb_idl.delete_lswitch_port(
+        lport_name=port_id, lswitch_name=ovn_utils.ovn_name(network_id)
+    )
+    ovn_client()._transaction([cmd])
+
+
+def _do_uplink_cleanup(network_id: str) -> None:
+    """Remove the trunk subport, OVN uplink LSPs, and shared Neutron port."""
+    shared_port = fetch_shared_router_port(network_id)
+    if not shared_port:
+        # Already cleaned up (e.g. by the PORT PRECOMMIT_DELETE handler).
+        return
+
+    segment_id = shared_port.name.removeprefix("uplink-")
+    handle_subport_removal(shared_port)
+    delete_uplink_port(segment_id, network_id)
+    delete_shared_port_lsp(shared_port.id, network_id)
+    shared_port.delete()
+
+
 def handle_router_interface_removal(_resource, _event, trigger, payload) -> None:
-    """Handles the removal of a router interface.
+    """Handles PORT PRECOMMIT_DELETE — fires when delete_router() deletes ports.
+
+    Specifically fires when delete_router() deletes ports directly.
 
     When router interface port is deleted, we remove the corresponding subport
     from the trunk and delete OVN localnet port.
@@ -333,17 +359,52 @@ def handle_router_interface_removal(_resource, _event, trigger, payload) -> None
         )
         return
 
-    segment = fetch_router_network_segment(network_id)
-    if not segment:
+    _do_uplink_cleanup(network_id)
+
+
+def handle_router_interface_after_delete(_resource, _event, trigger, payload) -> None:
+    """Handles ROUTER_INTERFACE AFTER_DELETE.
+
+    Fires on explicit remove_router_interface() calls.
+
+    remove_router_interface() fires ROUTER_INTERFACE AFTER_DELETE but does not
+    reliably trigger PORT PRECOMMIT_DELETE (the ML2 plugin only publishes
+    PRECOMMIT_DELETE when the port has an ACTIVE binding, which is not guaranteed
+    for router interface ports in all OVN flavours). This handler covers the
+    subnet-detachment case; the existing PORT PRECOMMIT_DELETE handler covers
+    direct port deletion during router deletion.
+
+    At AFTER_DELETE time the interface port is already removed from the DB, so
+    we check count == 0 (no remaining router ports) rather than count <= 1.
+    _do_uplink_cleanup is idempotent: if the PRECOMMIT_DELETE handler already
+    ran, fetch_shared_router_port returns None and cleanup exits silently.
+    """
+    port = payload.metadata["port"]
+    network_id = port["network_id"]
+
+    if port.get("device_owner") not in ROUTER_INTERFACE_AND_GW:
         return
 
-    shared_port = fetch_shared_router_port(segment)
-    if not shared_port:
+    # Port is already removed from DB; check whether any router ports remain.
+    remaining = Port.get_objects(
+        n_context.get_admin_context(),
+        network_id=network_id,
+        device_owner=ROUTER_INTERFACE_AND_GW,
+    )
+    if remaining:
+        LOG.debug(
+            "Router ports still present on network %(net)s, skipping uplink cleanup",
+            {"net": network_id},
+        )
         return
 
-    handle_subport_removal(shared_port)
-    delete_uplink_port(segment, network_id)
-    shared_port.delete()
+    try:
+        _do_uplink_cleanup(network_id)
+    except Exception as err:
+        LOG.error(
+            "Failed uplink cleanup for network %(net)s: %(error)s",
+            {"net": network_id, "error": err},
+        )
 
 
 def handle_subport_removal(port: Port) -> None:
@@ -357,29 +418,11 @@ def handle_subport_removal(port: Port) -> None:
         LOG.error("failed removing_subport: %(error)s", {"error": err})
 
 
-def fetch_router_network_segment(network_id: str) -> NetworkSegment | None:
-    segment = utils.network_segment_by_physnet(
-        network_id, cfg.CONF.ml2_understack.network_node_switchport_physnet
-    )
-    if not segment:
-        LOG.error(
-            "Router network segment not found for network %(network_id)s",
-            {"network_id": network_id},
-        )
-        return
-    LOG.debug("Router network segment found %(segment)s", {"segment": segment})
-    return segment
-
-
-def fetch_shared_router_port(segment: NetworkSegment) -> Port | None:
-    shared_ports = Port.get_objects(
-        n_context.get_admin_context(), name=f"uplink-{segment['id']}"
-    )
-
-    if not shared_ports:
-        LOG.error(
-            "No router shared ports found for segment %(segment)s", {"segment": segment}
-        )
-        return
-    LOG.debug("Router shared ports found %(ports)s", {"ports": shared_ports})
-    return shared_ports[0]
+def fetch_shared_router_port(network_id: str) -> Port | None:
+    ports = Port.get_objects(n_context.get_admin_context(), network_id=network_id)
+    for port in ports:
+        if port.name and port.name.startswith("uplink-"):
+            LOG.debug("Router shared port found %(port)s", {"port": port})
+            return port
+    LOG.debug("No router shared port on network %(net)s", {"net": network_id})
+    return None
