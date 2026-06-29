@@ -283,6 +283,61 @@ class TestCreatePortPostcommit:
             fake_segment, port_context.current["network_id"]
         )
 
+    def test_flavored_router_skips_uplink(self, mocker, port_context):
+        port_context.current["device_id"] = "router-uuid"
+        mocker.patch("neutron.objects.ports.Port.get_objects", return_value=[1])
+        mocker.patch("neutron_understack.routers._router_has_flavor", return_value=True)
+        create_segment = mocker.patch(
+            "neutron_understack.routers.fetch_or_create_router_segment"
+        )
+        create_neutron_port = mocker.patch(
+            "neutron_understack.utils.create_neutron_port_for_segment"
+        )
+        add_trunk = mocker.patch("neutron_understack.routers.add_subport_to_trunk")
+        create_uplink_port = mocker.patch(
+            "neutron_understack.routers.create_uplink_port"
+        )
+
+        create_port_postcommit(port_context)
+
+        create_segment.assert_not_called()
+        create_neutron_port.assert_not_called()
+        add_trunk.assert_not_called()
+        create_uplink_port.assert_not_called()
+
+    def test_unflavored_router_creates_uplink(self, mocker, port_context):
+        mocker.patch("neutron.objects.ports.Port.get_objects", return_value=[])
+        mocker.patch(
+            "neutron_understack.routers._router_has_flavor", return_value=False
+        )
+        fake_segment = {"id": "seg-123", "foo": "bar"}
+        create_segment = mocker.patch(
+            "neutron_understack.routers.fetch_or_create_router_segment",
+            return_value=fake_segment,
+        )
+        port = {"id": "port-123"}
+        create_neutron_port = mocker.patch(
+            "neutron_understack.utils.create_neutron_port_for_segment",
+            return_value=port,
+        )
+        add_trunk = mocker.patch("neutron_understack.routers.add_subport_to_trunk")
+        mocker.patch(
+            "neutron_understack.utils.network_segment_by_id",
+            return_value=fake_segment,
+        )
+        create_uplink_port = mocker.patch(
+            "neutron_understack.routers.create_uplink_port"
+        )
+
+        create_port_postcommit(port_context)
+
+        create_segment.assert_called_once_with(port_context)
+        create_neutron_port.assert_called_once_with(fake_segment, port_context)
+        add_trunk.assert_called_once_with(port, fake_segment)
+        create_uplink_port.assert_called_once_with(
+            fake_segment, port_context.current["network_id"]
+        )
+
 
 @pytest.fixture
 def ri_after_delete_payload(network_id) -> DBEventPayload:
