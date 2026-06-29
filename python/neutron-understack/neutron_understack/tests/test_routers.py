@@ -1,4 +1,5 @@
 import pytest
+from neutron.services.trunk import exceptions as trunk_exc
 from neutron_lib import constants as p_const
 from neutron_lib.callbacks.events import DBEventPayload
 
@@ -70,6 +71,25 @@ class TestAddSubportToTrunk:
                 ]
             },
         )
+
+    def test_duplicate_subport_is_ignored(self, mocker):
+        """A stranded sub-port from a previous failed attempt must not block retries."""
+        mocker.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value="trunk-uuid",
+        )
+        mocker.patch(
+            "neutron_lib.context.get_admin_context", return_value="admin_context"
+        )
+        mock_trunk_plugin = mocker.Mock()
+        mock_trunk_plugin.add_subports.side_effect = trunk_exc.DuplicateSubPort()
+        mocker.patch(
+            "neutron_understack.utils.fetch_trunk_plugin",
+            return_value=mock_trunk_plugin,
+        )
+
+        # should not raise
+        add_subport_to_trunk({"id": "port-123"}, {"segmentation_id": 42})
 
 
 class TestHandleSubportRemoval:
