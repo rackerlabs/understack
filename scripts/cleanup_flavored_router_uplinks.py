@@ -131,14 +131,41 @@ def print_dry_run_report(orphans: list[dict]) -> None:
         print()
 
 
-def execute_cleanup(conn, orphans: list[dict], kube_context: str | None) -> None:
+def build_kubectl_base(kube_context: str | None) -> list[str]:
+    cmd = ["kubectl"]
+    if kube_context:
+        cmd += ["--context", kube_context]
+    return cmd
+
+
+def verify_ovn_matches_openstack(network_id: str, kubectl_base: list[str]) -> None:
+    """Confirm OVN NB knows about network_id; exit if it does not.
+
+    A missing switch most likely means --context and --os-cloud point at
+    different clusters.
+    """
+    result = subprocess.run(
+        kubectl_base
+        + ["exec", "-n", OVN_NAMESPACE, OVN_POD, "--", "ovn-nbctl", "show", network_id],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0 or network_id not in result.stdout:
+        context_hint = f" (context: {kubectl_base[2]})" if len(kubectl_base) > 1 else ""
+        print(
+            f"ERROR: OVN NB{context_hint} has no switch for network {network_id}.\n"
+            "This likely means --context and --os-cloud are pointing at different "
+            "clusters.\nVerify that both flags target the same environment.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    log.debug("OVN context verified: network %s is present in NB", network_id)
+
+
+def execute_cleanup(conn, orphans: list[dict], kubectl_base: list[str]) -> None:
     if not orphans:
         print("No orphaned uplink ports found. Nothing to do.")
         return
-
-    kubectl_base = ["kubectl"]
-    if kube_context:
-        kubectl_base += ["--context", kube_context]
 
     errors = 0
     for o in orphans:
@@ -263,12 +290,17 @@ def main() -> None:
 
     orphans = find_orphaned_uplinks(conn, verbose=args.verbose)
 
+    kubectl_base = build_kubectl_base(args.kube_context)
+
+    if orphans:
+        verify_ovn_matches_openstack(orphans[0]["network_id"], kubectl_base)
+
     if not args.execute:
         print_dry_run_report(orphans)
         if orphans:
             print("Run with --execute to apply the changes above.")
     else:
-        execute_cleanup(conn, orphans, kube_context=args.kube_context)
+        execute_cleanup(conn, orphans, kubectl_base)
 
 
 if __name__ == "__main__":
