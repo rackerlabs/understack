@@ -39,6 +39,7 @@ jobs:
           python-version: 3.x
           cache: pip
           cache-dependency-path: requirements-docs.txt
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - name: Check component docs coverage
         run: make component-docs-check
       - run: make docs
