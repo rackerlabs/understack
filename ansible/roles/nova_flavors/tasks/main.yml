@@ -30,11 +30,12 @@
           }
         })
       }}
-  loop: "{{ device_types_data | selectattr('class', 'equalto', 'server') | selectattr('resource_class', 'defined') | subelements('resource_class') }}"
+  loop: "{{ device_types_data | d([]) | selectattr('class', 'equalto', 'server') | selectattr('resource_class', 'defined') | subelements('resource_class') }}"
+  when: device_types_data | d([]) | length > 0
 
 - name: Loop through flavors and create Nova flavors
   ansible.builtin.include_tasks: nova_flavors.yml
-  loop: "{{ flavors_data }}"
+  loop: "{{ flavors_data | d([]) }}"
   loop_control:
     loop_var: flavor_item
 
