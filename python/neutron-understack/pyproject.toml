@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "requests>=2,<3",
-    "neutron-lib>=3,<4",
+    "neutron-lib>=3,<5",
     "neutron>=27,<29",
     "oslo.config>=9.7.1",
     "oslo.log>=7.1.0",
@@ -37,6 +37,7 @@ dependencies = [
 ironic = "neutron_understack.config:list_ironic_opts"
 understack = "neutron_understack.config:list_understack_opts"
 cisco-asa = "neutron_understack.config:list_cisco_asa_opts"
+understack-vni = "neutron_understack.config:list_understack_vni_opts"
 
 [project.entry-points."neutron.ml2.mechanism_drivers"]
 understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
@@ -44,6 +45,16 @@ undersync = "neutron_understack.undersync_mech:UndersyncDriver"
 
 [project.entry-points."neutron.service_plugins"]
 l3_service_cisco_asa = "neutron_understack.l3_service_cisco_asa:CiscoAsa"
+understack_vni = "neutron_understack.l3_router.vrf:UnderstackVniPlugin"
+
+[project.entry-points."oslo.policy.policies"]
+neutron-understack = "neutron_understack.conf.policies:list_rules"
+
+[project.entry-points."neutron.policies"]
+neutron-understack = "neutron_understack.conf.policies:list_rules"
+
+[project.entry-points."neutron.db.alembic_migrations"]
+neutron-understack = "neutron_understack.db.migration:alembic_migrations"
 
 [project.urls]
 Source = "https://github.com/rackerlabs/understack"
