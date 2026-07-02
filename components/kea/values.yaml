@@ -1,1 +1,7 @@
 # Default values for kea-dhcp. Using upstream chart defaults for now.
+
+service:
+  # DHCP servers need to be reachable from the physical network, not just
+  # in-cluster, so expose the DHCP service via a LoadBalancer.
+  dhcp:
+    type: LoadBalancer
