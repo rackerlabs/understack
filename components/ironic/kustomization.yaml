@@ -6,7 +6,7 @@ resources:
   - ironic-mariadb-db.yaml
   - ironic-rabbitmq-queue.yaml
   - dnsmasq-pvc.yaml
-  - dnsmasq-ss.yaml
+#  - dnsmasq-ss.yaml
   - ironic-ks-user-baremetal.yaml
     # less than ideal addition but necessary so that we can have the ironic.conf.d loading
     # working due to the way the chart hardcodes the config-file parameter which then
