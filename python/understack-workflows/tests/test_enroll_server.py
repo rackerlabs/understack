@@ -266,6 +266,7 @@ def test_enrol_happy_path_uses_virtual_media_inspect_and_flips_back(mocker):
             "redfish_password": "calvin",
         },
         boot_interface="http-ipxe",
+        deploy_interface="direct",
         inspect_interface="idrac-redfish",
         extra={"external_cmdb_id": "cmdb-1"},
     )

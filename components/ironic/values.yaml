@@ -48,11 +48,6 @@ conf:
     "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
   ironic:
     DEFAULT:
-      # We only want to default to direct, otherwise defaults interfere with hardware
-      # types selecting their own defaults. So we purposefully leave the defaults unset
-      # but enable everything that our Redfish focused (with iDRAC and iLO support)
-      # systems need
-      default_deploy_interface: direct
       enabled_bios_interfaces: no-bios,redfish,idrac-redfish,ilo
       enabled_boot_interfaces: http-ipxe,ipxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,ilo-virtual-media,ilo-uefi-https,ilo-ipxe
       enabled_deploy_interfaces: direct,ramdisk,noop
