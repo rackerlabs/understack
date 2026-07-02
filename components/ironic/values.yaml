@@ -49,7 +49,7 @@ conf:
   ironic:
     DEFAULT:
       # hardware types we have enabled in ironic
-      enabled_hardware_types: redfish,idrac,ilo5,ilo,netdev
+      enabled_hardware_types: redfish,idrac,ilo5,ilo,netdev,manual-management
       # enabled interfaces for the above hardware types, each hardware type must
       # have at least one enabled interface that it reports it supports
       enabled_bios_interfaces: no-bios,redfish,idrac-redfish,ilo
