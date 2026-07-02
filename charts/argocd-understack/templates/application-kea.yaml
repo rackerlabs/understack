@@ -11,7 +11,8 @@ metadata:
 {{- include "understack.appLabelsBlock" $ | nindent 2 }}
 spec:
   destination:
-    namespace: kea
+    # TODO: revert to `kea` once that namespace is deployable again
+    namespace: openstack
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
