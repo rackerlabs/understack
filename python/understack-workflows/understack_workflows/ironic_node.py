@@ -151,6 +151,7 @@ def create_ironic_node(
             "redfish_password": bmc.password,
         },
         "boot_interface": STEADY_STATE_BOOT_INTERFACE,
+        "deploy_interface": "direct",
         "inspect_interface": inspect_interface,
     }
     if external_cmdb_id:
