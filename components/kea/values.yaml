@@ -5,3 +5,9 @@
 # each site's deploy-repo kea/ overlay, working around a chart bug where
 # setting service.dhcp.annotations renders invalid YAML (missing newline in
 # templates/service.yaml, still present on chart main as of 0.7.1).
+
+kea:
+  ctrlagent:
+    #Needed for HA, monitoring and stork
+    enabled: true
+    loglevel: "DEBUG"
