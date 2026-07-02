@@ -475,6 +475,15 @@ site:
     # @default -- false
     enabled: false
 
+  # -- Kea DHCP server
+  kea:
+    # -- Enable/disable deploying Kea DHCP
+    # @default -- false
+    enabled: false
+    # -- Chart version for Kea DHCP
+    # renovate: datasource=helm depName=kea-dhcp registryUrl=https://mglants.github.io/charts
+    chartVersion: "0.7.1"
+
   # -- External DNS operator
   external_dns:
     # -- Enable/disable deploying External DNS
