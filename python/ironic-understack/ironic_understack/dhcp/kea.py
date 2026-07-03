@@ -167,4 +167,4 @@ class KeaDHCPApi(base.BaseDHCP):
 
     def supports_ipxe_tag(self):
         """Indicate whether the provider supports the 'ipxe' tag."""
-        return True
+        return False
