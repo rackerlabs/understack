@@ -116,6 +116,7 @@ class KeaDHCPApi(base.BaseDHCP):
             if "ip_version" in opt:
                 kea_opt["space"] = f'dhcp{opt["ip_version"]}'
             kea_options.append(kea_opt)
+        print(kea_options)
         return self._update_host_reservation(port.address, kea_options)
 
     def update_dhcp_opts(self, task, options, vifs=None):
