@@ -18,9 +18,9 @@ class DHCPConfigurationError(exception.IronicException):
 class KeaDHCPApi(base.BaseDHCP):
     def __init__(self):
         super().__init__()
-        self.max_retries = CONF.kea_max_retries
+        self.max_retries = CONF.ironic_understack.kea_max_retries
 
-        if not CONF.kea_url:
+        if not CONF.ironic_understack.kea_url:
             raise DHCPConfigurationError("Kea URL must be specified in configuration")
 
     def _make_request(self, command, arguments, services=None):
@@ -33,7 +33,9 @@ class KeaDHCPApi(base.BaseDHCP):
         for attempt in range(self.max_retries):
             try:
                 response = requests.post(
-                    CONF.kea_url, json=payload, timeout=CONF.kea_request_timeout
+                    CONF.ironic_understack.kea_url,
+                    json=payload,
+                    timeout=CONF.ironic_understack.kea_request_timeout,
                 )
                 response.raise_for_status()
                 return response.json()
