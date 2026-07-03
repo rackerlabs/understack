@@ -19,6 +19,9 @@ dependencies = [
 [project.entry-points."ironic.console.container"]
 kubernetes = "ironic.console.container.kubernetes:KubernetesConsoleContainer"
 
+[project.entry-points."ironic.dhcp"]
+kea = "ironic_understack.dhcp.kea:KeaDHCPApi"
+
 [project.entry-points."ironic.inspection.hooks"]
 resource-class = "ironic_understack.resource_class:ResourceClassHook"
 update-baremetal-port = "ironic_understack.inspect_hook_update_baremetal_ports:InspectHookUpdateBaremetalPorts"
