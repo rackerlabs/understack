@@ -74,7 +74,7 @@ class KeaDHCPApi(base.BaseDHCP):
             return self._make_request("statistic-get", {"name": name})
         return self._make_request("statistic-get-all", {})
 
-    def _update_host_reservation(self, hw_address, options=None, remove=False):
+    def _update_host_reservation(self, hw_address, boot_file_name=None, remove=False):
         """Modify a host reservation in the Kea config file or hosts database."""
         # TODO(cid) add support/replace with the host database configuration
         # option in a central database managed by Ironic; the commands to have
@@ -89,12 +89,12 @@ class KeaDHCPApi(base.BaseDHCP):
             found = False
             for reservation in reservations:
                 if reservation.get("hw-address") == hw_address:
-                    reservation["option-data"] = options
+                    reservation["boot-file-name"] = boot_file_name
                     found = True
                     break
 
             if not found:
-                reservations.append({"hw-address": hw_address, "option-data": options})
+                reservations.append({"hw-address": hw_address, "boot-file-name": boot_file_name})
                 dhcp4_config["reservations"] = reservations
 
             config["arguments"]["Dhcp4"] = dhcp4_config
@@ -108,19 +108,12 @@ class KeaDHCPApi(base.BaseDHCP):
         """Update DHCP options for a specific port in Kea."""
         port = objects.Port.get(context, port_id)
 
-        kea_options = []
+        boot_file_name = ""
         for opt in dhcp_options:
-            if not opt["opt_name"].startswith("!"):
-                kea_opt = {
-                    "name": opt["opt_name"],
-                    "data": opt["opt_value"],
-                    "always-send": True,
-                }
-                if "ip_version" in opt:
-                    kea_opt["space"] = f'dhcp{opt["ip_version"]}'
-                kea_options.append(kea_opt)
-        print(kea_options)
-        return self._update_host_reservation(port.address, kea_options)
+            if opt["opt_name"].startswith("!"):
+                boot_file_name = opt["opt_value"]
+                break
+        return self._update_host_reservation(port.address, boot_file_name)
 
     def update_dhcp_opts(self, task, options, vifs=None):
         """Update DHCP options for all ports associated with a node."""
