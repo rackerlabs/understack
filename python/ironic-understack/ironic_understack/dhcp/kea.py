@@ -65,7 +65,7 @@ class KeaDHCPApi(base.BaseDHCP):
 
     def set_config(self, config):
         """Update Kea configuration."""
-        return self._make_request("config-set", {"config": config})
+        return self._make_request("config-set", config)
 
     def get_statistics(self, name=None):
         """Retrieve DHCP server statistics."""
