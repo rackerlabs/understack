@@ -29,6 +29,7 @@ class KeaDHCPApi(base.BaseDHCP):
             "service": services or ["dhcp4"],
             "arguments": arguments,
         }
+        print(f"PAYLOAD: {payload}") if command == "config-set" else 0
 
         for attempt in range(self.max_retries):
             try:
