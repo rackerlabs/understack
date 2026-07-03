@@ -82,6 +82,7 @@ class KeaDHCPApi(base.BaseDHCP):
         # offering
         try:
             config = self.get_config()
+            config["arguments"].pop("hash", None)
             dhcp4_config = config["arguments"]["Dhcp4"]
 
             reservations = dhcp4_config.get("reservations", [])
