@@ -110,14 +110,15 @@ class KeaDHCPApi(base.BaseDHCP):
 
         kea_options = []
         for opt in dhcp_options:
-            kea_opt = {
-                "name": opt["opt_name"],
-                "data": opt["opt_value"],
-                "always-send": True,
-            }
-            if "ip_version" in opt:
-                kea_opt["space"] = f'dhcp{opt["ip_version"]}'
-            kea_options.append(kea_opt)
+            if not opt["opt_name"].startswith("!"):
+                kea_opt = {
+                    "name": opt["opt_name"],
+                    "data": opt["opt_value"],
+                    "always-send": True,
+                }
+                if "ip_version" in opt:
+                    kea_opt["space"] = f'dhcp{opt["ip_version"]}'
+                kea_options.append(kea_opt)
         print(kea_options)
         return self._update_host_reservation(port.address, kea_options)
 
