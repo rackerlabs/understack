@@ -3,6 +3,7 @@ from ironic import objects
 from ironic.common import exception
 from ironic.dhcp import base
 from oslo_log import log as logging
+from urllib.parse import urlparse
 
 from ironic_understack.conf import CONF
 
@@ -84,17 +85,25 @@ class KeaDHCPApi(base.BaseDHCP):
             config = self.get_config()
             config["arguments"].pop("hash", None)
             dhcp4_config = config["arguments"]["Dhcp4"]
+            next_server = urlparse(boot_file_name).hostname
 
             reservations = dhcp4_config.get("reservations", [])
             found = False
             for reservation in reservations:
                 if reservation.get("hw-address") == hw_address:
                     reservation["boot-file-name"] = boot_file_name
+                    reservation["next-server"] = next_server
                     found = True
                     break
 
             if not found:
-                reservations.append({"hw-address": hw_address, "boot-file-name": boot_file_name})
+                reservations.append(
+                    {
+                        "hw-address": hw_address,
+                        "boot-file-name": boot_file_name,
+                        "next-server": next_server,
+                    }
+                )
                 dhcp4_config["reservations"] = reservations
 
             config["arguments"]["Dhcp4"] = dhcp4_config
