@@ -16,18 +16,16 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - chart: kea-dhcp
+  - ref: understack
+    path: 'charts/kea-dhcp'
+    repoURL: {{ include "understack.understack_url" $ }}
+    targetRevision: {{ include "understack.understack_ref" $ }}
     helm:
       ignoreMissingValueFiles: true
       releaseName: kea
       valueFiles:
       - $understack/components/kea/values.yaml
       - $deploy/{{ include "understack.deploy_path" $ }}/kea/values.yaml
-    repoURL: https://mglants.github.io/charts
-    targetRevision: {{ $.Values.site.kea.chartVersion }}
-  - ref: understack
-    repoURL: {{ include "understack.understack_url" $ }}
-    targetRevision: {{ include "understack.understack_ref" $ }}
   - path: {{ include "understack.deploy_path" $ }}/kea
     ref: deploy
     repoURL: {{ include "understack.deploy_url" $ }}
