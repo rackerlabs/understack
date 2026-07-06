@@ -30,7 +30,6 @@ class KeaDHCPApi(base.BaseDHCP):
             "service": services or ["dhcp4"],
             "arguments": arguments,
         }
-        print(f"PAYLOAD: {payload}") if command == "config-set" else 0
 
         for attempt in range(self.max_retries):
             try:
@@ -118,6 +117,7 @@ class KeaDHCPApi(base.BaseDHCP):
         port = objects.Port.get(context, port_id)
 
         boot_file_name = ""
+        print(f"DHCP_OPTIONS: {dhcp_options}")
         for opt in dhcp_options:
             if opt["opt_name"].startswith("!"):
                 boot_file_name = opt["opt_value"]
