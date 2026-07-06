@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kea-dhcp.fullname" . }}-headless
+  labels:
+    {{- include "kea-dhcp.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 67
+      targetPort: dhcp
+      protocol: UDP
+      name: dhcp
+    - port: 8080
+      targetPort: control-agent
+      protocol: TCP
+      name: control-agent
+  selector:
+    {{- include "kea-dhcp.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kea-dhcp.fullname" . }}
+  labels:
+    {{- include "kea-dhcp.labels" . | nindent 4 }}
+  {{- if .Values.service.dhcp.annotations }}
+  {{- with .Values.service.dhcp.annotations }}
+  annotations:
+  {{- toYaml . | indent 4 }}
+  {{- end }}
+  {{- end }}
+spec:
+{{- if (or (eq .Values.service.dhcp.type "ClusterIP") (empty .Values.service.dhcp.type)) }}
+  type: ClusterIP
+  {{- if .Values.service.dhcp.clusterIP }}
+  clusterIP: {{ .Values.service.dhcp.clusterIP }}
+  {{end}}
+{{- else if eq .Values.service.dhcp.type "LoadBalancer" }}
+  type: {{ .Values.service.dhcp.type }}
+  {{- if .Values.service.dhcp.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.service.dhcp.loadBalancerIP }}
+  {{- end }}
+  {{- if .Values.service.dhcp.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+{{ toYaml .Values.service.dhcp.loadBalancerSourceRanges | indent 4 }}
+  {{- end -}}
+{{- else }}
+  type: {{ .Values.service.dhcp.type }}
+{{- end }}
+{{- if .Values.service.dhcp.externalIPs }}
+  externalIPs:
+{{ toYaml .Values.service.dhcp.externalIPs | indent 4 }}
+{{- end }}
+  {{- if .Values.service.dhcp.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ .Values.service.dhcp.externalTrafficPolicy }}
+  {{- end }}
+  ports:
+    - port: {{ .Values.service.dhcp.port }}
+      targetPort: dhcp
+      protocol: UDP
+      name: dhcp
+  selector:
+    {{- include "kea-dhcp.selectorLabels" . | nindent 4 }}
+---
+{{- if .Values.kea.ctrlagent.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kea-dhcp.fullname" . }}-ctrl
+  labels:
+    {{- include "kea-dhcp.labels" . | nindent 4 }}
+  {{- if .Values.service.ctrl.annotations }}
+  {{- with .Values.service.ctrl.annotations }}
+  annotations:
+  {{- toYaml . | indent 4 }}
+  {{- end }}
+  {{- end }}
+spec:
+{{- if (or (eq .Values.service.ctrl.type "ClusterIP") (empty .Values.service.ctrl.type)) }}
+  type: ClusterIP
+  {{- if .Values.service.ctrl.clusterIP }}
+  clusterIP: {{ .Values.service.ctrl.clusterIP }}
+  {{end}}
+{{- else if eq .Values.service.ctrl.type "LoadBalancer" }}
+  type: {{ .Values.service.ctrl.type }}
+  {{- if .Values.service.ctrl.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.service.ctrl.loadBalancerIP }}
+  {{- end }}
+  {{- if .Values.service.ctrl.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+{{ toYaml .Values.service.ctrl.loadBalancerSourceRanges | indent 4 }}
+  {{- end -}}
+{{- else }}
+  type: {{ .Values.service.ctrl.type }}
+{{- end }}
+{{- if .Values.service.ctrl.externalIPs }}
+  externalIPs:
+{{ toYaml .Values.service.ctrl.externalIPs | indent 4 }}
+{{- end }}
+  {{- if .Values.service.ctrl.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ .Values.service.ctrl.externalTrafficPolicy }}
+  {{- end }}
+  ports:
+    - port: {{ .Values.service.ctrl.port }}
+      targetPort: control-agent
+      protocol: TCP
+      name: control-agent
+  selector:
+    {{- include "kea-dhcp.selectorLabels" . | nindent 4 }}
+{{- end }}

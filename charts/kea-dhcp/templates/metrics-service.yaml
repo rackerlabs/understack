@@ -1,0 +1,30 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "kea-dhcp.fullname" . }}-metrics
+  labels:
+    app.kubernetes.io/name: {{ include "kea-dhcp.name" . }}
+    helm.sh/chart: {{ include "kea-dhcp.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    {{- if .Values.metrics.service.labels -}}
+    {{ toYaml .Values.metrics.service.labels | nindent 4 }}
+    {{- end -}}
+  {{- if .Values.metrics.service.annotations }}
+  annotations: {{ toYaml .Values.metrics.service.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.metrics.service.type }}
+  {{ if eq .Values.metrics.service.type "LoadBalancer" -}} {{ if .Values.metrics.service.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.metrics.service.loadBalancerIP }}
+  {{ end -}}
+  {{- end -}}
+  ports:
+  - name: metrics
+    port: 9547
+    targetPort: metrics
+  selector:
+    app.kubernetes.io/name: {{ include "kea-dhcp.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
