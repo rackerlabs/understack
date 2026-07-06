@@ -1,5 +1,5 @@
 # renovate: datasource=docker depName=networktocode/nautobot versioning=semver
-ARG NAUTOBOT_VERSION=3.1.2
+ARG NAUTOBOT_VERSION=3.1.6
 ARG PYTHON_VERSION=3.12
 ARG NAUTOBOT_CONTAINER_TYPE=""
 
