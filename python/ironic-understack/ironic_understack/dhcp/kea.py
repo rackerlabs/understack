@@ -90,28 +90,26 @@ class KeaDHCPApi(base.BaseDHCP):
             found = False
             for reservation in reservations:
                 if reservation.get("hw-address") == hw_address:
-                    # reservation["option-data"] = [
-                    #     {
-                    #         "name": "boot-file-base",
-                    #         "data": boot_file_prefix,
-                    #         "always-send": True,
-                    #     }
-                    # ]
-                    reservation["client-classes"] = ["BOOTSRV_A"]
+                    reservation["option-data"] = [
+                        {
+                            "name": "boot-file-base",
+                            "data": boot_file_prefix,
+                            "always-send": True,
+                        }
+                    ]
                     found = True
                     break
             if not found:
                 reservations.append(
                     {
                         "hw-address": hw_address,
-                        # "option-data": [
-                        #     {
-                        #         "name": "boot-file-base",
-                        #         "data": boot_file_prefix,
-                        #         "always-send": True,
-                        #     },
-                        # ],
-                        "client-classes": ["BOOTSRV_A"],
+                        "option-data": [
+                            {
+                                "name": "boot-file-base",
+                                "data": boot_file_prefix,
+                                "always-send": True,
+                            },
+                        ],
                     }
                 )
                 dhcp4_config["reservations"] = reservations
