@@ -22,6 +22,7 @@ data:
             "rebind-timer": {{ .Values.kea.dhcp4.rebindtimer }},
             "reservations-global": true,
             "reservations-in-subnet": false,
+            "early-global-reservations-lookup": true,
             "control-socket": {
                 "socket-type": "unix",
                 "socket-name": "/run/kea/kea-dhcp4-ctrl.sock"
