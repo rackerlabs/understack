@@ -84,7 +84,7 @@ class KeaDHCPApi(base.BaseDHCP):
         try:
             config = self.get_config()
             config["arguments"].pop("hash", None)
-            dhcp4_config = config["arguments"]["Dhcp4"]["subnet4"][0]
+            dhcp4_config = config["arguments"]["Dhcp4"]
 
             reservations = dhcp4_config.get("reservations", [])
             found = False
@@ -117,7 +117,7 @@ class KeaDHCPApi(base.BaseDHCP):
                 dhcp4_config["reservations"] = reservations
 
             print(dhcp4_config)
-            config["arguments"]["Dhcp4"]["subnet4"][0] = dhcp4_config
+            config["arguments"]["Dhcp4"] = dhcp4_config
             self.set_config(config["arguments"])
             return True
         except Exception as e:
