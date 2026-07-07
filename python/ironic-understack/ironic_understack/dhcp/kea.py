@@ -75,7 +75,7 @@ class KeaDHCPApi(base.BaseDHCP):
             return self._make_request("statistic-get", {"name": name})
         return self._make_request("statistic-get-all", {})
 
-    def _update_host_reservation(self, hw_address, kea_options=None, remove=False):
+    def _update_host_reservation(self, hw_address, boot_file_prefix=None, remove=False):
         """Modify a host reservation in the Kea config file or hosts database."""
         # TODO(cid) add support/replace with the host database configuration
         # option in a central database managed by Ironic; the commands to have
@@ -84,44 +84,30 @@ class KeaDHCPApi(base.BaseDHCP):
         try:
             config = self.get_config()
             config["arguments"].pop("hash", None)
-            dhcp4_config = config["arguments"]["Dhcp4"]
+            dhcp4_config = config["arguments"]["Dhcp4"]["subnet4"][0]
 
             reservations = dhcp4_config.get("reservations", [])
             found = False
             for reservation in reservations:
                 if reservation.get("hw-address") == hw_address:
-                    if "httpclient" in reservation.get("client-classes", []):
-                        boot_file_name = kea_options["http"]["boot_file_name"]
-                        reservation["boot-file-name"] = boot_file_name
-                        next_server = urlparse(boot_file_name).hostname
-                        reservation["next-server"] = next_server
-                    elif "pxeclient" in reservation.get("client-classes", []):
-                        boot_file_name = kea_options["pxe"]["boot_file_name"]
-                        reservation["boot-file-name"] = boot_file_name
-                        next_server = urlparse(boot_file_name).hostname
-                        reservation["next-server"] = next_server
+                    reservation["option-data"] = [
+                        {"name": "boot-file-base", "data": boot_file_prefix}
+                    ]
                     found = True
+                    break
             if not found:
-                boot_file_name = kea_options["http"]["boot_file_name"]
                 reservations.append(
                     {
                         "hw-address": hw_address,
-                        "boot-file-name": kea_options["http"]["boot_file_name"],
-                        "next-server": urlparse(boot_file_name).hostname,
-                        "client-classes": ["httpclient"],
-                    }
-                )
-                reservations.append(
-                    {
-                        "hw-address": hw_address,
-                        "boot-file-name": kea_options["pxe"]["boot_file_name"],
-                        "next-server": urlparse(boot_file_name).hostname,
-                        "client-classes": ["pxeclient"],
+                        "option-data": [
+                            {"name": "boot-file-base", "data": boot_file_prefix},
+                        ],
                     }
                 )
                 dhcp4_config["reservations"] = reservations
 
-            config["arguments"]["Dhcp4"] = dhcp4_config
+            print(dhcp4_config)
+            config["arguments"]["Dhcp4"]["subnet4"][0] = dhcp4_config
             self.set_config(config["arguments"])
             return True
         except Exception as e:
@@ -132,20 +118,11 @@ class KeaDHCPApi(base.BaseDHCP):
         """Update DHCP options for a specific port in Kea."""
         port = objects.Port.get(context, port_id)
 
-        kea_options = {}
-        print(f"DHCP_OPTIONS: {dhcp_options}")
         for opt in dhcp_options:
-            if opt["opt_name"] == "!175,67":
-                kea_options["http"] = {
-                    "boot_file_name": opt["opt_value"],
-                    "client_class": "httpclient",
-                }
-            elif opt["opt_name"] == "67":
-                kea_options["pxe"] = {
-                    "boot_file_name": opt["opt_value"],
-                    "client_class": "pxeclient",
-                }
-        return self._update_host_reservation(port.address, kea_options)
+            if opt["opt_name"] == "67":
+                parsed_url = urlparse(opt["opt_value"])
+                boot_file_prefix = f"{parsed_url.scheme}://{parsed_url.netloc}/"
+        return self._update_host_reservation(port.address, boot_file_prefix)
 
     def update_dhcp_opts(self, task, options, vifs=None):
         """Update DHCP options for all ports associated with a node."""
