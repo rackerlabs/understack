@@ -8,7 +8,6 @@ from neutron_understack.db import understack_vni as vni_models
 
 MIN_VNI = getattr(n_const, "MIN_VXLAN_VNI", 1)
 MAX_VNI = n_const.MAX_VXLAN_VNI
-DEFAULT_VNI_RANGES = [f"{MIN_VNI}:{MAX_VNI}"]
 
 
 class UnderstackVNIInvalidRange(n_exc.NeutronException):
