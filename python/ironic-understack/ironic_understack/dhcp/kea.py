@@ -91,7 +91,11 @@ class KeaDHCPApi(base.BaseDHCP):
             for reservation in reservations:
                 if reservation.get("hw-address") == hw_address:
                     reservation["option-data"] = [
-                        {"name": "boot-file-base", "data": boot_file_prefix}
+                        {
+                            "name": "boot-file-base",
+                            "data": boot_file_prefix,
+                            "always-send": True,
+                        }
                     ]
                     found = True
                     break
@@ -100,7 +104,11 @@ class KeaDHCPApi(base.BaseDHCP):
                     {
                         "hw-address": hw_address,
                         "option-data": [
-                            {"name": "boot-file-base", "data": boot_file_prefix},
+                            {
+                                "name": "boot-file-base",
+                                "data": boot_file_prefix,
+                                "always-send": True,
+                            },
                         ],
                     }
                 )
