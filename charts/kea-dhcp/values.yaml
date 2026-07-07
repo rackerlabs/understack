@@ -47,6 +47,11 @@ kea:
     # - code: 66
     #   data: 192.168.1.2
     #   name: tftp-server-name
+    optionDef: []
+    #  - name: "boot-file-base"
+    #    code: "234"
+    #    type: "string"
+    #    space: "dhcp4"
     reservations: []
     # - ip-address: "192.168.1.2"
     #   hw-address: "aa:aa:aa:aa:aa:aa"

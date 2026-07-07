@@ -49,6 +49,9 @@ data:
             {{- if .Values.kea.dhcp4.options }}
             "option-data": {{ .Values.kea.dhcp4.options | toJson }},
             {{- end }}
+            {{- if .Values.kea.dhcp4.optionDef }}
+            "option-def": {{ .Values.kea.dhcp4.optionDef | toJson }},
+            {{- end }}
             {{- if .Values.kea.dhcp4.reservations }}
             "reservations": {{ .Values.kea.dhcp4.reservations | toJson }},
             {{- end }}
