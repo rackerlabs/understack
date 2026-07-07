@@ -1,5 +1,3 @@
-import contextlib
-
 from keystoneauth1 import loading as ks_loading
 from keystoneauth1 import session as ks_session
 from oslo_config import cfg
@@ -162,8 +160,7 @@ def register_l3_svc_cisco_asa_opts(config):
 
 
 def register_understack_vni_opts(config):
-    with contextlib.suppress(cfg.DuplicateOptError):
-        config.register_opts(_understack_vni_opts, _OPT_GRP_UNDERSTACK_VNI)
+    config.register_opts(_understack_vni_opts, _OPT_GRP_UNDERSTACK_VNI)
 
 
 def get_session(group: str) -> ks_session.Session:
