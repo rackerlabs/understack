@@ -52,6 +52,14 @@ kea:
     #    code: "234"
     #    type: "string"
     #    space: "dhcp4"
+    hooksLibraries: []
+    # - library: /usr/lib/x86_64-linux-gnu/kea/hooks/libdhcp_flex_option.so
+    #   parameters:
+    #     options:
+    #       - code: 67
+    #         space: dhcp4
+    #         csv-format: true
+    #         supersede: myvalue
     reservations: []
     # - ip-address: "192.168.1.2"
     #   hw-address: "aa:aa:aa:aa:aa:aa"

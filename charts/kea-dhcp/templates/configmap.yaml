@@ -64,6 +64,9 @@ data:
             {{- if .Values.kea.dhcp4.clientClasses }}
             "client-classes": {{ .Values.kea.dhcp4.clientClasses | toJson }},
             {{- end }}
+            {{- if .Values.kea.dhcp4.hooksLibraries }}
+            "hooks-libraries": {{ .Values.kea.dhcp4.hooksLibraries | toJson }},
+            {{- end }}
             {{ if gt .Values.replicaCount 1.0 }}
             <?include "ha.json"?>
             {{- end }}
