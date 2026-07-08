@@ -1,4 +1,6 @@
+import socket
 from urllib.parse import urlparse
+from urllib.parse import urlunparse
 
 import requests
 from ironic import objects
@@ -25,6 +27,15 @@ class KeaDHCPApi(base.BaseDHCP):
         if not CONF.ironic_understack.kea_url:
             raise DHCPConfigurationError("Kea URL must be specified in configuration")
 
+    def _lookup_api_urls(self):
+        service_url = CONF.ironic_understack.kea_url
+        parsed = urlparse(service_url)
+
+        results = socket.getaddrinfo(parsed.hostname, None)
+        ips = sorted({r[4][0] for r in results})
+
+        return [urlunparse(parsed._replace(netloc=f"{ip}:{parsed.port}")) for ip in ips]
+
     def _make_request(self, command, arguments, services=None):
         payload = {
             "command": command,
@@ -33,14 +44,16 @@ class KeaDHCPApi(base.BaseDHCP):
         }
 
         for attempt in range(self.max_retries):
+            results = []
             try:
-                response = requests.post(
-                    CONF.ironic_understack.kea_url,
-                    json=payload,
-                    timeout=CONF.ironic_understack.kea_request_timeout,
-                )
-                response.raise_for_status()
-                return response.json()
+                for url in self._lookup_api_urls():
+                    response = requests.post(
+                        url,
+                        json=payload,
+                        timeout=CONF.ironic_understack.kea_request_timeout,
+                    )
+                    response.raise_for_status()
+                    results.append(response)
             except requests.exceptions.Timeout:
                 LOG.warning(
                     "Timeout on attempt %d/%d for command %s",
@@ -60,6 +73,7 @@ class KeaDHCPApi(base.BaseDHCP):
                     self.max_retries,
                     e,
                 )
+            return results[0].json()
 
     def get_config(self):
         """Retrieve current Kea configuration."""
