@@ -72,9 +72,9 @@ func TestEnabledComponentsConvertsToHyphens(t *testing.T) {
 	components := enabledComponents(config)
 
 	expected := map[string]bool{
-		"cert-manager":      true,
-		"external-secrets":  true,
-		"argo-workflows":    true,
+		"cert-manager":     true,
+		"external-secrets": true,
+		"argo-workflows":   true,
 	}
 
 	if len(components) != len(expected) {
@@ -626,6 +626,83 @@ func TestDeployDisableRequiresTypeFlag(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "required flag(s) \"type\" not set") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDeployVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	writeCluster := func(name string, config map[string]any) {
+		clusterDir := filepath.Join(tmpDir, name)
+		if err := os.MkdirAll(clusterDir, 0755); err != nil {
+			t.Fatalf("failed to create cluster dir: %v", err)
+		}
+
+		data, err := yaml.Marshal(&config)
+		if err != nil {
+			t.Fatalf("failed to marshal config: %v", err)
+		}
+
+		deployYaml := filepath.Join(clusterDir, "deploy.yaml")
+		if err := os.WriteFile(deployYaml, data, 0644); err != nil {
+			t.Fatalf("failed to write deploy.yaml: %v", err)
+		}
+	}
+
+	writeCluster("cluster-a", map[string]any{
+		"understack_ref": "v0.4.16",
+		"deploy_ref":     "HEAD",
+	})
+	writeCluster("cluster-b", map[string]any{
+		"site": map[string]any{"enabled": true},
+	})
+
+	// Directories without a deploy.yaml and plain files should be skipped.
+	if err := os.MkdirAll(filepath.Join(tmpDir, "not-a-cluster"), 0755); err != nil {
+		t.Fatalf("failed to create dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("test"), 0644); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	var out strings.Builder
+	if err := runDeployVersions(tmpDir, &out); err != nil {
+		t.Fatalf("runDeployVersions failed: %v", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected header plus 2 environments, got %d lines: %q", len(lines), out.String())
+	}
+
+	rows := map[string][]string{}
+	for _, line := range lines[1:] {
+		fields := strings.Fields(line)
+		if len(fields) != 3 {
+			t.Fatalf("expected 3 columns, got %q", line)
+		}
+		rows[fields[0]] = fields[1:]
+	}
+
+	if refs, ok := rows["cluster-a"]; !ok || refs[0] != "v0.4.16" || refs[1] != "HEAD" {
+		t.Errorf("unexpected refs for cluster-a: %v", rows["cluster-a"])
+	}
+
+	if refs, ok := rows["cluster-b"]; !ok || refs[0] != "unknown" || refs[1] != "unknown" {
+		t.Errorf("expected unknown refs for cluster-b, got: %v", rows["cluster-b"])
+	}
+
+	if _, ok := rows["not-a-cluster"]; ok {
+		t.Error("directories without deploy.yaml should be skipped")
+	}
+}
+
+func TestDeployVersionsNoEnvironments(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	var out strings.Builder
+	if err := runDeployVersions(tmpDir, &out); err == nil {
+		t.Fatal("expected error when no environments exist")
 	}
 }
 

@@ -144,6 +144,21 @@ Walk all YAML files in the cluster directory and update UnderStack container ima
 
 - `--no-digest` — Write the tag only, skip the registry digest lookup.
 
+#### deploy versions
+
+```bash
+understackctl deploy versions
+```
+
+List every environment in the deployment repo along with the `understack_ref` and `deploy_ref` from its `deploy.yaml`. Environments without a ref set are shown as `unknown`.
+
+```console
+$ understackctl deploy versions
+ENVIRONMENT  UNDERSTACK  DEPLOY
+cluster-a    v0.4.16     HEAD
+cluster-b    unknown     unknown
+```
+
 ### device-type
 
 Manage hardware device type definitions. Requires `UC_DEPLOY` to be set.
