@@ -69,7 +69,7 @@ data:
             "hooks-libraries": {{ .Values.kea.dhcp4.hooksLibraries | toJson }},
             {{- end }}
             {{ if gt .Values.replicaCount 1.0 }}
-            <?include "ha.json"?>
+            <?include "/config/kea/ha.json"?>
             {{- end }}
             {{- if .Values.kea.dhcp4.loggers  }}
             "loggers": {{ .Values.kea.dhcp4.loggers | toJson  }}
