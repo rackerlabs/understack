@@ -1,5 +1,5 @@
 #
-# UnderStack dnsmasq configuration for OpenStack Ironic
+# UnderStack dnsmasq configuration - DNS only
 #
 # This config should be processed with jinja
 #
@@ -10,21 +10,15 @@ log-facility=-
 # configs
 conf-dir=/etc/dnsmasq.d
 
-{% if env.PROVISIONER_INTERFACE is defined -%}
-interface={{ env.PROVISIONER_INTERFACE }}
-bind-dynamic
-{%- else -%}
 except-interface=lo
 bind-interfaces
-{%- endif %}
 
-# DNS port to listen on, set to 0 to disable
+# DNS port to listen on
 port={{ env.DNS_PORT | default(53) }}
 
-{% if env.LOG_DNS_QUERIES | default(False, True) %}
 # enable DNS logging
 log-queries=extra
-{% endif %}
+log-debug
 
 # for now, do not set any resolv settings which results in us
 # forwarding requests to kubedns within the cluster
@@ -32,108 +26,10 @@ log-queries=extra
 # don't advertise /etc/hosts entries
 no-hosts
 
-{% macro dhcp_config(name) -%}
-# common DHCP config
-# the environment variables will be named like:
-{% set dhcp_circuitid = "DHCP_SETTAG_" ~ name|upper ~ "_CIRCUITID" -%}
-# {{ dhcp_circuitid }}
-{% set dhcp_range = "DHCP_RANGE_" ~ name|upper -%}
-# {{ dhcp_range }}
-{% set dhcp_proxy = "DHCP_PROXY_" ~ name|upper -%}
-# {{ dhcp_proxy }}
-{% set dhcp_option = "DHCP_OPTION_" ~ name|upper ~ "_" -%}
-# {{ dhcp_option }}$OPTION where $OPTION is any valid dnsmasq option. underscores will be converted to hyphens
-{% set dhcp_allowed = "DHCP_ALLOWED_SRVIDS_" ~ name|upper -%}
-# {{ dhcp_allowed }}
-{% if env[dhcp_circuitid] is defined and env[dhcp_circuitid] -%}
-# tag the traffic with the PXE relay MAC
-{% set tag = name|lower ~ "," -%}
-dhcp-circuitid=set:{{ tag }}{{ env[dhcp_circuitid] }}
-{% else -%}
-# no tag by the PXE relay MAC
-{% set tag = "" -%}
-{%- endif %}
-dhcp-range={{ tag }}{{ env[dhcp_range] }}
-shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_range].split(',')[0] }}
-{% if env[dhcp_proxy] is defined and env[dhcp_proxy] -%}
-shared-network={{ env.PROVISIONER_INTERFACE | default("eth0") }},{{ env[dhcp_proxy] }}
-{{ dhcp_proxy_list.append(env[dhcp_proxy]) or '' }}
-{%- endif %}
-{% for key, value in env.items() if key.startswith(dhcp_option) -%}
-{% set option = key|replace(dhcp_option, '') -%}
-{% if option|int(-1) != -1 -%}
-{% set option_prefix = '' -%}
-{% else -%}
-{% set option_prefix = 'option:' -%}
-{% endif -%}
-dhcp-option={{ tag }}{{ option_prefix }}{{ option|replace('_', '-')|lower }},{{ value }}
-{% endfor %}
-{% if env[dhcp_allowed] is defined and env[dhcp_allowed] -%}
-{{ dhcp_allowed_srvids_list.append(env[dhcp_allowed]) or '' }}
-{%- endif %}
-{%- endmacro %}
-
-# This DHCP server is allowed to send NAK responses:
-dhcp-authoritative
-# This DHCP server will issue a single IP per client MAC address.  The client-id
-# can be used to differentiate VMs sharing a NIC (and thus requiring multiple
-# IPs for a single MAC address).  We don't have that requirement, and in fact in
-# our case it causes us to assign additional IPs to every server because the
-# different stages of boot (iPXE, linux) use different client-ids:
-dhcp-ignore-clid
-# DHCP ranges to hand out
-{% set dhcp_proxy_list = [] -%}
-{% set dhcp_allowed_srvids_list = [] -%}
-{% if env.POD_IP is defined and env.POD_IP -%}
-{{ dhcp_proxy_list.append(env.POD_IP) or '' }}
-{%- endif %}
-{% set dhcp_tags_str = env.DHCP_TAGS|default('default') -%}
-{% set dhcp_tags = dhcp_tags_str.split(',') -%}
-{% for name in dhcp_tags -%}
-# pool {{ name }}
-{{ dhcp_config(name) }}
-{% endfor %}
-# dhcp_proxy_list '{{ dhcp_proxy_list }}'
-{% if dhcp_proxy_list | length > 0 -%}
-dhcp-proxy={{ dhcp_proxy_list|join(',') }}
-{% endif %}
-{% if dhcp_allowed_srvids_list | length > 0 %}
-dhcp-allowed-srvids={{ dhcp_allowed_srvids_list|join(',') }}
-{% endif %}
-enable-tftp
-tftp-no-fail
-tftp-root={{ env['TFTP_DIR'] | default('/var/lib/openstack-helm/tftpboot') }}
-
-# don't set to enable logging
-{% if env.LOG_DHCP_QUERIES | default(False, True) %}
-# enable DNS logging
-log-dhcp
-log-debug
-{% endif %}
-
-# check if client is already running iPXE
-dhcp-match=ipxe,175
-
-# Detect PXE architecture
-dhcp-match=set:efi,option:client-arch,7
-dhcp-match=set:efi,option:client-arch,9
-dhcp-match=set:efi,option:client-arch,11
-dhcp-match=set:efi,option:client-arch,16
-# dhcpv6.option: Client System Architecture Type (61)
-dhcp-match=set:efi6,option6:61,0007
-dhcp-match=set:efi6,option6:61,0009
-dhcp-match=set:efi6,option6:61,0011
-dhcp-match=set:efi6,option6:61,0016
-
-# provide PXE services to HTTPClient machines as well
-dhcp-pxe-vendor=PXEClient,HTTPClient
-
-# conductor will write configs here
-dhcp-hostsdir=/etc/dnsmasq.d/hostsdir.d
-dhcp-optsdir=/etc/dnsmasq.d/optsdir.d
+# disable DHCP and TFTP
+no-dhcp-interface=
 
 # static DNS entries to reach UnderStack components
 address=/.{{ env.DNS_ZONE }}/{{ env.INGRESS_IP }}
 
-dhcp-option=option:dns-server,{{ env.get('DNS_IP', env['INGRESS_IP']) }}
 # end of template

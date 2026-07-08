@@ -242,22 +242,12 @@ pod:
     ironic_conductor:
       ironic_conductor:
         volumeMounts:
-          - name: dnsmasq-ironic
-            mountPath: /etc/dnsmasq.d/
-          - name: dnsmasq-dhcp
-            mountPath: /var/lib/dnsmasq/
           - name: device-types
             mountPath: /var/lib/understack/device-types
           - name: ironic-inspection-rules
             mountPath: /etc/ironic/inspection-rules/
             readOnly: true
         volumes:
-          - name: dnsmasq-ironic
-            persistentVolumeClaim:
-              claimName: dnsmasq-ironic
-          - name: dnsmasq-dhcp
-            persistentVolumeClaim:
-              claimName: dnsmasq-dhcp
           - name: device-types
             configMap:
               name: device-types
