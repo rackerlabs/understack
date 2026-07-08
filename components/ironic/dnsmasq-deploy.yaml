@@ -32,7 +32,7 @@ spec:
       hostNetwork: true
       containers:
         - name: dnsmasq
-          image: ghcr.io/rackerlabs/understack/dnsmasq:latest
+          image: ghcr.io/rackerlabs/understack/dnsmasq:pr-2111
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
