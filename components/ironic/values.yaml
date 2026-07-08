@@ -265,12 +265,15 @@ pod:
             configMap:
               name: ironic-inspection-rules
               optional: true
+  replicas:
+    api: 4
+    conductor: 1
+    novncproxy: 1
   lifecycle:
     disruption_budget:
       api:
-        # this should be set to no more than (pod.replicas.api - 1)
-        # usually set on per-deployment basis.
-        min_available: 0
+        # allow for zero downtime ironic-api deployments by keeping an api node online
+        min_available: 1
   resources:
     enabled: true
     api:
