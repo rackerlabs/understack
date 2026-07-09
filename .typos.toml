@@ -36,3 +36,5 @@ retreive = "retreive"
 metadat = "metadat"
 # operators/rook/values-cluster.yaml mentions "ceph-blockpool-ecoded"
 ecoded = "ecoded"
+# lazy option is not a typo
+selectin = "selectin"

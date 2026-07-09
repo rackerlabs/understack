@@ -5,6 +5,7 @@ from oslo_config import cfg
 _OPT_GRP_ML2_UNDERSTACK = "ml2_understack"
 _OPT_GRP_IRONIC = "ironic"
 _OPT_GRP_L3_SVC_CISCO_ASA = "l3_service_cisco_asa"
+_OPT_GRP_UNDERSTACK_VNI = "understack_vni"
 
 _mech_understack_opts = [
     cfg.StrOpt(
@@ -99,6 +100,19 @@ _l3_svc_cisco_asa_opts = [
     ),
 ]
 
+_understack_vni_opts = [
+    cfg.ListOpt(
+        "vni_ranges",
+        default=["1:16777215"],
+        item_type=cfg.types.String(),
+        help=(
+            "Comma-separated list of VNI ranges available for automatic "
+            "Understack VRF router VNI allocation. Each entry is either a "
+            "single VNI or an inclusive start:end range."
+        ),
+    ),
+]
+
 
 def list_understack_opts():
     return [
@@ -125,6 +139,12 @@ def list_cisco_asa_opts():
     ]
 
 
+def list_understack_vni_opts():
+    return [
+        (_OPT_GRP_UNDERSTACK_VNI, _understack_vni_opts),
+    ]
+
+
 def register_ml2_understack_opts(config):
     config.register_opts(_mech_understack_opts, _OPT_GRP_ML2_UNDERSTACK)
 
@@ -137,6 +157,10 @@ def register_ironic_opts(config):
 
 def register_l3_svc_cisco_asa_opts(config):
     config.register_opts(_l3_svc_cisco_asa_opts, _OPT_GRP_L3_SVC_CISCO_ASA)
+
+
+def register_understack_vni_opts(config):
+    config.register_opts(_understack_vni_opts, _OPT_GRP_UNDERSTACK_VNI)
 
 
 def get_session(group: str) -> ks_session.Session:

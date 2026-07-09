@@ -345,6 +345,7 @@ def oslo_config():
     conf_fixture.setUp()
     # register the ml2_understack options
     understack_config.register_ml2_understack_opts(conf_fixture.conf)
+    understack_config.register_understack_vni_opts(conf_fixture.conf)
     yield conf_fixture
     conf_fixture.cleanUp()
 
