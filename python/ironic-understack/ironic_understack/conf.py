@@ -28,7 +28,7 @@ def setup_conf():
         ),
         cfg.StrOpt(
             "kea_url",
-            default="http://kea-kea-dhcp-ctrl.openstack.svc.cluster.local:8000",
+            default="http://kea-kea-dhcp-headless.openstack.svc.cluster.local:8000",
             help="URL of the Kea DHCP server's HTTP API endpoint. "
             "This endpoint is used for managing DHCP "
             "configuration, reservations, leases and subnet "
