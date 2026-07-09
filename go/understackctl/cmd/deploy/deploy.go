@@ -37,6 +37,7 @@ func NewCmdDeploy() *cobra.Command {
 	cmd.AddCommand(newCmdDeployEnable())
 	cmd.AddCommand(newCmdDeployDisable())
 	cmd.AddCommand(newCmdDeployImageSet())
+	cmd.AddCommand(newCmdDeployVersions())
 
 	return cmd
 }
