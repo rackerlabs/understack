@@ -68,3 +68,28 @@ def test_make_request_succeeds_on_first_attempt(kea, mocker):
 
     assert result == {"result": 0}
     assert post.call_count == 1
+
+
+def test_update_host_reservation_removes_existing_entry(kea, mocker):
+    other_reservation = {
+        "hw-address": "aa:aa:aa:aa:aa:aa",
+        "client-classes": ["BOOTSRV_A"],
+    }
+    target_reservation = {
+        "hw-address": "bb:bb:bb:bb:bb:bb",
+        "client-classes": ["BOOTSRV_A"],
+    }
+    config = {
+        "arguments": {
+            "hash": "somehash",
+            "Dhcp4": {"reservations": [other_reservation, target_reservation]},
+        }
+    }
+    mocker.patch.object(kea, "get_config", return_value=config)
+    set_config = mocker.patch.object(kea, "set_config")
+
+    result = kea._update_host_reservation("bb:bb:bb:bb:bb:bb", remove=True)
+
+    assert result is True
+    sent_config = set_config.call_args[0][0]
+    assert sent_config["Dhcp4"]["reservations"] == [other_reservation]

@@ -120,7 +120,7 @@ class KeaDHCPApi(base.BaseDHCP):
                         reservation["client-classes"] = ["BOOTSRV_A"]
                     else:
                         print(f"REMOVING RESERVATION: {reservation}")
-                        reservations.pop(reservation)
+                        reservations.remove(reservation)
                     found = True
                     break
             if not found:
