@@ -335,6 +335,39 @@ class Svi(base.L3ServiceProvider):
         # flavor -> provider -> driver lookup.
         return _is_svi_router(context, router)
 
+    @registry.receives(resources.ROUTER_GATEWAY, [events.BEFORE_CREATE])
+    def _reject_svi_external_gateway(self, _resource, _event, _trigger, payload):
+        context = payload.context
+        router_id = payload.resource_id
+        router = self.l3plugin.get_router(context, router_id)
+
+        if not self._is_svi_flavor(context, router):
+            LOG.debug(
+                "SVI gateway check skipped: router %(router)s is not SVI "
+                "(name=%(name)s flavor=%(flavor)s)",
+                {
+                    "router": router_id,
+                    "name": router.get("name"),
+                    "flavor": router.get("flavor_id"),
+                },
+            )
+            return
+
+        network_id = (payload.metadata or {}).get("network_id")
+        LOG.warning(
+            "SVI gateway check FAILED: router %(router)s (%(name)s) cannot "
+            "have an external gateway network %(network)s",
+            {
+                "router": router_id,
+                "name": router.get("name"),
+                "network": network_id,
+            },
+        )
+        raise n_exc.BadRequest(
+            resource="router",
+            msg="SVI routers cannot have an external gateway.",
+        )
+
     @registry.receives(resources.ROUTER_INTERFACE, [events.BEFORE_CREATE])
     def _validate_svi_router_interface(self, _resource, _event, _trigger, payload):
         router = payload.states[0]

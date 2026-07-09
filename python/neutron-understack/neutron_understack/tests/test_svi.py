@@ -283,3 +283,67 @@ class TestValidateSviRouterInterfaceCallback:
 
         assert "must belong to an address scope" in str(exc_info.value)
         assert "attach_mode=port" in caplog.text
+
+
+class TestRejectSviExternalGatewayCallback:
+    def test_rejects_svi_router_external_gateway(self, caplog, mocker):
+        router = {"id": "router-a", "name": "svi-router", "flavor_id": "flavor-a"}
+        l3_plugin = FakeL3Plugin(router)
+        flavor_plugin = FakeFlavorPlugin(_svi_driver())
+        _patch_plugins(
+            mocker,
+            core_plugin=FakeCorePlugin({}),
+            l3_plugin=l3_plugin,
+            flavor_plugin=flavor_plugin,
+        )
+        provider = svi.Svi(l3_plugin)
+        payload = SimpleNamespace(
+            context="context",
+            resource_id="router-a",
+            metadata={"network_id": "external-net"},
+        )
+
+        caplog.set_level(logging.WARNING, logger=svi.LOG.name)
+        with pytest.raises(n_exc.BadRequest) as exc_info:
+            provider._reject_svi_external_gateway(None, None, None, payload)
+
+        assert "cannot have an external gateway" in str(exc_info.value)
+        assert "SVI gateway check FAILED" in caplog.text
+        assert "external-net" in caplog.text
+
+    def test_allows_non_svi_router_external_gateway(self, mocker):
+        router = {"id": "router-a", "name": "vrf-router", "flavor_id": "flavor-a"}
+        l3_plugin = FakeL3Plugin(router)
+        flavor_plugin = FakeFlavorPlugin("neutron_understack.l3_router.vrf.Vrf")
+        _patch_plugins(
+            mocker,
+            core_plugin=FakeCorePlugin({}),
+            l3_plugin=l3_plugin,
+            flavor_plugin=flavor_plugin,
+        )
+        provider = svi.Svi(l3_plugin)
+        payload = SimpleNamespace(
+            context="context",
+            resource_id="router-a",
+            metadata={"network_id": "external-net"},
+        )
+
+        provider._reject_svi_external_gateway(None, None, None, payload)
+
+    def test_allows_router_without_flavor(self, mocker):
+        router = {"id": "router-a", "name": "plain-router", "flavor_id": None}
+        l3_plugin = FakeL3Plugin(router)
+        _patch_plugins(
+            mocker,
+            core_plugin=FakeCorePlugin({}),
+            l3_plugin=l3_plugin,
+            flavor_plugin=FakeFlavorPlugin(_svi_driver()),
+        )
+        provider = svi.Svi(l3_plugin)
+        payload = SimpleNamespace(
+            context="context",
+            resource_id="router-a",
+            metadata={"network_id": "external-net"},
+        )
+
+        provider._reject_svi_external_gateway(None, None, None, payload)
