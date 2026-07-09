@@ -102,6 +102,10 @@ class KeaDHCPApi(base.BaseDHCP):
         """Update Kea configuration."""
         return self._make_request("config-set", config)
 
+    def save_config(self):
+        """Save the current configuration to disk."""
+        return self._make_request("config-write", {})
+
     def get_statistics(self, name=None):
         """Retrieve DHCP server statistics."""
         if name:
@@ -169,6 +173,7 @@ class KeaDHCPApi(base.BaseDHCP):
             if not self.update_port_dhcp_opts(port.uuid, options):
                 success = False
                 LOG.error("Failed to update DHCP options for port %s", port.uuid)
+        self.save_config()
         return success
 
     def clean_dhcp_opts(self, task):
@@ -179,6 +184,7 @@ class KeaDHCPApi(base.BaseDHCP):
             if not self._update_host_reservation(port.address, remove=True):
                 success = False
                 LOG.error("Failed to clean DHCP options for port %s", port.uuid)
+        self.save_config()
         return success
 
     def get_ip_addresses(self, task):
