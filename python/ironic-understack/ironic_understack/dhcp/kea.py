@@ -119,7 +119,7 @@ class KeaDHCPApi(base.BaseDHCP):
                     if not remove:
                         reservation["client-classes"] = ["BOOTSRV_A"]
                     else:
-                        print(f"REMOVING RESERVATION: {reservation}")
+                        LOG.debug("Removing reservation: %s", reservation)
                         reservations.remove(reservation)
                     found = True
                     break
@@ -133,7 +133,7 @@ class KeaDHCPApi(base.BaseDHCP):
                     )
                     dhcp4_config["reservations"] = reservations
                 else:
-                    print(f"NO RESERVATION FOUND IN {reservations}")
+                    LOG.debug("No reservation found in %s", reservations)
                     return True
 
             config["arguments"]["Dhcp4"] = dhcp4_config
@@ -166,7 +166,7 @@ class KeaDHCPApi(base.BaseDHCP):
 
     def clean_dhcp_opts(self, task):
         """Remove DHCP options for all ports associated with a node."""
-        print("STARTING DHCP CLEANING")
+        LOG.debug("Starting DHCP cleaning")
         success = True
         for port in task.ports:
             if not self._update_host_reservation(port.address, remove=True):
