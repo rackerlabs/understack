@@ -34,6 +34,16 @@ def setup_conf():
             "configuration, reservations, leases and subnet "
             "operations through Kea's HTTP API interface.",
         ),
+        cfg.StrOpt(
+            "kea_log_requests",
+            default="false",
+            help="Enable logging of Kea API requests and responses.",
+        ),
+        cfg.StrOpt(
+            "kea_log_requests_body",
+            default="false",
+            help="Enable logging of the body of Kea API requests and responses.",
+        ),
         cfg.IntOpt(
             "kea_request_timeout",
             default=10,
@@ -42,7 +52,7 @@ def setup_conf():
         cfg.IntOpt(
             "kea_max_retries",
             default=3,
-            help="Maximum number of retry attempts for failed " "requests.",
+            help="Maximum number of retry attempts for failed requests.",
         ),
     ]
     cfg.CONF.register_group(grp)
