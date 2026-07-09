@@ -49,22 +49,22 @@ conf:
   ironic:
     DEFAULT:
       # hardware types we have enabled in ironic
-      enabled_hardware_types: redfish,idrac,ilo5,ilo,netdev,manual-management
+      enabled_hardware_types: redfish,idrac,netdev,manual-management
       # enabled interfaces for the above hardware types, each hardware type must
       # have at least one enabled interface that it reports it supports
-      enabled_bios_interfaces: no-bios,redfish,idrac-redfish,ilo
+      enabled_bios_interfaces: no-bios,redfish,idrac-redfish
       # remove fake once there is a noop that the ManualManagement uses, which netdev is derived from
-      enabled_boot_interfaces: http-ipxe,ipxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,ilo-virtual-media,ilo-uefi-https,ilo-ipxe,fake
+      enabled_boot_interfaces: http-ipxe,ipxe,redfish-virtual-media,redfish-https,idrac-redfish-virtual-media,fake
       enabled_console_interfaces: redfish-graphical,no-console
       enabled_deploy_interfaces: direct,ramdisk,noop
       enabled_firmware_interfaces: redfish,no-firmware
-      enabled_inspect_interfaces: redfish,agent,idrac-redfish,ilo,no-inspect
-      enabled_management_interfaces: ipmitool,redfish,idrac-redfish,ilo,ilo5,noop
+      enabled_inspect_interfaces: redfish,agent,idrac-redfish,no-inspect
+      enabled_management_interfaces: ipmitool,redfish,idrac-redfish,noop
       enabled_network_interfaces: noop,neutron
       # remove fake once there is a noop that the ManualManagement uses, which netdev is derived from
-      enabled_power_interfaces: redfish,ipmitool,idrac-redfish,ilo,fake
-      enabled_raid_interfaces: redfish,idrac-redfish,ilo5,agent,no-raid
-      enabled_vendor_interfaces: redfish,ipmitool,idrac-redfish,ilo,no-vendor
+      enabled_power_interfaces: redfish,ipmitool,idrac-redfish,fake
+      enabled_raid_interfaces: redfish,idrac-redfish,agent,no-raid
+      enabled_vendor_interfaces: redfish,ipmitool,idrac-redfish,no-vendor
       # the service account belongs to the service project but our nodes
       # will live in the infra domain in the baremetal project so the
       # service account needs to have permissions outside of just the
