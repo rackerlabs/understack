@@ -59,12 +59,12 @@ conf:
       enabled_deploy_interfaces: direct,ramdisk,noop
       enabled_firmware_interfaces: redfish,no-firmware
       enabled_inspect_interfaces: redfish,idrac-redfish,agent,no-inspect
-      enabled_management_interfaces: redfish,idrac-redfish,ipmitool,noop
+      enabled_management_interfaces: redfish,idrac-redfish,noop
       enabled_network_interfaces: neutron,noop
       # remove fake once there is a noop that the ManualManagement uses, which netdev is derived from
-      enabled_power_interfaces: redfish,idrac-redfish,ipmitool,fake
+      enabled_power_interfaces: redfish,idrac-redfish,fake
       enabled_raid_interfaces: redfish,idrac-redfish,agent,no-raid
-      enabled_vendor_interfaces: redfish,idrac-redfish,ipmitool,no-vendor
+      enabled_vendor_interfaces: redfish,idrac-redfish,no-vendor
       # the service account belongs to the service project but our nodes
       # will live in the infra domain in the baremetal project so the
       # service account needs to have permissions outside of just the
