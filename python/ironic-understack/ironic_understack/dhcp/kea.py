@@ -47,6 +47,10 @@ class KeaDHCPApi(base.BaseDHCP):
             results = []
             try:
                 for url in self._lookup_api_urls():
+                    LOG.debug(
+                        "Sending %(command)s request to Kea API %(url)s",
+                        {"command": command, "url": url},
+                    )
                     response = requests.post(
                         url,
                         json=payload,
