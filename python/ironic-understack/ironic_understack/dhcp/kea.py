@@ -43,6 +43,7 @@ class KeaDHCPApi(base.BaseDHCP):
             "arguments": arguments,
         }
 
+        last_exception = None
         for attempt in range(self.max_retries):
             results = []
             try:
@@ -58,7 +59,9 @@ class KeaDHCPApi(base.BaseDHCP):
                     )
                     response.raise_for_status()
                     results.append(response)
-            except requests.exceptions.Timeout:
+                return results[0].json()
+            except requests.exceptions.Timeout as e:
+                last_exception = e
                 LOG.warning(
                     "Timeout on attempt %d/%d for command %s",
                     attempt + 1,
@@ -66,18 +69,23 @@ class KeaDHCPApi(base.BaseDHCP):
                     command,
                 )
             except requests.exceptions.RequestException as e:
-                if attempt == self.max_retries - 1:
-                    LOG.error("Failed to execute command %s: %s", command, e)
-                    raise DHCPConfigurationError(
-                        f"Failed to execute {command}: {e}"
-                    ) from e
+                last_exception = e
                 LOG.warning(
                     "Request failed on attempt %d/%d: %s",
                     attempt + 1,
                     self.max_retries,
                     e,
                 )
-            return results[0].json()
+
+        LOG.error(
+            "Failed to execute command %s after %d attempts: %s",
+            command,
+            self.max_retries,
+            last_exception,
+        )
+        raise DHCPConfigurationError(
+            f"Failed to execute {command}: {last_exception}"
+        ) from last_exception
 
     def get_config(self):
         """Retrieve current Kea configuration."""
