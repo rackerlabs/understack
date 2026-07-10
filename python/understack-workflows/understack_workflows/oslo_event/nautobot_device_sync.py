@@ -146,7 +146,8 @@ def _populate_from_node(device_info: DeviceInfo, node) -> None:
 
     # External CMDB ID from node extra field
     extra = node.extra or {}
-    device_info.external_cmdb_id = extra.get("external_cmdb_id") or None
+    external_cmdb_id = extra.get("external_cmdb_id")
+    device_info.external_cmdb_id = str(external_cmdb_id) if external_cmdb_id else None
 
 
 def _populate_from_inventory(device_info: DeviceInfo, inventory: dict | None) -> None:
