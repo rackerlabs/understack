@@ -7,38 +7,40 @@ metadata:
   # they move between AppProject's
 spec:
   sourceRepos:
-  - '*'
+    - "*"
   destinations:
-  - namespace: 'argo'
-    server: '*'
-  - namespace: 'argocd'
-    server: '*'
-  - namespace: 'argo-events'
-    server: '*'
-  - namespace: 'understack-cdn'
-    server: '*'
-  - namespace: 'cert-manager'
-    server: '*'
-  - namespace: 'dex'
-    server: '*'
-  - namespace: 'nautobot'
-    server: '*'
-  - namespace: 'nautobotop'
-    server: '*'
-  - namespace: 'undersync'
-    server: '*'
-  - namespace: 'openstack'
-    server: '*'
-  - namespace: 'monitoring'
-    server: '*'
-  - namespace: 'otel-collector'
-    server: '*'
-  - namespace: 'kube-system'
-    server: '*'
-  - namespace: 'envoy-gateway'
-    server: '*'
-  - namespace: 'rook-ceph'
-    server: '*'
+    - namespace: "argo"
+      server: "*"
+    - namespace: "argocd"
+      server: "*"
+    - namespace: "argo-events"
+      server: "*"
+    - namespace: "understack-cdn"
+      server: "*"
+    - namespace: "cert-manager"
+      server: "*"
+    - namespace: "dex"
+      server: "*"
+    - namespace: "kea"
+      server: "*"
+    - namespace: "nautobot"
+      server: "*"
+    - namespace: "nautobotop"
+      server: "*"
+    - namespace: "undersync"
+      server: "*"
+    - namespace: "openstack"
+      server: "*"
+    - namespace: "monitoring"
+      server: "*"
+    - namespace: "otel-collector"
+      server: "*"
+    - namespace: "kube-system"
+      server: "*"
+    - namespace: "envoy-gateway"
+      server: "*"
+    - namespace: "rook-ceph"
+      server: "*"
   clusterResourceWhitelist:
-  - group: '*'
-    kind: '*'
+    - group: "*"
+      kind: "*"

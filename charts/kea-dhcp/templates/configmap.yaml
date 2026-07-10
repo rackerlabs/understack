@@ -1,0 +1,291 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ include "kea-dhcp.fullname" . }}
+data:
+  kea-dhcp4.conf: |
+    {
+    {{- if .Values.kea.dhcp4.enabled }}
+        "Dhcp4": {
+            "lease-database": {
+                "type": "memfile",
+                "persist": true,
+                "name": "/data/dhcp4.leases"
+            },
+            "interfaces-config": {
+                "interfaces": [ "INTERFACE" ],
+                "service-sockets-require-all": true,
+                "dhcp-socket-type": "{{ .Values.kea.dhcp4.dhcpSocketType }}"
+            },
+            "valid-lifetime": {{ .Values.kea.dhcp4.validlifetime }},
+            "renew-timer": {{ .Values.kea.dhcp4.renewtimer }},
+            "rebind-timer": {{ .Values.kea.dhcp4.rebindtimer }},
+            "reservations-global": true,
+            "reservations-in-subnet": false,
+            "early-global-reservations-lookup": true,
+            "control-socket": {
+                "socket-type": "unix",
+                "socket-name": "/run/kea/kea-dhcp4-ctrl.sock"
+            },
+            {{- if .Values.kea.ddns.enabled }}
+            "dhcp-ddns" : {
+                  "enable-updates" : true,
+                  "server-ip" : "127.0.0.1",
+                  "server-port" : 53001,
+                  "max-queue-size" : 2048,
+                  "ncr-protocol" : "UDP",
+                  "ncr-format" : "JSON"
+             },
+            "ddns-send-updates" : true,
+            "ddns-override-no-update" : true,
+            "ddns-override-client-update" : true,
+            "ddns-replace-client-name" : "when-not-present",
+            "ddns-generated-prefix": {{ .Values.kea.ddns.prefix | quote }},
+            "ddns-qualifying-suffix" : {{ .Values.kea.ddns.suffix | quote  }},
+            "ddns-update-on-renew" : false,
+            "ddns-use-conflict-resolution" : true,
+            "hostname-char-set": "[^A-Za-z0-9.-]",
+            "hostname-char-replacement": "",
+            {{- end }}
+            {{- if .Values.kea.dhcp4.options }}
+            "option-data": {{ .Values.kea.dhcp4.options | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp4.optionDef }}
+            "option-def": {{ .Values.kea.dhcp4.optionDef | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp4.reservations }}
+            "reservations": {{ .Values.kea.dhcp4.reservations | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp4.subnets }}
+            "subnet4": {{ .Values.kea.dhcp4.subnets | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp4.sharedNetworks }}
+            "shared-networks": {{ .Values.kea.dhcp4.sharedNetworks | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp4.clientClasses }}
+            "client-classes": {{ .Values.kea.dhcp4.clientClasses | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp4.hooksLibraries }}
+            "hooks-libraries": {{ .Values.kea.dhcp4.hooksLibraries | toJson }},
+            {{- end }}
+            {{ if gt .Values.replicaCount 1.0 }}
+            <?include "/config/kea/ha.json"?>
+            {{- end }}
+            {{- if .Values.kea.dhcp4.loggers  }}
+            "loggers": {{ .Values.kea.dhcp4.loggers | toJson  }}
+            {{- else}}
+            "loggers": [{
+                "name": "kea-dhcp4",
+                "output_options": [
+                  {
+                    "output": "stdout"
+                  }
+                ],
+                {{- if eq .Values.kea.dhcp4.loglevel "DEBUG" }}
+                "debuglevel": {{ .Values.kea.dhcp4.debugLevel }},
+                {{- end }}
+                "severity": "{{ .Values.kea.dhcp4.loglevel }}"
+            }]
+          {{- end }}
+        }
+    {{- end }}
+    }
+  kea-dhcp6.conf: |
+    {
+    {{- if .Values.kea.dhcp6.enabled }}
+        "Dhcp6": {
+            "lease-database": {
+                "type": "memfile",
+                "persist": true,
+                "name": "/data/dhcp6.leases"
+            },
+            "interfaces-config": {
+                "interfaces": [ "INTERFACE" ],
+                "service-sockets-require-all": true,
+                "dhcp-socket-type": "{{ .Values.kea.dhcp6.dhcpSocketType }}"
+            },
+            "valid-lifetime": {{ .Values.kea.dhcp6.validlifetime }},
+            "renew-timer": {{ .Values.kea.dhcp6.renewtimer }},
+            "rebind-timer": {{ .Values.kea.dhcp6.rebindtimer }},
+            "reservations-global": true,
+            "reservations-in-subnet": false,
+            "control-socket": {
+                "socket-type": "unix",
+                "socket-name": "/run/kea/kea-dhcp6-ctrl.sock"
+            },
+            {{- if .Values.kea.ddns.enabled }}
+            "dhcp-ddns" : {
+                  "enable-updates" : true,
+                  "server-ip" : "::1",
+                  "server-port" : 53001,
+                  "max-queue-size" : 2048,
+                  "ncr-protocol" : "UDP",
+                  "ncr-format" : "JSON"
+             },
+            "ddns-send-updates" : true,
+            "ddns-override-no-update" : true,
+            "ddns-override-client-update" : true,
+            "ddns-replace-client-name" : "when-not-present",
+            "ddns-generated-prefix": {{ .Values.kea.ddns.prefix | quote }},
+            "ddns-qualifying-suffix" : {{ .Values.kea.ddns.suffix | quote }},
+            "ddns-update-on-renew" : false,
+            "ddns-use-conflict-resolution" : true,
+            "hostname-char-set": "[^A-Za-z0-9.-]",
+            "hostname-char-replacement": "",
+            {{- end }}
+            {{- if .Values.kea.dhcp6.options }}
+            "option-data": {{ .Values.kea.dhcp6.options | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp6.reservations }}
+            "reservations": {{ .Values.kea.dhcp6.reservations | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp6.subnets }}
+            "subnet6": {{ .Values.kea.dhcp6.subnets | toJson }},
+            {{- end }}
+            {{- if .Values.kea.dhcp6.clientClasses }}
+            "client-classes": {{ .Values.kea.dhcp6.clientClasses | toJson }},
+            {{- end }}
+            {{ if gt .Values.replicaCount 1.0 }}
+            <?include "ha.json"?>
+            {{- end }}
+            "loggers": [{
+                "name": "kea-dhcp6",
+                "output_options": [
+                  {
+                    "output": "stdout"
+                  }
+                ],
+                {{- if eq .Values.kea.dhcp6.loglevel "DEBUG" }}
+                "debuglevel": {{ .Values.kea.dhcp6.debugLevel }},
+                {{- end }}
+                "severity": "{{ .Values.kea.dhcp6.loglevel }}"
+            }]
+        }
+    {{- end }}
+    }
+  kea-dhcp-ddns.conf: |
+    {
+    {{- if .Values.kea.ddns.enabled }}
+      "DhcpDdns": {
+        "forward-ddns": {{ .Values.kea.ddns.forward | toJson }},
+        "reverse-ddns": {{ .Values.kea.ddns.reverse | toJson }},
+        "control-socket": {
+            "socket-type": "unix",
+            "socket-name": "/run/kea/kea-dhcp-ddns-ctrl.sock"
+        },
+        "loggers": [
+          {
+            "name": "kea-dhcp-ddns",
+            "output_options": [
+              {
+                "output": "stdout"
+              }
+            ],
+            "severity": "{{ .Values.kea.ddns.loglevel }}"
+          }
+        ]
+      }
+    {{- end }}
+    }
+  kea-ctrl-agent.conf: |
+    {
+    {{- if .Values.kea.ctrlagent.enabled }}
+      "Control-agent": {
+        "http-host": "0.0.0.0",
+        "http-port": 8000,
+        "control-sockets": {
+          "dhcp4": {
+            "socket-type": "unix",
+            "socket-name": "/run/kea/kea-dhcp4-ctrl.sock"
+          },
+          "dhcp6": {
+            "socket-type": "unix",
+            "socket-name": "/run/kea/kea-dhcp6-ctrl.sock"
+          },
+          "d2": {
+            "socket-type": "unix",
+            "socket-name": "/run/kea/kea-dhcp-ddns-ctrl.sock"
+          }
+        },
+        "loggers": [
+          {
+            "name": "kea-ctrl-agent",
+            "output_options": [
+              {
+                "output": "stdout"
+              }
+            ],
+            "severity": "{{ .Values.kea.ctrlagent.loglevel }}"
+          }
+        ]
+      }
+    {{- end}}
+    }
+  keactrl.conf: |
+    #!/bin/sh
+
+    # This is a configuration file for keactrl script which controls
+    # the startup, shutdown, reconfiguration and gathering the status
+    # of the Kea's processes.
+
+    # Note that control agent must be launched after servers and netconf last.
+
+    # shellcheck disable=SC2034
+    # SC2034: ... appears unused. Verify use (or export if used externally).
+
+    # prefix holds the location where the Kea is installed.
+    prefix="/usr/local"
+
+    # Location of Kea configuration files.
+    kea_dhcp4_config_file="/config/kea/kea-dhcp4.conf"
+    kea_dhcp6_config_file="/config/kea/kea-dhcp6.conf"
+    kea_dhcp_ddns_config_file="/config/kea/kea-dhcp-ddns.conf"
+    kea_ctrl_agent_config_file="/config/kea/kea-ctrl-agent.conf"
+    kea_netconf_config_file="/config/kea/kea-netconf.conf"
+
+    # Location of Kea binaries.
+    exec_prefix="${prefix}"
+    dhcp4_srv="${exec_prefix}/sbin/kea-dhcp4"
+    dhcp6_srv="${exec_prefix}/sbin/kea-dhcp6"
+    dhcp_ddns_srv="${exec_prefix}/sbin/kea-dhcp-ddns"
+    ctrl_agent_srv="${exec_prefix}/sbin/kea-ctrl-agent"
+    netconf_srv="${exec_prefix}/sbin/kea-netconf"
+
+    # Start DHCPv4 server?
+    dhcp4={{- if .Values.kea.dhcp4.enabled }}yes{{- else }}no{{- end }}
+
+    # Start DHCPv6 server?
+    dhcp6={{- if .Values.kea.dhcp6.enabled }}yes{{- else }}no{{- end }}
+
+    # Start DHCP DDNS server?
+    dhcp_ddns={{- if .Values.kea.ddns.enabled }}yes{{- else }}no{{- end }}
+
+    # Start Control Agent?
+    ctrl_agent={{- if .Values.kea.ctrlagent.enabled }}yes{{- else }}no{{- end }}
+
+    # Start Netconf?
+    netconf=no
+
+    # Be verbose?
+    kea_verbose=no
+  {{ if gt .Values.replicaCount 1.0 }}
+  ha-init.json: |
+
+    "hooks-libraries": [{
+        "library": "/usr/local/lib/kea/hooks/libdhcp_lease_cmds.so",
+        "parameters": { }
+    }, {
+        "library": "/usr/local/lib/kea/hooks/libdhcp_ha.so",
+        "parameters": {
+            "high-availability": [{
+                "this-server-name": "HOSTNAME",
+                "mode": "load-balancing",
+                "heartbeat-delay": 10000,
+                "max-response-delay": 10000,
+                "max-ack-delay": 5000,
+                "max-unacked-clients": 5,
+                <?include "peers.json"?>
+            }]
+        }
+    }],
+  {{- end }}

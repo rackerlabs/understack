@@ -1,0 +1,201 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "kea-dhcp.fullname" . }}
+  labels:
+    {{- include "kea-dhcp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  serviceName: {{ template "kea-dhcp.fullname" . }}-headless
+  selector:
+    matchLabels:
+      {{- include "kea-dhcp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "kea-dhcp.selectorLabels" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum | trunc 63}}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "kea-dhcp.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+      - name: init-kea
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        command:
+        - sh
+        - "-c"
+        - |
+          set -ex
+          cp /mnt/config-map/* /mnt/kea/
+          {{- if .Values.kea.interface }}
+          interface={{ .Values.kea.interface }}
+          {{- else }}
+          echo "Finding interface..."
+          interface=$(route | grep '^default' | grep -o '[^ ]*$')
+          {{- end }}
+          echo "Selected interface $interface"
+          sed -i "s/INTERFACE/${interface}/g" /mnt/kea/kea-dhcp4.conf
+          sed -i "s/INTERFACE/${interface}/g" /mnt/kea/kea-dhcp6.conf
+          sed -i "s/HOSTNAME/${HOSTNAME}/g" /mnt/kea/ha-init.json || true
+          touch /mnt/kea/ha.json
+        volumeMounts:
+        - name: kea-config
+          mountPath: /mnt/kea
+        - name: kea-configmap
+          mountPath: /mnt/config-map
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: dhcp
+              containerPort: 67
+              protocol: UDP
+            - name: control-agent
+              containerPort: 8000
+              protocol: TCP
+              {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: 9547
+              protocol: TCP
+              {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.readinessProbe.enabled }}
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/usr/bin/env", "keactrl", "stop", "-c", "/config/kea/keactrl.conf"]
+          readinessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - >
+              {{- if .Values.kea.dhcp4.enabled }}
+                if keactrl status | grep -q 'DHCPv4 server: active'; then
+                  exit 0;
+                else
+                  exit 1;
+                fi
+              {{- end }}
+              {{- if .Values.kea.dhcp6.enabled }}
+                if keactrl status | grep -q 'DHCPv6 server: active'; then
+                  exit 0;
+                else
+                  exit 1;
+                fi
+              {{- end }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          {{- end }}
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            exec:
+              command:
+              - /bin/sh
+              - -c
+              - >
+              {{- if .Values.kea.dhcp4.enabled }}
+                if keactrl status | grep -q 'DHCPv4 server: active'; then
+                  exit 0;
+                else
+                  exit 1;
+                fi
+              {{- end }}
+              {{- if .Values.kea.dhcp6.enabled }}
+                if keactrl status | grep -q 'DHCPv6 server: active'; then
+                  exit 0;
+                else
+                  exit 1;
+                fi
+              {{- end }}
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          {{- end }}
+          volumeMounts:
+          - name: data
+            mountPath: /data
+          - name: kea-run
+            mountPath: /run/kea
+          # Prevent error Unable to use interprocess sync lockfile (No such file or directory): /data/run/kea/logger_lockfile
+          - name: kea-run
+            mountPath: /data/run/kea
+          - name: kea-config
+            mountPath: /config/kea
+        {{ if gt .Values.replicaCount 1.0 }}
+        - name: {{ .Chart.Name }}-sidecar
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag | default "latest" }}"
+          imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.sidecar.resources | nindent 12 }}
+          env:
+            - name: STATEFULSET_LABEL
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['app.kubernetes.io/instance']
+          volumeMounts:
+          - name: kea-config
+            mountPath: /config/kea
+        {{- end }}
+      volumes:
+      - name: kea-config
+        emptyDir: {}
+      - name: kea-run
+        emptyDir: {}
+      - name: kea-configmap
+        configMap:
+          name: "{{ include "kea-dhcp.fullname" . }}"
+{{- if .Values.persistence }}
+{{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      annotations:
+      {{- range $key, $value := .Values.persistence.annotations }}
+        {{ $key }}: {{ $value }}
+      {{- end }}
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size | quote }}
+      {{- if .Values.persistence.storageClass }}
+      {{- if (eq "-" .Values.persistence.storageClass) }}
+      storageClassName: ""
+      {{- else }}
+      storageClassName: "{{ .Values.persistence.storageClass }}"
+      {{- end }}
+      {{- end }}
+{{- else }}
+      - name: data
+        emptyDir: {}
+{{- end }}
+{{- end }}

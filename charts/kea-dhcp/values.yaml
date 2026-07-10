@@ -1,0 +1,228 @@
+# Default values for kea-dhcp.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# More replicas is not available for now due Kea implementation of peers url should be ipv4 or ipv6 addresses instead of dnsname
+replicaCount: 1
+
+image:
+  repository: ghcr.io/mglants/kea-dhcp
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+sidecar:
+  image:
+    repository: ghcr.io/mglants/kea-dhcp-sidecar
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is latest
+    tag: v0.0.2
+  resources:
+    limits:
+      cpu: 50m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+clusterDomain: "cluster.local"
+kea:
+  # interface: eth1 - specify interface if needed for multus
+  dhcp4:
+    enabled: true
+    dhcpSocketType: raw
+    validlifetime: "4000"
+    renewtimer: "1000"
+    rebindtimer: "2000"
+    loglevel: "DEBUG"
+    debugLevel: 0
+    options: []
+    # - name: domain-name-servers
+    #   data: 192.168.1.2
+    # - name: domain-name
+    #   data: local
+    # - name: domain-search
+    #   data: local
+    # - code: 66
+    #   data: 192.168.1.2
+    #   name: tftp-server-name
+    optionDef: []
+    #  - name: "boot-file-base"
+    #    code: "234"
+    #    type: "string"
+    #    space: "dhcp4"
+    hooksLibraries: []
+    # - library: /usr/lib/x86_64-linux-gnu/kea/hooks/libdhcp_flex_option.so
+    #   parameters:
+    #     options:
+    #       - code: 67
+    #         space: dhcp4
+    #         csv-format: true
+    #         supersede: myvalue
+    reservations: []
+    # - ip-address: "192.168.1.2"
+    #   hw-address: "aa:aa:aa:aa:aa:aa"
+    #   hostname: "hostname"
+    #   option-data:
+    #     - name: "tftp-servers"
+    #       data: "10.1.1.202,10.1.1.203"
+    subnets: []
+    # - subnet: "192.168.1.0/24"
+    #   pools:
+    #     - pool: "192.168.1.10-192.168.1.254"
+    #   option-data:
+    #     - name: "routers"
+    #       data: "172.16.10.1"
+  dhcp6:
+    enabled: false
+    dhcpSocketType: raw
+    validlifetime: "4000"
+    renewtimer: "1000"
+    rebindtimer: "2000"
+    loglevel: "DEBUG"
+    debugLevel: 0
+    options: []
+    reservations: []
+    # - ip-address: "2001:db8:1::100"
+    #   duid: "aa:aa:aa:aa:aa:aa"
+    #   hostname: "hostname"
+    #   option-data:
+    #     - name: "dns-servers"
+    #       data: "2001:db8:2::45, 2001:db8:2::100"
+    subnets: []
+    # - subnet: "2001:db8:1::/48"
+    #   pools:
+    #     - pool: "2001:db8:1::/80"
+  ddns:
+    enabled: false
+    loglevel: "DEBUG"
+    prefix: "myhost"
+    suffix: "home.arpa."
+    forward: {}
+    # ddns-domains:
+    # - name: home.arpa.
+    #   key-name: ''
+    #   dns-servers:
+    #   - ip-address: 172.16.32.2
+    #     port: 53
+    reverse: {}
+    # ddns-domains:
+    # - name: 168.192.in-addr.arpa.
+    #   key-name: ''
+    #   dns-servers:
+    #   - ip-address: 172.16.32.2
+    #     port: 53
+  ctrlagent:
+    # Needed for HA, monitoring and stork
+    enabled: false
+    loglevel: "DEBUG"
+metrics:
+  enabled: false
+  service:
+    type: ClusterIP
+    ## Use serviceLoadBalancerIP to request a specific static IP,
+    ## otherwise leave blank
+    # loadBalancerIP:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9547"
+    labels: {}
+serviceAccount:
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+role:
+  # Annotations to add to the Role
+  annotations: {}
+
+roleBinding:
+  # Annotations to add to the RoleBinding
+  annotations: {}
+
+podAnnotations: {}
+
+podSecurityContext: {}
+# fsGroup: 2000
+
+securityContext: {}
+# capabilities:
+#   drop:
+#   - ALL
+# readOnlyRootFilesystem: true
+# runAsNonRoot: true
+# runAsUser: 1000
+
+service:
+  dhcp:
+    type: ClusterIP
+    port: 67
+    ## Specify the nodePort value for the LoadBalancer and NodePort service types.
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+    ##
+    # nodePort:
+    ## Provide any additional annotations which may be required. This can be used to
+    ## set the LoadBalancer service type to internal only.
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+    ##
+    annotations: {}
+    ## Use loadBalancerIP to request a specific static IP,
+    ## otherwise leave blank
+    ##
+    loadBalancerIP:
+    # loadBalancerSourceRanges: []
+    ## Set the externalTrafficPolicy in the Service to either Cluster or Local
+    # externalTrafficPolicy: Cluster
+
+  ctrl:
+    type: ClusterIP
+    port: 8000
+    ## Specify the nodePort value for the LoadBalancer and NodePort service types.
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+    ##
+    # nodePort:
+    ## Provide any additional annotations which may be required. This can be used to
+    ## set the LoadBalancer service type to internal only.
+    ## ref: https://kubernetes.io/docs/concepts/services-networking/service/#internal-load-balancer
+    ##
+    annotations: {}
+    ## Use loadBalancerIP to request a specific static IP,
+    ## otherwise leave blank
+    ##
+    loadBalancerIP:
+    # loadBalancerSourceRanges: []
+    ## Set the externalTrafficPolicy in the Service to either Cluster or Local
+    # externalTrafficPolicy: Cluster
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+readinessProbe:
+  enabled: true
+livenessProbe:
+  enabled: true
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+# affinity:
+#   podAntiAffinity:
+#     requiredDuringSchedulingIgnoredDuringExecution:
+#       - labelSelector:
+#           matchExpressions:
+#             - key: app.kubernetes.io/name
+#               operator: In
+#               values:
+#                 - kea-dhcp
+#         topologyKey: kubernetes.io/hostname
+
+persistence:
+  enabled: false
+  size: 100Mi

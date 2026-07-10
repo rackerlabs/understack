@@ -1,0 +1,13 @@
+# Default values for kea-dhcp. Using upstream chart defaults for now.
+#
+# The chart's own DHCP Service is left at chart defaults (ClusterIP). External
+# reachability is provided per-site via a hand-written LoadBalancer Service in
+# each site's deploy-repo kea/ overlay, working around a chart bug where
+# setting service.dhcp.annotations renders invalid YAML (missing newline in
+# templates/service.yaml, still present on chart main as of 0.7.1).
+
+kea:
+  ctrlagent:
+    #Needed for HA, monitoring and stork
+    enabled: true
+    loglevel: "DEBUG"

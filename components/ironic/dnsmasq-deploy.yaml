@@ -10,20 +10,16 @@ spec:
   - name: dns
     port: 53
     protocol: UDP
-  - name: dhcp
-    port: 67
-    protocol: UDP
   clusterIP: None
   selector:
     application: ironic-dnsmasq
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: ironic-dnsmasq
   namespace: openstack
 spec:
-  serviceName: ironic-dnsmasq
   replicas: 1
   selector:
     matchLabels:
@@ -33,18 +29,15 @@ spec:
       labels:
         application: ironic-dnsmasq
     spec:
-      nodeSelector:
-        dhcp_role: server
       hostNetwork: true
       containers:
         - name: dnsmasq
-          image: ghcr.io/rackerlabs/understack/dnsmasq:latest
+          image: ghcr.io/rackerlabs/understack/dnsmasq:pr-2111
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
-              # needed for privileged ports and to send ICMP packets
-              add: ["NET_ADMIN", "NET_RAW"]
+              add: ["NET_BIND_SERVICE"]
           args:
             - /usr/sbin/dnsmasq
             - '--no-daemon'
@@ -56,25 +49,13 @@ spec:
             - name: dns
               containerPort: 53
               protocol: UDP
-            - name: dhcp
-              containerPort: 67
-              protocol: UDP
-            - name: tftp
-              containerPort: 69
-              protocol: UDP
           volumeMounts:
             - name: pod-tmp
               mountPath: /tmp
             - name: pod-dnsmasq-d
               mountPath: /etc/dnsmasq.d
-            - name: pod-dhcp
-              mountPath: /var/lib/misc
       volumes:
         - name: pod-tmp
           emptyDir: {}
         - name: pod-dnsmasq-d
-          persistentVolumeClaim:
-            claimName: dnsmasq-ironic
-        - name: pod-dhcp
-          persistentVolumeClaim:
-            claimName: dnsmasq-dhcp
+          emptyDir: {}
