@@ -792,7 +792,7 @@ test = [
 requires-dist = [
     { name = "keystoneauth1", specifier = ">=3.14.0" },
     { name = "neutron", specifier = ">=27,<29" },
-    { name = "neutron-lib", specifier = ">=3,<4" },
+    { name = "neutron-lib", specifier = ">=3,<5" },
     { name = "openstacksdk", specifier = ">=4.9.0" },
     { name = "oslo-config", specifier = ">=9.7.1" },
     { name = "oslo-log", specifier = ">=7.1.0" },
