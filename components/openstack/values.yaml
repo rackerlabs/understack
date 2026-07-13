@@ -83,6 +83,10 @@ keystoneServiceUsers:
   externalLinkAnnotationTemplate: ""
   # -- OpenStack service catalog interface to use
   keystoneInterface: "internal"
+  # -- Identity provider name (as created in Keystone)
+  keystoneIdentityProvider: "k8s-site-a"
+  # -- Path to Kubernetes service account token file
+  accessTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
   # -- OpenStack services with a definition of each of their service accounts
   services:
     keystone:
