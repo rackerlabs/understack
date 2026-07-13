@@ -146,7 +146,7 @@ global:
     enabled: false
     # -- config file to use for Nautobot scoped to either $understack or $deploy repo
     # @default -- $understack/components/nautobot/nautobot_config.py
-    nautobot_config: '$understack/components/nautobot/nautobot_config.py'
+    nautobot_config: "$understack/components/nautobot/nautobot_config.py"
 
   # -- Nautobot API token generation jobs
   nautobot_api_tokens:
@@ -234,7 +234,6 @@ global:
     # -- Enable/disable deploying sealed secrets
     # @default -- false
     enabled: false
-
 
 # -- This block is for setting up the UnderStack site specific ArgoCD Applications
 site:
@@ -347,7 +346,7 @@ site:
     wave: 1
     # -- Chart version for Keystone
     # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.5+a2a343968
+    chartVersion: 2026.1.10+a659ab8a2
 
   # -- Glance (Image Service)
   glance:
@@ -359,7 +358,7 @@ site:
     wave: 2
     # -- Chart version for Glance
     # renovate: datasource=helm depName=glance registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.5+bad57716b
+    chartVersion: 2026.1.11+a659ab8a2
 
   # -- Cinder (Block Storage Service)
   cinder:
@@ -371,8 +370,7 @@ site:
     wave: 2
     # -- Chart version for Cinder
     # renovate: datasource=helm depName=cinder registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.5+872fd69e7
-
+    chartVersion: 2026.1.16+d6497c16f
   # -- Ironic (Bare Metal Service)
   ironic:
     # -- Enable/disable deploying Ironic
@@ -383,8 +381,7 @@ site:
     wave: 2
     # -- Chart version for Ironic
     # renovate: datasource=helm depName=ironic registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.7+872fd69e7
-
+    chartVersion: 2026.1.10+a659ab8a2
   # -- Neutron (Networking Service)
   neutron:
     # -- Enable/disable deploying Neutron
@@ -395,7 +392,7 @@ site:
     wave: 2
     # -- Chart version for Neutron
     # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.8+872fd69e7
+    chartVersion: 2026.1.15+a659ab8a2
 
   # -- Placement (Placement Service)
   placement:
@@ -407,7 +404,7 @@ site:
     wave: 2
     # -- Chart version for Placement
     # renovate: datasource=helm depName=placement registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.4+a2a343968
+    chartVersion: 2026.1.7+a659ab8a2
 
   # -- Nova (Compute Service)
   nova:
@@ -419,7 +416,7 @@ site:
     wave: 3
     # -- Chart version for Nova
     # renovate: datasource=helm depName=nova registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.8+a2a343968
+    chartVersion: 2026.1.13+a659ab8a2
 
   # -- Octavia (Load Balancer Service)
   octavia:
@@ -431,7 +428,7 @@ site:
     wave: 3
     # -- Chart version for Octavia
     # renovate: datasource=helm depName=octavia registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.4+872fd69e7
+    chartVersion: 2026.1.7+a659ab8a2
 
   # -- Horizon (Dashboard)
   horizon:
@@ -443,7 +440,7 @@ site:
     wave: 4
     # -- Chart version for Horizon
     # renovate: datasource=helm depName=horizon registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.2+872fd69e7
+    chartVersion: 2026.1.8+a659ab8a2
 
   # -- Skyline (Dashboard)
   skyline:
@@ -455,7 +452,7 @@ site:
     wave: 4
     # -- Chart version for Skyline
     # renovate: datasource=helm depName=skyline registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.2+872fd69e7
+    chartVersion: 2026.1.3+a659ab8a2
 
   # -- Open vSwitch (Networking)
   openvswitch:
@@ -587,7 +584,7 @@ site:
     enabled: false
     # -- config file to use for Nautobot scoped to either $understack or $deploy repo
     # @default -- $understack/components/nautobot/nautobot_config.py
-    nautobot_config: '$understack/components/nautobot/nautobot_config.py'
+    nautobot_config: "$understack/components/nautobot/nautobot_config.py"
 
   # -- Ironic hardware exporter for bare-metal hardware metrics via RabbitMQ
   ironic_hardware_exporter:
