@@ -1,0 +1,54 @@
+---
+# Copyright (c) 2026 Rackspace Technology, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License. You may obtain
+# a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations
+# under the License.
+
+- name: Create k8s mapping
+  openstack.cloud.federation_mapping:
+    name: k8s-mapping
+    rules:
+      - local:
+          - user:
+              name: '{0}'
+            group:
+              domain:
+                name: service
+              name: k8s-serviceaccounts
+        remote:
+          - type: HTTP_OIDC_SUB
+
+- name: Create k8s identity providers
+  openstack.cloud.federation_idp:
+    name: "{{ item.name }}"
+    is_enabled: true
+    remote_ids:
+      - "{{ item.issuer }}"
+  loop: "{{ keystone_k8s_identity.providers }}"
+
+- name: Create k8s openid protocols
+  openstack.cloud.keystone_federation_protocol:
+    name: openid
+    idp: "{{ item.name }}"
+    mapping: k8s-mapping
+  loop: "{{ keystone_k8s_identity.providers }}"
+
+- name: Get k8s group domain info
+  openstack.cloud.identity_domain_info:
+    name: "{{ keystone_bootstrap_k8s_group_domain }}"
+  register: _k8s_group_domain
+
+- name: Create k8s service account group mappings
+  ansible.builtin.include_tasks: k8s_group.yml
+  loop: "{{ keystone_bootstrap_k8s_groups }}"
+  loop_control:
+    loop_var: group_item
