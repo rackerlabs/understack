@@ -47,7 +47,8 @@ spec:
               add: ["NET_ADMIN", "NET_RAW"]
           args:
             - /usr/sbin/dnsmasq
-            - '--no-daemon'
+            - "--no-daemon"
+            - "--conf-poll"
           envFrom:
             - configMapRef:
                 name: ironic-dnsmasq

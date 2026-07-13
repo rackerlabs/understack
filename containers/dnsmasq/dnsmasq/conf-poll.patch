@@ -1,0 +1,471 @@
+From: Marek Skrobacki <marek.skrobacki@rackspace.co.uk>
+Subject: [PATCH] add --conf-poll fallback for dynamic-dir config changes on NFS
+
+inotify never fires for --hostsdir/--dhcp-hostsdir/--dhcp-optsdir changes
+made by other NFS clients, so those changes were silently missed until
+SIGHUP or restart. --conf-poll (with --conf-poll-interval, default 1s)
+adds an opt-in stat-based poll of these directories, running alongside
+inotify and reusing the same reload path.
+
+Also forces the main loop to wake up at least once every
+--conf-poll-interval seconds when --conf-poll is set (the same way
+TFTP/DBus/DAD already force more frequent wake-ups): without any other
+DNS/DHCP/inotify activity, the loop's do_poll() would otherwise block
+indefinitely and the poller would never actually run, no matter how
+long the process had been up.
+
+Rebased against dnsmasq 2.93 (as packaged in Debian forky).
+---
+diff --git a/man/dnsmasq.8 b/man/dnsmasq.8
+index 099c65f..ea835bb 100644
+--- a/man/dnsmasq.8
++++ b/man/dnsmasq.8
+@@ -61,7 +61,8 @@ in alphabetical order.
+ .B --hostsdir=<path>
+ Read all the hosts files contained in the directory. New or changed files
+ are read automatically and modified and deleted files have removed records
+-automatically deleted.
++automatically deleted. This detection normally relies on inotify: see
++\fB--conf-poll\fP for filesystems, such as NFS, where that doesn't work.
+ .TP
+ .B \-E, --expand-hosts
+ Add the domain to simple names (without a period) in /etc/hosts
+@@ -486,6 +487,18 @@ by '/', like the \fB--server\fP syntax, eg.
+ .B \-n, --no-poll
+ Don't poll /etc/resolv.conf for changes.
+ .TP
++.B --conf-poll
++Poll the directories given by \fB--hostsdir\fP, \fB--dhcp-hostsdir\fP and
++\fB--dhcp-optsdir\fP for changes, in addition to the inotify-based detection
++used by default. This is intended for filesystems, such as NFS, where a
++change made by another host is not signalled to the local kernel via
++inotify, and would otherwise go unnoticed until dnsmasq is sent a SIGHUP
++or restarted. Disabled by default. See also \fB--conf-poll-interval\fP.
++.TP
++.B --conf-poll-interval=<seconds>
++Set the interval, in seconds, at which the directories are polled when
++\fB--conf-poll\fP is set. Defaults to 1 second.
++.TP
+ .B --clear-on-reload
+ Whenever /etc/resolv.conf is re-read or the upstream servers are set
+ via DBus, clear the DNS cache.
+@@ -1315,7 +1328,9 @@ the directory are read automatically, without the need to send SIGHUP.
+ If a file is deleted or changed after it has been read by dnsmasq, then the
+ host record it contained will remain until dnsmasq receives a SIGHUP, or 
+ is restarted; ie host records are only added dynamically. The order in which the
+-files in a directory are read is not defined.
++files in a directory are read is not defined. Detection of changed or new files
++normally relies on inotify: see \fB--conf-poll\fP for filesystems, such as NFS,
++where that doesn't work.
+ .TP
+ .B --dhcp-optsdir=<path>
+ This is equivalent to \fB--dhcp-optsfile\fP, with the differences noted for \fB--dhcp-hostsdir\fP.
+diff --git a/src/dnsmasq.c b/src/dnsmasq.c
+index adaa692..4bf4d2c 100644
+--- a/src/dnsmasq.c
++++ b/src/dnsmasq.c
+@@ -184,8 +184,11 @@ int main (int argc, char **argv)
+ #ifndef HAVE_INOTIFY
+   if (daemon->dynamic_dirs)
+     die(_("dhcp-hostsdir, dhcp-optsdir and hostsdir are not supported on this platform"), NULL, EC_BADCONF);
++#else
++  if (option_bool(OPT_CONF_POLL) && daemon->conf_poll_interval <= 0)
++    daemon->conf_poll_interval = 1;
+ #endif
+-  
++
+   if (option_bool(OPT_DNSSEC_VALID))
+     {
+ #ifdef HAVE_DNSSEC
+@@ -1117,7 +1120,16 @@ int main (int argc, char **argv)
+       else if (is_dad_listeners() &&
+ 	       (timeout == -1 || timeout > 1000))
+ 	timeout = 1000;
+-      
++
++      /* --conf-poll: with nothing else to wake the loop (no DNS/DHCP traffic,
++	 no inotify event), do_poll() below would otherwise block indefinitely
++	 and poll_dynamic_dirs(), below, would never get a chance to run. Force
++	 a periodic wake-up so it's actually polled every conf_poll_interval
++	 seconds, not just opportunistically when something else wakes us. */
++      if (option_bool(OPT_CONF_POLL) &&
++	  (timeout == -1 || timeout > daemon->conf_poll_interval * 1000))
++	timeout = daemon->conf_poll_interval * 1000;
++
+       if (daemon->port != 0)
+ 	set_dns_listeners();
+       
+@@ -1248,7 +1260,19 @@ int main (int argc, char **argv)
+ 	{
+ 	  if (daemon->port != 0 && !option_bool(OPT_NO_POLL))
+ 	    poll_resolv(1, 1, now);
+-	} 	  
++	}
++
++      /* Poll dynamic-dirs (--hostsdir/--dhcp-hostsdir/--dhcp-optsdir) for changes,
++	 as a fallback for filesystems, eg. NFS, where inotify doesn't fire for
++	 changes made by other clients. Runs alongside inotify, not instead of it. */
++      if (option_bool(OPT_CONF_POLL) &&
++	  (daemon->last_conf_poll == 0 ||
++	   difftime(now, daemon->last_conf_poll) >= (double)daemon->conf_poll_interval ||
++	   difftime(now, daemon->last_conf_poll) < -(double)daemon->conf_poll_interval))
++	{
++	  poll_dynamic_dirs(now);
++	  daemon->last_conf_poll = now;
++	}
+ #else
+       /* Check for changes to resolv files once per second max. */
+       /* Don't go silent for long periods if the clock goes backwards. */
+diff --git a/src/dnsmasq.h b/src/dnsmasq.h
+index ec9b0c4..bef90e2 100644
+--- a/src/dnsmasq.h
++++ b/src/dnsmasq.h
+@@ -296,7 +296,8 @@ struct event_desc {
+ #define OPT_LEASEQUERY     77
+ #define OPT_LOG_ONLY_FAILED  78
+ #define OPT_LOG_MALLOC     79
+-#define OPT_LAST           80
++#define OPT_CONF_POLL      80
++#define OPT_LAST           81
+ 
+ #define OPTION_BITS (sizeof(unsigned int)*8)
+ #define OPTION_SIZE ( (OPT_LAST/OPTION_BITS)+((OPT_LAST%OPTION_BITS)!=0) )
+@@ -730,11 +731,13 @@ struct resolvc {
+ #define AH_HOSTS    8
+ #define AH_DHCP_HST 16
+ #define AH_DHCP_OPT 32
++#define AH_POLL_SEEN 64 /* dyndir polling: file seen in this poll pass, see poll_dynamic_dirs() */
+ struct hostsfile {
+   struct hostsfile *next;
+   int flags;
+   char *fname;
+   unsigned int index; /* matches to cache entries for logging */
++  time_t mtime; /* last-seen mtime, used by dynamic-dir polling */
+ };
+ 
+ struct dyndir {
+@@ -1310,6 +1313,8 @@ extern struct daemon {
+   int dhcpfd, helperfd, pxefd; 
+ #ifdef HAVE_INOTIFY
+   int inotifyfd;
++  int conf_poll_interval; /* seconds, --conf-poll-interval */
++  time_t last_conf_poll;
+ #endif
+ #if defined(HAVE_LINUX_NETWORK)
+   int netlinkfd, kernel_version;
+@@ -1920,6 +1925,7 @@ int detect_loop(char *query, int type);
+ void inotify_dnsmasq_init(int errfd);
+ int inotify_check(time_t now);
+ void set_dynamic_inotify(int flag, int total_size, struct crec **rhash, int revhashsz);
++void poll_dynamic_dirs(time_t now);
+ #endif
+ 
+ /* poll.c */
+diff --git a/src/inotify.c b/src/inotify.c
+index eb85241..7e873bf 100644
+--- a/src/inotify.c
++++ b/src/inotify.c
+@@ -250,27 +250,27 @@ void set_dynamic_inotify(int flag, int total_size, struct crec **rhash, int revh
+ 	       /* ignore non-regular files */
+ 	       if ((ah = dyndir_addhosts(dd, ent->d_name)) &&
+ 		   stat(ah->fname, &buf) != -1 && S_ISREG(buf.st_mode))
+-		 total_size = read_hostsfile(ah->fname, ah->index, total_size, rhash, revhashsz);
++		 {
++		   ah->mtime = buf.st_mtime;
++		   total_size = read_hostsfile(ah->fname, ah->index, total_size, rhash, revhashsz);
++		 }
+ 	     }
+ #ifdef HAVE_DHCP
+ 	   else if (dd->flags & (AH_DHCP_HST | AH_DHCP_OPT))
+ 	     {
+-	       char *path;
+-	       
+-	       if ((path = whine_malloc(strlen(dd->dname) + lenfile + 2)))
++	       struct hostsfile *ah;
++
++	       /* Create/seed a tracking record (fname, mtime) here too, so that
++		  poll_dynamic_dirs(), below, doesn't mistake already-loaded
++		  files for new ones on its first pass after start-up. */
++	       if ((ah = dyndir_addhosts(dd, ent->d_name)) &&
++		   stat(ah->fname, &buf) != -1 && S_ISREG(buf.st_mode))
+ 		 {
+-		   strcpy(path, dd->dname);
+-		   strcat(path, "/");
+-		   strcat(path, ent->d_name);
+-		   
+-		   /* ignore non-regular files */
+-		   if (stat(path, &buf) != -1 && S_ISREG(buf.st_mode))
+-		     option_read_dynfile(path, dd->flags);
+-		   
+-		   free(path);
++		   ah->mtime = buf.st_mtime;
++		   option_read_dynfile(ah->fname, dd->flags);
+ 		 }
+ 	     }
+-#endif		   
++#endif
+ 	 }
+        
+        closedir(dir_stream);
+@@ -325,23 +325,36 @@ int inotify_check(time_t now)
+ 
+ 			/* Is this is a deletion event? */
+ 			if (in->mask & IN_DELETE)
+-			  my_syslog(LOG_INFO, _("inotify: %s removed"), ah->fname);
+-			else 
++			  {
++			    my_syslog(LOG_INFO, _("inotify: %s removed"), ah->fname);
++			    /* Keep mtime tracking (used by --conf-poll) in sync. */
++			    ah->mtime = 0;
++			  }
++			else
+ 			  my_syslog(LOG_INFO, _("inotify: %s new or modified"), ah->fname);
+ 
+ 			if (removed > 0)
+ 			  my_syslog(LOG_INFO, _("inotify: flushed %u names read from %s"), removed, ah->fname);
+-			
++
+ 			/* (Re-)load hostsfile only if this event isn't triggered by deletion */
+ 			if (!(in->mask & IN_DELETE))
+-			  read_hostsfile(ah->fname, ah->index, 0, NULL, 0);
++			  {
++			    struct stat buf;
++
++			    read_hostsfile(ah->fname, ah->index, 0, NULL, 0);
++
++			    /* Keep mtime tracking (used by --conf-poll) in sync, so that
++			       polling doesn't redundantly reload this file again. */
++			    if (stat(ah->fname, &buf) != -1)
++			      ah->mtime = buf.st_mtime;
++			  }
+ #ifdef HAVE_DHCP
+-			if (daemon->dhcp || daemon->doing_dhcp6) 
++			if (daemon->dhcp || daemon->doing_dhcp6)
+ 			  {
+ 			    /* Propagate the consequences of loading a new dhcp-host */
+ 			    dhcp_update_configs(daemon->dhcp_conf);
+-			    lease_update_from_configs(); 
+-			    lease_update_file(now); 
++			    lease_update_from_configs();
++			    lease_update_file(now);
+ 			    lease_update_dns(1);
+ 			  }
+ #endif
+@@ -350,33 +363,34 @@ int inotify_check(time_t now)
+ #ifdef HAVE_DHCP
+ 		else if (!(in->mask & IN_DELETE))
+ 		  {
+-		    char *path;
++		    struct hostsfile *ah;
+ 
+-		    if ((path = whine_malloc(strlen(dd->dname) + in->len + 2)))
++		    if ((ah = dyndir_addhosts(dd, in->name)))
+ 		      {
+-			strcpy(path, dd->dname);
+-			strcat(path, "/");
+-			strcat(path, in->name);
+-			
+-			my_syslog(LOG_INFO, _("inotify: %s new or modified"), path);
++			struct stat buf;
++
++			my_syslog(LOG_INFO, _("inotify: %s new or modified"), ah->fname);
+ 
+-			if ((dd->flags & AH_DHCP_HST) && option_read_dynfile(path, AH_DHCP_HST))
++			if ((dd->flags & AH_DHCP_HST) && option_read_dynfile(ah->fname, AH_DHCP_HST))
+ 			  {
+ 			    /* Propagate the consequences of loading a new dhcp-host */
+ 			    dhcp_update_configs(daemon->dhcp_conf);
+-			    lease_update_from_configs(); 
+-			    lease_update_file(now); 
++			    lease_update_from_configs();
++			    lease_update_file(now);
+ 			    lease_update_dns(1);
+ 			  }
+-			
++
+ 			if (dd->flags & AH_DHCP_OPT)
+-			  option_read_dynfile(path, AH_DHCP_OPT);
+-		    
+-			free(path);
++			  option_read_dynfile(ah->fname, AH_DHCP_OPT);
++
++			/* Keep mtime tracking (used by --conf-poll) in sync, so that
++			   polling doesn't redundantly reload this file again. */
++			if (stat(ah->fname, &buf) != -1)
++			  ah->mtime = buf.st_mtime;
+ 		      }
+ 		  }
+ #endif
+-		
++
+ 	      }
+ 	}
+     }
+@@ -384,4 +398,120 @@ int inotify_check(time_t now)
+   return hit;
+ }
+ 
++/* Poll dynamic-dirs (--hostsdir/--dhcp-hostsdir/--dhcp-optsdir) for changes,
++   as a fallback for filesystems (eg. NFS) where a local inotify watch never
++   sees changes made by another client. Mirrors the actions inotify_check()
++   takes for these directories above, but driven by stat()ing directory
++   contents each call instead of reading inotify events. Enabled with
++   --conf-poll, called from the main loop at most once every
++   --conf-poll-interval seconds. */
++void poll_dynamic_dirs(time_t now)
++{
++  struct dyndir *dd;
++
++  (void)now;
++
++  for (dd = daemon->dynamic_dirs; dd; dd = dd->next)
++    {
++      DIR *dir_stream;
++      struct dirent *ent;
++      struct hostsfile *ah;
++
++      if (!(dir_stream = opendir(dd->dname)))
++	{
++	  my_syslog(LOG_ERR, _("bad dynamic directory %s: %s"),
++		    dd->dname, strerror(errno));
++	  continue;
++	}
++
++      for (ah = dd->files; ah; ah = ah->next)
++	ah->flags &= ~AH_POLL_SEEN;
++
++      while ((ent = readdir(dir_stream)))
++	{
++	  struct stat buf;
++	  size_t lenfile = strlen(ent->d_name);
++
++	  /* ignore emacs backups and dotfiles, as inotify_check() does above */
++	  if (lenfile == 0 ||
++	      ent->d_name[lenfile - 1] == '~' ||
++	      (ent->d_name[0] == '#' && ent->d_name[lenfile - 1] == '#') ||
++	      ent->d_name[0] == '.')
++	    continue;
++
++	  if (!(ah = dyndir_addhosts(dd, ent->d_name)))
++	    continue;
++
++	  ah->flags |= AH_POLL_SEEN;
++
++	  /* ignore non-regular files */
++	  if (stat(ah->fname, &buf) == -1 || !S_ISREG(buf.st_mode))
++	    continue;
++
++	  /* unchanged since last time we looked? */
++	  if (ah->mtime != 0 && ah->mtime == buf.st_mtime)
++	    continue;
++
++	  ah->mtime = buf.st_mtime;
++
++	  if (dd->flags & AH_HOSTS)
++	    {
++	      const unsigned int removed = cache_remove_uid(ah->index);
++
++	      my_syslog(LOG_INFO, _("poll: %s new or modified"), ah->fname);
++	      if (removed > 0)
++		my_syslog(LOG_INFO, _("poll: flushed %u names read from %s"), removed, ah->fname);
++
++	      read_hostsfile(ah->fname, ah->index, 0, NULL, 0);
++#ifdef HAVE_DHCP
++	      if (daemon->dhcp || daemon->doing_dhcp6)
++		{
++		  /* Propagate the consequences of loading a new dhcp-host */
++		  dhcp_update_configs(daemon->dhcp_conf);
++		  lease_update_from_configs();
++		  lease_update_file(now);
++		  lease_update_dns(1);
++		}
++#endif
++	    }
++#ifdef HAVE_DHCP
++	  else
++	    {
++	      my_syslog(LOG_INFO, _("poll: %s new or modified"), ah->fname);
++
++	      if ((dd->flags & AH_DHCP_HST) && option_read_dynfile(ah->fname, AH_DHCP_HST))
++		{
++		  /* Propagate the consequences of loading a new dhcp-host */
++		  dhcp_update_configs(daemon->dhcp_conf);
++		  lease_update_from_configs();
++		  lease_update_file(now);
++		  lease_update_dns(1);
++		}
++
++	      if (dd->flags & AH_DHCP_OPT)
++		option_read_dynfile(ah->fname, AH_DHCP_OPT);
++	    }
++#endif
++	}
++
++      closedir(dir_stream);
++
++      /* Deletion is only tracked for --hostsdir, matching both inotify_check(),
++	 above, and the documented behaviour of --dhcp-hostsdir/--dhcp-optsdir:
++	 those records persist until dnsmasq receives a SIGHUP or is restarted. */
++      if (dd->flags & AH_HOSTS)
++	for (ah = dd->files; ah; ah = ah->next)
++	  if (ah->mtime != 0 && !(ah->flags & AH_POLL_SEEN))
++	    {
++	      const unsigned int removed = cache_remove_uid(ah->index);
++
++	      my_syslog(LOG_INFO, _("poll: %s removed"), ah->fname);
++	      if (removed > 0)
++		my_syslog(LOG_INFO, _("poll: flushed %u names read from %s"), removed, ah->fname);
++
++	      ah->mtime = 0;
++	    }
++    }
++}
++
+ #endif  /* INOTIFY */
+diff --git a/src/option.c b/src/option.c
+index 75c954a..dee59a9 100644
+--- a/src/option.c
++++ b/src/option.c
+@@ -202,6 +202,8 @@ struct myoption {
+ #define LOPT_SPLIT_RELAY   390
+ #define LOPT_LOG_MALLOC    391
+ #define LOPT_DHCP_AL_SVID  392
++#define LOPT_CONF_POLL     393
++#define LOPT_CONF_POLL_INT 394
+ 
+ #ifdef HAVE_GETOPT_LONG
+ static const struct option opts[] =  
+@@ -212,6 +214,8 @@ static const struct myoption opts[] =
+     { "version", 0, 0, 'v' },
+     { "no-hosts", 0, 0, 'h' },
+     { "no-poll", 0, 0, 'n' },
++    { "conf-poll", 0, 0, LOPT_CONF_POLL },
++    { "conf-poll-interval", 1, 0, LOPT_CONF_POLL_INT },
+     { "help", 0, 0, 'w' },
+     { "no-daemon", 0, 0, 'd' },
+     { "log-queries", 2, 0, 'q' },
+@@ -461,7 +465,9 @@ static struct {
+   { 'L', OPT_LOCALMX, NULL, gettext_noop("Return MX records for local hosts."), NULL },
+   { 'm', ARG_DUP, "<host_name>,<target>,<pref>", gettext_noop("Specify an MX record."), NULL },
+   { 'M', ARG_DUP, "<bootp opts>", gettext_noop("Specify BOOTP options to DHCP server."), NULL },
+-  { 'n', OPT_NO_POLL, NULL, gettext_noop("Do NOT poll %s file, reload only on SIGHUP."), RESOLVFILE }, 
++  { 'n', OPT_NO_POLL, NULL, gettext_noop("Do NOT poll %s file, reload only on SIGHUP."), RESOLVFILE },
++  { LOPT_CONF_POLL, OPT_CONF_POLL, NULL, gettext_noop("Poll dhcp-hostsdir, dhcp-optsdir and hostsdir for changes (eg. on NFS, where inotify doesn't work)."), NULL },
++  { LOPT_CONF_POLL_INT, ARG_ONE, "<seconds>", gettext_noop("Set polling interval for --conf-poll (defaults to 1)."), NULL },
+   { 'N', OPT_NO_NEG, NULL, gettext_noop("Do NOT cache failed search results."), NULL },
+   { LOPT_STALE_CACHE, ARG_ONE, "[=<max_expired>]", gettext_noop("Use expired cache data for faster reply."), NULL },
+   { 'o', OPT_ORDER, NULL, gettext_noop("Use nameservers strictly in the order given in %s."), RESOLVFILE },
+@@ -5365,6 +5371,13 @@ err:
+ 	break;
+       }
+ 
++    case LOPT_CONF_POLL_INT: /* --conf-poll-interval */
++#ifdef HAVE_INOTIFY
++      if (!atoi_check(arg, &daemon->conf_poll_interval) || daemon->conf_poll_interval <= 0)
++	ret_err(gen_err);
++#endif
++      break;
++
+ #ifdef HAVE_DNSSEC
+     case LOPT_DNSSEC_LIMITS:
+       {

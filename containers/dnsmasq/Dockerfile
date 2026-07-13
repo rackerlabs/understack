@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
-FROM debian:bookworm-20240408-slim AS builder
+FROM debian:forky-20260623-slim AS builder
 
 ENV DEBFULLNAME="Marek Skrobacki"
 ENV DEBEMAIL="marek.skrobacki@rackspace.co.uk"
 ENV QUILT_PATCHES=debian/patches
 
-RUN echo "deb-src http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list
+RUN echo "deb-src http://deb.debian.org/debian forky main" > /etc/apt/sources.list
 RUN apt-get update && apt-get -y install \
     build-essential \
     devscripts \
@@ -21,21 +21,24 @@ RUN apt-get update && apt-get -y install \
 WORKDIR /src
 RUN apt-get -y build-dep dnsmasq
 RUN apt-get -y source dnsmasq
-# copy in our patch
+# copy in our patches
 COPY containers/dnsmasq/dnsmasq/dhcp-allowed-srvids.patch /src/
-# setup the patch to be built into the quilt file
+COPY containers/dnsmasq/dnsmasq/conf-poll.patch /src/
+# setup the patches to be built into the quilt file
 # set our version number to a local override suffixed by '.uc1'
 RUN cd /src/dnsmasq-* && \
     mkdir -p debian/patches && \
     mv /src/dhcp-allowed-srvids.patch debian/patches && \
-    dch -l .uc "patched for dhcp-allowed-srvids" && \
+    mv /src/conf-poll.patch debian/patches && \
+    dch -l .uc "patched for dhcp-allowed-srvids and conf-poll" && \
     echo dhcp-allowed-srvids.patch >> debian/patches/series && \
+    echo conf-poll.patch >> debian/patches/series && \
     quilt push -a
 # build it
 RUN cd /src/dnsmasq-* && dpkg-buildpackage -rfakeroot
 
 
-FROM debian:bookworm-20240408-slim AS prod
+FROM debian:forky-20260623-slim AS prod
 
 LABEL org.opencontainers.image.description="dnsmasq for Understack's Ironic"
 

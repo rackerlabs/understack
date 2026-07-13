@@ -1,20 +1,18 @@
-From a3bfd99772edea6a7b78e30b7f3d4a80997323bd Mon Sep 17 00:00:00 2001
 From: Marek Skrobacki <marek.skrobacki@rackspace.co.uk>
-Date: Wed, 15 Jan 2025 17:10:57 -0600
-Subject: [PATCH] dd support for dhcp-allowed-srvids
+Subject: [PATCH] add support for dhcp-allowed-srvids
 
+Allow a DHCPREQUEST's Server ID (option 54) to be accepted even when it
+doesn't match an address on the local interface, for cases where dnsmasq
+runs behind a load balancer or inside a container, provided the value is
+explicitly allow-listed via --dhcp-allowed-srvids.
+
+Rebased against dnsmasq 2.93 (as packaged in Debian forky).
 ---
- man/dnsmasq.8 | 19 +++++++++++++++++++
- src/dnsmasq.h |  2 ++
- src/option.c  | 15 +++++++++++++++
- src/rfc2131.c | 46 ++++++++++++++++++++++++++++++++++++++--------
- 4 files changed, 74 insertions(+), 8 deletions(-)
-
 diff --git a/man/dnsmasq.8 b/man/dnsmasq.8
-index 32bdeff..8a6cb3e 100644
+index 5b01e63..099c65f 100644
 --- a/man/dnsmasq.8
 +++ b/man/dnsmasq.8
-@@ -2026,6 +2026,25 @@ form is used, there must be a route to all of the addresses configured on the in
+@@ -2094,6 +2094,25 @@ form is used, there must be a route to all of the addresses configured on the in
  The two-address form of shared-network is also usable with a DHCP relay: the first address
  is the address of the relay and the second, as before, specifies an extra subnet which
  addresses may be allocated from.
@@ -41,10 +39,10 @@ index 32bdeff..8a6cb3e 100644
  .TP
  .B \-s, --domain=<domain>[[,<address range>[,local]]|<interface>]
 diff --git a/src/dnsmasq.h b/src/dnsmasq.h
-index e455c3f..6f52e3e 100644
+index ebb8d15..ec9b0c4 100644
 --- a/src/dnsmasq.h
 +++ b/src/dnsmasq.h
-@@ -1206,11 +1206,13 @@ extern struct daemon {
+@@ -1236,11 +1236,13 @@ extern struct daemon {
    struct pxe_service *pxe_services;
    struct tag_if *tag_if; 
    struct addr_list *override_relays;
@@ -59,34 +57,37 @@ index e455c3f..6f52e3e 100644
    struct dhcp_netid_list *force_broadcast, *bootp_dynamic;
    struct hostsfile *dhcp_hosts_file, *dhcp_opts_file;
 diff --git a/src/option.c b/src/option.c
-index f4ff7c0..eafcf54 100644
+index 274732f..75c954a 100644
 --- a/src/option.c
 +++ b/src/option.c
-@@ -192,6 +192,7 @@ struct myoption {
- #define LOPT_NO_DHCP4      383
- #define LOPT_MAX_PROCS     384
- #define LOPT_DNSSEC_LIMITS 385
-+#define LOPT_DHCP_AL_SVID  386
+@@ -201,6 +201,7 @@ struct myoption {
+ #define LOPT_LEASEQUERY    389
+ #define LOPT_SPLIT_RELAY   390
+ #define LOPT_LOG_MALLOC    391
++#define LOPT_DHCP_AL_SVID  392
  
  #ifdef HAVE_GETOPT_LONG
  static const struct option opts[] =  
-@@ -388,6 +389,7 @@ static const struct myoption opts[] =
-     { "use-stale-cache", 2, 0 , LOPT_STALE_CACHE },
-     { "no-ident", 0, 0, LOPT_NO_IDENT },
+@@ -403,6 +404,7 @@ static const struct myoption opts[] =
      { "max-tcp-connections", 1, 0, LOPT_MAX_PROCS },
+     { "leasequery", 2, 0, LOPT_LEASEQUERY },
+     { "log-malloc", 0, 0, LOPT_LOG_MALLOC },
 +    { "dhcp-allowed-srvids", 1, 0, LOPT_DHCP_AL_SVID },
      { NULL, 0, 0, 0 }
    };
  
-@@ -591,6 +593,7 @@ static struct {
-   { LOPT_NO_IDENT, OPT_NO_IDENT, NULL, gettext_noop("Do not add CHAOS TXT records."), NULL },
+@@ -612,8 +614,9 @@ static struct {
    { LOPT_CACHE_RR, ARG_DUP, "<RR-type>", gettext_noop("Cache this DNS resource record type."), NULL },
    { LOPT_MAX_PROCS, ARG_ONE, "<integer>", gettext_noop("Maximum number of concurrent tcp connections."), NULL },
+   { LOPT_LOG_MALLOC, OPT_LOG_MALLOC, NULL, gettext_noop("Log memory allocation for debugging."), NULL },
 +  { LOPT_DHCP_AL_SVID, ARG_DUP, "[=<ipaddr>]...", gettext_noop("Allow these ServerIDs"), NULL },
    { 0, 0, NULL, NULL, NULL }
- }; 
+-}; 
++};
  
-@@ -4720,6 +4723,18 @@ static int one_opt(int option, char *arg, char *errstr, char *gen_err, int comma
+ /* We hide metacharacters in quoted strings by mapping them into the ASCII control
+    character space. Note that the \0, \t \b \r \033 and \n characters are carefully placed in the
+@@ -4809,6 +4812,18 @@ static int one_opt(int option, char *arg, char *errstr, char *gen_err, int comma
  	
  	break;
        }
@@ -106,10 +107,10 @@ index f4ff7c0..eafcf54 100644
  #endif
        
 diff --git a/src/rfc2131.c b/src/rfc2131.c
-index 68834ea..fd24654 100644
+index 7b58e69..98f3ff4 100644
 --- a/src/rfc2131.c
 +++ b/src/rfc2131.c
-@@ -1202,8 +1202,22 @@ size_t dhcp_reply(struct dhcp_context *context, char *iface_name, int int_index,
+@@ -1407,8 +1407,22 @@ size_t dhcp_reply(struct dhcp_context *context, char *iface_name, int int_index,
  	      
  	      if (override.s_addr != 0)
  		{
@@ -134,7 +135,7 @@ index 68834ea..fd24654 100644
  		}
  	      else 
  		{
-@@ -1230,12 +1244,28 @@ size_t dhcp_reply(struct dhcp_context *context, char *iface_name, int int_index,
+@@ -1435,12 +1449,28 @@ size_t dhcp_reply(struct dhcp_context *context, char *iface_name, int int_index,
  			override = intr->addr.in.sin_addr;
  		      else
  			{
@@ -169,5 +170,3 @@ index 68834ea..fd24654 100644
  			}
  		    }
  		}
--- 
-2.39.5 (Apple Git-154)
