@@ -38,7 +38,7 @@ spec:
       hostNetwork: true
       containers:
         - name: dnsmasq
-          image: ghcr.io/rackerlabs/understack/dnsmasq:latest
+          image: ghcr.io/rackerlabs/understack/dnsmasq:pr-2136
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -47,7 +47,8 @@ spec:
               add: ["NET_ADMIN", "NET_RAW"]
           args:
             - /usr/sbin/dnsmasq
-            - '--no-daemon'
+            - "--no-daemon"
+            - "--conf-poll"
           envFrom:
             - configMapRef:
                 name: ironic-dnsmasq
