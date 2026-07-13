@@ -1,0 +1,68 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ironic-kea-proxy
+data:
+  # Only the [ironic_understack] settings kea_proxy actually needs.
+  # kea_proxy does not consume the same ironic.conf.d assembly as
+  # ironic-api/ironic-conductor, so if kea_url (or any other kea_* option)
+  # is ever overridden in components/ironic/values.yaml's conf.ironic
+  # section, mirror that override here too.
+  kea_proxy.conf: |
+    [ironic_understack]
+    kea_proxy_listen_host = 0.0.0.0
+    kea_proxy_listen_port = 9080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ironic-kea-proxy
+  labels:
+    application: ironic-kea-proxy
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9080
+      targetPort: 9080
+  selector:
+    application: ironic-kea-proxy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ironic-kea-proxy
+  namespace: openstack
+spec:
+  # Exactly one replica is a hard correctness requirement, not just a
+  # default: kea_proxy serializes concurrent Kea config writes with an
+  # in-process threading.Lock (ironic_understack/kea_proxy/kea_client.py).
+  # A second replica would run its own independent lock and could race
+  # against the first, corrupting Kea reservations. Do not scale this up.
+  replicas: 1
+  selector:
+    matchLabels:
+      application: ironic-kea-proxy
+  template:
+    metadata:
+      labels:
+        application: ironic-kea-proxy
+    spec:
+      containers:
+        - name: kea-proxy
+          image: ghcr.io/rackerlabs/understack/ironic:pr-2111
+          command:
+            - ironic-understack-kea-proxy
+          ports:
+            - name: http
+              containerPort: 9080
+          volumeMounts:
+            - name: kea-proxy-conf
+              mountPath: /etc/ironic/ironic.conf.d/kea_proxy.conf
+              subPath: kea_proxy.conf
+              readOnly: true
+      volumes:
+        - name: kea-proxy-conf
+          configMap:
+            name: ironic-kea-proxy

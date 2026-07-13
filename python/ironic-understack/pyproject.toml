@@ -13,7 +13,13 @@ license = "MIT"
 dependencies = [
     "ironic>=35.0,<36",
     "pyyaml~=6.0",
+    "pecan>=1.7.0,<2",
+    "webob>=1.8.9,<2",
+    "cheroot>=11.1.2,<12",
 ]
+
+[project.scripts]
+ironic-understack-kea-proxy = "ironic_understack.kea_proxy.app:main"
 
 # REMOVE ME: delete this once we move away from patching a venv or we upgrade to a newer ironic base version
 [project.entry-points."ironic.console.container"]
@@ -45,6 +51,7 @@ test = [
     "pytest-cov>=7,<8",
     "pytest-github-actions-annotate-failures",
     "pytest-mock>=3.15.1",
+    "webtest>=3.0.0,<4",
 ]
 
 [tool.uv]

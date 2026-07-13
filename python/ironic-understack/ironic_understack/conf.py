@@ -54,6 +54,22 @@ def setup_conf():
             default=3,
             help="Maximum number of retry attempts for failed requests.",
         ),
+        cfg.StrOpt(
+            "kea_proxy_listen_host",
+            default="0.0.0.0",  # noqa: S104 -- binds within the pod network namespace
+            help="Host/address the kea_proxy service binds to.",
+        ),
+        cfg.IntOpt(
+            "kea_proxy_listen_port",
+            default=9080,
+            help="Port the kea_proxy service binds to.",
+        ),
+        cfg.StrOpt(
+            "kea_proxy_url",
+            default="http://ironic-kea-proxy.openstack.svc.cluster.local:9080",
+            help="URL of the kea_proxy service used by the DHCP driver to "
+            "manage reservations and leases on its behalf.",
+        ),
     ]
     cfg.CONF.register_group(grp)
     cfg.CONF.register_opts(opts, group=grp)
