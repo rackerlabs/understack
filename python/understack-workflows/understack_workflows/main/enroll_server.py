@@ -6,6 +6,7 @@ import os
 
 from ironicclient.v1.node import Node
 
+from understack_workflows import helpers
 from understack_workflows import ironic_node
 from understack_workflows.bmc import Bmc
 from understack_workflows.bmc import bmc_for_ip_address
@@ -15,7 +16,6 @@ from understack_workflows.bmc_chassis_info import chassis_info
 from understack_workflows.bmc_credentials import set_bmc_password
 from understack_workflows.bmc_hostname import bmc_set_hostname
 from understack_workflows.bmc_settings import update_dell_drac_settings
-from understack_workflows.helpers import setup_logger
 from understack_workflows.raid import configure_raid
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ def main() -> None:
 
     - Transition the node to the 'available' state (implies cleaning).
     """
-    setup_logger()
+    helpers.setup_logger()
     args = argument_parser().parse_args()
 
     enroll(
@@ -74,7 +74,7 @@ def enroll(
     firmware_update: bool,
     raid_configure: bool,
     old_password: str | None,
-    external_cmdb_id: str | None = None,
+    external_cmdb_id: int | str | None = None,
 ) -> None:
     logger.info("Starting enroll workflow for bmc_ip_address=%s", ip_address)
 
@@ -221,6 +221,7 @@ def argument_parser():
     )
     parser.add_argument(
         "--external-cmdb-id",
+        type=helpers.int_or_str,
         required=False,
         default="",
         help="External CMDB ID for RXDB integration",

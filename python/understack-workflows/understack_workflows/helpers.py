@@ -56,6 +56,14 @@ def setup_logger(level: int = logging.DEBUG) -> None:
     )
 
 
+def int_or_str(value: str) -> int | str:
+    """Attempts to convert a value to an integer."""
+    try:
+        return int(value)
+    except ValueError:
+        return value
+
+
 def boolean_args(val):
     normalised = str(val).upper()
     if normalised in ["YES", "TRUE", "T", "1"]:

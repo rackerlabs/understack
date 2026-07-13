@@ -5,7 +5,26 @@ from unittest.mock import patch
 
 import pytest
 
+from understack_workflows.helpers import int_or_str
 from understack_workflows.helpers import parser_nautobot_args
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("123", 123),
+        ("0", 0),
+        ("-5", -5),
+        ("abc", "abc"),
+        ("12ab", "12ab"),
+        ("", ""),
+        ("1.5", "1.5"),
+    ],
+)
+def test_int_or_str(value, expected):
+    result = int_or_str(value)
+    assert result == expected
+    assert type(result) is type(expected)
 
 
 @pytest.mark.parametrize(

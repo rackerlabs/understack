@@ -42,7 +42,7 @@ def create_or_update(
     bmc: Bmc,
     name: str,
     manufacturer: str,
-    external_cmdb_id: str | None = None,
+    external_cmdb_id: int | str | None = None,
 ) -> Node:
     """Find-or-create Node by name, update attributes, set state to Manageable.
 
@@ -110,7 +110,7 @@ def update_ironic_node(
     name,
     driver,
     inspect_interface,
-    external_cmdb_id: str | None = None,
+    external_cmdb_id: int | str | None = None,
 ):
     updates = [
         f"name={name}",
@@ -139,7 +139,7 @@ def create_ironic_node(
     name: str,
     driver: str,
     inspect_interface: str,
-    external_cmdb_id: str | None = None,
+    external_cmdb_id: int | str | None = None,
 ) -> Node:
     node_data = {
         "name": name,
