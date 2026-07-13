@@ -23,11 +23,16 @@ def _proxy_url():
     CONF.clear_override("kea_proxy_url", group="ironic_understack")
 
 
+@pytest.fixture(autouse=True)
+def _max_retries():
+    CONF.set_override("kea_max_retries", 3, group="ironic_understack")
+    yield
+    CONF.clear_override("kea_max_retries", group="ironic_understack")
+
+
 @pytest.fixture
 def kea():
-    api = KeaDHCPApi()
-    api.max_retries = 3
-    return api
+    return KeaDHCPApi()
 
 
 def _response(status_code=200, payload=None):
@@ -66,7 +71,7 @@ def test_request_raises_after_exhausting_retries(kea, mocker):
     with pytest.raises(DHCPConfigurationError):
         kea._request("GET", "/v1/leases")
 
-    assert request.call_count == kea.max_retries
+    assert request.call_count == 3
 
 
 def test_update_port_dhcp_opts_posts_reservation(kea, mocker):

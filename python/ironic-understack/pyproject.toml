@@ -16,6 +16,7 @@ dependencies = [
     "pecan>=1.7.0,<2",
     "webob>=1.8.9,<2",
     "cheroot>=11.1.2,<12",
+    "tenacity>=8.0.0",
 ]
 
 [project.scripts]

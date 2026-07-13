@@ -1,4 +1,5 @@
 import requests
+import tenacity
 from ironic import objects
 from ironic.common import exception
 from ironic.dhcp import base
@@ -17,6 +18,21 @@ class DHCPConfigurationError(exception.IronicException):
     _msg_fmt = "DHCP configuration error: %(reason)s"
 
 
+def _retry_stop(retry_state):
+    return retry_state.attempt_number >= CONF.ironic_understack.kea_max_retries
+
+
+def _log_retry(retry_state):
+    _self, method, path = retry_state.args[:3]
+    LOG.warning(
+        "Request to kea_proxy failed on attempt %d for %s %s: %s",
+        retry_state.attempt_number,
+        method,
+        path,
+        retry_state.outcome.exception(),
+    )
+
+
 class KeaDHCPApi(base.BaseDHCP):
     """Thin HTTP client for the kea_proxy service.
 
@@ -27,55 +43,43 @@ class KeaDHCPApi(base.BaseDHCP):
 
     def __init__(self):
         super().__init__()
-        self.max_retries = CONF.ironic_understack.kea_max_retries
 
         if not CONF.ironic_understack.kea_proxy_url:
             raise DHCPConfigurationError(
                 "kea_proxy_url must be specified in configuration"
             )
 
-    def _request(self, method, path, **kwargs):
+    @tenacity.retry(
+        stop=_retry_stop,
+        retry=tenacity.retry_if_exception_type(requests.exceptions.RequestException),
+        before_sleep=_log_retry,
+        reraise=True,
+    )
+    def _send(self, method, path, **kwargs):
         url = f"{CONF.ironic_understack.kea_proxy_url}{path}"
-
-        last_exception = None
-        for attempt in range(self.max_retries):
-            try:
-                response = requests.request(
-                    method,
-                    url,
-                    timeout=CONF.ironic_understack.kea_request_timeout,
-                    **kwargs,
-                )
-                response.raise_for_status()
-                return response.json()
-            except requests.exceptions.Timeout as e:
-                last_exception = e
-                LOG.warning(
-                    "Timeout on attempt %d/%d for %s %s",
-                    attempt + 1,
-                    self.max_retries,
-                    method,
-                    url,
-                )
-            except requests.exceptions.RequestException as e:
-                last_exception = e
-                LOG.warning(
-                    "Request failed on attempt %d/%d: %s",
-                    attempt + 1,
-                    self.max_retries,
-                    e,
-                )
-
-        LOG.error(
-            "Failed to execute %s %s after %d attempts: %s",
+        response = requests.request(
             method,
             url,
-            self.max_retries,
-            last_exception,
+            timeout=CONF.ironic_understack.kea_request_timeout,
+            **kwargs,
         )
-        raise DHCPConfigurationError(
-            f"Failed to execute {method} {url}: {last_exception}"
-        ) from last_exception
+        response.raise_for_status()
+        return response.json()
+
+    def _request(self, method, path, **kwargs):
+        try:
+            return self._send(method, path, **kwargs)
+        except requests.exceptions.RequestException as e:
+            LOG.error(
+                "Failed to execute %s %s after %d attempts: %s",
+                method,
+                path,
+                self._send.statistics.get("attempt_number"),
+                e,
+            )
+            raise DHCPConfigurationError(
+                f"Failed to execute {method} {path}: {e}"
+            ) from e
 
     def update_port_dhcp_opts(self, port_id, dhcp_options, context=None):
         """Update DHCP options for a specific port in Kea."""

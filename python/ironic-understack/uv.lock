@@ -463,6 +463,7 @@ dependencies = [
     { name = "ironic" },
     { name = "pecan" },
     { name = "pyyaml" },
+    { name = "tenacity" },
     { name = "webob" },
 ]
 
@@ -481,6 +482,7 @@ requires-dist = [
     { name = "ironic", specifier = ">=35.0,<36" },
     { name = "pecan", specifier = ">=1.7.0,<2" },
     { name = "pyyaml", specifier = "~=6.0" },
+    { name = "tenacity", specifier = ">=8.0.0" },
     { name = "webob", specifier = ">=1.8.9,<2" },
 ]
 
