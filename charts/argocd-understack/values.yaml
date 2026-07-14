@@ -466,8 +466,8 @@ site:
     # @default -- false
     enabled: false
     # -- Chart version for OVN
-    # renovate: datasource=helm depName=ovn registryUrl=https://tarballs.opendev.org/openstack/openstack-helm-infra
-    chartVersion: "2024.2.0"
+    # renovate: datasource=helm depName=ovn registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
+    chartVersion: "2026.1.3+a659ab8a2"
 
   # -- Chrony NTP service configuration
   chrony:

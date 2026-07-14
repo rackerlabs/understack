@@ -14,7 +14,7 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - repoURL: https://tarballs.opendev.org/openstack/openstack-helm-infra
+  - repoURL: https://tarballs.opendev.org/openstack/openstack-helm
     targetRevision: {{ $app.chartVersion }}
     chart: ovn
     helm:
