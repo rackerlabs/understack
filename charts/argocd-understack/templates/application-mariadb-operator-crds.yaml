@@ -15,7 +15,7 @@ spec:
   destination:
     namespace: mariadb-operator
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack
   source:
     repoURL: https://mariadb-operator.github.io/mariadb-operator
     chart: mariadb-operator-crds
