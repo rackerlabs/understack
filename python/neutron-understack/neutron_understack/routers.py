@@ -220,8 +220,11 @@ def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) ->
     We do what link_network_ha_chassis_group would have done: populate the unified
     network HCG with sync_ha_chassis_group_network_unified, then anchor the internal
     router-interface LRP to that same HCG. The gateway chassis is sourced from the
-    global HA_Chassis table (all records must share one chassis_name) so the fix
-    fires even before the external gateway port is attached.
+    global HA_Chassis table (all *live* records must share one chassis_name) so the
+    fix fires even before the external gateway port is attached. Rows pointing at a
+    chassis no longer present in the Southbound DB (e.g. left behind by a
+    decommissioned/replaced host) are excluded before checking for uniqueness, so a
+    single stale row elsewhere in the fleet doesn't block every vxlan network.
 
     For VLAN/FLAT networks neutron's handler already populates the network HCG
     correctly; we detect that and return early.
@@ -239,6 +242,7 @@ def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) ->
         if not client:
             return
         nb_idl = client._nb_idl
+        sb_idl = client._sb_idl
 
         # Skip if the per-network HCG is already populated — neutron handled it
         # (VLAN/FLAT gateways).  For vxlan the HCG is empty due to the neutron bug.
@@ -248,15 +252,22 @@ def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) ->
         if network_hcg and network_hcg.ha_chassis:
             return
 
-        # Derive the gateway chassis from every HA_Chassis row in the NB database.
-        # If exactly one distinct chassis_name exists, that is our gateway chassis.
-        # This avoids requiring the per-router HCG to exist first.
+        # Derive the gateway chassis from every *live* HA_Chassis row in the NB
+        # database. If exactly one distinct chassis_name exists, that is our
+        # gateway chassis. This avoids requiring the per-router HCG to exist yet.
+        # Rows referencing a chassis no longer registered in the Southbound DB
+        # (e.g. a decommissioned/replaced host) are excluded so they don't block
+        # this inference for every network in the fleet.
         all_ha_chassis = nb_idl.db_list_rows("HA_Chassis").execute(check_error=True)
-        chassis_names = {row.chassis_name for row in all_ha_chassis}
+        chassis_names = {
+            row.chassis_name
+            for row in all_ha_chassis
+            if sb_idl.lookup("Chassis", row.chassis_name, default=None) is not None
+        }
         if len(chassis_names) != 1:
             LOG.debug(
                 "Cannot determine unique gateway chassis for network %(net)s "
-                "(router %(router)s): found %(n)d distinct chassis name(s)",
+                "(router %(router)s): found %(n)d distinct live chassis name(s)",
                 {"net": network_id, "router": router_id, "n": len(chassis_names)},
             )
             return
