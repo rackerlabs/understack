@@ -2,6 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 import sqlalchemy as sa
+from neutron_lib.db import api as db_api
+from oslo_db import exception as db_exc
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -92,6 +94,81 @@ def test_auto_allocation_reports_exhaustion(db_context):
 
     with pytest.raises(understack_vni_db.UnderstackVNINoAvailable):
         helper.allocate_vni_for_router(db_context, "router-2", 0)
+
+
+def test_router_create_retries_auto_allocation_vni_race(mocker, db_context):
+    helper = understack_vni_db.UnderstackVniDbHelper(vni_ranges=["100:101"])
+    plugin = vrf.UnderstackVniPlugin.__new__(vrf.UnderstackVniPlugin)
+    plugin._vni_db = helper
+    mocker.patch.object(
+        vrf.directory,
+        "get_plugin",
+        return_value=FakeFlavorPlugin(vrf._vrf_provider_driver()),
+    )
+    mocker.patch("oslo_db.api.time.sleep")
+
+    original_flush = db_context.session.flush
+    original_rollback = db_context.session.rollback
+    collided = False
+    winner_inserted = False
+
+    def flush_with_collision(*args, **kwargs):
+        nonlocal collided
+        if not collided:
+            collided = True
+            raise db_exc.DBDuplicateEntry(columns=["vni"], value=100)
+        return original_flush(*args, **kwargs)
+
+    def rollback_and_insert_winner():
+        nonlocal winner_inserted
+        original_rollback()
+        if collided and not winner_inserted:
+            db_context.session.execute(
+                sa.text(
+                    """
+                    INSERT INTO understack_router_vni_allocations
+                        (vni, router_id)
+                    VALUES (:vni, :router_id)
+                    """
+                ),
+                {"vni": 100, "router_id": "router-racer"},
+            )
+            db_context.session.commit()
+            winner_inserted = True
+
+    mocker.patch.object(db_context.session, "flush", side_effect=flush_with_collision)
+    mocker.patch.object(
+        db_context.session, "rollback", side_effect=rollback_and_insert_winner
+    )
+
+    @db_api.retry_if_session_inactive()
+    def create_router(context, plugin):
+        router = {
+            "id": "router-1",
+            "flavor_id": "flavor-1",
+            apidef.EVPN_VNI: 0,
+        }
+        payload = SimpleNamespace(
+            context=context,
+            resource_id="router-1",
+            latest_state=router,
+        )
+
+        plugin._process_router_create(None, None, None, payload)
+        return payload.latest_state[apidef.EVPN_VNI]
+
+    assert create_router(db_context, plugin) == 101
+
+    rows = db_context.session.execute(
+        sa.text(
+            """
+            SELECT vni, router_id
+            FROM understack_router_vni_allocations
+            ORDER BY vni
+            """
+        )
+    ).fetchall()
+    assert rows == [(100, "router-racer"), (101, "router-1")]
 
 
 def test_vrf_router_create_allocates_vni(mocker):
