@@ -6,11 +6,6 @@ from neutron_lib.callbacks import priority_group
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib.db import resource_extend
-
-try:
-    from neutron_lib.api.definitions import evpn as evpn_apidef
-except ImportError:
-    evpn_apidef = None
 from neutron_lib.plugins import constants as plugin_constants
 from neutron_lib.plugins import directory
 from neutron_lib.services import base as service_base
@@ -18,6 +13,7 @@ from oslo_config import cfg
 from oslo_log import log as logging
 
 from neutron_understack import config
+from neutron_understack import evpn_compat
 from neutron_understack.api.definitions import understack_vni as apidef
 from neutron_understack.l3_router import understack_vni_db
 
@@ -44,9 +40,9 @@ def _is_vrf_router(context, router):
 
 
 def _supported_extension_aliases():
-    if evpn_apidef is not None:
-        return [evpn_apidef.ALIAS]
-    return [apidef.ALIAS]
+    # Advertise whichever extension provides the router evpn_vni attribute:
+    # core's ``evpn`` when core owns it, otherwise Understack's own.
+    return [evpn_compat.api_definition().ALIAS]
 
 
 @resource_extend.has_resource_extenders

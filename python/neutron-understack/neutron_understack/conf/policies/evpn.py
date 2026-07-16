@@ -1,6 +1,8 @@
 from neutron.conf.policies import base
 from oslo_policy import policy
 
+from neutron_understack import evpn_compat
+
 COLLECTION_PATH = "/routers"
 RESOURCE_PATH = "/routers/{id}"
 
@@ -31,4 +33,9 @@ rules = [
 
 
 def list_rules():
+    # When core owns EVPN it registers these same policies; registering them
+    # again makes neutron.policy.register_rules() raise DuplicatePolicyError
+    # and abort policy initialization for the whole neutron-server.
+    if evpn_compat.core_provides_evpn():
+        return []
     return rules
