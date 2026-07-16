@@ -1,0 +1,80 @@
+---
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: enroll-netdev
+  annotations:
+    workflows.argoproj.io/title: Enroll a network device in Ironic
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/enroll-netdev.yaml`
+kind: WorkflowTemplate
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  volumes:
+    - name: baremetal-manage
+      secret:
+        secretName: baremetal-manage
+        items:
+          - key: clouds.yaml
+            path: clouds.yaml
+  arguments:
+    parameters:
+      - name: name
+      - name: physical_network
+      - name: port1_mac
+      - name: port1_switch
+      - name: port1_intf
+      - name: port2_mac
+      - name: port2_switch
+      - name: port2_intf
+      - name: external_cmdb_id
+        value: ""
+      - name: resource_class
+        value: generic
+  templates:
+    - name: main
+      steps:
+        - - name: enroll-netdev
+            template: enroll-netdev
+    - name: enroll-netdev
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - enroll-netdev
+        args:
+          - --name
+          - "{{workflow.parameters.name}}"
+          - --physical-network
+          - "{{workflow.parameters.physical_network}}"
+          - --port1-mac
+          - "{{workflow.parameters.port1_mac}}"
+          - --port1-switch
+          - "{{workflow.parameters.port1_switch}}"
+          - --port1-intf
+          - "{{workflow.parameters.port1_intf}}"
+          - --port2-mac
+          - "{{workflow.parameters.port2_mac}}"
+          - --port2-switch
+          - "{{workflow.parameters.port2_switch}}"
+          - --port2-intf
+          - "{{workflow.parameters.port2_intf}}"
+          - --external-cmdb-id
+          - "{{workflow.parameters.external_cmdb_id}}"
+          - --resource-class
+          - "{{workflow.parameters.resource_class}}"
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+        env:
+          - name: WF_NS
+            value: "{{workflow.namespace}}"
+          - name: WF_NAME
+            value: "{{workflow.name}}"
+          - name: WF_UID
+            value: "{{workflow.uid}}"
+          - name: OS_CLOUD
+            value: understack

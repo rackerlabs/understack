@@ -13,6 +13,7 @@ resources:
   - workflowtemplates/sync-provision-state-to-nautobot.yaml
   - workflowtemplates/undersync-switch.yaml
   - workflowtemplates/keystone-event-project.yaml
+  - workflowtemplates/enroll-netdev.yaml
   - workflowtemplates/enroll-server.yaml
   - workflowtemplates/reclean-server.yaml
   - workflowtemplates/openstack-oslo-event.yaml
