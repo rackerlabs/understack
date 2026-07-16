@@ -14,7 +14,6 @@ from oslo_config import cfg
 from neutron_understack import config
 from neutron_understack import routers
 from neutron_understack import utils
-from neutron_understack.ironic import IronicClient
 from neutron_understack.l3_router import svi as svi_router
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
@@ -49,7 +48,6 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
 
         self.undersync = Undersync(conf.undersync_url)
-        self.ironic_client = IronicClient()
         self.trunk_driver = UnderStackTrunkDriver.create(self)
         self.subscribe()
 
@@ -266,13 +264,6 @@ class UnderstackDriver(MechanismDriver):
             port = context.current
 
         vlan_group_name = port[portbindings.PROFILE].get("physical_network")
-        if vlan_group_name is None:
-            local_link_info = utils.local_link_from_binding_profile(
-                port[portbindings.PROFILE]
-            )
-            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                local_link_info
-            )
 
         if current_vif_unbound and original_vif_other:
             self._tenant_network_port_cleanup(context)
@@ -325,13 +316,6 @@ class UnderstackDriver(MechanismDriver):
         port = context.current
 
         vlan_group_name = port[portbindings.PROFILE].get("physical_network")
-        if vlan_group_name is None:
-            local_link_info = utils.local_link_from_binding_profile(
-                port[portbindings.PROFILE]
-            )
-            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                local_link_info
-            )
 
         if not vlan_group_name:
             return
@@ -400,19 +384,17 @@ class UnderstackDriver(MechanismDriver):
         port = context.current
 
         vlan_group_name = port[portbindings.PROFILE].get("physical_network")
-        if vlan_group_name is None:
-            local_link_info = utils.local_link_from_binding_profile(
-                port[portbindings.PROFILE]
-            )
-            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                local_link_info
-            )
 
         if not vlan_group_name:
             LOG.error(
-                "bind_port_segment: no physical_network found for baremetal "
-                "port with mac address: %(mac)s",
-                {"mac": mac_address},
+                "bind_port_segment: physical_network is required in the "
+                "binding_profile for baremetal port binding, but was not found. "
+                "port_id=%(port_id)s mac_address=%(mac)s network_id=%(network_id)s.",
+                {
+                    "port_id": port["id"],
+                    "mac": mac_address,
+                    "network_id": network_id,
+                },
             )
             return
 

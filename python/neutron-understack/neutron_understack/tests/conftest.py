@@ -26,7 +26,6 @@ from neutron_lib.callbacks.events import DBEventPayload
 from oslo_config import fixture as config_fixture
 
 from neutron_understack import config as understack_config
-from neutron_understack.ironic import IronicClient
 from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.tests.helpers import Ml2PluginNoInit
 from neutron_understack.tests.helpers import extend_network_dict
@@ -196,18 +195,24 @@ def subnet_context(ml2_plugin, subnet_dict) -> SubnetContext:
 
 @pytest.fixture
 def binding_profile(request, port_id) -> str:
+    """A baremetal port binding profile.
+
+    Pass ``{"physical_network": None}`` to omit that key entirely.
+    """
     req = getattr(request, "param", {})
-    return json.dumps(
-        {
-            "local_link_information": [
-                {
-                    "port_id": req.get("port_id", str(port_id)),
-                    "switch_id": "11:22:33:44:55:66",
-                    "switch_info": "a1-1-1.iad3.rackspace.net",
-                }
-            ]
-        }
-    )
+    profile = {
+        "local_link_information": [
+            {
+                "port_id": req.get("port_id", str(port_id)),
+                "switch_id": "11:22:33:44:55:66",
+                "switch_info": "a1-1-1.iad3.rackspace.net",
+            }
+        ],
+    }
+    physical_network = req.get("physical_network", "physnet")
+    if physical_network is not None:
+        profile["physical_network"] = physical_network
+    return json.dumps(profile)
 
 
 @pytest.fixture
@@ -274,30 +279,15 @@ def port_context(network_context, port_dict, port_binding, ml2_plugin) -> PortCo
 
 
 @pytest.fixture
-def ironic_client(mocker) -> IronicClient:
-    return mocker.MagicMock(spec_set=IronicClient)
-
-
-@pytest.fixture
-def understack_driver(oslo_config, ironic_client) -> UnderstackDriver:
+def understack_driver(oslo_config) -> UnderstackDriver:
     driver = UnderstackDriver()
     driver.undersync = MagicMock(spec_set=Undersync)
-    driver.ironic_client = ironic_client
     return driver
 
 
 @pytest.fixture
 def understack_trunk_driver(understack_driver) -> UnderStackTrunkDriver:
     return UnderStackTrunkDriver.create(understack_driver)
-
-
-@pytest.fixture
-def _ironic_baremetal_port_physical_network(mocker, understack_driver) -> None:
-    mocker.patch.object(
-        understack_driver.ironic_client,
-        "baremetal_port_physical_network",
-        return_value="physnet",
-    )
 
 
 @pytest.fixture

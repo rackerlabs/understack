@@ -4,7 +4,6 @@ import logging
 from openstack import connection
 from openstack.baremetal.baremetal_service import BaremetalService
 from openstack.baremetal.v1.node import Node as BaremetalNode
-from openstack.baremetal.v1.port import Port as BaremetalPort
 from oslo_config import cfg
 
 from neutron_understack import config
@@ -60,18 +59,6 @@ class IronicClient:
             app_name="neutron_understack",
             app_version=version,
         ).baremetal
-
-    def baremetal_port_physical_network(self, local_link_info: dict) -> str | None:
-        port = self._port_by_local_link(local_link_info)
-        return port.physical_network if port else None
-
-    def _port_by_local_link(self, local_link_info: dict) -> BaremetalPort | None:
-        try:
-            return next(
-                self.irclient.ports(details=True, local_link_connection=local_link_info)
-            )
-        except StopIteration:
-            return None
 
     def baremetal_node_name(self, node_uuid: str) -> str | None:
         try:
