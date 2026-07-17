@@ -407,7 +407,7 @@ class TestLinkVxlanNetworkHaChassisGroup:
         )
 
     @staticmethod
-    def _client(mocker, ha_chassis_rows, lrp, network_hcg=None):
+    def _client(mocker, ha_chassis_rows, lrp, network_hcg=None, live_chassis=None):
         nb_idl = mocker.MagicMock()
         nb_idl.db_list_rows.return_value.execute.return_value = ha_chassis_rows
 
@@ -419,7 +419,22 @@ class TestLinkVxlanNetworkHaChassisGroup:
             return default
 
         nb_idl.lookup.side_effect = lookup
-        client = mocker.Mock(_nb_idl=nb_idl)
+
+        # By default every provided HA_Chassis row is treated as live, so
+        # existing callers don't need to know about the SB liveness check.
+        if live_chassis is None:
+            live_chassis = {row.chassis_name for row in ha_chassis_rows}
+
+        sb_idl = mocker.MagicMock()
+
+        def sb_lookup(table, name, default=None):
+            if table == "Chassis" and name in live_chassis:
+                return mocker.Mock(name=name)
+            return default
+
+        sb_idl.lookup.side_effect = sb_lookup
+
+        client = mocker.Mock(_nb_idl=nb_idl, _sb_idl=sb_idl)
         return client, nb_idl
 
     def _patch_sync(self, mocker, hcg="net-hcg-uuid"):
@@ -473,6 +488,32 @@ class TestLinkVxlanNetworkHaChassisGroup:
 
         sync.assert_not_called()
         nb_idl.db_set.assert_not_called()
+
+    def test_stale_chassis_excluded_from_uniqueness_check(self, mocker):
+        # chassis-2 no longer exists in the Southbound DB (e.g. decommissioned
+        # host) but a stale HA_Chassis row for it still lingers in NB. It must
+        # not block inference of the one live chassis.
+        hc_live = mocker.Mock(chassis_name="chassis-1")
+        hc_dead = mocker.Mock(chassis_name="chassis-2")
+        lrp = mocker.Mock(ha_chassis_group=[])
+        client, nb_idl = self._client(
+            mocker,
+            ha_chassis_rows=[hc_live, hc_dead],
+            lrp=lrp,
+            live_chassis={"chassis-1"},
+        )
+        sync = self._patch_sync(mocker)
+        mocker.patch("neutron_understack.routers.ovn_client", return_value=client)
+
+        link_vxlan_network_ha_chassis_group(None, None, None, self._payload(mocker))
+
+        sync.assert_called_once()
+        assert sync.call_args.args[5] == {"chassis-1": 32767}  # chassis_prio
+        nb_idl.db_set.assert_called_once_with(
+            "Logical_Router_Port",
+            "lrp-port-1",
+            ("ha_chassis_group", "net-hcg-uuid"),
+        )
 
     def test_network_hcg_already_populated(self, mocker):
         # VLAN/FLAT: neutron already populated the per-network HCG — we skip.
