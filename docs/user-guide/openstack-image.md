@@ -78,6 +78,93 @@ Explanation:
 * `--file /path/to/image.qcow2`: Specifies the path to the image file on your local machine.
 * `--public`: (Optional) Makes the image publicly accessible. Remove this flag to keep the image private to your project.
 
+## Image Properties
+
+Every image uploaded to Glance should have a set of metadata properties applied
+to it. OpenStack does not enforce required properties on images, but our
+environment relies on these properties for filtering, automation, and
+consistent catalog presentation. Treat the following properties as required
+when creating or importing any image.
+
+| Property | Description |
+|---|---|
+| `os_distro` | Short identifier for the OS distribution (lowercase, no spaces). |
+| `os_version` | Version string of the OS (e.g. `24.04`, `9.1.0`, `2025`). |
+| `os_type` | Kernel type of the operating system. See important note below. |
+| `os_name` | Human-readable display name for the OS. |
+
+<!-- markdownlint-capture -->
+<!-- markdownlint-disable MD046 -->
+!!! important
+
+    `os_type` only accepts **`linux`** or **`windows`** as values. There are
+    no other valid options. Even non-Linux unix-like systems (e.g. ESXi) should
+    use `linux`.
+<!-- markdownlint-restore -->
+
+### Setting Properties
+
+Properties can be set at image creation time with `--property` flags:
+
+```bash
+openstack image create 'My-Ubuntu-24.04' \
+  --disk-format qcow2 \
+  --property os_distro='ubuntu' \
+  --property os_version='24.04' \
+  --property os_type='linux' \
+  --property os_name='Ubuntu' \
+  --progress \
+  --file=/path/to/image.qcow2
+```
+
+Or applied to an existing image using `openstack image set`:
+
+```bash
+openstack image set \
+    --property os_distro='ubuntu' \
+    --property os_version='24.04' \
+    --property os_type='linux' \
+    --property os_name='Ubuntu' \
+    <image-id>
+```
+
+### Known Property Values
+
+To prevent fragmentation, use the values from the tables below. If you need to
+add a new OS that is not listed here, coordinate with the team so the table can
+be updated.
+
+#### os_distro
+
+| Value | OS |
+|---|---|
+| `almalinux` | Alma Linux |
+| `cirros` | Cirros |
+| `esxi` | VMware ESXi |
+| `flatcar` | Flatcar Container Linux |
+| `talos` | Talos Linux |
+| `ubuntu` | Ubuntu |
+| `windows` | Microsoft Windows |
+
+#### os_type
+
+| Value | Description |
+|---|---|
+| `linux` | All Linux and unix-like operating systems (including ESXi) |
+| `windows` | Microsoft Windows operating systems |
+
+#### os_name
+
+| Value | When to use |
+|---|---|
+| `Alma Linux` | Alma Linux images |
+| `Cirros` | Cirros test images |
+| `ESXi` | VMware ESXi images |
+| `Flatcar Container Linux` | Flatcar Container Linux images |
+| `Talos` | Talos Linux images |
+| `Ubuntu` | Ubuntu images |
+| `Windows Server` | Windows Server images |
+
 ## Additional Information
 
 For more detailed information on the openstack image command and its various
