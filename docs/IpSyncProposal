@@ -175,7 +175,6 @@ We need to confirm this with the team before locking in the site-facing interfac
 ## Alternatives Considered
 
 - **Cluster API's IPAM provider pattern:** useful to reason through the design, but not adopted — no machine lifecycle here, and it would add machinery we don't need.
-- **Full two-way sync on the whole object, no spec/status split:** rejected — too easy for both sides to fight over the same field and cause sync loops.
 - **Site agent wrapping OpenStack CLI commands:** considered, but calling the OpenStack APIs (Neutron/Ironic) directly is cleaner for a controller — better error handling, no subprocess management.
 
 ## Additional Details
