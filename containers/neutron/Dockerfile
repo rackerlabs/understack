@@ -21,6 +21,9 @@ ARG OPENSTACK_VERSION="required_argument"
 ADD https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} /upper-constraints.txt
 RUN sed -i '/^neutron-lib==.*/d' /upper-constraints.txt
 
+COPY containers/neutron/patches /tmp/patches/
+RUN cd /src/neutron && git apply /tmp/patches/*.patch
+
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
       --upgrade \
