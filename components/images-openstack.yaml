@@ -24,6 +24,7 @@ images:
     # ironic
     ironic_api: "ghcr.io/rackerlabs/understack/ironic:2026.1"
     ironic_conductor: "ghcr.io/rackerlabs/understack/ironic:2026.1"
+    ironic_novncproxy: "ghcr.io/rackerlabs/understack/ironic:2026.1"
     ironic_pxe: "ghcr.io/rackerlabs/understack/ironic:2026.1"
     ironic_pxe_init: "ghcr.io/rackerlabs/understack/ironic:2026.1"
     ironic_pxe_http: "docker.io/nginx:1.29.8"

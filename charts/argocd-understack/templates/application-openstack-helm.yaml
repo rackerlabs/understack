@@ -32,7 +32,7 @@ spec:
     server: {{ $.Values.cluster_server }}
   project: understack
   sources:
-  - repoURL: {{ $.Values.site.openstack.repoUrl }}
+  - repoURL: {{ $app.repoUrl | default $.Values.site.openstack.repoUrl }}
     targetRevision: {{ $app.chartVersion }}
     chart: {{ $appName }}
     helm:

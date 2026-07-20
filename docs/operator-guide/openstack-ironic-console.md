@@ -26,12 +26,12 @@ Here is brief explanation of what each component is responsible for:
   only one application - a browser with a HTML5 console exposed by the
   baremetal nodes BMC. These containers are accessible (internally) through
   VNC.
-- **ironic-novncproxy** is launched alongside the **Ironic Conductor** and as
-  the name implies, it proxies users HTTPS traffic. It does that by serving
-  [noVNC](https://github.com/novnc/noVNC) web application to the user's
-  browser. The browser then opens websocket connection to the
-  **ironic-novncproxy** which in turn opens VNC connection to the relevant
-  **container**.
+- **ironic-novncproxy** is deployed by the OpenStack-Helm Ironic chart as its
+  own Kubernetes Deployment and Service. As the name implies, it proxies users'
+  HTTPS traffic. It does that by serving [noVNC](https://github.com/novnc/noVNC)
+  web application to the user's browser. The browser then opens websocket
+  connection to the **ironic-novncproxy** which in turn opens VNC connection to
+  the relevant **container**.
 
 ## Sequence diagram
 
@@ -79,7 +79,9 @@ A typical deployment will have several components running to provide console fun
 Please note:
 
 - Each baremetal node console session gets it's own VNC container
-- There is a 1:1 coupling between the Ironic conductor and the Ironic NOVNCProxy
+- Console URLs are coupled to the conductor responsible for a node. Undercloud
+  currently runs one Ironic conductor and one chart-managed `ironic-novncproxy`
+  endpoint.
 
 ```mermaid
 flowchart LR
@@ -197,14 +199,13 @@ console feature:
 1. The baremetal nodes' console_interface must be set to a graphical driver
    such as `redfish-graphical`.
 2. Ironic must have the relevant drivers enabled in `enabled_console_interfaces`
-3. `ironic-novncproxy` must be launched for each of the ironic conductors. At
-   the time of writing, this is achieved through `extraContainers` because
-   OpenStack Helm does not have direct support for launching that component. We
-   plan to contribute that feature to [OSH][3] soon.
-4. Each instance of the `ironic-novncproxy` must be exposed to the external
-   world. This means, we have to create relevant Kubernetes `Service` and
-   `HTTPRoute` definitions. The `cert-manager` will take care of TLS certificates
-   and `external-dns` will register the DNS domain.
+3. The OpenStack-Helm Ironic chart's native novncproxy resources must be
+   enabled: `deployment_novncproxy`, `service_novncproxy`, `role_console_pods`,
+   and `rolebinding_console_pods`.
+4. The chart-created `ironic-novncproxy` Service must be exposed to the external
+   world. Undercloud routes the existing `console-0...` hostnames to that
+   Service through Envoy Gateway. The `cert-manager` will take care of TLS
+   certificates and `external-dns` will register the DNS domain.
 5. *(Optional)* The RBAC policy may need to be adjusted as the baremetal console,
    by default is only accessible to admins.
 
@@ -215,4 +216,3 @@ console feature:
 
 [1]: https://docs.openstack.org/ironic/latest/configuration/config.html#vnc
 [2]: https://docs.openstack.org/ironic/latest/install/graphical-console.html
-[3]: https://github.com/RSS-Engineering/undercloud-deploy/commit/d7201742ae5e10b9428be17b7418ac1066899214

@@ -1,6 +1,6 @@
 #!/bin/bash
 set -ex
-UPSTREAM_COMMIT="856238c56acb669c8e10cf1f0e0f4e0c9467c7e9"
+UPSTREAM_COMMIT="ae9d181738453333c5f06ef805344e294a923824"
 
 if ! [[ -f sync_from_upstream.sh ]]; then
   echo "Run ./sync_from_upstream.sh only from the containers/ironic-vnc-console folder."
