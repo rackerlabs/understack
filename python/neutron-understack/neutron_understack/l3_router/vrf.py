@@ -11,6 +11,7 @@ from neutron_lib.plugins import directory
 from neutron_lib.services import base as service_base
 from oslo_config import cfg
 from oslo_log import log as logging
+from oslo_serialization import jsonutils
 
 from neutron_understack import config
 from neutron_understack import evpn_compat
@@ -18,6 +19,23 @@ from neutron_understack.api.definitions import understack_vni as apidef
 from neutron_understack.l3_router import understack_vni_db
 
 LOG = logging.getLogger(__name__)
+
+# Service-profile metainfo key (and its allowed values) that toggles how the
+# Understack VNI plugin treats ``evpn_vni`` for routers of a given flavor. The
+# operator sets it as JSON in the flavor's service profile metainfo, e.g.
+# ``{"vni_alloc": "auto"}``.
+VNI_ALLOC_KEY = "vni_alloc"
+# ``off``  -- never allocate a VNI; reject any explicitly supplied evpn_vni.
+VNI_ALLOC_OFF = "off"
+# ``on``   -- allocate only an explicitly supplied evpn_vni; never auto-allocate.
+VNI_ALLOC_ON = "on"
+# ``auto`` -- auto-allocate a VNI when none is supplied; honor an explicit one.
+VNI_ALLOC_AUTO = "auto"
+# When a flavor carries no metainfo toggle (or has no flavor at all) we must not
+# allocate. This is what keeps non-VRF flavors (e.g. Palo Alto) from getting a
+# VNI now that the evpn_vni attribute default is ATTR_NOT_SPECIFIED.
+VNI_ALLOC_DEFAULT = VNI_ALLOC_OFF
+_VALID_VNI_ALLOC = (VNI_ALLOC_OFF, VNI_ALLOC_ON, VNI_ALLOC_AUTO)
 
 
 class Vrf(UserDefined):
@@ -28,15 +46,60 @@ def _vrf_provider_driver():
     return f"{Vrf.__module__}.{Vrf.__name__}"
 
 
-def _is_vrf_router(context, router):
+def _service_profile_metainfo(context, flavor_plugin, flavor):
+    """Return the parsed metainfo dict for a flavor's service profile.
+
+    metainfo is stored as a (nullable) JSON string on the service profile.
+    Returns an empty dict when there is no profile, no metainfo, or the
+    metainfo is not valid JSON describing an object.
+    """
+    for sp_id in flavor.get("service_profiles", []):
+        sp = flavor_plugin.get_service_profile(context, sp_id)
+        raw = sp.get("metainfo")
+        if not raw:
+            continue
+        if isinstance(raw, dict):
+            return raw
+        try:
+            parsed = jsonutils.loads(raw)
+        except (ValueError, TypeError):
+            LOG.warning(
+                "Ignoring non-JSON metainfo on service profile %s: %r",
+                sp_id,
+                raw,
+            )
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return {}
+
+
+def _router_vni_alloc(context, router):
+    """Resolve the evpn_vni allocation mode for a router from its flavor.
+
+    Returns one of ``off``/``on``/``auto``. A router with no flavor, no
+    service-profile metainfo, or an unrecognized value defaults to ``off``.
+    """
     flavor_id = router.get("flavor_id")
     if flavor_id is None or flavor_id is n_const.ATTR_NOT_SPECIFIED:
-        return False
+        return VNI_ALLOC_OFF
 
     flavor_plugin = directory.get_plugin(plugin_constants.FLAVORS)
     flavor = flavor_plugin.get_flavor(context, flavor_id)
-    provider = flavor_plugin.get_flavor_next_provider(context, flavor["id"])[0]
-    return str(provider["driver"]) == _vrf_provider_driver()
+    metainfo = _service_profile_metainfo(context, flavor_plugin, flavor)
+
+    mode = str(metainfo.get(VNI_ALLOC_KEY, VNI_ALLOC_DEFAULT)).lower()
+    if mode not in _VALID_VNI_ALLOC:
+        LOG.warning(
+            "Router flavor %s has invalid %s=%r in service-profile metainfo; "
+            "defaulting to %s",
+            flavor_id,
+            VNI_ALLOC_KEY,
+            mode,
+            VNI_ALLOC_DEFAULT,
+        )
+        return VNI_ALLOC_DEFAULT
+    return mode
 
 
 def _supported_extension_aliases():
@@ -91,15 +154,26 @@ class UnderstackVniPlugin(service_base.ServicePluginBase):
             apidef.EVPN_VNI,
             n_const.ATTR_NOT_SPECIFIED,
         )
+        explicit = not understack_vni_db.is_auto_vni(requested_vni)
 
-        if not _is_vrf_router(payload.context, router):
-            if not understack_vni_db.is_auto_vni(requested_vni):
+        mode = _router_vni_alloc(payload.context, router)
+
+        if mode == VNI_ALLOC_OFF:
+            if explicit:
                 raise n_exc.BadRequest(
                     resource=apidef.RESOURCE_NAME,
-                    msg="evpn_vni can only be set on VRF routers",
+                    msg="evpn_vni cannot be set on routers of this flavor",
                 )
+            # Leave evpn_vni as ATTR_NOT_SPECIFIED so neither Understack nor
+            # neutron core allocates a VNI for this router.
             return
 
+        if mode == VNI_ALLOC_ON and not explicit:
+            # Supplied-VNIs-only: nothing to allocate when none was supplied.
+            return
+
+        # ``auto`` (with or without an explicit VNI) or ``on`` with an explicit
+        # VNI: allocate_vni_for_router handles both auto-pick and specific-VNI.
         vni = self._vni_db.allocate_vni_for_router(
             payload.context,
             payload.resource_id,
@@ -107,9 +181,10 @@ class UnderstackVniPlugin(service_base.ServicePluginBase):
         )
         router[apidef.EVPN_VNI] = vni
         LOG.info(
-            "Allocated Understack VNI %s for VRF router %s",
+            "Allocated Understack VNI %s for router %s (vni_alloc=%s)",
             vni,
             payload.resource_id,
+            mode,
         )
 
     @registry.receives(resources.ROUTER, [events.PRECOMMIT_DELETE])
