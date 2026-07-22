@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 import sqlalchemy as sa
+from neutron_lib import constants as n_const
 from neutron_lib.db import api as db_api
 from oslo_db import exception as db_exc
 from sqlalchemy import create_engine
@@ -222,3 +223,12 @@ def test_non_vrf_router_create_rejects_explicit_vni(mocker):
         plugin._process_router_create(None, None, None, payload)
 
     plugin._vni_db.allocate_vni_for_router.assert_not_called()
+
+
+def test_evpn_vni_default_is_attr_not_specified():
+    # A bare ``router create`` (no evpn_vni) must leave the attribute as
+    # ATTR_NOT_SPECIFIED, matching core neutron-lib. A ``0`` default would be
+    # read by the core EVPNPlugin as an auto-allocate request and would
+    # allocate a VNI on every router. See launchpad bug 2160992.
+    attr = apidef.RESOURCE_ATTRIBUTE_MAP[apidef.COLLECTION_NAME][apidef.EVPN_VNI]
+    assert attr["default"] is n_const.ATTR_NOT_SPECIFIED
