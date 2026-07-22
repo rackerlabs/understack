@@ -103,6 +103,25 @@ Routers operate the same as baremetal servers. A VLAN must exist on the leaf pai
 where the virtual or physical router is being served from so that traffic can be
 handled.
 
+#### Router flavors and VRF VNI allocation
+
+Different [router flavors][ovn-router-flavors] map to different L3 service
+providers. For the fabric VRF flavors we additionally attach a VXLAN **VNI** to
+the router, tracked by the `understack_vni` L3 service plugin. Whether a VNI is
+allocated is driven by a `vni_alloc` value in the flavor's service-profile
+metainfo:
+
+- `off` (the default) — no VNI is allocated, and supplying one is rejected. This
+  is what keeps flavors like Palo Alto or Cisco ASA from receiving a VNI.
+- `on` — a VNI is allocated only when an admin explicitly supplies one
+  (`static_vrf`).
+- `auto` — a VNI is auto-allocated from the configured pool (`dynamic_vrf`).
+
+The router `evpn_vni` attribute defaults to *unspecified* (rather than `0`) so
+that neither UnderStack nor Neutron core auto-allocates a VNI for routers that
+have not opted in. Operational setup, migration, and troubleshooting steps are
+in the [Neutron operator guide](../operator-guide/openstack-neutron.md#router-flavors-and-vrf-vni-allocation).
+
 ## A View from the Neutron API/CLI
 
 First we'll create a self-serviced tenant network with the following:
