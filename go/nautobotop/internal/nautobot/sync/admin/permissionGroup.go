@@ -72,7 +72,7 @@ func (s *PermissionGroupSync) syncSinglePermission(
 		return nil
 	}
 
-	var groupIDs []int32
+	groupIDs := make([]int32, 0, len(perm.Groups))
 	for _, groupName := range perm.Groups {
 		gid, err := s.resolveGroupID(ctx, groupName, groupNameToID)
 		if err != nil {
