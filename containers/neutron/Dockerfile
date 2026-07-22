@@ -16,6 +16,7 @@ ADD --keep-git-dir=true https://github.com/rackerlabs/neutron-lib.git#${NEUTRON_
 RUN git -C /src/neutron-lib fetch --unshallow --tags
 
 COPY python/neutron-understack /src/neutron-understack
+COPY python/keystoneauth-kubeservicetoken /src/keystoneauth-kubeservicetoken
 
 ARG OPENSTACK_VERSION="required_argument"
 ADD https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} /upper-constraints.txt
@@ -27,7 +28,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
       --constraint /upper-constraints.txt \
         /src/neutron \
         /src/neutron-lib \
-        /src/neutron-understack
+        /src/neutron-understack \
+        /src/keystoneauth-kubeservicetoken
 
 ARG OPENSTACK_VERSION="required_argument"
 FROM quay.io/airshipit/neutron:${OPENSTACK_VERSION}-ubuntu_noble AS final

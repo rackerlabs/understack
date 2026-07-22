@@ -73,32 +73,11 @@ pod:
         volumeMounts:
           - mountPath: /var/lib/cinder
             name: var-lib-cinder
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
         volumes:
           - name: var-lib-cinder
             emptyDir: {}
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-                - secret:
-                    name: cinder-netapp-config
-                    optional: true
-    cinder_volume_usage_audit:
-      cinder_volume_usage_audit:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
+    # cinder_db_sync has no native etcSources support in the chart, so the
+    # cinder-etc-snippets mount still has to be injected manually here.
     cinder_db_sync:
       cinder_db_sync:
         volumeMounts:
@@ -111,54 +90,30 @@ pod:
               sources:
                 - secret:
                     name: cinder-ks-etc
-    cinder_backup:
-      cinder_backup:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-    cinder_scheduler:
-      cinder_scheduler:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-    cinder_db_purge:
-      cinder_db_purge:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
+  # cinder-ks-etc mounting for the other components is handled natively via
+  # pod.etcSources below, rather than duplicating it through pod.mounts.
+  etcSources:
     cinder_api:
-      cinder_api:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
+      - secret:
+          name: cinder-ks-etc
+    cinder_scheduler:
+      - secret:
+          name: cinder-ks-etc
+    cinder_volume:
+      - secret:
+          name: cinder-ks-etc
+      - secret:
+          name: cinder-netapp-config
+          optional: true
+    cinder_volume_usage_audit:
+      - secret:
+          name: cinder-ks-etc
+    cinder_backup:
+      - secret:
+          name: cinder-ks-etc
+    cinder_db_purge:
+      - secret:
+          name: cinder-ks-etc
   lifecycle:
     disruption_budget:
       deployments:

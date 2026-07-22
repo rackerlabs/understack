@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keystoneauth-kubeservicetoken"
+version = "0.1.0"
+description = "Keystoneauth plugin that reads OIDC access tokens from a file"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "keystoneauth1>=5.0.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0.0",
+  "pytest-cov>=7.1.0",
+]
+
+[project.entry-points."keystoneauth1.plugin"]
+v3oidcaccesstokenfile = "keystoneauth_kubeservicetoken.oidc:OpenIDConnectAccessTokenFileLoader"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["S101", "S106"]
