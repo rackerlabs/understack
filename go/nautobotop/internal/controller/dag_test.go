@@ -82,6 +82,7 @@ func TestTopologicalSort(t *testing.T) {
 				{Name: "namespace", DependsOn: []string{"location", "tenant"}},
 				{Name: "vlan", DependsOn: []string{"vlanGroup", "location", "tenant", "role"}},
 				{Name: "prefix", DependsOn: []string{"namespace", "rir", "location", "vlan", "tenant", "role"}},
+				{Name: "permissionGroup"},
 			},
 			want: []string{
 				"clusterGroup", "clusterType", "deviceType", "locationTypes",
