@@ -21,12 +21,11 @@ spec:
     parameters:
       - name: name
       - name: physical_network
-      - name: port1_mac
-      - name: port1_switch
-      - name: port1_intf
-      - name: port2_mac
-      - name: port2_switch
-      - name: port2_intf
+      # JSON array of ports with stable labels. Change/delete/rename labels
+      # manually. Optional per-port "switch_id" (real switch MAC) overrides the
+      # 00:00:00:00:00:00 placeholder, e.g.
+      # [{"label":"port1","mac":"..","switch":"..","intf":"..","switch_id":".."}]
+      - name: ports
       - name: external_cmdb_id
         value: ""
       - name: resource_class
@@ -46,18 +45,8 @@ spec:
           - "{{workflow.parameters.name}}"
           - --physical-network
           - "{{workflow.parameters.physical_network}}"
-          - --port1-mac
-          - "{{workflow.parameters.port1_mac}}"
-          - --port1-switch
-          - "{{workflow.parameters.port1_switch}}"
-          - --port1-intf
-          - "{{workflow.parameters.port1_intf}}"
-          - --port2-mac
-          - "{{workflow.parameters.port2_mac}}"
-          - --port2-switch
-          - "{{workflow.parameters.port2_switch}}"
-          - --port2-intf
-          - "{{workflow.parameters.port2_intf}}"
+          - --ports
+          - "{{workflow.parameters.ports}}"
           - --external-cmdb-id
           - "{{workflow.parameters.external_cmdb_id}}"
           - --resource-class
