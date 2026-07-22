@@ -24,50 +24,54 @@
   ansible.builtin.debug:
     msg: "Found {{ prefixes_query.json.count }} prefixes tagged with '{{ subnet_pool_tag }}' in location '{{ site_location }}'"
 
-- name: Assert prefixes were found
-  ansible.builtin.assert:
-    that:
-      - prefixes_query.json.count > 0
-    fail_msg: "No prefixes found with tag '{{ subnet_pool_tag }}' in location '{{ site_location }}' in Nautobot"
-
-- name: Group prefixes by subnet pool name
-  ansible.builtin.set_fact:
-    subnet_pools: |
-      {{
-        prefixes_query.json.results
-        | selectattr('custom_fields.subnet_pool_name', 'defined')
-        | groupby('custom_fields.subnet_pool_name')
-        | map(attribute='1')
-        | map('list')
-      }}
-
-- name: Log discovered subnet pools
+- name: Skip subnet pool creation when no prefixes were found
   ansible.builtin.debug:
-    msg: |
-      Discovered subnet pools:
-      {{ subnet_pools | map(attribute='0.custom_fields.subnet_pool_name') | list }}
+    msg: >-
+      No prefixes found with tag '{{ subnet_pool_tag }}' in location
+      '{{ site_location }}'; skipping OpenStack subnet pool creation
+  when: prefixes_query.json.count | int == 0
 
-- name: Create or update OpenStack subnet pools
-  openstack.cloud.subnet_pool:
-    state: present
-    name: "{{ pool_item[0].custom_fields.subnet_pool_name }}"
-    prefixes: "{{ pool_item | map(attribute='prefix') | list }}"
-    default_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_default_prefixlen }}"
-    minimum_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_min_prefixlen }}"
-    maximum_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_max_prefixlen }}"
-    is_shared: true
-  loop: "{{ subnet_pools }}"
-  loop_control:
-    loop_var: pool_item
-    label: "{{ pool_item[0].custom_fields.subnet_pool_name }}"
-  register: subnet_pool_results
+- name: Create OpenStack subnet pools from matching prefixes
+  when: prefixes_query.json.count | int > 0
+  block:
+    - name: Group prefixes by subnet pool name
+      ansible.builtin.set_fact:
+        subnet_pools: |
+          {{
+            prefixes_query.json.results
+            | selectattr('custom_fields.subnet_pool_name', 'defined')
+            | groupby('custom_fields.subnet_pool_name')
+            | map(attribute='1')
+            | map('list')
+          }}
 
-- name: Log subnet pool creation results
-  ansible.builtin.debug:
-    msg: "Subnet pool '{{ item.pool_item[0].custom_fields.subnet_pool_name }}': {{ 'created' if item is changed else 'unchanged' }}"
-  loop: "{{ subnet_pool_results.results }}"
-  when: item is not skipped
+    - name: Log discovered subnet pools
+      ansible.builtin.debug:
+        msg: |
+          Discovered subnet pools:
+          {{ subnet_pools | map(attribute='0.custom_fields.subnet_pool_name') | list }}
 
-- name: Verify subnet pools were created
-  ansible.builtin.debug:
-    msg: "Successfully created/updated {{ subnet_pool_results.results | length }} subnet pools"
+    - name: Create or update OpenStack subnet pools
+      openstack.cloud.subnet_pool:
+        state: present
+        name: "{{ pool_item[0].custom_fields.subnet_pool_name }}"
+        prefixes: "{{ pool_item | map(attribute='prefix') | list }}"
+        default_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_default_prefixlen }}"
+        minimum_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_min_prefixlen }}"
+        maximum_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_max_prefixlen }}"
+        is_shared: true
+      loop: "{{ subnet_pools }}"
+      loop_control:
+        loop_var: pool_item
+        label: "{{ pool_item[0].custom_fields.subnet_pool_name }}"
+      register: subnet_pool_results
+
+    - name: Log subnet pool creation results
+      ansible.builtin.debug:
+        msg: "Subnet pool '{{ item.pool_item[0].custom_fields.subnet_pool_name }}': {{ 'created' if item is changed else 'unchanged' }}"
+      loop: "{{ subnet_pool_results.results }}"
+      when: item is not skipped
+
+    - name: Verify subnet pools were created
+      ansible.builtin.debug:
+        msg: "Successfully created/updated {{ subnet_pool_results.results | length }} subnet pools"
