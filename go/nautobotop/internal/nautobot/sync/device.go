@@ -10,6 +10,7 @@ import (
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/dcim"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/extras"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/helpers"
+	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/ipam"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/models"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/tenancy"
 	"github.com/samber/lo"
@@ -25,6 +26,7 @@ type DeviceSync struct {
 	statusSvc     *dcim.StatusService
 	roleSvc       *extras.RoleService
 	tenantSvc     *tenancy.TenantService
+	vlanGroupSvc  *ipam.VlanGroupService
 }
 
 func NewDeviceSync(nautobotClient *client.NautobotClient) *DeviceSync {
@@ -37,6 +39,7 @@ func NewDeviceSync(nautobotClient *client.NautobotClient) *DeviceSync {
 		statusSvc:     dcim.NewStatusService(nautobotClient.GetClient()),
 		roleSvc:       extras.NewRoleService(nautobotClient.GetClient()),
 		tenantSvc:     tenancy.NewTenantService(nautobotClient.GetClient()),
+		vlanGroupSvc:  ipam.NewVlanGroupService(nautobotClient),
 	}
 }
 
@@ -153,6 +156,29 @@ func (s *DeviceSync) syncSingleDevice(ctx context.Context, device models.Device)
 		deviceRequest.Platform = platformRef
 	}
 
+	// Set custom fields (optional)
+	customFields := make(map[string]interface{})
+	if device.ChassisMacAddress != "" {
+		customFields["chassis_mac_address"] = device.ChassisMacAddress
+	}
+	if device.ExternalCmdbID != "" {
+		customFields["external_cmdb_id"] = device.ExternalCmdbID
+	}
+	if len(customFields) > 0 {
+		deviceRequest.CustomFields = customFields
+	}
+
+	// Set vlan_group_to_devices relationship (optional)
+	if device.VlanGroup != "" {
+		vlanGroupID := s.buildVlanGroupID(ctx, device.VlanGroup)
+		if vlanGroupID != "" {
+			relationships := map[string]nb.ApprovalWorkflowDefinitionRequestRelationshipsValue{
+				"vlan_group_to_devices": helpers.BuildRelationshipSource(vlanGroupID),
+			}
+			deviceRequest.Relationships = &relationships
+		}
+	}
+
 	if existingDevice.Id == nil {
 		return s.createDevice(ctx, deviceRequest, device.Name)
 	}
@@ -256,4 +282,13 @@ func (s *DeviceSync) buildTenantReference(ctx context.Context, name string) (nb.
 
 func (s *DeviceSync) buildPlatformReference(platformID string) nb.NullableApprovalWorkflowUser {
 	return helpers.BuildNullableApprovalWorkflowUser(platformID)
+}
+
+func (s *DeviceSync) buildVlanGroupID(ctx context.Context, name string) string {
+	vg := s.vlanGroupSvc.GetByName(ctx, name)
+	if vg.Id == nil {
+		s.client.AddReport("syncDevice", "vlan group not found", "name", name)
+		return ""
+	}
+	return *vg.Id
 }
