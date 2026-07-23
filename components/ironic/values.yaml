@@ -133,6 +133,9 @@ conf:
       processes: 4
 
 endpoints:
+  oslo_db:
+    hosts:
+      default: mariadb-primary
   oslo_messaging:
     namespace: null
     statefulset:

@@ -37,6 +37,9 @@ conf:
       amqp_durable_queues: true
 
 endpoints:
+  oslo_db:
+    hosts:
+      default: mariadb-primary
   dashboard:
     host_fqdn_override:
       public:

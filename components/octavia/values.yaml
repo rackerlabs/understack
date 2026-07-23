@@ -4,6 +4,9 @@
 # values, but should include all endpoints
 # required by this chart
 endpoints:
+  oslo_db:
+    hosts:
+      default: mariadb-primary
   oslo_messaging:
     statefulset:
       replicas: 3

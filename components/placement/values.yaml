@@ -46,6 +46,9 @@ pod:
     enabled: true
 
 endpoints:
+  oslo_db:
+    hosts:
+      default: mariadb-primary
   placement:
     scheme:
       public: 'https'

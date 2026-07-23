@@ -1,5 +1,8 @@
 ---
 endpoints:
+  oslo_db:
+    hosts:
+      default: mariadb-primary
   skyline:
     host_fqdn_override:
       public:
