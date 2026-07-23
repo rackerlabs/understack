@@ -33,21 +33,142 @@
     vni_min: "{{ ucvni_groups_result.json.results[0].range.split('-')[0] | int }}"
     vni_max: "{{ ucvni_groups_result.json.results[0].range.split('-')[1] | int }}"
 
-- name: Check if Neutron segment range already exists
+- name: List current Neutron segment ranges
   ansible.builtin.command:
-    cmd: openstack network segment range show {{ ucvni_group.name }} --format value --column id
-  register: existing_segment_range
-  failed_when: false
+    argv:
+      - openstack
+      - network
+      - segment
+      - range
+      - list
+      - --format
+      - json
+  register: neutron_segment_range_list
   changed_when: false
+  retries: 3
+  delay: 5
+  until: neutron_segment_range_list.rc == 0
+
+- name: Extract matching Neutron segment ranges
+  ansible.builtin.set_fact:
+    neutron_segment_ranges_by_name: >-
+      {{
+        (neutron_segment_range_list.stdout | from_json)
+        | selectattr('Name', 'equalto', ucvni_group.name)
+        | list
+      }}
+    neutron_segment_ranges_matching_ucvni: >-
+      {{
+        (neutron_segment_range_list.stdout | from_json)
+        | selectattr('Name', 'equalto', ucvni_group.name)
+        | selectattr('Network Type', 'in', ['vxlan', 'VXLAN'])
+        | selectattr('Minimum ID', 'in', [vni_min | int, vni_min | string])
+        | selectattr('Maximum ID', 'in', [vni_max | int, vni_max | string])
+        | selectattr('Shared', 'in', [true, 'True', 'true'])
+        | list
+      }}
+
+- name: Report duplicate Neutron segment range names
+  ansible.builtin.debug:
+    msg: >-
+      Found {{ neutron_segment_ranges_by_name | length }} Neutron segment
+      ranges named '{{ ucvni_group.name }}'; treating the segment range as
+      present because {{ neutron_segment_ranges_matching_ucvni | length }}
+      entries match Nautobot.
+  when:
+    - neutron_segment_ranges_by_name | length > 1
+    - neutron_segment_ranges_matching_ucvni | length > 0
+
+- name: Validate existing Neutron segment range name is not conflicting
+  ansible.builtin.assert:
+    that:
+      - >-
+        (neutron_segment_ranges_by_name | length) == 0 or
+        (neutron_segment_ranges_matching_ucvni | length) > 0
+    fail_msg: >-
+      Neutron segment range '{{ ucvni_group.name }}' already exists, but none
+      of the ranges with that name match Nautobot UCVNI Group range
+      '{{ ucvni_group.range }}'. Existing ranges:
+      {{ neutron_segment_ranges_by_name }}
 
 - name: Create Neutron VXLAN segment range from UCVNI Group {{ ucvni_group.name }}
   ansible.builtin.command:
-    cmd: >-
-      openstack network segment range create
-      --network-type vxlan
-      --minimum {{ vni_min }}
-      --maximum {{ vni_max }}
-      --share
-      {{ ucvni_group.name }}
-  when: existing_segment_range.rc != 0
-  changed_when: true
+    argv:
+      - openstack
+      - network
+      - segment
+      - range
+      - create
+      - --network-type
+      - vxlan
+      - --minimum
+      - "{{ vni_min }}"
+      - --maximum
+      - "{{ vni_max }}"
+      - --share
+      - "{{ ucvni_group.name }}"
+  when:
+    - (neutron_segment_ranges_by_name | length) == 0
+    - (neutron_segment_ranges_matching_ucvni | length) == 0
+  register: create_segment_range
+  failed_when: >-
+    create_segment_range.rc != 0 and
+    (
+      (
+        (create_segment_range.stdout | default('')) ~
+        (create_segment_range.stderr | default(''))
+      ) | regex_search('(?i)(already exists|duplicate|504|gateway timeout)')
+    ) is none
+  changed_when: >-
+    create_segment_range.rc == 0 or
+    (
+      (
+        (create_segment_range.stdout | default('')) ~
+        (create_segment_range.stderr | default(''))
+      ) | regex_search('(?i)(504|gateway timeout)')
+    ) is not none
+
+- name: List current Neutron segment ranges after create
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - segment
+      - range
+      - list
+      - --format
+      - json
+  register: neutron_segment_range_list_after_create
+  changed_when: false
+  retries: 6
+  delay: 10
+  until: neutron_segment_range_list_after_create.rc == 0
+
+- name: Extract matching Neutron segment ranges after create
+  ansible.builtin.set_fact:
+    neutron_segment_ranges_by_name: >-
+      {{
+        (neutron_segment_range_list_after_create.stdout | from_json)
+        | selectattr('Name', 'equalto', ucvni_group.name)
+        | list
+      }}
+    neutron_segment_ranges_matching_ucvni: >-
+      {{
+        (neutron_segment_range_list_after_create.stdout | from_json)
+        | selectattr('Name', 'equalto', ucvni_group.name)
+        | selectattr('Network Type', 'in', ['vxlan', 'VXLAN'])
+        | selectattr('Minimum ID', 'in', [vni_min | int, vni_min | string])
+        | selectattr('Maximum ID', 'in', [vni_max | int, vni_max | string])
+        | selectattr('Shared', 'in', [true, 'True', 'true'])
+        | list
+      }}
+
+- name: Validate Neutron segment range matches UCVNI Group {{ ucvni_group.name }}
+  ansible.builtin.assert:
+    that:
+      - neutron_segment_ranges_matching_ucvni | length > 0
+    fail_msg: >-
+      Neutron segment range '{{ ucvni_group.name }}' was not found with
+      network_type=vxlan, minimum={{ vni_min }}, maximum={{ vni_max }}, and
+      shared=True. Existing ranges with this name:
+      {{ neutron_segment_ranges_by_name }}
