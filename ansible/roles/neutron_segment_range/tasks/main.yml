@@ -9,9 +9,9 @@
     openstack_region: >-
       {{ (clouds_yaml_raw.content | b64decode | from_yaml).clouds[lookup('env', 'OS_CLOUD')].region_name }}
 
-- name: Query Nautobot for UCVNI Groups in region {{ openstack_region }}
+- name: Query Nautobot for UCVNI Groups in region blah
   ansible.builtin.uri:
-    url: "{{ nautobot_url }}/api/plugins/undercloud-vni/ucvni-groups/?location={{ openstack_region }}"
+    url: "{{ nautobot_url }}/api/plugins/undercloud-vni/ucvni-groups/?location=blah"
     method: GET
     headers:
       Authorization: "Token {{ nautobot_token }}"
@@ -24,7 +24,7 @@
     that:
       - ucvni_groups_result.json.count == 1
     fail_msg: >-
-      Expected exactly 1 UCVNI Group for location '{{ openstack_region }}',
+      Expected exactly 1 UCVNI Group for location blah,
       found {{ ucvni_groups_result.json.count }}
 
 - name: Extract UCVNI Group data and parse VNI range
