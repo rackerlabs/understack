@@ -1,6 +1,5 @@
 from neutron.objects.network import NetworkSegment
 from neutron.objects.ports import Port
-from neutron.objects.ports import PortBindingLevel
 from neutron.objects.trunk import SubPort
 from neutron.services.trunk.drivers import base as trunk_base
 from neutron.services.trunk.models import Trunk
@@ -223,11 +222,6 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             vlan_group_name=vlan_group_name,
         )
 
-    def _delete_binding_level(self, port_id: str, host: str) -> PortBindingLevel:
-        binding_level = utils.port_binding_level_by_port_id(port_id, host)
-        binding_level.delete()
-        return binding_level
-
     def _delete_unused_segment(self, segment_id: str) -> NetworkSegment:
         network_segment = utils.network_segment_by_id(segment_id)
         if not utils.ports_bound_to_segment(
@@ -238,8 +232,12 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
 
     def _handle_segment_deallocation(self, subports: list[SubPort], host: str):
         for subport in subports:
-            subport_binding_level = self._delete_binding_level(subport["port_id"], host)
-            self._delete_unused_segment(subport_binding_level.segment_id)
+            binding_level = utils.port_binding_level_by_port_id(
+                subport["port_id"], host
+            )
+            if binding_level:
+                binding_level.delete()
+                self._delete_unused_segment(binding_level.segment_id)
 
     def _handle_subports_removal(
         self,
