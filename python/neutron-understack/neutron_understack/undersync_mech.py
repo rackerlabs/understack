@@ -8,6 +8,7 @@ from oslo_config import cfg
 
 from neutron_understack import config
 from neutron_understack.undersync import Undersync
+from neutron_understack.undersync_trunk import UndersyncTrunkDriver
 
 from .ml2_type_annotations import PortContext
 
@@ -26,6 +27,7 @@ class UndersyncDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
 
         self.undersync = Undersync(conf.undersync_url)
+        self.trunk_driver = UndersyncTrunkDriver.create(self)
 
     def bind_port(self, context: PortContext) -> None:
         port = context.current
