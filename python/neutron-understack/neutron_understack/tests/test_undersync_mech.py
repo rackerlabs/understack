@@ -5,14 +5,31 @@ from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
 
+from neutron_understack.undersync import Undersync
 from neutron_understack.undersync_mech import UndersyncDriver
 
 
 @pytest.fixture
-def driver():
+def driver(mocker):
+    mocker.patch("neutron_understack.config.get_session")
     d = UndersyncDriver()
     d.initialize()
     return d
+
+
+class TestInitialize:
+    def test_creates_undersync_client(self, mocker, oslo_config):
+        mocker.patch("neutron_understack.config.get_session")
+        oslo_config.config(
+            undersync_url="http://undersync.example.com",
+            group="ml2_understack",
+        )
+
+        driver = UndersyncDriver()
+        driver.initialize()
+
+        assert isinstance(driver.undersync, Undersync)
+        assert driver.undersync.api_url == "http://undersync.example.com"
 
 
 def _make_context(vnic_type=portbindings.VNIC_BAREMETAL, segments=None):
