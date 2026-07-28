@@ -197,6 +197,97 @@ Now everything is back to normal and the prometheus alert should clear:
 +--------------------------------------+------------------------------+--------------------------------------+-------------------+-------+-------+----------------------+
 ```
 
+## Verifying a router port is bound to an HA_Chassis_Group
+
+UnderStack tenant networks are VXLAN. Bare-metal nodes reach them through the
+leaf switches, which map each network's VNI to a VLAN on the trunk facing the
+neutron network node — so OVN has to tag traffic leaving through that network
+node's uplink with the correct VLAN for the leaf to translate back onto the
+right VNI (see `create_uplink_port`/`fetch_or_create_router_segment` in
+`neutron_understack/routers.py` for how that per-network dynamic VLAN segment
+gets allocated today). This is the same VNI-to-VLAN bridging problem the
+upstream
+[L2VNI mechanism driver](https://docs.openstack.org/networking-baremetal/latest/configuration/ml2/l2vni-mechanism-driver.html)
+(`baremetal_l2vni`) solves generically — allocate a dynamic VLAN per overlay
+network, create an OVN localnet port for it, then let the switch-management
+driver program that VLAN on the physical trunk — and what UnderStack is
+moving toward in place of the bespoke logic in `routers.py`. Both a router's
+external gateway port
+(`network:router_gateway`) and its internal interface ports
+(`network:router_interface`) rely on an OVN `HA_Chassis_Group` (HCG) to know
+which chassis should actually own that tagging/forwarding for their traffic:
+
+- The **gateway** port's HCG (named `neutron-<router_id>`) determines which
+  chassis runs SNAT/DNAT — including floating IPs. If it's not linked,
+  north/south NAT traffic is silently dropped even though everything else
+  (ports, NAT rules, chassis registration) looks correct.
+- An **internal interface** port's HCG (named `neutron-<network_id>`) is what
+  lets bare-metal nodes on that VXLAN network ARP/route through the router.
+  If it's not linked, those nodes can't reach their gateway.
+
+The `Logical_Router_Port.ha_chassis_group` field is the thing that must be
+set — if it's empty (`[]`), the port has no chassis to run on, regardless of
+whether an HCG exists elsewhere in the database.
+
+!!! note
+    A `No hosting information found for port <id>` WARNING in the neutron
+    logs is usually **not** related to this — that message just means the
+    Neutron ML2 port binding for that port has no `host` set, which is normal
+    for router ports. Don't chase it; check the HCG directly instead.
+
+### Process
+
+1. Find the router port IDs (gateway and/or interface):
+
+    ``` text
+     openstack port list --router <router_name_or_id> -c id -c device_owner
+    ```
+
+2. Check whether each port's Logical_Router_Port has an HCG linked:
+
+    ``` text
+     kubectl -n openstack exec -i ovn-ovsdb-nb-0 -c ovsdb -- \
+       ovn-nbctl get Logical_Router_Port lrp-<port_id> ha_chassis_group
+    ```
+
+    An empty result (`[]`) means the port isn't bound to any chassis — this
+    is the bug.
+
+3. If it's empty, check whether the HCG it *should* be pointing at even
+   exists and has a chassis in it. For a gateway port, look for
+   `neutron-<router_id>`; for an internal interface port, look for
+   `neutron-<network_id>`:
+
+    ``` text
+     kubectl -n openstack exec -i ovn-ovsdb-nb-0 -c ovsdb -- \
+       ovn-nbctl list HA_Chassis_Group
+    ```
+
+    - If the group doesn't exist at all, or exists with an empty
+      `ha_chassis` list, nothing has scheduled a gateway chassis for that
+      router/network yet.
+    - If the group exists *and* has a chassis, but the LRP still isn't
+      linked to it, the group was created/synced but never attached to the
+      port — this is exactly the gap `neutron_understack.routers`'s
+      `link_router_gateway_ha_chassis_group` and
+      `link_vxlan_network_ha_chassis_group` work around (see
+      `python/neutron-understack/neutron_understack/routers.py`).
+
+4. Cross-check the chassis itself is live and gateway-capable:
+
+    ``` text
+     kubectl -n openstack exec -i ovn-ovsdb-sb-0 -c ovsdb -- ovn-sbctl list Chassis
+    ```
+
+    Look for `ovn-cms-options=enable-chassis-as-gw` in `other_config`, and
+    confirm the chassis UUID referenced by the HCG's `HA_Chassis` rows
+    matches a chassis that's actually present here.
+
+If the HCG and chassis both look correct but the LRP is still unlinked,
+`scripts/cleanup_dead_ovn_ha_chassis.py` (dry-run by default) can repopulate
+empty per-network HCGs and re-link the LRP in one pass — run it before making
+any manual `ovn-nbctl` changes.
+
 ## Resync Neutron with OVN
 
 Resync neutron data with OVN and repair the ovn database by running the
