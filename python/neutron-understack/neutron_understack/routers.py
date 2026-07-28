@@ -204,27 +204,33 @@ def create_uplink_port(segment: NetworkSegment, network_id: str, txn=None) -> No
 
 
 def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) -> None:
-    """Populate the unified network HCG (and anchor the internal LRP) for vxlan.
+    """Populate the unified network HCG for vxlan external gateways.
 
-    Workaround for a neutron bug exposed in 2026.1. For a router with a vxlan-type
-    external gateway, neutron pins the Logical_Router to a single
-    chassis via ``options:chassis`` and creates a per-router HA_Chassis_Group
-    (neutron-<router_id>) carrying that chassis, but it never sets
-    ha_chassis_group on the gateway LRP. neutron's link_network_ha_chassis_group
-    (fired when the internal LRP is created) bails out at its
-    ``if not gw_lrps[0].ha_chassis_group`` check, so it never copies the chassis
-    into the per-network unified HCG (neutron-<network_id>). External/baremetal
-    ports on that network reference the empty network HCG, so no chassis owns
-    them and routing/ARP breaks.
+    Workaround for a neutron bug exposed in 2026.1. For a vxlan-type external
+    gateway, neutron pins the Logical_Router to a chassis via ``options:chassis``
+    but never populates ``gateway_chassis`` on the gateway LRP (that's only done
+    for VLAN/FLAT via the OVN L3 scheduler). neutron's own
+    ``link_network_ha_chassis_group`` builds its chassis list from that empty
+    ``gateway_chassis``, so it syncs the per-network unified HCG
+    (neutron-<network_id>) with zero members, leaving external/baremetal ports on
+    that network with no owning chassis and broken routing/ARP.
 
-    We do what link_network_ha_chassis_group would have done: populate the unified
-    network HCG with sync_ha_chassis_group_network_unified, then anchor the internal
-    router-interface LRP to that same HCG. The gateway chassis is sourced from the
-    global HA_Chassis table (all *live* records must share one chassis_name) so the
-    fix fires even before the external gateway port is attached. Rows pointing at a
-    chassis no longer present in the Southbound DB (e.g. left behind by a
-    decommissioned/replaced host) are excluded before checking for uniqueness, so a
-    single stale row elsewhere in the fleet doesn't block every vxlan network.
+    We populate that same unified HCG ourselves via
+    sync_ha_chassis_group_network_unified. The chassis comes from the global
+    HA_Chassis table (all *live* rows must share one chassis_name), so this works
+    even before the gateway port is attached. Rows for chassis no longer in the
+    Southbound DB (decommissioned/replaced hosts) are excluded so one stale row
+    doesn't block every vxlan network.
+
+    We do NOT set ha_chassis_group on the internal router-interface LRP.
+    Upstream never does this on a Logical_Router_Port (only on external
+    Logical_Switch_Ports), and doing so on a router that already has
+    options:chassis set -- true for every vxlan gateway -- makes ovn-northd log
+    "Bad configuration: distributed gateway port configured on ... L3 gateway
+    router" and ignore it anyway, since the router is already centralized on one
+    chassis. We guard on options:chassis rather than dropping the anchor
+    outright in case this fixup is ever reused for a genuinely distributed
+    router.
 
     For VLAN/FLAT networks neutron's handler already populates the network HCG
     correctly; we detect that and return early.
@@ -301,8 +307,20 @@ def link_vxlan_network_ha_chassis_group(_resource, _event, _trigger, payload) ->
                 txn,
             )
 
-            # Anchor the internal router-interface LRP to the same unified HCG.
-            if nb_idl.lookup("Logical_Router_Port", lrp_name, default=None):
+            # Anchor the internal LRP to the HCG, unless the router is
+            # centralized (options:chassis set) -- see docstring.
+            lr = nb_idl.lookup(
+                "Logical_Router", ovn_utils.ovn_name(router_id), default=None
+            )
+            router_is_centralized = bool(lr and lr.options.get("chassis"))
+            if router_is_centralized:
+                LOG.debug(
+                    "Not anchoring LRP %(lrp)s to HCG %(hcg)s: router "
+                    "%(router)s is centralized (options:chassis set), so "
+                    "northd would reject a distributed gateway port on it",
+                    {"lrp": lrp_name, "hcg": hcg, "router": router_id},
+                )
+            elif nb_idl.lookup("Logical_Router_Port", lrp_name, default=None):
                 txn.add(
                     nb_idl.db_set(
                         "Logical_Router_Port",
