@@ -127,17 +127,6 @@ pod:
     neutron_server:
       - secret:
           name: neutron-ks-etc
-  mounts:
-    neutron_server:
-      neutron_server:
-        volumeMounts:
-          - mountPath: /etc/undersync/
-            name: undersync-token
-            readOnly: true
-        volumes:
-          - name: undersync-token
-            secret:
-              secretName: undersync-token
 
   use_fqdn:
     neutron_agent: false
