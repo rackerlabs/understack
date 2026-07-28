@@ -46,7 +46,6 @@ Required or commonly required items:
 - `values.yaml`: Provide the Neutron-specific chart or manifest values.
 - `neutron-db-password` Secret: Provide `username` and `password` for the Neutron database user.
 - `neutron-rabbitmq-password` Secret: Provide `username` and `password` for the Neutron messaging user.
-- `undersync-token` Secret: Provide a `token` value if Neutron automation needs to call undersync.
 
 Optional additions:
 
