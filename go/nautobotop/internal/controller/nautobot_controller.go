@@ -37,9 +37,13 @@ import (
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	syncv1alpha1 "github.com/rackerlabs/understack/go/nautobotop/api/v1alpha1"
 )
@@ -53,6 +57,7 @@ type NautobotReconciler struct {
 // +kubebuilder:rbac:groups=sync.rax.io,resources=nautobots,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=sync.rax.io,resources=nautobots/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=sync.rax.io,resources=nautobots/finalizers,verbs=update
+// +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -551,9 +556,37 @@ func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, naut
 func (r *NautobotReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&syncv1alpha1.Nautobot{}).
+		Watches(
+			&corev1.ConfigMap{},
+			handler.EnqueueRequestsFromMapFunc(r.mapConfigMapToNautobot),
+			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
+		).
 		WithOptions(controller.Options{RecoverPanic: ptr.To(true)}).
 		Named("nautobot").
 		Complete(r)
+}
+
+func (r *NautobotReconciler) mapConfigMapToNautobot(ctx context.Context, obj client.Object) []reconcile.Request {
+	var list syncv1alpha1.NautobotList
+	if err := r.List(ctx, &list); err != nil {
+		logf.FromContext(ctx).Error(err, "failed to list Nautobot CRs for ConfigMap mapping")
+		return nil
+	}
+	var requests []reconcile.Request
+	for i := range list.Items {
+		cr := &list.Items[i]
+		for _, ref := range cr.Spec.ConfigMapRefs() {
+			sel := ref.ConfigMapSelector
+			if sel.Name == obj.GetName() &&
+				sel.Namespace != nil && *sel.Namespace == obj.GetNamespace() {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{Name: cr.Name}, // CR is cluster-scoped
+				})
+				break
+			}
+		}
+	}
+	return requests
 }
 
 // SyncDecision represents the result of evaluating whether a sync should proceed
