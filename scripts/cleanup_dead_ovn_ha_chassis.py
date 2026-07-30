@@ -15,13 +15,27 @@ Three related problems (phase 3 is opt-in, see --delete-orphaned-networks):
 
 2. Empty per-network unified HA_Chassis_Groups. Once (1) has happened (or
    for any other reason a network's unified group ended up empty), its
-   external/baremetal ports have no chassis to claim them. Normally you'd
-   fix this per-router by detaching/reattaching a subnet to re-fire
-   link_vxlan_network_ha_chassis_group. This script instead derives the
-   right chassis directly from the router's own HA_Chassis_Group and writes
-   it to the network's group (plus anchors the internal router-interface
-   LRP to it), mirroring what that function does — for every affected
-   network in one run, no manual per-router action needed.
+   external/baremetal ports have no chassis to claim them. This script
+   repopulates it for every affected network in one run, no manual
+   per-router action needed. The chassis is sourced two ways, tried in
+   order:
+     a. The router's own options:chassis, if set (every centralized/vxlan
+        gateway router has this set directly -- it's what makes it
+        centralized). This is the primary source and is always reliable:
+        the router-scoped HA_Chassis_Group (neutron-<router_id>) that
+        link_vxlan_network_ha_chassis_group would otherwise derive this
+        from is only ever created once, at gateway-port-creation time, and
+        nothing recreates it if it's later deleted. Several routers in this
+        fleet have options:chassis set but no such group anymore.
+     b. Falling back to that per-router HA_Chassis_Group only when the
+        router isn't centralized (no options:chassis). Routers created long
+        enough ago may have neither -- those are reported as skipped, not
+        guessed at.
+   It does not touch any Logical_Router_Port: routers.py no longer anchors
+   the internal router-interface LRP to the network HCG either, since that
+   trips ovn-northd's "distributed gateway port configured on ... L3
+   gateway router" warning on every vxlan gateway router for no operational
+   benefit.
 
 3. Leftover networks from a half-deleted network. When a neutron network is
    deleted but OVN is left with a stale Logical_Switch (neutron-<network_id>),
@@ -44,10 +58,11 @@ Runs in dry-run mode by default. Pass --execute to apply changes.
 Caveat: repopulation here is a direct, minimal OVN write. It does not
 replicate neutron's candidate filtering (chassis-as-gw eligibility, physnet
 connectivity, priority ordering across multiple chassis) that
-sync_ha_chassis_group_network_unified performs. It only picks a chassis
-if the router's own HA_Chassis_Group resolves to exactly one distinct live
-chassis. This is safe for the common single-gateway-chassis case; in a
-multi-chassis HA setup, prefer re-triggering the real neutron code path.
+sync_ha_chassis_group_network_unified performs. When falling back to a
+router's own HA_Chassis_Group (2b above), it only picks a chassis if that
+group resolves to exactly one distinct live chassis. This is safe for the
+common single-gateway-chassis case; in a multi-chassis HA setup, prefer
+re-triggering the real neutron code path.
 """
 
 import argparse
@@ -61,6 +76,7 @@ NB_POD = "ovn-ovsdb-nb-0"
 SB_POD = "ovn-ovsdb-sb-0"
 OVN_NAMESPACE = "openstack"
 
+NEUTRON_PREFIX = "neutron-"
 OVN_NETWORK_ID_EXT_ID_KEY = "neutron:network_id"
 OVN_ROUTER_ID_EXT_ID_KEY = "neutron:router_id"
 HA_CHASSIS_GROUP_HIGHEST_PRIORITY = 32767
@@ -147,11 +163,15 @@ def get_all_ha_chassis_groups(kubectl_base: list[str]) -> list[dict]:
     )
 
 
-def get_all_router_ports(kubectl_base: list[str]) -> list[dict]:
-    """Every Logical_Router_Port row in the Northbound DB."""
-    return _ovn_list(
-        kubectl_base, NB_POD, "ovn-nbctl", "Logical_Router_Port", "name,external_ids"
+def get_router_chassis_by_id(kubectl_base: list[str]) -> dict[str, str | None]:
+    """Map neutron router_id -> its Logical_Router options:chassis, if set."""
+    rows = _ovn_list(
+        kubectl_base, NB_POD, "ovn-nbctl", "Logical_Router", "name,options"
     )
+    return {
+        r["name"].removeprefix(NEUTRON_PREFIX): (r.get("options") or {}).get("chassis")
+        for r in rows
+    }
 
 
 # --- Phase 1: stale HA_Chassis cleanup -------------------------------------
@@ -256,23 +276,22 @@ def plan_repopulation(
     groups: list[dict],
     all_ha_chassis_by_uuid: dict[str, str],
     stale_uuids: set[str],
-    router_ports: list[dict],
+    live_chassis: set[str],
+    router_chassis_by_id: dict[str, str | None],
 ) -> tuple[list[dict], list[tuple[str, str]]]:
     """Work out which empty per-network HCGs can be safely repopulated.
 
-    A group is a candidate if: it's a per-network unified HCG (has
-    neutron:network_id in external_ids), it has no members once stale ones
-    are excluded, and its associated router's own HCG resolves to exactly
-    one distinct live chassis.
+    A group is a candidate if it's a per-network unified HCG (has
+    neutron:network_id in external_ids) with no members once stale ones are
+    excluded. The chassis to (re)add is sourced from, in order:
+
+    1. The router's own options:chassis, if set and still live. This is the
+       primary, most reliable source (see module docstring point 2).
+    2. The router's own per-router HA_Chassis_Group (neutron-<router_id>),
+       only tried when the router isn't centralized (no options:chassis),
+       and only if it resolves to exactly one distinct live chassis.
     """
     groups_by_name = {g["name"]: g for g in groups}
-
-    lrps_by_network: dict[str, list[dict]] = {}
-    for lrp in router_ports:
-        ext = lrp.get("external_ids") or {}
-        net_name = ext.get("neutron:network_name")
-        if net_name:
-            lrps_by_network.setdefault(net_name, []).append(lrp)
 
     plan = []
     skipped = []
@@ -292,52 +311,44 @@ def plan_repopulation(
             skipped.append((g["name"], "no router_id in HCG external_ids"))
             continue
 
-        router_group = groups_by_name.get(f"neutron-{router_id}")
-        if not router_group:
-            skipped.append((g["name"], f"router HCG neutron-{router_id} not found"))
-            continue
+        target_chassis = None
+        skip_reason = None
 
-        router_members = _as_list(router_group.get("ha_chassis"))
-        router_remaining = [m for m in router_members if m not in stale_uuids]
-        chassis_names = {
-            all_ha_chassis_by_uuid[m]
-            for m in router_remaining
-            if m in all_ha_chassis_by_uuid
-        }
-        if len(chassis_names) != 1:
-            skipped.append(
-                (
-                    g["name"],
-                    f"router HCG resolves to {len(chassis_names)} distinct "
-                    "live chassis (expected exactly 1)",
+        centralized_chassis = router_chassis_by_id.get(router_id)
+        if centralized_chassis:
+            if centralized_chassis in live_chassis:
+                target_chassis = centralized_chassis
+            else:
+                skip_reason = (
+                    f"router's options:chassis ({centralized_chassis}) is "
+                    "not a live chassis"
                 )
-            )
-            continue
-        target_chassis = next(iter(chassis_names))
+        else:
+            router_group = groups_by_name.get(f"neutron-{router_id}")
+            if not router_group:
+                skip_reason = (
+                    f"router is not centralized and its HCG "
+                    f"neutron-{router_id} was not found"
+                )
+            else:
+                router_members = _as_list(router_group.get("ha_chassis"))
+                router_remaining = [m for m in router_members if m not in stale_uuids]
+                chassis_names = {
+                    all_ha_chassis_by_uuid[m]
+                    for m in router_remaining
+                    if m in all_ha_chassis_by_uuid
+                }
+                if len(chassis_names) == 1:
+                    target_chassis = next(iter(chassis_names))
+                else:
+                    skip_reason = (
+                        f"router HCG resolves to {len(chassis_names)} "
+                        "distinct live chassis (expected exactly 1)"
+                    )
 
-        switch_name = f"neutron-{network_id}"
-        candidates = [
-            lrp
-            for lrp in lrps_by_network.get(switch_name, [])
-            if (lrp.get("external_ids") or {}).get("neutron:router_name")
-            == f"neutron-{router_id}"
-        ]
-        if not candidates:
-            skipped.append(
-                (
-                    g["name"],
-                    f"no internal Logical_Router_Port found for network "
-                    f"{network_id} on router {router_id}",
-                )
-            )
+        if target_chassis is None:
+            skipped.append((g["name"], skip_reason))
             continue
-        if len(candidates) > 1:
-            log.warning(
-                "Multiple internal LRPs found for network %s on router %s; using %s",
-                network_id,
-                router_id,
-                candidates[0]["name"],
-            )
 
         plan.append(
             {
@@ -346,7 +357,6 @@ def plan_repopulation(
                 "network_id": network_id,
                 "router_id": router_id,
                 "target_chassis": target_chassis,
-                "lrp_name": candidates[0]["name"],
             }
         )
     return plan, skipped
@@ -362,13 +372,11 @@ def print_repopulation_report(plan: list[dict], skipped: list[tuple[str, str]]) 
         print(f"[DRY-RUN]   Network HCG : {p['group_name']}")
         print(f"[DRY-RUN]   Router      : {p['router_id']}")
         print(f"[DRY-RUN]   Chassis     : {p['target_chassis']}")
-        print(f"[DRY-RUN]   Anchor LRP  : {p['lrp_name']}")
         print(
             f"[DRY-RUN]   Action      : create HA_Chassis "
             f"chassis_name={p['target_chassis']} "
             f"priority={HA_CHASSIS_GROUP_HIGHEST_PRIORITY}; add to "
-            f"{p['group_uuid']}; set {p['lrp_name']} "
-            f"ha_chassis_group={p['group_uuid']}"
+            f"{p['group_uuid']}"
         )
         print()
 
@@ -386,10 +394,7 @@ def execute_repopulation(
 
     print(f"About to repopulate {len(plan)} network HCG(s):")
     for p in plan:
-        print(
-            f"  - {p['group_name']}: chassis {p['target_chassis']}, "
-            f"anchor LRP {p['lrp_name']}"
-        )
+        print(f"  - {p['group_name']}: chassis {p['target_chassis']}")
     if not _confirm("Apply these Phase 2 changes?", assume_yes):
         print("Skipped Phase 2 — no changes made.\n")
         return
@@ -410,11 +415,6 @@ def execute_repopulation(
             p["group_uuid"],
             "ha_chassis",
             hc_id,
-            "--",
-            "set",
-            "Logical_Router_Port",
-            p["lrp_name"],
-            f"ha_chassis_group={p['group_uuid']}",
         ]
 
     print(f"Repopulating {len(plan)} network HCG(s) in one transaction …")
@@ -428,8 +428,6 @@ def execute_repopulation(
 
 
 # --- Phase 3: delete truly-orphaned leftover networks ---------------------
-
-NEUTRON_PREFIX = "neutron-"
 
 # Safety tripwire: if more than this fraction of OVN networks look orphaned,
 # the OpenStack credentials almost certainly aren't admin (or can't list every
@@ -924,10 +922,14 @@ def main() -> None:
         execute_cleanup(cleanup_records, kubectl_base, args.assume_yes)
 
     if not args.skip_repopulate:
-        log.info("Fetching Logical_Router_Port rows …")
-        router_ports = get_all_router_ports(kubectl_base)
+        log.info("Fetching Logical_Router options:chassis …")
+        router_chassis_by_id = get_router_chassis_by_id(kubectl_base)
         plan, skipped = plan_repopulation(
-            groups, all_ha_chassis_by_uuid, stale_uuids, router_ports
+            groups,
+            all_ha_chassis_by_uuid,
+            stale_uuids,
+            live_chassis,
+            router_chassis_by_id,
         )
 
         if not args.execute:

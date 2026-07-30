@@ -407,7 +407,9 @@ class TestLinkVxlanNetworkHaChassisGroup:
         )
 
     @staticmethod
-    def _client(mocker, ha_chassis_rows, lrp, network_hcg=None, live_chassis=None):
+    def _client(
+        mocker, ha_chassis_rows, lrp, network_hcg=None, live_chassis=None, router=None
+    ):
         nb_idl = mocker.MagicMock()
         nb_idl.db_list_rows.return_value.execute.return_value = ha_chassis_rows
 
@@ -416,6 +418,8 @@ class TestLinkVxlanNetworkHaChassisGroup:
                 return network_hcg  # None by default (unpopulated vxlan HCG)
             if table == "Logical_Router_Port":
                 return lrp
+            if table == "Logical_Router":
+                return router  # None by default (not centralized)
             return default
 
         nb_idl.lookup.side_effect = lookup
@@ -541,3 +545,47 @@ class TestLinkVxlanNetworkHaChassisGroup:
         # The network HCG is still populated even if the LRP is not found yet.
         sync.assert_called_once()
         nb_idl.db_set.assert_not_called()
+
+    def test_skips_lrp_anchor_when_router_is_centralized(self, mocker):
+        # Every vxlan gateway router has options:chassis set (that's what makes
+        # it vxlan rather than VLAN/FLAT). Anchoring one of its ports as a
+        # distributed gateway port makes ovn-northd log "Bad configuration:
+        # distributed gateway port configured on ... L3 gateway router" and
+        # ignore the setting anyway, so we must not attempt it.
+        hc = mocker.Mock(chassis_name="chassis-1")
+        lrp = mocker.Mock(ha_chassis_group=[])
+        router = mocker.Mock(options={"chassis": "some-chassis-uuid"})
+        client, nb_idl = self._client(
+            mocker, ha_chassis_rows=[hc], lrp=lrp, router=router
+        )
+        sync = self._patch_sync(mocker)
+        mocker.patch("neutron_understack.routers.ovn_client", return_value=client)
+
+        link_vxlan_network_ha_chassis_group(None, None, None, self._payload(mocker))
+
+        # The network HCG is still populated (that's what actually fixes the
+        # external/baremetal ports)...
+        sync.assert_called_once()
+        # ...but the internal LRP is left alone.
+        nb_idl.db_set.assert_not_called()
+
+    def test_anchors_lrp_when_router_is_not_centralized(self, mocker):
+        # Defensive case: if this fixup is ever reused for a genuinely
+        # distributed router (no options:chassis), the old anchoring behavior
+        # still applies.
+        hc = mocker.Mock(chassis_name="chassis-1")
+        lrp = mocker.Mock(ha_chassis_group=[])
+        router = mocker.Mock(options={})
+        client, nb_idl = self._client(
+            mocker, ha_chassis_rows=[hc], lrp=lrp, router=router
+        )
+        self._patch_sync(mocker)
+        mocker.patch("neutron_understack.routers.ovn_client", return_value=client)
+
+        link_vxlan_network_ha_chassis_group(None, None, None, self._payload(mocker))
+
+        nb_idl.db_set.assert_called_once_with(
+            "Logical_Router_Port",
+            "lrp-port-1",
+            ("ha_chassis_group", "net-hcg-uuid"),
+        )
