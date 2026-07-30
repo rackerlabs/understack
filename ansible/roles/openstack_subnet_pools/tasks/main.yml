@@ -51,11 +51,18 @@
           Discovered subnet pools:
           {{ subnet_pools | map(attribute='0.custom_fields.subnet_pool_name') | list }}
 
+    - name: Debug - Show all prefixes for each pool
+      ansible.builtin.debug:
+        msg: |
+          Pool: {{ item[0].custom_fields.subnet_pool_name }}
+          Prefixes: {{ item | map(attribute='prefix') | list | sort }}
+      loop: "{{ subnet_pools }}"
+
     - name: Create or update OpenStack subnet pools
       openstack.cloud.subnet_pool:
         state: present
         name: "{{ pool_item[0].custom_fields.subnet_pool_name }}"
-        prefixes: "{{ pool_item | map(attribute='prefix') | list }}"
+        prefixes: "{{ (pool_item | map(attribute='prefix') | list) | sort }}"
         default_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_default_prefixlen }}"
         minimum_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_min_prefixlen }}"
         maximum_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_max_prefixlen }}"
