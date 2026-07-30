@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kubectl-us-net"
+description = "kubectl plugin for troubleshooting UnderStack's Neutron/OVN data plane"
+authors = [{ name = "Understack Developers" }]
+requires-python = ">=3.12"
+readme = "README.md"
+dependencies = [
+    "openstacksdk>=4.2.0,<5",
+    "keystoneauth-websso>=0.2.0,<0.3",
+    "typer>=0.21,<0.22",
+]
+license = { text = "Apache-2.0" }
+dynamic = ["version"]
+
+[project.scripts]
+kubectl-us-net = "us_net.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/rackerlabs/understack"
+Issues = "https://github.com/rackerlabs/understack/issues"
+
+[dependency-groups]
+test = [
+    "pytest<10",
+    "pytest-github-actions-annotate-failures",
+    "pytest-cov>=6.1.0",
+]
+[tool.uv]
+default-groups = ["test"]
+
+[tool.hatch.build.targets.sdist]
+include = ["us_net"]
+
+[tool.hatch.build.targets.wheel]
+include = ["us_net"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+root = "../../"
+tag_regex = "^kubectl-us-net/v(?P<version>.*)$"
+
+[tool.ruff]
+target-version = "py312"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "D",       # pydocstyle
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
+  "S",       # flake8-bandit
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
+]
+
+ignore = [
+    "D100",  # don't require docs for every module
+    "D101",  # don't require docs for every class
+    "D102",  # don't require docs for every class method
+    "D103",  # don't require docs for every function
+    "D104",  # don't require docs for every package
+    "D106",  # don't require docs for every nested class
+    "D107",  # don't require docs for __init__
+    "D417",  # don't require docs for every function parameter
+    "S404",  # subprocess module import is intentional here (kubectl/openstack wrapper)
+    "S603",  # subprocess calls use internally-built argv lists, never shell=True
+    "S607",  # kubectl/openstack/ovn-nbctl etc. are intentionally resolved via PATH
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[tool.ruff.lint.pydocstyle]
+# enable the google doc style rules by default
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # assert is the point in tests

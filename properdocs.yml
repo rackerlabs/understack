@@ -232,6 +232,7 @@ nav:
     - 'Networking':
       - operator-guide/openstack-neutron.md
       - operator-guide/ovs-ovn.md
+      - operator-guide/kubectl-us-net.md
     - 'Infrastructure':
       - operator-guide/argocd-helm-chart.md
       - operator-guide/workflows.md
