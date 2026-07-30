@@ -104,7 +104,11 @@ spec:
                               project_id_without_dashes = {{ printf "{{workflow.parameters.project_id}}" | quote }}
                               print(str(uuid.UUID(project_id_without_dashes)))
                   - - name: ansible-storage-update
-                      when: {{ printf "\"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted && \"{{workflow.parameters.previous_provision_state}}\" == deploying" | quote }}
+                      when: >-
+                        {{ printf "(
+                          \"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted ||
+                          \"{{steps.oslo-events.outputs.parameters.storage}}\" == wanted-but-not-project
+                        ) && \"{{workflow.parameters.previous_provision_state}}\" == deploying" | quote }}
                       templateRef:
                         name: ansible-workflow-template
                         template: ansible-run
