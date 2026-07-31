@@ -130,12 +130,12 @@ pod:
 
   use_fqdn:
     neutron_agent: false
+  replicas:
+    server: 4
   lifecycle:
     disruption_budget:
       server:
-        # this should be set to no more than (pod.replicas.server - 1)
-        # usually set on per-deployment basis.
-        min_available: 0
+        min_available: 2
   resources:
     enabled: true
     server:
