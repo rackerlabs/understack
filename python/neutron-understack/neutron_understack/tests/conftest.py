@@ -33,6 +33,8 @@ from neutron_understack.tests.helpers import extend_network_dict
 from neutron_understack.tests.helpers import extend_port_dict_with_trunk
 from neutron_understack.trunk import UnderStackTrunkDriver
 from neutron_understack.undersync import Undersync
+from neutron_understack.undersync_mech import UndersyncDriver
+from neutron_understack.undersync_trunk import UndersyncTrunkDriver
 
 
 @pytest.fixture
@@ -289,6 +291,18 @@ def understack_driver(oslo_config, ironic_client) -> UnderstackDriver:
 @pytest.fixture
 def understack_trunk_driver(understack_driver) -> UnderStackTrunkDriver:
     return UnderStackTrunkDriver.create(understack_driver)
+
+
+@pytest.fixture
+def undersync_driver(oslo_config) -> UndersyncDriver:
+    driver = UndersyncDriver()
+    driver.undersync = MagicMock(spec_set=Undersync)
+    return driver
+
+
+@pytest.fixture
+def undersync_trunk_driver(undersync_driver) -> UndersyncTrunkDriver:
+    return UndersyncTrunkDriver.create(undersync_driver)
 
 
 @pytest.fixture
