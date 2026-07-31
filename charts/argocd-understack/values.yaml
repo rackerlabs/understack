@@ -341,7 +341,7 @@ site:
     wave: 1
     # -- Chart version for Keystone
     # renovate: datasource=helm depName=keystone registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.13+234b739f2
+    chartVersion: 2026.1.18+13b545c0e
 
   # -- Glance (Image Service)
   glance:
