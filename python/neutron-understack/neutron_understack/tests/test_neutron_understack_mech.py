@@ -250,18 +250,24 @@ class TestBindPort:
 
         port_context.continue_binding.assert_not_called()
 
-    @pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
-    def test_does_not_bind_when_physical_network_not_found(
+    def test_fails_when_physical_network_missing(
         self, mocker, port_context, understack_driver
     ):
-        understack_driver.ironic_client.baremetal_port_physical_network.return_value = (
-            None
-        )
+        """Port binding fails when physical_network is absent from binding_profile.
+
+        This enforces that physical_network must be present for binding to succeed.
+        """
+        # Remove physical_network from binding_profile to test hard requirement
+        binding_profile_dict = port_context.current[portbindings.PROFILE].copy()
+        binding_profile_dict.pop("physical_network", None)
+        port_context.current[portbindings.PROFILE] = binding_profile_dict
+
         mocker.patch.object(port_context, "continue_binding")
         port_context._prepare_to_bind(port_context.network.network_segments)
 
         understack_driver.bind_port(port_context)
 
+        # Binding should not proceed without physical_network
         port_context.continue_binding.assert_not_called()
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)

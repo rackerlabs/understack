@@ -181,10 +181,16 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_host = parent_port.bindings[0].host
 
         vlan_group_name = binding_profile.get("physical_network")
-        if vlan_group_name is None:
-            local_link_info = utils.local_link_from_binding_profile(binding_profile)
-            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                local_link_info
+        if not vlan_group_name:
+            raise exc.BadRequest(
+                resource="port",
+                msg=(
+                    "physical_network is required in binding_profile for baremetal "
+                    f"port trunk configuration. Port {parent_port.id} does not have "
+                    "physical_network in its binding_profile. "
+                    "Please ensure the port's binding_profile contains "
+                    "physical_network in local_link_information."
+                ),
             )
 
         self._handle_segment_allocation(subports, vlan_group_name, binding_host)
@@ -210,10 +216,17 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_host = parent_port_obj.bindings[0].host
 
         vlan_group_name = binding_profile.get("physical_network")
-        if vlan_group_name is None:
-            local_link_info = utils.local_link_from_binding_profile(binding_profile)
-            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                local_link_info
+        if not vlan_group_name:
+            port_id = parent_port_obj.id
+            raise exc.BadRequest(
+                resource="port",
+                msg=(
+                    "physical_network is required in binding_profile for baremetal "
+                    f"port trunk configuration. Port {port_id} does not have "
+                    "physical_network in its binding_profile. "
+                    "Please ensure the port's binding_profile contains "
+                    "physical_network in local_link_information."
+                ),
             )
         self._handle_subports_removal(
             binding_profile=binding_profile,
@@ -263,10 +276,17 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         if utils.parent_port_is_bound(parent_port):
             binding_profile = parent_port.bindings[0].profile
             vlan_group_name = binding_profile.get("physical_network")
-            if vlan_group_name is None:
-                local_link_info = utils.local_link_from_binding_profile(binding_profile)
-                vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                    local_link_info
+            if not vlan_group_name:
+                port_id = parent_port.id
+                raise exc.BadRequest(
+                    resource="port",
+                    msg=(
+                        "physical_network is required in binding_profile for "
+                        f"baremetal port trunk configuration. Port {port_id} does not "
+                        "have physical_network in its binding_profile. "
+                        "Please ensure the port's binding_profile contains "
+                        "physical_network in local_link_information."
+                    ),
                 )
             LOG.debug("subports_added_post found vlan_group_name=%s", vlan_group_name)
             self.undersync.sync(vlan_group_name)

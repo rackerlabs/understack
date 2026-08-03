@@ -199,13 +199,14 @@ def binding_profile(request, port_id) -> str:
     req = getattr(request, "param", {})
     return json.dumps(
         {
+            "physical_network": req.get("physical_network", "physnet"),
             "local_link_information": [
                 {
                     "port_id": req.get("port_id", str(port_id)),
                     "switch_id": "11:22:33:44:55:66",
                     "switch_info": "a1-1-1.iad3.rackspace.net",
                 }
-            ]
+            ],
         }
     )
 
