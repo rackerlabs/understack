@@ -86,11 +86,10 @@ func TestTopologicalSort(t *testing.T) {
 			want: []string{
 				"clusterGroup", "clusterType", "deviceType", "locationTypes",
 				"location",
-				"rackGroup", "rir", "role", "tenantGroup", "vlanGroup",
-				"rack", "tenant",
-				"device", "namespace", "vlan",
-				"cluster",
-				"prefix",
+				"rackGroup", "rack", "rir", "role", "tenantGroup",
+				"tenant",
+				"device", "cluster", "namespace", "vlanGroup",
+				"vlan", "prefix",
 			},
 		},
 		{
