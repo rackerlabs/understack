@@ -78,7 +78,6 @@ markdown_extensions:
   - pymdownx.mark
   - pymdownx.snippets
   - nl2br
-  - admonition
   - pymdownx.details
   - pymdownx.tabbed:
       alternate_style: true
