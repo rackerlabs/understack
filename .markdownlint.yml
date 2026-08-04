@@ -23,9 +23,11 @@ MD013: false
 MD014: false
 
 # MD024 - Multiple headings with the same content
-# Multiple identical headings in the document are not allowed
-# This is disabled on all of the release notes pages in docs/release-notes
-MD024: true
+# Identical headings are only an error when they are siblings under the same
+# parent. The release notes pages in docs/release-notes repeat headings such as
+# "Action required" once per version section, which is intended.
+MD024:
+    siblings_only: true
 
 # MD033 - Inline HTML
 # Triggered when raw HTML is used in a markdown document
