@@ -44,7 +44,7 @@ def test_vlan_group_name_single_cab():
     }
 
 
-def test_vlan_group_name_pair_cab():
+def test_vlan_group_name_pair_cab_dash_one():
     assert vlan_group_names(
         [
             port("a1-1-1.abc1"),
@@ -56,6 +56,23 @@ def test_vlan_group_name_pair_cab():
     ) == {
         "a1-1-1.abc1": "a1-1/a1-2-network",
         "a1-2-1.abc1": "a1-1/a1-2-network",
+        "a1-1-1f.abc1": "a1-1/a1-2-storage",
+        "a1-2-1f.abc1": "a1-1/a1-2-storage",
+    }
+
+
+def test_vlan_group_name_pair_cab_dash_two():
+    assert vlan_group_names(
+        [
+            port("a1-1-2.abc1"),
+            port("a1-2-2.abc1"),
+            port("a1-1-1f.abc1"),
+            port("a1-2-1f.abc1"),
+        ],
+        mapping,
+    ) == {
+        "a1-1-2.abc1": "a1-1-2/a1-2-2-network",
+        "a1-2-2.abc1": "a1-1-2/a1-2-2-network",
         "a1-1-1f.abc1": "a1-1/a1-2-storage",
         "a1-2-1f.abc1": "a1-1/a1-2-storage",
     }
