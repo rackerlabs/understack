@@ -15,10 +15,11 @@ export OS_CLOUD=understack-dev
 
 There are also a number of CLI tools we use:
 
-* [OpenStack CLI Setup](https://rackerlabs.github.io/understack/user-guide/openstack-cli/)
-* [Argo Workflows CLI Setup](https://rackerlabs.github.io/understack/component-argo-workflows/?h=argo#argo-cli)
+* [OpenStack CLI Setup](../user-guide/openstack-cli.md)
+* [Argo Workflows CLI Setup](../component-argo-workflows.md#argo-cli)
 
-For more about OpenStack cloud configuration, see: <https://rackerlabs.github.io/understack/user-guide/openstack-cli/>
+For more about OpenStack cloud configuration, see the
+[OpenStack CLI guide](../user-guide/openstack-cli.md).
 
 For more about Nautobot tokens, see: <https://docs.nautobot.com/projects/core/en/stable/user-guide/platform-functionality/users/token/>
 
