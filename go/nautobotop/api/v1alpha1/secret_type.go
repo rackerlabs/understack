@@ -2,13 +2,15 @@ package v1alpha1
 
 type SecretKeySelector struct {
 	// The name of the Secret resource being referred to.
+	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength:=1
 	// +kubebuilder:validation:MaxLength:=253
 	// +kubebuilder:validation:Pattern:=^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
-	Name string `json:"name,omitempty"`
+	Name string `json:"name"`
 
 	// The namespace of the Secret resource being referred to.
-	// Ignored if referent is not cluster-scoped, otherwise defaults to the namespace of the referent.
+	// Ignored if referent is not cluster-scoped. For this cluster-scoped
+	// resource, when unset it falls back to NautobotServiceRef.Namespace.
 	// +optional
 	// +kubebuilder:validation:MinLength:=1
 	// +kubebuilder:validation:MaxLength:=63
