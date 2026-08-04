@@ -1,18 +1,31 @@
 name: pages build and deployment
 
+# `make docs` does more than render docs/: it regenerates pages from sources
+# elsewhere in the tree and runs component-docs-check. Those sources have to be
+# listed here or a PR can merge without this workflow ever running and break
+# the docs build on main.
 on:
   push:
     branches:
       - main
-    paths:
+    paths: &docs_paths
       - "properdocs.yml"
       - "docs/**"
       - ".github/workflows/properdocs.yaml"
+      # component-docs-check validates docs/deploy-guide/components/ against these
+      - "charts/argocd-understack/templates/**"
+      # docs/workflows/ is generated from these by argo-workflows-to-mkdocs.py
+      - "workflows/**"
+      - "components/global-workflows/**"
+      # the neutron-understack sample config page is generated from this
+      - "python/neutron-understack/**"
+      # the build itself
+      - "Makefile"
+      - "requirements-docs.txt"
+      - "scripts/argo-workflows-to-mkdocs.py"
+      - "scripts/check-component-docs.py"
   pull_request:
-    paths:
-      - "properdocs.yml"
-      - "docs/**"
-      - ".github/workflows/properdocs.yaml"
+    paths: *docs_paths
   workflow_dispatch:
   merge_group:
     types: [checks_requested]
