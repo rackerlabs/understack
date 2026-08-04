@@ -28,6 +28,7 @@ import (
 
 	nbClient "github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/sync"
+	syncadmin "github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/sync/admin"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -116,6 +117,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		{name: "cluster", dependsOn: []string{"clusterType", "clusterGroup", "location", "device"}, configRefs: nautobotCR.Spec.ClusterRef, syncFunc: r.syncCluster},
 		// Depends on: namespace, rir, location, vlan, tenant, role
 		{name: "prefix", dependsOn: []string{"namespace", "rir", "location", "vlan", "tenant", "role"}, configRefs: nautobotCR.Spec.PrefixRef, syncFunc: r.syncPrefix},
+		{name: "permissionGroup", configRefs: nautobotCR.Spec.PermissionGroupRef, syncFunc: r.syncPermissionGroup},
 	}
 
 	// Resolve execution order using topological sort (Kahn's algorithm)
@@ -294,6 +296,22 @@ func (r *NautobotReconciler) syncRack(ctx context.Context,
 	syncSvc := sync.NewRackSync(nautobotClient)
 	if err := syncSvc.SyncAll(ctx, rackData); err != nil {
 		return fmt.Errorf("failed to sync racks: %w", err)
+	}
+	return nil
+}
+
+func (r *NautobotReconciler) syncPermissionGroup(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	permissionGroupData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("syncing permission groups", "count", len(permissionGroupData))
+	if len(permissionGroupData) == 0 {
+		return nil
+	}
+	syncSvc := syncadmin.NewPermissionGroupSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, permissionGroupData); err != nil {
+		return fmt.Errorf("failed to sync permission groups: %w", err)
 	}
 	return nil
 }
