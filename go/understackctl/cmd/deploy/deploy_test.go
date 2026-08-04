@@ -284,16 +284,154 @@ func TestDeployCheck(t *testing.T) {
 	kustomPath := filepath.Join(keystoneDir, "kustomization.yaml")
 	valuesPath := filepath.Join(keystoneDir, "values.yaml")
 
-	if err := os.WriteFile(kustomPath, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(kustomPath, []byte(kustomizationContent), 0644); err != nil {
 		t.Fatalf("failed to write kustomization.yaml: %v", err)
 	}
 
-	if err := os.WriteFile(valuesPath, []byte("test"), 0644); err != nil {
+	if err := os.WriteFile(valuesPath, []byte(valuesContent), 0644); err != nil {
 		t.Fatalf("failed to write values.yaml: %v", err)
 	}
 
 	if err := runDeployCheck(clusterName); err != nil {
 		t.Errorf("check should pass: %v", err)
+	}
+}
+
+// writeCheckCluster creates a cluster with a single keystone component whose
+// only required file is kustomization.yaml, so that deploy check exercises the
+// kustomize build and nothing else.
+func writeCheckCluster(t *testing.T, kustomization string, extraFiles map[string]string) string {
+	t.Helper()
+
+	clusterName := filepath.Join(t.TempDir(), "test-cluster")
+	compDir := filepath.Join(clusterName, "keystone")
+	if err := os.MkdirAll(compDir, 0755); err != nil {
+		t.Fatalf("failed to create component dir: %v", err)
+	}
+
+	config := map[string]any{
+		"site": map[string]any{
+			"enabled": true,
+			"keystone": map[string]any{
+				"installApp":     false,
+				"installConfigs": true,
+			},
+		},
+	}
+
+	data, err := yaml.Marshal(&config)
+	if err != nil {
+		t.Fatalf("failed to marshal config: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(clusterName, "deploy.yaml"), data, 0644); err != nil {
+		t.Fatalf("failed to write deploy.yaml: %v", err)
+	}
+
+	kustomPath := filepath.Join(compDir, "kustomization.yaml")
+	if err := os.WriteFile(kustomPath, []byte(kustomization), 0644); err != nil {
+		t.Fatalf("failed to write kustomization.yaml: %v", err)
+	}
+
+	for name, content := range extraFiles {
+		if err := os.WriteFile(filepath.Join(compDir, name), []byte(content), 0644); err != nil {
+			t.Fatalf("failed to write %s: %v", name, err)
+		}
+	}
+
+	return clusterName
+}
+
+func TestDeployCheckBuildsKustomizations(t *testing.T) {
+	const configMapContent = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keystone-test
+data:
+  key: value
+`
+
+	tests := []struct {
+		name          string
+		kustomization string
+		extraFiles    map[string]string
+		wantErr       bool
+	}{
+		{
+			name:          "generated stub builds",
+			kustomization: kustomizationContent,
+		},
+		{
+			name: "kustomization with a resource builds",
+			kustomization: `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - configmap.yaml
+`,
+			extraFiles: map[string]string{"configmap.yaml": configMapContent},
+		},
+		{
+			name:          "malformed yaml fails",
+			kustomization: "not: [valid, kustomization\n",
+			wantErr:       true,
+		},
+		{
+			name: "unknown field fails",
+			kustomization: `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resourcez: []
+`,
+			wantErr: true,
+		},
+		{
+			name: "missing resource fails",
+			kustomization: `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - does-not-exist.yaml
+`,
+			wantErr: true,
+		},
+		{
+			// Builtin plugins referenced from a "transformers:" field are the
+			// one thing that depends on BploUseStaticallyLinked; with
+			// BploLoadFromFileSys this fails looking for a plugin root.
+			name: "builtin transformer plugin builds",
+			kustomization: `apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - configmap.yaml
+transformers:
+  - labeller.yaml
+`,
+			extraFiles: map[string]string{
+				"configmap.yaml": configMapContent,
+				"labeller.yaml": `apiVersion: builtin
+kind: LabelTransformer
+metadata:
+  name: add-labels
+labels:
+  team: understack
+fieldSpecs:
+  - path: metadata/labels
+    create: true
+`,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			clusterName := writeCheckCluster(t, tc.kustomization, tc.extraFiles)
+
+			err := runDeployCheck(clusterName)
+			if tc.wantErr && err == nil {
+				t.Fatal("expected runDeployCheck to fail")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("runDeployCheck failed: %v", err)
+			}
+		})
 	}
 }
 

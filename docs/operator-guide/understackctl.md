@@ -105,7 +105,18 @@ Sync the cluster directory with `deploy.yaml`. Creates directories, `kustomizati
 understackctl deploy check <cluster-name>
 ```
 
-Validate that every enabled component has the required `kustomization.yaml` and `values.yaml` files. Reports any missing files and exits with an error if validation fails.
+Validate that every enabled component has the required `kustomization.yaml` and `values.yaml` files, and build each component's `kustomization.yaml` to catch invalid or unresolvable configuration before ArgoCD sees it. The build is equivalent to:
+
+```bash
+kustomize build --enable-alpha-plugins --enable-exec --enable-helm \
+    --load-restrictor LoadRestrictionsNone <component-dir>
+```
+
+This is a superset of the `kustomize.buildOptions` ArgoCD itself runs with, so a component that passes `check` may still be rejected by ArgoCD if it relies on alpha or exec plugins.
+
+Kustomize is built into `understackctl`, so no external `kustomize` binary is required. Components that inflate a Helm chart via `helmCharts:` do need `helm` on your `PATH`, since kustomize shells out to it.
+
+Reports any missing files and build failures, then exits with an error if validation fails.
 
 #### deploy render
 

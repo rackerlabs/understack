@@ -67,7 +67,8 @@ directories contain:
 - `kustomization.yaml` - Kustomize configuration for the component
 - `values.yaml` - Helm value overrides for the component
 
-You can verify all required files exist with:
+You can verify all required files exist, and that each component's
+kustomization builds, with:
 
 ```bash
 understackctl deploy check my-site
