@@ -78,7 +78,6 @@ markdown_extensions:
   - pymdownx.mark
   - pymdownx.snippets
   - nl2br
-  - admonition
   - pymdownx.details
   - pymdownx.tabbed:
       alternate_style: true
@@ -99,8 +98,14 @@ plugins:
   - callouts
   - mermaid-zoom
 
+# These only accept warn/info/ignore -- there is no "error" level -- so the
+# `--strict` flag in the Makefile is what actually turns them into build
+# failures. Do not drop `--strict`: it is what enforces that every page under
+# docs/ appears in `nav:` below (omitted_files) and that no link points at a
+# missing page or a renamed heading (not_found, anchors).
 validation:
   omitted_files: warn
+  not_found: warn
   absolute_links: warn
   unrecognized_links: warn
   anchors: warn
@@ -227,7 +232,6 @@ nav:
       - operator-guide/openstack-ironic-change-boot-interface.md
       - operator-guide/baremetal-ironic-cleanup-runbook.md
       - operator-guide/openstack-ironic-console.md
-      - operator-guide/openstack-neutron.md
       - operator-guide/openstack-placement.md
     - 'Networking':
       - operator-guide/openstack-neutron.md
