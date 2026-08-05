@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: ironicrunbook
     app.kubernetes.io/component: rbac
 rules:
-  # Read-only runbook permissions
+  # Runbook permissions
   - apiGroups:
       - baremetal.ironicproject.org
     resources:
@@ -16,10 +16,12 @@ rules:
       - list
       - watch
 
-  # Read-only status permissions
+  # Status update permissions
   - apiGroups:
       - baremetal.ironicproject.org
     resources:
       - ironicrunbooks/status
     verbs:
       - get
+      - patch
+      - update
