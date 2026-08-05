@@ -1,0 +1,67 @@
+---
+# Bind service profile to router flavor
+# Idempotent: checks if binding exists, creates if needed, removes old ones
+
+- name: "Get current flavor details for {{ flavor_config.name }}"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - show
+      - "{{ flavor_config.name }}"
+      - --format
+      - json
+  register: flavor_details_raw
+  changed_when: false
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: flavor_details_raw.rc == 0
+
+- name: "Parse flavor details"
+  ansible.builtin.set_fact:
+    current_flavor_details: "{{ flavor_details_raw.stdout | from_json }}"
+    flavor_id: "{{ (flavor_details_raw.stdout | from_json).id }}"
+
+- name: "Extract current service profile IDs"
+  ansible.builtin.set_fact:
+    current_profile_ids: "{{ current_flavor_details.service_profile_ids | default([]) }}"
+
+- name: "Check if current service profile is already bound"
+  ansible.builtin.set_fact:
+    profile_already_bound: "{{ service_profile_id in current_profile_ids }}"
+
+- name: "Remove old service profiles for {{ flavor_config.name }}"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - remove
+      - profile
+      - "{{ flavor_config.name }}"
+      - "{{ item }}"
+  loop: "{{ current_profile_ids }}"
+  when:
+    - item != service_profile_id
+    - current_profile_ids | length > 0
+  changed_when: true
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+
+- name: "Bind service profile to flavor {{ flavor_config.name }}"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - add
+      - profile
+      - "{{ flavor_config.name }}"
+      - "{{ service_profile_id }}"
+  when: not profile_already_bound
+  changed_when: true
+  register: profile_binding_result
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: profile_binding_result.rc == 0 or 'already' in (profile_binding_result.stderr | default(''))
