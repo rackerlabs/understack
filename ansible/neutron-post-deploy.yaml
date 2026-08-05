@@ -24,6 +24,7 @@
       ansible.builtin.import_tasks: tasks/check_nautobot_auth.yml
 
   roles:
+    - role: neutron_router_flavors
     - role: neutron_segment_range
     - role: openstack_subnet_pools
     - role: openstack_network

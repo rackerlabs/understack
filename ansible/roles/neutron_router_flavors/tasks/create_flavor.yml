@@ -1,0 +1,75 @@
+---
+# Create or update router flavor
+# Idempotent: checks if flavor exists by name, creates if needed, updates if exists
+
+- name: "Check if router flavor exists: {{ flavor_config.name }}"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - show
+      - "{{ flavor_config.name }}"
+      - --format
+      - json
+  register: flavor_exists_check
+  changed_when: false
+  failed_when: false
+
+- name: "Set flavor_id from existing or create new"
+  block:
+    - name: "Parse existing flavor and set ID"
+      ansible.builtin.set_fact:
+        existing_flavor: "{{ flavor_exists_check.stdout | from_json }}"
+        flavor_id: "{{ (flavor_exists_check.stdout | from_json).id }}"
+      when:
+        - flavor_exists_check.rc == 0
+        - flavor_exists_check.stdout | length > 0
+
+    - name: "Create router flavor: {{ flavor_config.name }}"
+      ansible.builtin.command:
+        argv:
+          - openstack
+          - network
+          - flavor
+          - create
+          - --service-type
+          - "{{ neutron_router_flavor_service_type }}"
+          - --description
+          - "{{ flavor_config.description }}"
+          - --format
+          - json
+          - "{{ flavor_config.name }}"
+      register: flavor_created
+      when: flavor_exists_check.rc != 0
+      changed_when: true
+      retries: "{{ neutron_router_flavor_retries }}"
+      delay: "{{ neutron_router_flavor_delay }}"
+      until: flavor_created.rc == 0 or 'already exists' in (flavor_created.stderr | default(''))
+
+    - name: "Set flavor_id from new creation"
+      ansible.builtin.set_fact:
+        existing_flavor: "{{ flavor_created.stdout | from_json }}"
+        flavor_id: "{{ (flavor_created.stdout | from_json).id }}"
+      when:
+        - flavor_created is changed
+        - flavor_created.rc == 0
+
+- name: "Update flavor description if needed"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - set
+      - --description
+      - "{{ flavor_config.description }}"
+      - "{{ flavor_id }}"
+  when:
+    - existing_flavor is defined
+    - existing_flavor.description != flavor_config.description
+  changed_when: true
+  register: flavor_update_result
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: flavor_update_result.rc == 0
