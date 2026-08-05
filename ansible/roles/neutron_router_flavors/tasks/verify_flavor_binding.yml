@@ -1,0 +1,75 @@
+---
+# Verify that a router flavor is properly configured
+# Checks that the flavor exists, has a service profile, and the profile has the correct driver
+
+- name: "Verify flavor exists and is properly bound: {{ flavor_config.name }}"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - show
+      - "{{ flavor_config.name }}"
+      - --format
+      - json
+  register: verify_flavor_raw
+  changed_when: false
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: verify_flavor_raw.rc == 0
+
+- name: "Parse flavor verification"
+  ansible.builtin.set_fact:
+    verified_flavor: "{{ verify_flavor_raw.stdout | from_json }}"
+
+- name: "Validate flavor has service profile bound"
+  ansible.builtin.assert:
+    that:
+      - verified_flavor.service_profile_ids is defined
+      - verified_flavor.service_profile_ids | length > 0
+    fail_msg: >-
+      Router flavor '{{ flavor_config.name }}' has no service profiles bound.
+      This should not happen if binding task succeeded.
+
+- name: "Extract bound profile ID"
+  ansible.builtin.set_fact:
+    bound_profile_id: "{{ verified_flavor.service_profile_ids[0] }}"
+
+- name: "Verify service profile has correct driver"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - profile
+      - show
+      - "{{ bound_profile_id }}"
+      - --format
+      - json
+  register: verify_profile_raw
+  changed_when: false
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: verify_profile_raw.rc == 0
+
+- name: "Parse profile verification"
+  ansible.builtin.set_fact:
+    verified_profile: "{{ verify_profile_raw.stdout | from_json }}"
+
+- name: "Validate profile has correct driver"
+  ansible.builtin.assert:
+    that:
+      - verified_profile.driver == flavor_config.driver
+    fail_msg: >-
+      Router flavor '{{ flavor_config.name }}' is bound to profile {{ bound_profile_id }}
+      which has driver {{ verified_profile.driver }}, but expected {{ flavor_config.driver }}.
+
+- name: "Report successful flavor configuration"
+  ansible.builtin.debug:
+    msg: >-
+      Router flavor '{{ flavor_config.name }}' is properly configured:
+      - Flavor ID: {{ verified_flavor.id }}
+      - Service Profile ID: {{ bound_profile_id }}
+      - Driver: {{ verified_profile.driver }}
+      - Description: {{ verified_flavor.description }}
+    verbosity: 1

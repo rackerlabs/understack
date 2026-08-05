@@ -1,0 +1,28 @@
+---
+# Main orchestration task for neutron_router_flavors role
+# Manages idempotent creation/update of Neutron router flavors and service profiles
+
+- name: Validate router flavor configuration
+  ansible.builtin.assert:
+    that:
+      - neutron_router_flavors is defined
+      - neutron_router_flavors | length > 0
+    fail_msg: "No router flavors configured in neutron_router_flavors variable"
+  run_once: true
+
+- name: Display configured router flavors
+  ansible.builtin.debug:
+    msg: "Configuring router flavors: {{ neutron_router_flavors | map(attribute='name') | list }}"
+  run_once: true
+
+- name: Process each router flavor
+  ansible.builtin.include_tasks: process_flavor.yml
+  loop: "{{ neutron_router_flavors }}"
+  loop_control:
+    loop_var: current_flavor
+    label: "{{ current_flavor.name }}"
+  run_once: true
+
+- name: Verify all router flavors are configured
+  ansible.builtin.include_tasks: verify_flavors.yml
+  run_once: true

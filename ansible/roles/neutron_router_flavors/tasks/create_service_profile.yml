@@ -1,0 +1,83 @@
+---
+# Create or update service profile for a router flavor
+# Idempotent: checks if profile exists by driver, creates if needed, updates if exists
+
+- name: "List existing service profiles"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - profile
+      - list
+      - --format
+      - json
+  register: existing_profiles_raw
+  changed_when: false
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: existing_profiles_raw.rc == 0
+
+- name: "Parse existing service profiles"
+  ansible.builtin.set_fact:
+    existing_profiles: "{{ existing_profiles_raw.stdout | from_json }}"
+
+- name: "Check if service profile exists: {{ flavor_config.driver }}"
+  ansible.builtin.set_fact:
+    matching_profile: "{{ existing_profiles | selectattr('driver', 'equalto', flavor_config.driver) | first | default(none) }}"
+
+- name: "Create service profile {{ flavor_config.name ~ '/' ~ flavor_config.driver }}"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - profile
+      - create
+      - --enable
+      - --driver
+      - "{{ flavor_config.driver }}"
+      - --description
+      - "{{ flavor_config.driver_description }}"
+      - --metainfo
+      - "{{ flavor_config.service_profile_metainfo | to_json }}"
+      - --format
+      - json
+  register: service_profile_created
+  when: matching_profile is none
+  changed_when: true
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: service_profile_created.rc == 0 or 'already exists' in (service_profile_created.stderr | default(''))
+
+- name: "Set service profile ID from creation output"
+  ansible.builtin.set_fact:
+    service_profile_id: "{{ (service_profile_created.stdout | from_json).id }}"
+  when:
+    - service_profile_created is changed
+    - service_profile_created.rc == 0
+
+- name: "Set service profile ID from existing profile"
+  ansible.builtin.set_fact:
+    service_profile_id: "{{ matching_profile.id }}"
+  when: matching_profile is not none
+
+- name: "Update service profile description and metainfo if needed"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - profile
+      - set
+      - --description
+      - "{{ flavor_config.driver_description }}"
+      - --metainfo
+      - "{{ flavor_config.service_profile_metainfo | to_json }}"
+      - "{{ service_profile_id }}"
+  when: matching_profile is not none
+  changed_when: true
+  register: profile_update_result
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: profile_update_result.rc == 0
