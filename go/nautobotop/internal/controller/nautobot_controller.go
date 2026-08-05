@@ -39,6 +39,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	syncv1alpha1 "github.com/rackerlabs/understack/go/nautobotop/api/v1alpha1"
@@ -551,9 +552,55 @@ func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, naut
 func (r *NautobotReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&syncv1alpha1.Nautobot{}).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.configMapToNautobotRequests)).
 		WithOptions(controller.Options{RecoverPanic: ptr.To(true)}).
 		Named("nautobot").
 		Complete(r)
+}
+
+// configMapToNautobotRequests maps a changed ConfigMap to the Nautobot CR(s) that reference it.
+func (r *NautobotReconciler) configMapToNautobotRequests(ctx context.Context, obj client.Object) []ctrl.Request {
+	log := logf.FromContext(ctx)
+
+	var nautobotList syncv1alpha1.NautobotList
+	if err := r.List(ctx, &nautobotList); err != nil {
+		log.Error(err, "failed to list Nautobot CRs for ConfigMap watch")
+		return nil
+	}
+
+	var requests []ctrl.Request
+	for i := range nautobotList.Items {
+		nb := &nautobotList.Items[i]
+		if r.referencesConfigMap(nb, obj.GetName(), obj.GetNamespace()) {
+			requests = append(requests, ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name: nb.Name,
+				},
+			})
+		}
+	}
+
+	if len(requests) > 0 {
+		log.Info("ConfigMap change triggered reconcile", "configMap", obj.GetName(), "namespace", obj.GetNamespace(), "matchedCRs", len(requests))
+	}
+
+	return requests
+}
+
+// referencesConfigMap checks whether a Nautobot CR references the given ConfigMap by name and namespace.
+func (r *NautobotReconciler) referencesConfigMap(nb *syncv1alpha1.Nautobot, name, namespace string) bool {
+	for _, ref := range nb.Spec.ConfigMapRefs() {
+		if ref.ConfigMapSelector.Name == name {
+			refNS := ""
+			if ref.ConfigMapSelector.Namespace != nil {
+				refNS = *ref.ConfigMapSelector.Namespace
+			}
+			if refNS == namespace {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // SyncDecision represents the result of evaluating whether a sync should proceed
