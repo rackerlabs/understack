@@ -19,7 +19,7 @@ class InspectHookChassisModel(base.InspectionHook):
         chassis_model = _extract_chassis_model(node, inventory)
         manufacturer = _extract_manufacturer(node, inventory)
         trait_name = _trait_name(manufacturer, chassis_model)
-        _set_node_traits(task, "CUSTOM_CHASSIS_MODEL_", trait_name)
+        _set_node_traits(task, "CUSTOM_", trait_name)
 
 
 def _set_node_traits(task, prefix: str, required_trait: str):
