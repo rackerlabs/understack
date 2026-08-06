@@ -12,6 +12,7 @@ on:
       - "containers/dnsmasq/**"
       - "containers/ironic-nautobot-client/**"
       - "containers/ironic-vnc-client/**"
+      - "containers/shell-operator-ironic/**"
       - "containers/understack-tests/**"
       - "python/**"
       - ".github/workflows/containers.yaml"
