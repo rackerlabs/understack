@@ -43,7 +43,7 @@ build-all:
 			OUTFILE=$$DIR/$(BINARY_NAME)$$EXT; \
 			mkdir -p $$DIR; \
 			echo "Building $$OUTFILE..."; \
-			CGO_ENABLED=0 GOOS=$$GOOS GOARCH=$$GOARCH go build $() -o $$OUTFILE . || echo "Failed to build $$GOOS/$$GOARCH"; \
+			CGO_ENABLED=0 GOOS=$$GOOS GOARCH=$$GOARCH go build $(LDFLAGS) -o $$OUTFILE . || echo "Failed to build $$GOOS/$$GOARCH"; \
 		done \
 	done
 
