@@ -172,11 +172,28 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 
+	// Validate nautobotSecretRef before attempting auth
+	if nautobotCR.Spec.NautobotSecretRef.Name == "" {
+		log.Info("nautobotSecretRef.Name is not configured, skipping sync")
+		nautobotCR.Status.Ready = false
+		nautobotCR.Status.Message = "nautobotSecretRef is not configured: secret name is required"
+		if err := r.Status().Update(ctx, &nautobotCR); err != nil {
+			log.Error(err, "failed to update status")
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	}
+
 	// Create Nautobot client
 	username, token, err := r.getAuthTokenFromSecretRef(ctx, nautobotCR)
 	if err != nil {
 		log.Error(err, "failed to get nautobot auth token")
-		return ctrl.Result{}, err
+		nautobotCR.Status.Ready = false
+		nautobotCR.Status.Message = fmt.Sprintf("authentication not configured: %v", err)
+		if statusErr := r.Status().Update(ctx, &nautobotCR); statusErr != nil {
+			log.Error(statusErr, "failed to update status after auth error")
+		}
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
 	}
 	nautobotURL := fmt.Sprintf("http://%s.%s.svc.cluster.local/api", nautobotCR.Spec.NautobotServiceRef.Name, nautobotCR.Spec.NautobotServiceRef.Namespace)
 	nautobotClient, err := nbClient.NewNautobotClient(nautobotURL, username, token, nautobotCR.Spec.CacheMaxSize)
@@ -521,30 +538,47 @@ func (r *NautobotReconciler) syncDevice(ctx context.Context,
 	return nil
 }
 
-// getAuthTokenFromSecretRef: this will fetch Nautobot auth token from the given refer.
+// getAuthTokenFromSecretRef fetches the Nautobot auth token from the referenced Secret.
+// If Namespace is not set on the secret ref, it falls back to NautobotServiceRef.Namespace.
 func (r *NautobotReconciler) getAuthTokenFromSecretRef(ctx context.Context, nautobotCR syncv1alpha1.Nautobot) (string, string, error) {
-	var username, token string
-	if nautobotCR.Spec.NautobotSecretRef.Namespace == nil || *nautobotCR.Spec.NautobotSecretRef.Namespace == "" {
-		return "", "", fmt.Errorf("nautobotSecretRef %q is missing a namespace", nautobotCR.Spec.NautobotSecretRef.Name)
+	ref := nautobotCR.Spec.NautobotSecretRef
+
+	// Caller should have already validated Name, but be defensive
+	if ref.Name == "" {
+		return "", "", fmt.Errorf("nautobotSecretRef name is empty")
 	}
+
+	// Default namespace: use NautobotServiceRef.Namespace as a fallback
+	// (since the CRD is cluster-scoped and has no inherent namespace)
+	namespace := ""
+	if ref.Namespace != nil && *ref.Namespace != "" {
+		namespace = *ref.Namespace
+	} else if nautobotCR.Spec.NautobotServiceRef.Namespace != "" {
+		namespace = nautobotCR.Spec.NautobotServiceRef.Namespace
+	}
+
+	if namespace == "" {
+		return "", "", fmt.Errorf("nautobotSecretRef %q is missing a namespace and no fallback namespace is available", ref.Name)
+	}
+
 	secret := &corev1.Secret{}
-	err := r.Get(ctx, types.NamespacedName{Name: nautobotCR.Spec.NautobotSecretRef.Name, Namespace: *nautobotCR.Spec.NautobotSecretRef.Namespace}, secret)
-	if err != nil {
-		return "", "", err
+	if err := r.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: namespace}, secret); err != nil {
+		return "", "", fmt.Errorf("failed to fetch secret %s/%s: %w", namespace, ref.Name, err)
 	}
-	// Read the secret value
-	if valBytes, ok := secret.Data[nautobotCR.Spec.NautobotSecretRef.UsernameKey]; ok {
+
+	var username, token string
+	if valBytes, ok := secret.Data[ref.UsernameKey]; ok {
 		username = string(valBytes)
 	}
-	if valBytes, ok := secret.Data[nautobotCR.Spec.NautobotSecretRef.TokenKey]; ok {
+	if valBytes, ok := secret.Data[ref.TokenKey]; ok {
 		token = string(valBytes)
 	}
 
-	if username != "" || token != "" {
-		return username, token, nil
+	if username == "" && token == "" {
+		return "", "", fmt.Errorf("secret keys %q/%q not found in secret %s/%s", ref.UsernameKey, ref.TokenKey, namespace, ref.Name)
 	}
 
-	return "", "", fmt.Errorf("secret keys not found in provide secret")
+	return username, token, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
