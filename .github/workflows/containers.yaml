@@ -13,6 +13,7 @@ on:
       - "containers/ironic-nautobot-client/**"
       - "containers/ironic-vnc-client/**"
       - "containers/shell-operator-ironic/**"
+      - "containers/shell-operator-neutron/**"
       - "containers/understack-tests/**"
       - "python/**"
       - ".github/workflows/containers.yaml"
