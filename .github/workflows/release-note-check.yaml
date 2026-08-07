@@ -1,0 +1,73 @@
+name: Release note check
+
+# Deliberately has no `paths:` filter. A path-filtered workflow never reports a
+# status on pull requests that do not match it, which means it can never be made
+# a required check. Instead this always runs and short-circuits to success
+# unless the pull request has been flagged as upgrade-impacting, so the majority
+# of changes see no new friction.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+  merge_group:
+    types: [checks_requested]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-note:
+    name: Release note for upgrade-impacting change
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # merge_group events carry no pull request context, so there is nothing to
+      # check. Succeed so this workflow is still safe to mark as required.
+      - name: Skip on merge queue
+        if: github.event_name == 'merge_group'
+        run: echo "No pull request context on merge_group, skipping."
+
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+
+      - name: Require a release note when flagged
+        if: github.event_name == 'pull_request'
+        env:
+          # The title is attacker-controlled, so pass it through the environment
+          # rather than interpolating it into the script.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          flagged=0
+          if printf '%s' "$PR_TITLE" \
+              | grep -Eq '^(feat|fix|docs|test|ci|chore)(\([^)]*\))?!:'; then
+            flagged=1
+            echo "Flagged by '!' in the pull request title."
+          fi
+          if printf '%s' "$PR_LABELS" | grep -q '"upgrade-impact"'; then
+            flagged=1
+            echo "Flagged by the upgrade-impact label."
+          fi
+
+          if [ "$flagged" -eq 0 ]; then
+            echo "Not flagged as upgrade-impacting, nothing to check."
+            exit 0
+          fi
+
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" \
+              | grep -q '^docs/release-notes/'; then
+            echo "Release note present."
+            exit 0
+          fi
+
+          echo "::error::This pull request is flagged as upgrade-impacting but does not touch docs/release-notes/. Add a bullet to the Unreleased section of the current series page describing what an operator has to do, or remove the upgrade-impact label and the '!' from the title if no operator action is needed."
+          exit 1
