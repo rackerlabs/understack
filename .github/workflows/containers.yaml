@@ -11,7 +11,7 @@ on:
       - "containers/ansible/**"
       - "containers/dnsmasq/**"
       - "containers/ironic-nautobot-client/**"
-      - "containers/ironic-vnc-client/**"
+      - "containers/ironic-vnc-container/**"
       - "containers/shell-operator-ironic/**"
       - "containers/understack-tests/**"
       - "python/**"
