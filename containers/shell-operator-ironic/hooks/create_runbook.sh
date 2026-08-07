@@ -57,20 +57,28 @@ PATCH
   }
 
   sync_runbook() {
-    local i="$1"
+    # obj_path is a jq filter expression (e.g. "." or ".[0].object")
+    # pointing at the IronicRunbook object within BINDING_CONTEXT_PATH.
+    local obj_path="$1"
     local resource_name namespace kind runbook_name description public owner
 
-    resource_name=$(jq -r ".${i}.metadata.name" "${BINDING_CONTEXT_PATH}")
-    namespace=$(jq -r ".${i}.metadata.namespace" "${BINDING_CONTEXT_PATH}")
-    kind=$(jq -r ".${i}.kind" "${BINDING_CONTEXT_PATH}")
-    runbook_name=$(jq -r ".${i}.spec.runbookName" "${BINDING_CONTEXT_PATH}")
-    description=$(jq -r ".${i}.spec.description // empty" "${BINDING_CONTEXT_PATH}")
-    public=$(jq -r ".${i}.spec.public // empty" "${BINDING_CONTEXT_PATH}")
-    owner=$(jq -r ".${i}.spec.owner // empty" "${BINDING_CONTEXT_PATH}")
+    resource_name=$(jq -r "${obj_path}.metadata.name" "${BINDING_CONTEXT_PATH}")
+    namespace=$(jq -r "${obj_path}.metadata.namespace" "${BINDING_CONTEXT_PATH}")
+    kind=$(jq -r "${obj_path}.kind" "${BINDING_CONTEXT_PATH}")
+    runbook_name=$(jq -r "${obj_path}.spec.runbookName" "${BINDING_CONTEXT_PATH}")
+    description=$(jq -r "${obj_path}.spec.description // empty" "${BINDING_CONTEXT_PATH}")
+    public=$(jq -r "${obj_path}.spec.public // empty" "${BINDING_CONTEXT_PATH}")
+    owner=$(jq -r "${obj_path}.spec.owner // empty" "${BINDING_CONTEXT_PATH}")
 
     echo "[create_runbook] Creating runbook kind=${kind} name=${resource_name} namespace=${namespace} runbookName=${runbook_name} description=${description} public=${public} owner=${owner}"
 
-    jq -r ".${i}.spec.steps" "${BINDING_CONTEXT_PATH}" > /tmp/steps.json
+    jq -r "${obj_path}.spec.steps" "${BINDING_CONTEXT_PATH}" > /tmp/steps.json
+
+    if ! jq -e 'type == "array" and length > 0' /tmp/steps.json >/dev/null 2>&1; then
+        echo "[create_runbook] FAILED: name=${resource_name} error=spec.steps is missing, null, or empty" >&2
+        patch_status "${namespace}" "${resource_name}" "Failed" "spec.steps must be a non-empty array"
+        return 1
+    fi
 
     command_args=(baremetal runbook create --name "${runbook_name}" --steps /tmp/steps.json)
 
@@ -89,7 +97,7 @@ PATCH
     if output=$(openstack "${command_args[@]}" 2>&1); then
         echo "[create_runbook] SUCCESS: Runbook created in Ironic name=${resource_name} output=${output}"
 
-        traits_json=$(jq -c ".${i}.spec.traits // []" "${BINDING_CONTEXT_PATH}")
+        traits_json=$(jq -c "${obj_path}.spec.traits // []" "${BINDING_CONTEXT_PATH}")
         if [[ "${traits_json}" != "[]" ]]; then
             echo "[create_runbook] Setting traits name=${resource_name} traits=${traits_json}"
             ironic_endpoint=$(openstack endpoint list --service baremetal --interface internal -f value -c URL 2>/dev/null | head -1)
@@ -147,7 +155,7 @@ PATCH
           ORIG_BINDING_CONTEXT_PATH="${BINDING_CONTEXT_PATH}"
           jq -r ".[$i].objects[$j].object" "${BINDING_CONTEXT_PATH}" > /tmp/sync_object.json
           BINDING_CONTEXT_PATH=/tmp/sync_object.json
-          sync_runbook ""
+          sync_runbook "."
           BINDING_CONTEXT_PATH="${ORIG_BINDING_CONTEXT_PATH}"
         else
           echo "[create_runbook] Resource name=${obj_name} already synced, skipping"
@@ -157,7 +165,7 @@ PATCH
     fi
 
     if [[ $type == "Event" ]] ; then
-      if ! sync_runbook "[$i].object"; then
+      if ! sync_runbook ".[$i].object"; then
         exit 1
       fi
     fi
