@@ -48,8 +48,11 @@ def vlan_group_names(
         rack_names = {p.rack_name for p in ports_in_group}
         switch_suffixes = {p.switch_suffix for p in ports_in_group}
 
-        if len(rack_names) > 1 and switch_suffixes == {"2"}:
-            rack_names = {f"{rack_name}-2" for rack_name in rack_names}
+        # Special case naming for pairs of racks that have multiple leaf pairs.
+        # (We don't handle multiple pairs in a single rack.)
+        if switch_suffixes in [{"2"}, {"3"}, {"4"}, {"5"}, {"6"}]:
+            suffix = next(iter(switch_suffixes))
+            rack_names = {f"{rack_name}-{suffix}" for rack_name in rack_names}
 
         vlan_group_name = "/".join(sorted(rack_names)) + "-" + switch_category
 
