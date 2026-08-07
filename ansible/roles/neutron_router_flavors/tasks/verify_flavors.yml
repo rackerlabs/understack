@@ -1,0 +1,37 @@
+---
+# Final verification that all router flavors are configured
+# Lists all flavors and their profiles
+
+- name: "List all Neutron router flavors"
+  ansible.builtin.command:
+    argv:
+      - openstack
+      - network
+      - flavor
+      - list
+      - --format
+      - json
+  register: all_flavors_raw
+  changed_when: false
+  retries: "{{ neutron_router_flavor_retries }}"
+  delay: "{{ neutron_router_flavor_delay }}"
+  until: all_flavors_raw.rc == 0
+
+- name: "Parse all flavors"
+  ansible.builtin.set_fact:
+    all_flavors: "{{ all_flavors_raw.stdout | from_json }}"
+
+- name: "Debug all flavors structure"
+  ansible.builtin.debug:
+    msg: "{{ all_flavors }}"
+    verbosity: 0
+  when: false
+
+- name: "Report configured router flavors"
+  ansible.builtin.debug:
+    msg: |
+      Successfully configured the following router flavors:
+      {% for flavor in all_flavors %}
+      - {{ flavor.Name }} (ID: {{ flavor.ID }})
+      {% endfor %}
+    verbosity: 0

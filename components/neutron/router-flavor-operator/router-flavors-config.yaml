@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: neutron-router-flavors
+  namespace: openstack
+  labels:
+    app.kubernetes.io/name: neutron-router-flavor-operator
+    app.kubernetes.io/component: config
+data:
+  flavors.json: |
+    {
+      "router_flavors": [
+        {
+          "name": "pa1410",
+          "service_type": "L3_ROUTER_NAT",
+          "description": "Physical PA 1410",
+          "driver": "neutron_understack.l3_router.palo_alto.PaloAlto",
+          "profile_description": "Physical PA 1410",
+          "metainfo": {
+            "resource_class": "pa1410"
+          }
+        }
+      ]
+    }
