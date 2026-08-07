@@ -466,6 +466,12 @@ def is_dynamic_network_segment(segment_id: str) -> bool:
     return segment.is_dynamic
 
 
+def release_segment_if_unused(segment: NetworkSegment) -> None:
+    """Release a dynamic VLAN segment once no ports remain bound to it."""
+    if not ports_bound_to_segment(segment.id) and segment.is_dynamic:
+        release_dynamic_segment(segment.id)
+
+
 def local_link_from_binding_profile(binding_profile: dict) -> dict | None:
     return binding_profile.get("local_link_information", [None])[0]
 
