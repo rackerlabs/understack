@@ -89,6 +89,29 @@ func init() {
 	SchemeBuilder.Register(&Nautobot{}, &NautobotList{})
 }
 
+// ConfigMapRefs returns every ConfigMap reference declared in the spec.
+func (s *NautobotSpec) ConfigMapRefs() []ConfigMapRef {
+	refs := make([]ConfigMapRef, 0)
+	refs = append(refs, s.DeviceTypesRef...)
+	refs = append(refs, s.LocationTypesRef...)
+	refs = append(refs, s.LocationRef...)
+	refs = append(refs, s.RackGroupRef...)
+	refs = append(refs, s.RackRef...)
+	refs = append(refs, s.VlanGroupRef...)
+	refs = append(refs, s.VlanRef...)
+	refs = append(refs, s.PrefixRef...)
+	refs = append(refs, s.ClusterTypeRef...)
+	refs = append(refs, s.ClusterGroupRef...)
+	refs = append(refs, s.ClusterRef...)
+	refs = append(refs, s.NamespaceRef...)
+	refs = append(refs, s.RirRef...)
+	refs = append(refs, s.RoleRef...)
+	refs = append(refs, s.TenantGroupRef...)
+	refs = append(refs, s.TenantRef...)
+	refs = append(refs, s.DeviceRef...)
+	return refs
+}
+
 func (r *Nautobot) GetSyncHash(key string) string {
 	if r == nil || r.Status.SyncHash == nil {
 		return ""
