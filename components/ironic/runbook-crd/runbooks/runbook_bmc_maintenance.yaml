@@ -6,6 +6,7 @@ metadata:
 spec:
   runbookName: bmc-maintenance
   description: "Performs BMC maintenance operations including clearing the job queue and synchronizing the BMC clock."
+  disableRamdisk: true
   traits:
     - CUSTOM_DELL_IDRAC
 

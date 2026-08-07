@@ -185,10 +185,6 @@ spec:
           description: Human-readable description of the runbook
           jsonPath: .spec.description
           priority: 1
-        - name: Steps
-          type: integer
-          description: Number of steps in the runbook
-          jsonPath: .spec.steps[*]
         - name: Public
           type: boolean
           description: Whether the runbook is public
