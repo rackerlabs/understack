@@ -62,17 +62,17 @@ PATCH
     local obj_path="$1"
     local resource_name namespace kind runbook_name description public owner
 
-    resource_name=$(jq -r "${obj_path}.metadata.name" "${BINDING_CONTEXT_PATH}")
-    namespace=$(jq -r "${obj_path}.metadata.namespace" "${BINDING_CONTEXT_PATH}")
-    kind=$(jq -r "${obj_path}.kind" "${BINDING_CONTEXT_PATH}")
-    runbook_name=$(jq -r "${obj_path}.spec.runbookName" "${BINDING_CONTEXT_PATH}")
-    description=$(jq -r "${obj_path}.spec.description // empty" "${BINDING_CONTEXT_PATH}")
-    public=$(jq -r "${obj_path}.spec.public // empty" "${BINDING_CONTEXT_PATH}")
-    owner=$(jq -r "${obj_path}.spec.owner // empty" "${BINDING_CONTEXT_PATH}")
+    resource_name=$(jq -r "${obj_path} | .metadata.name" "${BINDING_CONTEXT_PATH}")
+    namespace=$(jq -r "${obj_path} | .metadata.namespace" "${BINDING_CONTEXT_PATH}")
+    kind=$(jq -r "${obj_path} | .kind" "${BINDING_CONTEXT_PATH}")
+    runbook_name=$(jq -r "${obj_path} | .spec.runbookName" "${BINDING_CONTEXT_PATH}")
+    description=$(jq -r "${obj_path} | .spec.description // empty" "${BINDING_CONTEXT_PATH}")
+    public=$(jq -r "${obj_path} | .spec.public // empty" "${BINDING_CONTEXT_PATH}")
+    owner=$(jq -r "${obj_path} | .spec.owner // empty" "${BINDING_CONTEXT_PATH}")
 
     echo "[update_runbook] Updating runbook kind=${kind} name=${resource_name} namespace=${namespace} runbookName=${runbook_name} description=${description} public=${public} owner=${owner}"
 
-    jq -r "${obj_path}.spec.steps" "${BINDING_CONTEXT_PATH}" > /tmp/steps.json
+    jq -r "${obj_path} | .spec.steps" "${BINDING_CONTEXT_PATH}" > /tmp/steps.json
 
     if ! jq -e 'type == "array" and length > 0' /tmp/steps.json >/dev/null 2>&1; then
         echo "[update_runbook] FAILED: name=${resource_name} error=spec.steps is missing, null, or empty" >&2
@@ -95,7 +95,7 @@ PATCH
     if output=$(openstack "${command_args[@]}" 2>&1); then
         echo "[update_runbook] SUCCESS: Runbook updated in Ironic name=${resource_name} output=${output}"
 
-        traits_json=$(jq -c "${obj_path}.spec.traits // []" "${BINDING_CONTEXT_PATH}")
+        traits_json=$(jq -c "${obj_path} | .spec.traits // []" "${BINDING_CONTEXT_PATH}")
         if [[ "${traits_json}" != "[]" ]]; then
             echo "[update_runbook] Setting traits name=${resource_name} traits=${traits_json}"
             ironic_endpoint=$(openstack endpoint list --service baremetal --interface internal -f value -c URL 2>/dev/null | head -1)
