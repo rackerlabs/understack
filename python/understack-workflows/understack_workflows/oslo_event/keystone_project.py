@@ -6,6 +6,7 @@ from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
+from understack_workflows.netapp.config import NetAppConfig
 from understack_workflows.netapp.manager import NetAppManager
 
 logger = logging.getLogger(__name__)
@@ -71,10 +72,14 @@ def handle_project_created(
     svm_name = None
     svm_state = "unknown"
     try:
-        netapp_manager = NetAppManager()
-        svm_name = _create_svm(netapp_manager, event)
-        save_output("svm_created", str(True))
-        svm_state = "created"
+        backends = NetAppConfig.get_all_backends()
+        for backend_config in backends:
+            netapp_manager = NetAppManager(netapp_config=backend_config)
+            svm_name = _create_svm(netapp_manager, event)
+            if svm_name:
+                save_output("svm_created", str(True))
+                svm_state = "created"
+                break
     finally:
         if not svm_name:
             svm_name = "not_returned"
@@ -98,25 +103,35 @@ def handle_project_updated(
     svm_name = None
     svm_state = "unknown"
     try:
-        netapp_manager = NetAppManager()
-        svm_exists = netapp_manager.check_if_svm_exists(project_id=event.project_id)
+        backends = NetAppConfig.get_all_backends()
+
+        # Find which backend has the SVM (if any)
+        existing_manager = None
+        for backend_config in backends:
+            netapp_manager = NetAppManager(netapp_config=backend_config)
+            if netapp_manager.check_if_svm_exists(project_id=event.project_id):
+                existing_manager = netapp_manager
+                break
 
         # Tag removed
-        if not project_is_svm_enabled and svm_exists:
+        if not project_is_svm_enabled and existing_manager:
             logger.warning(
                 "SVM os-%s exists on NetApp but project %s is no longer tagged with %s",
                 event.project_id,
                 event.project_id,
                 SVM_PROJECT_TAG,
             )
-            netapp_manager.cleanup_project(event.project_id)
+            existing_manager.cleanup_project(event.project_id)
             svm_state = "removed"
         # Tag added
         elif project_is_svm_enabled:
-            if svm_exists:
+            if existing_manager:
                 save_output("svm_created", str(False))
                 svm_state = "present"
             else:
+                # Create on first backend
+                first_backend = backends[0]
+                netapp_manager = NetAppManager(netapp_config=first_backend)
                 svm_name = _create_svm(netapp_manager, event)
                 save_output("svm_created", str(True))
                 svm_state = "created"
@@ -138,15 +153,34 @@ def handle_project_deleted(
     event = KeystoneProjectEvent.from_event_dict(event_data)
     logger.info("Starting ONTAP SVM and Volume delete workflow.")
     try:
-        netapp_manager = NetAppManager()
-        svm_exists = netapp_manager.check_if_svm_exists(project_id=event.project_id)
+        backends = NetAppConfig.get_all_backends()
+        logger.info("Loaded %d backend(s) from config.", len(backends))
 
-        if svm_exists:
-            logger.info("SVM for project %s exists - cleaning it up.", event.project_id)
-            netapp_manager.cleanup_project(event.project_id)
-            save_output("svm_state", "removed")
-        else:
-            logger.info("SVM for project %s did not exist.", event.project_id)
+        svm_found = False
+        for backend_config in backends:
+            logger.info(
+                "Checking backend '%s' for project %s SVM.",
+                backend_config.section,
+                event.project_id,
+            )
+            netapp_manager = NetAppManager(netapp_config=backend_config)
+            svm_exists = netapp_manager.check_if_svm_exists(project_id=event.project_id)
+
+            if svm_exists:
+                svm_found = True
+                logger.info(
+                    "SVM for project %s found on backend '%s' - cleaning it up.",
+                    event.project_id,
+                    backend_config.section,
+                )
+                netapp_manager.cleanup_project(event.project_id)
+                save_output("svm_state", "removed")
+                break
+
+        if not svm_found:
+            logger.info(
+                "SVM for project %s did not exist on any backend.", event.project_id
+            )
             save_output("svm_state", "nonexistent")
     except Exception as e:
         logger.error(e)

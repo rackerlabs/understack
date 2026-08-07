@@ -222,9 +222,16 @@ class NetAppClient(NetAppClientInterface):
     def _setup_connection(self) -> None:
         """Set up the NetApp SDK connection."""
         try:
-            # Only create connection if one doesn't already exist
-            # This supports cases where NetAppManager sets up the connection first
-            if not hasattr(config, "CONNECTION") or config.CONNECTION is None:
+            # Create a new connection if none exists, or if targeting a different host
+            needs_connection = (
+                not hasattr(config, "CONNECTION")
+                or config.CONNECTION is None
+                or (
+                    hasattr(config.CONNECTION, "_host")
+                    and config.CONNECTION._host != self._config.hostname
+                )
+            )
+            if needs_connection:
                 config.CONNECTION = HostConnection(
                     self._config.hostname,
                     username=self._config.username,

@@ -6,7 +6,6 @@ from netapp_ontap.host_connection import HostConnection
 from netapp_ontap.resources.nvme_namespace import NvmeNamespace
 
 from understack_workflows.netapp.client import NetAppClient
-from understack_workflows.netapp.config import NetAppConfig
 from understack_workflows.netapp.exceptions import NetAppManagerError
 from understack_workflows.netapp.lif_service import LifService
 from understack_workflows.netapp.route_service import RouteService
@@ -31,7 +30,6 @@ class NetAppManager:
 
     def __init__(
         self,
-        config_path="/etc/netapp/netapp_nvme.conf",
         netapp_config=None,
         netapp_client=None,
         svm_service=None,
@@ -42,8 +40,8 @@ class NetAppManager:
         """Initialize NetAppManager with dependency injection support.
 
         Args:
-            config_path: Path to NetApp configuration file
-            netapp_config: NetAppConfig instance (optional, for dependency injection)
+            netapp_config: NetAppConfig instance (required unless netapp_client
+                           is provided)
             netapp_client: NetAppClient instance (optional, for dependency injection)
             svm_service: SvmService instance (optional, for dependency injection)
             volume_service: VolumeService instance (optional, for dependency injection)
@@ -52,7 +50,6 @@ class NetAppManager:
         """
         # Set up dependencies with dependency injection or create defaults
         self._setup_dependencies(
-            config_path,
             netapp_config,
             netapp_client,
             svm_service,
@@ -63,7 +60,6 @@ class NetAppManager:
 
     def _setup_dependencies(
         self,
-        config_path,
         netapp_config,
         netapp_client,
         svm_service,
@@ -75,17 +71,15 @@ class NetAppManager:
         # Initialize configuration
         if netapp_config is not None:
             self._config = netapp_config
+        elif netapp_client is not None:
+            # Client provided via dependency injection - config not needed
+            self._config = None
         else:
-            # Create config from file if client is not provided (client needs config)
-            # Only skip config creation if client is provided via dependency injection
-            if netapp_client is None:
-                # Need to create config since we'll need to create a client
-                self._config = NetAppConfig(config_path)
-            else:
-                # Client provided via dependency injection - config not needed
-                self._config = None
+            raise ValueError(
+                "netapp_config is required when netapp_client is not provided"
+            )
 
-        # Set up connection if using traditional constructor pattern
+        # Set up connection if config is provided and services are not injected
         if (
             self._config is not None
             and netapp_client is None
@@ -94,7 +88,6 @@ class NetAppManager:
             and lif_service is None
             and route_service is None
         ):
-            # Traditional constructor usage - set up connection directly
             # Check if connection needs to be established (handle both real and
             # mocked config)
             needs_connection = (
@@ -105,6 +98,12 @@ class NetAppManager:
                 (
                     hasattr(config.CONNECTION, "_mock_name")
                     and config.CONNECTION._mock_name  # pyright: ignore
+                )
+                or
+                # Force new connection when targeting a different host
+                (
+                    hasattr(config.CONNECTION, "_host")
+                    and config.CONNECTION._host != self._config.hostname  # pyright: ignore[reportAttributeAccessIssue]
                 )
             )
             if needs_connection:
@@ -118,8 +117,7 @@ class NetAppManager:
         if netapp_client is not None:
             self._client = netapp_client
         else:
-            # Create client with config - config should always exist for
-            # traditional usage
+            # Create client with config
             if self._config is None:
                 raise ValueError(
                     "NetAppConfig is required when NetAppClient is not provided"

@@ -21,6 +21,17 @@ def load_json_sample(filename: str) -> dict:
 class TestIntegrationTests:
     """Integration tests for complete script execution with mock Nautobot."""
 
+    @pytest.fixture(autouse=True)
+    def _mock_get_all_backends(self):
+        """Auto-mock get_all_backends for all integration tests."""
+        mock_backend = Mock()
+        mock_backend.section = "backend1"
+        with patch(
+            "understack_workflows.main.netapp_configure_net.NetAppConfig.get_all_backends",
+            return_value=[mock_backend],
+        ):
+            yield
+
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
@@ -522,6 +533,17 @@ class TestIntegrationWithNetAppManager:
     NetAppManager initialization and network configuration operations.
     """
 
+    @pytest.fixture(autouse=True)
+    def _mock_get_all_backends(self):
+        """Auto-mock get_all_backends for all integration tests."""
+        mock_backend = Mock()
+        mock_backend.section = "backend1"
+        with patch(
+            "understack_workflows.main.netapp_configure_net.NetAppConfig.get_all_backends",
+            return_value=[mock_backend],
+        ):
+            yield
+
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
@@ -575,9 +597,7 @@ class TestIntegrationWithNetAppManager:
         assert result == 0
 
         # Verify NetAppManager was initialized with default config path
-        mock_netapp_manager_class.assert_called_once_with(
-            "/etc/netapp/netapp_nvme.conf"
-        )
+        mock_netapp_manager_class.assert_called_once()
 
         # Verify Nautobot client was created and GraphQL query was executed
         mock_nautobot_class.assert_called_once()
@@ -657,7 +677,7 @@ class TestIntegrationWithNetAppManager:
         assert result == 0
 
         # Verify NetAppManager was initialized with custom config path
-        mock_netapp_manager_class.assert_called_once_with(custom_config_path)
+        mock_netapp_manager_class.assert_called_once()
 
         # Verify NetApp LIF creation was called (single sample has 2 interfaces)
         assert mock_netapp_manager_instance.create_lif.call_count == 2
@@ -725,9 +745,7 @@ class TestIntegrationWithNetAppManager:
             main()
 
         # Verify NetAppManager was initialized
-        mock_netapp_manager_class.assert_called_once_with(
-            "/etc/netapp/netapp_nvme.conf"
-        )
+        mock_netapp_manager_class.assert_called_once()
 
         # Verify GraphQL query was executed successfully before NetApp error
         mock_nautobot_instance.session.graphql.query.assert_called_once()
@@ -790,9 +808,7 @@ class TestIntegrationWithNetAppManager:
         assert result == 0
 
         # Verify NetAppManager was initialized
-        mock_netapp_manager_class.assert_called_once_with(
-            "/etc/netapp/netapp_nvme.conf"
-        )
+        mock_netapp_manager_class.assert_called_once()
 
         # Verify GraphQL query was executed
         mock_nautobot_instance.session.graphql.query.assert_called_once()
@@ -862,9 +878,7 @@ class TestIntegrationWithNetAppManager:
         assert result == 0
 
         # Verify NetAppManager was initialized
-        mock_netapp_manager_class.assert_called_once_with(
-            "/etc/netapp/netapp_nvme.conf"
-        )
+        mock_netapp_manager_class.assert_called_once()
 
         # Verify GraphQL query was executed with normalized project ID
         mock_nautobot_instance.session.graphql.query.assert_called_once_with(
@@ -907,6 +921,17 @@ class TestIntegrationWithNetAppManager:
 
 class TestRouteCreationIntegration:
     """Integration tests for route creation workflow."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_get_all_backends(self):
+        """Auto-mock get_all_backends for all route creation tests."""
+        mock_backend = Mock()
+        mock_backend.section = "backend1"
+        with patch(
+            "understack_workflows.main.netapp_configure_net.NetAppConfig.get_all_backends",
+            return_value=[mock_backend],
+        ):
+            yield
 
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
@@ -978,9 +1003,7 @@ class TestRouteCreationIntegration:
         assert result == 0
 
         # Verify NetAppManager was initialized
-        mock_netapp_manager_class.assert_called_once_with(
-            "/etc/netapp/netapp_nvme.conf"
-        )
+        mock_netapp_manager_class.assert_called_once()
 
         # Verify GraphQL query was executed
         mock_nautobot_instance.session.graphql.query.assert_called_once()
@@ -1384,8 +1407,7 @@ class TestRouteCreationIntegration:
 
         # Mock NetAppManager with SVM not found error during route creation
         svm_error = SvmOperationError(
-            "Route creation failed: SVM 'os-12345678123456789abc123456789012'"
-            "not found",
+            "Route creation failed: SVM 'os-12345678123456789abc123456789012'not found",
             svm_name="os-12345678123456789abc123456789012",
             context={
                 "operation": "Route creation",

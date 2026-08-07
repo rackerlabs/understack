@@ -7,6 +7,7 @@ from understack_workflows.helpers import credential
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.nautobot import Nautobot
+from understack_workflows.netapp.config import NetAppConfig
 from understack_workflows.netapp.manager import NetAppManager
 from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 from understack_workflows.netapp.value_objects import VirtualMachineNetworkInfo
@@ -375,7 +376,24 @@ def main():
         # Establish Nautobot connection using parsed arguments
         logger.info("Connecting to Nautobot at: %s", args.nautobot_url)
         nautobot_client = Nautobot(args.nautobot_url, nb_token, logger=logger)
-        netapp_manager = NetAppManager(args.netapp_config_path)
+
+        # Find the backend where this project's SVM lives
+        backends = NetAppConfig.get_all_backends(args.netapp_config_path)
+        netapp_manager = None
+        for backend_config in backends:
+            mgr = NetAppManager(netapp_config=backend_config)
+            if mgr.check_if_svm_exists(project_id=args.project_id):
+                netapp_manager = mgr
+                logger.info(
+                    "Found SVM for project %s on backend '%s'",
+                    args.project_id,
+                    backend_config.section,
+                )
+                break
+
+        if netapp_manager is None:
+            logger.error("SVM for project %s not found on any backend", args.project_id)
+            return 1
 
         # Call do_action() with appropriate parameters
         raw_response, structured_data = do_action(

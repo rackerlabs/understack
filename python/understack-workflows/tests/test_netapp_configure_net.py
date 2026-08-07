@@ -1749,6 +1749,17 @@ class TestArgumentParserNetappConfigPath:
 class TestMainFunctionWithNetAppManager:
     """Test cases for main function with NetAppManager integration."""
 
+    @pytest.fixture(autouse=True)
+    def _mock_get_all_backends(self):
+        """Auto-mock get_all_backends for all main function tests."""
+        mock_backend = Mock()
+        mock_backend.section = "backend1"
+        with patch(
+            "understack_workflows.main.netapp_configure_net.NetAppConfig.get_all_backends",
+            return_value=[mock_backend],
+        ):
+            yield
+
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
     @patch("understack_workflows.main.netapp_configure_net.credential")
@@ -1805,10 +1816,8 @@ class TestMainFunctionWithNetAppManager:
         # Verify successful execution
         assert result == 0
 
-        # Verify NetAppManager was initialized with default path
-        mock_netapp_manager_class.assert_called_once_with(
-            "/etc/netapp/netapp_nvme.conf"
-        )
+        # Verify NetAppManager was initialized with a backend config
+        mock_netapp_manager_class.assert_called_once()
 
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
@@ -1865,8 +1874,8 @@ class TestMainFunctionWithNetAppManager:
         # Verify successful execution
         assert result == 0
 
-        # Verify NetAppManager was initialized with custom path
-        mock_netapp_manager_class.assert_called_once_with(custom_path)
+        # Verify NetAppManager was initialized with a backend config
+        mock_netapp_manager_class.assert_called_once()
 
     @patch("understack_workflows.main.netapp_configure_net.NetAppManager")
     @patch("understack_workflows.main.netapp_configure_net.Nautobot")
@@ -1907,9 +1916,7 @@ class TestMainFunctionWithNetAppManager:
             main()
 
         # Verify NetAppManager initialization was attempted
-        mock_netapp_manager_class.assert_called_once_with(
-            "/etc/netapp/netapp_nvme.conf"
-        )
+        mock_netapp_manager_class.assert_called_once()
 
     @patch(
         "understack_workflows.main.netapp_configure_net.netapp_create_interfaces_and_routes"
