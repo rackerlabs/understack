@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+function usage() {
+    echo "$(basename "$0") <path-to-checkout> <version>" >&2
+    echo "" >&2
+    echo "Rebases an UnderStack fork branch (understack/\$VERSION) on top of" >&2
+    echo "upstream's stable/\$VERSION branch, and syncs the local stable/\$VERSION" >&2
+    echo "mirror branch, then force-pushes both to the rackerlabs remote." >&2
+    echo "" >&2
+    echo "Example: $(basename "$0") ~/work/ironic 2026.1" >&2
+    echo "" >&2
+    echo "Requirements on the checkout:" >&2
+    echo "  - a remote named 'upstream' pointing at the openstack/* project" >&2
+    echo "  - a remote named 'rackerlabs' pointing at the rackerlabs fork" >&2
+    echo "  - local branches stable/\$VERSION and understack/\$VERSION" >&2
+
+    exit 1
+}
+
+function log() { echo "[INFO]  $*"; }
+function warn() { echo "[WARN]  $*" >&2; }
+function err() { echo "[ERROR] $*" >&2; }
+function die() { err "$*"; exit 1; }
+
+function confirm() {
+    local prompt="$1"
+    local ans
+    read -r -p "${prompt} [y/N] " ans
+    case "$ans" in
+        [Yy]*) ;;
+        *) die "Aborted by user." ;;
+    esac
+}
+
+function git_c() {
+    git -C "$REPO_PATH" "$@"
+}
+
+if [[ $# -ne 2 ]]; then
+    usage
+fi
+
+REPO_PATH="$1"
+VERSION="$2"
+
+if [[ -z "$REPO_PATH" || -z "$VERSION" ]]; then
+    usage
+fi
+
+STABLE_BRANCH="stable/${VERSION}"
+UNDERSTACK_BRANCH="understack/${VERSION}"
+TIMESTAMP=$(date +%Y%m%d%H%M%S)
+REPO_NAME=$(basename "$REPO_PATH")
+
+# ---------------------------------------------------------------------------
+# Step 1: pre-flight checks
+# ---------------------------------------------------------------------------
+
+log "Step 1: pre-flight checks"
+
+if [[ ! -d "$REPO_PATH" ]]; then
+    die "Path does not exist or is not a directory: $REPO_PATH"
+fi
+
+if ! git_c rev-parse --git-dir >/dev/null 2>&1; then
+    die "Not a git repository: $REPO_PATH"
+fi
+
+if [[ -n "$(git_c status --porcelain)" ]]; then
+    die "Working tree is not clean. Commit, stash, or clean up changes in $REPO_PATH before rebasing."
+fi
+
+GIT_DIR=$(git_c rev-parse --git-dir)
+if [[ -d "${REPO_PATH}/${GIT_DIR}/rebase-merge" || -d "${REPO_PATH}/${GIT_DIR}/rebase-apply" ]]; then
+    die "A rebase is already in progress in $REPO_PATH. Resolve it (git rebase --continue/--abort) first."
+fi
+if git_c rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+    die "A merge is already in progress in $REPO_PATH. Resolve it first."
+fi
+if git_c rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null 2>&1; then
+    die "A cherry-pick is already in progress in $REPO_PATH. Resolve it first."
+fi
+
+UPSTREAM_URL=$(git_c remote get-url upstream 2>/dev/null) || die "Remote 'upstream' not found in $REPO_PATH."
+RACKERLABS_URL=$(git_c remote get-url rackerlabs 2>/dev/null) || die "Remote 'rackerlabs' not found in $REPO_PATH."
+
+if ! git_c show-ref --verify --quiet "refs/heads/${STABLE_BRANCH}"; then
+    die "Local branch '${STABLE_BRANCH}' does not exist in $REPO_PATH. See containers/*/README.md for setup steps."
+fi
+if ! git_c show-ref --verify --quiet "refs/heads/${UNDERSTACK_BRANCH}"; then
+    die "Local branch '${UNDERSTACK_BRANCH}' does not exist in $REPO_PATH. See containers/*/README.md for setup steps."
+fi
+
+CURRENT_BRANCH=$(git_c rev-parse --abbrev-ref HEAD)
+LOCAL_STABLE_SHA=$(git_c rev-parse "$STABLE_BRANCH")
+LOCAL_UNDERSTACK_SHA=$(git_c rev-parse "$UNDERSTACK_BRANCH")
+
+echo ""
+echo "Checkout path:        $REPO_PATH"
+echo "Version:               $VERSION"
+echo "Current branch:        $CURRENT_BRANCH"
+echo "upstream remote:       $UPSTREAM_URL"
+echo "rackerlabs remote:     $RACKERLABS_URL"
+echo "local ${STABLE_BRANCH}: $LOCAL_STABLE_SHA"
+echo "local ${UNDERSTACK_BRANCH}: $LOCAL_UNDERSTACK_SHA"
+echo ""
+
+confirm "Proceed to fetch upstream and rackerlabs?"
+
+# ---------------------------------------------------------------------------
+# Step 2: fetch + second verification
+# ---------------------------------------------------------------------------
+
+log "Step 2: fetching remotes"
+
+git_c fetch upstream --prune
+git_c fetch rackerlabs --prune
+
+UPSTREAM_STABLE_REF="upstream/${STABLE_BRANCH}"
+RACKERLABS_STABLE_REF="rackerlabs/${STABLE_BRANCH}"
+RACKERLABS_UNDERSTACK_REF="rackerlabs/${UNDERSTACK_BRANCH}"
+
+git_c rev-parse -q --verify "$UPSTREAM_STABLE_REF" >/dev/null 2>&1 \
+    || die "Remote ref '${UPSTREAM_STABLE_REF}' does not exist. Check the version or that upstream has cut this stable branch."
+git_c rev-parse -q --verify "$RACKERLABS_STABLE_REF" >/dev/null 2>&1 \
+    || die "Remote ref '${RACKERLABS_STABLE_REF}' does not exist on rackerlabs."
+git_c rev-parse -q --verify "$RACKERLABS_UNDERSTACK_REF" >/dev/null 2>&1 \
+    || die "Remote ref '${RACKERLABS_UNDERSTACK_REF}' does not exist on rackerlabs."
+
+UPSTREAM_STABLE_SHA=$(git_c rev-parse "$UPSTREAM_STABLE_REF")
+RACKERLABS_STABLE_SHA=$(git_c rev-parse "$RACKERLABS_STABLE_REF")
+RACKERLABS_UNDERSTACK_SHA=$(git_c rev-parse "$RACKERLABS_UNDERSTACK_REF")
+
+echo ""
+echo "${UPSTREAM_STABLE_REF}:"
+git_c log -1 --oneline "$UPSTREAM_STABLE_REF"
+echo ""
+echo "${RACKERLABS_STABLE_REF}:"
+git_c log -1 --oneline "$RACKERLABS_STABLE_REF"
+echo ""
+echo "${RACKERLABS_UNDERSTACK_REF}:"
+git_c log -1 --oneline "$RACKERLABS_UNDERSTACK_REF"
+echo ""
+
+PRE_REBASE_PATCH_COUNT=$(git_c rev-list --count "${RACKERLABS_STABLE_REF}..${UNDERSTACK_BRANCH}")
+
+echo "About to run:"
+echo "  git rebase --onto ${UPSTREAM_STABLE_REF} (${UPSTREAM_STABLE_SHA}) ${RACKERLABS_STABLE_REF} (${RACKERLABS_STABLE_SHA}) ${UNDERSTACK_BRANCH}"
+echo ""
+
+confirm "Proceed with the rebase?"
+
+# ---------------------------------------------------------------------------
+# Step 3: rebase
+# ---------------------------------------------------------------------------
+
+log "Step 3: rebasing"
+
+BACKUP_UNDERSTACK_TAG="backup/${UNDERSTACK_BRANCH}/${TIMESTAMP}"
+BACKUP_STABLE_TAG="backup/${STABLE_BRANCH}/${TIMESTAMP}"
+git_c tag "$BACKUP_UNDERSTACK_TAG" "$UNDERSTACK_BRANCH"
+git_c tag "$BACKUP_STABLE_TAG" "$STABLE_BRANCH"
+log "Created local backup tags: ${BACKUP_UNDERSTACK_TAG}, ${BACKUP_STABLE_TAG}"
+
+git_c checkout "$UNDERSTACK_BRANCH"
+
+if ! git_c rebase --onto "$UPSTREAM_STABLE_REF" "$RACKERLABS_STABLE_REF" "$UNDERSTACK_BRANCH"; then
+    err "Rebase stopped due to conflicts."
+    err "Resolve conflicts, then run 'git rebase --continue' (or 'git rebase --abort' to bail out) in $REPO_PATH."
+    err "Re-run this script afterward to continue with the sync/push steps."
+    exit 1
+fi
+
+git_c checkout "$STABLE_BRANCH"
+if ! git_c merge --ff-only "$UPSTREAM_STABLE_REF"; then
+    die "Local ${STABLE_BRANCH} could not be fast-forwarded to ${UPSTREAM_STABLE_REF}. It may have diverged unexpectedly."
+fi
+
+git_c checkout "$UNDERSTACK_BRANCH"
+
+POST_REBASE_PATCH_COUNT=$(git_c rev-list --count "${STABLE_BRANCH}..${UNDERSTACK_BRANCH}")
+
+echo ""
+echo "Patches ahead of ${STABLE_BRANCH} before rebase: ${PRE_REBASE_PATCH_COUNT}"
+echo "Patches ahead of ${STABLE_BRANCH} after rebase:  ${POST_REBASE_PATCH_COUNT}"
+echo ""
+
+if [[ "$PRE_REBASE_PATCH_COUNT" != "$POST_REBASE_PATCH_COUNT" ]]; then
+    warn "Patch count changed across the rebase. Review 'git log ${STABLE_BRANCH}..${UNDERSTACK_BRANCH}' before pushing."
+fi
+
+# ---------------------------------------------------------------------------
+# Step 4: pre-push safety + third confirmation
+# ---------------------------------------------------------------------------
+
+log "Step 4: pre-push safety check"
+
+git_c fetch rackerlabs --prune
+
+CURRENT_RACKERLABS_STABLE_SHA=$(git_c rev-parse "$RACKERLABS_STABLE_REF")
+CURRENT_RACKERLABS_UNDERSTACK_SHA=$(git_c rev-parse "$RACKERLABS_UNDERSTACK_REF")
+
+if [[ "$CURRENT_RACKERLABS_STABLE_SHA" != "$RACKERLABS_STABLE_SHA" ]]; then
+    die "rackerlabs/${STABLE_BRANCH} moved since it was checked earlier (someone else pushed). Re-run this script."
+fi
+if [[ "$CURRENT_RACKERLABS_UNDERSTACK_SHA" != "$RACKERLABS_UNDERSTACK_SHA" ]]; then
+    die "rackerlabs/${UNDERSTACK_BRANCH} moved since it was checked earlier (someone else pushed). Re-run this script."
+fi
+
+NEW_STABLE_SHA=$(git_c rev-parse "$STABLE_BRANCH")
+NEW_UNDERSTACK_SHA=$(git_c rev-parse "$UNDERSTACK_BRANCH")
+
+echo ""
+echo "rackerlabs ${STABLE_BRANCH}:      ${RACKERLABS_STABLE_SHA} -> ${NEW_STABLE_SHA}"
+echo "rackerlabs ${UNDERSTACK_BRANCH}: ${RACKERLABS_UNDERSTACK_SHA} -> ${NEW_UNDERSTACK_SHA}"
+echo ""
+
+confirm "Force-push ${STABLE_BRANCH} and ${UNDERSTACK_BRANCH} to rackerlabs?"
+
+git_c push --force-with-lease rackerlabs "$STABLE_BRANCH"
+git_c push --force-with-lease rackerlabs "$UNDERSTACK_BRANCH"
+
+echo ""
+log "Done."
+echo "rackerlabs ${STABLE_BRANCH}:      ${RACKERLABS_STABLE_SHA} -> ${NEW_STABLE_SHA}"
+echo "rackerlabs ${UNDERSTACK_BRANCH}: ${RACKERLABS_UNDERSTACK_SHA} -> ${NEW_UNDERSTACK_SHA}"
+echo ""
+log "Local backup tags (delete once you're satisfied): git -C $REPO_PATH tag -d ${BACKUP_UNDERSTACK_TAG} ${BACKUP_STABLE_TAG}"
+echo ""
+log "Next: update containers/${REPO_NAME}/Dockerfile to pin the new ${UNDERSTACK_BRANCH} HEAD commit: ${NEW_UNDERSTACK_SHA}"

@@ -46,6 +46,17 @@ git checkout -b understack/2026.2
 
 ## Rebasing to keep things clean
 
+The `scripts/git-understack-rebase` script in the understack repo automates this: it checks your
+remotes and branches, shows you the commits involved, performs the rebase, and force-pushes both
+branches to `rackerlabs` after you confirm each step. It expects a remote named `upstream`
+(pointing at `openstack/nova`, not `origin`) and a remote named `rackerlabs`.
+
+```bash
+scripts/git-understack-rebase ~/work/nova 2026.1
+```
+
+To do it manually instead:
+
 ```bash
 git checkout stable/2026.1
 git pull -p

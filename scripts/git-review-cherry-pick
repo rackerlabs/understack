@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+function usage() {
+    echo "$(basename "$0") <gerrit-change-number> <version>" >&2
+    echo "" >&2
+    echo "Downloads a Gerrit change via 'git review -d' and cherry-picks it onto" >&2
+    echo "understack/\$VERSION, then pushes the result to the rackerlabs remote." >&2
+    echo "" >&2
+    echo "Run this from inside the OpenStack project checkout (e.g. ~/work/ironic)." >&2
+    echo "If this script is on your PATH as 'git-review-cherry-pick', invoke it as:" >&2
+    echo "" >&2
+    echo "  git review-cherry-pick <gerrit-change-number> <version>" >&2
+    echo "" >&2
+    echo "Example: git review-cherry-pick 12345 2026.1" >&2
+    echo "" >&2
+    echo "Requirements:" >&2
+    echo "  - 'git-review' installed and this repo has a .gitreview file" >&2
+    echo "  - a remote named 'rackerlabs' to push the result to" >&2
+    echo "  - local branch understack/\$VERSION" >&2
+
+    exit 1
+}
+
+function log() { echo "[INFO]  $*"; }
+function warn() { echo "[WARN]  $*" >&2; }
+function err() { echo "[ERROR] $*" >&2; }
+function die() { err "$*"; exit 1; }
+
+function confirm() {
+    local prompt="$1"
+    local ans
+    read -r -p "${prompt} [y/N] " ans
+    case "$ans" in
+        [Yy]*) ;;
+        *) die "Aborted by user." ;;
+    esac
+}
+
+if [[ $# -ne 2 ]]; then
+    usage
+fi
+
+CHANGE="$1"
+VERSION="$2"
+UNDERSTACK_BRANCH="understack/${VERSION}"
+
+if [[ -z "$CHANGE" || -z "$VERSION" ]]; then
+    usage
+fi
+
+# ---------------------------------------------------------------------------
+# Step 1: pre-flight checks
+# ---------------------------------------------------------------------------
+
+log "Step 1: pre-flight checks"
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+    die "Not inside a git repository. Run this from within the OpenStack project checkout."
+fi
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+if ! command -v git-review >/dev/null 2>&1; then
+    die "'git-review' is not installed or not on PATH."
+fi
+
+if [[ ! -f "${REPO_ROOT}/.gitreview" ]]; then
+    die "No .gitreview file found at ${REPO_ROOT}. Is this a Gerrit-managed OpenStack repo?"
+fi
+
+if [[ -n "$(git status --porcelain)" ]]; then
+    die "Working tree is not clean. Commit, stash, or clean up changes before continuing."
+fi
+
+GIT_DIR=$(git rev-parse --git-dir)
+if [[ -d "${GIT_DIR}/rebase-merge" || -d "${GIT_DIR}/rebase-apply" ]]; then
+    die "A rebase is already in progress in this repo. Resolve it first."
+fi
+if git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then
+    die "A merge is already in progress in this repo. Resolve it first."
+fi
+if git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null 2>&1; then
+    die "A cherry-pick is already in progress in this repo. Resolve it first."
+fi
+
+RACKERLABS_URL=$(git remote get-url rackerlabs 2>/dev/null) || die "Remote 'rackerlabs' not found in $REPO_ROOT."
+
+if ! git show-ref --verify --quiet "refs/heads/${UNDERSTACK_BRANCH}"; then
+    die "Local branch '${UNDERSTACK_BRANCH}' does not exist. See containers/*/README.md for setup steps."
+fi
+
+ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+log "Checking rackerlabs/${UNDERSTACK_BRANCH} for drift"
+git fetch rackerlabs --prune -q
+LOCAL_UNDERSTACK_SHA=$(git rev-parse "$UNDERSTACK_BRANCH")
+REMOTE_UNDERSTACK_SHA=$(git rev-parse -q --verify "rackerlabs/${UNDERSTACK_BRANCH}" || echo "")
+if [[ -n "$REMOTE_UNDERSTACK_SHA" && "$LOCAL_UNDERSTACK_SHA" != "$REMOTE_UNDERSTACK_SHA" ]]; then
+    die "Local ${UNDERSTACK_BRANCH} (${LOCAL_UNDERSTACK_SHA}) does not match rackerlabs/${UNDERSTACK_BRANCH} (${REMOTE_UNDERSTACK_SHA}). Sync your local branch before cherry-picking."
+fi
+
+echo ""
+echo "Repo:                $REPO_ROOT"
+echo "Gerrit change:       $CHANGE"
+echo "Target branch:       $UNDERSTACK_BRANCH"
+echo "rackerlabs remote:   $RACKERLABS_URL"
+echo "Current branch:      $ORIGINAL_BRANCH"
+echo ""
+
+confirm "Download change ${CHANGE} with 'git review -d' and cherry-pick it onto ${UNDERSTACK_BRANCH}?"
+
+# ---------------------------------------------------------------------------
+# Step 2: download the change
+# ---------------------------------------------------------------------------
+
+log "Step 2: downloading change ${CHANGE}"
+
+git review -d "$CHANGE"
+
+REVIEW_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+REVIEW_SHA=$(git rev-parse HEAD)
+
+if [[ "$REVIEW_BRANCH" == "$ORIGINAL_BRANCH" || "$REVIEW_BRANCH" == "$UNDERSTACK_BRANCH" ]]; then
+    die "'git review -d' did not switch to a new review branch as expected; aborting to avoid cherry-picking the wrong commit."
+fi
+
+log "Downloaded onto branch ${REVIEW_BRANCH} at ${REVIEW_SHA}"
+echo ""
+git log -5 --oneline "$REVIEW_BRANCH"
+echo ""
+
+CHAIN_COUNT=$(git rev-list --count "${REVIEW_BRANCH}@{u}..${REVIEW_BRANCH}" 2>/dev/null || echo "")
+if [[ -n "$CHAIN_COUNT" && "$CHAIN_COUNT" != "1" ]]; then
+    warn "Review branch has ${CHAIN_COUNT} commits ahead of its tracked upstream ref."
+    warn "This change may depend on other unmerged Gerrit changes (a dependency chain)."
+    warn "Only the tip commit (${REVIEW_SHA}) will be cherry-picked here. Check the log above."
+fi
+
+confirm "Cherry-pick ${REVIEW_SHA} onto ${UNDERSTACK_BRANCH}?"
+
+# ---------------------------------------------------------------------------
+# Step 3: cherry-pick
+# ---------------------------------------------------------------------------
+
+log "Step 3: cherry-picking onto ${UNDERSTACK_BRANCH}"
+
+git checkout "$UNDERSTACK_BRANCH"
+
+if ! git cherry-pick "$REVIEW_SHA"; then
+    err "Cherry-pick stopped due to conflicts."
+    err "Resolve conflicts, then run 'git cherry-pick --continue' (or '--abort')."
+    err "Once resolved, push manually with: git push rackerlabs ${UNDERSTACK_BRANCH}"
+    err "The downloaded review branch '${REVIEW_BRANCH}' was left in place; delete it once you're done: git branch -D ${REVIEW_BRANCH}"
+    exit 1
+fi
+
+NEW_SHA=$(git rev-parse HEAD)
+log "Cherry-pick succeeded: ${UNDERSTACK_BRANCH} is now at ${NEW_SHA}"
+
+# ---------------------------------------------------------------------------
+# Step 4: push + cleanup
+# ---------------------------------------------------------------------------
+
+confirm "Push ${UNDERSTACK_BRANCH} (${LOCAL_UNDERSTACK_SHA} -> ${NEW_SHA}) to rackerlabs?"
+
+git push rackerlabs "$UNDERSTACK_BRANCH"
+
+log "Pushed. Cleaning up temporary review branch ${REVIEW_BRANCH}."
+git branch -D "$REVIEW_BRANCH"
+
+echo ""
+log "Done."
+echo "rackerlabs ${UNDERSTACK_BRANCH}: ${LOCAL_UNDERSTACK_SHA} -> ${NEW_SHA}"
+echo ""
+log "Next: update containers/$(basename "$REPO_ROOT")/Dockerfile to pin the new ${UNDERSTACK_BRANCH} HEAD commit: ${NEW_SHA}"
