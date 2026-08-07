@@ -5,6 +5,7 @@ from openstack.connection import Connection
 from pynautobot.core.api import Api as Nautobot
 
 from understack_workflows.helpers import save_output
+from understack_workflows.netapp.config import NetAppConfig
 from understack_workflows.netapp.manager import NetAppManager
 from understack_workflows.oslo_event.constants import VOLUME_SIZE
 
@@ -52,11 +53,18 @@ def handle_volume_type_access_added(
     extra_specs = getattr(vol_type, "extra_specs", {}) or {}
     volume_size = extra_specs.get("netapp:flexvol_size", VOLUME_SIZE)
 
-    netapp_manager = NetAppManager()
+    backends = NetAppConfig.get_all_backends()
+    netapp_manager = None
+    for backend_config in backends:
+        mgr = NetAppManager(netapp_config=backend_config)
+        if mgr.check_if_svm_exists(project_id=event.project_id):
+            netapp_manager = mgr
+            break
 
-    if not netapp_manager.check_if_svm_exists(project_id=event.project_id):
+    if netapp_manager is None:
         logger.warning(
-            "SVM for project %s does not exist, skipping FlexVol creation",
+            "SVM for project %s does not exist on any backend, "
+            "skipping FlexVol creation",
             event.project_id,
         )
         save_output("volume_created", str(False))
@@ -92,9 +100,14 @@ def handle_volume_type_access_removed(
     )
 
     try:
-        netapp_manager = NetAppManager()
-        volume_name = netapp_manager.get_volume_name(event.volume_type_id)
-        deleted = netapp_manager.delete_volume(volume_name, force=False)
+        backends = NetAppConfig.get_all_backends()
+        deleted = False
+        for backend_config in backends:
+            netapp_manager = NetAppManager(netapp_config=backend_config)
+            if netapp_manager.check_if_svm_exists(project_id=event.project_id):
+                volume_name = netapp_manager.get_volume_name(event.volume_type_id)
+                deleted = netapp_manager.delete_volume(volume_name, force=False)
+                break
         save_output("volume_deleted", str(deleted))
     except Exception as e:
         logger.error(
