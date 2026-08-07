@@ -1,0 +1,56 @@
+---
+# Neutron Router Flavors Role - Defaults
+# Provides idempotent management of router flavors and service profiles
+
+# OpenStack cloud configuration name from clouds.yaml
+openstack_cloud: "{{ lookup('env', 'OS_CLOUD') | default('default') }}"
+
+# Service type for router flavors
+neutron_router_flavor_service_type: L3_ROUTER_NAT
+
+# Default router flavors configuration
+# This can be overridden in site-config
+neutron_router_flavors:
+  - name: dynamic_vrf
+    description: "Dynamic Fabric VRF (auto VNI)"
+    driver: "neutron_understack.l3_router.vrf.Vrf"
+    driver_description: "Dynamic Fabric VRF (auto VNI)"
+    service_profile_metainfo:
+      vni_alloc: "auto"
+    enabled: true
+
+  - name: static_vrf
+    description: "Static Fabric VRF (admin supplied VNI)"
+    driver: "neutron_understack.l3_router.vrf.Vrf"
+    driver_description: "Static Fabric VRF (admin supplied VNI)"
+    service_profile_metainfo:
+      vni_alloc: "on"
+    enabled: true
+
+  - name: svi
+    description: "On-Fabric SVI Gateways"
+    driver: "neutron_understack.l3_router.svi.Svi"
+    driver_description: "On-Fabric SVI Gateways"
+    service_profile_metainfo: {}
+    enabled: true
+
+  - name: cisco_asa
+    description: "Physical Cisco ASA Stub"
+    driver: "neutron_understack.l3_router.cisco_asa.CiscoAsa"
+    driver_description: "Physical Cisco ASA Stub"
+    service_profile_metainfo: {}
+    enabled: true
+
+  - name: palo_alto
+    description: "Physical Palo Alto Stub"
+    driver: "neutron_understack.l3_router.palo_alto.PaloAlto"
+    driver_description: "Physical Palo Alto Stub"
+    service_profile_metainfo: {}
+    enabled: true
+
+# Retry settings for idempotency checks
+neutron_router_flavor_retries: 3
+neutron_router_flavor_delay: 5
+
+# Command timeout
+neutron_router_flavor_command_timeout: 300

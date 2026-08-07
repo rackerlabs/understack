@@ -1,0 +1,23 @@
+---
+# Process individual router flavor - idempotent creation/update
+# Creates service profile, flavor, and binds them together
+
+- name: "Ensure service profile exists for {{ current_flavor.name }}"
+  ansible.builtin.include_tasks: create_service_profile.yml
+  vars:
+    flavor_config: "{{ current_flavor }}"
+
+- name: "Ensure flavor exists for {{ current_flavor.name }}"
+  ansible.builtin.include_tasks: create_flavor.yml
+  vars:
+    flavor_config: "{{ current_flavor }}"
+
+- name: "Ensure flavor is bound to service profile for {{ current_flavor.name }}"
+  ansible.builtin.include_tasks: bind_profile_to_flavor.yml
+  vars:
+    flavor_config: "{{ current_flavor }}"
+
+- name: "Verify flavor is configured correctly: {{ current_flavor.name }}"
+  ansible.builtin.include_tasks: verify_flavor_binding.yml
+  vars:
+    flavor_config: "{{ current_flavor }}"
