@@ -20,7 +20,7 @@ class TestNetAppManagerOrchestration:
 
     @pytest.fixture
     def mock_config_file(self):
-        """Create a temporary config file for testing."""
+        """Create a temporary config file and return a NetAppConfig for testing."""
         config_content = """[netapp_nvme]
 netapp_server_hostname = test-hostname
 netapp_login = test-user
@@ -29,8 +29,13 @@ netapp_password = test-password
         with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
             f.write(config_content)
             f.flush()
-            yield f.name
-        os.unlink(f.name)
+            config_path = f.name
+
+        from understack_workflows.netapp.config import NetAppConfig
+
+        netapp_config = NetAppConfig(config_path, "netapp_nvme")
+        yield netapp_config
+        os.unlink(config_path)
 
     @patch("understack_workflows.netapp.manager.config")
     @patch("understack_workflows.netapp.manager.HostConnection")
@@ -38,7 +43,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test manager initialization sets up all required services."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Verify all services are initialized
         assert hasattr(manager, "_client")
@@ -58,7 +63,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test create_svm delegates to SvmService with correct parameters."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._svm_service.create_svm = MagicMock(return_value="os-test-project")
 
         result = manager.create_svm("test-project", "test-aggregate")
@@ -75,7 +80,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test create_volume delegates to VolumeService with correct parameters."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._volume_service.create_volume = MagicMock(
             return_value="vol_test-project"
         )
@@ -96,7 +101,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test get_aggregates delegates to NetAppClient."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         aggregates = [
             AggregateResult(name="aggr_b", state="online", used_percent=40),
             AggregateResult(name="aggr_a", state="online", used_percent=20),
@@ -114,7 +119,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test aggregate selection prefers the least-used online aggregate."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._client.get_aggregates = MagicMock(
             return_value=[
                 AggregateResult(name="aggr_b", state="online", used_percent=40),
@@ -133,7 +138,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test aggregate selection remains deterministic on equal utilization."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._client.get_aggregates = MagicMock(
             return_value=[
                 AggregateResult(name="aggr_b", state="online", used_percent=20),
@@ -151,7 +156,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test aggregate selection fails when the cluster reports none."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._client.get_aggregates = MagicMock(return_value=[])
 
         with pytest.raises(NetAppManagerError, match="No NetApp aggregates"):
@@ -163,7 +168,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test aggregate selection fails when usage data is unavailable."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._client.get_aggregates = MagicMock(
             return_value=[
                 AggregateResult(name="aggr_a", state="offline", used_percent=10),
@@ -180,7 +185,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test delete_svm with standard naming delegates to SvmService."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._svm_service.delete_svm = MagicMock(return_value=True)
 
         result = manager.delete_svm("os-test-project")
@@ -195,7 +200,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test delete_svm with non-standard naming falls back to client."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._client.delete_svm = MagicMock(return_value=True)
 
         result = manager.delete_svm("custom-svm-name")
@@ -210,7 +215,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test delete_volume with standard naming delegates to VolumeService."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._volume_service.delete_volume = MagicMock(return_value=True)
 
         result = manager.delete_volume("vol_test-project", force=True)
@@ -227,7 +232,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test check_if_svm_exists delegates to SvmService."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._svm_service.exists = MagicMock(return_value=True)
 
         result = manager.check_if_svm_exists("test-project")
@@ -241,7 +246,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test mapped_namespaces with standard naming delegates to VolumeService."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         expected_namespaces = ["namespace1", "namespace2"]
         manager._volume_service.get_mapped_namespaces = MagicMock(
             return_value=expected_namespaces
@@ -261,7 +266,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test create_lif delegates to LifService."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._lif_service.create_lif = MagicMock()
 
         config_obj = NetappIPInterfaceConfig(
@@ -283,7 +288,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test naming convention utility methods."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Test SVM naming (delegated to SvmService)
         assert manager._svm_service.get_svm_name("test-project") == "os-test-project"
@@ -297,7 +302,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test that errors from services are properly propagated."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Test SVM service error propagation
         from understack_workflows.netapp.exceptions import SvmOperationError
@@ -327,7 +332,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test cleanup_project orchestrates services correctly."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Mock service methods
         manager._volume_service.exists = MagicMock(return_value=True)
@@ -353,7 +358,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test cleanup_project stops SVM deletion when volume deletion fails."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Mock volume deletion failure
         manager._volume_service.exists = MagicMock(return_value=True)
@@ -377,7 +382,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test that all public method signatures are maintained."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Mock all service methods to avoid actual calls
         manager._svm_service.create_svm = MagicMock(return_value="test-svm")
@@ -483,7 +488,7 @@ class TestNetAppManagerRouteIntegration:
 
     @pytest.fixture
     def mock_config_file(self):
-        """Create a temporary config file for testing."""
+        """Create a temporary config file and return a NetAppConfig for testing."""
         config_content = """[netapp_nvme]
 netapp_server_hostname = test-hostname
 netapp_login = test-user
@@ -492,8 +497,13 @@ netapp_password = test-password
         with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
             f.write(config_content)
             f.flush()
-            yield f.name
-        os.unlink(f.name)
+            config_path = f.name
+
+        from understack_workflows.netapp.config import NetAppConfig
+
+        netapp_config = NetAppConfig(config_path, "netapp_nvme")
+        yield netapp_config
+        os.unlink(config_path)
 
     @pytest.fixture
     def sample_interface_configs(self):
@@ -525,7 +535,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test that RouteService is properly initialized in NetAppManager."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Verify route service is initialized
         assert hasattr(manager, "_route_service")
@@ -543,7 +553,7 @@ netapp_password = test-password
         """Test create_routes_for_project delegates to RouteService."""
         from understack_workflows.netapp.value_objects import RouteResult
 
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Mock route service
         expected_results = [
@@ -586,7 +596,7 @@ netapp_password = test-password
         """Test create_routes_for_project error handling and propagation."""
         from understack_workflows.netapp.exceptions import NetworkOperationError
 
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Mock route service to raise an error
         manager._route_service.create_routes_from_interfaces = MagicMock(
@@ -608,7 +618,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test create_routes_for_project with empty interface list."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Mock route service
         manager._route_service.create_routes_from_interfaces = MagicMock(
@@ -636,7 +646,7 @@ netapp_password = test-password
         mock_route_service = MagicMock(spec=RouteService)
 
         manager = NetAppManager(
-            config_path=mock_config_file,
+            netapp_config=mock_config_file,
             netapp_client=mock_client,
             route_service=mock_route_service,
         )

@@ -96,6 +96,17 @@ class TestKeystoneProjectTags:
 class TestHandleProjectCreated:
     """Test cases for handle_project_created function."""
 
+    @pytest.fixture(autouse=True)
+    def _mock_get_all_backends(self):
+        """Auto-mock get_all_backends for all create tests."""
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        with patch(
+            "understack_workflows.oslo_event.keystone_project.NetAppConfig.get_all_backends",
+            return_value=[mock_backend],
+        ):
+            yield
+
     @pytest.fixture
     def mock_conn(self):
         """Create a mock OpenStack connection."""
@@ -351,6 +362,17 @@ class TestHandleProjectCreated:
 
 class TestHandleProjectUpdated:
     """Test cases for handle_project_updated function."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_get_all_backends(self):
+        """Auto-mock get_all_backends for all update tests."""
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        with patch(
+            "understack_workflows.oslo_event.keystone_project.NetAppConfig.get_all_backends",
+            return_value=[mock_backend],
+        ):
+            yield
 
     @pytest.fixture
     def mock_conn(self):
@@ -737,8 +759,12 @@ class TestHandleProjectDeleted:
 
     @patch("builtins.open", new_callable=mock.mock_open)
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    @patch(
+        "understack_workflows.oslo_event.keystone_project.NetAppConfig.get_all_backends"
+    )
     def test_handle_project_deleted_svm_exists(
         self,
+        mock_get_all_backends,
         mock_netapp_class,
         mock_open,
         mock_conn,
@@ -747,6 +773,9 @@ class TestHandleProjectDeleted:
     ):
         """Test project deletion when SVM exists."""
         mock_file = mock_open.return_value
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_class.return_value = mock_netapp_manager
@@ -756,6 +785,7 @@ class TestHandleProjectDeleted:
         )
 
         assert result == 0
+        mock_netapp_class.assert_called_once_with(netapp_config=mock_backend)
         mock_netapp_manager.check_if_svm_exists.assert_called_once_with(
             project_id="test-project-123"
         )
@@ -765,8 +795,12 @@ class TestHandleProjectDeleted:
 
     @patch("builtins.open", new_callable=mock.mock_open)
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    @patch(
+        "understack_workflows.oslo_event.keystone_project.NetAppConfig.get_all_backends"
+    )
     def test_handle_project_deleted_svm_does_not_exist(
         self,
+        mock_get_all_backends,
         mock_netapp_class,
         mock_open,
         mock_conn,
@@ -775,6 +809,9 @@ class TestHandleProjectDeleted:
     ):
         """Test project deletion when SVM does not exist."""
         mock_file = mock_open.return_value
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = False
         mock_netapp_class.return_value = mock_netapp_manager
@@ -793,8 +830,12 @@ class TestHandleProjectDeleted:
 
     @patch("builtins.open", new_callable=mock.mock_open)
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    @patch(
+        "understack_workflows.oslo_event.keystone_project.NetAppConfig.get_all_backends"
+    )
     def test_handle_project_deleted_netapp_manager_failure(
         self,
+        mock_get_all_backends,
         mock_netapp_class,
         mock_open,
         mock_conn,
@@ -803,6 +844,9 @@ class TestHandleProjectDeleted:
     ):
         """Test handling when NetAppManager creation fails during deletion."""
         mock_file = mock_open.return_value
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_class.side_effect = Exception("NetApp connection failed")
 
         result = handle_project_deleted(
@@ -810,14 +854,18 @@ class TestHandleProjectDeleted:
         )
 
         assert result == 1  # Should return 1 on exception
-        mock_netapp_class.assert_called_once()
+        mock_netapp_class.assert_called_once_with(netapp_config=mock_backend)
         mock_open.assert_any_call("/var/run/argo/output.svm_state", "w")
         mock_file.write.assert_any_call("unknown")
 
     @patch("builtins.open", new_callable=mock.mock_open)
     @patch("understack_workflows.oslo_event.keystone_project.NetAppManager")
+    @patch(
+        "understack_workflows.oslo_event.keystone_project.NetAppConfig.get_all_backends"
+    )
     def test_handle_project_deleted_cleanup_failure(
         self,
+        mock_get_all_backends,
         mock_netapp_class,
         mock_open,
         mock_conn,
@@ -826,6 +874,9 @@ class TestHandleProjectDeleted:
     ):
         """Test handling when cleanup_project fails during deletion."""
         mock_file = mock_open.return_value
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_manager.cleanup_project.side_effect = Exception("Cleanup failed")
