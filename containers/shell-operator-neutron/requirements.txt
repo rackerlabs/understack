@@ -1,0 +1,3 @@
+pip
+python-openstackclient
+python-neutronclient

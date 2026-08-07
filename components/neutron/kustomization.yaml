@@ -7,3 +7,4 @@ resources:
   - neutron-rabbitmq-queue.yaml
   - job-neutron-post-deploy.yaml
   - configmap-neutron-bin.yaml
+  - ./router-flavor-operator

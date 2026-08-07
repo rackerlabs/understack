@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shell-operator-neutron
+  namespace: openstack
+  labels:
+    app.kubernetes.io/name: neutron-router-flavor-operator
+    app.kubernetes.io/component: controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shell-operator-neutron
+  template:
+    metadata:
+      labels:
+        app: shell-operator-neutron
+    spec:
+      serviceAccountName: neutron-router-flavor-operator
+      restartPolicy: Always
+      containers:
+        - name: shell-operator
+          image: ghcr.io/rackerlabs/understack/shell-operator-neutron:pr-2200
+          imagePullPolicy: Always
+          env:
+            - name: OS_CLOUD
+              value: understack
+            - name: NEUTRON_ROUTER_FLAVORS_CONFIG
+              value: /etc/neutron-router-flavors/flavors.json
+          volumeMounts:
+            - mountPath: /etc/openstack
+              name: infrasetup
+              readOnly: true
+            - mountPath: /etc/neutron-router-flavors
+              name: router-flavors-config
+              readOnly: true
+      volumes:
+        - name: infrasetup
+          secret:
+            secretName: infrasetup
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
+        - name: router-flavors-config
+          configMap:
+            name: neutron-router-flavors
