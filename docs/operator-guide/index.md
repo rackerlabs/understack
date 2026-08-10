@@ -33,6 +33,12 @@ clouds:
 In the above case `uc-prod-infra` would be the operator area while `uc-prod` would
 be the regular project area.
 
+## Upgrading
+
+- [Release Notes](../release-notes/index.md) - What you have to do to move a
+  deployment between versions. If you deploy from `main`, read the
+  [Unreleased](../release-notes/unreleased.md) page.
+
 ## Infrastructure Topics
 
 - [Gateway API Migration Guide](gateway-api.md) - Migration from ingress-nginx to Kubernetes Gateway API with Envoy Gateway

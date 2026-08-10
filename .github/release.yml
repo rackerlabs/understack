@@ -1,0 +1,25 @@
+# Shapes the auto-generated notes GitHub attaches to a release.
+#
+# GitHub can only filter by label and by author -- there is no path filtering.
+# That is why .github/labeler.yml exists: it turns "this pull request only
+# touches something released on its own tag" into a label this file can act on.
+changelog:
+  exclude:
+    labels:
+      # applied by .github/workflows/labeler.yaml when every changed file lives
+      # under a CLI utility or image with its own tag namespace
+      # (understackctl/vX.Y.Z, ironic-ipxe/vX.Y.Z and friends), so those changes
+      # are announced by their own release instead. Can also be applied by hand
+      # to keep any pull request out of the notes.
+      - skip-changelog
+  categories:
+    - title: Upgrade impacting
+      labels:
+        - upgrade-impact
+        - breaking change
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Other changes
+      labels:
+        - "*"

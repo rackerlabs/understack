@@ -1,0 +1,36 @@
+name: Labeler
+
+# Applies the path-derived labels in .github/labeler.yml so that
+# .github/release.yml can keep separately released changes out of the platform
+# release notes.
+#
+# Uses pull_request_target because a pull_request run from a fork gets a
+# read-only token and cannot label anything. That trigger runs the workflow
+# definition from the base branch with a writable token, which is only safe
+# because nothing here checks out or executes the pull request's code --
+# actions/labeler works entirely from the API. Do not add a checkout step.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: Apply path labels
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        with:
+          # Remove the label again when a pull request grows beyond the
+          # separately released subtree. Without this, adding a chart change to
+          # an understackctl pull request would leave it excluded from the
+          # release notes.
+          sync-labels: true

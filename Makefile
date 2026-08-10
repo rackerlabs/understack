@@ -7,6 +7,7 @@ ifeq ($(GITHUB_ACTIONS), true)
 	PIP := pip
 	PYTHON := python
 	PROPERDOCS := properdocs
+	SCRIV := scriv
 	# throw away to ensure we always run this
 	ACTIVATE := .activate
 else
@@ -14,10 +15,13 @@ else
 	PIP := $(VENV_DIR)/bin/pip
 	PYTHON := $(VENV_DIR)/bin/python
 	PROPERDOCS := $(VENV_DIR)/bin/properdocs
+	SCRIV := $(VENV_DIR)/bin/scriv
 	ACTIVATE := $(VENV_DIR)/bin/activate
 endif
 
 NEUTRON_SAMPLE_CONFIG := docs/design-guide/neutron-understack-config-sample.md
+
+UNRELEASED_NOTES := docs/release-notes/unreleased.md
 
 WFTMPLS := $(wildcard components/*-workflows/*/workflowtemplates/*.yaml)
 
@@ -49,10 +53,29 @@ $(NEUTRON_SAMPLE_CONFIG): ## Generate neutron-understack sample configuration do
 	       --config-file tools/config/neutron-understack-config-generator.conf; \
 	   printf '\n```\n'; } > $(NEUTRON_SAMPLE_CONFIG)
 
+# Renders the release-note fragments in changelog.d/ into a generated
+# "Unreleased" page. scriv has no --draft mode, so this collects with --keep,
+# which leaves the fragments in place. scriv exits 2 when there is nothing to
+# collect, which is the normal case; any other failure is real.
+.PHONY: unreleased-notes
+unreleased-notes: $(ACTIVATE) ## Render pending release notes into the Unreleased page
+	@printf '%s\n' \
+	  '# Unreleased' \
+	  '' \
+	  'Changes merged to `main` that are not yet in a tagged release. If you' \
+	  'deploy with `understack_ref: HEAD`, these apply to your deployment now.' \
+	  '' \
+	  'This page is generated from the fragments in `changelog.d/`. If nothing' \
+	  'is listed below, nothing merged since the last tag needs operator action.' \
+	  '' \
+	  '<!-- scriv-insert-here -->' > $(UNRELEASED_NOTES)
+	@$(SCRIV) collect --config changelog.d/unreleased.ini --keep --no-add \
+	  || [ $$? -eq 2 ]
+
 .PHONY: docs
-docs: $(ACTIVATE) wftmpls $(NEUTRON_SAMPLE_CONFIG) component-docs-check ## Builds the documentation
+docs: $(ACTIVATE) wftmpls $(NEUTRON_SAMPLE_CONFIG) unreleased-notes component-docs-check ## Builds the documentation
 	$(PROPERDOCS) build --strict
 
 .PHONY: docs-local
-docs-local: $(ACTIVATE) wftmpls $(NEUTRON_SAMPLE_CONFIG) component-docs-check ## Build and locally host the documentation
+docs-local: $(ACTIVATE) wftmpls $(NEUTRON_SAMPLE_CONFIG) unreleased-notes component-docs-check ## Build and locally host the documentation
 	$(PROPERDOCS) serve --strict --livereload

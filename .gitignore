@@ -27,6 +27,10 @@ docs/workflows/
 # auto-generated neutron-understack sample config docs
 docs/design-guide/neutron-understack-config-sample.md
 
+# auto-generated release notes for changes not yet tagged
+# rendered from changelog.d/ by `make unreleased-notes`
+docs/release-notes/unreleased.md
+
 # devbox's envrc
 .envrc
 .direnv

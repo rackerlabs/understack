@@ -1,0 +1,47 @@
+<!--
+A release note fragment. Delete this comment block, then uncomment the one
+section below that fits and write the note. Everything you write here is copied
+verbatim into the release notes page, so it can be as long as it needs to be:
+paragraphs, numbered steps, fenced code blocks.
+
+Write for an operator who has to act, not for a reviewer reading the diff. Most
+changes need no fragment at all -- only add one when a deployment has to do
+something beyond a normal resync.
+
+Two formatting rules the docs build enforces:
+
+  * Nested list items and code blocks inside a list indent by 4 spaces
+    (markdownlint MD007).
+  * A single newline inside a paragraph renders as a line break, because the
+    nl2br extension is enabled. Wrap deliberately.
+
+A worked example:
+
+    ### Action required
+
+    Tenant VXLAN networks are now bound to per-leaf VLANs. Networks created
+    before this change keep working, but new segments need the gateway enabled.
+
+    1. Enable it in your deploy repo:
+
+        ```yaml title="$CLUSTER_NAME/deploy.yaml"
+        site:
+          neutron:
+            vxlan_gateway: true
+        ```
+
+    2. Resync, then confirm the agent picked it up:
+
+        ```bash
+        kubectl -n openstack get pods -l application=neutron
+        ```
+
+    Rolling back is not possible once segments are allocated; see #2126588 for
+    the recovery path.
+-->
+{% for cat in config.categories %}
+<!--
+### {{ cat }}
+
+-->
+{% endfor %}
