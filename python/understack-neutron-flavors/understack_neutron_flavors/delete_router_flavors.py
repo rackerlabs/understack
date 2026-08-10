@@ -1,0 +1,209 @@
+"""Delete/prune logic for removed Neutron router flavors."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from . import router_flavors_common as common
+
+
+def configured_service_profile_ids(flavors: list[dict[str, Any]]) -> set[str]:
+    return {
+        str(flavor_config["profile_id"])
+        for flavor_config in flavors
+        if flavor_config.get("profile_id")
+    }
+
+
+def configured_flavor_names(flavors: list[dict[str, Any]]) -> set[str]:
+    return {
+        str(flavor_config["name"])
+        for flavor_config in flavors
+        if flavor_config.get("name")
+    }
+
+
+def service_profile_driver(profile: Any) -> str:
+    return str(common.get_value(profile, "driver", "Driver", default=""))
+
+
+def get_cached_service_profile(
+    conn: Any,
+    profile_id: str,
+    profile_cache: dict[str, Any | None],
+) -> Any | None:
+    if profile_id not in profile_cache:
+        profile_cache[profile_id] = common.get_service_profile(conn, profile_id)
+    return profile_cache[profile_id]
+
+
+def is_prunable_service_profile(profile: Any) -> bool:
+    driver = service_profile_driver(profile)
+    return bool(common.PRUNE_DRIVER_PREFIXES) and any(
+        driver.startswith(prefix) for prefix in common.PRUNE_DRIVER_PREFIXES
+    )
+
+
+def is_prunable_flavor(
+    conn: Any,
+    flavor: Any,
+    profile_cache: dict[str, Any | None],
+) -> bool:
+    if (
+        common.get_value(flavor, "service_type", "Service Type")
+        != common.DEFAULT_SERVICE_TYPE
+    ):
+        return False
+
+    if common.is_managed_flavor(flavor):
+        return True
+
+    for profile_id in common.service_profile_ids(flavor):
+        profile = get_cached_service_profile(conn, profile_id, profile_cache)
+        if (
+            profile
+            and common.is_managed_service_profile(profile)
+            and is_prunable_service_profile(profile)
+        ):
+            return True
+
+    return False
+
+
+def flavor_has_routers(conn: Any, flavor: Any) -> bool:
+    flavor_id = common.resource_id(flavor)
+    flavor_name = common.get_value(flavor, "name", "Name", default=flavor_id)
+
+    try:
+        routers = list(conn.network.routers(flavor_id=flavor_id))
+    except Exception as exc:
+        common.log(
+            f"Unable to check routers for removed router flavor {flavor_name}; "
+            f"skipping deletion: {exc}"
+        )
+        return True
+
+    if routers:
+        common.log(
+            f"Router flavor {flavor_name} is still used by {len(routers)} "
+            "router(s); skipping deletion"
+        )
+        return True
+
+    return False
+
+
+def service_profile_attached_to_any_flavor(conn: Any, profile_id: str) -> bool:
+    for flavor in conn.network.flavors(service_type=common.DEFAULT_SERVICE_TYPE):
+        if profile_id in common.service_profile_ids(flavor):
+            return True
+    return False
+
+
+def maybe_delete_service_profile(
+    conn: Any,
+    profile_id: str,
+    protected_profile_ids: set[str],
+    profile_cache: dict[str, Any | None],
+) -> None:
+    if not common.DELETE_UNUSED_SERVICE_PROFILES:
+        common.log(f"Keeping service profile {profile_id}; profile pruning is disabled")
+        return
+
+    if profile_id in protected_profile_ids:
+        common.log(
+            f"Keeping service profile {profile_id}; it is configured by "
+            "router_flavors.json"
+        )
+        return
+
+    profile = get_cached_service_profile(conn, profile_id, profile_cache)
+    if not profile:
+        return
+
+    if not is_prunable_service_profile(profile):
+        common.log(
+            f"Keeping service profile {profile_id}; driver "
+            f"{service_profile_driver(profile)} is outside prune scope"
+        )
+        return
+
+    if not common.is_managed_service_profile(profile):
+        common.log(f"Keeping service profile {profile_id}; it is not operator-managed")
+        return
+
+    if service_profile_attached_to_any_flavor(conn, profile_id):
+        common.log(f"Keeping service profile {profile_id}; it is still attached")
+        return
+
+    common.log(f"Deleting unused service profile {profile_id}")
+    try:
+        conn.network.delete_service_profile(profile, ignore_missing=True)
+        profile_cache[profile_id] = None
+    except Exception as exc:
+        if common.is_not_found(exc):
+            profile_cache[profile_id] = None
+            return
+        if common.is_conflict(exc):
+            common.log(f"Service profile {profile_id} is still in use; skipping delete")
+            return
+        raise
+
+
+def delete_removed_flavor(
+    conn: Any,
+    flavor: Any,
+    protected_profile_ids: set[str],
+    profile_cache: dict[str, Any | None],
+) -> None:
+    flavor_id = common.resource_id(flavor)
+    flavor_name = common.get_value(flavor, "name", "Name", default=flavor_id)
+    profile_ids = common.service_profile_ids(flavor)
+
+    if flavor_has_routers(conn, flavor):
+        return
+
+    common.log(f"Deleting removed router flavor {flavor_name} ({flavor_id})")
+    try:
+        conn.network.delete_flavor(flavor, ignore_missing=True)
+    except Exception as exc:
+        if common.is_not_found(exc):
+            return
+        if common.is_conflict(exc):
+            common.log(f"Router flavor {flavor_name} is still in use; skipping delete")
+            return
+        raise
+
+    for profile_id in profile_ids:
+        maybe_delete_service_profile(
+            conn,
+            profile_id,
+            protected_profile_ids,
+            profile_cache,
+        )
+
+
+def prune_removed_flavors(conn: Any, flavors: list[dict[str, Any]]) -> None:
+    if not common.PRUNE_REMOVED_FLAVORS:
+        common.log("Router flavor pruning is disabled")
+        return
+
+    desired_names = configured_flavor_names(flavors)
+    protected_profile_ids = configured_service_profile_ids(flavors)
+    profile_cache: dict[str, Any | None] = {}
+
+    common.log("Pruning removed router flavors")
+    for flavor in list(conn.network.flavors(service_type=common.DEFAULT_SERVICE_TYPE)):
+        flavor_name = common.get_value(flavor, "name", "Name")
+        if not flavor_name or flavor_name in desired_names:
+            continue
+
+        if not is_prunable_flavor(conn, flavor, profile_cache):
+            continue
+
+        delete_removed_flavor(
+            conn,
+            flavor,
+            protected_profile_ids,
+            profile_cache,
+        )

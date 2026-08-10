@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "understack-neutron-flavors"
+description = "Shell-operator hooks for UnderStack Neutron reconciliation"
+authors = [{ name = "Understack Developers" }]
+requires-python = ">=3.12"
+readme = "README.md"
+dependencies = [
+    "openstacksdk>=4.2.0,<5",
+]
+license = { text = "Apache-2.0" }
+dynamic = ["version"]
+
+[project.scripts]
+neutron-router-flavors = "understack_neutron_flavors.router_flavors:main"
+
+[project.urls]
+Homepage = "https://github.com/rackerlabs/understack"
+Issues = "https://github.com/rackerlabs/understack/issues"
+
+[dependency-groups]
+test = [
+    "pytest<10",
+    "pytest-github-actions-annotate-failures",
+    "pytest-cov>=6.1.0",
+]
+
+[tool.uv]
+default-groups = ["test"]
+
+[tool.hatch.build.targets.sdist]
+include = ["understack_neutron_flavors"]
+
+[tool.hatch.build.targets.wheel]
+include = ["understack_neutron_flavors"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+root = "../../"
+tag_regex = "^understack-neutron-flavors/v(?P<version>.*)$"
+git_describe_command = "git describe --dirty --tags --long --match understack-neutron-flavors/v*"
+fallback_version = "0.1.0"
+
+[tool.ruff]
+target-version = "py312"
+fix = true
+
+[tool.ruff.lint]
+select = [
+  "D",       # pydocstyle
+  "E",       # pycodestyle (error)
+  "F",       # pyflakes
+  "B",       # flake8-bugbear
+  "I",       # isort
+  "S",       # flake8-bandit
+  "UP",      # pyupgrade
+  "ASYNC",   # flake8-async
+]
+
+ignore = [
+    "D100",  # don't require docs for every module
+    "D101",  # don't require docs for every class
+    "D102",  # don't require docs for every class method
+    "D103",  # don't require docs for every function
+    "D104",  # don't require docs for every package
+    "D106",  # don't require docs for every nested class
+    "D107",  # don't require docs for __init__
+    "D417",  # don't require docs for every function parameter
+]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[tool.ruff.lint.pydocstyle]
+# enable the google doc style rules by default
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]  # assert is the point in tests

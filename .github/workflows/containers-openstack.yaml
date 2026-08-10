@@ -17,6 +17,7 @@ on:
       - "containers/octavia/**"
       - "containers/openstack-client/**"
       - "containers/placement/**"
+      - "containers/neutron-router-flavor-sync/**"
       - "containers/skyline/**"
       - ".github/workflows/containers-openstack.yaml"
       - ".github/workflows/build-container-reuse.yaml"
@@ -73,6 +74,16 @@ jobs:
       dockerfile_path: containers/neutron/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
+
+  neutron-router-flavor-sync:
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: neutron-router-flavor-sync
+      dockerfile_path: containers/neutron-router-flavor-sync/Dockerfile
+      build_args: OPENSTACK_VERSION=2026.1
+      latest_name: "2026.1"
+      target: prod
 
   ironic:
     uses: ./.github/workflows/build-container-reuse.yaml
