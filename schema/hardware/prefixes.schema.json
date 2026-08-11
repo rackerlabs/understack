@@ -12,6 +12,11 @@
           "description": "Human-readable description of the prefix",
           "type": "string"
         },
+        "id": {
+          "description": "Unique UUID identifier for this prefix (RFC 4122, lowercase canonical form)",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
         "locations": {
           "description": "List of location names where this prefix is used",
           "items": {
@@ -90,6 +95,7 @@
       },
       "required": [
         "prefix",
+        "id",
         "namespace",
         "type",
         "status",

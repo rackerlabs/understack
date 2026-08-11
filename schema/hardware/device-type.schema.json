@@ -22,6 +22,11 @@
       "items": {
         "description": "Console port",
         "properties": {
+          "id": {
+            "description": "Unique UUID identifier for this console port (RFC 4122, lowercase canonical form)",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
           "name": {
             "description": "Console port name",
             "type": "string"
@@ -33,17 +38,28 @@
         },
         "required": [
           "name",
+          "id",
           "type"
         ],
         "type": "object"
       },
       "type": "array"
     },
+    "id": {
+      "description": "Unique UUID identifier for this device type (RFC 4122, lowercase canonical form)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "type": "string"
+    },
     "interfaces": {
       "description": "Network interfaces",
       "items": {
         "description": "Network interface",
         "properties": {
+          "id": {
+            "description": "Unique UUID identifier for this interface (RFC 4122, lowercase canonical form)",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
           "mgmt_only": {
             "description": "Whether this interface is management-only",
             "type": "boolean"
@@ -59,6 +75,7 @@
         },
         "required": [
           "name",
+          "id",
           "type"
         ],
         "type": "object"
@@ -82,6 +99,11 @@
       "items": {
         "description": "Module bay",
         "properties": {
+          "id": {
+            "description": "Unique UUID identifier for this module bay (RFC 4122, lowercase canonical form)",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
           "label": {
             "description": "Module bay label",
             "type": "string"
@@ -97,6 +119,7 @@
         },
         "required": [
           "name",
+          "id",
           "position"
         ],
         "type": "object"
@@ -116,6 +139,11 @@
             "description": "Allocated power draw in watts",
             "type": "integer"
           },
+          "id": {
+            "description": "Unique UUID identifier for this power port (RFC 4122, lowercase canonical form)",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+            "type": "string"
+          },
           "maximum_draw": {
             "description": "Maximum power draw in watts",
             "type": "integer"
@@ -131,6 +159,7 @@
         },
         "required": [
           "name",
+          "id",
           "type"
         ],
         "type": "object"
@@ -220,6 +249,7 @@
     "class",
     "manufacturer",
     "model",
+    "id",
     "u_height",
     "is_full_depth"
   ],

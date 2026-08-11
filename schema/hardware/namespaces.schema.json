@@ -8,6 +8,11 @@
           "description": "Human-readable description of the namespace",
           "type": "string"
         },
+        "id": {
+          "description": "Unique UUID identifier for this namespace (RFC 4122, lowercase canonical form)",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
         "location": {
           "description": "Location associated with this namespace (must correspond to a defined location)",
           "type": "string"
@@ -28,6 +33,7 @@
       },
       "required": [
         "name",
+        "id",
         "description",
         "location"
       ],
