@@ -15,6 +15,11 @@
           "description": "Human-readable description of the location",
           "type": "string"
         },
+        "id": {
+          "description": "Unique UUID identifier for this location (RFC 4122, lowercase canonical form)",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+          "type": "string"
+        },
         "location_type": {
           "description": "Type of location (must correspond to a defined location type)",
           "minLength": 1,
@@ -39,6 +44,7 @@
       },
       "required": [
         "name",
+        "id",
         "description",
         "location_type",
         "status"
