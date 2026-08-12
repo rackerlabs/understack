@@ -1,0 +1,159 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: neutronrouterflavors.neutron.understack.rackspace.net
+spec:
+  group: neutron.understack.rackspace.net
+  names:
+    kind: NeutronRouterFlavor
+    listKind: NeutronRouterFlavorList
+    plural: neutronrouterflavors
+    shortNames:
+    - nrf
+    singular: neutronrouterflavor
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    additionalPrinterColumns:
+    - name: Flavor
+      type: string
+      jsonPath: .spec.name
+    - name: ServiceType
+      type: string
+      jsonPath: .spec.service_type
+    - name: Driver
+      type: string
+      jsonPath: .spec.driver
+    - name: SyncStatus
+      type: string
+      jsonPath: .status.syncStatus
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        description: NeutronRouterFlavor defines one Neutron router flavor and its service profile.
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            type: object
+            required:
+            - name
+            - driver
+            properties:
+              name:
+                description: Neutron router flavor name.
+                type: string
+                minLength: 1
+                maxLength: 255
+                pattern: ^[A-Za-z0-9._-]+$
+              service_type:
+                description: Neutron service type for the flavor.
+                type: string
+                enum:
+                - L3_ROUTER_NAT
+                minLength: 1
+                maxLength: 255
+                default: L3_ROUTER_NAT
+              service_provider:
+                description: Optional Neutron service provider name used when generating Neutron configuration.
+                type: string
+                minLength: 1
+                maxLength: 255
+                pattern: ^[A-Za-z0-9._-]+$
+              description:
+                description: Description stored on the Neutron router flavor.
+                type: string
+                maxLength: 1024
+              driver:
+                description: Service profile driver class.
+                type: string
+                minLength: 1
+                maxLength: 1024
+                pattern: ^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)+$
+              profile_description:
+                description: Description stored on the Neutron service profile.
+                type: string
+                maxLength: 1024
+              profile_id:
+                description: Existing Neutron service profile ID to attach instead of creating or discovering one.
+                type: string
+                format: uuid
+              meta_info:
+                description: Service profile metainfo payload.
+                type: object
+                properties:
+                  resource_class:
+                    description: Resource class consumed by a physical router provider.
+                    type: string
+                    minLength: 1
+                    maxLength: 255
+                    pattern: ^[A-Za-z0-9._:-]+$
+                  vni_alloc:
+                    description: VNI allocation mode for VRF router providers.
+                    type: string
+                    enum:
+                    - "off"
+                    - "on"
+                    - auto
+          status:
+            description: NeutronRouterFlavorStatus defines the observed sync state.
+            type: object
+            properties:
+              syncStatus:
+                description: SyncStatus indicates the synchronization state with Neutron.
+                type: string
+                enum:
+                - Synced
+                - Failed
+                - Unknown
+              lastSyncTime:
+                description: LastSyncTime is the last time the operator attempted to sync the flavor.
+                type: string
+                format: date-time
+              observedGeneration:
+                description: ObservedGeneration is the metadata generation last processed by the operator.
+                type: integer
+                format: int64
+              message:
+                description: Message provides details about the last sync attempt.
+                type: string
+                maxLength: 2048
+              conditions:
+                description: Conditions describe current observed state.
+                type: array
+                items:
+                  type: object
+                  required:
+                  - type
+                  - status
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                      maxLength: 2048
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+    subresources:
+      status: {}
