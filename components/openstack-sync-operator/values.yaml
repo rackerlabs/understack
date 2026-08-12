@@ -1,0 +1,34 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/rackerlabs/understack/openstack-sync-operator
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  # tag: ""
+
+serviceAccount:
+  create: true
+  name: ""
+
+rbac:
+  create: true
+  clusterWide: false
+  # The base placeholder hook has no Kubernetes bindings. Add hook permissions
+  # here with the hook that needs them.
+  rules: []
+
+openstack:
+  cloud: understack
+  cloudsSecretName: infrasetup
+  cloudsSecretKey: clouds.yaml
+
+hooks: {}
+
+podAnnotations: {}
+podLabels: {}
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

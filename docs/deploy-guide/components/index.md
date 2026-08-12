@@ -98,6 +98,7 @@ enablement defaults, validation, and troubleshooting notes.
 | [openstack-helm](./openstack-helm.md) | site |
 | [openstack-memcached](./openstack-memcached.md) | site |
 | [openstack-resource-controller](./openstack-resource-controller.md) | global, site |
+| [openstack-sync-operator](./openstack-sync-operator.md) | site |
 | [opentelemetry-operator](./opentelemetry-operator.md) | global, site |
 | [openvswitch](./openvswitch.md) | site |
 | [otel-collector](./otel-collector.md) | global, site |

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "hooks": {
+      "type": "object",
+      "description": "Additional hook definitions keyed by hook name.",
+      "additionalProperties": {
+        "$ref": "#/definitions/hook"
+      }
+    },
+    "plugins": {
+      "type": "object",
+      "description": "Built-in plugin enablement keyed by plugin name.",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "pluginData": {
+      "type": "object",
+      "description": "Built-in plugin hook data keyed by plugin name.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "hook": {
+            "$ref": "#/definitions/hook"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "hook": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "crd": {
+          "type": "string",
+          "minLength": 1
+        },
+        "envPrefix": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "integer",
+              "boolean"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
