@@ -82,6 +82,10 @@ repos:
     rev: 40.8.1
     hooks:
       - id: renovate-config-validator
+        # the hook's default pattern only matches renovate.json/.renovaterc, so
+        # extend it to the shared presets under .github/renovate/ that this repo
+        # and undercloud-deploy extend
+        files: '(^|/)\.?renovate(?:rc)?(?:\.json5?)?$|^\.github/renovate/.+\.json5?$'
   - repo: https://github.com/RobertCraigie/pyright-python
     rev: v1.1.408
     hooks:
