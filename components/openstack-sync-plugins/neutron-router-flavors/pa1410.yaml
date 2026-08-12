@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/openstack-sync/neutron-router-flavor.schema.json
+---
+apiVersion: neutron.understack.rackspace.net/v1alpha1
+kind: NeutronRouterFlavor
+metadata:
+  name: pa1410
+  labels:
+    app.kubernetes.io/name: openstack-sync-plugins
+    app.kubernetes.io/component: neutron-router-flavors
+    app.kubernetes.io/part-of: openstack-sync
+spec:
+  name: pa1410
+  service_type: L3_ROUTER_NAT
+  description: Physical PA 1410
+  driver: neutron_understack.l3_router.palo_alto.PaloAlto
+  profile_description: Physical PA 1410
+  meta_info:
+    resource_class: pa1410

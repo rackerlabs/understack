@@ -60,7 +60,9 @@ Create the name of the service account to use.
 {{- end }}
 
 {{/*
-Checksum for hook settings that affect shell-operator startup configuration.
+Build the checksum used on the Deployment pod template. When hook settings
+change, this checksum changes and Kubernetes restarts the pod. That restart is
+required because shell-operator reads hook watches only when the pod starts.
 */}}
 {{- define "openstack-sync-operator.hookConfigChecksum" -}}
 {{- include "openstack-sync-operator.configuredHooks" . | fromYaml | toJson | sha256sum -}}

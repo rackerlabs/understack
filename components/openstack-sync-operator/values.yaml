@@ -22,6 +22,29 @@ openstack:
   cloudsSecretName: infrasetup
   cloudsSecretKey: clouds.yaml
 
+# Built-in plugin enablement. Site values normally only override these booleans
+# and selected pluginData.<name>.hook.env values.
+# Built-in hook configuration. Site values normally override only:
+# - plugins.<name>: enable or disable a hook
+# - pluginData.<name>.hook.env: override selected hook env values
+#
+# Helm turns these hook settings into a checksum on the Deployment pod template.
+# When these values change, the checksum changes, so Kubernetes restarts the pod.
+# That restart is required because shell-operator reads hook watches only when
+# the pod starts.
+plugins:
+  neutronRouterFlavors: false
+
+pluginData:
+  neutronRouterFlavors:
+    hook:
+      path: /hooks/router_flavors.py
+      crd: crds/neutron.understack.rackspace.net_neutronrouterflavors.yaml
+      envPrefix: NEUTRON_ROUTER_FLAVOR
+      env:
+        SYNC_CRONTAB: "0 * * * *"
+        PRUNE: "false"
+
 hooks: {}
 
 podAnnotations: {}

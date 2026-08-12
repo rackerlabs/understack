@@ -17,3 +17,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         /src/openstack-sync
 
 COPY --chmod=755 python/openstack-sync/openstack_sync/hooks/placeholder.py /hooks/placeholder.py
+COPY --chmod=755 python/openstack-sync/openstack_sync/hooks/router_flavors.py /hooks/router_flavors.py
