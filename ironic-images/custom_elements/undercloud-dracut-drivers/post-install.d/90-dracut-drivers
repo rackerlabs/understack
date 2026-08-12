@@ -1,0 +1,64 @@
+#!/bin/bash
+
+if [ ${DIB_DEBUG_TRACE:-0} -gt 0 ]; then
+    set -x
+fi
+set -eu
+set -o pipefail
+
+# Ubuntu 26.04 uses dracut instead of initramfs-tools. When the image is built
+# on a GitHub Actions runner (no RAID controller present), dracut in hostonly
+# mode won't include storage drivers needed for bare metal servers.
+#
+# This script:
+# 1. Drops a dracut config for generic (non-hostonly) initramfs with all
+#    necessary drivers and systemd modules
+# 2. Adds "rw" to the kernel command line so root is mounted read-write
+#    (dracut+systemd does not automatically remount rw from fstab like
+#    initramfs-tools does)
+# 3. Regenerates the initramfs after all packages are installed
+
+mkdir -p /etc/dracut.conf.d
+
+cat > /etc/dracut.conf.d/99-undercloud-baremetal.conf << 'EOF'
+# Build a generic initramfs that includes all drivers, not just those
+# for the build host. Required for bare metal deployment where the target
+# hardware differs from the image build environment.
+hostonly=no
+hostonly_cmdline=no
+
+# Process /etc/fstab for mount options
+use_fstab="yes"
+
+# Explicitly include storage controller drivers common in our fleet
+add_drivers+=" megaraid_sas mpt3sas mptsas ahci nvme sd_mod sr_mod "
+
+# Include filesystem modules
+add_drivers+=" ext4 xfs vfat "
+
+# Ensure systemd modules are present for proper root mount and remount
+add_dracutmodules+=" systemd systemd-initrd rootfs-block "
+EOF
+
+echo "Installed /etc/dracut.conf.d/99-undercloud-baremetal.conf"
+
+# Add "rw" to the kernel command line. With dracut+systemd, the root
+# filesystem must be explicitly mounted rw via the cmdline. Unlike
+# initramfs-tools, dracut does not rely on /etc/fstab for the initial
+# root mount mode.
+#
+# We use GRUB_CMDLINE_LINUX (not _DEFAULT) because the bootloader
+# element's finalise.d/50-bootloader appends its own GRUB_CMDLINE_LINUX_DEFAULT
+# line after this script runs. GRUB_CMDLINE_LINUX is applied to all
+# boot entries and isn't overwritten by the bootloader element.
+if [ -f /etc/default/grub ]; then
+    if ! grep -q 'GRUB_CMDLINE_LINUX=.*\brw\b' /etc/default/grub; then
+        echo 'GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} rw"' >> /etc/default/grub
+        echo "Added 'rw' to GRUB_CMDLINE_LINUX"
+    fi
+fi
+
+# Regenerate all initramfs images with the new configuration.
+# This runs in post-install.d so all kernel packages are already installed.
+dracut --regenerate-all --force
+echo "Regenerated initramfs for all installed kernels"

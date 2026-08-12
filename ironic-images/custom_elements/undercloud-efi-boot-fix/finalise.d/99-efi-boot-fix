@@ -1,0 +1,75 @@
+#!/bin/bash
+
+if [ ${DIB_DEBUG_TRACE:-0} -gt 0 ]; then
+    set -x
+fi
+set -eu
+set -o pipefail
+
+# During the DIB finalise phase, /boot/efi is mounted but the distro-specific
+# EFI directory (EFI/ubuntu) does not exist because the shim-signed package
+# installs its files to /usr/lib/shim/ rather than directly to the ESP.
+#
+# The bootloader element's 50-bootloader script runs grub-install --removable
+# which places a plain grubx64.efi as EFI/BOOT/BOOTX64.EFI. However, the
+# shim-signed package also installs a BOOTX64.CSV that references shimx64.efi,
+# which IPA then uses to create UEFI NVRAM boot entries pointing to a
+# non-existent \EFI\BOOT\shimx64.efi — causing boot failure.
+#
+# Fix: Install the signed shim and grub binaries into the proper locations
+# on the ESP so the full secure boot chain works.
+
+ESP_BOOT_DIR="/boot/efi/EFI/BOOT"
+ESP_UBUNTU_DIR="/boot/efi/EFI/ubuntu"
+
+# Signed shim location from shim-signed package
+SHIM_SIGNED="/usr/lib/shim/shimx64.efi.signed"
+# Signed grub location from grub-efi-amd64-signed package
+GRUB_SIGNED="/usr/lib/grub/x86_64-efi-signed/grubx64.efi.signed"
+
+if [ ! -f "${SHIM_SIGNED}" ]; then
+    echo "WARNING: ${SHIM_SIGNED} not found, skipping EFI boot fix"
+    exit 0
+fi
+
+# Create the distro-specific EFI directory
+mkdir -p "${ESP_UBUNTU_DIR}"
+
+# Install shimx64.efi to EFI/BOOT/ (what BOOTX64.CSV advertises)
+cp "${SHIM_SIGNED}" "${ESP_BOOT_DIR}/shimx64.efi"
+echo "Copied shimx64.efi to ${ESP_BOOT_DIR}/"
+
+# Install signed grub as grubx64.efi in EFI/BOOT/ (shim chains to this name)
+if [ -f "${GRUB_SIGNED}" ]; then
+    cp "${GRUB_SIGNED}" "${ESP_BOOT_DIR}/grubx64.efi"
+    echo "Copied grubx64.efi to ${ESP_BOOT_DIR}/"
+fi
+
+# Install shimx64.efi to EFI/ubuntu/ (standard Ubuntu location)
+cp "${SHIM_SIGNED}" "${ESP_UBUNTU_DIR}/shimx64.efi"
+echo "Copied shimx64.efi to ${ESP_UBUNTU_DIR}/"
+
+# Install signed grub to EFI/ubuntu/
+if [ -f "${GRUB_SIGNED}" ]; then
+    cp "${GRUB_SIGNED}" "${ESP_UBUNTU_DIR}/grubx64.efi"
+    echo "Copied grubx64.efi to ${ESP_UBUNTU_DIR}/"
+fi
+
+# Copy grub.cfg to EFI/ubuntu/ so shim->grub chain can find it
+if [ -f /boot/grub/grub.cfg ]; then
+    cp /boot/grub/grub.cfg "${ESP_UBUNTU_DIR}/grub.cfg"
+    echo "Copied grub.cfg to ${ESP_UBUNTU_DIR}/"
+elif [ -f /boot/efi/EFI/BOOT/grub.cfg ]; then
+    cp /boot/efi/EFI/BOOT/grub.cfg "${ESP_UBUNTU_DIR}/grub.cfg"
+    echo "Copied grub.cfg from EFI/BOOT/ to ${ESP_UBUNTU_DIR}/"
+fi
+
+# Ensure grub.cfg exists in EFI/BOOT/ for the shim->grub chain.
+# The signed grub looks for grub.cfg relative to its own prefix. If booting
+# via shimx64.efi -> grubx64.efi in EFI/BOOT/, grub needs a config here.
+if [ ! -f "${ESP_BOOT_DIR}/grub.cfg" ]; then
+    if [ -f /boot/grub/grub.cfg ]; then
+        cp /boot/grub/grub.cfg "${ESP_BOOT_DIR}/grub.cfg"
+        echo "Copied grub.cfg to ${ESP_BOOT_DIR}/"
+    fi
+fi
