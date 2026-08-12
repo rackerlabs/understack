@@ -1,0 +1,86 @@
+---
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: enroll-fw
+  annotations:
+    workflows.argoproj.io/title: Enroll a firewall in Ironic
+    workflows.argoproj.io/description: |
+      Defined in `workflows/argo-events/workflowtemplates/enroll-fw.yaml`.
+      Reuses enroll-netdev for the node/port lifecycle and additionally records
+      firewall management details in driver_info and the HA mate serial in extra.
+kind: WorkflowTemplate
+spec:
+  serviceAccountName: workflow
+  entrypoint: main
+  volumes:
+    - name: baremetal-manage
+      secret:
+        secretName: baremetal-manage
+        items:
+          - key: clouds.yaml
+            path: clouds.yaml
+  arguments:
+    parameters:
+      - name: name
+      - name: physical_network
+      # JSON array of ports (same format as enroll-netdev).
+      - name: ports
+      - name: external_cmdb_id
+        value: ""
+      - name: resource_class
+        value: generic
+      # Firewall management/identity metadata. management_* land in the node's
+      # driver_info; mate_serial lands in extra. Omit (leave "") to skip.
+      - name: management_ip
+        value: ""
+      - name: management_switch
+        value: ""
+      - name: management_switch_port
+        value: ""
+      - name: mate_serial
+        value: ""
+  templates:
+    - name: main
+      steps:
+        - - name: enroll-fw
+            template: enroll-fw
+    - name: enroll-fw
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - enroll-fw
+        args:
+          - --name
+          - "{{workflow.parameters.name}}"
+          - --physical-network
+          - "{{workflow.parameters.physical_network}}"
+          - --ports
+          - "{{workflow.parameters.ports}}"
+          - --external-cmdb-id
+          - "{{workflow.parameters.external_cmdb_id}}"
+          - --resource-class
+          - "{{workflow.parameters.resource_class}}"
+          - --management-ip
+          - "{{workflow.parameters.management_ip}}"
+          - --management-switch
+          - "{{workflow.parameters.management_switch}}"
+          - --management-switch-port
+          - "{{workflow.parameters.management_switch_port}}"
+          - --mate-serial
+          - "{{workflow.parameters.mate_serial}}"
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        envFrom:
+          - configMapRef:
+              name: cluster-metadata
+        env:
+          - name: WF_NS
+            value: "{{workflow.namespace}}"
+          - name: WF_NAME
+            value: "{{workflow.name}}"
+          - name: WF_UID
+            value: "{{workflow.uid}}"
+          - name: OS_CLOUD
+            value: understack
