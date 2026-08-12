@@ -45,6 +45,21 @@ pluginData:
         SYNC_CRONTAB: "0 * * * *"
         PRUNE: "false"
 
+# Built-in plugin enablement. Site values normally only override these booleans
+# and selected pluginData.<name>.hook.env values.
+plugins:
+  neutronRouterFlavors: false
+
+pluginData:
+  neutronRouterFlavors:
+    hook:
+      path: /hooks/router_flavors.py
+      crd: crds/neutron.understack.rackspace.net_neutronrouterflavors.yaml
+      envPrefix: NEUTRON_ROUTER_FLAVOR
+      env:
+        SYNC_CRONTAB: "0 * * * *"
+        PRUNE: "false"
+
 hooks: {}
 
 podAnnotations: {}
