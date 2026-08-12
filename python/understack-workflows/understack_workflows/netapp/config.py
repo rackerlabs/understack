@@ -7,18 +7,24 @@ from understack_workflows.netapp.exceptions import ConfigurationError
 
 
 class NetAppConfig:
-    """Handles NetApp configuration parsing and validation."""
+    """Handles NetApp configuration parsing and validation.
 
-    def __init__(self, config_path: str = "/etc/netapp/netapp_nvme.conf"):
-        """Initialize NetApp configuration.
+    Each section in the INI file represents a backend with its own
+    credentials and optional settings.
+    """
+
+    def __init__(self, config_path: str, section: str):
+        """Initialize NetApp configuration for a specific backend section.
 
         Args:
             config_path: Path to the NetApp configuration file
+            section: INI section name identifying the backend
 
         Raises:
             ConfigurationError: If configuration file is missing or invalid
         """
         self._config_path = config_path
+        self._section = section
         self._config_data = self._parse_config()
         self.validate()
 
@@ -48,19 +54,29 @@ class NetAppConfig:
                 context={"parsing_error": str(e)},
             ) from e
 
+        if self._section not in parser.sections():
+            raise ConfigurationError(
+                f"Section '{self._section}' not found in {self._config_path}",
+                config_path=self._config_path,
+                context={
+                    "requested_section": self._section,
+                    "available_sections": parser.sections(),
+                },
+            )
+
         try:
             config_data = {
-                "hostname": parser.get("netapp_nvme", "netapp_server_hostname"),
-                "username": parser.get("netapp_nvme", "netapp_login"),
-                "password": parser.get("netapp_nvme", "netapp_password"),
+                "hostname": parser.get(self._section, "netapp_server_hostname"),
+                "username": parser.get(self._section, "netapp_login"),
+                "password": parser.get(self._section, "netapp_password"),
             }
 
             # Optional netapp_nic_slot_prefix with default value
             try:
                 config_data["netapp_nic_slot_prefix"] = parser.get(
-                    "netapp_nvme", "netapp_nic_slot_prefix"
+                    self._section, "netapp_nic_slot_prefix"
                 )
-            except (configparser.NoSectionError, configparser.NoOptionError):
+            except configparser.NoOptionError:
                 config_data["netapp_nic_slot_prefix"] = "e4"
 
             return config_data
@@ -68,7 +84,7 @@ class NetAppConfig:
             raise ConfigurationError(
                 f"Missing required configuration in {self._config_path}: {e}",
                 config_path=self._config_path,
-                context={"missing_config": str(e)},
+                context={"missing_config": str(e), "section": self._section},
             ) from e
 
     def validate(self) -> None:
@@ -127,3 +143,50 @@ class NetAppConfig:
     def config_path(self) -> str:
         """Get the configuration file path."""
         return self._config_path
+
+    @property
+    def section(self) -> str:
+        """Get the backend section name this config was loaded from."""
+        return self._section
+
+    @staticmethod
+    def get_all_backends(
+        config_path: str = "/etc/netapp/netapp_nvme.conf",
+    ) -> list["NetAppConfig"]:
+        """Load all backend configurations from the config file.
+
+        Each section in the INI file is treated as a separate backend.
+
+        Args:
+            config_path: Path to the NetApp configuration file
+
+        Returns:
+            List of NetAppConfig instances, one per section
+
+        Raises:
+            ConfigurationError: If the file is missing or has no valid sections
+        """
+        if not os.path.exists(config_path):
+            raise ConfigurationError(
+                f"Configuration file not found at {config_path}",
+                config_path=config_path,
+            )
+
+        parser = configparser.ConfigParser()
+        try:
+            parser.read(config_path)
+        except configparser.Error as e:
+            raise ConfigurationError(
+                f"Failed to parse configuration file: {e}",
+                config_path=config_path,
+                context={"parsing_error": str(e)},
+            ) from e
+
+        sections = parser.sections()
+        if not sections:
+            raise ConfigurationError(
+                f"No sections found in configuration file {config_path}",
+                config_path=config_path,
+            )
+
+        return [NetAppConfig(config_path=config_path, section=s) for s in sections]

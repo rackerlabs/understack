@@ -72,13 +72,25 @@ class TestHandleVolumeTypeAccessAdded:
         result = handle_volume_type_access_added(mock_conn, mock_nautobot, event_data)
         assert result == 1
 
+    @patch(
+        "understack_workflows.oslo_event.cinder_volume_type.NetAppConfig.get_all_backends"
+    )
     @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
     @patch("builtins.open")
     def test_svm_does_not_exist_returns_1(
-        self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_netapp_class,
+        mock_get_all_backends,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """If SVM doesn't exist, skip volume creation and return 1."""
         mock_conn.block_storage.get_type.return_value = MagicMock(extra_specs={})
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = False
         mock_netapp_class.return_value = mock_netapp_manager
@@ -93,13 +105,25 @@ class TestHandleVolumeTypeAccessAdded:
         )
         mock_netapp_manager.create_volume.assert_not_called()
 
+    @patch(
+        "understack_workflows.oslo_event.cinder_volume_type.NetAppConfig.get_all_backends"
+    )
     @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
     @patch("builtins.open")
     def test_successful_volume_creation(
-        self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_netapp_class,
+        mock_get_all_backends,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Volume created with the dynamically selected aggregate and default size."""
         mock_conn.block_storage.get_type.return_value = MagicMock(extra_specs={})
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_manager.select_aggregate_name.return_value = "aggr-selected"
@@ -118,10 +142,19 @@ class TestHandleVolumeTypeAccessAdded:
             aggregate_name="aggr-selected",
         )
 
+    @patch(
+        "understack_workflows.oslo_event.cinder_volume_type.NetAppConfig.get_all_backends"
+    )
     @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
     @patch("builtins.open")
     def test_extra_specs_used_for_aggregate_and_size(
-        self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_netapp_class,
+        mock_get_all_backends,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """aggregate_name and volume_size from extra_specs override defaults."""
         mock_conn.block_storage.get_type.return_value = MagicMock(
@@ -130,6 +163,9 @@ class TestHandleVolumeTypeAccessAdded:
                 "netapp:flexvol_size": "1TB",
             }
         )
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_class.return_value = mock_netapp_manager
@@ -147,13 +183,25 @@ class TestHandleVolumeTypeAccessAdded:
             aggregate_name="aggr_custom",
         )
 
+    @patch(
+        "understack_workflows.oslo_event.cinder_volume_type.NetAppConfig.get_all_backends"
+    )
     @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
     @patch("builtins.open")
     def test_aggregate_selection_failure_propagates(
-        self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_netapp_class,
+        mock_get_all_backends,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """If no aggregate can be selected, volume creation is not attempted."""
         mock_conn.block_storage.get_type.return_value = MagicMock(extra_specs={})
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
         mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_manager.select_aggregate_name.side_effect = Exception(
@@ -198,14 +246,27 @@ class TestHandleVolumeTypeAccessRemoved:
         result = handle_volume_type_access_removed(mock_conn, mock_nautobot, event_data)
         assert result == 1
 
+    @patch(
+        "understack_workflows.oslo_event.cinder_volume_type.NetAppConfig.get_all_backends"
+    )
     @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
     @patch("builtins.open")
     def test_successful_volume_deletion(
-        self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_netapp_class,
+        mock_get_all_backends,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Volume deleted and returns 0 on success."""
         expected_volume_name = f"vol_{VOLUME_TYPE_ID.replace('-', '')}"
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
+        mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_manager.get_volume_name.return_value = expected_volume_name
         mock_netapp_manager.delete_volume.return_value = True
         mock_netapp_class.return_value = mock_netapp_manager
@@ -220,13 +281,26 @@ class TestHandleVolumeTypeAccessRemoved:
             expected_volume_name, force=False
         )
 
+    @patch(
+        "understack_workflows.oslo_event.cinder_volume_type.NetAppConfig.get_all_backends"
+    )
     @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
     @patch("builtins.open")
     def test_deletion_returns_false_returns_1(
-        self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_netapp_class,
+        mock_get_all_backends,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Returns 1 when delete_volume returns False."""
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
+        mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_manager.delete_volume.return_value = False
         mock_netapp_class.return_value = mock_netapp_manager
 
@@ -236,13 +310,26 @@ class TestHandleVolumeTypeAccessRemoved:
 
         assert result == 1
 
+    @patch(
+        "understack_workflows.oslo_event.cinder_volume_type.NetAppConfig.get_all_backends"
+    )
     @patch("understack_workflows.oslo_event.cinder_volume_type.NetAppManager")
     @patch("builtins.open")
     def test_deletion_failure_returns_1(
-        self, mock_open, mock_netapp_class, mock_conn, mock_nautobot, valid_event_data
+        self,
+        mock_open,
+        mock_netapp_class,
+        mock_get_all_backends,
+        mock_conn,
+        mock_nautobot,
+        valid_event_data,
     ):
         """Returns 1 when delete_volume raises an exception."""
+        mock_backend = MagicMock()
+        mock_backend.section = "backend1"
+        mock_get_all_backends.return_value = [mock_backend]
         mock_netapp_manager = MagicMock()
+        mock_netapp_manager.check_if_svm_exists.return_value = True
         mock_netapp_manager.delete_volume.side_effect = Exception("Delete failed")
         mock_netapp_class.return_value = mock_netapp_manager
 

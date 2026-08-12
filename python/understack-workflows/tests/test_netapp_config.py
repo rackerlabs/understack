@@ -2,7 +2,6 @@
 
 import os
 import tempfile
-from unittest.mock import patch
 
 import pytest
 
@@ -16,7 +15,7 @@ class TestNetAppConfig:
     @pytest.fixture
     def valid_config_file(self):
         """Create a valid temporary config file for testing."""
-        config_content = """[netapp_nvme]
+        config_content = """[backend1]
 netapp_server_hostname = test-hostname.example.com
 netapp_login = test-user
 netapp_password = test-password-123
@@ -30,7 +29,7 @@ netapp_password = test-password-123
     @pytest.fixture
     def config_with_nic_prefix(self):
         """Create a config file with custom NIC slot prefix."""
-        config_content = """[netapp_nvme]
+        config_content = """[backend1]
 netapp_server_hostname = test-hostname.example.com
 netapp_login = test-user
 netapp_password = test-password-123
@@ -43,12 +42,18 @@ netapp_nic_slot_prefix = e5
         os.unlink(f.name)
 
     @pytest.fixture
-    def minimal_config_file(self):
-        """Create a minimal valid config file."""
-        config_content = """[netapp_nvme]
-netapp_server_hostname = host
-netapp_login = user
-netapp_password = pass
+    def multi_backend_config_file(self):
+        """Create a config file with multiple backends."""
+        config_content = """[staging-svm1]
+netapp_server_hostname = netapp1.staging.example.com
+netapp_login = admin1
+netapp_password = pass1
+
+[staging-svm2]
+netapp_server_hostname = netapp2.staging.example.com
+netapp_login = admin2
+netapp_password = pass2
+netapp_nic_slot_prefix = e2
 """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
             f.write(config_content)
@@ -58,59 +63,28 @@ netapp_password = pass
 
     def test_successful_initialization(self, valid_config_file):
         """Test successful NetAppConfig initialization."""
-        config = NetAppConfig(valid_config_file)
+        config = NetAppConfig(valid_config_file, "backend1")
 
         assert config.hostname == "test-hostname.example.com"
         assert config.username == "test-user"
         assert config.password == "test-password-123"
         assert config.netapp_nic_slot_prefix == "e4"  # Default value
         assert config.config_path == valid_config_file
-
-    def test_default_config_path(self):
-        """Test NetAppConfig with default config path."""
-        with patch.object(NetAppConfig, "_parse_config") as mock_parse:
-            mock_parse.return_value = {
-                "hostname": "default-host",
-                "username": "default-user",
-                "password": "default-pass",
-            }
-
-            config = NetAppConfig()
-
-            assert config.config_path == "/etc/netapp/netapp_nvme.conf"
-            mock_parse.assert_called_once()
+        assert config.section == "backend1"
 
     def test_file_not_found(self):
         """Test ConfigurationError when config file doesn't exist."""
         with pytest.raises(ConfigurationError) as exc_info:
-            NetAppConfig("/nonexistent/path/config.conf")
+            NetAppConfig("/nonexistent/path/config.conf", "backend1")
 
         error = exc_info.value
         assert "Configuration file not found" in error.message
         assert error.config_path == "/nonexistent/path/config.conf"
 
     def test_missing_section(self):
-        """Test ConfigurationError when required section is missing."""
-        config_content = """[wrong_section]
-some_key = some_value
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
-            f.write(config_content)
-            f.flush()
-
-            with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
-
-            error = exc_info.value
-            assert "Missing required configuration" in error.message
-            assert error.config_path == f.name
-            assert "missing_config" in error.context
-
-        os.unlink(f.name)
-
-    def test_missing_hostname_option(self):
-        """Test ConfigurationError when hostname option is missing."""
-        config_content = """[netapp_nvme]
+        """Test ConfigurationError when requested section is missing."""
+        config_content = """[other_section]
+netapp_server_hostname = test-hostname
 netapp_login = test-user
 netapp_password = test-password
 """
@@ -119,7 +93,26 @@ netapp_password = test-password
             f.flush()
 
             with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
+                NetAppConfig(f.name, "nonexistent_section")
+
+            error = exc_info.value
+            assert "not found" in error.message
+            assert "nonexistent_section" in error.message
+
+        os.unlink(f.name)
+
+    def test_missing_hostname_option(self):
+        """Test ConfigurationError when hostname option is missing."""
+        config_content = """[backend1]
+netapp_login = test-user
+netapp_password = test-password
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
+            f.write(config_content)
+            f.flush()
+
+            with pytest.raises(ConfigurationError) as exc_info:
+                NetAppConfig(f.name, "backend1")
 
             error = exc_info.value
             assert "Missing required configuration" in error.message
@@ -129,7 +122,7 @@ netapp_password = test-password
 
     def test_missing_username_option(self):
         """Test ConfigurationError when username option is missing."""
-        config_content = """[netapp_nvme]
+        config_content = """[backend1]
 netapp_server_hostname = test-hostname
 netapp_password = test-password
 """
@@ -138,7 +131,7 @@ netapp_password = test-password
             f.flush()
 
             with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
+                NetAppConfig(f.name, "backend1")
 
             error = exc_info.value
             assert "Missing required configuration" in error.message
@@ -148,7 +141,7 @@ netapp_password = test-password
 
     def test_missing_password_option(self):
         """Test ConfigurationError when password option is missing."""
-        config_content = """[netapp_nvme]
+        config_content = """[backend1]
 netapp_server_hostname = test-hostname
 netapp_login = test-user
 """
@@ -157,7 +150,7 @@ netapp_login = test-user
             f.flush()
 
             with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
+                NetAppConfig(f.name, "backend1")
 
             error = exc_info.value
             assert "Missing required configuration" in error.message
@@ -167,7 +160,7 @@ netapp_login = test-user
 
     def test_empty_hostname_value(self):
         """Test ConfigurationError when hostname value is empty."""
-        config_content = """[netapp_nvme]
+        config_content = """[backend1]
 netapp_server_hostname =
 netapp_login = test-user
 netapp_password = test-password
@@ -177,7 +170,7 @@ netapp_password = test-password
             f.flush()
 
             with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
+                NetAppConfig(f.name, "backend1")
 
             error = exc_info.value
             assert "Configuration validation failed" in error.message
@@ -189,7 +182,7 @@ netapp_password = test-password
 
     def test_empty_username_value(self):
         """Test ConfigurationError when username value is empty."""
-        config_content = """[netapp_nvme]
+        config_content = """[backend1]
 netapp_server_hostname = test-hostname
 netapp_login =
 netapp_password = test-password
@@ -199,7 +192,7 @@ netapp_password = test-password
             f.flush()
 
             with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
+                NetAppConfig(f.name, "backend1")
 
             error = exc_info.value
             assert "Configuration validation failed" in error.message
@@ -209,7 +202,7 @@ netapp_password = test-password
 
     def test_empty_password_value(self):
         """Test ConfigurationError when password value is empty."""
-        config_content = """[netapp_nvme]
+        config_content = """[backend1]
 netapp_server_hostname = test-hostname
 netapp_login = test-user
 netapp_password =
@@ -219,7 +212,7 @@ netapp_password =
             f.flush()
 
             with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
+                NetAppConfig(f.name, "backend1")
 
             error = exc_info.value
             assert "Configuration validation failed" in error.message
@@ -229,7 +222,7 @@ netapp_password =
 
     def test_multiple_empty_fields(self):
         """Test ConfigurationError when multiple fields are empty."""
-        config_content = """[netapp_nvme]
+        config_content = """[backend1]
 netapp_server_hostname =
 netapp_login =
 netapp_password = test-password
@@ -239,7 +232,7 @@ netapp_password = test-password
             f.flush()
 
             with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
+                NetAppConfig(f.name, "backend1")
 
             error = exc_info.value
             assert "Configuration validation failed" in error.message
@@ -248,29 +241,9 @@ netapp_password = test-password
 
         os.unlink(f.name)
 
-    def test_whitespace_only_values(self):
-        """Test ConfigurationError when values contain only whitespace."""
-        config_content = """[netapp_nvme]
-netapp_server_hostname = test-hostname
-netapp_login =
-netapp_password =
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
-            f.write(config_content)
-            f.flush()
-
-            with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
-
-            error = exc_info.value
-            assert "Configuration validation failed" in error.message
-            assert "Empty fields: username, password" in error.message
-
-        os.unlink(f.name)
-
     def test_malformed_config_file(self):
         """Test ConfigurationError when config file is malformed."""
-        config_content = """[netapp_nvme
+        config_content = """[backend1
 netapp_server_hostname = test-hostname
 invalid line without equals
 netapp_login = test-user
@@ -280,7 +253,7 @@ netapp_login = test-user
             f.flush()
 
             with pytest.raises(ConfigurationError) as exc_info:
-                NetAppConfig(f.name)
+                NetAppConfig(f.name, "backend1")
 
             error = exc_info.value
             assert "Failed to parse configuration file" in error.message
@@ -290,16 +263,15 @@ netapp_login = test-user
 
     def test_validate_method_directly(self, valid_config_file):
         """Test calling validate method directly."""
-        config = NetAppConfig(valid_config_file)
+        config = NetAppConfig(valid_config_file, "backend1")
 
         # Should not raise any exception
         config.validate()
 
     def test_properties_immutable(self, valid_config_file):
         """Test that config properties are read-only."""
-        config = NetAppConfig(valid_config_file)
+        config = NetAppConfig(valid_config_file, "backend1")
 
-        # Properties should not be settable
         with pytest.raises(AttributeError):
             config.hostname = "new-hostname"  # type: ignore[misc]
 
@@ -309,34 +281,9 @@ netapp_login = test-user
         with pytest.raises(AttributeError):
             config.password = "new-password"  # type: ignore[misc]
 
-    def test_config_with_extra_sections(self, valid_config_file):
-        """Test config parsing ignores extra sections."""
-        config_content = """[netapp_nvme]
-netapp_server_hostname = test-hostname
-netapp_login = test-user
-netapp_password = test-password
-
-[extra_section]
-extra_key = extra_value
-
-[another_section]
-another_key = another_value
-"""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
-            f.write(config_content)
-            f.flush()
-
-            config = NetAppConfig(f.name)
-
-            assert config.hostname == "test-hostname"
-            assert config.username == "test-user"
-            assert config.password == "test-password"
-
-        os.unlink(f.name)
-
     def test_netapp_nic_slot_prefix_custom_value(self, config_with_nic_prefix):
         """Test NetAppConfig with custom NIC slot prefix."""
-        config = NetAppConfig(config_with_nic_prefix)
+        config = NetAppConfig(config_with_nic_prefix, "backend1")
 
         assert config.hostname == "test-hostname.example.com"
         assert config.username == "test-user"
@@ -345,13 +292,13 @@ another_key = another_value
 
     def test_netapp_nic_slot_prefix_default_value(self, valid_config_file):
         """Test NetAppConfig uses default NIC slot prefix when not specified."""
-        config = NetAppConfig(valid_config_file)
+        config = NetAppConfig(valid_config_file, "backend1")
 
         assert config.netapp_nic_slot_prefix == "e4"
 
     def test_config_with_extra_options(self):
-        """Test config parsing ignores extra options in netapp_nvme section."""
-        config_content = """[netapp_nvme]
+        """Test config parsing ignores extra options in section."""
+        config_content = """[backend1]
 netapp_server_hostname = test-hostname
 netapp_login = test-user
 netapp_password = test-password
@@ -362,7 +309,7 @@ another_option = another_value
             f.write(config_content)
             f.flush()
 
-            config = NetAppConfig(f.name)
+            config = NetAppConfig(f.name, "backend1")
 
             assert config.hostname == "test-hostname"
             assert config.username == "test-user"
@@ -370,67 +317,128 @@ another_option = another_value
 
         os.unlink(f.name)
 
+
+class TestNetAppConfigGetAllBackends:
+    """Test cases for NetAppConfig.get_all_backends()."""
+
+    @pytest.fixture
+    def multi_backend_config_file(self):
+        """Create a config file with multiple backends."""
+        config_content = """[staging-svm1]
+netapp_server_hostname = netapp1.staging.example.com
+netapp_login = admin1
+netapp_password = pass1
+
+[staging-svm2]
+netapp_server_hostname = netapp2.staging.example.com
+netapp_login = admin2
+netapp_password = pass2
+netapp_nic_slot_prefix = e2
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
+            f.write(config_content)
+            f.flush()
+            yield f.name
+        os.unlink(f.name)
+
+    def test_get_all_backends_returns_all_sections(self, multi_backend_config_file):
+        """Test that get_all_backends returns one config per section."""
+        backends = NetAppConfig.get_all_backends(multi_backend_config_file)
+
+        assert len(backends) == 2
+        assert backends[0].section == "staging-svm1"
+        assert backends[0].hostname == "netapp1.staging.example.com"
+        assert backends[0].username == "admin1"
+        assert backends[0].password == "pass1"
+        assert backends[0].netapp_nic_slot_prefix == "e4"  # default
+
+        assert backends[1].section == "staging-svm2"
+        assert backends[1].hostname == "netapp2.staging.example.com"
+        assert backends[1].username == "admin2"
+        assert backends[1].password == "pass2"
+        assert backends[1].netapp_nic_slot_prefix == "e2"
+
+    def test_get_all_backends_file_not_found(self):
+        """Test ConfigurationError when file doesn't exist."""
+        with pytest.raises(ConfigurationError) as exc_info:
+            NetAppConfig.get_all_backends("/nonexistent/path.conf")
+
+        assert "Configuration file not found" in exc_info.value.message
+
+    def test_get_all_backends_empty_file(self):
+        """Test ConfigurationError when file has no sections."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
+            f.write("# just a comment\n")
+            f.flush()
+
+            with pytest.raises(ConfigurationError) as exc_info:
+                NetAppConfig.get_all_backends(f.name)
+
+            assert "No sections found" in exc_info.value.message
+
+        os.unlink(f.name)
+
+    def test_get_all_backends_single_section(self):
+        """Test get_all_backends with a single section."""
+        config_content = """[prod-svm1]
+netapp_server_hostname = netapp.prod.example.com
+netapp_login = prod-admin
+netapp_password = prod-pass
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
+            f.write(config_content)
+            f.flush()
+
+            backends = NetAppConfig.get_all_backends(f.name)
+
+            assert len(backends) == 1
+            assert backends[0].section == "prod-svm1"
+            assert backends[0].hostname == "netapp.prod.example.com"
+
+        os.unlink(f.name)
+
     def test_integration_netapp_config_with_from_nautobot_response(
-        self, config_with_nic_prefix
+        self,
     ):
         """Test integration between NetAppConfig and NetappIPInterfaceConfig."""
         from unittest.mock import MagicMock
 
         from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
 
-        # Create config with custom NIC prefix
-        config = NetAppConfig(config_with_nic_prefix)
-        assert config.netapp_nic_slot_prefix == "e5"
+        config_content = """[backend1]
+netapp_server_hostname = test-hostname.example.com
+netapp_login = test-user
+netapp_password = test-password-123
+netapp_nic_slot_prefix = e5
+"""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
+            f.write(config_content)
+            f.flush()
 
-        # Create a mock nautobot response
-        mock_interface_a = MagicMock()
-        mock_interface_a.name = "N1-lif-A"
-        mock_interface_a.address = "192.168.1.10/24"
-        mock_interface_a.vlan = 100
+            config = NetAppConfig(f.name, "backend1")
+            assert config.netapp_nic_slot_prefix == "e5"
 
-        mock_interface_b = MagicMock()
-        mock_interface_b.name = "N1-lif-B"
-        mock_interface_b.address = "192.168.1.11/24"
-        mock_interface_b.vlan = 100
+            mock_interface_a = MagicMock()
+            mock_interface_a.name = "N1-lif-A"
+            mock_interface_a.address = "192.168.1.10/24"
+            mock_interface_a.vlan = 100
 
-        mock_response = MagicMock()
-        mock_response.interfaces = [mock_interface_a, mock_interface_b]
+            mock_interface_b = MagicMock()
+            mock_interface_b.name = "N1-lif-B"
+            mock_interface_b.address = "192.168.1.11/24"
+            mock_interface_b.vlan = 100
 
-        # Test that from_nautobot_response uses the custom prefix
-        configs = NetappIPInterfaceConfig.from_nautobot_response(mock_response, config)
+            mock_response = MagicMock()
+            mock_response.interfaces = [mock_interface_a, mock_interface_b]
 
-        assert len(configs) == 2
-        assert configs[0].base_port_name == "e5a"
-        assert configs[1].base_port_name == "e5b"
-        assert configs[0].nic_slot_prefix == "e5"
-        assert configs[1].nic_slot_prefix == "e5"
+            configs = NetappIPInterfaceConfig.from_nautobot_response(
+                mock_response, config
+            )
 
-    def test_from_nautobot_response_default_prefix(self, valid_config_file):
-        """Test that from_nautobot_response uses default when no config provided."""
-        from unittest.mock import MagicMock
+            assert len(configs) == 2
+            assert configs[0].base_port_name == "e5a"
+            assert configs[1].base_port_name == "e5b"
+            assert configs[0].nic_slot_prefix == "e5"
+            assert configs[1].nic_slot_prefix == "e5"
 
-        from understack_workflows.netapp.value_objects import NetappIPInterfaceConfig
-
-        # Create a mock nautobot response
-        mock_interface = MagicMock()
-        mock_interface.name = "N1-lif-A"
-        mock_interface.address = "192.168.1.10/24"
-        mock_interface.vlan = 100
-
-        mock_response = MagicMock()
-        mock_response.interfaces = [mock_interface]
-
-        # Test without config (should use default)
-        configs = NetappIPInterfaceConfig.from_nautobot_response(mock_response)
-        assert len(configs) == 1
-        assert configs[0].base_port_name == "e4a"
-        assert configs[0].nic_slot_prefix == "e4"
-
-        # Test with config that has default prefix
-        config = NetAppConfig(valid_config_file)
-        configs_with_config = NetappIPInterfaceConfig.from_nautobot_response(
-            mock_response, config
-        )
-        assert len(configs_with_config) == 1
-        assert configs_with_config[0].base_port_name == "e4a"
-        assert configs_with_config[0].nic_slot_prefix == "e4"
+        os.unlink(f.name)

@@ -18,7 +18,7 @@ class TestNetAppManagerIntegration:
 
     @pytest.fixture
     def mock_config_file(self):
-        """Create a temporary config file for testing."""
+        """Create a temporary config file and return a NetAppConfig for testing."""
         config_content = """[netapp_nvme]
 netapp_server_hostname = test-hostname
 netapp_login = test-user
@@ -27,8 +27,13 @@ netapp_password = test-password
         with tempfile.NamedTemporaryFile(mode="w", suffix=".conf", delete=False) as f:
             f.write(config_content)
             f.flush()
-            yield f.name
-        os.unlink(f.name)
+            config_path = f.name
+
+        from understack_workflows.netapp.config import NetAppConfig
+
+        netapp_config = NetAppConfig(config_path, "netapp_nvme")
+        yield netapp_config
+        os.unlink(config_path)
 
     # ========================================================================
     # Service Coordination Tests
@@ -40,7 +45,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test that all services are properly initialized and coordinated."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Verify all services are initialized with proper dependencies
         from understack_workflows.netapp.client import NetAppClient
@@ -66,7 +71,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test error propagation across service boundaries."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Test SVM service error propagation
         manager._svm_service.create_svm = MagicMock(
@@ -96,7 +101,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test successful coordination between services during cleanup."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         project_id = "test-project-123"
 
         # Mock all service methods for successful cleanup
@@ -123,7 +128,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test coordination when volume deletion fails."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         project_id = "test-project-123"
 
         # Mock volume deletion failure
@@ -148,7 +153,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test coordination when volume succeeds but SVM deletion fails."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         project_id = "test-project-123"
 
         # Mock volume success, SVM failure
@@ -173,7 +178,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test coordination when resources don't exist."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         project_id = "nonexistent-project"
 
         # Mock resources don't exist
@@ -198,7 +203,7 @@ netapp_password = test-password
     ):
         """Test cleanup coordination with mixed resource existence scenarios."""
         # Scenario 1: Only volume exists
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         manager._volume_service.exists = MagicMock(return_value=True)
         manager._svm_service.exists = MagicMock(return_value=False)
         manager._volume_service.delete_volume = MagicMock(return_value=True)
@@ -213,7 +218,7 @@ netapp_password = test-password
         assert result == {"volume": True, "svm": True}
 
         # Scenario 2: Only SVM exists (create new manager instance)
-        manager2 = NetAppManager(mock_config_file)
+        manager2 = NetAppManager(netapp_config=mock_config_file)
         manager2._volume_service.exists = MagicMock(return_value=False)
         manager2._svm_service.exists = MagicMock(return_value=True)
         manager2._volume_service.delete_volume = MagicMock()
@@ -232,7 +237,7 @@ netapp_password = test-password
     ):
         """Test exception handling during cleanup coordination."""
         # Test volume service exception
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         project_id = "test-project-123"
 
         manager._volume_service.exists = MagicMock(return_value=True)
@@ -250,7 +255,7 @@ netapp_password = test-password
 
         # Test SVM service exception after successful volume deletion (new
         # manager instance)
-        manager2 = NetAppManager(mock_config_file)
+        manager2 = NetAppManager(netapp_config=mock_config_file)
         manager2._volume_service.exists = MagicMock(return_value=True)
         manager2._volume_service.delete_volume = MagicMock(return_value=True)
         manager2._svm_service.exists = MagicMock(return_value=True)
@@ -273,7 +278,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test cleanup coordination when existence checks fail."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         project_id = "test-project-123"
 
         # Mock existence check failures
@@ -305,7 +310,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test complete project lifecycle across all services."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
         project_id = "lifecycle-test-project"
 
         # Mock successful creation workflow
@@ -352,7 +357,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test that service state remains consistent across multiple operations."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Verify all services share the same dependencies
         client_id = id(manager._client)
@@ -367,7 +372,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test that logging is properly coordinated across services."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Mock service methods
         manager._volume_service.exists = MagicMock(return_value=True)
@@ -400,7 +405,7 @@ netapp_password = test-password
         self, mock_host_connection, mock_config, mock_config_file
     ):
         """Test that refactored manager maintains backward compatibility."""
-        manager = NetAppManager(mock_config_file)
+        manager = NetAppManager(netapp_config=mock_config_file)
 
         # Mock all service methods to avoid actual calls
         manager._svm_service.create_svm = MagicMock(return_value="test-svm")
