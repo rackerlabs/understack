@@ -52,6 +52,7 @@ type NautobotSpec struct {
 	TenantGroupRef     []ConfigMapRef    `json:"tenantGroupRef,omitempty"`
 	TenantRef          []ConfigMapRef    `json:"tenantRef,omitempty"`
 	DeviceRef          []ConfigMapRef    `json:"deviceRef,omitempty"`
+	PermissionGroupRef []ConfigMapRef    `json:"permissionGroupRef,omitempty"`
 }
 
 // NautobotStatus defines the observed state of Nautobot.

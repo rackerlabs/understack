@@ -28,6 +28,7 @@ import (
 
 	nbClient "github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/client"
 	"github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/sync"
+	syncadmin "github.com/rackerlabs/understack/go/nautobotop/internal/nautobot/sync/admin"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -117,6 +118,7 @@ func (r *NautobotReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		{name: "cluster", dependsOn: []string{"clusterType", "clusterGroup", "location", "device"}, configRefs: nautobotCR.Spec.ClusterRef, syncFunc: r.syncCluster},
 		// Depends on: namespace, rir, location, vlan, tenant, role
 		{name: "prefix", dependsOn: []string{"namespace", "rir", "location", "vlan", "tenant", "role"}, configRefs: nautobotCR.Spec.PrefixRef, syncFunc: r.syncPrefix},
+		{name: "permissionGroup", configRefs: nautobotCR.Spec.PermissionGroupRef, syncFunc: r.syncPermissionGroup},
 	}
 
 	// Resolve execution order using topological sort (Kahn's algorithm)
@@ -256,7 +258,7 @@ func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 	deviceTypeMap map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing device types", "count", len(deviceTypeMap))
+	log.Info("starting sync of device types", "totalEntriesDefined", len(deviceTypeMap))
 	if len(deviceTypeMap) == 0 {
 		return nil
 	}
@@ -264,6 +266,7 @@ func (r *NautobotReconciler) syncDeviceTypes(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, deviceTypeMap); err != nil {
 		return fmt.Errorf("failed to sync device types: %w", err)
 	}
+	log.Info("completed sync of device types")
 	return nil
 }
 
@@ -272,7 +275,7 @@ func (r *NautobotReconciler) syncRackGroup(ctx context.Context,
 	rackGroup map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing rack group", "count", len(rackGroup))
+	log.Info("starting sync of rack groups", "totalEntriesDefined", len(rackGroup))
 	if len(rackGroup) == 0 {
 		return nil
 	}
@@ -280,6 +283,7 @@ func (r *NautobotReconciler) syncRackGroup(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, rackGroup); err != nil {
 		return fmt.Errorf("failed to sync rack group: %w", err)
 	}
+	log.Info("completed sync of rack groups")
 	return nil
 }
 
@@ -288,7 +292,7 @@ func (r *NautobotReconciler) syncRack(ctx context.Context,
 	rackData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing racks", "count", len(rackData))
+	log.Info("starting sync of racks", "totalEntriesDefined", len(rackData))
 	if len(rackData) == 0 {
 		return nil
 	}
@@ -296,6 +300,24 @@ func (r *NautobotReconciler) syncRack(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, rackData); err != nil {
 		return fmt.Errorf("failed to sync racks: %w", err)
 	}
+	log.Info("completed sync of racks")
+	return nil
+}
+
+func (r *NautobotReconciler) syncPermissionGroup(ctx context.Context,
+	nautobotClient *nbClient.NautobotClient,
+	permissionGroupData map[string]string,
+) error {
+	log := logf.FromContext(ctx)
+	log.Info("starting sync of permission groups", "totalEntriesDefined", len(permissionGroupData))
+	if len(permissionGroupData) == 0 {
+		return nil
+	}
+	syncSvc := syncadmin.NewPermissionGroupSync(nautobotClient)
+	if err := syncSvc.SyncAll(ctx, permissionGroupData); err != nil {
+		return fmt.Errorf("failed to sync permission groups: %w", err)
+	}
+	log.Info("completed sync of permission groups")
 	return nil
 }
 
@@ -304,7 +326,7 @@ func (r *NautobotReconciler) syncLocation(ctx context.Context,
 	locationType map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing location types", "count", len(locationType))
+	log.Info("starting sync of locations", "totalEntriesDefined", len(locationType))
 	if len(locationType) == 0 {
 		return nil
 	}
@@ -312,6 +334,7 @@ func (r *NautobotReconciler) syncLocation(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
 		return fmt.Errorf("failed to sync location types: %w", err)
 	}
+	log.Info("completed sync of locations")
 	return nil
 }
 
@@ -320,7 +343,7 @@ func (r *NautobotReconciler) syncLocationTypes(ctx context.Context,
 	locationType map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing location types", "count", len(locationType))
+	log.Info("starting sync of location types", "totalEntriesDefined", len(locationType))
 	if len(locationType) == 0 {
 		return nil
 	}
@@ -328,6 +351,7 @@ func (r *NautobotReconciler) syncLocationTypes(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, locationType); err != nil {
 		return fmt.Errorf("failed to sync location types: %w", err)
 	}
+	log.Info("completed sync of location types")
 	return nil
 }
 
@@ -336,7 +360,7 @@ func (r *NautobotReconciler) syncVlanGroup(ctx context.Context,
 	vlanGroupData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing vlan groups", "count", len(vlanGroupData))
+	log.Info("starting sync of vlan groups", "totalEntriesDefined", len(vlanGroupData))
 	if len(vlanGroupData) == 0 {
 		return nil
 	}
@@ -344,6 +368,7 @@ func (r *NautobotReconciler) syncVlanGroup(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, vlanGroupData); err != nil {
 		return fmt.Errorf("failed to sync vlan groups: %w", err)
 	}
+	log.Info("completed sync of vlan groups")
 	return nil
 }
 
@@ -352,7 +377,7 @@ func (r *NautobotReconciler) syncVlan(ctx context.Context,
 	vlanData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing vlans", "count", len(vlanData))
+	log.Info("starting sync of vlans", "totalEntriesDefined", len(vlanData))
 	if len(vlanData) == 0 {
 		return nil
 	}
@@ -360,6 +385,7 @@ func (r *NautobotReconciler) syncVlan(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, vlanData); err != nil {
 		return fmt.Errorf("failed to sync vlans: %w", err)
 	}
+	log.Info("completed sync of vlans")
 	return nil
 }
 
@@ -368,7 +394,7 @@ func (r *NautobotReconciler) syncPrefix(ctx context.Context,
 	prefixData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing prefixes", "count", len(prefixData))
+	log.Info("starting sync of prefixes", "totalEntriesDefined", len(prefixData))
 	if len(prefixData) == 0 {
 		return nil
 	}
@@ -376,6 +402,7 @@ func (r *NautobotReconciler) syncPrefix(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, prefixData); err != nil {
 		return fmt.Errorf("failed to sync prefixes: %w", err)
 	}
+	log.Info("completed sync of prefixes")
 	return nil
 }
 
@@ -384,7 +411,7 @@ func (r *NautobotReconciler) syncClusterType(ctx context.Context,
 	clusterTypeData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing cluster types", "count", len(clusterTypeData))
+	log.Info("starting sync of cluster types", "totalEntriesDefined", len(clusterTypeData))
 	if len(clusterTypeData) == 0 {
 		return nil
 	}
@@ -392,6 +419,7 @@ func (r *NautobotReconciler) syncClusterType(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, clusterTypeData); err != nil {
 		return fmt.Errorf("failed to sync cluster types: %w", err)
 	}
+	log.Info("completed sync of cluster types")
 	return nil
 }
 
@@ -400,7 +428,7 @@ func (r *NautobotReconciler) syncClusterGroup(ctx context.Context,
 	clusterGroupData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing cluster groups", "count", len(clusterGroupData))
+	log.Info("starting sync of cluster groups", "totalEntriesDefined", len(clusterGroupData))
 	if len(clusterGroupData) == 0 {
 		return nil
 	}
@@ -408,6 +436,7 @@ func (r *NautobotReconciler) syncClusterGroup(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, clusterGroupData); err != nil {
 		return fmt.Errorf("failed to sync cluster groups: %w", err)
 	}
+	log.Info("completed sync of cluster groups")
 	return nil
 }
 
@@ -416,7 +445,7 @@ func (r *NautobotReconciler) syncCluster(ctx context.Context,
 	clusterData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing clusters", "count", len(clusterData))
+	log.Info("starting sync of clusters", "totalEntriesDefined", len(clusterData))
 	if len(clusterData) == 0 {
 		return nil
 	}
@@ -424,6 +453,7 @@ func (r *NautobotReconciler) syncCluster(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, clusterData); err != nil {
 		return fmt.Errorf("failed to sync clusters: %w", err)
 	}
+	log.Info("completed sync of clusters")
 	return nil
 }
 func (r *NautobotReconciler) syncNamespace(ctx context.Context,
@@ -431,7 +461,7 @@ func (r *NautobotReconciler) syncNamespace(ctx context.Context,
 	namespaceData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing namespaces", "count", len(namespaceData))
+	log.Info("starting sync of namespaces", "totalEntriesDefined", len(namespaceData))
 	if len(namespaceData) == 0 {
 		return nil
 	}
@@ -439,6 +469,7 @@ func (r *NautobotReconciler) syncNamespace(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, namespaceData); err != nil {
 		return fmt.Errorf("failed to sync namespaces: %w", err)
 	}
+	log.Info("completed sync of namespaces")
 	return nil
 }
 
@@ -447,7 +478,7 @@ func (r *NautobotReconciler) syncRir(ctx context.Context,
 	rirData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing rirs", "count", len(rirData))
+	log.Info("starting sync of rirs", "totalEntriesDefined", len(rirData))
 	if len(rirData) == 0 {
 		return nil
 	}
@@ -455,6 +486,7 @@ func (r *NautobotReconciler) syncRir(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, rirData); err != nil {
 		return fmt.Errorf("failed to sync rirs: %w", err)
 	}
+	log.Info("completed sync of rirs")
 	return nil
 }
 
@@ -463,7 +495,7 @@ func (r *NautobotReconciler) syncRole(ctx context.Context,
 	roleData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing roles", "count", len(roleData))
+	log.Info("starting sync of roles", "totalEntriesDefined", len(roleData))
 	if len(roleData) == 0 {
 		return nil
 	}
@@ -471,6 +503,7 @@ func (r *NautobotReconciler) syncRole(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, roleData); err != nil {
 		return fmt.Errorf("failed to sync roles: %w", err)
 	}
+	log.Info("completed sync of roles")
 	return nil
 }
 
@@ -479,7 +512,7 @@ func (r *NautobotReconciler) syncTenantGroup(ctx context.Context,
 	tenantGroupData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing tenant groups", "count", len(tenantGroupData))
+	log.Info("starting sync of tenant groups", "totalEntriesDefined", len(tenantGroupData))
 	if len(tenantGroupData) == 0 {
 		return nil
 	}
@@ -487,6 +520,7 @@ func (r *NautobotReconciler) syncTenantGroup(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, tenantGroupData); err != nil {
 		return fmt.Errorf("failed to sync tenant groups: %w", err)
 	}
+	log.Info("completed sync of tenant groups")
 	return nil
 }
 
@@ -495,7 +529,7 @@ func (r *NautobotReconciler) syncTenant(ctx context.Context,
 	tenantData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing tenants", "count", len(tenantData))
+	log.Info("starting sync of tenants", "totalEntriesDefined", len(tenantData))
 	if len(tenantData) == 0 {
 		return nil
 	}
@@ -503,6 +537,7 @@ func (r *NautobotReconciler) syncTenant(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, tenantData); err != nil {
 		return fmt.Errorf("failed to sync tenants: %w", err)
 	}
+	log.Info("completed sync of tenants")
 	return nil
 }
 
@@ -511,7 +546,7 @@ func (r *NautobotReconciler) syncDevice(ctx context.Context,
 	deviceData map[string]string,
 ) error {
 	log := logf.FromContext(ctx)
-	log.Info("syncing devices", "count", len(deviceData))
+	log.Info("starting sync of devices", "totalEntriesDefined", len(deviceData))
 	if len(deviceData) == 0 {
 		return nil
 	}
@@ -519,6 +554,7 @@ func (r *NautobotReconciler) syncDevice(ctx context.Context,
 	if err := syncSvc.SyncAll(ctx, deviceData); err != nil {
 		return fmt.Errorf("failed to sync devices: %w", err)
 	}
+	log.Info("completed sync of devices")
 	return nil
 }
 
