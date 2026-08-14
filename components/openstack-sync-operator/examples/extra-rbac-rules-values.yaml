@@ -1,0 +1,39 @@
+# Example values override for a future plugin that needs Kubernetes resources
+# outside the chart-generated defaults.
+#
+# Use with:
+#   helm template openstack-sync-operator ../ -f extra-rbac-rules-values.yaml
+#
+# Default RBAC
+# ------------
+# Without rbac.rules, the chart generates the permissions it can infer:
+#
+# 1. Secret read access, always:
+#      apiGroups: [""]
+#      resources: ["secrets"]
+#      verbs: ["get"]
+#
+# 2. For each enabled plugin, CRD read/watch access from pluginData.<name>.hook.crd:
+#      verbs: ["get", "list", "watch"]
+#
+# 3. For each enabled plugin whose CRD defines a status subresource:
+#      resources: ["<plural>/status"]
+#      verbs: ["get", "patch", "update"]
+#
+# For example, enabling plugins.neutronRouterFlavors adds access to:
+#   - neutronrouterflavors
+#   - neutronrouterflavors/status
+#
+# Extra RBAC
+# ----------
+# rbac.rules is only for resources the chart cannot infer from plugin CRDs.
+# Each item is appended verbatim to the generated Role or ClusterRole.
+#
+# When rbac.clusterWide is false, these rules go into a namespaced Role.
+# When rbac.clusterWide is true, these rules go into a ClusterRole.
+
+rbac:
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get", "list", "watch"]

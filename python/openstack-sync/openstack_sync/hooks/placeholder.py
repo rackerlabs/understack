@@ -11,17 +11,16 @@ without needing any Kubernetes watches or extra RBAC.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 from typing import Any
 
+from openstack_sync.hooks.common import configure_logging
+from openstack_sync.plugins.common import env_bool
 from openstack_sync.utils import get_openstack_connection
 
-TRUTHY_VALUES = {"1", "true", "yes", "on"}
-
-
-def env_is_truthy(name: str, default: str = "false") -> bool:
-    return os.environ.get(name, default).lower() in TRUTHY_VALUES
+LOG = logging.getLogger(__name__)
 
 
 def build_hook_config() -> dict[str, Any]:
@@ -34,9 +33,6 @@ def build_hook_config() -> dict[str, Any]:
         "onStartup": 10,
     }
     return hook_config
-
-
-HOOK_CONFIG = build_hook_config()
 
 
 def check_openstack_connectivity() -> None:
@@ -52,25 +48,24 @@ def check_openstack_connectivity() -> None:
     secret_name = os.environ.get("OPENSTACK_PLACEHOLDER_DEFAULT_SECRET")
     cloud_name = os.environ.get("OPENSTACK_PLACEHOLDER_DEFAULT_CLOUD")
 
-    print(
-        f"connectivity check: authenticating against cloud={cloud_name!r} "
-        f"secret={secret_name!r}",
-        flush=True,
+    LOG.info(
+        "connectivity check: authenticating against cloud=%r secret=%r",
+        cloud_name,
+        secret_name,
     )
     conn = get_openstack_connection(secret_name, cloud_name)
     # Lightweight probe: check_token(str) -> bool confirms the token is valid
     # and Keystone is reachable without any side effects.
     conn.identity.check_token(conn.auth_token)
-    print(
-        f"connectivity check: OK cloud={cloud_name!r} secret={secret_name!r}",
-        flush=True,
-    )
+    LOG.info("connectivity check: OK cloud=%r secret=%r", cloud_name, secret_name)
 
 
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--config":
         print(json.dumps(build_hook_config(), indent=2))
         return 0
+
+    configure_logging()
 
     context_path = os.environ.get("BINDING_CONTEXT_PATH")
     if not context_path:
@@ -83,27 +78,22 @@ def main() -> int:
     try:
         binding_contexts = json.loads(raw)
     except json.JSONDecodeError as exc:
-        print(f"failed to parse binding context: {exc}", file=sys.stderr)
+        LOG.error("failed to parse binding context: %s", exc)
         return 1
 
     for context in binding_contexts:
         # Shell-operator passes [{"binding": "onStartup"}] for startup runs.
         if context.get("binding") == "onStartup":
-            if not env_is_truthy("OPENSTACK_PLACEHOLDER_ENABLED"):
-                print(
+            if not env_bool("OPENSTACK_PLACEHOLDER_ENABLED", False):
+                LOG.info(
                     "connectivity check: skipped"
-                    " (OPENSTACK_PLACEHOLDER_ENABLED is not set)",
-                    flush=True,
+                    " (OPENSTACK_PLACEHOLDER_ENABLED is not set)"
                 )
                 continue
             try:
                 check_openstack_connectivity()
             except Exception as exc:  # noqa: BLE001
-                print(
-                    f"connectivity check FAILED: {exc}",
-                    file=sys.stderr,
-                    flush=True,
-                )
+                LOG.error("connectivity check FAILED: %s", exc)
                 return 1
 
     return 0

@@ -3,12 +3,9 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "hooks": {
-      "type": "object",
-      "description": "Additional hook definitions keyed by hook name.",
-      "additionalProperties": {
-        "$ref": "#/definitions/hook"
-      }
+    "env": {
+      "description": "Operator-level environment variables injected directly into the container.",
+      "$ref": "#/definitions/operatorEnv"
     },
     "plugins": {
       "type": "object",
@@ -21,24 +18,44 @@
       "type": "object",
       "description": "Built-in plugin hook data keyed by plugin name.",
       "additionalProperties": {
-        "type": "object",
-        "additionalProperties": true,
-        "properties": {
-          "hook": {
-            "$ref": "#/definitions/hook"
-          }
-        }
+        "$ref": "#/definitions/pluginData"
       }
     }
   },
   "definitions": {
-    "hook": {
+    "operatorEnv": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "properties": {
+        "LOG_LEVEL": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "debug",
+            "info",
+            "error"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/envValue"
+      }
+    },
+    "pluginData": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
+        "hook": {
+          "$ref": "#/definitions/pluginHook"
+        }
+      }
+    },
+    "pluginHook": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
         "path": {
           "type": "string",
           "minLength": 1
@@ -53,17 +70,34 @@
           "pattern": "^[A-Z][A-Z0-9_]*$"
         },
         "env": {
-          "type": "object",
-          "additionalProperties": {
-            "type": [
-              "string",
-              "number",
-              "integer",
-              "boolean"
-            ]
-          }
+          "$ref": "#/definitions/hookEnv"
         }
       }
+    },
+    "hookEnv": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/envValue"
+      }
+    },
+    "envValue": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string",
+          "not": {
+            "pattern": "^\\s*([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]|1|0|[Yy][Ee][Ss]|[Nn][Oo]|[Oo][Nn]|[Oo][Ff][Ff])\\s*$"
+          }
+        }
+      ]
     }
   }
 }
