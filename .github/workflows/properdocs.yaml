@@ -19,6 +19,8 @@ on:
       - "components/global-workflows/**"
       # the neutron-understack sample config page is generated from this
       - "python/neutron-understack/**"
+      # docs/release-notes/unreleased.md is generated from these
+      - "changelog.d/**"
       # the build itself
       - "Makefile"
       - "requirements-docs.txt"

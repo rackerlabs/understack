@@ -8,3 +8,4 @@ mkdocs-multirepo-plugin>=0.8.3
 mkdocs-include-dir-to-nav
 mkdocs-callouts
 mkdocs-mermaid-zoom
+scriv>=1.8.0

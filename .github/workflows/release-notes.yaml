@@ -1,0 +1,112 @@
+name: Release notes
+
+# Runs after a repository-wide vX.Y.Z tag is pushed, and does two things:
+#
+#   1. Collects the release-note fragments in changelog.d/ into the current
+#      series page and opens a pull request against main with the result.
+#   2. Creates the GitHub release for the tag with auto-generated notes,
+#      linking the upgrade notes only when there actually are some.
+#
+# The collection deliberately runs against the *tagged* commit rather than the
+# tip of main. If it ran against main, a fragment merged in the minutes between
+# tagging and this workflow finishing would be filed under a release that does
+# not contain it.
+#
+# The notes therefore land on main one commit *after* the tag, so the tag itself
+# does not contain its own rendered notes. That is fine here: the docs site
+# publishes from main only, and nothing builds the docs from a tag checkout.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-notes:
+    name: Collect notes and create the release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          # the tag being released, not main
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: 3.x
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install Dependencies
+        run: pip install -r requirements-docs.txt
+
+      - name: Collect fragments into the series page
+        id: collect
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # scriv exits 2 when there is nothing to collect, which is the common
+          # case: most tags carry no operator-facing change at all.
+          collected=true
+          scriv collect --version "$TAG" --no-add || {
+            status=$?
+            if [ "$status" -eq 2 ]; then
+              collected=false
+            else
+              exit "$status"
+            fi
+          }
+
+          # Belt and braces: if the working tree is clean there is no note,
+          # whatever scriv's exit code said.
+          if [ -z "$(git status --porcelain -- docs/release-notes changelog.d)" ]; then
+            collected=false
+          fi
+
+          echo "collected=$collected" >> "$GITHUB_OUTPUT"
+          echo "series=${TAG%.*}" >> "$GITHUB_OUTPUT"
+          echo "Collected notes for $TAG: $collected"
+
+      - name: Open a pull request with the collected notes
+        if: steps.collect.outputs.collected == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          base: main
+          branch: release-notes/${{ github.ref_name }}
+          # the '[Bot] docs: ' prefix is whitelisted in
+          # .github/pr-title-checker-config.json
+          title: "[Bot] docs: release notes for ${{ github.ref_name }}"
+          commit-message: "docs: release notes for ${{ github.ref_name }}"
+          labels: documentation
+          body: |
+            Assembled by `scriv` from the release-note fragments present at
+            `${{ github.ref_name }}`, which has already been tagged.
+
+            Merging this publishes the
+            [${{ github.ref_name }} upgrade notes](https://rackerlabs.github.io/understack/release-notes/${{ steps.collect.outputs.series }}/#changelog-${{ github.ref_name }})
+            to the docs site. The link in the
+            [release body](https://github.com/rackerlabs/understack/releases/tag/${{ github.ref_name }})
+            stays broken until then, so merge promptly.
+
+            Review the wording, not the mechanics — if a note reads badly, fix
+            it here rather than reverting.
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          generate_release_notes: true
+          # only link upgrade notes that exist
+          body: ${{ steps.collect.outputs.collected == 'true' && format('**Upgrading?** See the [{0} upgrade notes](https://rackerlabs.github.io/understack/release-notes/{1}/#changelog-{0}).', github.ref_name, steps.collect.outputs.series) || '' }}

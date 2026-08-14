@@ -8,6 +8,7 @@
     "github>rackerlabs/understack//.github/renovate/matchOpenStackHelm"
   ],
   "semanticCommits": "enabled",
+  "labels": ["dependencies"],
   "packageRules": [
     {
       "matchManagers": [

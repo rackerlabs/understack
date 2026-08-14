@@ -1,0 +1,30 @@
+# Path-derived labels, used by .github/release.yml to keep changes that are
+# released on their own tag out of the platform release notes.
+#
+# `all-globs-to-all-files` means EVERY changed file has to match, so a pull
+# request that touches go/understackctl/ *and* charts/ is not labelled and still
+# appears in the platform notes. That is deliberate: most pull requests in this
+# repository span several top-level directories, and a label here removes a
+# change from the release notes entirely.
+#
+# Each subtree needs its own `changed-files` block. Putting all the globs into
+# one `all-globs-to-all-files` would require every glob to match every file,
+# which can never be true.
+"skip-changelog":
+  - any:
+      # CLI utilities and operators, tagged understackctl/vX.Y.Z and friends
+      - changed-files:
+          - all-globs-to-all-files: ["go/understackctl/**"]
+      - changed-files:
+          - all-globs-to-all-files: ["go/nautobotop/**"]
+      - changed-files:
+          - all-globs-to-all-files: ["go/dexop/**"]
+      - changed-files:
+          - all-globs-to-all-files: ["go/ironic-hardware-exporter/**"]
+      - changed-files:
+          - all-globs-to-all-files: ["python/kubectl-us-net/**"]
+      # images built and tagged on their own, not on the platform v* tag
+      - changed-files:
+          - all-globs-to-all-files: ["containers/ironic-ipxe/**"]
+      - changed-files:
+          - all-globs-to-all-files: ["ironic-images/**"]
