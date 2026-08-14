@@ -85,7 +85,9 @@ spec:
                 maxLength: 255
                 pattern: ^[A-Za-z0-9._-]+$
               service_type:
-                description: Neutron service type for the flavor.
+                description: >-
+                  Neutron service type for the flavor. For router flavors this
+                  is always L3_ROUTER_NAT (plugin_constants.L3 in neutron-lib).
                 type: string
                 enum:
                 - L3_ROUTER_NAT
