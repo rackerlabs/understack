@@ -7,6 +7,7 @@ from rich import print
 from rich.console import Console
 from rich.table import Table
 
+from diff_nautobot_understack.device.main import ironic_nodes_diff_from_nautobot_devices
 from diff_nautobot_understack.network.main import (
     openstack_network_diff_from_ucvni_network,
 )
@@ -17,6 +18,9 @@ from diff_nautobot_understack.project.main import (
     openstack_project_diff_from_nautobot_tenant,
 )
 from diff_nautobot_understack.settings import app_settings as settings
+from diff_nautobot_understack.subnet.main import (
+    openstack_subnets_diff_from_nautobot_prefixes,
+)
 
 required_env_vars = ["NAUTOBOT_TOKEN", "NAUTOBOT_URL", "OS_CLOUD"]
 
@@ -29,6 +33,8 @@ app = typer.Typer(
 diff_outputs = {
     "project": {"title": "Project Diff", "id_column_name": "Project ID"},
     "network": {"title": "Network Diff", "id_column_name": "Network ID"},
+    "subnet": {"title": "Subnet Diff", "id_column_name": "Subnet ID"},
+    "device": {"title": "Device Diff", "id_column_name": "Device ID"},
 }
 
 
@@ -106,6 +112,32 @@ def network(
     settings.debug = debug
     diff_result = openstack_network_diff_from_ucvni_network()
     display_output(diff_result, "network", output_format)
+
+
+@app.command()
+def subnets(
+    debug: bool = typer.Option(False, "--debug", "-v", help="Enable debug mode"),
+    output_format: str = typer.Option(
+        "json", "--format", help="Available formats: json, table, human"
+    ),
+):
+    """OpenStack subnets ⟹ Nautobot prefixes"""
+    settings.debug = debug
+    diff_result = openstack_subnets_diff_from_nautobot_prefixes()
+    display_output(diff_result, "subnet", output_format)
+
+
+@app.command()
+def devices(
+    debug: bool = typer.Option(False, "--debug", "-v", help="Enable debug mode"),
+    output_format: str = typer.Option(
+        "json", "--format", help="Available formats: json, table, human"
+    ),
+):
+    """Ironic nodes ⟹ Nautobot devices"""
+    settings.debug = debug
+    diff_result = ironic_nodes_diff_from_nautobot_devices()
+    display_output(diff_result, "device", output_format)
 
 
 def check_env_vars(required_vars):
