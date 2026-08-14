@@ -1,0 +1,47 @@
+{{- if eq (include "understack.isEnabled" (list $.Values.site "openstack_sync_operator")) "true" }}
+{{- $app := $.Values.site.openstack_sync_operator }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ printf "%s-%s" $.Release.Name "openstack-sync-operator" }}
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true,IncludeMutationWebhook=true
+    {{- with $app.wave }}
+    argocd.argoproj.io/sync-wave: {{ quote . }}
+    {{- end }}
+{{- include "understack.appLabelsBlock" $ | nindent 2 }}
+spec:
+  destination:
+    namespace: {{ $.Values.site.openstack.namespace }}
+    server: {{ $.Values.cluster_server }}
+  project: understack
+  sources:
+  - path: components/openstack-sync-operator
+    ref: understack
+    repoURL: {{ include "understack.understack_url" $ }}
+    targetRevision: {{ include "understack.understack_ref" $ }}
+    helm:
+      ignoreMissingValueFiles: false
+      releaseName: openstack-sync-operator
+      valueFiles:
+      - $understack/components/openstack-sync-operator/values.yaml
+      - $deploy/{{ include "understack.deploy_path" $ }}/openstack-sync-operator/values.yaml
+  - ref: deploy
+    repoURL: {{ include "understack.deploy_url" $ }}
+    targetRevision: {{ include "understack.deploy_ref" $ }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      annotations:
+        argocd.argoproj.io/sync-options: Delete=false
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    - RespectIgnoreDifferences=true
+    - ApplyOutOfSyncOnly=true
+{{- end }}

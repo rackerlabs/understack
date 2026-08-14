@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/openstack-sync/neutron-router-flavor.schema.json
+---
+apiVersion: neutron.understack.rackspace.net/v1alpha1
+kind: NeutronRouterFlavor
+metadata:
+  name: dynamic-vrf
+  labels:
+    app.kubernetes.io/name: openstack-sync-plugins
+    app.kubernetes.io/component: neutron-router-flavors
+    app.kubernetes.io/part-of: openstack-sync
+spec:
+  name: dynamic_vrf
+  service_type: L3_ROUTER_NAT
+  description: Dynamic Fabric VRF (auto VNI)
+  driver: neutron_understack.l3_router.vrf.Vrf
+  profile_description: Dynamic Fabric VRF (auto VNI)
+  meta_info:
+    vni_alloc: auto

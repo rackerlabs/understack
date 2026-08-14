@@ -305,6 +305,24 @@ site:
     # @default -- false
     enabled: false
 
+  # -- OpenStack sync shell-operator
+  openstack_sync_operator:
+    # -- Enable/disable deploying OpenStack sync shell-operator
+    # @default -- false
+    enabled: false
+    # -- Sync wave for deployment ordering
+    # @default -- 4
+    wave: 4
+
+  # -- OpenStack sync custom resources
+  openstack_sync_plugins:
+    # -- Enable/disable deploying OpenStack sync custom resources
+    # @default -- false
+    enabled: false
+    # -- Sync wave for deployment ordering
+    # @default -- 5
+    wave: 5
+
   # -- RabbitMQ Cluster Operator (site deployment)
   rabbitmq_system:
     # -- Enable/disable deploying RabbitMQ operator

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://rackerlabs.github.io/understack/schema/openstack-sync/neutron-router-flavor.schema.json",
+  "title": "OpenStack Sync Neutron Router Flavor Spec",
+  "description": "Schema for Neutron router flavor spec data consumed by openstack-sync. When attached to a NeutronRouterFlavor custom resource, only spec is constrained.",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/neutronRouterFlavorSpec"
+    },
+    {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "spec": {
+          "$ref": "#/definitions/neutronRouterFlavorSpec"
+        }
+      },
+      "required": [
+        "spec"
+      ]
+    }
+  ],
+  "definitions": {
+    "neutronRouterFlavorSpec": {
+      "description": "Neutron router flavor data stored under spec.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Neutron router flavor name.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "service_type": {
+          "description": "Neutron service type for the flavor.",
+          "type": "string",
+          "enum": [
+            "L3_ROUTER_NAT"
+          ]
+        },
+        "service_provider": {
+          "description": "Optional Neutron service provider name used when generating Neutron configuration.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "description": {
+          "description": "Description stored on the Neutron router flavor.",
+          "type": "string",
+          "maxLength": 1024
+        },
+        "driver": {
+          "description": "Service profile driver class.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+$"
+        },
+        "profile_description": {
+          "description": "Description stored on the Neutron service profile.",
+          "type": "string",
+          "maxLength": 1024
+        },
+        "profile_id": {
+          "description": "Existing Neutron service profile ID to attach instead of creating or discovering one.",
+          "type": "string",
+          "format": "uuid"
+        },
+        "meta_info": {
+          "$ref": "#/definitions/metaInfo"
+        }
+      },
+      "required": [
+        "name",
+        "driver"
+      ]
+    },
+    "metaInfo": {
+      "description": "Service profile metainfo payload.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "resource_class": {
+          "description": "Resource class consumed by a physical router provider.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "vni_alloc": {
+          "description": "VNI allocation mode for VRF router providers.",
+          "type": "string",
+          "enum": [
+            "off",
+            "on",
+            "auto"
+          ]
+        }
+      }
+    }
+  }
+}
