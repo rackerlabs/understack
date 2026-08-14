@@ -26,6 +26,24 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "cloudCredentialsRef": {
+          "description": "Reference to a Kubernetes Secret containing the OpenStack clouds.yaml.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["secretName", "cloudName"],
+          "properties": {
+            "secretName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            },
+            "cloudName": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
         "name": {
           "description": "Neutron router flavor name.",
           "type": "string",
@@ -52,6 +70,31 @@
           "type": "string",
           "maxLength": 1024
         },
+        "is_enabled": {
+          "description": "Whether the Neutron router flavor is enabled.",
+          "type": "boolean",
+          "default": true
+        },
+        "service_profiles": {
+          "description": "Service profiles to associate with this flavor. The operator find-or-creates each profile by (driver, meta_info) and reconciles the flavor's set of bound profiles to match.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/serviceProfileSpec"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "service_profiles"
+      ]
+    },
+    "serviceProfileSpec": {
+      "description": "A single service profile entry.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["driver"],
+      "properties": {
         "driver": {
           "description": "Service profile driver class.",
           "type": "string",
@@ -59,24 +102,20 @@
           "maxLength": 1024,
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)+$"
         },
-        "profile_description": {
+        "description": {
           "description": "Description stored on the Neutron service profile.",
           "type": "string",
           "maxLength": 1024
         },
-        "profile_id": {
-          "description": "Existing Neutron service profile ID to attach instead of creating or discovering one.",
-          "type": "string",
-          "format": "uuid"
+        "is_enabled": {
+          "description": "Whether the service profile is enabled in Neutron.",
+          "type": "boolean",
+          "default": true
         },
         "meta_info": {
           "$ref": "#/definitions/metaInfo"
         }
-      },
-      "required": [
-        "name",
-        "driver"
-      ]
+      }
     },
     "metaInfo": {
       "description": "Service profile metainfo payload.",

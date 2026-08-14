@@ -7,19 +7,19 @@ Read hook CRD metadata used by RBAC and shell-operator environment wiring.
 {{- $hook := index . 2 -}}
 {{- $crdPath := get $hook "crd" -}}
 {{- if not $crdPath -}}
-{{- fail (printf "hooks.%s.crd is required for CRD metadata" $hookName) -}}
+{{- fail (printf "pluginData.%s.hook.crd is required for CRD metadata" $hookName) -}}
 {{- end -}}
-{{- $crdYaml := required (printf "hooks.%s.crd file %s is empty or missing" $hookName $crdPath) ($root.Files.Get $crdPath) -}}
+{{- $crdYaml := required (printf "pluginData.%s.hook.crd file %s is empty or missing" $hookName $crdPath) ($root.Files.Get $crdPath) -}}
 {{- $crd := fromYaml $crdYaml -}}
 {{- if ne $crd.kind "CustomResourceDefinition" -}}
-{{- fail (printf "hooks.%s.crd must point to a CustomResourceDefinition" $hookName) -}}
+{{- fail (printf "pluginData.%s.hook.crd must point to a CustomResourceDefinition" $hookName) -}}
 {{- end -}}
-{{- $group := required (printf "hooks.%s.crd spec.group is required" $hookName) $crd.spec.group -}}
-{{- $kind := required (printf "hooks.%s.crd spec.names.kind is required" $hookName) $crd.spec.names.kind -}}
-{{- $plural := required (printf "hooks.%s.crd spec.names.plural is required" $hookName) $crd.spec.names.plural -}}
+{{- $group := required (printf "pluginData.%s.hook.crd spec.group is required" $hookName) $crd.spec.group -}}
+{{- $kind := required (printf "pluginData.%s.hook.crd spec.names.kind is required" $hookName) $crd.spec.names.kind -}}
+{{- $plural := required (printf "pluginData.%s.hook.crd spec.names.plural is required" $hookName) $crd.spec.names.plural -}}
 {{- $storageVersion := "" -}}
 {{- $hasStatus := false -}}
-{{- range $version := required (printf "hooks.%s.crd spec.versions is required" $hookName) $crd.spec.versions }}
+{{- range $version := required (printf "pluginData.%s.hook.crd spec.versions is required" $hookName) $crd.spec.versions }}
 {{- if $version.storage -}}
 {{- $storageVersion = $version.name -}}
 {{- end -}}
@@ -28,7 +28,7 @@ Read hook CRD metadata used by RBAC and shell-operator environment wiring.
 {{- end -}}
 {{- end -}}
 {{- if not $storageVersion -}}
-{{- fail (printf "hooks.%s.crd must define a storage version" $hookName) -}}
+{{- fail (printf "pluginData.%s.hook.crd must define a storage version" $hookName) -}}
 {{- end -}}
 {{- dict
   "apiVersion" (printf "%s/%s" $group $storageVersion)

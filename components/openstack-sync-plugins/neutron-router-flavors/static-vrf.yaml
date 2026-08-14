@@ -15,7 +15,8 @@ spec:
   name: static_vrf
   service_type: L3_ROUTER_NAT
   description: Static Fabric VRF (admin supplied VNI)
-  driver: neutron_understack.l3_router.vrf.Vrf
-  profile_description: Static Fabric VRF (admin supplied VNI)
-  meta_info:
-    vni_alloc: "on"
+  service_profiles:
+    - driver: neutron_understack.l3_router.vrf.Vrf
+      description: Static Fabric VRF (admin supplied VNI)
+      meta_info:
+        vni_alloc: "on"
