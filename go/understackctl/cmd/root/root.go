@@ -43,6 +43,11 @@ func init() {
 	rootCmd.AddCommand(other.NewCmdOtherSecrets())
 }
 
+// SetVersion sets the version reported by `understackctl --version`.
+func SetVersion(version, commit string) {
+	rootCmd.Version = fmt.Sprintf("%s (%s)", version, commit)
+}
+
 // Execute will execute the root command
 func Execute() error {
 	return rootCmd.Execute()
