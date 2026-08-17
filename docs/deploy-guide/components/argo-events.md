@@ -46,7 +46,6 @@ Required or commonly required items:
 - `core-creds` Secret: Provide `username` and `password` keys for any shared automation account used by event-driven jobs.
 - `bmc-master` Secret: Provide a `key` value when hardware-management workflows need a master credential.
 - `bmc-legacy-passwords` Secret: Provide a `passwords` key when workflows still need a flat password bundle.
-- `undersync-token` Secret: Provide a `token` key if workflows call the undersync API.
 - `deploy-repo-auth` Secret: Provide `ssh-privatekey` and `known_hosts` so workflows can clone or update deployment content.
 - `dockerconfigjson-github-com` Secret: Provide `.dockerconfigjson` when workflow images are pulled from a private registry.
 
