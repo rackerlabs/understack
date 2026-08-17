@@ -1,0 +1,218 @@
+# IP and Resource Sync (ipsync) between Nautobot and Undercloud Sites
+
+```
+---
+title: IP and Resource Sync (ipsync) between Nautobot and Undercloud Sites
+authors:
+  - "@geetikabatra"
+reviewers:
+  - "@abhimanyusharma"
+  - "@syedhaseebahmed"
+
+creation-date: 2026-07-20
+last-updated: 2026-07-20
+status: provisional
+---
+```
+
+## Table of Contents
+
+- [IP and Resource Sync (ipsync) between Nautobot and Undercloud Sites](#ip-and-resource-sync-ipsync-between-nautobot-and-undercloud-sites)
+  * [Table of Contents](#table-of-contents)
+  * [Glossary](#glossary)
+  * [Summary](#summary)
+  * [Motivation](#motivation)
+    + [Goals](#goals)
+    + [Non-Goals](#non-goals)
+  * [Proposal](#proposal)
+    + [User Stories](#user-stories)
+      - [Story 1 - New device added at a site](#story-1---new-device-added-at-a-site)
+      - [Story 2 - Site state drifts from Nautobot](#story-2---site-state-drifts-from-nautobot)
+      - [Story 3 - Adding a new resource type (VLANs, beyond IPs)](#story-3---adding-a-new-resource-type-vlans-beyond-ips)
+    + [Requirements](#requirements)
+      - [Functional Requirements](#functional-requirements)
+      - [Non-Functional Requirements](#non-functional-requirements)
+    + [Implementation Details/Notes/Constraints](#implementation-detailsnotesconstraints)
+      - [Current State](#current-state)
+      - [Proposed Architecture](#proposed-architecture)
+      - [Sync Direction and Ownership Model](#sync-direction-and-ownership-model)
+      - [Site-Side Execution](#site-side-execution)
+      - [Conflict Handling](#conflict-handling)
+      - [Nautobot Operator Changes](#nautobot-operator-changes)
+      - [Open Question: Site Reachability](#open-question-site-reachability)
+  * [Alternatives Considered](#alternatives-considered)
+  * [Additional Details](#additional-details)
+    + [Test Plan](#test-plan)
+      - [Subtasks](#subtasks)
+    + [Graduation Criteria](#graduation-criteria)
+  * [Implementation History](#implementation-history)
+
+## Glossary
+
+- **Nautobot** - the system that stores the "true" record of physical hardware info: IP addresses, VLANs, devices, etc.
+- **Nautobot Operator** - an operator we already have. It reads data from Nautobot and creates matching CRs in our management cluster.
+- **Site** - a physical undercloud location, with its own hardware and its own OpenStack setup (Neutron, Ironic).
+- **ipsync** - the overall sync process (existing operator + the changes proposed here) that keeps Nautobot and each site in agreement.
+- **Global/Management Cluster** - the cluster where the Nautobot Operator runs.
+
+## Summary
+
+Nautobot holds the master record of IPs, VLANs, and other hardware info for all our undercloud sites. Right now, the Nautobot Operator only reads from Nautobot and copies that into the management cluster — it's one-way. This proposal is about closing the loop: getting that data out to each site, and getting real status back from each site into Nautobot, so both stay in agreement over time. We are not using Cluster API for this — this builds directly on the Nautobot Operator we already have, and sites apply changes using their own OpenStack APIs (Neutron/Ironic).
+
+## Motivation
+
+Today, keeping a site's actual IP/VLAN setup matching Nautobot is mostly manual. As we add more sites and more types of resources, this gets harder to keep track of and easy to get wrong. Right now there's no clear way to:
+
+1. Push new or changed IP/VLAN data from Nautobot out to the site that needs it.
+2. Report back what's actually configured at a site, so Nautobot reflects reality, not just intent.
+3. Notice when Nautobot and a site disagree, without one side just silently overwriting the other.
+
+### Goals
+
+1. Push desired IP/VLAN/resource state from Nautobot out to each site.
+2. Send actual state from each site back to Nautobot.
+3. Flag disagreements between desired and actual state instead of silently overwriting either side.
+4. Keep the design generic enough to add more resource types later, not just IPs/VLANs.
+5. Build this by extending the Nautobot Operator we already have, not a new separate system.
+
+### Non-Goals
+
+1. We are not using Cluster API, its IPAM provider pattern, or the claim/pool contract for this. That was only used earlier as a way to explain the idea — it's not part of the actual build.
+2. This proposal doesn't decide exactly how every conflict gets auto-resolved. It focuses on detecting and surfacing conflicts; resolution rules can be added later.
+3. This proposal doesn't cover bringing a brand-new site online — only keeping already-onboarded sites in sync.
+
+## Proposal
+
+### User Stories
+
+#### Story 1 - New device added at a site
+
+Someone adds a new device and assigns it an IP/VLAN in Nautobot. Today, someone has to go apply that manually at the site. With ipsync, that change should flow from Nautobot to the site's CR, get picked up automatically, and get applied at the site through Neutron/Ironic — no manual step.
+
+#### Story 2 - Site state drifts from Nautobot
+
+Someone changes something directly at a site (say, reconfigures a port) without touching Nautobot. ipsync should notice the mismatch, mark it as a conflict instead of overwriting either side, and surface it so someone can decide: update Nautobot to match the site, or push the site back to match Nautobot.
+
+#### Story 3 - Adding a new resource type (VLANs, beyond IPs)
+
+We want to sync VLANs too, using the same setup we build for IPs. The contract between the operator and the site shouldn't care what resource type it's syncing — adding VLANs should just mean adding a new CRD/schema following the same pattern, not a new architecture.
+
+### Requirements
+
+#### Functional Requirements
+
+- FR1: The Nautobot Operator keeps doing what it does today — reading from Nautobot into CRs. That doesn't change.
+- FR2: The Nautobot Operator needs a way to write back to Nautobot when a site reports new observed state.
+- FR3: CRs managed by the operator need to separate desired state (`spec`, comes from Nautobot) from observed state (`status`, comes from the site).
+- FR4: The system should support IPs and VLANs to start, built so more resource types can be added later without rework.
+- FR5: When `spec` and `status` disagree, the system should flag it as a conflict, not silently overwrite either side.
+- FR6: Sites should apply changes using their own OpenStack APIs (Neutron for network/VLAN stuff, Ironic for hardware) rather than shelling out to CLI commands.
+
+#### Non-Functional Requirements
+
+- NFR1: Unit tests for the Nautobot writeback path.
+- NFR2: Unit tests for conflict detection, covering both IPs and VLANs.
+- NFR3: Writeback needs to be idempotent — re-sending the same observed state shouldn't cause repeat Nautobot writes or extra webhook/change-log noise.
+- NFR4: The design should work whether sites can reach the management cluster directly or not (see [Open Question: Site Reachability](#open-question-site-reachability)).
+
+### Implementation Details/Notes/Constraints
+
+#### Current State
+
+The Nautobot Operator today only goes one way: it reads from Nautobot's API and writes matching CRs in the management cluster. There's no site-side piece yet, no writeback to Nautobot, and no conflict detection.
+
+#### Proposed Architecture
+
+Three pieces, two of which need new work:
+
+1. **Nautobot Operator (extended)** — the one we have today, plus a writeback path and conflict detection.
+2. **Site-side execution** — applies desired state at each site via Neutron/Ironic, and reads back actual state the same way. Whether this runs as a standing process or a scheduled job depends on how reachable the site is (see below).
+3. **Nautobot** — stays as-is, still the source of truth for desired/allocated state.
+
+We looked at Cluster API's IPAM provider pattern (`IPAddressClaim`/`IPAddress`) as a way to reason through this design, but it's not part of what we're building — there's no machine lifecycle to manage here, so pulling in CAPI would just add complexity without a real payoff.
+
+#### Sync Direction and Ownership Model
+
+Instead of syncing a whole object both ways, we split ownership by field:
+
+- `spec.*` — desired state, owned by Nautobot, flows Nautobot → site.
+- `status.observedState.*` — what's actually at the site (configured IP, tagged VLAN, port status, last-seen time), flows site → Nautobot.
+- `status.conditions` — sync health, e.g. `InSync`, `Conflict`, `SiteUnreachable`.
+
+This way, Nautobot and the site are never both trying to write the same field, which is what causes fights and sync loops. It's the same spec/status split Kubernetes itself uses.
+
+#### Site-Side Execution
+
+Sites apply desired state and read back actual state directly through their own OpenStack APIs — Neutron for network/VLAN resources, Ironic for hardware. We're calling the APIs directly instead of wrapping the OpenStack CLI, since that avoids managing subprocesses and gives cleaner, structured responses to reconcile against.
+
+#### Conflict Handling
+
+When `status.observedState` doesn't match `spec`, we don't just pick a winner automatically:
+
+1. Mark `status.conditions` with `Conflict=true` for that field.
+2. Skip the Nautobot writeback for that field until it's resolved.
+3. How conflicts eventually get resolved — field-level ownership, last-write-wins, or manual review — is left open for now. This proposal only commits to catching and surfacing conflicts, not resolving them automatically.
+
+#### Nautobot Operator Changes
+
+Concretely, here's what needs to be added to the operator:
+
+1. CRD changes to split existing structures into `spec` (desired) and `status.observedState` / `status.conditions` (observed + sync health).
+2. A second reconcile path that triggers on `status` updates and writes back to Nautobot (PATCH/PUT).
+3. Idempotency handling so writing back unchanged state doesn't spam Nautobot.
+4. Conflict detection comparing `spec` against `status.observedState` field by field.
+5. A way for the site to read desired state and send back observed state — the exact shape depends on the open question below.
+
+#### Open Question: Site Reachability
+
+This isn't settled yet, and it decides how the site talks to the operator:
+
+- **If sites can reach the management cluster's API directly:** no new plumbing needed. The site just runs a scoped Kubernetes client (limited to its own site's CRs) reading `spec` and writing `status`.
+- **If sites are isolated and can't reach the management cluster directly** (which seems likely, given these are undercloud sites): the operator needs some new way to hand off desired state and receive observed state — a queue, a webhook, or a polling endpoint.
+
+We need to confirm this with the team before locking in the site-facing interface.
+
+## Alternatives Considered
+
+- **Cluster API's IPAM provider pattern:** useful to reason through the design, but not adopted — no machine lifecycle here, and it would add machinery we don't need.
+- **Site agent wrapping OpenStack CLI commands:** considered, but calling the OpenStack APIs (Neutron/Ironic) directly is cleaner for a controller — better error handling, no subprocess management.
+
+## Additional Details
+
+### Test Plan
+
+- Unit tests for the Nautobot writeback path (only status changes, spec untouched).
+- Unit tests confirming repeated writebacks with unchanged state don't cause duplicate writes.
+- Unit tests for conflict detection across IPs and VLANs.
+- Integration tests against a test Nautobot instance, covering both the existing read path and the new write path.
+- End-to-end test: a site applies desired state, reports actual state back, including one deliberate conflict case.
+
+#### Subtasks
+
+- Confirm with Abhimanyu/Haseeb whether sites can reach the management cluster directly (blocks the interface design).
+- Extend the Nautobot Operator's CRDs with `status.observedState` and `status.conditions`.
+- Build the Nautobot writeback path.
+- Build conflict detection.
+- Build site-side execution against Neutron/Ironic, starting with IPs.
+- Extend to VLANs once IPs are working end-to-end.
+
+### Graduation Criteria
+
+**Alpha**
+
+- spec/status split done for IPs.
+- Nautobot writeback working and idempotent.
+- Conflict detection working and visible via conditions.
+
+**Beta**
+
+- VLANs supported using the same setup.
+- Site-side execution tested against at least one real site.
+
+**Stable**
+
+- Two full sync cycles in production across multiple sites, no unresolved sync loops or data loss.
+
+## Implementation History
+
+- 2026-07-20: Initial proposal drafted from design discussion with Abhimanyu Sharma and Syed Haseeb Ahmed.
