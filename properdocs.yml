@@ -139,6 +139,9 @@ nav:
     - design-guide/neutron-understack-config-sample.md
     - design-guide/argo-workflows.md
     - design-guide/argo-events.md
+  - 'Proposals':
+    - proposals/index.md
+    - proposals/ipsync.md
   - 'Deployment Guide':
     - deploy-guide/welcome.md
     - deploy-guide/requirements.md
