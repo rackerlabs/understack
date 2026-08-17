@@ -159,10 +159,11 @@ initContainers:
     exit "${missing}"
 ```
 
-For Neutron router flavors, the enabled hook watches `NeutronRouterFlavor` CRs,
-runs on the configured schedule, reads a full snapshot of current CRs, reconciles
-Neutron flavors and service profiles through `openstacksdk`, and patches CR
-status when the CRD exposes the status subresource.
+For Neutron router flavors, the enabled hook registers a `kubernetes` binding
+that watches `NeutronRouterFlavor` CRs and a `schedule` binding for periodic
+sync. Reconciliation logic (reading CRs, calling `openstacksdk`, and patching CR
+status) is not yet implemented; the hook currently exits 0 without taking action
+on events.
 
 When no hook is enabled, the operator can still start. In that state the Role
 has no custom-resource permissions and no OpenStack sync work is expected.
