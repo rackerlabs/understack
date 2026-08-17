@@ -96,8 +96,6 @@ spec:
           timeoutSeconds: 5
           failureThreshold: 3
         env:
-        - name: OS_CLOUD
-          value: {{ .Values.openstack.cloud | quote }}
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
@@ -106,22 +104,10 @@ spec:
         - name: {{ $envName }}
           value: {{ get $hookEnv $envName | quote }}
         {{- end }}
-        volumeMounts:
-        - name: openstack-clouds
-          mountPath: /etc/openstack/clouds.yaml
-          subPath: clouds.yaml
-          readOnly: true
         {{- with .Values.resources }}
         resources:
           {{- toYaml . | nindent 12 }}
         {{- end }}
-      volumes:
-      - name: openstack-clouds
-        secret:
-          secretName: {{ .Values.openstack.cloudsSecretName }}
-          items:
-          - key: {{ .Values.openstack.cloudsSecretKey }}
-            path: clouds.yaml
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

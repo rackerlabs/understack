@@ -51,7 +51,33 @@ spec:
             required:
             - name
             - driver
+            - cloudCredentialsRef
             properties:
+              cloudCredentialsRef:
+                description: >-
+                  cloudCredentialsRef points to a Kubernetes Secret containing
+                  an OpenStack clouds.yaml file. The operator reads this secret
+                  directly at reconcile time — no volume mount is required.
+                type: object
+                required:
+                - secretName
+                - cloudName
+                properties:
+                  secretName:
+                    description: >-
+                      Name of a Secret in the same namespace as this resource.
+                      The Secret must contain a key named clouds.yaml holding
+                      an OpenStack clouds.yaml file.
+                    type: string
+                    minLength: 1
+                    maxLength: 253
+                  cloudName:
+                    description: >-
+                      Name of the cloud entry within the clouds.yaml to
+                      authenticate as.
+                    type: string
+                    minLength: 1
+                    maxLength: 256
               name:
                 description: Neutron router flavor name.
                 type: string

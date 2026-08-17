@@ -9,6 +9,9 @@ metadata:
     app.kubernetes.io/component: neutron-router-flavors
     app.kubernetes.io/part-of: openstack-sync
 spec:
+  cloudCredentialsRef:
+    secretName: infrasetup
+    cloudName: understack
   name: dynamic_vrf
   service_type: L3_ROUTER_NAT
   description: Dynamic Fabric VRF (auto VNI)
