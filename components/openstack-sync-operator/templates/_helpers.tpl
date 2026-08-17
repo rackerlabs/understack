@@ -74,15 +74,21 @@ Normalize built-in plugin hooks and direct hook definitions.
 {{- define "openstack-sync-operator.configuredHooks" -}}
 {{- $hooks := dict -}}
 {{- $enabledPlugins := default dict .Values.plugins -}}
-{{- range $pluginName, $plugin := default dict .Values.pluginData -}}
+{{- $pluginData := default dict .Values.pluginData -}}
+{{- range $pluginName, $_ := $enabledPlugins -}}
+{{- if not (hasKey $pluginData $pluginName) -}}
+{{- fail (printf "plugins.%s has no matching pluginData.%s entry" $pluginName $pluginName) -}}
+{{- end -}}
+{{- end -}}
+{{- range $pluginName, $plugin := $pluginData -}}
 {{- $hook := default dict $plugin.hook -}}
 {{- if gt (len $hook) 0 -}}
 {{- $hookValues := dict -}}
 {{- range $key, $value := $hook -}}
 {{- $_ := set $hookValues $key $value -}}
 {{- end -}}
-{{- $_ := set $hookValues "enabled" (eq (get $enabledPlugins $pluginName) true) -}}
-{{- $_ := set $hooks $pluginName $hookValues -}}
+{{- $_1 := set $hookValues "enabled" (eq (get $enabledPlugins $pluginName) true) -}}
+{{- $_2 := set $hooks $pluginName $hookValues -}}
 {{- end -}}
 {{- end -}}
 {{- range $hookName, $hook := default dict .Values.hooks -}}

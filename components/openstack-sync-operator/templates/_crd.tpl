@@ -5,7 +5,10 @@ Read hook CRD metadata used by RBAC and shell-operator environment wiring.
 {{- $root := index . 0 -}}
 {{- $hookName := index . 1 -}}
 {{- $hook := index . 2 -}}
-{{- $crdPath := required (printf "hooks.%s.crd is required when hook is enabled" $hookName) $hook.crd -}}
+{{- $crdPath := get $hook "crd" -}}
+{{- if not $crdPath -}}
+{{- fail (printf "hooks.%s.crd is required for CRD metadata" $hookName) -}}
+{{- end -}}
 {{- $crdYaml := required (printf "hooks.%s.crd file %s is empty or missing" $hookName $crdPath) ($root.Files.Get $crdPath) -}}
 {{- $crd := fromYaml $crdYaml -}}
 {{- if ne $crd.kind "CustomResourceDefinition" -}}
