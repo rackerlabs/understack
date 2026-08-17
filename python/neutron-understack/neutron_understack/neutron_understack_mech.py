@@ -296,10 +296,9 @@ class UnderstackDriver(MechanismDriver):
         segment_id = context.original_top_bound_segment["id"]
         original_binding = context.original[portbindings.PROFILE]
 
-        if not utils.ports_bound_to_segment(
-            segment_id
-        ) and utils.is_dynamic_network_segment(segment_id):
-            context.release_dynamic_segment(segment_id)
+        segment = utils.network_segment_by_id(segment_id)
+        if segment:
+            utils.release_segment_if_unused(segment)
 
         networks_to_remove = {segment_id}
 
@@ -323,9 +322,6 @@ class UnderstackDriver(MechanismDriver):
             self._delete_port_baremetal(context)
 
     def _delete_port_baremetal(self, context: PortContext) -> None:
-        # Only clean up provisioning ports. Ports with tenant networks are cleaned
-        # up in _tenant_network_port_cleanup
-
         port = context.current
 
         vlan_group_name = port[portbindings.PROFILE].get("physical_network")
@@ -337,10 +333,27 @@ class UnderstackDriver(MechanismDriver):
                 local_link_info
             )
 
-        if vlan_group_name and is_provisioning_network(port["network_id"]):
+        if not vlan_group_name:
+            return
+
+        if is_provisioning_network(port["network_id"]):
             # Signals end of the provisioning / cleaning cycle, so we
             # put the port back to its normal tenant mode:
             self.undersync.sync(vlan_group_name)
+            return
+
+        # A tenant network port normally has its dynamic VLAN segment released
+        # by _tenant_network_port_cleanup, but that only runs on the
+        # update_port_postcommit bound->unbound transition. A port deleted
+        # directly (still bound) skips that transition entirely, so without
+        # this the segment -- and its VLAN -- leaks forever.
+        segment = utils.network_segment_by_physnet(port["network_id"], vlan_group_name)
+        if segment:
+            utils.release_segment_if_unused(segment)
+
+        # Reconcile the switch so the removed port's VLAN config is torn down,
+        # matching the unbind path in _update_port_baremetal.
+        self.undersync.sync(vlan_group_name)
 
     def bind_port(self, context: PortContext) -> None:
         """Bind the VXLAN network segment and allocate dynamic VLAN segments.

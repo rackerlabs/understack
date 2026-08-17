@@ -150,6 +150,10 @@ class TestUpdatePortPostCommit:
         understack_driver.undersync.sync.assert_not_called()
 
 
+MECH_UTILS = "neutron_understack.neutron_understack_mech.utils"
+
+
+@pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
 class TestDeletePortPostCommit:
     def test_skips_non_baremetal_port(self, understack_driver, port_context):
         port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_NORMAL
@@ -157,6 +161,79 @@ class TestDeletePortPostCommit:
         understack_driver.delete_port_postcommit(port_context)
 
         understack_driver.undersync.sync.assert_not_called()
+
+    def test_releases_unused_dynamic_segment_on_tenant_network(
+        self, mocker, understack_driver, port_context
+    ):
+        """Deleting a still-bound tenant port must release its dynamic segment.
+
+        This is the only way it gets released: unlike an explicit unbind
+        (update_port_postcommit -> _tenant_network_port_cleanup), a direct
+        delete never goes through that transition.
+        """
+        segment = mocker.Mock(id="segment-a", is_dynamic=True)
+        find_segment = mocker.patch(
+            f"{MECH_UTILS}.network_segment_by_physnet", return_value=segment
+        )
+        mocker.patch(f"{MECH_UTILS}.ports_bound_to_segment", return_value=[])
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+
+        understack_driver.delete_port_postcommit(port_context)
+
+        find_segment.assert_called_once_with(
+            port_context.current["network_id"], "physnet"
+        )
+        release.assert_called_once_with("segment-a")
+        # The switch must be reconciled so the removed port's VLAN is torn down.
+        understack_driver.undersync.sync.assert_called_once_with("physnet")
+
+    def test_keeps_segment_still_bound_to_other_ports(
+        self, mocker, understack_driver, port_context
+    ):
+        segment = mocker.Mock(id="segment-a")
+        mocker.patch(f"{MECH_UTILS}.network_segment_by_physnet", return_value=segment)
+        mocker.patch(
+            f"{MECH_UTILS}.ports_bound_to_segment", return_value=["other-port"]
+        )
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+
+        understack_driver.delete_port_postcommit(port_context)
+
+        release.assert_not_called()
+
+    def test_keeps_non_dynamic_segment(self, mocker, understack_driver, port_context):
+        segment = mocker.Mock(id="segment-a", is_dynamic=False)
+        mocker.patch(f"{MECH_UTILS}.network_segment_by_physnet", return_value=segment)
+        mocker.patch(f"{MECH_UTILS}.ports_bound_to_segment", return_value=[])
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+
+        understack_driver.delete_port_postcommit(port_context)
+
+        release.assert_not_called()
+
+    def test_skips_release_when_no_segment_found(
+        self, mocker, understack_driver, port_context
+    ):
+        mocker.patch(f"{MECH_UTILS}.network_segment_by_physnet", return_value=None)
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+
+        understack_driver.delete_port_postcommit(port_context)
+
+        release.assert_not_called()
+
+    def test_syncs_and_skips_release_on_provisioning_network(
+        self, mocker, understack_driver, port_context
+    ):
+        mocker.patch(
+            "neutron_understack.neutron_understack_mech.is_provisioning_network",
+            return_value=True,
+        )
+        release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
+
+        understack_driver.delete_port_postcommit(port_context)
+
+        understack_driver.undersync.sync.assert_called_once_with("physnet")
+        release.assert_not_called()
 
 
 @pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
