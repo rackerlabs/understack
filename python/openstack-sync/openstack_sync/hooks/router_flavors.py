@@ -6,6 +6,10 @@ from __future__ import annotations
 import json
 import os
 import sys
+from typing import Any
+
+from openstack_sync.utils import get_openstack_connection
+from openstack_sync.utils import pod_namespace  # noqa: F401 — re-exported for tests
 
 TRUTHY_VALUES = {"1", "true", "yes", "on"}
 
@@ -20,6 +24,43 @@ def router_flavor_namespace() -> str | None:
         or os.environ.get("POD_NAMESPACE")
         or None
     )
+
+
+# ---------------------------------------------------------------------------
+# Reconciliation
+# ---------------------------------------------------------------------------
+
+
+def reconcile_router_flavor(event: dict[str, Any]) -> None:
+    """Reconcile a single NeutronRouterFlavor resource against OpenStack.
+
+    Reads ``spec.cloudCredentialsRef`` from the event to determine which
+    Kubernetes Secret and which cloud entry to use.  No operator-level
+    cloud configuration is required — each resource is self-describing.
+    """
+    obj = event["object"]
+    spec = obj.get("spec", {})
+
+    creds_ref = spec.get("cloudCredentialsRef", {})
+    secret_name = creds_ref.get("secretName")
+    cloud_name = creds_ref.get("cloudName")
+
+    if not secret_name or not cloud_name:
+        raise ValueError(
+            f"NeutronRouterFlavor {obj.get('metadata', {}).get('name')!r} "
+            "is missing spec.cloudCredentialsRef.secretName or .cloudName"
+        )
+
+    conn = get_openstack_connection(secret_name, cloud_name)  # noqa: F841
+
+    # Full reconciliation logic (create/update/delete router flavor) will be
+    # wired in here once the connection-per-resource pattern is established.
+    # The connection object is available as `conn` for subsequent API calls.
+
+
+# ---------------------------------------------------------------------------
+# Hook configuration
+# ---------------------------------------------------------------------------
 
 
 def build_hook_config() -> dict[str, object]:
@@ -41,7 +82,7 @@ def build_hook_config() -> dict[str, object]:
         "apiVersion": "neutron.understack.rackspace.net/v1alpha1",
         "kind": "NeutronRouterFlavor",
         "executeHookOnEvent": ["Added", "Modified", "Deleted"],
-        "jqFilter": ".spec",
+        "jqFilter": ".",
         "includeSnapshotsFrom": ["neutron-router-flavors"],
     }
     namespace = router_flavor_namespace()
@@ -68,9 +109,32 @@ def build_hook_config() -> dict[str, object]:
 HOOK_CONFIG = build_hook_config()
 
 
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--config":
         print(json.dumps(build_hook_config(), indent=2))
+        return 0
+
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return 0
+
+    try:
+        binding_contexts = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        print(f"failed to parse binding context: {exc}", file=sys.stderr)
+        return 1
+
+    for context in binding_contexts:
+        binding = context.get("binding", "")
+        if binding == "neutron-router-flavors":
+            for item in context.get("objects", []):
+                reconcile_router_flavor(item)
+
     return 0
 
 

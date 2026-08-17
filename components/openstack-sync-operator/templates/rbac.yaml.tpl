@@ -1,6 +1,7 @@
 {{- if .Values.rbac.create }}
 {{- $clusterWide := eq .Values.rbac.clusterWide true }}
 {{- $rules := list }}
+{{- $rules = append $rules (dict "apiGroups" (list "") "resources" (list "secrets") "verbs" (list "get")) }}
 {{- range $rule := default list .Values.rbac.rules }}
 {{- $rules = append $rules $rule }}
 {{- end }}

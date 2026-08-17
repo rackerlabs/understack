@@ -17,11 +17,6 @@ rbac:
   # here with the hook that needs them.
   rules: []
 
-openstack:
-  cloud: understack
-  cloudsSecretName: infrasetup
-  cloudsSecretKey: clouds.yaml
-
 # Built-in plugin enablement. Site values normally only override these booleans
 # and selected pluginData.<name>.hook.env values.
 # Built-in hook configuration. Site values normally override only:
@@ -44,6 +39,8 @@ pluginData:
       env:
         SYNC_CRONTAB: "0 * * * *"
         PRUNE: "false"
+        DEFAULT_SECRET: infrasetup
+        DEFAULT_CLOUD: understack
 
 hooks: {}
 
