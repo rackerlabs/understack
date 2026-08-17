@@ -7,10 +7,13 @@
 {{- $configuredHooks := include "openstack-sync-operator.configuredHooks" . | fromYaml }}
 {{- range $hookName, $hook := default dict $configuredHooks }}
 {{- if eq $hook.enabled true }}
+{{- $crdPath := get $hook "crd" }}
+{{- if $crdPath }}
 {{- $crd := include "openstack-sync-operator.hookCrd" (list $ $hookName $hook) | fromYaml }}
 {{- $rules = append $rules (dict "apiGroups" (list $crd.group) "resources" (list $crd.plural) "verbs" (list "get" "list" "watch")) }}
 {{- if $crd.hasStatus }}
 {{- $rules = append $rules (dict "apiGroups" (list $crd.group) "resources" (list (printf "%s/status" $crd.plural)) "verbs" (list "get" "patch" "update")) }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

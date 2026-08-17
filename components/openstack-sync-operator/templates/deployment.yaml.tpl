@@ -1,28 +1,29 @@
 {{- $enabledHooks := dict -}}
 {{- $hookEnv := dict -}}
+{{- $_ := dict -}}
 {{- $configuredHooks := include "openstack-sync-operator.configuredHooks" . | fromYaml -}}
 {{- range $hookName, $hook := default dict $configuredHooks -}}
 {{- $hookEnabled := eq $hook.enabled true -}}
 {{- if $hookEnabled -}}
-{{- $_ := set $enabledHooks $hookName $hook -}}
+{{- $_ = set $enabledHooks $hookName $hook -}}
 {{- end -}}
 {{- $envPrefix := get $hook "envPrefix" -}}
 {{- if $envPrefix -}}
-{{- $_ := set $hookEnv (printf "%s_ENABLED" $envPrefix) (ternary "true" "false" $hookEnabled) -}}
+{{- $_ = set $hookEnv (printf "%s_ENABLED" $envPrefix) (ternary "true" "false" $hookEnabled) -}}
 {{- $crdPath := get $hook "crd" -}}
-{{- if or $hookEnabled $crdPath -}}
+{{- if $crdPath -}}
 {{- $crd := include "openstack-sync-operator.hookCrd" (list $ $hookName $hook) | fromYaml -}}
-{{- $_ := set $hookEnv (printf "%s_CRD_API_VERSION" $envPrefix) $crd.apiVersion -}}
-{{- $_ := set $hookEnv (printf "%s_CRD_KIND" $envPrefix) $crd.kind -}}
-{{- $_ := set $hookEnv (printf "%s_CRD_RESOURCE" $envPrefix) $crd.resource -}}
-{{- $_ := set $hookEnv (printf "%s_STATUS_ENABLED" $envPrefix) (ternary "true" "false" $crd.hasStatus) -}}
+{{- $_ = set $hookEnv (printf "%s_CRD_API_VERSION" $envPrefix) $crd.apiVersion -}}
+{{- $_ = set $hookEnv (printf "%s_CRD_KIND" $envPrefix) $crd.kind -}}
+{{- $_ = set $hookEnv (printf "%s_CRD_RESOURCE" $envPrefix) $crd.resource -}}
+{{- $_ = set $hookEnv (printf "%s_STATUS_ENABLED" $envPrefix) (ternary "true" "false" $crd.hasStatus) -}}
 {{- end -}}
 {{- range $envName, $envValue := default dict $hook.env }}
 {{- $name := printf "%s_%s" $envPrefix $envName -}}
 {{- if hasKey $hookEnv $name }}
 {{- fail (printf "duplicate hook environment variable %s" $name) }}
 {{- end }}
-{{- $_ := set $hookEnv $name (toString $envValue) -}}
+{{- $_ = set $hookEnv $name (toString $envValue) -}}
 {{- end }}
 {{- end }}
 {{- end -}}
