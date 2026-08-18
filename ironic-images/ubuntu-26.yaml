@@ -1,7 +1,7 @@
-- imagename: ubuntu-noble
+- imagename: ubuntu-resolute
   environment:
     DISTRO_NAME: 'ubuntu'
-    DIB_RELEASE: 'noble'
+    DIB_RELEASE: 'resolute'
   elements:
   - ubuntu
   - grub2
@@ -9,3 +9,5 @@
   - baremetal
   - bootloader
   - package-installs
+  - undercloud-efi-boot-fix
+  - undercloud-dracut-drivers

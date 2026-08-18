@@ -112,7 +112,7 @@ jobs:
           mkdir -p upload
           find . -maxdepth 1 -type f \( -name '*.qcow2' -o -name '*.kernel' -o -name '*.initramfs' \) -exec cp {} upload/ \;
         env:
-          ELEMENTS_PATH: "${{ env.distro == 'ipa-debian' && format('{0}/share/ironic-python-agent-builder/dib:{1}/ironic-images/custom_elements', env.pythonLocation, github.workspace) || ''}}"
+          ELEMENTS_PATH: "${{ env.distro == 'ipa-debian' && format('{0}/share/ironic-python-agent-builder/dib:{1}/ironic-images/custom_elements', env.pythonLocation, github.workspace) || format('{0}/ironic-images/custom_elements', github.workspace) }}"
 
       - name: Set timestamp environment variable
         run: echo "TIMESTAMP=$(git show --no-patch --no-notes --pretty='%cd' --date=format:'%Y%m%d%H%M%S' ${{ github.sha }})" >>  $GITHUB_ENV

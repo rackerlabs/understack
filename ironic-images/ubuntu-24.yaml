@@ -1,0 +1,12 @@
+- imagename: ubuntu-noble
+  environment:
+    DISTRO_NAME: 'ubuntu'
+    DIB_RELEASE: 'noble'
+  elements:
+  - ubuntu
+  - grub2
+  - block-device-efi
+  - baremetal
+  - bootloader
+  - package-installs
+  - undercloud-efi-boot-fix
