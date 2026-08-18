@@ -23,6 +23,7 @@ permissions:
   # pull-requests: read
 
 env:
+  # renovate: datasource=github-releases depName=golangci/golangci-lint
   GOLANGCI_LINT_VERSION: v2.1.2
 
 jobs:
