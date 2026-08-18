@@ -23,7 +23,6 @@ permissions:
   # pull-requests: read
 
 env:
-  GO_VERSION: 1.23
   GOLANGCI_LINT_VERSION: v2.1.2
 
 jobs:
@@ -42,11 +41,6 @@ jobs:
           echo "apps=${app_array}"
           printf "apps=%s\n" "${app_array}" >> "$GITHUB_OUTPUT"
         shell: bash
-
-      # Set up Go environment
-      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-        with:
-          go-version: ${{ env.GO_VERSION }}
     outputs:
       apps: ${{ steps.list_dirs.outputs.apps }}
 
@@ -60,6 +54,13 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           fetch-depth: 1
+
+      # golangci-lint-action does not install Go, so each module's toolchain
+      # comes from its own go.mod rather than a version pinned in this file.
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go/${{ matrix.app }}/go.mod
+          cache-dependency-path: go/${{ matrix.app }}/go.sum
 
       - name: golangci-lint ${{ matrix.app }}
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
