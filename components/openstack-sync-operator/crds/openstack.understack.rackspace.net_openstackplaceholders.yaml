@@ -1,0 +1,133 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: openstackplaceholders.openstack.understack.rackspace.net
+spec:
+  group: openstack.understack.rackspace.net
+  names:
+    kind: OpenstackPlaceholder
+    listKind: OpenstackPlaceholderList
+    plural: openstackplaceholders
+    shortNames:
+    - osph
+    singular: openstackplaceholder
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    additionalPrinterColumns:
+    - name: Secret
+      type: string
+      jsonPath: .spec.cloudCredentialsRef.secretName
+    - name: Cloud
+      type: string
+      jsonPath: .spec.cloudCredentialsRef.cloudName
+    - name: SyncStatus
+      type: string
+      jsonPath: .status.syncStatus
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        description: >-
+          OpenstackPlaceholder is a sample resource that demonstrates the
+          cloudCredentialsRef pattern used by all openstack-sync CRDs.
+          The placeholder hook verifies OpenStack connectivity using the
+          referenced credentials on startup and on a configurable schedule.
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            type: object
+            required:
+            - cloudCredentialsRef
+            properties:
+              cloudCredentialsRef:
+                description: >-
+                  cloudCredentialsRef points to a Kubernetes Secret containing
+                  an OpenStack clouds.yaml file.  The operator reads this secret
+                  directly at reconcile time — no volume mount is required.
+                type: object
+                required:
+                - secretName
+                - cloudName
+                properties:
+                  secretName:
+                    description: >-
+                      Name of a Secret in the same namespace as this resource.
+                      The Secret must contain a key named clouds.yaml holding
+                      an OpenStack clouds.yaml file.
+                    type: string
+                    minLength: 1
+                    maxLength: 253
+                  cloudName:
+                    description: >-
+                      Name of the cloud entry within the clouds.yaml to
+                      authenticate as.
+                    type: string
+                    minLength: 1
+                    maxLength: 256
+              description:
+                description: Optional human-readable description of what this placeholder represents.
+                type: string
+                maxLength: 1024
+          status:
+            description: OpenstackPlaceholderStatus reflects the last observed connectivity check.
+            type: object
+            properties:
+              syncStatus:
+                description: SyncStatus indicates the result of the last connectivity check.
+                type: string
+                enum:
+                - Synced
+                - Failed
+                - Unknown
+              lastSyncTime:
+                description: LastSyncTime is the last time the operator attempted a connectivity check.
+                type: string
+                format: date-time
+              observedGeneration:
+                description: ObservedGeneration is the metadata generation last processed by the operator.
+                type: integer
+                format: int64
+              message:
+                description: Message provides details about the last connectivity check attempt.
+                type: string
+                maxLength: 2048
+              conditions:
+                description: Conditions describe the current observed state.
+                type: array
+                items:
+                  type: object
+                  required:
+                  - type
+                  - status
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                      maxLength: 2048
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+    subresources:
+      status: {}

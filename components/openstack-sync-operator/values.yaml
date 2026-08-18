@@ -28,9 +28,19 @@ rbac:
 # That restart is required because shell-operator reads hook watches only when
 # the pod starts.
 plugins:
+  openstackPlaceholder: false
   neutronRouterFlavors: false
 
 pluginData:
+  openstackPlaceholder:
+    hook:
+      path: /hooks/placeholder.py
+      crd: crds/openstack.understack.rackspace.net_openstackplaceholders.yaml
+      envPrefix: OPENSTACK_PLACEHOLDER
+      env:
+        DEFAULT_SECRET: infrasetup
+        DEFAULT_CLOUD: understack
+
   neutronRouterFlavors:
     hook:
       path: /hooks/router_flavors.py

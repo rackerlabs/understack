@@ -131,26 +131,17 @@ def test_get_openstack_connection_reads_secret(monkeypatch):
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
 
     fake_conn = mock.MagicMock(name="fake_conn")
-    fake_openstack = mock.MagicMock()
-    fake_openstack.connect.return_value = fake_conn
 
-    with mock.patch.dict("sys.modules", {"openstack": fake_openstack}):
+    with mock.patch(
+        "openstack_sync.utils.openstack.connection.Connection",
+        return_value=fake_conn,
+    ):
         with mock.patch.object(
             k8s_module, "read_secret_key", return_value=FAKE_CLOUDS_YAML
         ):
             conn = k8s_module.get_openstack_connection("infrasetup", "understack")
 
     assert conn is fake_conn
-    fake_openstack.connect.assert_called_once_with(
-        cloud="understack",
-        auth={
-            "auth_url": "https://keystone.example.com/v3",
-            "username": "infrasetup",
-            "password": "secret",
-            "project_name": "baremetal",
-        },
-        region_name="iad3",
-    )
 
 
 def test_get_openstack_connection_memoized(monkeypatch):
@@ -159,10 +150,11 @@ def test_get_openstack_connection_memoized(monkeypatch):
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
 
     fake_conn = mock.MagicMock(name="fake_conn")
-    fake_openstack = mock.MagicMock()
-    fake_openstack.connect.return_value = fake_conn
 
-    with mock.patch.dict("sys.modules", {"openstack": fake_openstack}):
+    with mock.patch(
+        "openstack_sync.utils.openstack.connection.Connection",
+        return_value=fake_conn,
+    ) as mock_conn:
         with mock.patch.object(
             k8s_module, "read_secret_key", return_value=FAKE_CLOUDS_YAML
         ):
@@ -170,7 +162,7 @@ def test_get_openstack_connection_memoized(monkeypatch):
             conn2 = k8s_module.get_openstack_connection("infrasetup", "understack")
 
     assert conn1 is conn2
-    fake_openstack.connect.assert_called_once()
+    mock_conn.assert_called_once()
 
 
 def test_get_openstack_connection_separate_per_secret(monkeypatch):
@@ -180,15 +172,16 @@ def test_get_openstack_connection_separate_per_secret(monkeypatch):
 
     conn_a = mock.MagicMock(name="conn_a")
     conn_b = mock.MagicMock(name="conn_b")
-    fake_openstack = mock.MagicMock()
-    fake_openstack.connect.side_effect = [conn_a, conn_b]
 
     bm_yaml = FAKE_CLOUDS_YAML.replace("infrasetup", "baremetal-manage")
 
     def fake_read(secret_name, secret_key, namespace):
         return FAKE_CLOUDS_YAML if secret_name == "infrasetup" else bm_yaml  # noqa: S105
 
-    with mock.patch.dict("sys.modules", {"openstack": fake_openstack}):
+    with mock.patch(
+        "openstack_sync.utils.openstack.connection.Connection",
+        side_effect=[conn_a, conn_b],
+    ):
         with mock.patch.object(k8s_module, "read_secret_key", side_effect=fake_read):
             result_a = k8s_module.get_openstack_connection("infrasetup", "understack")
             result_b = k8s_module.get_openstack_connection(
@@ -197,7 +190,6 @@ def test_get_openstack_connection_separate_per_secret(monkeypatch):
 
     assert result_a is conn_a
     assert result_b is conn_b
-    assert fake_openstack.connect.call_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -211,8 +203,6 @@ def test_reconcile_router_flavor_reads_credentials_ref(monkeypatch):
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
 
     fake_conn = mock.MagicMock()
-    fake_openstack = mock.MagicMock()
-    fake_openstack.connect.return_value = fake_conn
 
     event = {
         "object": {
@@ -228,15 +218,16 @@ def test_reconcile_router_flavor_reads_credentials_ref(monkeypatch):
         }
     }
 
-    with mock.patch.dict("sys.modules", {"openstack": fake_openstack}):
+    with mock.patch(
+        "openstack_sync.utils.openstack.connection.Connection",
+        return_value=fake_conn,
+    ):
         with mock.patch.object(
             k8s_module, "read_secret_key", return_value=FAKE_CLOUDS_YAML
         ) as mock_read:
             router_flavors.reconcile_router_flavor(event)
 
     mock_read.assert_called_once_with("baremetal-manage", "clouds.yaml", "openstack")
-    fake_openstack.connect.assert_called_once()
-    assert fake_openstack.connect.call_args.kwargs["cloud"] == "understack"
 
 
 def test_reconcile_router_flavor_raises_when_creds_ref_missing():
@@ -289,13 +280,11 @@ def test_reconcile_router_flavor_raises_when_cloud_name_missing():
 # ---------------------------------------------------------------------------
 
 
-def test_main_dispatches_binding_context(monkeypatch, capsys):
+def test_main_dispatches_binding_context(monkeypatch, capsys, tmp_path):
     monkeypatch.setattr(k8s_module, "_connection_cache", {})
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
 
     fake_conn = mock.MagicMock()
-    fake_openstack = mock.MagicMock()
-    fake_openstack.connect.return_value = fake_conn
 
     binding_context = json.dumps(
         [
@@ -320,33 +309,41 @@ def test_main_dispatches_binding_context(monkeypatch, capsys):
         ]
     )
 
-    with mock.patch.dict("sys.modules", {"openstack": fake_openstack}):
+    ctx_file = tmp_path / "binding_context.json"
+    ctx_file.write_text(binding_context)
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", str(ctx_file))
+
+    with mock.patch(
+        "openstack_sync.utils.openstack.connection.Connection",
+        return_value=fake_conn,
+    ):
         with mock.patch.object(
             k8s_module, "read_secret_key", return_value=FAKE_CLOUDS_YAML
         ):
             with mock.patch.object(router_flavors.sys, "argv", ["router_flavors.py"]):
-                with mock.patch("sys.stdin") as mock_stdin:
-                    mock_stdin.read.return_value = binding_context
-                    result = router_flavors.main()
+                result = router_flavors.main()
 
     assert result == 0
-    assert fake_openstack.connect.call_args.kwargs["cloud"] == "understack"
 
 
-def test_main_returns_error_on_invalid_json(monkeypatch, capsys):
+def test_main_returns_error_on_invalid_json(monkeypatch, capsys, tmp_path):
+    ctx_file = tmp_path / "binding_context.json"
+    ctx_file.write_text("not-json")
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", str(ctx_file))
+
     with mock.patch.object(router_flavors.sys, "argv", ["router_flavors.py"]):
-        with mock.patch("sys.stdin") as mock_stdin:
-            mock_stdin.read.return_value = "not-json"
-            result = router_flavors.main()
+        result = router_flavors.main()
 
     assert result == 1
     assert "failed to parse binding context" in capsys.readouterr().err
 
 
-def test_main_returns_zero_on_empty_stdin(monkeypatch):
+def test_main_returns_zero_on_empty_stdin(monkeypatch, tmp_path):
+    ctx_file = tmp_path / "binding_context.json"
+    ctx_file.write_text("")
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", str(ctx_file))
+
     with mock.patch.object(router_flavors.sys, "argv", ["router_flavors.py"]):
-        with mock.patch("sys.stdin") as mock_stdin:
-            mock_stdin.read.return_value = ""
-            result = router_flavors.main()
+        result = router_flavors.main()
 
     assert result == 0

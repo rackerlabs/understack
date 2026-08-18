@@ -10,6 +10,12 @@ import base64
 import os
 from typing import Any
 
+import openstack
+import yaml
+from kubernetes import client
+from kubernetes import config as k8s_config
+from openstack.config import loader as os_config_loader
+
 
 def read_secret_key(secret_name: str, secret_key: str, namespace: str) -> str:
     """Read a single key from a Kubernetes Secret and return its decoded value.
@@ -29,9 +35,6 @@ def read_secret_key(secret_name: str, secret_key: str, namespace: str) -> str:
     Raises:
         KeyError: When ``secret_key`` is not present in the Secret's data.
     """
-    from kubernetes import client  # type: ignore[import]
-    from kubernetes import config as k8s_config  # type: ignore[import]
-
     try:
         k8s_config.load_incluster_config()
     except k8s_config.ConfigException:
@@ -81,13 +84,20 @@ def get_openstack_connection(secret_name: str, cloud_name: str) -> Any:
     if cache_key in _connection_cache:
         return _connection_cache[cache_key]
 
-    import openstack  # type: ignore[import]
-    import yaml
-
     clouds_yaml_text = read_secret_key(secret_name, "clouds.yaml", pod_namespace())
-    clouds_config: dict[str, Any] = yaml.safe_load(clouds_yaml_text)
-    cloud_entry = clouds_config["clouds"][cloud_name]
 
-    conn = openstack.connect(cloud=cloud_name, **cloud_entry)
+    # openstack.connect(cloud=name) resolves the named cloud from files on
+    # disk, which fails inside a container with no clouds.yaml present.
+    # Instead, parse the YAML from the Secret and inject it directly into
+    # the SDK config loader — no filesystem writes required.
+    loader = os_config_loader.OpenStackConfig(
+        config_files=[],
+        vendor_files=[],
+        load_yaml_config=False,
+        load_envvars=False,
+    )
+    loader.cloud_config = yaml.safe_load(clouds_yaml_text)
+    region = loader.get_one(cloud=cloud_name)
+    conn = openstack.connection.Connection(config=region)
     _connection_cache[cache_key] = conn
     return conn

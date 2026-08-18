@@ -119,7 +119,11 @@ def main() -> int:
         print(json.dumps(build_hook_config(), indent=2))
         return 0
 
-    raw = sys.stdin.read()
+    context_path = os.environ.get("BINDING_CONTEXT_PATH")
+    if not context_path:
+        return 0
+    with open(context_path) as f:
+        raw = f.read()
     if not raw.strip():
         return 0
 
