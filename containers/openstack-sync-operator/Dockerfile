@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM ghcr.io/flant/shell-operator:v1.13.1 AS prod
+FROM ghcr.io/flant/shell-operator:v1.20.2 AS prod
 LABEL org.opencontainers.image.description="OpenStack sync shell-operator"
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
