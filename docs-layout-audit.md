@@ -1,8 +1,8 @@
 # Documentation Layout Audit
 
-**Status:** proposal, for team review. This file is a planning artifact, not
-product documentation. Delete it once the phases below have landed or been
-rejected.
+**Status:** Phase 1 has landed; Phases 2–6 are a proposal, for team review. This
+file is a planning artifact, not product documentation. Delete it once the phases
+below have landed or been rejected.
 
 It lives at the repository root rather than under `docs/` on purpose: every file
 under `docs/` has to be added to `nav:` in `properdocs.yml` and gets published to
@@ -28,6 +28,11 @@ configuring the network — it hands all three the same flat page list.
 
 ## What is there now
 
+The counts and structure in this section describe the layout **as it was before
+Phase 1**, because that is what the findings below are about. Phase 1 has since
+changed the tabs and added five pages; it moved nothing, so every finding still
+points at a real file. Current state is 141 pages under seven tabs.
+
 137 markdown pages, all of them listed in the hand-maintained `nav:`. Eight
 top-level entries: `Home`, `Overview`, `Design Guide`, `Deployment Guide`,
 `Operator Guide`, `Release Notes`, `User Guide`, `Workflows`.
@@ -49,9 +54,11 @@ at `workflows/argo-events/docs/`.
 
 ### The big one: no contributor documentation exists
 
-There is no contributor section on the site and no `CONTRIBUTING.md` in the
-repository. Everything a new developer needs is in those 61 external files, which
-are unlinked, unlinted for links, and drifting. The clearest symptom is three
+There was no contributor section on the site, and there is still no
+`CONTRIBUTING.md` in the repository. Phase 1 added a `Contributing` front door,
+but a front door is not documentation: everything a new developer actually needs
+is still in those 61 external files, which are unlinked, unlinted for links, and
+drifting. Phase 6 is where that gets fixed. The clearest symptom is three
 near-identical `DEVELOPMENT.md` files (`python/ironic-understack/`,
 `python/neutron-understack/`, `python/understack-workflows/`) that differ by a
 handful of lines — the classic copy-paste decay.
@@ -169,6 +176,11 @@ to upstream OpenStack docs), `operator-guide/openstack-placement.md` (17 lines,
 two commands), `operator-guide/rook-ceph.md` (24 lines, dashboard access only for
 a storage backend).
 
+Phase 1 dealt with the first two: `design-guide/intro.md` is deleted (redirected
+to `contributing/`) and `user-guide/index.md` is a real front door. The two
+`operator-guide` stubs are still stubs — they are thin because the underlying
+material is thin, which is a writing problem rather than a layout one.
+
 ### The component pages
 
 56 of them plus an index. Roughly 27 are 45–51 line near-identical template
@@ -227,23 +239,41 @@ on `Home`, and the architecture depth a system operator actually needs belongs i
 | **Reference** | all, lookup mode | Component pages, generated workflow docs, hardware schemas, config samples. Does not belong inside a narrative. |
 
 Within Operations the groups are role-aligned, but not everything collapses to
-exactly three — two existing groups are already system-operator material and
+exactly three — several existing groups are already system-operator material and
 stay put:
 
-- **Architecture & Troubleshooting** (system operators): the architecture
-  overview and the five `component-*.md` overview blurbs, plus the new
-  troubleshooting hub and `troubleshooting-osh.md`, `ovs-ovn.md`,
-  `kubectl-us-net.md`, `logging.md`.
+- **Troubleshooting and Architecture** (system operators): the new troubleshooting
+  hub, the architecture overview, the five `component-*.md` overview blurbs, and
+  the pages that are about diagnosing the deployment as a whole rather than one
+  subsystem — `troubleshooting-osh.md`, `logging.md`, `monitoring.md`.
 - **OpenStack Services** (system operators): today's per-service `OpenStack`
   group, largely as-is.
+- **Platform Services** (system operators): the services UnderStack runs
+  *alongside* OpenStack — ArgoCD, Argo Workflows, Gateway API, Nautobot and its
+  operator, MariaDB, Postgres, RabbitMQ, Rook Ceph.
 - **Hardware** (DC techs): BMC/Redfish, firmware, enrollment — today's
-  `Hardware` section, largely as-is.
+  `Hardware` section, plus `bmc-password.md`.
 - **Networking** (network operations): today's `Networking` section.
-- **Scripts and Tools** (system operators): cross-cutting, kept as-is.
+- **Scripts and Tools** (system operators): cross-cutting, plus
+  `ansible-local-usage.md`.
 
 `Infrastructure`'s 17 pages — databases, ingress, Nautobot, logging,
 monitoring, Ansible — get sorted across these groups by who actually reads
-them, rather than surviving as a sixth, uncategorized dumping ground.
+them, rather than surviving as an uncategorized dumping ground. Most of them
+land in **Platform Services**, which is a sixth group but a named and coherent
+one: "the supporting services", not "everything else".
+
+Two notes on judgement calls this list originally got wrong:
+
+- `ovs-ovn.md` and `kubectl-us-net.md` are **network operations** tools, so they
+  stay in **Networking**. An earlier draft of this document listed them in both
+  Networking and the group then called "Architecture & Troubleshooting", which is
+  not a thing nav can do.
+  The troubleshooting hub links to them instead — which is the point of having a
+  hub: a page can be indexed from anywhere while living in exactly one place.
+- The supporting services do not fit inside **OpenStack Services**, because
+  MariaDB and Nautobot are not OpenStack services. Widening that group's label to
+  cover them would have made it meaningless.
 
 `Release Notes` keeps the top-level tab it shipped with, rather than becoming an
 "Upgrading" group inside Operations. Its audience is system operators, which is
@@ -315,29 +345,58 @@ Consequences:
 
 ### Phasing
 
-Each phase is a separate reviewable PR.
+Each phase is a reviewable stream of work. Keep individual PRs small, but land
+the phases in this order: correctness and guardrails precede the larger content
+moves they are meant to protect.
 
-- **Phase 1 — nav rewrite plus the new front doors.** This is the phase that
-  delivers the front doors. Rewrite `nav:` to the seven tabs using **existing
-  on-disk paths only** — no file moves. `Release Notes` carries over untouched,
-  including its hand-ordering comment. Add `docs/contributing/index.md`,
-  `docs/reference/index.md` and a `docs/operator-guide/troubleshooting.md` hub,
-  and rewrite the 8-line upstream-forwarding `user-guide/index.md` into a real
-  **Using the Cloud** front door. Rewrite the "Getting Started" card on
-  `docs/index.md` into five audience cards — system operators, DC techs, network
-  operations, users, contributors (cheapest high-value edit in the whole plan).
-  Delete `design-guide/intro.md`. Add `mkdocs-redirects`. Revertable by
-  reverting one file, with zero external breakage.
-- **Phase 2 — content merges.** Fold `secrets.md` into `secrets-eso-setup.md`
+- **Phase 1 — nav rewrite plus the new front doors. Done.** `nav:` is now the
+  seven tabs, using **existing on-disk paths only** — no file moved, so no
+  in-repo or external link changed. `Release Notes` carried over untouched,
+  including its hand-ordering comment. Added `docs/contributing/index.md`,
+  `docs/reference/index.md`, role landing pages for Hardware and Networking, and
+  the `docs/operator-guide/troubleshooting.md` hub;
+  rewrote the 8-line upstream-forwarding `user-guide/index.md` into a real
+  **Using the Cloud** front door and the "Getting Started" card on `docs/index.md`
+  into audience cards — six of them, not five, because system operators get one
+  for day 0 and one for day 2 rather than being asked which they are. Deleted
+  `design-guide/intro.md` and added
+  `mkdocs-redirects` carrying its one redirect. Also dropped `navigation.expand`,
+  since that only made sense alongside the nav rewrite.
+
+    Three things came up during implementation that the plan above had not
+    settled:
+
+    - **`vision.md` is parked on the `Home` tab.** Phase 4 folds it into
+      `docs/index.md`, but a page cannot be de-listed in the meantime, so `Home`
+      is temporarily a two-page section rather than a single page.
+    - **`Platform Services` was needed as a sixth Operations group**, because the
+      supporting services have nowhere else to go. See the note above.
+    - **`kubernetes.md`, `secrets.md` and `networking.md` sit under `Deploy`**
+      with their current filenames. They read oddly there — `networking.md` in
+      particular — but renaming them is Phase 4's job, and doing it here would
+      have broken the "no file moves" property that makes this phase cheap to
+      revert.
+- **Phase 2 — correctness.** Fix guidance that can send readers down a known
+  wrong path before reorganizing more of the site. At minimum: replace the
+  ingress-nginx instructions in `deploy-guide/config-dex.md`, decide whether the
+  `ingress-nginx` component page and bootstrap entry should be removed, replace
+  the fictional `understack_ref: v1.0.0` examples, resolve published TODOs on the
+  primary deployment path, and either add real Ceph/PostgreSQL/BMC diagnostics
+  or keep the troubleshooting index scoped to what those pages actually cover.
+- **Phase 3 — anti-rot CI.** Land the checks listed below before moving files or
+  generating more indexes. Fix the missing `nautobot-worker` component-index row
+  and the zero-match workflow dependency glob as part of introducing the checks,
+  so each guardrail starts from a clean baseline.
+- **Phase 4 — content merges.** Fold `secrets.md` into `secrets-eso-setup.md`
   and the two `server-firmware-update.md` into one. Move `networking.md` to
   `deploy-guide/provisioning-network.md` and `kubernetes.md` to
   `deploy-guide/tools.md`, which dissolves the naming collision. Fold the
   Overview vision statement into `docs/index.md`. Retitle the colliding H1s so
   the three OpenStack Helm pages become "Why We Diverge from OpenStack Helm",
   "openstack-helm (component)" and "Troubleshooting OpenStack Helm".
-- **Phase 3 — dissolve `design-guide/`.** Hardware schemas to `reference/`, the
+- **Phase 5 — dissolve `design-guide/`.** Hardware schemas to `reference/`, the
   four design deep-dives to `contributing/design/`, and the architecture
-  overview into the Operations **Architecture & Troubleshooting** group,
+  overview into the Operations **Troubleshooting and Architecture** group,
   consolidated there with the five `component-*.md` overview blurbs. Add the
   missing reciprocal links between the reference and how-to hardware pages.
 
@@ -345,25 +404,28 @@ Each phase is a separate reviewable PR.
     badly undercounted it as "the two `ansible/roles/nova_flavors/` link fixes".
     The actual set is:
 
-    - **12 relative `../design-guide/*.md` links across 4 pages**, 9 of them in
-      `operator-guide/openstack-ironic-inspection-guide.md` alone. Redirects do
-      not help — `validation.not_found` reads the markdown source. Phase 1's two
-      new front doors add 5 more, for 17 across 6 pages.
+    - **17 relative `../design-guide/*.md` links across 6 pages.**
+      `operator-guide/openstack-ironic-inspection-guide.md` alone has 9;
+      `reference/index.md` has 4 and `contributing/index.md` has 1, both added by
+      Phase 1. Redirects do not help here — `validation.not_found` reads the
+      markdown source.
     - **One** external link, `ansible/roles/nova_flavors/README.md:15`. Line 243
       of the same file points at `operator-guide/flavors/` and must be left
       alone, which is how the "two fixes" miscount happened.
     - `Makefile` lines 22 and 49, for the generated sample config path.
-- **Phase 4 — write the Contributing tab.** The largest writing effort; split
+- **Phase 6 — write the Contributing tab.** The largest writing effort; split
   per-language so each sub-PR has an owner. Add root `CONTRIBUTING.md`, which
   GitHub surfaces in the PR UI alongside the `pull_request_template.md` that now
   exists. Surface `RELEASING.md` in this tab rather than rewriting it — it is
   current, and `RELEASING.md` at the root is the path the CI failure message and
   the PR template point at, so it stays where it is and the tab links to it (or
   includes it via `pymdownx.snippets`, which is already enabled).
-- **Phase 5 — anti-rot CI.** `.github/workflows/release-note-check.yaml` is the
-  shape to copy for the checks below: no `paths:` filter, short-circuit to
-  success, so it can actually be marked required. A path-filtered workflow never
-  reports a status on non-matching PRs and therefore can never be required.
+
+Every PR that moves or merges a page must include its redirect map, update all
+in-repository links, and pass `make docs`. Before merging a phase, also verify
+the old published URLs in the built `site/`, inspect merged pages for duplicate
+headings, and confirm the new landing pages still route every advertised task to
+content that performs that task.
 
 ### Mechanics that are easy to get wrong
 
@@ -389,7 +451,7 @@ Each phase is a separate reviewable PR.
   any other section.
 - **`MD024` is now `siblings_only: true`,** relaxed so release-notes pages can
   repeat "Action required" per version. Duplicate headings are still an error
-  between siblings, which is exactly the case Phase 2 creates when it
+  between siblings, which is exactly the case Phase 4 creates when it
   concatenates two pages — so the merges still need heading passes.
 - **`validation` has no `error` level.** It only accepts `warn`/`info`/`ignore`,
   so `--strict` in the Makefile is the only thing that turns these into failures.
@@ -412,7 +474,12 @@ Each phase is a separate reviewable PR.
   Reference with no Makefile change — and a generated tree cannot have explicit
   per-page redirect keys anyway.
 
-### Anti-rot checks worth adding (Phase 5)
+### Anti-rot checks worth adding (Phase 3)
+
+Use `.github/workflows/release-note-check.yaml` as the workflow shape: no
+`paths:` filter and a short-circuit to success, so the check can be required. A
+path-filtered workflow never reports a status on non-matching pull requests and
+therefore cannot be required.
 
 1. Make `check-component-docs.py` **bidirectional**, so a deleted template does
    not leave a zombie page. Requires allowlisting the eleven pages that have no
@@ -437,14 +504,21 @@ Each phase is a separate reviewable PR.
    this check's scope.
 6. A contributor-tab coverage check: every top-level `go/<x>/` and `python/<x>/`
    directory must be mentioned in the Contributing tab. Same shape as
-   `check-component-docs.py`, and the thing that stops Phase 4's work decaying
+   `check-component-docs.py`, and the thing that stops Phase 6's work decaying
    back into invisible files.
 
 ## Status of the work
 
-**Phases 1 through 5 are unstarted**, and they are a proposal rather than a plan
-of record — the point of this document is to get agreement on the target layout
-before anyone starts moving pages.
+**Phase 1 is done.** The seven tabs, five new front doors and the troubleshooting
+hub are in place; `properdocs build --strict` is clean and
+`check-component-docs.py` passes. Nothing moved on disk, so nothing outside
+`properdocs.yml` and the pages listed in that phase changed.
+
+**Phases 2 through 6 are unstarted**, and they remain a proposal rather than a
+plan of record. Phase 1 was deliberately the phase that commits to nothing: the
+findings below still need agreement before pages start moving, and the fastest
+way to disagree with the target layout is now to click around the seven tabs and
+say what feels wrong.
 
 One piece of the target layout does now exist, arrived at independently: #2191
 added the `Release Notes` tab, `docs/release-notes/`, the `changelog.d/` fragment
