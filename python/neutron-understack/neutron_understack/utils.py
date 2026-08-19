@@ -472,10 +472,6 @@ def release_segment_if_unused(segment: NetworkSegment) -> None:
         release_dynamic_segment(segment.id)
 
 
-def local_link_from_binding_profile(binding_profile: dict) -> dict | None:
-    return binding_profile.get("local_link_information", [None])[0]
-
-
 def parent_port_is_bound(port: port_obj.Port) -> bool:
     port_binding = port.bindings[0]
     return bool(

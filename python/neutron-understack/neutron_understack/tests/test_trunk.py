@@ -1,6 +1,10 @@
+import logging
+
 import pytest
 from neutron.plugins.ml2.driver_context import portbindings
+from neutron_lib import exceptions as exc
 
+from neutron_understack import trunk as trunk_module
 from neutron_understack import utils
 from neutron_understack.trunk import SubportSegmentationIDError
 
@@ -51,7 +55,6 @@ class TestTrunkCreated:
         )
 
 
-@pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
 @pytest.mark.usefixtures("_utils_fetch_subport_network_id_patch")
 class Test_HandleTenantVlanIDAndSwitchportConfig:
     def test_that_check_subports_segmentation_id_is_called(
@@ -182,7 +185,6 @@ class TestTrunkDeleted:
         )
 
 
-@pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
 @pytest.mark.usefixtures("_utils_fetch_subport_network_id_patch")
 class Test_CleanParentPortSwitchportConfig:
     def test_when_parent_port_is_bound(
@@ -390,3 +392,100 @@ class TestCheckSubportsSegmentationId:
         subport.segmentation_id = 1600
         with pytest.raises(SubportSegmentationIDError):
             understack_trunk_driver._check_subports_segmentation_id([subport], trunk_id)
+
+
+@pytest.mark.parametrize("binding_profile", [{"physical_network": None}], indirect=True)
+class TestMissingPhysicalNetwork:
+    """physical_network is mandatory: there is no fallback lookup.
+
+    It is enforced on the precommit hooks, where raising aborts the
+    transaction. The postcommit hooks cannot roll anything back, so they log
+    and degrade instead of raising.
+    """
+
+    @pytest.fixture
+    def _bound_parent_port(self, mocker, port_object) -> None:
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch("neutron_understack.utils.parent_port_is_bound", return_value=True)
+
+    def test_precommit_create_rejects_the_request(
+        self, understack_trunk_driver, port_object, subport
+    ):
+        with pytest.raises(exc.BadRequest, match="physical_network is required"):
+            understack_trunk_driver._add_subports_networks_to_parent_port_switchport(
+                port_object, [subport]
+            )
+
+    @pytest.mark.usefixtures("_bound_parent_port")
+    def test_subports_deleted_precommit_rejects_the_request(
+        self, mocker, understack_trunk_driver, trunk
+    ):
+        with pytest.raises(exc.BadRequest, match="physical_network is required"):
+            understack_trunk_driver.subports_deleted_precommit(
+                None, None, None, mocker.Mock(states=[trunk])
+            )
+
+    @pytest.mark.usefixtures("_bound_parent_port")
+    def test_trunk_deleted_precommit_rejects_the_request(
+        self, mocker, understack_trunk_driver, trunk
+    ):
+        with pytest.raises(exc.BadRequest, match="physical_network is required"):
+            understack_trunk_driver.trunk_deleted_precommit(
+                None, None, None, mocker.Mock(states=[trunk])
+            )
+
+    def test_precommit_delete_ignores_unbound_parent_port(
+        self, mocker, understack_trunk_driver, trunk, port_object
+    ):
+        """An unbound parent port has no switchport config to tear down.
+
+        There is nothing to validate, so a missing physnet must not block the
+        delete.
+        """
+        mocker.patch(
+            "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch(
+            "neutron_understack.utils.parent_port_is_bound", return_value=False
+        )
+
+        understack_trunk_driver.subports_deleted_precommit(
+            None, None, None, mocker.Mock(states=[trunk])
+        )
+
+    @pytest.mark.usefixtures("_bound_parent_port")
+    def test_subports_added_post_logs_instead_of_raising(
+        self, mocker, caplog, understack_trunk_driver, trunk
+    ):
+        caplog.set_level(logging.ERROR, logger=trunk_module.LOG.name)
+
+        understack_trunk_driver.subports_added_post(
+            None, None, None, mocker.Mock(states=[trunk])
+        )
+
+        assert "physical_network is required" in caplog.text
+        understack_trunk_driver.undersync.sync.assert_not_called()
+
+    @pytest.mark.usefixtures(
+        "_bound_parent_port", "_utils_fetch_subport_network_id_patch"
+    )
+    def test_clean_parent_port_releases_segments_without_syncing(
+        self, mocker, caplog, understack_trunk_driver, trunk, subport
+    ):
+        """Teardown still runs postcommit so the subports' VLANs do not leak.
+
+        Only the undersync call is skipped, since there is no vlan group to
+        reconcile.
+        """
+        deallocate = mocker.patch.object(
+            understack_trunk_driver, "_handle_segment_deallocation"
+        )
+        caplog.set_level(logging.ERROR, logger=trunk_module.LOG.name)
+
+        understack_trunk_driver._clean_parent_port_switchport_config(trunk, [subport])
+
+        assert "physical_network is required" in caplog.text
+        deallocate.assert_called_once()
+        understack_trunk_driver.undersync.sync.assert_not_called()

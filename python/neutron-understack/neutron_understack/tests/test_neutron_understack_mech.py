@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
 
@@ -6,6 +7,7 @@ from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
 
+from neutron_understack import neutron_understack_mech
 from neutron_understack.neutron_understack_mech import UnderstackDriver
 
 
@@ -153,7 +155,6 @@ class TestUpdatePortPostCommit:
 MECH_UTILS = "neutron_understack.neutron_understack_mech.utils"
 
 
-@pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
 class TestDeletePortPostCommit:
     def test_skips_non_baremetal_port(self, understack_driver, port_context):
         port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_NORMAL
@@ -236,7 +237,6 @@ class TestDeletePortPostCommit:
         release.assert_not_called()
 
 
-@pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
 class TestBindPort:
     def test_does_not_bind_vlan_only_segments(
         self,
@@ -327,19 +327,26 @@ class TestBindPort:
 
         port_context.continue_binding.assert_not_called()
 
-    @pytest.mark.usefixtures("_ironic_baremetal_port_physical_network")
-    def test_does_not_bind_when_physical_network_not_found(
-        self, mocker, port_context, understack_driver
+    @pytest.mark.parametrize(
+        "binding_profile", [{"physical_network": None}], indirect=True
+    )
+    def test_does_not_bind_when_physical_network_missing(
+        self, mocker, caplog, port_context, understack_driver
     ):
-        understack_driver.ironic_client.baremetal_port_physical_network.return_value = (
-            None
-        )
+        """physical_network is required: there is no fallback lookup any more.
+
+        Without it we cannot tell which VLAN group to allocate a segment in, so
+        binding is refused and the reason is logged rather than failing silently.
+        """
         mocker.patch.object(port_context, "continue_binding")
         port_context._prepare_to_bind(port_context.network.network_segments)
+        caplog.set_level(logging.ERROR, logger=neutron_understack_mech.LOG.name)
 
         understack_driver.bind_port(port_context)
 
         port_context.continue_binding.assert_not_called()
+        assert "physical_network is required" in caplog.text
+        assert port_context.current["id"] in caplog.text
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
     def test_with_trunk_details(
@@ -420,8 +427,6 @@ class TestKeystoneAuthentication:
             "neutron_understack.config.get_session",
             return_value=mock_session_instance,
         )
-        mocker.patch("neutron_understack.neutron_understack_mech.IronicClient")
-
         driver = UnderstackDriver()
         driver.initialize()
 

@@ -29,6 +29,18 @@ class SubportSegmentationIDError(exc.NeutronException):
     )
 
 
+def _missing_physnet_msg(port_id: str) -> str:
+    """Explain that a parent port cannot be configured without a physnet.
+
+    physical_network names the VLAN group that undersync configures, so
+    without it there is no switch to push the trunk's subport VLANs to.
+    """
+    return (
+        "physical_network is required in the binding_profile for baremetal port "
+        f"trunk configuration, but port {port_id} does not have one."
+    )
+
+
 class UnderStackTrunkDriver(trunk_base.DriverBase):
     def __init__(
         self,
@@ -46,7 +58,6 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             can_trunk_bound_port=can_trunk_bound_port,
         )
         self.undersync = self.plugin_driver.undersync
-        self.ironic_client = self.plugin_driver.ironic_client
 
     @property
     def is_loaded(self):
@@ -83,6 +94,12 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             cancellable=True,
         )
         registry.subscribe(
+            self.subports_deleted_precommit,
+            resources.SUBPORTS,
+            events.PRECOMMIT_DELETE,
+            cancellable=True,
+        )
+        registry.subscribe(
             self.subports_deleted,
             resources.SUBPORTS,
             events.AFTER_DELETE,
@@ -92,6 +109,12 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             self.trunk_created,
             resources.TRUNK,
             events.PRECOMMIT_CREATE,
+            cancellable=True,
+        )
+        registry.subscribe(
+            self.trunk_deleted_precommit,
+            resources.TRUNK,
+            events.PRECOMMIT_DELETE,
             cancellable=True,
         )
         registry.subscribe(
@@ -181,10 +204,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_host = parent_port.bindings[0].host
 
         vlan_group_name = binding_profile.get("physical_network")
-        if vlan_group_name is None:
-            local_link_info = utils.local_link_from_binding_profile(binding_profile)
-            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                local_link_info
+        if not vlan_group_name:
+            # Reached from the PRECOMMIT_CREATE handlers, so raising here aborts
+            # the transaction and surfaces the error to the API caller.
+            raise exc.BadRequest(
+                resource="port", msg=_missing_physnet_msg(parent_port.id)
             )
 
         self._handle_segment_allocation(subports, vlan_group_name, binding_host)
@@ -210,11 +234,14 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_host = parent_port_obj.bindings[0].host
 
         vlan_group_name = binding_profile.get("physical_network")
-        if vlan_group_name is None:
-            local_link_info = utils.local_link_from_binding_profile(binding_profile)
-            vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                local_link_info
-            )
+        if not vlan_group_name:
+            # This runs postcommit: the subports are already gone from the DB,
+            # so raising cannot roll anything back. The PRECOMMIT_DELETE
+            # handlers reject this case while it is still abortable; getting
+            # here means the binding profile changed underneath us. Log it and
+            # still release the segments -- otherwise their VLANs leak -- but
+            # skip the undersync call, since there is no vlan group to sync.
+            LOG.error(_missing_physnet_msg(parent_port_obj.id))
         self._handle_subports_removal(
             binding_profile=binding_profile,
             binding_host=binding_host,
@@ -263,13 +290,33 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         if utils.parent_port_is_bound(parent_port):
             binding_profile = parent_port.bindings[0].profile
             vlan_group_name = binding_profile.get("physical_network")
-            if vlan_group_name is None:
-                local_link_info = utils.local_link_from_binding_profile(binding_profile)
-                vlan_group_name = self.ironic_client.baremetal_port_physical_network(
-                    local_link_info
-                )
+            if not vlan_group_name:
+                # subports_added validates the same parent port on
+                # PRECOMMIT_CREATE, so normally we never get here. This runs
+                # postcommit, where raising cannot undo the subport creation,
+                # and there is no vlan group to sync.
+                LOG.error(_missing_physnet_msg(parent_port.id))
+                return
             LOG.debug("subports_added_post found vlan_group_name=%s", vlan_group_name)
             self.undersync.sync(vlan_group_name)
+
+    def _validate_parent_port_physnet(self, trunk: Trunk) -> None:
+        """Reject a teardown whose parent port has no physical_network.
+
+        The switchport teardown itself runs on AFTER_DELETE, where the rows are
+        already committed and an exception cannot roll them back, so the check
+        has to happen here while the transaction can still be aborted.
+        """
+        parent_port_obj = utils.fetch_port_object(trunk.port_id)
+        if not utils.parent_port_is_bound(parent_port_obj):
+            return
+        if not parent_port_obj.bindings[0].profile.get("physical_network"):
+            raise exc.BadRequest(
+                resource="port", msg=_missing_physnet_msg(parent_port_obj.id)
+            )
+
+    def subports_deleted_precommit(self, resource, event, trunk_plugin, payload):
+        self._validate_parent_port_physnet(payload.states[0])
 
     def subports_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
@@ -281,6 +328,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         subports = trunk.sub_ports
         if subports:
             self._handle_tenant_vlan_id_and_switchport_config(subports, trunk)
+
+    def trunk_deleted_precommit(self, resource, event, trunk_plugin, payload):
+        trunk = payload.states[0]
+        if trunk.sub_ports:
+            self._validate_parent_port_physnet(trunk)
 
     def trunk_deleted(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
