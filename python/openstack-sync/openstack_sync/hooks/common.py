@@ -19,7 +19,7 @@ LOG = logging.getLogger(__name__)
 def configure_logging() -> None:
     """Configure runtime hook logging without affecting --config output."""
     logging.basicConfig(
-        level=os.environ.get("OPENSTACK_SYNC_LOG_LEVEL", "INFO").upper(),
+        level=os.environ.get("LOG_LEVEL", "info").upper(),
         format="%(levelname)s:%(name)s:%(message)s",
         stream=sys.stderr,
     )

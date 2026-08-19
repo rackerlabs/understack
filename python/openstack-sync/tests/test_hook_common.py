@@ -11,6 +11,29 @@ import pytest
 from openstack_sync.hooks import common as hc
 
 # ---------------------------------------------------------------------------
+# configure_logging
+# ---------------------------------------------------------------------------
+
+
+def test_configure_logging_defaults_to_info(monkeypatch):
+    monkeypatch.delenv("LOG_LEVEL", raising=False)
+
+    with mock.patch.object(logging, "basicConfig") as basic_config:
+        hc.configure_logging()
+
+    assert basic_config.call_args.kwargs["level"] == "INFO"
+
+
+def test_configure_logging_reads_log_level(monkeypatch):
+    monkeypatch.setenv("LOG_LEVEL", "debug")
+
+    with mock.patch.object(logging, "basicConfig") as basic_config:
+        hc.configure_logging()
+
+    assert basic_config.call_args.kwargs["level"] == "DEBUG"
+
+
+# ---------------------------------------------------------------------------
 # Type coercions
 # ---------------------------------------------------------------------------
 

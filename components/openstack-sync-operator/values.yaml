@@ -1,5 +1,10 @@
 replicaCount: 1
 
+# Operator-level environment variables injected directly into the container.
+# LOG_LEVEL controls both shell-operator and Python hook logging.
+env:
+  LOG_LEVEL: info
+
 image:
   repository: ghcr.io/rackerlabs/understack/openstack-sync-operator
   pullPolicy: IfNotPresent

@@ -3,6 +3,10 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
+    "env": {
+      "description": "Operator-level environment variables injected directly into the container.",
+      "$ref": "#/definitions/operatorEnv"
+    },
     "plugins": {
       "type": "object",
       "description": "Built-in plugin enablement keyed by plugin name.",
@@ -19,6 +23,26 @@
     }
   },
   "definitions": {
+    "operatorEnv": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "properties": {
+        "LOG_LEVEL": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "debug",
+            "info",
+            "error"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/envValue"
+      }
+    },
     "pluginData": {
       "type": "object",
       "additionalProperties": false,
@@ -56,21 +80,24 @@
         "pattern": "^[A-Z][A-Z0-9_]*$"
       },
       "additionalProperties": {
-        "anyOf": [
-          {
-            "type": "boolean"
-          },
-          {
-            "type": "number"
-          },
-          {
-            "type": "string",
-            "not": {
-              "pattern": "^\\s*([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]|1|0|[Yy][Ee][Ss]|[Nn][Oo]|[Oo][Nn]|[Oo][Ff][Ff])\\s*$"
-            }
-          }
-        ]
+        "$ref": "#/definitions/envValue"
       }
+    },
+    "envValue": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string",
+          "not": {
+            "pattern": "^\\s*([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]|1|0|[Yy][Ee][Ss]|[Nn][Oo]|[Oo][Nn]|[Oo][Ff][Ff])\\s*$"
+          }
+        }
+      ]
     }
   }
 }

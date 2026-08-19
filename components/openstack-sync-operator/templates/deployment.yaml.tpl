@@ -27,6 +27,13 @@
 {{- end }}
 {{- end }}
 {{- end -}}
+{{- $operatorEnv := dict "LOG_LEVEL" "info" -}}
+{{- range $envName, $envValue := default dict .Values.env }}
+{{- if hasKey $hookEnv $envName }}
+{{- fail (printf "duplicate operator environment variable %s" $envName) }}
+{{- end }}
+{{- $_ = set $operatorEnv $envName $envValue -}}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -103,6 +110,10 @@ spec:
         {{- range $envName := keys $hookEnv | sortAlpha }}
         - name: {{ $envName }}
           value: {{ get $hookEnv $envName | quote }}
+        {{- end }}
+        {{- range $envName := keys $operatorEnv | sortAlpha }}
+        - name: {{ $envName }}
+          value: {{ get $operatorEnv $envName | quote }}
         {{- end }}
         {{- with .Values.resources }}
         resources:
