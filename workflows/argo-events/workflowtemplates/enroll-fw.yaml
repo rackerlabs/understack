@@ -28,7 +28,6 @@ spec:
       - name: external_cmdb_id
         value: ""
       - name: resource_class
-        value: generic
       # Firewall management/identity metadata. management_* land in the node's
       # driver_info; mate_serial lands in extra. Omit (leave "") to skip.
       - name: management_ip
