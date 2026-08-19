@@ -2,6 +2,7 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "configMigration": true,
   "extends": [
+    "customManagers:githubActionsVersions",
     "github>rackerlabs/understack//.github/renovate/default",
     "github>rackerlabs/understack//.github/renovate/nautobot",
     "github>rackerlabs/understack//.github/renovate/understackContainerMatch",
@@ -58,6 +59,17 @@
       ],
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Update *_VERSION variables in Makefiles carrying a renovate comment",
+      "managerFilePatterns": [
+        "/(^|/)Makefile$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>\\S+?)(?: versioning=(?<versioning>\\S+?))?\\s+[A-Za-z0-9_]+?_VERSION\\s*\\??=\\s*(?<currentValue>\\S+)"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
     }
   ],
   "argocd": {
