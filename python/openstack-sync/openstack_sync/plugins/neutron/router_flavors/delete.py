@@ -218,12 +218,17 @@ def prune_orphaned_service_profiles(
         )
 
 
-def prune_removed_flavors(conn: Any, flavors: list[dict[str, Any]]) -> None:
+def prune_removed_flavors(
+    conn: Any,
+    flavors: list[dict[str, Any]],
+    *,
+    authoritative_empty_desired: bool = False,
+) -> None:
     if not PRUNE_REMOVED_FLAVORS:
         LOG.info("Router flavor pruning is disabled")
         return
 
-    if not flavors:
+    if not flavors and not authoritative_empty_desired:
         LOG.warning(
             "No desired router flavors found; skipping prune to avoid deleting "
             "all managed router flavors"

@@ -32,7 +32,7 @@ def test_placeholder_hook_config(capsys):
         assert placeholder.main() == 0
 
     config = json.loads(capsys.readouterr().out)
-    assert config == placeholder.HOOK_CONFIG
+    assert config == placeholder.build_hook_config()
     assert config["onStartup"] == 10
 
 

@@ -75,7 +75,7 @@ def router_flavor_object(name: str, spec: dict | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# HOOK_CONFIG shape
+# hook config shape
 # ---------------------------------------------------------------------------
 
 
@@ -331,6 +331,192 @@ def test_main_prunes_after_successful_full_set_reconcile(monkeypatch, tmp_path):
         "dynamic-vrf",
         "pa1410",
     ]
+
+
+def test_main_prunes_deleted_only_credentials(monkeypatch, tmp_path):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
+    monkeypatch.setenv("POD_NAMESPACE", "openstack")
+    monkeypatch.setattr(hook, "PRUNE_REMOVED_FLAVORS", True)
+    conn = mock.MagicMock()
+
+    context_path = write_binding_context(
+        tmp_path,
+        [
+            {
+                "binding": common.CRD_BINDING_NAME,
+                "type": "Event",
+                "watchEvent": "Deleted",
+                "object": router_flavor_object("pa1410"),
+                "snapshots": {common.CRD_BINDING_NAME: []},
+            }
+        ],
+    )
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", context_path)
+
+    with (
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.get_openstack_connection",
+            return_value=conn,
+        ) as mock_connect,
+        mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
+        mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.prune_removed_flavors"
+        ) as mock_prune,
+        mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
+    ):
+        result = hook.main()
+
+    assert result == 0
+    mock_connect.assert_called_once_with("infrasetup", "understack")
+    mock_sync.assert_not_called()
+    mock_prune.assert_called_once_with(conn, [], authoritative_empty_desired=True)
+
+
+def test_main_ignores_deleted_only_credentials_when_prune_is_disabled(
+    monkeypatch, tmp_path
+):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
+    monkeypatch.setenv("POD_NAMESPACE", "openstack")
+    monkeypatch.setattr(hook, "PRUNE_REMOVED_FLAVORS", False)
+
+    context_path = write_binding_context(
+        tmp_path,
+        [
+            {
+                "binding": common.CRD_BINDING_NAME,
+                "type": "Event",
+                "watchEvent": "Deleted",
+                "object": router_flavor_object("pa1410"),
+                "snapshots": {common.CRD_BINDING_NAME: []},
+            }
+        ],
+    )
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", context_path)
+
+    with (
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.get_openstack_connection"
+        ) as mock_connect,
+        mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
+        mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.prune_removed_flavors"
+        ) as mock_prune,
+        mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
+    ):
+        result = hook.main()
+
+    assert result == 0
+    mock_connect.assert_not_called()
+    mock_sync.assert_not_called()
+    mock_prune.assert_not_called()
+
+
+def test_main_prunes_active_and_deleted_only_credentials(monkeypatch, tmp_path):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
+    monkeypatch.setenv("POD_NAMESPACE", "openstack")
+    monkeypatch.setattr(hook, "PRUNE_REMOVED_FLAVORS", True)
+    active_conn = mock.MagicMock(name="active_conn")
+    deleted_conn = mock.MagicMock(name="deleted_conn")
+
+    active_object = router_flavor_object("pa1410")
+    deleted_object = router_flavor_object(
+        "other-cloud-flavor",
+        {
+            "cloudCredentialsRef": {
+                "secretName": "other-secret",
+                "cloudName": "other-cloud",
+            }
+        },
+    )
+    context_path = write_binding_context(
+        tmp_path,
+        [
+            {
+                "binding": common.CRD_BINDING_NAME,
+                "type": "Event",
+                "watchEvent": "Deleted",
+                "object": deleted_object,
+                "snapshots": {
+                    common.CRD_BINDING_NAME: [{"object": active_object}],
+                },
+            }
+        ],
+    )
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", context_path)
+
+    def connect(secret_name, cloud_name):
+        if (secret_name, cloud_name) == ("infrasetup", "understack"):
+            return active_conn
+        if (secret_name, cloud_name) == ("other-secret", "other-cloud"):
+            return deleted_conn
+        raise AssertionError((secret_name, cloud_name))
+
+    with (
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.get_openstack_connection",
+            side_effect=connect,
+        ),
+        mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
+        mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor"),
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.prune_removed_flavors"
+        ) as mock_prune,
+        mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
+    ):
+        result = hook.main()
+
+    assert result == 0
+    assert mock_prune.call_args_list == [
+        mock.call(active_conn, [mock.ANY]),
+        mock.call(deleted_conn, [], authoritative_empty_desired=True),
+    ]
+    assert mock_prune.call_args_list[0].args[1][0]["name"] == "pa1410"
+
+
+def test_main_skips_empty_snapshot_prune_without_credentials(monkeypatch, tmp_path):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
+    monkeypatch.setenv("POD_NAMESPACE", "openstack")
+    monkeypatch.setattr(hook, "PRUNE_REMOVED_FLAVORS", True)
+
+    context_path = write_binding_context(
+        tmp_path,
+        [
+            {
+                "binding": "hourly sync",
+                "type": "Schedule",
+                "snapshots": {common.CRD_BINDING_NAME: []},
+            }
+        ],
+    )
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", context_path)
+
+    with (
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.get_openstack_connection"
+        ) as mock_connect,
+        mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
+        mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.prune_removed_flavors"
+        ) as mock_prune,
+        mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
+    ):
+        result = hook.main()
+
+    assert result == 0
+    mock_connect.assert_not_called()
+    mock_sync.assert_not_called()
+    mock_prune.assert_not_called()
 
 
 def test_main_continues_after_failure_and_skips_prune(monkeypatch, tmp_path):

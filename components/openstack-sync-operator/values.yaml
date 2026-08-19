@@ -43,4 +43,6 @@ pluginData:
       envPrefix: NEUTRON_ROUTER_FLAVOR
       env:
         SYNC_CRONTAB: "0 * * * *"
+        # When true, removing a NeutronRouterFlavor CR also deletes its unused
+        # operator-managed OpenStack flavor. Enable this before removing the CR.
         PRUNE: false

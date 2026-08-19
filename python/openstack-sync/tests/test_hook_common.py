@@ -153,6 +153,67 @@ def test_truncate_message_custom_limit():
     assert result == "ab..."
 
 
+def _matching_status(
+    *,
+    sync_status: str = "Synced",
+    message: str = "ok",
+    generation: int | None = 1,
+) -> dict:
+    condition_status = "True" if sync_status == "Synced" else "False"
+    reason = "ReconcileSucceeded" if sync_status == "Synced" else "ReconcileFailed"
+    status = {
+        "syncStatus": sync_status,
+        "lastSyncTime": "2026-08-19T06:20:21Z",
+        "message": message,
+        "conditions": [
+            {
+                "type": "Synced",
+                "status": condition_status,
+                "reason": reason,
+                "message": message,
+                "lastTransitionTime": "2026-08-19T06:20:21Z",
+            }
+        ],
+    }
+    if generation is not None:
+        status["observedGeneration"] = generation
+    return status
+
+
+def test_status_is_current_ignores_timestamps():
+    current = _matching_status(
+        message="Successfully reconciled router flavor",
+        generation=3,
+    )
+
+    assert hc._status_is_current(
+        current,
+        "Synced",
+        "Successfully reconciled router flavor",
+        3,
+    )
+
+
+@pytest.mark.parametrize(
+    ("current", "sync_status", "message", "generation"),
+    [
+        (None, "Synced", "ok", 1),
+        ({}, "Synced", "ok", 1),
+        (_matching_status(sync_status="Failed"), "Synced", "ok", 1),
+        (_matching_status(message="old"), "Synced", "new", 1),
+        (_matching_status(generation=1), "Synced", "ok", 2),
+        ({**_matching_status(), "conditions": []}, "Synced", "ok", 1),
+    ],
+)
+def test_status_is_current_detects_real_status_differences(
+    current,
+    sync_status,
+    message,
+    generation,
+):
+    assert not hc._status_is_current(current, sync_status, message, generation)
+
+
 # ---------------------------------------------------------------------------
 # patch_resource_status
 # ---------------------------------------------------------------------------
@@ -194,6 +255,23 @@ def test_patch_resource_status_calls_kubectl():
     assert "test-flavor" in cmd
     assert "-n" in cmd
     assert "openstack" in cmd
+
+
+def test_patch_resource_status_skips_when_current_status_matches():
+    with mock.patch("subprocess.run") as mock_run:
+        hc.patch_resource_status(
+            name="test-flavor",
+            namespace="openstack",
+            generation=1,
+            sync_status="Synced",
+            message="ok",
+            crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
+            crd_kind="NeutronRouterFlavor",
+            status_enabled=True,
+            current_status=_matching_status(),
+        )
+
+    mock_run.assert_not_called()
 
 
 def test_patch_resource_status_no_namespace():
@@ -247,129 +325,3 @@ def test_patch_resource_status_logs_on_kubectl_failure(caplog):
                 status_enabled=True,
             )
     assert "failed to patch" in caplog.text
-
-
-# ---------------------------------------------------------------------------
-# dispatch_binding_contexts
-# ---------------------------------------------------------------------------
-
-
-def _make_event(binding: str, event_type: str, watch_event: str = "Added") -> dict:
-    return {
-        "binding": binding,
-        "type": event_type,
-        "watchEvent": watch_event,
-        "object": {"metadata": {"name": "obj-1"}, "spec": {}},
-    }
-
-
-def test_dispatch_synchronization():
-    called = []
-    contexts = [
-        {
-            "binding": "my-binding",
-            "type": "Synchronization",
-            "objects": [
-                {"object": {"metadata": {"name": "a"}, "spec": {}}},
-                {"object": {"metadata": {"name": "b"}, "spec": {}}},
-            ],
-        }
-    ]
-    result = hc.dispatch_binding_contexts(
-        contexts, "my-binding", lambda item: called.append(item)
-    )
-    assert result == 0
-    assert len(called) == 2
-
-
-def test_dispatch_event_added():
-    called = []
-    contexts = [_make_event("my-binding", "Event", "Added")]
-    result = hc.dispatch_binding_contexts(
-        contexts, "my-binding", lambda item: called.append(item)
-    )
-    assert result == 0
-    assert len(called) == 1
-
-
-def test_dispatch_event_deleted_is_skipped():
-    called = []
-    contexts = [_make_event("my-binding", "Event", "Deleted")]
-    result = hc.dispatch_binding_contexts(
-        contexts, "my-binding", lambda item: called.append(item)
-    )
-    assert result == 0
-    assert called == []
-
-
-def test_dispatch_schedule_snapshot():
-    called = []
-    contexts = [
-        {
-            "binding": "hourly sync",
-            "type": "Schedule",
-            "snapshots": {
-                "my-binding": [
-                    {"object": {"metadata": {"name": "x"}, "spec": {}}},
-                ]
-            },
-        }
-    ]
-    result = hc.dispatch_binding_contexts(
-        contexts, "my-binding", lambda item: called.append(item)
-    )
-    assert result == 0
-    assert len(called) == 1
-
-
-def test_dispatch_ignores_other_bindings():
-    called = []
-    contexts = [_make_event("other-binding", "Event", "Added")]
-    result = hc.dispatch_binding_contexts(
-        contexts, "my-binding", lambda item: called.append(item)
-    )
-    assert result == 0
-    assert called == []
-
-
-def test_dispatch_returns_1_on_reconcile_error(caplog):
-    contexts = [_make_event("my-binding", "Event", "Added")]
-    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
-        result = hc.dispatch_binding_contexts(
-            contexts,
-            "my-binding",
-            lambda item: (_ for _ in ()).throw(RuntimeError("boom")),
-        )
-    assert result == 1
-    assert "reconcile failed" in caplog.text
-
-
-def test_dispatch_continues_after_reconcile_error(caplog):
-    called = []
-    contexts = [
-        {
-            "binding": "my-binding",
-            "type": "Synchronization",
-            "objects": [
-                {"object": {"metadata": {"name": "bad"}, "spec": {}}},
-                {"object": {"metadata": {"name": "good"}, "spec": {}}},
-            ],
-        }
-    ]
-
-    def reconcile(item: dict) -> None:
-        name = item["object"]["metadata"]["name"]
-        called.append(name)
-        if name == "bad":
-            raise RuntimeError("boom")
-
-    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
-        result = hc.dispatch_binding_contexts(
-            contexts,
-            "my-binding",
-            reconcile,
-        )
-
-    assert result == 1
-    assert called == ["bad", "good"]
-    assert "reconcile failed" in caplog.text

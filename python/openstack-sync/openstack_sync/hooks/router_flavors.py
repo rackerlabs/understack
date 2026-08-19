@@ -35,6 +35,9 @@ from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import 
     CRD_RESOURCE,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    PRUNE_REMOVED_FLAVORS,
+)
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     STATUS_ENABLED,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
@@ -44,6 +47,7 @@ from openstack_sync.plugins.neutron.router_flavors.update import sync_flavor
 from openstack_sync.utils import get_openstack_connection
 
 LOG = logging.getLogger(__name__)
+CredentialKey = tuple[str, str]
 
 # ---------------------------------------------------------------------------
 # Resource dataclass
@@ -60,6 +64,7 @@ class RouterFlavorResource:
     generation: int | None
     secret_name: str
     cloud_name: str
+    current_status: dict[str, Any] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -108,9 +113,6 @@ def build_hook_config() -> dict[str, Any]:
     return hook_config
 
 
-HOOK_CONFIG = build_hook_config()
-
-
 # ---------------------------------------------------------------------------
 # Binding context parsing
 # ---------------------------------------------------------------------------
@@ -146,6 +148,8 @@ def _resource_from_object(obj: Any, source: str) -> RouterFlavorResource:
         resource_name = string_or_none(metadata.get("name"))
         resource_namespace = string_or_none(metadata.get("namespace"))
         generation = int_or_none(metadata.get("generation"))
+    raw_status = obj.get("status")
+    current_status = raw_status if isinstance(raw_status, dict) else None
 
     try:
         creds_ref = flavor.pop("cloudCredentialsRef")
@@ -163,6 +167,7 @@ def _resource_from_object(obj: Any, source: str) -> RouterFlavorResource:
         generation=generation,
         secret_name=secret_name,
         cloud_name=cloud_name,
+        current_status=current_status,
     )
 
 
@@ -176,6 +181,34 @@ def _resources_from_items(items: list[Any], source: str) -> list[RouterFlavorRes
         resources.append(_resource_from_object(obj, item_source))
 
     return sorted(resources, key=lambda r: str(r.flavor.get("name", "")))
+
+
+def deleted_router_flavor_resources_from_binding_context(
+    contexts: list[dict[str, Any]],
+) -> list[RouterFlavorResource]:
+    resources: list[RouterFlavorResource] = []
+    for index, context in enumerate(contexts):
+        if (
+            context.get("binding") != CRD_BINDING_NAME
+            or context.get("type") != "Event"
+            or context.get("watchEvent") != "Deleted"
+        ):
+            continue
+        obj = context.get("object")
+        if not obj:
+            LOG.warning(
+                "Deleted %s event has no object; cannot use it for prune credentials",
+                CRD_KIND,
+            )
+            continue
+        resources.append(
+            _resource_from_object(
+                obj,
+                f"Deleted event {CRD_BINDING_NAME}[{index}]",
+            )
+        )
+
+    return resources
 
 
 def router_flavor_resources_from_binding_context(
@@ -237,6 +270,7 @@ def patch_flavor_status(
         crd_resource=CRD_RESOURCE,
         crd_kind=CRD_KIND,
         status_enabled=STATUS_ENABLED,
+        current_status=resource.current_status,
     )
 
 
@@ -251,8 +285,8 @@ def _resource_display_name(resource: RouterFlavorResource) -> str:
 
 def _resources_by_credentials(
     resources: list[RouterFlavorResource],
-) -> dict[tuple[str, str], list[RouterFlavorResource]]:
-    grouped: dict[tuple[str, str], list[RouterFlavorResource]] = {}
+) -> dict[CredentialKey, list[RouterFlavorResource]]:
+    grouped: dict[CredentialKey, list[RouterFlavorResource]] = {}
     for resource in resources:
         key = (resource.secret_name, resource.cloud_name)
         grouped.setdefault(key, []).append(resource)
@@ -271,25 +305,17 @@ def reconcile_router_flavor_resource(conn: Any, resource: RouterFlavorResource) 
     sync_flavor(conn, resource.flavor)
 
 
-def reconcile_router_flavor(event: dict[str, Any]) -> None:
-    """Reconcile a single NeutronRouterFlavor resource against OpenStack."""
-    resource = _resource_from_object(event["object"], "event.object")
-    conn = get_openstack_connection(resource.secret_name, resource.cloud_name)
-    try:
-        wait_for_openstack_network(conn)
-        reconcile_router_flavor_resource(conn, resource)
-    except Exception as exc:
-        patch_flavor_status(resource, "Failed", str(exc))
-        raise
-    patch_flavor_status(resource, "Synced", "Successfully reconciled router flavor")
-
-
-def reconcile_router_flavor_resources(resources: list[RouterFlavorResource]) -> int:
+def reconcile_router_flavor_resources(
+    resources: list[RouterFlavorResource],
+    deleted_resources: list[RouterFlavorResource] | None = None,
+) -> int:
+    deleted_resources = deleted_resources or []
     flavors = [resource.flavor for resource in resources]
     LOG.info("Found %s router flavor(s) to reconcile", len(flavors))
 
     grouped_resources = _resources_by_credentials(resources)
-    connections: dict[tuple[str, str], Any] = {}
+    deleted_resources_by_credentials = _resources_by_credentials(deleted_resources)
+    connections: dict[CredentialKey, Any] = {}
     failed_resources: list[RouterFlavorResource] = []
 
     for credentials, credential_resources in grouped_resources.items():
@@ -358,6 +384,22 @@ def reconcile_router_flavor_resources(resources: list[RouterFlavorResource]) -> 
             [resource.flavor for resource in credential_resources],
         )
 
+    if PRUNE_REMOVED_FLAVORS:
+        deleted_only_credentials = set(deleted_resources_by_credentials) - set(
+            grouped_resources
+        )
+        for credentials in sorted(deleted_only_credentials):
+            secret_name, cloud_name = credentials
+            conn = get_openstack_connection(secret_name, cloud_name)
+            wait_for_openstack_network(conn)
+            prune_removed_flavors(conn, [], authoritative_empty_desired=True)
+
+        if not grouped_resources and not deleted_resources_by_credentials:
+            LOG.info(
+                "Skipping router flavor prune; no router flavor credentials "
+                "are available"
+            )
+
     LOG.info("Finished reconciling router flavors")
     return 0
 
@@ -397,7 +439,10 @@ def main() -> int:
         if not isinstance(binding_contexts, list):
             raise ConfigError("Shell-operator binding context must be a list")
         resources = load_router_flavor_resources(binding_contexts)
-        return reconcile_router_flavor_resources(resources)
+        deleted_resources = deleted_router_flavor_resources_from_binding_context(
+            binding_contexts
+        )
+        return reconcile_router_flavor_resources(resources, deleted_resources)
     except Exception as exc:  # noqa: BLE001
         LOG.error("%s", exc)
         return 1

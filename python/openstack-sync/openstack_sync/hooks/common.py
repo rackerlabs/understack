@@ -1,7 +1,6 @@
 """Generic shell-operator hook utilities shared across all hooks.
 
-Provides binding context I/O, status patching via kubectl, and the
-Synchronization/Event/Schedule dispatch loop that every hook needs.
+Provides binding context I/O and status patching via kubectl.
 """
 
 from __future__ import annotations
@@ -12,7 +11,6 @@ import logging
 import os
 import subprocess
 import sys
-from collections.abc import Callable
 from typing import Any
 
 LOG = logging.getLogger(__name__)
@@ -117,6 +115,64 @@ def truncate_message(message: Any, max_length: int = 2048) -> str:
     return f"{text[: max_length - 3]}..."
 
 
+def _condition_status(sync_status: str) -> str:
+    return "True" if sync_status == "Synced" else "False"
+
+
+def _condition_reason(sync_status: str) -> str:
+    return "ReconcileSucceeded" if sync_status == "Synced" else "ReconcileFailed"
+
+
+def _desired_condition(sync_status: str, message: str) -> dict[str, str]:
+    return {
+        "type": "Synced",
+        "status": _condition_status(sync_status),
+        "reason": _condition_reason(sync_status),
+        "message": truncate_message(message),
+    }
+
+
+def _synced_condition(current: dict[str, Any]) -> dict[str, Any] | None:
+    conditions = current.get("conditions")
+    if not isinstance(conditions, list):
+        return None
+    for condition in conditions:
+        if isinstance(condition, dict) and condition.get("type") == "Synced":
+            return condition
+    return None
+
+
+def _status_is_current(
+    current: dict[str, Any] | None,
+    sync_status: str,
+    message: str,
+    generation: int | None,
+) -> bool:
+    """Return True when the existing CR status already matches desired state.
+
+    Timestamp fields are intentionally ignored. Rewriting them on every no-op
+    reconcile creates a Kubernetes Modified event and can requeue the hook.
+    """
+    if not current:
+        return False
+
+    truncated_message = truncate_message(message)
+    if current.get("syncStatus") != sync_status:
+        return False
+    if current.get("message") != truncated_message:
+        return False
+    if generation is not None and current.get("observedGeneration") != generation:
+        return False
+
+    current_condition = _synced_condition(current)
+    if current_condition is None:
+        return False
+    for key, value in _desired_condition(sync_status, truncated_message).items():
+        if current_condition.get(key) != value:
+            return False
+    return True
+
+
 def patch_resource_status(
     *,
     name: str,
@@ -127,6 +183,7 @@ def patch_resource_status(
     crd_resource: str,
     crd_kind: str,
     status_enabled: bool,
+    current_status: dict[str, Any] | None = None,
 ) -> None:
     """Patch the status subresource of a CR via kubectl.
 
@@ -140,26 +197,28 @@ def patch_resource_status(
             ``neutronrouterflavors.neutron.understack.rackspace.net``).
         crd_kind: CRD kind used in log messages (e.g. ``NeutronRouterFlavor``).
         status_enabled: When False the function returns immediately.
+        current_status: Current CR status from the binding context. When it
+            already matches the desired stable fields, the patch is skipped.
     """
     if not status_enabled:
         return
 
+    if _status_is_current(current_status, sync_status, message, generation):
+        LOG.debug(
+            "skipping %s status patch for %s; status is already current",
+            crd_kind,
+            name,
+        )
+        return
+
     timestamp = utc_timestamp()
-    condition_status = "True" if sync_status == "Synced" else "False"
-    reason = "ReconcileSucceeded" if sync_status == "Synced" else "ReconcileFailed"
+    condition = _desired_condition(sync_status, message)
+    condition["lastTransitionTime"] = timestamp
     status: dict[str, Any] = {
         "syncStatus": sync_status,
         "lastSyncTime": timestamp,
         "message": truncate_message(message),
-        "conditions": [
-            {
-                "type": "Synced",
-                "status": condition_status,
-                "reason": reason,
-                "message": truncate_message(message),
-                "lastTransitionTime": timestamp,
-            }
-        ],
+        "conditions": [condition],
     }
     if generation is not None:
         status["observedGeneration"] = generation
@@ -193,71 +252,3 @@ def patch_resource_status(
     if result.returncode != 0:
         error = (result.stderr or result.stdout or "unknown error").strip()
         LOG.warning("failed to patch %s status for %s: %s", crd_kind, name, error)
-
-
-# ---------------------------------------------------------------------------
-# Binding context dispatch loop
-# ---------------------------------------------------------------------------
-
-
-def dispatch_binding_contexts(
-    binding_contexts: list[dict[str, Any]],
-    binding_name: str,
-    reconcile_fn: Callable[[dict[str, Any]], None],
-) -> int:
-    """Dispatch each object in *binding_contexts* to *reconcile_fn*.
-
-    Handles the three shell-operator context types:
-    - ``Synchronization``: full object list on startup
-    - ``Event``: single Added/Modified/Deleted event (Deleted is skipped)
-    - Schedule / other: objects from the snapshots map
-
-    Args:
-        binding_contexts: Parsed list from the shell-operator binding context.
-        binding_name: The binding name to filter on.
-        reconcile_fn: Called with each individual event dict ``{"object": ...}``.
-
-    Returns:
-        0 on success, 1 if any reconciliation raises.
-    """
-    failed = False
-
-    for context in binding_contexts:
-        binding = context.get("binding", "")
-        context_type = context.get("type", "")
-
-        if context_type == "Synchronization":
-            if binding != binding_name:
-                continue
-            for item in context.get("objects", []):
-                try:
-                    reconcile_fn(item)
-                except Exception as exc:  # noqa: BLE001
-                    LOG.error("reconcile failed: %s", exc)
-                    failed = True
-
-        elif context_type == "Event":
-            if binding != binding_name:
-                continue
-            if context.get("watchEvent") == "Deleted":
-                continue
-            obj = context.get("object")
-            if obj:
-                try:
-                    reconcile_fn({"object": obj})
-                except Exception as exc:  # noqa: BLE001
-                    LOG.error("reconcile failed: %s", exc)
-                    failed = True
-
-        else:
-            # Schedule bindings use the schedule's name, not the Kubernetes
-            # binding name. The desired objects live in the snapshots map.
-            snapshots = context.get("snapshots", {})
-            for item in snapshots.get(binding_name, []):
-                try:
-                    reconcile_fn(item)
-                except Exception as exc:  # noqa: BLE001
-                    LOG.error("reconcile failed: %s", exc)
-                    failed = True
-
-    return 1 if failed else 0

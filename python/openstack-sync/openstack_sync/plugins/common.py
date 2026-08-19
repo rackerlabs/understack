@@ -16,8 +16,6 @@ from typing import Any
 
 from openstack import exceptions as openstack_exceptions
 
-from openstack_sync.utils import get_openstack_connection
-
 LOG = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -197,48 +195,6 @@ def is_not_found(exc: Exception) -> bool:
 def is_conflict(exc: Exception) -> bool:
     """Return True for openstacksdk 409 exceptions."""
     return isinstance(exc, openstack_exceptions.ConflictException)
-
-
-# ---------------------------------------------------------------------------
-# Config validation
-# ---------------------------------------------------------------------------
-
-
-def validate_config(items: Any, source: str) -> list[dict[str, Any]]:
-    """Validate that *items* is a list of dicts.
-
-    Args:
-        items: The value to validate.
-        source: Human-readable label used in error messages.
-
-    Returns:
-        A shallow copy of the validated list.
-
-    Raises:
-        ConfigError: When *items* is not a list or contains a non-dict element.
-    """
-    if not isinstance(items, list):
-        raise ConfigError(f"{source} must be a list")
-    validated = []
-    for index, item in enumerate(items):
-        if not isinstance(item, dict):
-            raise ConfigError(f"{source}[{index}] must be an object")
-        validated.append(dict(item))
-    return validated
-
-
-# ---------------------------------------------------------------------------
-# OpenStack connection
-# ---------------------------------------------------------------------------
-
-
-def connect_openstack(secret_name: str, cloud_name: str) -> Any:
-    """Return an authenticated OpenStack connection loaded from a K8s Secret.
-
-    Delegates to :func:`openstack_sync.utils.get_openstack_connection` so
-    credentials are read from Kubernetes rather than a file on disk.
-    """
-    return get_openstack_connection(secret_name, cloud_name)
 
 
 # ---------------------------------------------------------------------------

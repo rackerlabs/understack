@@ -27,7 +27,11 @@ def _fake_conn():
     return mock.MagicMock(name="fake_conn")
 
 
-def _router_flavor_object(name: str, spec: dict | None = None) -> dict:
+def _router_flavor_object(
+    name: str,
+    spec: dict | None = None,
+    status: dict | None = None,
+) -> dict:
     flavor_spec = {
         "name": name,
         "driver": "some.Driver",
@@ -37,7 +41,7 @@ def _router_flavor_object(name: str, spec: dict | None = None) -> dict:
         },
     }
     flavor_spec.update(spec or {})
-    return {
+    obj = {
         "metadata": {
             "name": name,
             "namespace": "openstack",
@@ -45,6 +49,9 @@ def _router_flavor_object(name: str, spec: dict | None = None) -> dict:
         },
         "spec": flavor_spec,
     }
+    if status is not None:
+        obj["status"] = status
+    return obj
 
 
 def _snapshot_context(*objects: dict) -> list[dict]:
@@ -78,6 +85,17 @@ def test_router_flavor_hook_config_disabled(monkeypatch):
 def test_router_flavor_hook_config_omits_schedule_without_crontab(monkeypatch):
     monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
     monkeypatch.delenv("NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB", raising=False)
+    monkeypatch.delenv("POD_NAMESPACE", raising=False)
+
+    config = router_flavors.build_hook_config()
+
+    assert config["kubernetes"][0]["name"] == router_flavors.CRD_BINDING_NAME
+    assert "schedule" not in config
+
+
+def test_router_flavor_hook_config_omits_schedule_with_empty_crontab(monkeypatch):
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB", "")
     monkeypatch.delenv("POD_NAMESPACE", raising=False)
 
     config = router_flavors.build_hook_config()
@@ -139,78 +157,114 @@ def test_router_flavor_hook_config_printed_on_config_flag(monkeypatch, capsys):
 
 
 # ---------------------------------------------------------------------------
-# reconcile_router_flavor: credential resolution and sync delegation
+# binding context parsing
 # ---------------------------------------------------------------------------
 
 
-def test_reconcile_uses_cloudcredentialsref(monkeypatch):
-    """Per-resource cloudCredentialsRef is used to connect to OpenStack."""
-    monkeypatch.setattr(utils, "_connection_cache", {})
-    monkeypatch.setenv("POD_NAMESPACE", "openstack")
-
-    event = {
-        "object": {
-            "metadata": {"name": "test-flavor"},
-            "spec": {
-                "name": "test-flavor",
-                "driver": "some.Driver",
-                "cloudCredentialsRef": {
-                    "secretName": "baremetal-manage",
-                    "cloudName": "understack",
-                },
-            },
-        }
+def test_load_router_flavor_resources_keeps_current_status():
+    status = {
+        "syncStatus": "Synced",
+        "message": "Successfully reconciled router flavor",
+        "observedGeneration": 1,
     }
+    contexts = _snapshot_context(_router_flavor_object("flavor-a", status=status))
+
+    resources = router_flavors.load_router_flavor_resources(contexts)
+
+    assert resources[0].current_status == status
+
+
+def test_patch_flavor_status_passes_current_status():
+    status = {"syncStatus": "Synced", "message": "ok", "observedGeneration": 1}
+    secret_name = "infrasetup"  # noqa: S105
+    resource = router_flavors.RouterFlavorResource(
+        flavor={"name": "flavor-a", "driver": "some.Driver"},
+        name="flavor-a",
+        namespace="openstack",
+        generation=1,
+        secret_name=secret_name,
+        cloud_name="understack",
+        current_status=status,
+    )
+
+    with mock.patch(
+        "openstack_sync.hooks.router_flavors.patch_resource_status"
+    ) as mock_patch:
+        router_flavors.patch_flavor_status(resource, "Synced", "ok")
+
+    assert mock_patch.call_args.kwargs["current_status"] == status
+
+
+# ---------------------------------------------------------------------------
+# reconcile_router_flavor_resources: credential resolution and sync delegation
+# ---------------------------------------------------------------------------
+
+
+def test_reconcile_uses_cloudcredentialsref():
+    """Per-resource cloudCredentialsRef is used to connect to OpenStack."""
+    resource = router_flavors.load_router_flavor_resources(
+        _snapshot_context(
+            _router_flavor_object(
+                "test-flavor",
+                {
+                    "cloudCredentialsRef": {
+                        "secretName": "baremetal-manage",
+                        "cloudName": "understack",
+                    },
+                },
+            )
+        )
+    )[0]
+    conn = _fake_conn()
 
     with (
         mock.patch(
-            "openstack_sync.utils.openstack.connection.Connection",
-            return_value=_fake_conn(),
-        ),
-        mock.patch.object(
-            utils, "read_secret_key", return_value=FAKE_CLOUDS_YAML
-        ) as mock_read,
+            "openstack_sync.hooks.router_flavors.get_openstack_connection",
+            return_value=conn,
+        ) as mock_connect,
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.prune_removed_flavors"
+        ) as mock_prune,
     ):
-        router_flavors.reconcile_router_flavor(event)
+        result = router_flavors.reconcile_router_flavor_resources([resource])
 
-    mock_read.assert_called_once_with("baremetal-manage", "clouds.yaml", "openstack")
+    assert result == 0
+    mock_connect.assert_called_once_with("baremetal-manage", "understack")
+    mock_sync.assert_called_once_with(conn, resource.flavor)
+    mock_prune.assert_called_once_with(conn, [resource.flavor])
 
 
 def test_reconcile_requires_cloudcredentialsref():
-    event = {
-        "object": {
-            "metadata": {"name": "no-ref-flavor"},
-            "spec": {"name": "no-ref-flavor", "driver": "some.Driver"},
-        }
+    obj = {
+        "metadata": {"name": "no-ref-flavor"},
+        "spec": {"name": "no-ref-flavor", "driver": "some.Driver"},
     }
 
     with pytest.raises(
         router_flavors.ConfigError,
         match="cloudCredentialsRef is required",
     ):
-        router_flavors.reconcile_router_flavor(event)
+        router_flavors.load_router_flavor_resources(_snapshot_context(obj))
 
 
 def test_reconcile_requires_complete_cloudcredentialsref():
-    event = {
-        "object": {
-            "metadata": {"name": "partial-flavor"},
-            "spec": {
-                "name": "partial-flavor",
-                "driver": "some.Driver",
-                "cloudCredentialsRef": {"secretName": "custom-secret"},
-            },
-        }
+    obj = {
+        "metadata": {"name": "partial-flavor"},
+        "spec": {
+            "name": "partial-flavor",
+            "driver": "some.Driver",
+            "cloudCredentialsRef": {"secretName": "custom-secret"},
+        },
     }
 
     with pytest.raises(
         router_flavors.ConfigError,
         match=r"cloudCredentialsRef\.cloudName",
     ):
-        router_flavors.reconcile_router_flavor(event)
+        router_flavors.load_router_flavor_resources(_snapshot_context(obj))
 
 
 # ---------------------------------------------------------------------------

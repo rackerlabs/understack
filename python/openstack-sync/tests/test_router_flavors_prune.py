@@ -76,6 +76,22 @@ def test_prune_keeps_managed_flavors_when_desired_list_is_empty(monkeypatch):
     assert conn.network.deleted_flavors == []
 
 
+def test_prune_deletes_managed_flavors_when_empty_desired_is_explicit(monkeypatch):
+    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
+    flavor = {
+        "id": "managed-flavor-id",
+        "name": "removed-managed-flavor",
+        "service_type": common.DEFAULT_SERVICE_TYPE,
+        "description": common.managed_flavor_description("created by operator"),
+        "service_profile_ids": [],
+    }
+    conn = SimpleNamespace(network=FakeNetwork([flavor], {}))
+
+    delete.prune_removed_flavors(conn, [], authoritative_empty_desired=True)
+
+    assert conn.network.deleted_flavors == ["managed-flavor-id"]
+
+
 def test_prune_deletes_removed_managed_flavor(monkeypatch):
     monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
     flavor = {

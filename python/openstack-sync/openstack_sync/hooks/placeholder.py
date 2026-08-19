@@ -35,9 +35,6 @@ def build_hook_config() -> dict[str, Any]:
     return hook_config
 
 
-HOOK_CONFIG = build_hook_config()
-
-
 def check_openstack_connectivity() -> None:
     """Attempt to authenticate against OpenStack and log the result.
 
