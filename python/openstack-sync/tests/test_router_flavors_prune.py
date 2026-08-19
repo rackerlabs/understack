@@ -93,7 +93,7 @@ def test_prune_deletes_removed_managed_flavor(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# prune_orphaned_service_profiles — second-pass GC for partial-failure orphans
+# prune_orphaned_service_profiles: second-pass GC for partial-failure orphans
 # ---------------------------------------------------------------------------
 
 
@@ -142,7 +142,7 @@ def test_prune_orphaned_profiles_deletes_unattached_managed_profile(monkeypatch)
     monkeypatch.setattr(delete, "DELETE_UNUSED_SERVICE_PROFILES", True)
 
     orphan = _make_orphan_profile("orphan-profile-id")
-    # No flavors in Neutron — the orphan's parent was already deleted.
+    # No flavors in Neutron; the orphan's parent was already deleted.
     network = FakeNetworkWithProfiles(flavors=[], profiles={orphan.id: orphan})
     conn = SimpleNamespace(network=network)
 

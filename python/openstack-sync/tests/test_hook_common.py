@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from unittest import mock
 
 import pytest
@@ -158,19 +159,19 @@ def test_truncate_message_custom_limit():
 
 
 def test_patch_resource_status_skips_when_disabled():
-    logs = []
-    hc.patch_resource_status(
-        name="test-flavor",
-        namespace="openstack",
-        generation=1,
-        sync_status="Synced",
-        message="ok",
-        crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
-        crd_kind="NeutronRouterFlavor",
-        status_enabled=False,
-        log_fn=logs.append,
-    )
-    assert logs == []
+    with mock.patch("subprocess.run") as mock_run:
+        hc.patch_resource_status(
+            name="test-flavor",
+            namespace="openstack",
+            generation=1,
+            sync_status="Synced",
+            message="ok",
+            crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
+            crd_kind="NeutronRouterFlavor",
+            status_enabled=False,
+        )
+
+    mock_run.assert_not_called()
 
 
 def test_patch_resource_status_calls_kubectl():
@@ -213,41 +214,39 @@ def test_patch_resource_status_no_namespace():
     assert "-n" not in cmd
 
 
-def test_patch_resource_status_logs_on_kubectl_not_found():
-    logs = []
+def test_patch_resource_status_logs_on_kubectl_not_found(caplog):
     with mock.patch("subprocess.run", side_effect=FileNotFoundError):
-        hc.patch_resource_status(
-            name="test-flavor",
-            namespace=None,
-            generation=None,
-            sync_status="Synced",
-            message="ok",
-            crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
-            crd_kind="NeutronRouterFlavor",
-            status_enabled=True,
-            log_fn=logs.append,
-        )
-    assert any("kubectl not found" in msg for msg in logs)
+        with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+            hc.patch_resource_status(
+                name="test-flavor",
+                namespace=None,
+                generation=None,
+                sync_status="Synced",
+                message="ok",
+                crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
+                crd_kind="NeutronRouterFlavor",
+                status_enabled=True,
+            )
+    assert "kubectl not found" in caplog.text
 
 
-def test_patch_resource_status_logs_on_kubectl_failure():
-    logs = []
+def test_patch_resource_status_logs_on_kubectl_failure(caplog):
     with mock.patch("subprocess.run") as mock_run:
         mock_run.return_value = mock.MagicMock(
             returncode=1, stderr="not found", stdout=""
         )
-        hc.patch_resource_status(
-            name="test-flavor",
-            namespace="openstack",
-            generation=None,
-            sync_status="Synced",
-            message="ok",
-            crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
-            crd_kind="NeutronRouterFlavor",
-            status_enabled=True,
-            log_fn=logs.append,
-        )
-    assert any("failed to patch" in msg for msg in logs)
+        with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+            hc.patch_resource_status(
+                name="test-flavor",
+                namespace="openstack",
+                generation=None,
+                sync_status="Synced",
+                message="ok",
+                crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
+                crd_kind="NeutronRouterFlavor",
+                status_enabled=True,
+            )
+    assert "failed to patch" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +306,7 @@ def test_dispatch_schedule_snapshot():
     called = []
     contexts = [
         {
-            "binding": "my-binding",
+            "binding": "hourly sync",
             "type": "Schedule",
             "snapshots": {
                 "my-binding": [
@@ -333,14 +332,44 @@ def test_dispatch_ignores_other_bindings():
     assert called == []
 
 
-def test_dispatch_returns_1_on_reconcile_error():
-    logs = []
+def test_dispatch_returns_1_on_reconcile_error(caplog):
     contexts = [_make_event("my-binding", "Event", "Added")]
-    result = hc.dispatch_binding_contexts(
-        contexts,
-        "my-binding",
-        lambda item: (_ for _ in ()).throw(RuntimeError("boom")),
-        log_fn=logs.append,
-    )
+    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
+        result = hc.dispatch_binding_contexts(
+            contexts,
+            "my-binding",
+            lambda item: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
     assert result == 1
-    assert any("reconcile failed" in msg for msg in logs)
+    assert "reconcile failed" in caplog.text
+
+
+def test_dispatch_continues_after_reconcile_error(caplog):
+    called = []
+    contexts = [
+        {
+            "binding": "my-binding",
+            "type": "Synchronization",
+            "objects": [
+                {"object": {"metadata": {"name": "bad"}, "spec": {}}},
+                {"object": {"metadata": {"name": "good"}, "spec": {}}},
+            ],
+        }
+    ]
+
+    def reconcile(item: dict) -> None:
+        name = item["object"]["metadata"]["name"]
+        called.append(name)
+        if name == "bad":
+            raise RuntimeError("boom")
+
+    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
+        result = hc.dispatch_binding_contexts(
+            contexts,
+            "my-binding",
+            reconcile,
+        )
+
+    assert result == 1
+    assert called == ["bad", "good"]
+    assert "reconcile failed" in caplog.text

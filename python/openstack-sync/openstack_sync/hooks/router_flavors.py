@@ -4,18 +4,23 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 from dataclasses import dataclass
 from typing import Any
 
-from openstack_sync.hooks.common import dispatch_binding_contexts
+from openstack_sync.hooks.common import configure_logging
 from openstack_sync.hooks.common import int_or_none
 from openstack_sync.hooks.common import patch_resource_status
 from openstack_sync.hooks.common import read_binding_context
 from openstack_sync.hooks.common import snapshot_items
 from openstack_sync.hooks.common import string_or_none
 from openstack_sync.hooks.common import synchronization_items
+from openstack_sync.plugins.common import ConfigError
+from openstack_sync.plugins.common import env_bool
+from openstack_sync.plugins.common import get_value
+from openstack_sync.plugins.neutron.router_flavors.delete import prune_removed_flavors
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     CRD_API_VERSION,
 )
@@ -30,20 +35,15 @@ from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import 
     CRD_RESOURCE,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    DEFAULT_CLOUD,
-)
-from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    DEFAULT_SECRET,
-)
-from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     STATUS_ENABLED,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    ConfigError,
+    wait_for_openstack_network,
 )
-from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import log
 from openstack_sync.plugins.neutron.router_flavors.update import sync_flavor
 from openstack_sync.utils import get_openstack_connection
+
+LOG = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Resource dataclass
@@ -76,14 +76,12 @@ def build_hook_config() -> dict[str, Any]:
         },
     }
 
-    is_sync_enabled = bool(
-        os.environ.get("NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB", "").strip()
-    )
-    if not is_sync_enabled:
+    if not env_bool("NEUTRON_ROUTER_FLAVOR_ENABLED", False):
         # Shell-operator requires at least one binding.
         hook_config["onStartup"] = 10
         return hook_config
 
+    sync_crontab = os.environ.get("NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB", "").strip()
     namespace = os.environ.get("POD_NAMESPACE")
     kubernetes_binding: dict[str, Any] = {
         "name": CRD_BINDING_NAME,
@@ -99,13 +97,14 @@ def build_hook_config() -> dict[str, Any]:
         }
 
     hook_config["kubernetes"] = [kubernetes_binding]
-    hook_config["schedule"] = [
-        {
-            "name": "hourly sync",
-            "crontab": os.environ["NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB"],
-            "includeSnapshotsFrom": [CRD_BINDING_NAME],
-        }
-    ]
+    if sync_crontab:
+        hook_config["schedule"] = [
+            {
+                "name": "hourly sync",
+                "crontab": sync_crontab,
+                "includeSnapshotsFrom": [CRD_BINDING_NAME],
+            }
+        ]
     return hook_config
 
 
@@ -115,6 +114,19 @@ HOOK_CONFIG = build_hook_config()
 # ---------------------------------------------------------------------------
 # Binding context parsing
 # ---------------------------------------------------------------------------
+
+
+def _required_cloud_credential(
+    creds_ref: dict[str, Any],
+    field: str,
+    source: str,
+) -> str:
+    value = creds_ref.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(
+            f"{source} spec.cloudCredentialsRef.{field} must be a non-empty string"
+        )
+    return value.strip()
 
 
 def _resource_from_object(obj: Any, source: str) -> RouterFlavorResource:
@@ -135,12 +147,14 @@ def _resource_from_object(obj: Any, source: str) -> RouterFlavorResource:
         resource_namespace = string_or_none(metadata.get("namespace"))
         generation = int_or_none(metadata.get("generation"))
 
-    if "name" not in flavor and resource_name:
-        flavor["name"] = resource_name
-
-    creds_ref = flavor.pop("cloudCredentialsRef", {}) or {}
-    secret_name = creds_ref.get("secretName") or DEFAULT_SECRET
-    cloud_name = creds_ref.get("cloudName") or DEFAULT_CLOUD
+    try:
+        creds_ref = flavor.pop("cloudCredentialsRef")
+    except KeyError as exc:
+        raise ConfigError(f"{source} spec.cloudCredentialsRef is required") from exc
+    if not isinstance(creds_ref, dict):
+        raise ConfigError(f"{source} spec.cloudCredentialsRef must be an object")
+    secret_name = _required_cloud_credential(creds_ref, "secretName", source)
+    cloud_name = _required_cloud_credential(creds_ref, "cloudName", source)
 
     return RouterFlavorResource(
         flavor=flavor,
@@ -164,13 +178,9 @@ def _resources_from_items(items: list[Any], source: str) -> list[RouterFlavorRes
     return sorted(resources, key=lambda r: str(r.flavor.get("name", "")))
 
 
-def load_router_flavor_resources() -> list[RouterFlavorResource]:
-    contexts = read_binding_context()
-    if not contexts:
-        raise ConfigError(
-            f"Shell-operator binding context is required to load {CRD_KIND} objects"
-        )
-
+def router_flavor_resources_from_binding_context(
+    contexts: list[dict[str, Any]],
+) -> list[RouterFlavorResource] | None:
     items = snapshot_items(contexts, CRD_BINDING_NAME)
     if items is not None:
         return _resources_from_items(items, f"Snapshot {CRD_BINDING_NAME}")
@@ -178,6 +188,23 @@ def load_router_flavor_resources() -> list[RouterFlavorResource]:
     items = synchronization_items(contexts, CRD_BINDING_NAME)
     if items is not None:
         return _resources_from_items(items, f"Synchronization {CRD_BINDING_NAME}")
+
+    return None
+
+
+def load_router_flavor_resources(
+    contexts: list[dict[str, Any]] | None = None,
+) -> list[RouterFlavorResource]:
+    if contexts is None:
+        contexts = read_binding_context()
+    if not contexts:
+        raise ConfigError(
+            f"Shell-operator binding context is required to load {CRD_KIND} objects"
+        )
+
+    resources = router_flavor_resources_from_binding_context(contexts)
+    if resources is not None:
+        return resources
 
     raise ConfigError(
         f"Shell-operator binding context does not contain "
@@ -196,7 +223,10 @@ def patch_flavor_status(
     message: str,
 ) -> None:
     if not resource.name:
-        log(f"Unable to patch {CRD_KIND} status; Kubernetes metadata.name is missing")
+        LOG.warning(
+            "Unable to patch %s status; Kubernetes metadata.name is missing",
+            CRD_KIND,
+        )
         return
     patch_resource_status(
         name=resource.name,
@@ -207,7 +237,6 @@ def patch_flavor_status(
         crd_resource=CRD_RESOURCE,
         crd_kind=CRD_KIND,
         status_enabled=STATUS_ENABLED,
-        log_fn=log,
     )
 
 
@@ -216,11 +245,121 @@ def patch_flavor_status(
 # ---------------------------------------------------------------------------
 
 
+def _resource_display_name(resource: RouterFlavorResource) -> str:
+    return str(get_value(resource.flavor, "name", default=resource.name or "<unknown>"))
+
+
+def _resources_by_credentials(
+    resources: list[RouterFlavorResource],
+) -> dict[tuple[str, str], list[RouterFlavorResource]]:
+    grouped: dict[tuple[str, str], list[RouterFlavorResource]] = {}
+    for resource in resources:
+        key = (resource.secret_name, resource.cloud_name)
+        grouped.setdefault(key, []).append(resource)
+    return grouped
+
+
+def _mark_resources_failed(
+    resources: list[RouterFlavorResource],
+    message: str,
+) -> None:
+    for resource in resources:
+        patch_flavor_status(resource, "Failed", message)
+
+
+def reconcile_router_flavor_resource(conn: Any, resource: RouterFlavorResource) -> None:
+    sync_flavor(conn, resource.flavor)
+
+
 def reconcile_router_flavor(event: dict[str, Any]) -> None:
     """Reconcile a single NeutronRouterFlavor resource against OpenStack."""
     resource = _resource_from_object(event["object"], "event.object")
     conn = get_openstack_connection(resource.secret_name, resource.cloud_name)
-    sync_flavor(conn, resource.flavor)
+    try:
+        wait_for_openstack_network(conn)
+        reconcile_router_flavor_resource(conn, resource)
+    except Exception as exc:
+        patch_flavor_status(resource, "Failed", str(exc))
+        raise
+    patch_flavor_status(resource, "Synced", "Successfully reconciled router flavor")
+
+
+def reconcile_router_flavor_resources(resources: list[RouterFlavorResource]) -> int:
+    flavors = [resource.flavor for resource in resources]
+    LOG.info("Found %s router flavor(s) to reconcile", len(flavors))
+
+    grouped_resources = _resources_by_credentials(resources)
+    connections: dict[tuple[str, str], Any] = {}
+    failed_resources: list[RouterFlavorResource] = []
+
+    for credentials, credential_resources in grouped_resources.items():
+        secret_name, cloud_name = credentials
+        try:
+            conn = get_openstack_connection(secret_name, cloud_name)
+        except Exception as exc:  # noqa: BLE001
+            failed_resources.extend(credential_resources)
+            message = f"OpenStack connection failed: {exc}"
+            _mark_resources_failed(credential_resources, message)
+            LOG.error(
+                "Failed to connect to OpenStack cloud=%r secret=%r: %s",
+                cloud_name,
+                secret_name,
+                exc,
+            )
+            continue
+
+        connections[credentials] = conn
+        try:
+            wait_for_openstack_network(conn)
+        except Exception as exc:  # noqa: BLE001
+            failed_resources.extend(credential_resources)
+            _mark_resources_failed(
+                credential_resources,
+                f"Neutron API unavailable: {exc}",
+            )
+            LOG.error(
+                "Neutron API unavailable for cloud=%r secret=%r: %s",
+                cloud_name,
+                secret_name,
+                exc,
+            )
+            continue
+
+        for resource in credential_resources:
+            try:
+                reconcile_router_flavor_resource(conn, resource)
+            except Exception as exc:  # noqa: BLE001
+                failed_resources.append(resource)
+                patch_flavor_status(resource, "Failed", str(exc))
+                LOG.error(
+                    "Failed to reconcile router flavor %s: %s",
+                    _resource_display_name(resource),
+                    exc,
+                )
+                continue
+
+            patch_flavor_status(
+                resource,
+                "Synced",
+                "Successfully reconciled router flavor",
+            )
+
+    if failed_resources:
+        LOG.error(
+            "Skipping router flavor prune because %s flavor(s) failed to reconcile",
+            len(failed_resources),
+        )
+        return 1
+
+    for credentials, credential_resources in grouped_resources.items():
+        conn = connections[credentials]
+        prune_removed_flavors(
+            conn,
+            [resource.flavor for resource in credential_resources],
+        )
+
+    LOG.info("Finished reconciling router flavors")
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -231,6 +370,12 @@ def reconcile_router_flavor(event: dict[str, Any]) -> None:
 def main() -> int:
     if len(sys.argv) > 1 and sys.argv[1] == "--config":
         print(json.dumps(build_hook_config(), indent=2))
+        return 0
+
+    configure_logging()
+
+    if not env_bool("NEUTRON_ROUTER_FLAVOR_ENABLED", False):
+        LOG.info("Router flavor sync is disabled")
         return 0
 
     context_path = os.environ.get("BINDING_CONTEXT_PATH")
@@ -245,15 +390,17 @@ def main() -> int:
     try:
         binding_contexts = json.loads(raw)
     except json.JSONDecodeError as exc:
-        print(f"failed to parse binding context: {exc}", file=sys.stderr)
+        LOG.error("failed to parse binding context: %s", exc)
         return 1
 
-    return dispatch_binding_contexts(
-        binding_contexts,
-        CRD_BINDING_NAME,
-        reconcile_router_flavor,
-        log_fn=log,
-    )
+    try:
+        if not isinstance(binding_contexts, list):
+            raise ConfigError("Shell-operator binding context must be a list")
+        resources = load_router_flavor_resources(binding_contexts)
+        return reconcile_router_flavor_resources(resources)
+    except Exception as exc:  # noqa: BLE001
+        LOG.error("%s", exc)
+        return 1
 
 
 if __name__ == "__main__":

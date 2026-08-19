@@ -13,7 +13,7 @@ import os
 import pytest
 
 # ---------------------------------------------------------------------------
-# Required env vars for router_flavors_common — set before any import
+# Required env vars for router_flavors_common - set before any import
 # ---------------------------------------------------------------------------
 
 _ROUTER_FLAVOR_REQUIRED_ENV = {
@@ -24,8 +24,6 @@ _ROUTER_FLAVOR_REQUIRED_ENV = {
     "NEUTRON_ROUTER_FLAVOR_CRD_RESOURCE": (
         "neutronrouterflavors.neutron.understack.rackspace.net"
     ),
-    "NEUTRON_ROUTER_FLAVOR_DEFAULT_SECRET": "infrasetup",
-    "NEUTRON_ROUTER_FLAVOR_DEFAULT_CLOUD": "understack",
 }
 
 for _key, _value in _ROUTER_FLAVOR_REQUIRED_ENV.items():

@@ -1,6 +1,6 @@
 """Generic utilities shared across all openstack-sync plugins.
 
-Provides environment helpers, duck-typed OpenStack resource accessors,
+Provides environment helpers, OpenStack SDK resource accessors,
 meta_info normalisation, exception classifiers, and common API helpers
 that are reusable by any plugin regardless of which OpenStack service it
 targets.
@@ -8,13 +8,17 @@ targets.
 
 from __future__ import annotations
 
-import ast
 import json
+import logging
 import os
 import time
 from typing import Any
 
+from openstack import exceptions as openstack_exceptions
+
 from openstack_sync.utils import get_openstack_connection
+
+LOG = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Environment helpers
@@ -52,72 +56,61 @@ class ConfigError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Duck-typed OpenStack resource accessors
+# OpenStack SDK resource accessors
 # ---------------------------------------------------------------------------
 
 _MISSING = object()
 
 
+def _mapping_value(mapping: dict[str, Any], name: str) -> Any:
+    """Read *name* from a mapping without invoking default values."""
+    try:
+        return mapping[name]
+    except KeyError:
+        return _MISSING
+
+
+def _attribute_value(resource: Any, name: str) -> Any:
+    """Read *name* through attribute access."""
+    try:
+        return getattr(resource, name)
+    except AttributeError:
+        return _MISSING
+
+
 def _resource_value(resource: Any, name: str) -> Any:
     """Read *name* from *resource* regardless of type.
 
-    Handles dicts, SDK objects with ``.get()``, plain attributes, and objects
-    with a ``.to_dict()`` method.  Returns the ``_MISSING`` sentinel when the
-    name cannot be found.
+    Plain dicts are the operator contract and are read by exact key.
+    OpenStack resources are read through their openstacksdk attribute names,
+    for example ``meta_info`` and ``service_profile_ids``.  Neutron wire names
+    are mapped by openstacksdk before this layer reads them.
     """
-    if isinstance(resource, dict):
-        return resource[name] if name in resource else _MISSING
+    if type(resource) is dict:
+        return _mapping_value(resource, name)
 
-    getter = getattr(resource, "get", None)
-    if callable(getter):
-        try:
-            value = getter(name, _MISSING)
-        except TypeError:
-            try:
-                value = getter(name)
-            except Exception:
-                value = _MISSING
-        except Exception:
-            value = _MISSING
-
-        if value is not _MISSING:
-            return value
-
-    value = getattr(resource, name, _MISSING)
+    value = _attribute_value(resource, name)
     if value is not _MISSING:
         return value
 
-    try:
-        data = resource.to_dict(computed=False)
-    except Exception:
-        data = {}
-
-    return data[name] if name in data else _MISSING
+    return _MISSING
 
 
-def get_value(resource: Any, *names: str, default: Any = None) -> Any:
-    """Return the first non-None value found under any of *names* in *resource*.
-
-    Tries each name in turn using :func:`_resource_value`, supporting dicts,
-    OpenStack SDK objects (which use inconsistent casing like ``id`` vs
-    ``ID``), and objects with a ``.to_dict()`` method.
-    """
-    for name in names:
-        value = _resource_value(resource, name)
-        if value is not _MISSING and value is not None:
-            return value
+def get_value(resource: Any, name: str, default: Any = None) -> Any:
+    """Return a non-None value from *resource* by canonical field name."""
+    value = _resource_value(resource, name)
+    if value is not _MISSING and value is not None:
+        return value
     return default
 
 
 def resource_id(resource: Any) -> str:
     """Return the string ID of an OpenStack resource.
 
-    Tries ``id``, ``ID``, and ``Id`` in that order.
-
     Raises:
         RuntimeError: When no ID field can be found.
     """
-    value = get_value(resource, "id", "ID", "Id")
+    value = get_value(resource, "id")
     if not value:
         raise RuntimeError(f"Unable to read ID from resource {resource!r}")
     return str(value)
@@ -131,9 +124,10 @@ def resource_id(resource: Any) -> str:
 def normalize_meta_info(value: Any) -> Any:
     """Normalise a meta_info value into a Python dict (or passthrough).
 
-    Neutron stores ``service_profile.meta_info`` as a JSON string in some SDK
-    versions and as a dict in others.  This function handles both, as well as
-    Python literal strings produced by older tooling.
+    The operator uses the openstacksdk field name ``meta_info``.  Neutron
+    stores that value as JSON text, so existing service profiles may return a
+    string while desired specs provide a dict.  Non-JSON strings pass through
+    unchanged so drift reports can show the raw value.
     """
     if value is None or value == "":
         return {}
@@ -145,10 +139,7 @@ def normalize_meta_info(value: Any) -> Any:
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            try:
-                return ast.literal_eval(text)
-            except (SyntaxError, ValueError):
-                return text
+            return text
 
     return value
 
@@ -157,21 +148,6 @@ def meta_info_payload(value: Any) -> str:
     """Return a canonical compact JSON string representation of *value*."""
     normalized = normalize_meta_info(value)
     return json.dumps(normalized, sort_keys=True, separators=(",", ":"))
-
-
-def comparable_meta_info(value: Any) -> Any:
-    """Strip operator-managed keys from *value* before comparison.
-
-    Operator marker keys (e.g. ``_understack_router_flavor_operator``) are
-    injected at creation time and must not trigger spurious updates when
-    comparing desired vs current state.  The caller is responsible for
-    passing the set of keys to strip via the module-level constant in the
-    plugin's ``common`` module.
-    """
-    normalized = normalize_meta_info(value)
-    if isinstance(normalized, dict):
-        return {k: v for k, v in normalized.items()}
-    return normalized
 
 
 def comparable_meta_info_without(value: Any, exclude_keys: frozenset[str]) -> Any:
@@ -210,20 +186,13 @@ def managed_meta_info(value: Any, markers: dict[str, str]) -> Any:
 
 
 def is_not_found(exc: Exception) -> bool:
-    """Return True for 404 / ResourceNotFound exceptions."""
-    return getattr(exc, "status_code", None) == 404 or exc.__class__.__name__ in {
-        "NotFoundException",
-        "ResourceNotFound",
-    }
+    """Return True for openstacksdk 404 exceptions."""
+    return isinstance(exc, openstack_exceptions.NotFoundException)
 
 
 def is_conflict(exc: Exception) -> bool:
-    """Return True for 409 / ConflictException / 'already exists' exceptions."""
-    return (
-        getattr(exc, "status_code", None) == 409
-        or exc.__class__.__name__ in {"ConflictException", "ResourceConflict"}
-        or "already" in str(exc).lower()
-    )
+    """Return True for openstacksdk 409 exceptions."""
+    return isinstance(exc, openstack_exceptions.ConflictException)
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +246,6 @@ def wait_for_openstack_network(
     conn: Any,
     retries: int = 30,
     delay: float = 10.0,
-    log_fn: Any = None,
 ) -> None:
     """Poll until the Neutron network API is reachable.
 
@@ -285,7 +253,6 @@ def wait_for_openstack_network(
         conn: An authenticated OpenStack connection.
         retries: Maximum number of attempts before raising.
         delay: Seconds to wait between attempts.
-        log_fn: Optional callable used to emit progress messages.
 
     Raises:
         RuntimeError: When the API does not become ready within *retries*.
@@ -299,8 +266,7 @@ def wait_for_openstack_network(
                 raise RuntimeError(
                     f"Neutron API did not become ready after {retries} attempt(s)"
                 ) from exc
-            if log_fn:
-                log_fn(f"Waiting for Neutron API ({attempt}/{retries}): {exc}")
+            LOG.info("Waiting for Neutron API (%s/%s): %s", attempt, retries, exc)
             time.sleep(delay)
 
 
@@ -322,18 +288,12 @@ def get_service_profile(conn: Any, profile_id: str) -> Any | None:
 def service_profile_ids(flavor: Any) -> list[str]:
     """Return the list of service profile IDs attached to *flavor*.
 
-    Handles the SDK's inconsistent field names (``service_profile_ids``,
-    ``service_profiles``, ``profiles``) and CSV string representations.
+    The openstacksdk ``Flavor.service_profile_ids`` attribute maps Neutron's
+    ``service_profiles`` wire field.
     """
-    profiles = get_value(
-        flavor,
-        "service_profile_ids",
-        "service_profiles",
-        "profiles",
-        default=[],
-    )
+    profiles = get_value(flavor, "service_profile_ids", default=[])
     if profiles is None:
         return []
-    if isinstance(profiles, str):
-        return [item.strip() for item in profiles.split(",") if item.strip()]
+    if not isinstance(profiles, list):
+        raise TypeError("flavor.service_profile_ids must be a list")
     return [str(profile) for profile in profiles]

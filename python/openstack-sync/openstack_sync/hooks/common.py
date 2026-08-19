@@ -8,11 +8,24 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import logging
 import os
 import subprocess
 import sys
 from collections.abc import Callable
 from typing import Any
+
+LOG = logging.getLogger(__name__)
+
+
+def configure_logging() -> None:
+    """Configure runtime hook logging without affecting --config output."""
+    logging.basicConfig(
+        level=os.environ.get("OPENSTACK_SYNC_LOG_LEVEL", "INFO").upper(),
+        format="%(levelname)s:%(name)s:%(message)s",
+        stream=sys.stderr,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Type coercions
@@ -114,7 +127,6 @@ def patch_resource_status(
     crd_resource: str,
     crd_kind: str,
     status_enabled: bool,
-    log_fn: Callable[[str], None] = lambda msg: print(msg, file=sys.stderr),
 ) -> None:
     """Patch the status subresource of a CR via kubectl.
 
@@ -128,7 +140,6 @@ def patch_resource_status(
             ``neutronrouterflavors.neutron.understack.rackspace.net``).
         crd_kind: CRD kind used in log messages (e.g. ``NeutronRouterFlavor``).
         status_enabled: When False the function returns immediately.
-        log_fn: Callable used to emit warning messages.
     """
     if not status_enabled:
         return
@@ -176,12 +187,12 @@ def patch_resource_status(
             text=True,
         )
     except FileNotFoundError:
-        log_fn(f"WARNING: kubectl not found; unable to patch {crd_kind} status")
+        LOG.warning("kubectl not found; unable to patch %s status", crd_kind)
         return
 
     if result.returncode != 0:
         error = (result.stderr or result.stdout or "unknown error").strip()
-        log_fn(f"WARNING: failed to patch {crd_kind} status for {name}: {error}")
+        LOG.warning("failed to patch %s status for %s: %s", crd_kind, name, error)
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +204,6 @@ def dispatch_binding_contexts(
     binding_contexts: list[dict[str, Any]],
     binding_name: str,
     reconcile_fn: Callable[[dict[str, Any]], None],
-    log_fn: Callable[[str], None] = lambda msg: print(msg, file=sys.stderr),
 ) -> int:
     """Dispatch each object in *binding_contexts* to *reconcile_fn*.
 
@@ -206,27 +216,29 @@ def dispatch_binding_contexts(
         binding_contexts: Parsed list from the shell-operator binding context.
         binding_name: The binding name to filter on.
         reconcile_fn: Called with each individual event dict ``{"object": ...}``.
-        log_fn: Callable used to emit error messages.
 
     Returns:
         0 on success, 1 if any reconciliation raises.
     """
+    failed = False
+
     for context in binding_contexts:
         binding = context.get("binding", "")
-        if binding != binding_name:
-            continue
-
         context_type = context.get("type", "")
 
         if context_type == "Synchronization":
+            if binding != binding_name:
+                continue
             for item in context.get("objects", []):
                 try:
                     reconcile_fn(item)
                 except Exception as exc:  # noqa: BLE001
-                    log_fn(f"reconcile failed: {exc}")
-                    return 1
+                    LOG.error("reconcile failed: %s", exc)
+                    failed = True
 
         elif context_type == "Event":
+            if binding != binding_name:
+                continue
             if context.get("watchEvent") == "Deleted":
                 continue
             obj = context.get("object")
@@ -234,17 +246,18 @@ def dispatch_binding_contexts(
                 try:
                     reconcile_fn({"object": obj})
                 except Exception as exc:  # noqa: BLE001
-                    log_fn(f"reconcile failed: {exc}")
-                    return 1
+                    LOG.error("reconcile failed: %s", exc)
+                    failed = True
 
         else:
-            # Schedule or other: objects live in the snapshots map
+            # Schedule bindings use the schedule's name, not the Kubernetes
+            # binding name. The desired objects live in the snapshots map.
             snapshots = context.get("snapshots", {})
             for item in snapshots.get(binding_name, []):
                 try:
                     reconcile_fn(item)
                 except Exception as exc:  # noqa: BLE001
-                    log_fn(f"reconcile failed: {exc}")
-                    return 1
+                    LOG.error("reconcile failed: %s", exc)
+                    failed = True
 
-    return 0
+    return 1 if failed else 0

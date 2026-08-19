@@ -7,21 +7,21 @@ classifiers, etc.) live in :mod:`openstack_sync.plugins.common`.
 from __future__ import annotations
 
 import os
-import sys
-import time
 from typing import Any
 
-from openstack_sync.plugins.common import ConfigError
+from openstack_sync.plugins.common import comparable_meta_info_without
 from openstack_sync.plugins.common import env_bool
 from openstack_sync.plugins.common import env_tuple
 from openstack_sync.plugins.common import get_value
-from openstack_sync.plugins.common import meta_info_payload
+from openstack_sync.plugins.common import managed_meta_info as managed_meta_info_with
+from openstack_sync.plugins.common import meta_info_matches_without
 from openstack_sync.plugins.common import normalize_meta_info
+from openstack_sync.plugins.common import wait_for_openstack_network as wait_for_network
 
 # ---------------------------------------------------------------------------
 # Router-flavor CRD identity
 # ---------------------------------------------------------------------------
-# These four are always injected by the Helm chart from the CRD file via
+# The chart injects these from the rendered CRD when the hook has an envPrefix.
 CRD_API_VERSION = os.environ["NEUTRON_ROUTER_FLAVOR_CRD_API_VERSION"]
 CRD_KIND = os.environ["NEUTRON_ROUTER_FLAVOR_CRD_KIND"]
 CRD_RESOURCE = os.environ["NEUTRON_ROUTER_FLAVOR_CRD_RESOURCE"]
@@ -32,10 +32,7 @@ CRD_BINDING_NAME = os.environ.get(
     "neutron-router-flavors",
 )
 CRD_NAMESPACE = os.environ.get("POD_NAMESPACE")
-DEFAULT_SERVICE_TYPE = os.environ.get(
-    "NEUTRON_ROUTER_FLAVOR_SERVICE_TYPE",
-    "L3_ROUTER_NAT",
-)
+DEFAULT_SERVICE_TYPE = "L3_ROUTER_NAT"
 
 # ---------------------------------------------------------------------------
 # Prune / lifecycle config
@@ -79,37 +76,21 @@ OPERATOR_META_INFO_MARKERS: dict[str, str] = {
 OPERATOR_META_INFO_KEYS = frozenset(OPERATOR_META_INFO_MARKERS)
 
 # ---------------------------------------------------------------------------
-# Retry / credential defaults
+# Retry config
 # ---------------------------------------------------------------------------
 
 READY_RETRIES = int(os.environ.get("NEUTRON_ROUTER_FLAVOR_READY_RETRIES", "30"))
 READY_DELAY = float(os.environ.get("NEUTRON_ROUTER_FLAVOR_READY_DELAY", "10"))
 
-DEFAULT_SECRET = os.environ["NEUTRON_ROUTER_FLAVOR_DEFAULT_SECRET"]
-DEFAULT_CLOUD = os.environ["NEUTRON_ROUTER_FLAVOR_DEFAULT_CLOUD"]
-
 
 # ---------------------------------------------------------------------------
-# Logging
-# ---------------------------------------------------------------------------
-
-
-def log(message: str) -> None:
-    """Write a prefixed message to stderr."""
-    print(f"[router_flavors] {message}", file=sys.stderr)
-
-
-# ---------------------------------------------------------------------------
-# meta_info — plugin-specific wrappers that close over OPERATOR_META_INFO_KEYS
+# meta_info helpers bound to this plugin's operator marker keys
 # ---------------------------------------------------------------------------
 
 
 def comparable_meta_info(value: Any) -> Any:
     """Strip operator marker keys from *value* before comparison."""
-    normalized = normalize_meta_info(value)
-    if isinstance(normalized, dict):
-        return {k: v for k, v in normalized.items() if k not in OPERATOR_META_INFO_KEYS}
-    return normalized
+    return comparable_meta_info_without(value, OPERATOR_META_INFO_KEYS)
 
 
 def meta_info_matches(current: Any, desired: Any) -> bool:
@@ -117,19 +98,12 @@ def meta_info_matches(current: Any, desired: Any) -> bool:
 
     Operator-managed marker keys are ignored during comparison.
     """
-    return meta_info_payload(comparable_meta_info(current)) == meta_info_payload(
-        comparable_meta_info(desired)
-    )
+    return meta_info_matches_without(current, desired, OPERATOR_META_INFO_KEYS)
 
 
 def managed_meta_info(value: Any) -> Any:
     """Merge operator ownership markers into *value*."""
-    normalized = normalize_meta_info(value)
-    if not isinstance(normalized, dict):
-        return normalized
-    merged = dict(normalized)
-    merged.update(OPERATOR_META_INFO_MARKERS)
-    return merged
+    return managed_meta_info_with(value, OPERATOR_META_INFO_MARKERS)
 
 
 # ---------------------------------------------------------------------------
@@ -158,9 +132,7 @@ def flavor_description_has_marker(value: Any) -> bool:
 
 def is_managed_flavor(flavor: Any) -> bool:
     """Return True when the flavor's description contains the operator marker."""
-    return flavor_description_has_marker(
-        get_value(flavor, "description", "Description", default="")
-    )
+    return flavor_description_has_marker(get_value(flavor, "description", default=""))
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +142,7 @@ def is_managed_flavor(flavor: Any) -> bool:
 
 def service_profile_meta_info(profile: Any) -> Any:
     """Return the meta_info field of *profile*."""
-    return get_value(profile, "meta_info", "metainfo", default={})
+    return get_value(profile, "meta_info", default={})
 
 
 def is_managed_service_profile(profile: Any) -> bool:
@@ -188,20 +160,12 @@ def is_managed_service_profile(profile: Any) -> bool:
 
 
 def config_meta_info(flavor_config: dict[str, Any]) -> Any:
-    """Extract and validate meta_info from a flavor config dict.
-
-    Raises:
-        ConfigError: When the deprecated ``metainfo`` key is used instead of
-            ``meta_info``.
-    """
-    if "metainfo" in flavor_config:
-        name = flavor_config.get("name", "<unknown>")
-        raise ConfigError(f"Router flavor {name} uses metainfo; use meta_info instead")
+    """Return the canonical meta_info payload from a router flavor spec."""
     return flavor_config.get("meta_info", {})
 
 
 # ---------------------------------------------------------------------------
-# Neutron readiness probe — thin wrapper that uses module-level retry config
+# Neutron readiness probe
 # ---------------------------------------------------------------------------
 
 
@@ -210,14 +174,4 @@ def wait_for_openstack_network(conn: Any) -> None:
 
     Uses ``READY_RETRIES`` and ``READY_DELAY`` from this module's env config.
     """
-    for attempt in range(1, READY_RETRIES + 1):
-        try:
-            next(iter(conn.network.flavors()), None)
-            return
-        except Exception as exc:
-            if attempt >= READY_RETRIES:
-                raise RuntimeError(
-                    f"Neutron API did not become ready after {READY_RETRIES} attempt(s)"
-                ) from exc
-            log(f"Waiting for Neutron API ({attempt}/{READY_RETRIES}): {exc}")
-            time.sleep(READY_DELAY)
+    wait_for_network(conn, retries=READY_RETRIES, delay=READY_DELAY)
