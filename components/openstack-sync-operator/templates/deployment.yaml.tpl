@@ -65,7 +65,7 @@ spec:
         - |
           missing=0
           {{- range $hookName, $hook := $enabledHooks }}
-          {{- $hookPath := required (printf "hooks.%s.path is required when hook is enabled" $hookName) $hook.path }}
+          {{- $hookPath := required (printf "pluginData.%s.hook.path is required when hook is enabled" $hookName) $hook.path }}
           if [ ! -x {{ $hookPath | quote }} ]; then
             echo {{ printf "enabled hook %s missing or not executable: %s" $hookName $hookPath | quote }} >&2
             missing=1

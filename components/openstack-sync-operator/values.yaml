@@ -13,12 +13,7 @@ serviceAccount:
 rbac:
   create: true
   clusterWide: false
-  # The base placeholder hook has no Kubernetes bindings. Add hook permissions
-  # here with the hook that needs them.
-  rules: []
 
-# Built-in plugin enablement. Site values normally only override these booleans
-# and selected pluginData.<name>.hook.env values.
 # Built-in hook configuration. Site values normally override only:
 # - plugins.<name>: enable or disable a hook
 # - pluginData.<name>.hook.env: override selected hook env values
@@ -48,15 +43,4 @@ pluginData:
       envPrefix: NEUTRON_ROUTER_FLAVOR
       env:
         SYNC_CRONTAB: "0 * * * *"
-        PRUNE: "false"
-
-hooks: {}
-
-podAnnotations: {}
-podLabels: {}
-
-resources: {}
-
-nodeSelector: {}
-tolerations: []
-affinity: {}
+        PRUNE: false

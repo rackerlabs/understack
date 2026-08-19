@@ -3,13 +3,6 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "hooks": {
-      "type": "object",
-      "description": "Additional hook definitions keyed by hook name.",
-      "additionalProperties": {
-        "$ref": "#/definitions/hook"
-      }
-    },
     "plugins": {
       "type": "object",
       "description": "Built-in plugin enablement keyed by plugin name.",
@@ -21,24 +14,24 @@
       "type": "object",
       "description": "Built-in plugin hook data keyed by plugin name.",
       "additionalProperties": {
-        "type": "object",
-        "additionalProperties": true,
-        "properties": {
-          "hook": {
-            "$ref": "#/definitions/hook"
-          }
-        }
+        "$ref": "#/definitions/pluginData"
       }
     }
   },
   "definitions": {
-    "hook": {
+    "pluginData": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
+        "hook": {
+          "$ref": "#/definitions/pluginHook"
+        }
+      }
+    },
+    "pluginHook": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
         "path": {
           "type": "string",
           "minLength": 1
@@ -53,16 +46,30 @@
           "pattern": "^[A-Z][A-Z0-9_]*$"
         },
         "env": {
-          "type": "object",
-          "additionalProperties": {
-            "type": [
-              "string",
-              "number",
-              "integer",
-              "boolean"
-            ]
-          }
+          "$ref": "#/definitions/hookEnv"
         }
+      }
+    },
+    "hookEnv": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Z][A-Z0-9_]*$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "string",
+            "not": {
+              "pattern": "^\\s*([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee]|1|0|[Yy][Ee][Ss]|[Nn][Oo]|[Oo][Nn]|[Oo][Ff][Ff])\\s*$"
+            }
+          }
+        ]
       }
     }
   }

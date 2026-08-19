@@ -17,14 +17,10 @@ import sys
 from typing import Any
 
 from openstack_sync.hooks.common import configure_logging
+from openstack_sync.plugins.common import env_bool
 from openstack_sync.utils import get_openstack_connection
 
 LOG = logging.getLogger(__name__)
-TRUTHY_VALUES = {"1", "true", "yes", "on"}
-
-
-def env_is_truthy(name: str, default: str = "false") -> bool:
-    return os.environ.get(name, default).lower() in TRUTHY_VALUES
 
 
 def build_hook_config() -> dict[str, Any]:
@@ -91,7 +87,7 @@ def main() -> int:
     for context in binding_contexts:
         # Shell-operator passes [{"binding": "onStartup"}] for startup runs.
         if context.get("binding") == "onStartup":
-            if not env_is_truthy("OPENSTACK_PLACEHOLDER_ENABLED"):
+            if not env_bool("OPENSTACK_PLACEHOLDER_ENABLED", False):
                 LOG.info(
                     "connectivity check: skipped"
                     " (OPENSTACK_PLACEHOLDER_ENABLED is not set)"

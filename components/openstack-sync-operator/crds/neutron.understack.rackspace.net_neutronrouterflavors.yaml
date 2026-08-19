@@ -37,7 +37,6 @@ spec:
       openAPIV3Schema:
         description: NeutronRouterFlavor defines one Neutron router flavor and its service profile.
         type: object
-        additionalProperties: false
         required:
         - spec
         properties:
@@ -49,7 +48,6 @@ spec:
             type: object
           spec:
             type: object
-            additionalProperties: false
             required:
             - name
             - driver
@@ -61,7 +59,6 @@ spec:
                   an OpenStack clouds.yaml file. The operator reads this secret
                   directly at reconcile time; no volume mount is required.
                 type: object
-                additionalProperties: false
                 required:
                 - secretName
                 - cloudName
@@ -124,7 +121,6 @@ spec:
               meta_info:
                 description: Service profile metadata payload.
                 type: object
-                additionalProperties: false
                 properties:
                   resource_class:
                     description: Resource class consumed by a physical router provider.
@@ -142,7 +138,6 @@ spec:
           status:
             description: NeutronRouterFlavorStatus defines the observed sync state.
             type: object
-            additionalProperties: false
             properties:
               syncStatus:
                 description: SyncStatus indicates the synchronization state with Neutron.
@@ -168,7 +163,6 @@ spec:
                 type: array
                 items:
                   type: object
-                  additionalProperties: false
                   required:
                   - type
                   - status

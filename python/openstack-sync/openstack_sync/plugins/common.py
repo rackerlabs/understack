@@ -28,13 +28,17 @@ LOG = logging.getLogger(__name__)
 def env_bool(name: str, default: bool) -> bool:
     """Return a boolean from an environment variable.
 
-    Accepts ``1 / true / yes / on`` (case-insensitive) as truthy values.
-    Returns *default* when the variable is unset.
+    Accepts only the exact values ``true`` and ``false``. Returns *default*
+    when the variable is unset.
     """
     value = os.environ.get(name)
     if value is None:
         return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    raise ConfigError(f"{name} must be true or false")
 
 
 def env_tuple(name: str, default: str) -> tuple[str, ...]:
