@@ -21,6 +21,7 @@ status: provisional
     - [Goals](#goals)
     - [Non-Goals](#non-goals)
 - [Proposal](#proposal)
+    - [Architecture](#architecture)
     - [Data Ownership: Static vs Dynamic](#data-ownership-static-vs-dynamic)
     - [User Stories](#user-stories)
     - [Requirements](#requirements)
@@ -192,6 +193,66 @@ and observability that a one-shot playbook does not.
    data.
 
 ## Proposal
+
+### Architecture
+
+```mermaid
+flowchart LR
+    subgraph git["Deploy repo — source of truth"]
+        YAML["hardware YAML<br/>(VLAN groups, locations, racks)"]:::static
+        GEN["static generator output<br/>(OOB/VNI ranges, ASNs, loopbacks)"]:::static
+        CI["CI: schema validation"]:::static
+    end
+
+    subgraph globalc["Global Cluster"]
+        CM["ConfigMaps"]:::static
+        OP["nautobotop<br/>schema + referential validation<br/>writes ownership marker"]:::static
+        NB["Nautobot<br/>(projection)"]:::store
+        ARGO["Argo Events / Workflows<br/>ironic-nautobot-client"]:::dynamic
+        RB["ipsync read-back<br/>(pull, read-only)"]:::readback
+        REP["drift report<br/>(CR status, metrics)"]:::readback
+    end
+
+    subgraph site["Site"]
+        NEU["Neutron"]:::dynamic
+        IRO["Ironic"]:::dynamic
+    end
+
+    YAML --> CI
+    GEN --> CI
+    CI -->|"on merge, rendered"| CM
+    CM --> OP
+    OP -->|"static: create/update/delete,<br/>marked objects only"| NB
+    NEU -->|"oslo notifications"| ARGO
+    ARGO -->|"dynamic: recorded reading"| NB
+    RB -->|"pull actual state"| NEU
+    RB -->|"pull actual state"| IRO
+    NB -.->|"compare"| RB
+    RB --> REP
+
+    classDef static fill:#bfdbfe,stroke:#3b82f6,color:#000
+    classDef dynamic fill:#fed7aa,stroke:#ea580c,color:#000
+    classDef readback fill:#bbf7d0,stroke:#16a34a,color:#000
+    classDef store fill:#e2e8f0,stroke:#64748b,color:#000
+```
+
+Three paths, none of which share a field:
+
+- **Static (blue), deploy repo → Nautobot.** The only authoring surface. Schema
+  validation runs in the deploy repo's CI before merge and again in nautobotop;
+  referential validation runs against the Nautobot API at reconcile time. Every
+  object nautobotop writes carries an ownership marker, and its delete pass is
+  scoped to that marker.
+- **Dynamic (orange), site → Nautobot.** Unchanged: a site's Neutron allocates
+  inside the authored ranges and the existing oslo/Argo path records it in
+  Nautobot as a reading. Unmarked, so nautobotop leaves it alone.
+- **Read-back (green), global → site, read-only.** ipsync pulls actual state from
+  a site, compares it with Nautobot, and reports differences. It writes to
+  neither side. If the global cluster cannot reach site APIs directly, this
+  becomes a per-site read-only agent that global pulls from
+  ([Open Questions](#open-questions)).
+
+nautobotop never writes to a site, and read-back never writes to Nautobot.
 
 ### Data Ownership: Static vs Dynamic
 
