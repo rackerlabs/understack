@@ -133,11 +133,13 @@ def test_enabled_hook_config_watches_router_flavors(monkeypatch):
     assert binding["jqFilter"] == "."
     assert binding["includeSnapshotsFrom"] == [common.CRD_BINDING_NAME]
     assert binding["namespace"]["nameSelector"]["matchNames"] == ["openstack"]
+    assert binding["queue"] == common.CRD_BINDING_NAME
     assert config["schedule"] == [
         {
             "name": "hourly sync",
             "crontab": "*/15 * * * *",
             "includeSnapshotsFrom": [common.CRD_BINDING_NAME],
+            "queue": common.CRD_BINDING_NAME,
         }
     ]
 

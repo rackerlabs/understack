@@ -95,6 +95,10 @@ def build_hook_config() -> dict[str, Any]:
         "executeHookOnEvent": ["Added", "Modified", "Deleted"],
         "jqFilter": ".",
         "includeSnapshotsFrom": [CRD_BINDING_NAME],
+        # Dedicated queue so a slow Neutron readiness wait or reconciliation
+        # only delays this hook's own tasks, not other hooks sharing the
+        # default "main" queue.
+        "queue": CRD_BINDING_NAME,
     }
     if namespace:
         kubernetes_binding["namespace"] = {
@@ -108,6 +112,7 @@ def build_hook_config() -> dict[str, Any]:
                 "name": "hourly sync",
                 "crontab": sync_crontab,
                 "includeSnapshotsFrom": [CRD_BINDING_NAME],
+                "queue": CRD_BINDING_NAME,
             }
         ]
     return hook_config

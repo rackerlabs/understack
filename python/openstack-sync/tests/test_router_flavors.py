@@ -114,7 +114,9 @@ def test_router_flavor_hook_config_uses_pod_namespace(monkeypatch):
     assert config["kubernetes"][0]["namespace"] == {
         "nameSelector": {"matchNames": ["openstack"]}
     }
+    assert config["kubernetes"][0]["queue"] == router_flavors.CRD_BINDING_NAME
     assert config["schedule"][0]["crontab"] == "0 * * * *"
+    assert config["schedule"][0]["queue"] == router_flavors.CRD_BINDING_NAME
     assert "onStartup" not in config
 
 
