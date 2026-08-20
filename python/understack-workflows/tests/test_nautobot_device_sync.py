@@ -508,13 +508,22 @@ class TestSyncDeviceToNautobot:
     def mock_nautobot(self):
         return MagicMock()
 
+    @pytest.fixture
+    def location(self):
+        return MagicMock()
+
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
     @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     @patch(
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
     def test_sync_creates_new_device(
-        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+        self,
+        mock_sync_interfaces,
+        mock_fetch,
+        mock_ironic_class,
+        mock_nautobot,
+        location,
     ):
         node_uuid = str(uuid.uuid4())
         device_info = DeviceInfo(
@@ -530,7 +539,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.return_value = MagicMock()
         mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
 
-        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot, location)
 
         assert result == EXIT_STATUS_SUCCESS
         mock_nautobot.dcim.devices.create.assert_called_once()
@@ -541,7 +550,12 @@ class TestSyncDeviceToNautobot:
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
     def test_sync_updates_existing_device(
-        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+        self,
+        mock_sync_interfaces,
+        mock_fetch,
+        mock_ironic_class,
+        mock_nautobot,
+        location,
     ):
         node_uuid = str(uuid.uuid4())
         device_info = DeviceInfo(
@@ -562,20 +576,20 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.get.return_value = existing_device
         mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
 
-        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot, location)
 
         assert result == EXIT_STATUS_SUCCESS
         mock_nautobot.dcim.devices.create.assert_not_called()
 
-    def test_sync_with_empty_uuid_returns_error(self, mock_nautobot):
-        result = sync_device_to_nautobot("", mock_nautobot)
+    def test_sync_with_empty_uuid_returns_error(self, mock_nautobot, location):
+        result = sync_device_to_nautobot("", mock_nautobot, location)
 
         assert result == EXIT_STATUS_FAILURE
 
     @patch("understack_workflows.oslo_event.nautobot_device_sync.IronicClient")
     @patch("understack_workflows.oslo_event.nautobot_device_sync.fetch_node_details")
     def test_sync_without_location_skips_for_uninspected_node(
-        self, mock_fetch, mock_ironic_class, mock_nautobot
+        self, mock_fetch, mock_ironic_class, mock_nautobot, location
     ):
         """Test that sync skips gracefully for uninspected nodes without location."""
         node_uuid = str(uuid.uuid4())
@@ -583,7 +597,7 @@ class TestSyncDeviceToNautobot:
         mock_fetch.return_value = (device_info, {}, [])
         mock_nautobot.dcim.devices.get.return_value = None
 
-        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot, location)
 
         # Should fail since no location available
         assert result == EXIT_STATUS_FAILURE
@@ -596,7 +610,12 @@ class TestSyncDeviceToNautobot:
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
     def test_sync_recreates_device_with_mismatched_uuid(
-        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+        self,
+        mock_sync_interfaces,
+        mock_fetch,
+        mock_ironic_class,
+        mock_nautobot,
+        location,
     ):
         """Test device with mismatched UUID is deleted and recreated."""
         node_uuid = str(uuid.uuid4())
@@ -622,7 +641,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.return_value = MagicMock()
         mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
 
-        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot, location)
 
         assert result == EXIT_STATUS_SUCCESS
         # Should delete old device
@@ -636,7 +655,12 @@ class TestSyncDeviceToNautobot:
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
     def test_sync_device_not_found_by_name_creates_new(
-        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+        self,
+        mock_sync_interfaces,
+        mock_fetch,
+        mock_ironic_class,
+        mock_nautobot,
+        location,
     ):
         """Test that device not found by UUID or name is created."""
         node_uuid = str(uuid.uuid4())
@@ -655,7 +679,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.return_value = MagicMock()
         mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
 
-        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot, location)
 
         assert result == EXIT_STATUS_SUCCESS
         mock_nautobot.dcim.devices.create.assert_called_once()
@@ -666,7 +690,12 @@ class TestSyncDeviceToNautobot:
         "understack_workflows.oslo_event.nautobot_device_sync.sync_interfaces_from_data"
     )
     def test_sync_uuid_mismatch_uses_old_device_location(
-        self, mock_sync_interfaces, mock_fetch, mock_ironic_class, mock_nautobot
+        self,
+        mock_sync_interfaces,
+        mock_fetch,
+        mock_ironic_class,
+        mock_nautobot,
+        location,
     ):
         """Test that location is preserved from old device when new node has none.
 
@@ -698,7 +727,7 @@ class TestSyncDeviceToNautobot:
         mock_nautobot.dcim.devices.create.return_value = MagicMock()
         mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
 
-        result = sync_device_to_nautobot(node_uuid, mock_nautobot)
+        result = sync_device_to_nautobot(node_uuid, mock_nautobot, location)
 
         assert result == EXIT_STATUS_SUCCESS
         # Should delete old device after preserving location
@@ -762,12 +791,17 @@ class TestHandleNodeEvent:
                 }
             },
         }
+        mock_conn.config.region_name = "iad3"
         mock_sync.return_value = EXIT_STATUS_SUCCESS
 
         result = handle_node_event(mock_conn, mock_nautobot, event_data)
 
         assert result == EXIT_STATUS_SUCCESS
-        mock_sync.assert_called_once_with(node_uuid, mock_nautobot)
+        # The connection's region resolves a Nautobot Location that is threaded
+        # through to the sync.
+        mock_nautobot.dcim.locations.get.assert_called_once_with(name="iad3")
+        location = mock_nautobot.dcim.locations.get.return_value
+        mock_sync.assert_called_once_with(node_uuid, mock_nautobot, location)
 
     def test_handle_node_event_no_uuid(self, mock_conn, mock_nautobot):
         event_data = {"payload": {"ironic_object.data": {}}}

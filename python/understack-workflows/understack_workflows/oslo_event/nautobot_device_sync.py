@@ -21,6 +21,7 @@ from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from openstack.connection import Connection
 from pynautobot import RequestError
 from pynautobot.core.api import Api as Nautobot
+from pynautobot.core.response import Record
 
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.ironic.provision_state_mapper import ProvisionStateMapper
@@ -54,6 +55,46 @@ def _is_retryable_error(exc: BaseException) -> bool:
         status_code = getattr(exc.req, "status_code", None)
         return status_code in (502, 503, 504)
     return False
+
+
+@tenacity.retry(
+    retry=tenacity.retry_if_exception(_is_retryable_error),
+    wait=tenacity.wait_random_exponential(
+        multiplier=1, min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX
+    ),
+    stop=tenacity.stop_after_attempt(RETRY_ATTEMPTS),
+    before_sleep=tenacity.before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def get_location_for_region(nautobot_client: Nautobot, region: str) -> Record:
+    """Resolve an OpenStack region name to its Nautobot Location.
+
+    A deployment manages a single OpenStack region, which maps to a single
+    Nautobot Location (the location name matches the region name). Resolving
+    it once, up front, lets location-scoped Nautobot lookups be scoped to
+    this Location.
+
+    Args:
+        nautobot_client: Nautobot API client
+        region: OpenStack region name
+
+    Transient Nautobot failures (503, connection errors) are retried with
+    exponential backoff, matching the other Nautobot calls in this module; a
+    non-retryable ``ValueError`` (bad or ambiguous region) is raised
+    immediately.
+
+    Returns:
+        The Nautobot Location record for the region.
+
+    Raises:
+        ValueError: if the region does not resolve to exactly one Location.
+    """
+    location = nautobot_client.dcim.locations.get(name=region)
+    if not location or isinstance(location, list):
+        raise ValueError(
+            f"OpenStack region {region!r} did not resolve to a single Nautobot location"
+        )
+    return location
 
 
 @dataclass
@@ -243,6 +284,7 @@ def fetch_node_details(
     node_uuid: str,
     ironic_client: IronicClient,
     nautobot_client: Nautobot,
+    location: Record,
 ) -> tuple[DeviceInfo, dict, list]:
     """Fetch complete device info from Ironic.
 
@@ -250,6 +292,8 @@ def fetch_node_details(
         node_uuid: Ironic node UUID
         ironic_client: Ironic API client
         nautobot_client: Nautobot API client (for switch location lookup)
+        location: Nautobot Location for this deployment's region, used to scope
+            location-scoped Nautobot lookups
 
     Returns:
         Tuple of (DeviceInfo, inventory dict, ports list)
@@ -538,6 +582,7 @@ def _find_or_create_nautobot_device(
 def sync_device_to_nautobot(
     node_uuid: str,
     nautobot_client: Nautobot,
+    location: Record,
     sync_interfaces: bool = True,
 ) -> int:
     """Sync an Ironic node to Nautobot.
@@ -553,6 +598,8 @@ def sync_device_to_nautobot(
     Args:
         node_uuid: Ironic node UUID
         nautobot_client: Nautobot API client
+        location: Nautobot Location for this deployment's region, used to scope
+            location-scoped Nautobot lookups
         sync_interfaces: Whether to also sync interfaces (default: True)
 
     Returns:
@@ -566,7 +613,7 @@ def sync_device_to_nautobot(
         ironic_client = IronicClient()
 
         ironic_node_info, inventory, ports = fetch_node_details(
-            node_uuid, ironic_client, nautobot_client
+            node_uuid, ironic_client, nautobot_client, location
         )
 
         nautobot_device = _find_or_create_nautobot_device(
@@ -627,7 +674,7 @@ def _extract_node_uuid_from_event(event_data: dict[str, Any]) -> str | None:
 
 
 def handle_node_event(
-    _conn: Connection, nautobot_client: Nautobot, event_data: dict[str, Any]
+    conn: Connection, nautobot_client: Nautobot, event_data: dict[str, Any]
 ) -> int:
     """Handle any Ironic node event and sync to Nautobot.
 
@@ -639,7 +686,9 @@ def handle_node_event(
     - baremetal.node.maintenance_set.end
 
     Args:
-        _conn: OpenStack connection (unused, kept for handler signature)
+        conn: OpenStack connection; its region resolves the Nautobot Location
+            used to scope location-scoped lookups to the region this deployment
+            manages
         nautobot_client: Nautobot API client
         event_data: Raw event data dict
 
@@ -654,7 +703,8 @@ def handle_node_event(
     event_type = event_data.get("event_type", "unknown")
     logger.info("Handling %s for node %s", event_type, node_uuid)
 
-    return sync_device_to_nautobot(node_uuid, nautobot_client)
+    location = get_location_for_region(nautobot_client, conn.config.region_name)
+    return sync_device_to_nautobot(node_uuid, nautobot_client, location)
 
 
 def delete_device_from_nautobot(node_uuid: str, nautobot_client: Nautobot) -> int:
