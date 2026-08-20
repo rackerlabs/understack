@@ -10,6 +10,9 @@ import requests
 from understack_workflows.oslo_event.nautobot_device_sync import EXIT_STATUS_FAILURE
 from understack_workflows.oslo_event.nautobot_device_sync import EXIT_STATUS_SUCCESS
 from understack_workflows.oslo_event.nautobot_device_sync import DeviceInfo
+from understack_workflows.oslo_event.nautobot_device_sync import (
+    InvalidRackPositionError,
+)
 from understack_workflows.oslo_event.nautobot_device_sync import _create_nautobot_device
 from understack_workflows.oslo_event.nautobot_device_sync import (
     _extract_node_uuid_from_event,
@@ -23,12 +26,19 @@ from understack_workflows.oslo_event.nautobot_device_sync import (
 )
 from understack_workflows.oslo_event.nautobot_device_sync import _populate_from_node
 from understack_workflows.oslo_event.nautobot_device_sync import (
+    _preserve_location_from_device,
+)
+from understack_workflows.oslo_event.nautobot_device_sync import (
+    _set_location_from_extra,
+)
+from understack_workflows.oslo_event.nautobot_device_sync import (
     _set_location_from_switches,
 )
 from understack_workflows.oslo_event.nautobot_device_sync import _update_nautobot_device
 from understack_workflows.oslo_event.nautobot_device_sync import (
     delete_device_from_nautobot,
 )
+from understack_workflows.oslo_event.nautobot_device_sync import fetch_node_details
 from understack_workflows.oslo_event.nautobot_device_sync import (
     handle_node_delete_event,
 )
@@ -301,6 +311,253 @@ class TestSetLocationFromSwitches:
         assert device_info.location_id is None
 
 
+class TestSetLocationFromExtra:
+    """Test cases for _set_location_from_extra function."""
+
+    @pytest.fixture
+    def device_info(self):
+        return DeviceInfo(uuid="test-uuid")
+
+    @pytest.fixture
+    def mock_nautobot(self):
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_rack(self):
+        rack = MagicMock()
+        rack.id = "rack-uuid"
+        rack.location.id = "location-uuid"
+        rack.u_height = 42
+        return rack
+
+    @pytest.fixture
+    def location(self):
+        loc = MagicMock()
+        loc.id = "region-loc-uuid"
+        loc.name = "iad3"
+        return loc
+
+    def test_sets_rack_location_and_position(
+        self, device_info, mock_nautobot, mock_rack, location
+    ):
+        node = MagicMock()
+        node.extra = {"rack": "R1", "position": 12}
+        mock_nautobot.dcim.racks.get.return_value = mock_rack
+
+        assert (
+            _set_location_from_extra(device_info, node, mock_nautobot, location) is True
+        )
+
+        # Lookup is scoped to the region's location.
+        mock_nautobot.dcim.racks.get.assert_called_once_with(
+            name="R1", location="region-loc-uuid"
+        )
+        assert device_info.rack_id == "rack-uuid"
+        assert device_info.location_id == "location-uuid"
+        assert device_info.position == 12
+
+    def test_position_string_is_coerced_to_int(
+        self, device_info, mock_nautobot, mock_rack, location
+    ):
+        node = MagicMock()
+        node.extra = {"rack": "R1", "position": "12"}
+        mock_nautobot.dcim.racks.get.return_value = mock_rack
+
+        assert (
+            _set_location_from_extra(device_info, node, mock_nautobot, location) is True
+        )
+        assert device_info.position == 12
+
+    def test_invalid_position_fails_before_lookup(
+        self, device_info, mock_nautobot, location
+    ):
+        """A non-integer position fails without touching device_info."""
+        node = MagicMock()
+        node.extra = {"rack": "R1", "position": "not-a-number"}
+
+        with pytest.raises(InvalidRackPositionError, match="must be an integer"):
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+
+        # Position is validated before the rack lookup, so no API call or
+        # partial mutation happens.
+        mock_nautobot.dcim.racks.get.assert_not_called()
+        assert device_info.rack_id is None
+        assert device_info.location_id is None
+        assert device_info.position is None
+
+    @pytest.mark.parametrize("position", [0, -1])
+    def test_position_must_be_positive(
+        self, device_info, mock_nautobot, mock_rack, location, position
+    ):
+        node = MagicMock()
+        node.extra = {"rack": "R1", "position": position}
+        mock_nautobot.dcim.racks.get.return_value = mock_rack
+
+        with pytest.raises(InvalidRackPositionError, match=r"outside.*1\.\.42"):
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+
+        assert device_info.rack_id is None
+        assert device_info.location_id is None
+        assert device_info.position is None
+
+    def test_position_must_not_exceed_rack_height(
+        self, device_info, mock_nautobot, mock_rack, location
+    ):
+        node = MagicMock()
+        node.extra = {"rack": "R1", "position": 43}
+        mock_nautobot.dcim.racks.get.return_value = mock_rack
+
+        with pytest.raises(InvalidRackPositionError, match=r"outside.*1\.\.42"):
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+
+        assert device_info.rack_id is None
+        assert device_info.location_id is None
+        assert device_info.position is None
+
+    def test_missing_position_falls_back(self, device_info, mock_nautobot, location):
+        node = MagicMock()
+        node.extra = {"rack": "R1"}
+
+        assert (
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+            is False
+        )
+        mock_nautobot.dcim.racks.get.assert_not_called()
+        assert device_info.rack_id is None
+        assert device_info.location_id is None
+        assert device_info.position is None
+
+    def test_missing_rack_falls_back(self, device_info, mock_nautobot, location):
+        node = MagicMock()
+        node.extra = {"position": 12}
+
+        assert (
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+            is False
+        )
+        mock_nautobot.dcim.racks.get.assert_not_called()
+        assert device_info.rack_id is None
+
+    def test_empty_extra_falls_back(self, device_info, mock_nautobot, location):
+        node = MagicMock()
+        node.extra = None
+
+        assert (
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+            is False
+        )
+        mock_nautobot.dcim.racks.get.assert_not_called()
+
+    def test_rack_not_found_falls_back(self, device_info, mock_nautobot, location):
+        node = MagicMock()
+        node.extra = {"rack": "unknown", "position": 12}
+        mock_nautobot.dcim.racks.get.return_value = None
+
+        assert (
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+            is False
+        )
+        assert device_info.rack_id is None
+        assert device_info.location_id is None
+        assert device_info.position is None
+
+    def test_ambiguous_rack_falls_back(self, device_info, mock_nautobot, location):
+        """Pynautobot .get() raises ValueError when >1 rack matches."""
+        node = MagicMock()
+        node.extra = {"rack": "R1", "position": 12}
+        mock_nautobot.dcim.racks.get.side_effect = ValueError(
+            "get() returned more than one result"
+        )
+
+        assert (
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+            is False
+        )
+        assert device_info.rack_id is None
+        assert device_info.location_id is None
+        assert device_info.position is None
+
+    def test_rack_list_result_falls_back(self, device_info, mock_nautobot, location):
+        """Pynautobot's typing allows .get() to return a list; treat as ambiguous."""
+        node = MagicMock()
+        node.extra = {"rack": "R1", "position": 12}
+        mock_nautobot.dcim.racks.get.return_value = [MagicMock(), MagicMock()]
+
+        assert (
+            _set_location_from_extra(device_info, node, mock_nautobot, location)
+            is False
+        )
+        assert device_info.rack_id is None
+        assert device_info.location_id is None
+        assert device_info.position is None
+
+    def test_extra_overrides_switch_lookup(self, mock_nautobot, mock_rack, location):
+        """When extra provides rack+position, switches are not consulted."""
+        node = MagicMock()
+        node.properties = {}
+        node.traits = None
+        node.provision_state = "active"
+        node.lessee = None
+        node.extra = {"rack": "R1", "position": 12}
+        mock_nautobot.dcim.racks.get.return_value = mock_rack
+
+        ironic_client = MagicMock()
+        ironic_client.get_node.return_value = node
+        ironic_client.get_node_inventory.return_value = {}
+        # A cabled port that would otherwise drive switch-based location.
+        ironic_client.list_ports.return_value = [
+            MagicMock(local_link_connection={"switch_info": "switch1.example.com"})
+        ]
+
+        device_info, _, _ = fetch_node_details(
+            "test-uuid", ironic_client, mock_nautobot, location
+        )
+
+        assert device_info.rack_id == "rack-uuid"
+        assert device_info.location_id == "location-uuid"
+        assert device_info.position == 12
+        mock_nautobot.dcim.racks.get.assert_called_once_with(
+            name="R1", location="region-loc-uuid"
+        )
+        # Switch lookup (dcim.devices.get) must not be used.
+        mock_nautobot.dcim.devices.get.assert_not_called()
+
+
+class TestPreserveLocationFromDevice:
+    """Test cases for _preserve_location_from_device function."""
+
+    @pytest.fixture
+    def old_device(self):
+        """An old device (matched by name, different UUID) with a stale face."""
+        old = MagicMock()
+        old.location = None
+        old.rack = None
+        old.position = None
+        old.face = MagicMock(value="rear")
+        return old
+
+    def test_preserves_face_when_unset(self, old_device):
+        device_info = DeviceInfo(uuid="test-uuid")
+
+        _preserve_location_from_device(device_info, old_device)
+
+        assert device_info.face == "rear"
+
+    def test_does_not_clobber_face_set_from_extra(self, old_device):
+        """A face already set for the new node must not be clobbered.
+
+        When a face is resolved for the new node (e.g. defaulted alongside an
+        extra-derived rack/position), the old, unrelated device's stale face
+        must not overwrite it.
+        """
+        device_info = DeviceInfo(uuid="test-uuid", position=12, face="front")
+
+        _preserve_location_from_device(device_info, old_device)
+
+        assert device_info.face == "front"
+        assert device_info.position == 12
+
+
 class TestGetRecordValue:
     """Test cases for _get_record_value function."""
 
@@ -456,6 +713,24 @@ class TestUpdateNautobotDevice:
         assert mock_nautobot_device.position == 10
         assert mock_nautobot_device.face == "front"
 
+    def test_update_position_preserves_existing_rear_face(self, mock_nautobot_device):
+        """A rear-mounted device isn't flipped to 'front' when face is unset."""
+        mock_nautobot_device.position = None
+        mock_nautobot_device.face = MagicMock(value="rear")
+        device_info = DeviceInfo(
+            uuid="test-uuid",
+            position=10,
+            # face is None (extra-based flow never sets it)
+        )
+
+        result = _update_nautobot_device(device_info, mock_nautobot_device)
+
+        assert result is True
+        assert mock_nautobot_device.position == 10
+        # Face already "rear" and matches target, so it is left untouched
+        # rather than being reassigned to "front".
+        assert _get_record_value(mock_nautobot_device.face, "value") == "rear"
+
     def test_update_position_no_change_when_same(self, mock_nautobot_device):
         """Test that no update occurs when position/face are already set correctly."""
         mock_nautobot_device.position = 42
@@ -469,6 +744,35 @@ class TestUpdateNautobotDevice:
         result = _update_nautobot_device(device_info, mock_nautobot_device)
 
         assert result is False
+        mock_nautobot_device.save.assert_not_called()
+
+    def test_rack_change_without_position_clears_old_position(
+        self, mock_nautobot_device
+    ):
+        mock_nautobot_device.position = 12
+        mock_nautobot_device.face = MagicMock(value="rear")
+        device_info = DeviceInfo(uuid="test-uuid", rack_id="new-rack")
+
+        result = _update_nautobot_device(device_info, mock_nautobot_device)
+
+        assert result is True
+        assert mock_nautobot_device.rack == "new-rack"
+        assert mock_nautobot_device.position is None
+        # Only position is cleared; the existing face is preserved.
+        assert _get_record_value(mock_nautobot_device.face, "value") == "rear"
+        mock_nautobot_device.save.assert_called_once()
+
+    def test_same_rack_without_position_preserves_old_position(
+        self, mock_nautobot_device
+    ):
+        mock_nautobot_device.rack = MagicMock(id="same-rack")
+        mock_nautobot_device.position = 12
+        device_info = DeviceInfo(uuid="test-uuid", rack_id="same-rack")
+
+        result = _update_nautobot_device(device_info, mock_nautobot_device)
+
+        assert result is False
+        assert mock_nautobot_device.position == 12
         mock_nautobot_device.save.assert_not_called()
 
 

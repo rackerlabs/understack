@@ -15,15 +15,34 @@ A node's `extra` field is a free-form dictionary on the Ironic node. UnderStack 
 of well-known keys there, which the Nautobot device sync reads when reconciling the node into
 Nautobot. Keys that UnderStack does not recognize are ignored by the sync.
 
-The following key is consumed today:
+The following keys are consumed today:
 
 - `external_cmdb_id` — an identifier for the node in an external CMDB. During sync it is copied to
   the Nautobot device custom field of the same name (`external_cmdb_id`).
+- `rack` — the **name** of the Nautobot rack the node lives in. When set together with `position`,
+  the sync places the device in that rack (and its location), overriding the default behavior of
+  inferring the rack from the switches the node is cabled to.
+- `position` — the rack unit the node occupies. It must be a positive integer no greater than the
+  rack's `u_height`. Maps to the Nautobot device `position`. The sync preserves the face of an
+  existing Nautobot device; a device without a face defaults to `front`.
 
-Set it with:
+`rack` and `position` are only applied when **both** are present and the rack name resolves to a
+single Nautobot rack. If either is missing (or the rack can't be found), the sync falls back to
+deriving the rack and location from the node's connected switches.
+
+If switch-derived placement changes the device's rack without supplying a new position, the sync
+clears the old position. The device remains assigned to the new rack without occupying a specific
+rack unit. An invalid explicit position fails the device sync and leaves its existing placement
+unchanged.
+
+Rack lookup is scoped to the Nautobot location whose name matches the deployment's OpenStack
+region name. That location must exist and resolve uniquely for node synchronization to run.
+
+Set them with:
 
 ```bash
 openstack baremetal node set ${NODE_UUID} --extra external_cmdb_id=CMDB-000000
+openstack baremetal node set ${NODE_UUID} --extra rack=RACK-NAME --extra position=12
 ```
 
 ### Hardware Enrollment

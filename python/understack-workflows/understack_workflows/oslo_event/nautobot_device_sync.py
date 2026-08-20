@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
+from typing import cast
 from uuid import UUID
 
 import requests
@@ -38,6 +39,10 @@ EXIT_STATUS_FAILURE = 1
 RETRY_ATTEMPTS = 5
 RETRY_WAIT_MIN = 2
 RETRY_WAIT_MAX = 30
+
+
+class InvalidRackPositionError(ValueError):
+    """Raised when an explicit rack position cannot be applied safely."""
 
 
 def _is_retryable_error(exc: BaseException) -> bool:
@@ -221,6 +226,102 @@ def _generate_device_name(device_info: DeviceInfo) -> None:
         device_info.name = f"{device_info.manufacturer}-{device_info.serial_number}"
 
 
+def _set_location_from_extra(
+    device_info: DeviceInfo,
+    node,
+    nautobot_client: Nautobot,
+    location: Record,
+) -> bool:
+    """Determine device location from the node's ``extra`` field.
+
+    Uses ``extra.rack`` (a Nautobot rack name) and ``extra.position`` (the
+    rack unit the node occupies). Both must be present for this to take
+    effect; when either is missing, or the rack cannot be resolved in
+    Nautobot, this returns ``False`` so the caller falls back to deriving
+    location from the connected switches.
+
+    Rack names are only unique within a location, so the lookup is scoped to
+    ``location`` (this deployment's region).
+
+    Args:
+        device_info: DeviceInfo to update with location, rack and position
+        node: Ironic node object
+        nautobot_client: Nautobot API client
+        location: Nautobot Location used to scope the rack lookup
+
+    Returns:
+        True if rack, location and position were set from ``extra``.
+    """
+    extra = node.extra or {}
+    rack_name = extra.get("rack")
+    position = extra.get("position")
+
+    # Both are required; otherwise fall back to switch-based lookup.
+    if not rack_name or position is None:
+        return False
+
+    try:
+        rack_position = int(position)
+    except (TypeError, ValueError) as e:
+        raise InvalidRackPositionError(
+            f"extra.position {position!r} for node {device_info.uuid} "
+            "must be an integer"
+        ) from e
+
+    try:
+        # Scope by location: rack names are only unique within a location.
+        try:
+            rack = nautobot_client.dcim.racks.get(name=rack_name, location=location.id)
+        except ValueError:
+            # pynautobot's .get() raises when more than one rack matches.
+            logger.warning(
+                "extra.rack %s (location %s) for node %s matched multiple "
+                "Nautobot racks, falling back to switch-based location",
+                rack_name,
+                location.name,
+                device_info.uuid,
+            )
+            return False
+
+        # pynautobot's typing allows .get() to return a list; treat that (and
+        # an empty result) as "did not resolve to a single rack".
+        if not rack or isinstance(rack, list):
+            logger.warning(
+                "extra.rack %s (location %s) for node %s did not resolve to a "
+                "single Nautobot rack, falling back to switch-based location",
+                rack_name,
+                location.name,
+                device_info.uuid,
+            )
+            return False
+
+        rack_height = cast(int, rack.u_height)
+
+        if not 1 <= rack_position <= rack_height:
+            raise InvalidRackPositionError(
+                f"extra.position {rack_position} for node {device_info.uuid} "
+                f"is outside rack {rack_name!r} height 1..{rack_height}"
+            )
+
+        device_info.rack_id = rack.id
+        device_info.location_id = _get_record_value(rack.location, "id")
+        device_info.position = rack_position
+        return True
+
+    except InvalidRackPositionError:
+        # Bad explicit placement is an operator error. Do not fall back and
+        # silently move the device somewhere other than requested.
+        raise
+    except Exception as e:
+        # Re-raise retryable errors (503, connection issues) to trigger retry
+        if _is_retryable_error(e):
+            raise
+        logger.error(
+            "Failed to set location from extra for node %s: %s", device_info.uuid, e
+        )
+        return False
+
+
 def _set_location_from_switches(
     device_info: DeviceInfo,
     ports: list,
@@ -315,7 +416,10 @@ def fetch_node_details(
     _populate_from_node(device_info, node)
     _populate_from_inventory(device_info, inventory)
     _generate_device_name(device_info)
-    _set_location_from_switches(device_info, ports, nautobot_client)
+    # Prefer an explicit rack/position from the node's extra field; fall back
+    # to deriving location from the connected switches when it isn't set.
+    if not _set_location_from_extra(device_info, node, nautobot_client, location):
+        _set_location_from_switches(device_info, ports, nautobot_client)
 
     return device_info, inventory, ports
 
@@ -414,10 +518,12 @@ def _update_nautobot_device(
             logger.debug("Updating location: %s", device_info.location_id)
 
     # Rack (Record with .id attribute)
+    rack_changed = False
     if device_info.rack_id:
         current_rack = _get_record_value(nautobot_device.rack, "id")
         if current_rack != device_info.rack_id:
             nautobot_device.rack = device_info.rack_id
+            rack_changed = True
             updated = True
             logger.debug("Updating rack: %s", device_info.rack_id)
 
@@ -427,13 +533,21 @@ def _update_nautobot_device(
             nautobot_device.position = device_info.position
             updated = True
             logger.debug("Updating position: %s", device_info.position)
-        # Face is required when position is set
-        target_face = device_info.face or "front"
+        # Face is required when position is set. Fall back to whatever the
+        # device already has so a rear-mounted device isn't flipped to front.
         current_face = _get_record_value(nautobot_device.face, "value")
+        target_face = device_info.face or current_face or "front"
         if current_face != target_face:
             nautobot_device.face = target_face
             updated = True
             logger.debug("Updating face: %s", target_face)
+    elif rack_changed and nautobot_device.position is not None:
+        # A position belongs to a particular rack. When switch-derived
+        # placement moves the device to another rack without supplying a new
+        # position, keep it assigned to the rack but clear the stale rack unit.
+        nautobot_device.position = None
+        updated = True
+        logger.debug("Clearing position after rack change")
 
     # Tenant (Record with .id attribute, from Ironic lessee)
     if device_info.tenant_id:
@@ -499,11 +613,11 @@ def _preserve_location_from_device(device_info: DeviceInfo, nautobot_device) -> 
             device_info.rack_id = old_rack_id
             logger.info("Preserving rack %s from old device", old_rack_id)
 
-    if nautobot_device.position is not None:
+    if nautobot_device.position is not None and device_info.position is None:
         device_info.position = nautobot_device.position
         logger.info("Preserving position %s from old device", nautobot_device.position)
 
-    if nautobot_device.face:
+    if nautobot_device.face and device_info.face is None:
         device_info.face = _get_record_value(nautobot_device.face, "value")
         logger.info("Preserving face %s from old device", device_info.face)
 
