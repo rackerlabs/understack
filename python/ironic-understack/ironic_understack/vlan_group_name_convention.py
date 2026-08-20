@@ -30,6 +30,10 @@ def vlan_group_names(
     racks separated by a slash:
 
     ["a11-12-1", "a11-13-1"] => "a11-12/a11-13-network"
+
+    In a pair of racks using -2 switches, we add a -2 to the cabinet name:
+
+    ["a11-12-2", "a11-13-2"] => "a11-12-2/a11-13-2-network"
     """
     assert_consistent_data_center(ports)
     assert_single_or_paired_racks(ports)
@@ -42,9 +46,19 @@ def vlan_group_names(
     vlan_group_names = {}
     for switch_category, ports_in_group in vlan_groups.items():
         rack_names = {p.rack_name for p in ports_in_group}
+        switch_suffixes = {p.switch_suffix for p in ports_in_group}
+
+        # Special case naming for pairs of racks that have multiple leaf pairs.
+        # (We don't handle multiple pairs in a single rack.)
+        if switch_suffixes in [{"2"}, {"3"}, {"4"}, {"5"}, {"6"}]:
+            suffix = next(iter(switch_suffixes))
+            rack_names = {f"{rack_name}-{suffix}" for rack_name in rack_names}
+
         vlan_group_name = "/".join(sorted(rack_names)) + "-" + switch_category
+
         for p in ports_in_group:
             vlan_group_names[p.switch_system_name] = vlan_group_name
+
     return vlan_group_names
 
 
