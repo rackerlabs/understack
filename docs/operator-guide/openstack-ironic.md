@@ -9,6 +9,23 @@ The primary Ironic objects you'll interact with are:
 - **Nodes**: Represent physical servers, containing hardware specifications, BMC credentials, and provisioning state
 - **Ports**: Represent physical network connections to switches, identified by MAC addresses
 
+### Node `extra` metadata
+
+A node's `extra` field is a free-form dictionary on the Ironic node. UnderStack stores a small set
+of well-known keys there, which the Nautobot device sync reads when reconciling the node into
+Nautobot. Keys that UnderStack does not recognize are ignored by the sync.
+
+The following key is consumed today:
+
+- `external_cmdb_id` — an identifier for the node in an external CMDB. During sync it is copied to
+  the Nautobot device custom field of the same name (`external_cmdb_id`).
+
+Set it with:
+
+```bash
+openstack baremetal node set ${NODE_UUID} --extra external_cmdb_id=CMDB-000000
+```
+
 ### Hardware Enrollment
 
 Hardware enrollment is an automated process in UnderStack. For details on how servers are discovered and enrolled, see [TODO: Hardware Enrollment Documentation].
