@@ -28,7 +28,7 @@ rbac:
 # That restart is required because shell-operator reads hook watches only when
 # the pod starts.
 plugins:
-  openstackPlaceholder: false
+  openstackPlaceholder: true
   neutronRouterFlavors: false
 
 pluginData:
@@ -54,4 +54,4 @@ pluginData:
         READY_DELAY: 10
         # When true, removing a NeutronRouterFlavor CR also deletes its unused
         # operator-managed OpenStack flavor. Enable this before removing the CR.
-        PRUNE: false
+        PRUNE: true
