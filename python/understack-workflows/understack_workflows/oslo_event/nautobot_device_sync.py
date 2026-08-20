@@ -207,6 +207,97 @@ def _generate_device_name(device_info: DeviceInfo) -> None:
         device_info.name = f"{device_info.manufacturer}-{device_info.serial_number}"
 
 
+def _set_location_from_extra(
+    device_info: DeviceInfo,
+    node,
+    nautobot_client: Nautobot,
+    location: Record,
+) -> bool:
+    """Determine device location from the node's ``extra`` field.
+
+    Uses ``extra.rack`` (a Nautobot rack name) and ``extra.position`` (the
+    rack unit the node occupies). Both must be present for this to take
+    effect; when either is missing, or the rack cannot be resolved in
+    Nautobot, this returns ``False`` so the caller falls back to deriving
+    location from the connected switches.
+
+    Rack names are only unique within a location, so the lookup is scoped to
+    ``location`` (this deployment's region).
+
+    Args:
+        device_info: DeviceInfo to update with location, rack and position
+        node: Ironic node object
+        nautobot_client: Nautobot API client
+        location: Nautobot Location used to scope the rack lookup
+
+    Returns:
+        True if rack, location and position were set from ``extra``.
+    """
+    extra = node.extra or {}
+    rack_name = extra.get("rack")
+    position = extra.get("position")
+
+    # Both are required; otherwise fall back to switch-based lookup.
+    if not rack_name or position is None:
+        return False
+
+    # Validate position before touching device_info so a bad value can't leave
+    # a half-applied placement.
+    try:
+        rack_position = int(position)
+    except (TypeError, ValueError):
+        logger.warning(
+            "extra.position %r for node %s is not an integer, falling back "
+            "to switch-based location",
+            position,
+            device_info.uuid,
+        )
+        return False
+
+    try:
+        # Scope by location: rack names are only unique within a location.
+        try:
+            rack = nautobot_client.dcim.racks.get(
+                name=rack_name, location_id=location.id
+            )
+        except ValueError:
+            # pynautobot's .get() raises when more than one rack matches.
+            logger.warning(
+                "extra.rack %s (location %s) for node %s matched multiple "
+                "Nautobot racks, falling back to switch-based location",
+                rack_name,
+                location.name,
+                device_info.uuid,
+            )
+            return False
+
+        # pynautobot's typing allows .get() to return a list; treat that (and
+        # an empty result) as "did not resolve to a single rack".
+        if not rack or isinstance(rack, list):
+            logger.warning(
+                "extra.rack %s (location %s) for node %s did not resolve to a "
+                "single Nautobot rack, falling back to switch-based location",
+                rack_name,
+                location.name,
+                device_info.uuid,
+            )
+            return False
+
+        device_info.rack_id = rack.id
+        device_info.location_id = _get_record_value(rack.location, "id")
+        device_info.position = rack_position
+        return True
+
+    except Exception as e:
+        # Re-raise retryable errors (503, connection issues) to trigger retry
+        if _is_retryable_error(e):
+            raise
+        logger.error(
+            "Failed to set location from extra for node %s: %s", device_info.uuid, e
+        )
+        return False
+
+
 def _set_location_from_switches(
     device_info: DeviceInfo,
     ports: list,
@@ -301,7 +392,10 @@ def fetch_node_details(
     _populate_from_node(device_info, node)
     _populate_from_inventory(device_info, inventory)
     _generate_device_name(device_info)
-    _set_location_from_switches(device_info, ports, nautobot_client)
+    # Prefer an explicit rack/position from the node's extra field; fall back
+    # to deriving location from the connected switches when it isn't set.
+    if not _set_location_from_extra(device_info, node, nautobot_client, location):
+        _set_location_from_switches(device_info, ports, nautobot_client)
 
     return device_info, inventory, ports
 
@@ -485,7 +579,7 @@ def _preserve_location_from_device(device_info: DeviceInfo, nautobot_device) -> 
             device_info.rack_id = old_rack_id
             logger.info("Preserving rack %s from old device", old_rack_id)
 
-    if nautobot_device.position is not None:
+    if nautobot_device.position is not None and device_info.position is None:
         device_info.position = nautobot_device.position
         logger.info("Preserving position %s from old device", nautobot_device.position)
 
