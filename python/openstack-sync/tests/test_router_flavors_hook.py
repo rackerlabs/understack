@@ -231,7 +231,7 @@ def test_main_reconciles_binding_context_objects(monkeypatch, tmp_path):
         mock.patch("openstack_sync.hooks.router_flavors.prune_removed_flavors"),
         mock.patch(
             "openstack_sync.hooks.router_flavors.sync_flavor",
-            side_effect=lambda conn, flavor: synced.append(flavor["name"]),
+            side_effect=lambda conn, flavor, profiles: synced.append(flavor["name"]),
         ),
         mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
     ):
@@ -545,7 +545,7 @@ def test_main_continues_after_failure_and_skips_prune(monkeypatch, tmp_path):
     monkeypatch.setenv("BINDING_CONTEXT_PATH", context_path)
     seen = []
 
-    def sync_flavor(conn, flavor):
+    def sync_flavor(conn, flavor, profiles):
         seen.append(flavor["name"])
         if flavor["name"] == "bad-flavor":
             raise RuntimeError("bad flavor config")

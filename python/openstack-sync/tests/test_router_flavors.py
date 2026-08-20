@@ -235,7 +235,7 @@ def test_reconcile_uses_cloudcredentialsref():
 
     assert result == 0
     mock_connect.assert_called_once_with("baremetal-manage", "understack")
-    mock_sync.assert_called_once_with(conn, resource.flavor)
+    mock_sync.assert_called_once_with(conn, resource.flavor, {})
     mock_prune.assert_called_once_with(conn, [resource.flavor])
 
 

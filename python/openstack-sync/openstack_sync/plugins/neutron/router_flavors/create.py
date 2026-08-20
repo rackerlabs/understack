@@ -32,13 +32,26 @@ from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import 
 )
 
 LOG = logging.getLogger(__name__)
+ServiceProfileCache = dict[str, list[Any]]
 
 
-def find_matching_profile(conn: Any, driver: str, meta_info: Any) -> Any | None:
+def list_service_profiles(conn: Any, driver: str) -> list[Any]:
+    """Fetch service profiles for a single driver from Neutron."""
+    return list(conn.network.service_profiles(driver=driver))
+
+
+def service_profiles_for_driver(
+    conn: Any, driver: str, profile_cache: ServiceProfileCache
+) -> list[Any]:
+    """Return a credential-group cache entry for service profiles by driver."""
+    if driver not in profile_cache:
+        profile_cache[driver] = list_service_profiles(conn, driver)
+    return profile_cache[driver]
+
+
+def find_matching_profile(profiles: list[Any], meta_info: Any) -> Any | None:
     matching_profiles = []
-    for profile in conn.network.service_profiles():
-        if get_value(profile, "driver", default="") != driver:
-            continue
+    for profile in profiles:
         if meta_info_matches(service_profile_meta_info(profile), meta_info):
             matching_profiles.append(profile)
 
@@ -78,6 +91,7 @@ def ensure_profile(
     description: str,
     meta_info: Any,
     configured_profile_id: str,
+    profile_cache: ServiceProfileCache,
 ) -> Any:
     if configured_profile_id:
         profile = get_service_profile(conn, configured_profile_id)
@@ -109,19 +123,25 @@ def ensure_profile(
             f"for {name} was not found"
         )
 
-    profile = find_matching_profile(conn, driver, meta_info)
+    profiles = service_profiles_for_driver(conn, driver, profile_cache)
+    profile = find_matching_profile(profiles, meta_info)
     if profile:
         profile_id = resource_id(profile)
         LOG.info("Reusing service profile %s for %s", profile_id, name)
         return profile
 
     LOG.info("Creating service profile for %s driver=%s", name, driver)
-    return conn.network.create_service_profile(
+    new_profile = conn.network.create_service_profile(
         description=description,
         driver=driver,
         meta_info=meta_info_payload(managed_meta_info(meta_info)),
         is_enabled=True,
     )
+    # Make the new profile visible to any later flavor in this same run that
+    # has an identical (driver, meta_info) spec, so it gets reused instead of
+    # creating a duplicate profile.
+    profiles.append(new_profile)
+    return new_profile
 
 
 def find_flavor(conn: Any, name: str) -> Any | None:

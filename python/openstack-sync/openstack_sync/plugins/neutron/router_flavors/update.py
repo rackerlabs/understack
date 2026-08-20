@@ -56,7 +56,11 @@ def render_flavor(flavor: Any) -> dict[str, Any]:
     }
 
 
-def sync_flavor(conn: Any, flavor_config: dict[str, Any]) -> None:
+def sync_flavor(
+    conn: Any,
+    flavor_config: dict[str, Any],
+    profile_cache: create.ServiceProfileCache,
+) -> None:
     name = flavor_config.get("name")
     driver = flavor_config.get("driver")
     if not name or not driver:
@@ -72,7 +76,7 @@ def sync_flavor(conn: Any, flavor_config: dict[str, Any]) -> None:
 
     LOG.info("Reconciling router flavor %s", name)
     profile = create.ensure_profile(
-        conn, name, driver, profile_description, meta_info, profile_id
+        conn, name, driver, profile_description, meta_info, profile_id, profile_cache
     )
     flavor = ensure_flavor(conn, name, service_type, description)
     flavor = create.ensure_profile_attached(conn, flavor, profile)

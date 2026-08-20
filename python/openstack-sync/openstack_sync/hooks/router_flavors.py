@@ -20,6 +20,7 @@ from openstack_sync.hooks.common import synchronization_items
 from openstack_sync.plugins.common import ConfigError
 from openstack_sync.plugins.common import env_bool
 from openstack_sync.plugins.common import get_value
+from openstack_sync.plugins.neutron.router_flavors.create import ServiceProfileCache
 from openstack_sync.plugins.neutron.router_flavors.delete import prune_removed_flavors
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     CRD_API_VERSION,
@@ -306,8 +307,10 @@ def _mark_resources_failed(
         patch_flavor_status(resource, "Failed", message)
 
 
-def reconcile_router_flavor_resource(conn: Any, resource: RouterFlavorResource) -> None:
-    sync_flavor(conn, resource.flavor)
+def reconcile_router_flavor_resource(
+    conn: Any, resource: RouterFlavorResource, profile_cache: ServiceProfileCache
+) -> None:
+    sync_flavor(conn, resource.flavor, profile_cache)
 
 
 def reconcile_router_flavor_resources(
@@ -356,9 +359,14 @@ def reconcile_router_flavor_resources(
             )
             continue
 
+        # Fetched lazily by driver once per credential group. ensure_profile()
+        # appends newly created profiles into the same driver cache entry so a
+        # later flavor with an identical meta_info spec reuses it.
+        profile_cache: ServiceProfileCache = {}
+
         for resource in credential_resources:
             try:
-                reconcile_router_flavor_resource(conn, resource)
+                reconcile_router_flavor_resource(conn, resource, profile_cache)
             except Exception as exc:  # noqa: BLE001
                 failed_resources.append(resource)
                 patch_flavor_status(resource, "Failed", str(exc))

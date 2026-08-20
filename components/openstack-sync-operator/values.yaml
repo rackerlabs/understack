@@ -48,6 +48,10 @@ pluginData:
       envPrefix: NEUTRON_ROUTER_FLAVOR
       env:
         SYNC_CRONTAB: "0 * * * *"
+        # Neutron readiness wait before a router flavor reconcile fails.
+        # Total wait is READY_RETRIES * READY_DELAY seconds.
+        READY_RETRIES: 30
+        READY_DELAY: 10
         # When true, removing a NeutronRouterFlavor CR also deletes its unused
         # operator-managed OpenStack flavor. Enable this before removing the CR.
         PRUNE: false

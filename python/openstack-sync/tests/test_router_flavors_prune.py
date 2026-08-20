@@ -37,6 +37,9 @@ class FakeNetwork:
         self, flavor: dict[str, Any], ignore_missing: bool = True
     ) -> None:
         self.deleted_flavors.append(flavor["id"])
+        self._flavors = [
+            current for current in self._flavors if current["id"] != flavor["id"]
+        ]
 
 
 def test_prune_keeps_manual_flavor_with_managed_service_profile(monkeypatch):
@@ -106,6 +109,26 @@ def test_prune_deletes_removed_managed_flavor(monkeypatch):
     delete.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_flavors == ["managed-flavor-id"]
+
+
+def test_prune_deletes_removed_managed_flavor_and_unused_profile(monkeypatch):
+    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
+    monkeypatch.setattr(delete, "DELETE_UNUSED_SERVICE_PROFILES", True)
+    profile = _make_orphan_profile("managed-profile-id")
+    flavor = {
+        "id": "managed-flavor-id",
+        "name": "removed-managed-flavor",
+        "service_type": common.DEFAULT_SERVICE_TYPE,
+        "description": common.managed_flavor_description("created by operator"),
+        "service_profile_ids": [profile.id],
+    }
+    network = FakeNetworkWithProfiles([flavor], {profile.id: profile})
+    conn = SimpleNamespace(network=network)
+
+    delete.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+
+    assert network.deleted_flavors == ["managed-flavor-id"]
+    assert network.deleted_profiles == ["managed-profile-id"]
 
 
 # ---------------------------------------------------------------------------
