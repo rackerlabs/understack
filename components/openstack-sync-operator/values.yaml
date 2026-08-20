@@ -30,6 +30,7 @@ rbac:
 plugins:
   openstackPlaceholder: false
   neutronRouterFlavors: false
+  ironicRunbooks: true
 
 pluginData:
   openstackPlaceholder:
@@ -49,6 +50,15 @@ pluginData:
       env:
         SYNC_CRONTAB: "0 * * * *"
         PRUNE: "false"
+        DEFAULT_SECRET: infrasetup
+        DEFAULT_CLOUD: understack
+
+  ironicRunbooks:
+    hook:
+      path: /hooks/ironic_runbooks.py
+      crd: crds/baremetal.ironicproject.org_ironicrunbooks.yaml
+      envPrefix: IRONIC_RUNBOOK
+      env:
         DEFAULT_SECRET: infrasetup
         DEFAULT_CLOUD: understack
 
