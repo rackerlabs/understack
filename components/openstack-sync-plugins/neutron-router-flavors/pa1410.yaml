@@ -15,7 +15,8 @@ spec:
   name: pa1410
   service_type: L3_ROUTER_NAT
   description: Physical PA 1410
-  driver: neutron_understack.l3_router.palo_alto.PaloAlto
-  profile_description: Physical PA 1410
-  meta_info:
-    resource_class: pa1410
+  service_profiles:
+    - driver: neutron_understack.l3_router.palo_alto.PaloAlto
+      description: Physical PA 1410
+      meta_info:
+        resource_class: pa1410

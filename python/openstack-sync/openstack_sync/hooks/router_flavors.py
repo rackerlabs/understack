@@ -3,143 +3,68 @@
 
 from __future__ import annotations
 
-import json
-import os
 import sys
 from typing import Any
 
-from openstack_sync.utils import get_openstack_connection
-from openstack_sync.utils import pod_namespace  # noqa: F401 — re-exported for tests
-
-TRUTHY_VALUES = {"1", "true", "yes", "on"}
-
-
-def env_is_truthy(name: str, default: str = "false") -> bool:
-    return os.environ.get(name, default).lower() in TRUTHY_VALUES
-
-
-def router_flavor_namespace() -> str | None:
-    return (
-        os.environ.get("NEUTRON_ROUTER_FLAVOR_NAMESPACE")
-        or os.environ.get("POD_NAMESPACE")
-        or None
-    )
+from openstack_sync.hooks.framework import HookConfig
+from openstack_sync.hooks.framework import SyncPlugin
+from openstack_sync.hooks.framework import build_crd_hook_config
+from openstack_sync.hooks.framework import hook_enabled
+from openstack_sync.hooks.framework import hook_inputs
+from openstack_sync.hooks.framework import run_hook
+from openstack_sync.hooks.framework import run_sync
+from openstack_sync.plugins.common import wait_for_openstack_network
+from openstack_sync.plugins.neutron.router_flavors import prune as prune_module
+from openstack_sync.plugins.neutron.router_flavors import reconcile as reconcile_module
+from openstack_sync.plugins.neutron.router_flavors.config import BINDING_NAME
+from openstack_sync.plugins.neutron.router_flavors.config import ENV_PREFIX
 
 
-# ---------------------------------------------------------------------------
-# Reconciliation
-# ---------------------------------------------------------------------------
+class RouterFlavorPlugin(SyncPlugin):
+    """Sync NeutronRouterFlavor CRs into Neutron flavors and service profiles."""
 
+    noun = "router flavor"
 
-def reconcile_router_flavor(event: dict[str, Any]) -> None:
-    """Reconcile a single NeutronRouterFlavor resource against OpenStack.
-
-    Reads ``spec.cloudCredentialsRef`` from the event to determine which
-    Kubernetes Secret and which cloud entry to use.  No operator-level
-    cloud configuration is required — each resource is self-describing.
-    """
-    obj = event["object"]
-    spec = obj.get("spec", {})
-
-    creds_ref = spec.get("cloudCredentialsRef", {})
-    secret_name = creds_ref.get("secretName")
-    cloud_name = creds_ref.get("cloudName")
-
-    if not secret_name or not cloud_name:
-        raise ValueError(
-            f"NeutronRouterFlavor {obj.get('metadata', {}).get('name')!r} "
-            "is missing spec.cloudCredentialsRef.secretName or .cloudName"
+    def wait_for_api(self, conn: Any) -> None:
+        wait_for_openstack_network(
+            conn,
+            retries=self.config.ready_retries,
+            delay=self.config.ready_delay,
         )
 
-    conn = get_openstack_connection(secret_name, cloud_name)  # noqa: F841
+    def new_cache(self) -> reconcile_module.ProfileCache:
+        # Keyed by driver and shared across every flavor in one credential
+        # group, so two flavors wanting the same profile share one lookup and
+        # end up sharing one profile.
+        return {}
 
-    # Full reconciliation logic (create/update/delete router flavor) will be
-    # wired in here once the connection-per-resource pattern is established.
-    # The connection object is available as `conn` for subsequent API calls.
+    def reconcile(
+        self, conn: Any, spec: dict[str, Any], cache: reconcile_module.ProfileCache
+    ) -> list[str]:
+        return reconcile_module.sync_flavor(conn, spec, cache)
 
-
-# ---------------------------------------------------------------------------
-# Hook configuration
-# ---------------------------------------------------------------------------
-
-
-def build_hook_config() -> dict[str, object]:
-    hook_config: dict[str, object] = {
-        "configVersion": "v1",
-        "settings": {
-            "executionMinInterval": "30s",
-            "executionBurst": 1,
-        },
-    }
-
-    if not env_is_truthy("NEUTRON_ROUTER_FLAVOR_ENABLED"):
-        # Shell-operator requires at least one binding.
-        hook_config["onStartup"] = 10
-        return hook_config
-
-    kubernetes_binding: dict[str, object] = {
-        "name": "neutron-router-flavors",
-        "apiVersion": "neutron.understack.rackspace.net/v1alpha1",
-        "kind": "NeutronRouterFlavor",
-        "executeHookOnEvent": ["Added", "Modified", "Deleted"],
-        "jqFilter": ".",
-        "includeSnapshotsFrom": ["neutron-router-flavors"],
-    }
-    namespace = router_flavor_namespace()
-    if namespace:
-        kubernetes_binding["namespace"] = {
-            "nameSelector": {
-                "matchNames": [namespace],
-            },
-        }
-
-    hook_config["kubernetes"] = [kubernetes_binding]
-    hook_config["schedule"] = [
-        {
-            "name": "hourly sync",
-            "crontab": os.environ.get(
-                "NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB", "0 * * * *"
-            ),
-            "includeSnapshotsFrom": ["neutron-router-flavors"],
-        }
-    ]
-    return hook_config
-
-
-HOOK_CONFIG = build_hook_config()
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+    def prune(
+        self,
+        conn: Any,
+        desired_specs: list[dict[str, Any]],
+        *,
+        authoritative_empty: bool,
+    ) -> None:
+        if not self.config.prune:
+            return
+        prune_module.prune_removed_flavors(
+            conn, desired_specs, authoritative_empty=authoritative_empty
+        )
 
 
 def main() -> int:
-    if len(sys.argv) > 1 and sys.argv[1] == "--config":
-        print(json.dumps(build_hook_config(), indent=2))
-        return 0
+    def run(contexts: list[dict[str, Any]]) -> int:
+        if not hook_enabled(ENV_PREFIX):
+            return 0
+        config = HookConfig.from_env(ENV_PREFIX, binding_name=BINDING_NAME)
+        return run_sync(RouterFlavorPlugin(config), hook_inputs(contexts, config))
 
-    context_path = os.environ.get("BINDING_CONTEXT_PATH")
-    if not context_path:
-        return 0
-    with open(context_path) as f:
-        raw = f.read()
-    if not raw.strip():
-        return 0
-
-    try:
-        binding_contexts = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        print(f"failed to parse binding context: {exc}", file=sys.stderr)
-        return 1
-
-    for context in binding_contexts:
-        binding = context.get("binding", "")
-        if binding == "neutron-router-flavors":
-            for item in context.get("objects", []):
-                reconcile_router_flavor(item)
-
-    return 0
+    return run_hook(lambda: build_crd_hook_config(ENV_PREFIX, BINDING_NAME), run)
 
 
 if __name__ == "__main__":

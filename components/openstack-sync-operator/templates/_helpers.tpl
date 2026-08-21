@@ -69,7 +69,7 @@ required because shell-operator reads hook watches only when the pod starts.
 {{- end }}
 
 {{/*
-Normalize built-in plugin hooks and direct hook definitions.
+Normalize built-in plugin hooks.
 */}}
 {{- define "openstack-sync-operator.configuredHooks" -}}
 {{- $hooks := dict -}}
@@ -90,9 +90,6 @@ Normalize built-in plugin hooks and direct hook definitions.
 {{- $_1 := set $hookValues "enabled" (eq (get $enabledPlugins $pluginName) true) -}}
 {{- $_2 := set $hooks $pluginName $hookValues -}}
 {{- end -}}
-{{- end -}}
-{{- range $hookName, $hook := default dict .Values.hooks -}}
-{{- $_ := set $hooks $hookName $hook -}}
 {{- end -}}
 {{- $hooks | toYaml -}}
 {{- end }}

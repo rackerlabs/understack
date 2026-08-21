@@ -27,6 +27,13 @@
 {{- end }}
 {{- end }}
 {{- end -}}
+{{- $operatorEnv := dict "LOG_LEVEL" "info" -}}
+{{- range $envName, $envValue := default dict .Values.env }}
+{{- if hasKey $hookEnv $envName }}
+{{- fail (printf "duplicate operator environment variable %s" $envName) }}
+{{- end }}
+{{- $_ = set $operatorEnv $envName $envValue -}}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -65,7 +72,7 @@ spec:
         - |
           missing=0
           {{- range $hookName, $hook := $enabledHooks }}
-          {{- $hookPath := required (printf "hooks.%s.path is required when hook is enabled" $hookName) $hook.path }}
+          {{- $hookPath := required (printf "pluginData.%s.hook.path is required when hook is enabled" $hookName) $hook.path }}
           if [ ! -x {{ $hookPath | quote }} ]; then
             echo {{ printf "enabled hook %s missing or not executable: %s" $hookName $hookPath | quote }} >&2
             missing=1
@@ -103,6 +110,10 @@ spec:
         {{- range $envName := keys $hookEnv | sortAlpha }}
         - name: {{ $envName }}
           value: {{ get $hookEnv $envName | quote }}
+        {{- end }}
+        {{- range $envName := keys $operatorEnv | sortAlpha }}
+        - name: {{ $envName }}
+          value: {{ get $operatorEnv $envName | quote }}
         {{- end }}
         {{- with .Values.resources }}
         resources:
