@@ -229,7 +229,9 @@ def test_reconcile_uses_cloudcredentialsref():
         ) as mock_connect,
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -298,7 +300,9 @@ def test_main_dispatches_to_reconcile(monkeypatch, tmp_path):
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
         mock.patch("openstack_sync.hooks.router_flavors.prune_removed_flavors"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch.object(router_flavors.sys, "argv", ["router_flavors.py"]),
     ):
         result = router_flavors.main()

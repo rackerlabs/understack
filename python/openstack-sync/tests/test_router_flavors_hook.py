@@ -270,6 +270,101 @@ def test_main_reconciles_binding_context_objects(monkeypatch, tmp_path):
     assert synced == ["pa1410"]
 
 
+def _drift_context(monkeypatch, tmp_path) -> None:
+    """Set up a single-flavor schedule binding context for status assertions."""
+    clear_env(monkeypatch)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB", "0 * * * *")
+    monkeypatch.setenv("POD_NAMESPACE", "openstack")
+    monkeypatch.setattr(utils, "_connection_cache", {})
+
+    context_path = write_binding_context(
+        tmp_path,
+        [
+            {
+                "binding": "hourly sync",
+                "type": "Schedule",
+                "snapshots": {
+                    common.CRD_BINDING_NAME: [
+                        {"object": router_flavor_object("pa1410")},
+                    ]
+                },
+            }
+        ],
+    )
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", context_path)
+
+
+def test_main_reports_plain_success_when_no_profile_drift(monkeypatch, tmp_path):
+    """The drift-free status message must stay exactly as it was."""
+    _drift_context(monkeypatch, tmp_path)
+
+    with (
+        mock.patch(
+            "openstack_sync.utils.openstack.connection.Connection",
+            return_value=mock.MagicMock(),
+        ),
+        mock.patch.object(utils, "read_secret_key", return_value=FAKE_CLOUDS_YAML),
+        mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.patch_flavor_status"
+        ) as mock_status,
+        mock.patch("openstack_sync.hooks.router_flavors.prune_removed_flavors"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]),
+        mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
+    ):
+        result = hook.main()
+
+    assert result == 0
+    assert mock_status.call_args.args[1] == "Synced"
+    assert mock_status.call_args.args[2] == "Successfully reconciled router flavor"
+
+
+def test_main_reports_service_profile_drift_in_synced_status(monkeypatch, tmp_path):
+    """Drift must reach the CR status.
+
+    The flavor is converged, so the status stays Synced -- but reporting a bare
+    success is how a disabled service profile stays invisible until every router
+    create against the flavor fails.
+    """
+    _drift_context(monkeypatch, tmp_path)
+    drift = [
+        common.ProfileDrift(
+            profile_id="prof-a",
+            driver="neutron_understack.l3_router.vrf.Vrf",
+            field="is_enabled",
+            have=False,
+            want=True,
+        )
+    ]
+
+    with (
+        mock.patch(
+            "openstack_sync.utils.openstack.connection.Connection",
+            return_value=mock.MagicMock(),
+        ),
+        mock.patch.object(utils, "read_secret_key", return_value=FAKE_CLOUDS_YAML),
+        mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.patch_flavor_status"
+        ) as mock_status,
+        mock.patch("openstack_sync.hooks.router_flavors.prune_removed_flavors"),
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=drift
+        ),
+        mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
+    ):
+        result = hook.main()
+
+    # Drift is not a reconcile failure: the flavor still converged.
+    assert result == 0
+    assert mock_status.call_args.args[1] == "Synced"
+    message = mock_status.call_args.args[2]
+    assert message.startswith("Successfully reconciled router flavor")
+    assert "prof-a" in message
+    assert "is_enabled" in message
+
+
 def test_main_returns_error_when_reconcile_fails(monkeypatch, tmp_path):
     clear_env(monkeypatch)
     monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
@@ -343,7 +438,9 @@ def test_main_prunes_after_successful_full_set_reconcile(monkeypatch, tmp_path):
         ),
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -392,7 +489,9 @@ def test_main_prunes_deleted_only_credentials(monkeypatch, tmp_path):
         ) as mock_connect,
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -435,7 +534,9 @@ def test_main_returns_error_when_deleted_only_connection_fails(monkeypatch, tmp_
             "openstack_sync.hooks.router_flavors.wait_for_openstack_network"
         ) as mock_wait,
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -480,7 +581,9 @@ def test_main_returns_error_when_deleted_only_prune_fails(monkeypatch, tmp_path)
             "openstack_sync.hooks.router_flavors.wait_for_openstack_network"
         ) as mock_wait,
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors",
             side_effect=RuntimeError("delete failed"),
@@ -524,7 +627,9 @@ def test_main_ignores_deleted_only_credentials_when_prune_is_disabled(
         ) as mock_connect,
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -586,7 +691,7 @@ def test_main_prunes_active_and_deleted_only_credentials(monkeypatch, tmp_path):
         ),
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]),
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -626,7 +731,9 @@ def test_main_skips_empty_snapshot_prune_without_credentials(monkeypatch, tmp_pa
         ) as mock_connect,
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -764,7 +871,9 @@ def test_added_event_reconciles_only_added_resource(monkeypatch, tmp_path):
         ),
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -826,7 +935,9 @@ def test_deleted_event_reconciles_none_and_prunes_with_remaining_snapshot(
         ),
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -884,7 +995,9 @@ def test_modified_event_skipped_when_status_already_current(monkeypatch, tmp_pat
         ) as mock_connect,
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch(
             "openstack_sync.hooks.router_flavors.prune_removed_flavors"
         ) as mock_prune,
@@ -940,7 +1053,9 @@ def test_modified_event_reconciles_when_generation_bumped(monkeypatch, tmp_path)
         ),
         mock.patch("openstack_sync.hooks.router_flavors.wait_for_openstack_network"),
         mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
-        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.sync_flavor", return_value=[]
+        ) as mock_sync,
         mock.patch("openstack_sync.hooks.router_flavors.prune_removed_flavors"),
         mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
     ):

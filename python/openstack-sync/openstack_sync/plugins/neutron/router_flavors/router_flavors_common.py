@@ -7,6 +7,7 @@ classifiers, etc.) live in :mod:`openstack_sync.plugins.common`.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from typing import Any
 
 from openstack_sync.plugins.common import comparable_meta_info_without
@@ -219,6 +220,42 @@ def is_managed_service_profile(profile: Any) -> bool:
     return (
         isinstance(meta_info, dict)
         and meta_info.get(MANAGED_META_INFO_KEY) == MANAGED_META_INFO_VALUE
+    )
+
+
+# ---------------------------------------------------------------------------
+# Service profile drift reporting
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ProfileDrift:
+    """One field of a reused service profile that diverged from the CR spec.
+
+    Profile drift is reported, never auto-corrected.  Neutron's
+    ``update_service_profile`` calls ``_ensure_service_profile_not_in_use`` and
+    raises ``ServiceProfileInUse`` (HTTP 409) while *any* flavor binding exists
+    -- not merely while a router is using it -- and this operator binds every
+    profile it manages.  An update attempt would therefore fail every cycle.
+    Correcting drift requires unbinding the profile from every flavor first,
+    which is an operator decision, not something to do behind their back.
+    """
+
+    profile_id: str
+    driver: str
+    field: str
+    have: Any
+    want: Any
+
+    def describe(self) -> str:
+        """Return a short ``field: have=... want=...`` description."""
+        return f"{self.field}: have={self.have!r} want={self.want!r}"
+
+
+def describe_profile_drift(drift: list[ProfileDrift]) -> str:
+    """Return a single-line summary of *drift* for logs and CR status."""
+    return "; ".join(
+        f"service profile {item.profile_id} {item.describe()}" for item in drift
     )
 
 

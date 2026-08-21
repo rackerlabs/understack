@@ -23,6 +23,9 @@ from openstack_sync.plugins.common import get_value
 from openstack_sync.plugins.neutron.router_flavors.create import ServiceProfileCache
 from openstack_sync.plugins.neutron.router_flavors.delete import prune_removed_flavors
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    ProfileDrift,
+)
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     crd_api_version,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
@@ -34,6 +37,9 @@ from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import 
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     crd_resource,
+)
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    describe_profile_drift,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     prune_removed_flavors_enabled,
@@ -442,8 +448,25 @@ def _mark_resources_failed(
 
 def reconcile_router_flavor_resource(
     conn: Any, resource: RouterFlavorResource, profile_cache: ServiceProfileCache
-) -> None:
-    sync_flavor(conn, resource.flavor, profile_cache)
+) -> list[ProfileDrift]:
+    return sync_flavor(conn, resource.flavor, profile_cache)
+
+
+def _synced_status_message(drift: list[ProfileDrift]) -> str:
+    """Return the Synced status message, qualified by any unfixable drift.
+
+    The flavor really is converged, so the status stays Synced; but reporting a
+    bare success while a reused service profile diverges from the spec is how a
+    disabled profile stays invisible until every router create against the
+    flavor fails.
+    """
+    message = "Successfully reconciled router flavor"
+    if not drift:
+        return message
+    return (
+        f"{message}; service profile drift requires manual action: "
+        f"{describe_profile_drift(drift)}"
+    )
 
 
 def reconcile_router_flavor_resources(
@@ -506,7 +529,7 @@ def reconcile_router_flavor_resources(
 
         for resource in credential_resources:
             try:
-                reconcile_router_flavor_resource(conn, resource, profile_cache)
+                drift = reconcile_router_flavor_resource(conn, resource, profile_cache)
             except Exception as exc:  # noqa: BLE001
                 failed_resources.append(resource)
                 patch_flavor_status(resource, "Failed", str(exc))
@@ -520,7 +543,7 @@ def reconcile_router_flavor_resources(
             patch_flavor_status(
                 resource,
                 "Synced",
-                "Successfully reconciled router flavor",
+                _synced_status_message(drift),
             )
 
     if failed_resources:
