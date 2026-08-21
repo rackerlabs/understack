@@ -166,7 +166,7 @@ def test_router_flavor_hook_config_printed_on_config_flag(monkeypatch, capsys):
 # ---------------------------------------------------------------------------
 
 
-def test_load_router_flavor_resources_keeps_current_status():
+def test_load_router_flavor_hook_inputs_keeps_current_status():
     status = {
         "syncStatus": "Synced",
         "message": "Successfully reconciled router flavor",
@@ -174,9 +174,9 @@ def test_load_router_flavor_resources_keeps_current_status():
     }
     contexts = _snapshot_context(_router_flavor_object("flavor-a", status=status))
 
-    resources = router_flavors.load_router_flavor_resources(contexts)
+    hook_inputs = router_flavors.load_router_flavor_hook_inputs(contexts)
 
-    assert resources[0].current_status == status
+    assert hook_inputs.resources_to_reconcile[0].current_status == status
 
 
 def test_patch_flavor_status_passes_current_status():
@@ -207,7 +207,7 @@ def test_patch_flavor_status_passes_current_status():
 
 def test_reconcile_uses_cloudcredentialsref():
     """Per-resource cloudCredentialsRef is used to connect to OpenStack."""
-    resource = router_flavors.load_router_flavor_resources(
+    resource = router_flavors.load_router_flavor_hook_inputs(
         _snapshot_context(
             _router_flavor_object(
                 "test-flavor",
@@ -219,7 +219,7 @@ def test_reconcile_uses_cloudcredentialsref():
                 },
             )
         )
-    )[0]
+    ).resources_to_reconcile[0]
     conn = _fake_conn()
 
     with (
@@ -252,7 +252,7 @@ def test_reconcile_requires_cloudcredentialsref():
         router_flavors.ConfigError,
         match="cloudCredentialsRef is required",
     ):
-        router_flavors.load_router_flavor_resources(_snapshot_context(obj))
+        router_flavors.load_router_flavor_hook_inputs(_snapshot_context(obj))
 
 
 def test_reconcile_requires_complete_cloudcredentialsref():
@@ -269,7 +269,7 @@ def test_reconcile_requires_complete_cloudcredentialsref():
         router_flavors.ConfigError,
         match=r"cloudCredentialsRef\.cloudName",
     ):
-        router_flavors.load_router_flavor_resources(_snapshot_context(obj))
+        router_flavors.load_router_flavor_hook_inputs(_snapshot_context(obj))
 
 
 # ---------------------------------------------------------------------------
