@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from typing import Any
 
 from openstack_sync.plugins.common import get_service_profile
@@ -15,19 +16,19 @@ from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import 
     DEFAULT_SERVICE_TYPE,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    DELETE_UNUSED_SERVICE_PROFILES,
-)
-from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    PRUNE_DRIVER_PREFIXES,
-)
-from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    PRUNE_REMOVED_FLAVORS,
+    delete_unused_service_profiles_enabled,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     is_managed_flavor,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     is_managed_service_profile,
+)
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    prune_driver_prefixes,
+)
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    prune_removed_flavors_enabled,
 )
 
 LOG = logging.getLogger(__name__)
@@ -65,15 +66,31 @@ def get_cached_service_profile(
 
 def is_prunable_service_profile(profile: Any) -> bool:
     driver = service_profile_driver(profile)
-    return bool(PRUNE_DRIVER_PREFIXES) and any(
-        driver.startswith(prefix) for prefix in PRUNE_DRIVER_PREFIXES
-    )
+    prefixes = prune_driver_prefixes()
+    return bool(prefixes) and any(driver.startswith(prefix) for prefix in prefixes)
 
 
-def is_prunable_flavor(conn: Any, flavor: Any) -> bool:
+def is_prunable_flavor(flavor: Any) -> bool:
     if get_value(flavor, "service_type") != DEFAULT_SERVICE_TYPE:
         return False
     return is_managed_flavor(flavor)
+
+
+def service_profile_attachment_counts(flavors: list[Any]) -> Counter[str]:
+    counts: Counter[str] = Counter()
+    for flavor in flavors:
+        counts.update(set(service_profile_ids(flavor)))
+    return counts
+
+
+def detach_service_profile_ids(
+    profile_attachment_counts: Counter[str],
+    profile_ids: list[str],
+) -> None:
+    for profile_id in profile_ids:
+        profile_attachment_counts[profile_id] -= 1
+        if profile_attachment_counts[profile_id] <= 0:
+            del profile_attachment_counts[profile_id]
 
 
 def flavor_has_routers(conn: Any, flavor: Any) -> bool:
@@ -102,11 +119,11 @@ def flavor_has_routers(conn: Any, flavor: Any) -> bool:
     return False
 
 
-def service_profile_attached_to_any_flavor(conn: Any, profile_id: str) -> bool:
-    for flavor in conn.network.flavors(service_type=DEFAULT_SERVICE_TYPE):
-        if profile_id in service_profile_ids(flavor):
-            return True
-    return False
+def service_profile_attached_to_any_flavor(
+    profile_attachment_counts: Counter[str],
+    profile_id: str,
+) -> bool:
+    return profile_attachment_counts[profile_id] > 0
 
 
 def maybe_delete_service_profile(
@@ -114,8 +131,9 @@ def maybe_delete_service_profile(
     profile_id: str,
     protected_profile_ids: set[str],
     profile_cache: dict[str, Any | None],
+    profile_attachment_counts: Counter[str],
 ) -> None:
-    if not DELETE_UNUSED_SERVICE_PROFILES:
+    if not delete_unused_service_profiles_enabled():
         LOG.info("Keeping service profile %s; profile pruning is disabled", profile_id)
         return
 
@@ -143,7 +161,7 @@ def maybe_delete_service_profile(
         LOG.info("Keeping service profile %s; it is not operator-managed", profile_id)
         return
 
-    if service_profile_attached_to_any_flavor(conn, profile_id):
+    if service_profile_attached_to_any_flavor(profile_attachment_counts, profile_id):
         LOG.info("Keeping service profile %s; it is still attached", profile_id)
         return
 
@@ -166,6 +184,7 @@ def delete_removed_flavor(
     flavor: Any,
     protected_profile_ids: set[str],
     profile_cache: dict[str, Any | None],
+    profile_attachment_counts: Counter[str],
 ) -> None:
     flavor_id = resource_id(flavor)
     flavor_name = get_value(flavor, "name", default=flavor_id)
@@ -179,18 +198,25 @@ def delete_removed_flavor(
         conn.network.delete_flavor(flavor, ignore_missing=True)
     except Exception as exc:
         if is_not_found(exc):
-            return
-        if is_conflict(exc):
+            LOG.info("Router flavor %s (%s) is already absent", flavor_name, flavor_id)
+        elif is_conflict(exc):
             LOG.info(
                 "Router flavor %s is still in use; skipping delete",
                 flavor_name,
             )
             return
-        raise
+        else:
+            raise
+
+    detach_service_profile_ids(profile_attachment_counts, profile_ids)
 
     for profile_id in profile_ids:
         maybe_delete_service_profile(
-            conn, profile_id, protected_profile_ids, profile_cache
+            conn,
+            profile_id,
+            protected_profile_ids,
+            profile_cache,
+            profile_attachment_counts,
         )
 
 
@@ -198,6 +224,7 @@ def prune_orphaned_service_profiles(
     conn: Any,
     protected_profile_ids: set[str],
     profile_cache: dict[str, Any | None],
+    profile_attachment_counts: Counter[str],
 ) -> None:
     """Delete orphaned operator-managed service profiles.
 
@@ -214,7 +241,11 @@ def prune_orphaned_service_profiles(
         if not is_managed_service_profile(profile):
             continue
         maybe_delete_service_profile(
-            conn, profile_id, protected_profile_ids, profile_cache
+            conn,
+            profile_id,
+            protected_profile_ids,
+            profile_cache,
+            profile_attachment_counts,
         )
 
 
@@ -224,7 +255,7 @@ def prune_removed_flavors(
     *,
     authoritative_empty_desired: bool = False,
 ) -> None:
-    if not PRUNE_REMOVED_FLAVORS:
+    if not prune_removed_flavors_enabled():
         LOG.info("Router flavor pruning is disabled")
         return
 
@@ -240,14 +271,27 @@ def prune_removed_flavors(
     profile_cache: dict[str, Any | None] = {}
 
     LOG.info("Pruning removed router flavors")
-    for flavor in list(conn.network.flavors(service_type=DEFAULT_SERVICE_TYPE)):
+    current_flavors = list(conn.network.flavors(service_type=DEFAULT_SERVICE_TYPE))
+    profile_attachment_counts = service_profile_attachment_counts(current_flavors)
+    for flavor in current_flavors:
         flavor_name = get_value(flavor, "name")
         if not flavor_name or flavor_name in desired_names:
             continue
-        if not is_prunable_flavor(conn, flavor):
+        if not is_prunable_flavor(flavor):
             continue
-        delete_removed_flavor(conn, flavor, protected_profile_ids, profile_cache)
+        delete_removed_flavor(
+            conn,
+            flavor,
+            protected_profile_ids,
+            profile_cache,
+            profile_attachment_counts,
+        )
 
     # Second pass: catch profiles orphaned by a partial failure on a previous
     # run (delete_flavor succeeded but maybe_delete_service_profile threw).
-    prune_orphaned_service_profiles(conn, protected_profile_ids, profile_cache)
+    prune_orphaned_service_profiles(
+        conn,
+        protected_profile_ids,
+        profile_cache,
+        profile_attachment_counts,
+    )

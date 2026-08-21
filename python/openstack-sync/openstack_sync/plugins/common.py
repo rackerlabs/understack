@@ -39,6 +39,44 @@ def env_bool(name: str, default: bool) -> bool:
     raise ConfigError(f"{name} must be true or false")
 
 
+def env_int(name: str, default: int) -> int:
+    """Return an integer from an environment variable."""
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be an integer") from exc
+
+
+def env_float(name: str, default: float) -> float:
+    """Return a float from an environment variable."""
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a number") from exc
+
+
+def env_required(name: str) -> str:
+    """Return the value of a required environment variable.
+
+    Raises :exc:`ConfigError` when the variable is absent or empty.  Use
+    this for values that must be present at runtime but must not be read at
+    import time (e.g. CRD identity vars injected by the Helm chart).
+    """
+    value = os.environ.get(name)
+    if not value:
+        raise ConfigError(
+            f"{name} is required but not set; "
+            "ensure the Helm chart has injected it before the hook runs"
+        )
+    return value
+
+
 def env_tuple(name: str, default: str) -> tuple[str, ...]:
     """Return a tuple of strings parsed from a comma-separated env variable."""
     return tuple(

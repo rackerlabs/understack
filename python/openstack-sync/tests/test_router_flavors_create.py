@@ -28,7 +28,7 @@ def _make_profile(
 ) -> Any:
     raw_meta = dict(meta_info or {})
     if managed:
-        raw_meta.update(common.OPERATOR_META_INFO_MARKERS)
+        raw_meta.update(common.operator_meta_info_markers())
     return types.SimpleNamespace(
         id=profile_id,
         driver=driver,
@@ -274,7 +274,7 @@ def test_ensure_profile_creates_service_profile_with_management_markers():
     kwargs = conn.network.create_service_profile.call_args.kwargs
     meta_info = plugin_common.normalize_meta_info(kwargs["meta_info"])
     assert meta_info["vni_alloc"] == "auto"
-    for key, value in common.OPERATOR_META_INFO_MARKERS.items():
+    for key, value in common.operator_meta_info_markers().items():
         assert meta_info[key] == value
 
 

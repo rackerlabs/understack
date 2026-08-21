@@ -11,6 +11,9 @@ from typing import Any
 
 from openstack_sync.plugins.common import comparable_meta_info_without
 from openstack_sync.plugins.common import env_bool
+from openstack_sync.plugins.common import env_float
+from openstack_sync.plugins.common import env_int
+from openstack_sync.plugins.common import env_required
 from openstack_sync.plugins.common import env_tuple
 from openstack_sync.plugins.common import get_value
 from openstack_sync.plugins.common import managed_meta_info as managed_meta_info_with
@@ -21,32 +24,74 @@ from openstack_sync.plugins.common import wait_for_openstack_network as wait_for
 # ---------------------------------------------------------------------------
 # Router-flavor CRD identity
 # ---------------------------------------------------------------------------
-# The chart injects these from the rendered CRD when the hook has an envPrefix.
-CRD_API_VERSION = os.environ["NEUTRON_ROUTER_FLAVOR_CRD_API_VERSION"]
-CRD_KIND = os.environ["NEUTRON_ROUTER_FLAVOR_CRD_KIND"]
-CRD_RESOURCE = os.environ["NEUTRON_ROUTER_FLAVOR_CRD_RESOURCE"]
-STATUS_ENABLED = env_bool("NEUTRON_ROUTER_FLAVOR_STATUS_ENABLED", False)
-# Internal shell-operator binding label -- not injected externally.
-CRD_BINDING_NAME = os.environ.get(
-    "NEUTRON_ROUTER_FLAVOR_CRD_BINDING_NAME",
-    "neutron-router-flavors",
-)
-CRD_NAMESPACE = os.environ.get("POD_NAMESPACE")
+# CRD_API_VERSION, CRD_KIND, and CRD_RESOURCE are injected by the Helm chart
+# at runtime and must NOT be read at module import time.  Importing this module
+# happens before shell-operator invokes the hook with --config, and these vars
+# are not guaranteed to be present at that point (e.g. broken chart rendering,
+# unit tests that only exercise the --config path).
+#
+# Use the accessor functions below — crd_api_version(), crd_kind(),
+# crd_resource() — everywhere these values are needed.  They call
+# env_required() which raises ConfigError with a clear message if a var is
+# absent, rather than crashing at import with a raw KeyError.
+#
+# Internal shell-operator binding label default.
+CRD_BINDING_NAME = "neutron-router-flavors"
 DEFAULT_SERVICE_TYPE = "L3_ROUTER_NAT"
+
+
+def crd_api_version() -> str:
+    """Return the CRD API version injected by the Helm chart."""
+    return env_required("NEUTRON_ROUTER_FLAVOR_CRD_API_VERSION")
+
+
+def crd_kind() -> str:
+    """Return the CRD kind injected by the Helm chart."""
+    return env_required("NEUTRON_ROUTER_FLAVOR_CRD_KIND")
+
+
+def crd_resource() -> str:
+    """Return the fully-qualified CRD resource name injected by the Helm chart."""
+    return env_required("NEUTRON_ROUTER_FLAVOR_CRD_RESOURCE")
+
+
+def crd_binding_name() -> str:
+    """Return the shell-operator binding label for the CRD watch."""
+    return os.environ.get("NEUTRON_ROUTER_FLAVOR_CRD_BINDING_NAME", CRD_BINDING_NAME)
+
+
+def crd_namespace() -> str | None:
+    """Return the namespace used for CRD status patches."""
+    return os.environ.get("POD_NAMESPACE")
+
+
+def status_enabled() -> bool:
+    """Return whether CRD status patching is enabled."""
+    return env_bool("NEUTRON_ROUTER_FLAVOR_STATUS_ENABLED", False)
+
 
 # ---------------------------------------------------------------------------
 # Prune / lifecycle config
 # ---------------------------------------------------------------------------
 
-PRUNE_REMOVED_FLAVORS = env_bool("NEUTRON_ROUTER_FLAVOR_PRUNE", False)
-DELETE_UNUSED_SERVICE_PROFILES = env_bool(
-    "NEUTRON_ROUTER_FLAVOR_DELETE_UNUSED_PROFILES",
-    True,
-)
-PRUNE_DRIVER_PREFIXES = env_tuple(
-    "NEUTRON_ROUTER_FLAVOR_PRUNE_DRIVER_PREFIXES",
-    "neutron_understack.l3_router.",
-)
+
+def prune_removed_flavors_enabled() -> bool:
+    """Return whether removed router flavor pruning is enabled."""
+    return env_bool("NEUTRON_ROUTER_FLAVOR_PRUNE", False)
+
+
+def delete_unused_service_profiles_enabled() -> bool:
+    """Return whether unused service profile deletion is enabled."""
+    return env_bool("NEUTRON_ROUTER_FLAVOR_DELETE_UNUSED_PROFILES", True)
+
+
+def prune_driver_prefixes() -> tuple[str, ...]:
+    """Return service profile driver prefixes eligible for pruning."""
+    return env_tuple(
+        "NEUTRON_ROUTER_FLAVOR_PRUNE_DRIVER_PREFIXES",
+        "neutron_understack.l3_router.",
+    )
+
 
 # ---------------------------------------------------------------------------
 # Operator ownership markers
@@ -64,23 +109,46 @@ FLAVOR_DESCRIPTION_MARKER = os.environ.get(
 MARKER_VERSION_META_INFO_KEY = "_understack_router_flavor_marker_version"
 MARKER_VERSION_META_INFO_VALUE = "v1"
 MARKER_SOURCE_META_INFO_KEY = "_understack_router_flavor_source"
-MARKER_SOURCE_META_INFO_VALUE = os.environ.get(
-    "NEUTRON_ROUTER_FLAVOR_SOURCE",
-    CRD_KIND,
-)
-OPERATOR_META_INFO_MARKERS: dict[str, str] = {
-    MANAGED_META_INFO_KEY: MANAGED_META_INFO_VALUE,
-    MARKER_VERSION_META_INFO_KEY: MARKER_VERSION_META_INFO_VALUE,
-    MARKER_SOURCE_META_INFO_KEY: MARKER_SOURCE_META_INFO_VALUE,
-}
-OPERATOR_META_INFO_KEYS = frozenset(OPERATOR_META_INFO_MARKERS)
 
 # ---------------------------------------------------------------------------
 # Retry config
 # ---------------------------------------------------------------------------
 
-READY_RETRIES = int(os.environ.get("NEUTRON_ROUTER_FLAVOR_READY_RETRIES", "30"))
-READY_DELAY = float(os.environ.get("NEUTRON_ROUTER_FLAVOR_READY_DELAY", "10"))
+
+def ready_retries() -> int:
+    """Return the Neutron readiness retry count."""
+    return env_int("NEUTRON_ROUTER_FLAVOR_READY_RETRIES", 30)
+
+
+def ready_delay() -> float:
+    """Return the Neutron readiness delay in seconds."""
+    return env_float("NEUTRON_ROUTER_FLAVOR_READY_DELAY", 10)
+
+
+# ---------------------------------------------------------------------------
+# Runtime-resolved marker helpers
+# ---------------------------------------------------------------------------
+# MARKER_SOURCE defaults to the CRD kind, which is only available at runtime.
+# Use marker_source() rather than a module-level constant.
+
+
+def marker_source() -> str:
+    """Return the marker source value, defaulting to the CRD kind."""
+    return os.environ.get("NEUTRON_ROUTER_FLAVOR_SOURCE") or crd_kind()
+
+
+def operator_meta_info_markers() -> dict[str, str]:
+    """Return the operator ownership marker dict."""
+    return {
+        MANAGED_META_INFO_KEY: MANAGED_META_INFO_VALUE,
+        MARKER_VERSION_META_INFO_KEY: MARKER_VERSION_META_INFO_VALUE,
+        MARKER_SOURCE_META_INFO_KEY: marker_source(),
+    }
+
+
+def operator_meta_info_keys() -> frozenset[str]:
+    """Return the frozenset of operator marker keys."""
+    return frozenset(operator_meta_info_markers())
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +158,7 @@ READY_DELAY = float(os.environ.get("NEUTRON_ROUTER_FLAVOR_READY_DELAY", "10"))
 
 def comparable_meta_info(value: Any) -> Any:
     """Strip operator marker keys from *value* before comparison."""
-    return comparable_meta_info_without(value, OPERATOR_META_INFO_KEYS)
+    return comparable_meta_info_without(value, operator_meta_info_keys())
 
 
 def meta_info_matches(current: Any, desired: Any) -> bool:
@@ -98,12 +166,12 @@ def meta_info_matches(current: Any, desired: Any) -> bool:
 
     Operator-managed marker keys are ignored during comparison.
     """
-    return meta_info_matches_without(current, desired, OPERATOR_META_INFO_KEYS)
+    return meta_info_matches_without(current, desired, operator_meta_info_keys())
 
 
 def managed_meta_info(value: Any) -> Any:
     """Merge operator ownership markers into *value*."""
-    return managed_meta_info_with(value, OPERATOR_META_INFO_MARKERS)
+    return managed_meta_info_with(value, operator_meta_info_markers())
 
 
 # ---------------------------------------------------------------------------
@@ -172,6 +240,7 @@ def config_meta_info(flavor_config: dict[str, Any]) -> Any:
 def wait_for_openstack_network(conn: Any) -> None:
     """Poll until the Neutron network API is reachable.
 
-    Uses ``READY_RETRIES`` and ``READY_DELAY`` from this module's env config.
+    Reads retry config at call time so malformed values do not break hook
+    import or shell-operator --config registration.
     """
-    wait_for_network(conn, retries=READY_RETRIES, delay=READY_DELAY)
+    wait_for_network(conn, retries=ready_retries(), delay=ready_delay())

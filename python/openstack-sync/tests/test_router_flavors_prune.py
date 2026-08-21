@@ -11,13 +11,23 @@ from openstack_sync.plugins.neutron.router_flavors import (
 )
 
 
+def enable_prune(monkeypatch):
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "true")
+
+
+def enable_profile_delete(monkeypatch):
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_DELETE_UNUSED_PROFILES", "true")
+
+
 class FakeNetwork:
     def __init__(self, flavors: list[dict[str, Any]], profiles: dict[str, Any]):
         self._flavors = flavors
         self._profiles = profiles
         self.deleted_flavors: list[str] = []
+        self.flavor_list_calls = 0
 
     def flavors(self, service_type: str | None = None) -> list[dict[str, Any]]:
+        self.flavor_list_calls += 1
         return [
             flavor
             for flavor in self._flavors
@@ -43,7 +53,7 @@ class FakeNetwork:
 
 
 def test_prune_keeps_manual_flavor_with_managed_service_profile(monkeypatch):
-    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
+    enable_prune(monkeypatch)
     flavor = {
         "id": "manual-flavor-id",
         "name": "manual-flavor",
@@ -64,7 +74,7 @@ def test_prune_keeps_manual_flavor_with_managed_service_profile(monkeypatch):
 
 
 def test_prune_keeps_managed_flavors_when_desired_list_is_empty(monkeypatch):
-    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
+    enable_prune(monkeypatch)
     flavor = {
         "id": "managed-flavor-id",
         "name": "removed-managed-flavor",
@@ -80,7 +90,7 @@ def test_prune_keeps_managed_flavors_when_desired_list_is_empty(monkeypatch):
 
 
 def test_prune_deletes_managed_flavors_when_empty_desired_is_explicit(monkeypatch):
-    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
+    enable_prune(monkeypatch)
     flavor = {
         "id": "managed-flavor-id",
         "name": "removed-managed-flavor",
@@ -96,7 +106,7 @@ def test_prune_deletes_managed_flavors_when_empty_desired_is_explicit(monkeypatc
 
 
 def test_prune_deletes_removed_managed_flavor(monkeypatch):
-    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
+    enable_prune(monkeypatch)
     flavor = {
         "id": "managed-flavor-id",
         "name": "removed-managed-flavor",
@@ -112,8 +122,8 @@ def test_prune_deletes_removed_managed_flavor(monkeypatch):
 
 
 def test_prune_deletes_removed_managed_flavor_and_unused_profile(monkeypatch):
-    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
-    monkeypatch.setattr(delete, "DELETE_UNUSED_SERVICE_PROFILES", True)
+    enable_prune(monkeypatch)
+    enable_profile_delete(monkeypatch)
     profile = _make_orphan_profile("managed-profile-id")
     flavor = {
         "id": "managed-flavor-id",
@@ -177,35 +187,45 @@ def _make_orphan_profile(
 
 def test_prune_orphaned_profiles_deletes_unattached_managed_profile(monkeypatch):
     """A managed profile with no parent flavor is deleted by the second pass."""
-    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
-    monkeypatch.setattr(delete, "DELETE_UNUSED_SERVICE_PROFILES", True)
+    enable_prune(monkeypatch)
+    enable_profile_delete(monkeypatch)
 
     orphan = _make_orphan_profile("orphan-profile-id")
     # No flavors in Neutron; the orphan's parent was already deleted.
     network = FakeNetworkWithProfiles(flavors=[], profiles={orphan.id: orphan})
     conn = SimpleNamespace(network=network)
 
-    delete.prune_orphaned_service_profiles(conn, set(), {})
+    delete.prune_orphaned_service_profiles(
+        conn,
+        set(),
+        {},
+        delete.service_profile_attachment_counts([]),
+    )
 
     assert "orphan-profile-id" in network.deleted_profiles
 
 
 def test_prune_orphaned_profiles_keeps_protected_profile(monkeypatch):
     """A profile listed in protected_profile_ids is never deleted."""
-    monkeypatch.setattr(delete, "DELETE_UNUSED_SERVICE_PROFILES", True)
+    enable_profile_delete(monkeypatch)
 
     orphan = _make_orphan_profile("protected-profile-id")
     network = FakeNetworkWithProfiles(flavors=[], profiles={orphan.id: orphan})
     conn = SimpleNamespace(network=network)
 
-    delete.prune_orphaned_service_profiles(conn, {"protected-profile-id"}, {})
+    delete.prune_orphaned_service_profiles(
+        conn,
+        {"protected-profile-id"},
+        {},
+        delete.service_profile_attachment_counts([]),
+    )
 
     assert network.deleted_profiles == []
 
 
 def test_prune_orphaned_profiles_keeps_non_managed_profile(monkeypatch):
     """A profile without the operator ownership marker is not touched."""
-    monkeypatch.setattr(delete, "DELETE_UNUSED_SERVICE_PROFILES", True)
+    enable_profile_delete(monkeypatch)
     import types
 
     unmanaged = types.SimpleNamespace(
@@ -216,7 +236,12 @@ def test_prune_orphaned_profiles_keeps_non_managed_profile(monkeypatch):
     network = FakeNetworkWithProfiles(flavors=[], profiles={unmanaged.id: unmanaged})
     conn = SimpleNamespace(network=network)
 
-    delete.prune_orphaned_service_profiles(conn, set(), {})
+    delete.prune_orphaned_service_profiles(
+        conn,
+        set(),
+        {},
+        delete.service_profile_attachment_counts([]),
+    )
 
     assert network.deleted_profiles == []
 
@@ -228,8 +253,8 @@ def test_prune_removed_flavors_cleans_up_orphaned_profile_on_next_run(monkeypatc
     Neutron, so the flavor loop skips it.  The second-pass GC should find and
     delete the orphaned profile.
     """
-    monkeypatch.setattr(delete, "PRUNE_REMOVED_FLAVORS", True)
-    monkeypatch.setattr(delete, "DELETE_UNUSED_SERVICE_PROFILES", True)
+    enable_prune(monkeypatch)
+    enable_profile_delete(monkeypatch)
 
     # Neutron state after the partial failure: flavor is gone, profile remains.
     orphan = _make_orphan_profile("orphan-after-partial-failure")
@@ -240,3 +265,41 @@ def test_prune_removed_flavors_cleans_up_orphaned_profile_on_next_run(monkeypatc
     delete.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
 
     assert "orphan-after-partial-failure" in network.deleted_profiles
+
+
+def test_prune_removed_flavors_lists_l3_flavors_once_for_profile_checks(monkeypatch):
+    enable_prune(monkeypatch)
+    enable_profile_delete(monkeypatch)
+
+    removed_profile = _make_orphan_profile("removed-profile-id")
+    orphan_profile = _make_orphan_profile("orphan-profile-id")
+    attached_profile = _make_orphan_profile("attached-profile-id")
+    removed_flavor = {
+        "id": "removed-flavor-id",
+        "name": "removed-flavor",
+        "service_type": common.DEFAULT_SERVICE_TYPE,
+        "description": common.managed_flavor_description("created by operator"),
+        "service_profile_ids": [removed_profile.id],
+    }
+    kept_flavor = {
+        "id": "kept-flavor-id",
+        "name": "kept-flavor",
+        "service_type": common.DEFAULT_SERVICE_TYPE,
+        "description": common.managed_flavor_description("created by operator"),
+        "service_profile_ids": [attached_profile.id],
+    }
+    network = FakeNetworkWithProfiles(
+        [removed_flavor, kept_flavor],
+        {
+            removed_profile.id: removed_profile,
+            orphan_profile.id: orphan_profile,
+            attached_profile.id: attached_profile,
+        },
+    )
+    conn = SimpleNamespace(network=network)
+
+    delete.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+
+    assert network.flavor_list_calls == 1
+    assert network.deleted_flavors == ["removed-flavor-id"]
+    assert network.deleted_profiles == ["removed-profile-id", "orphan-profile-id"]

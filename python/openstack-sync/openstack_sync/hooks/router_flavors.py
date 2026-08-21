@@ -23,23 +23,23 @@ from openstack_sync.plugins.common import get_value
 from openstack_sync.plugins.neutron.router_flavors.create import ServiceProfileCache
 from openstack_sync.plugins.neutron.router_flavors.delete import prune_removed_flavors
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    CRD_API_VERSION,
+    crd_api_version,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    CRD_BINDING_NAME,
+    crd_binding_name,
 )
-from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import CRD_KIND
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import crd_kind
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    CRD_NAMESPACE,
-)
-from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    CRD_RESOURCE,
+    crd_namespace,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    PRUNE_REMOVED_FLAVORS,
+    crd_resource,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    STATUS_ENABLED,
+    prune_removed_flavors_enabled,
+)
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    status_enabled,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     wait_for_openstack_network,
@@ -89,17 +89,18 @@ def build_hook_config() -> dict[str, Any]:
 
     sync_crontab = os.environ.get("NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB", "").strip()
     namespace = os.environ.get("POD_NAMESPACE")
+    binding_name = crd_binding_name()
     kubernetes_binding: dict[str, Any] = {
-        "name": CRD_BINDING_NAME,
-        "apiVersion": CRD_API_VERSION,
-        "kind": CRD_KIND,
+        "name": binding_name,
+        "apiVersion": crd_api_version(),
+        "kind": crd_kind(),
         "executeHookOnEvent": ["Added", "Modified", "Deleted"],
         "jqFilter": ".",
-        "includeSnapshotsFrom": [CRD_BINDING_NAME],
+        "includeSnapshotsFrom": [binding_name],
         # Dedicated queue so a slow Neutron readiness wait or reconciliation
         # only delays this hook's own tasks, not other hooks sharing the
         # default "main" queue.
-        "queue": CRD_BINDING_NAME,
+        "queue": binding_name,
     }
     if namespace:
         kubernetes_binding["namespace"] = {
@@ -112,8 +113,8 @@ def build_hook_config() -> dict[str, Any]:
             {
                 "name": "hourly sync",
                 "crontab": sync_crontab,
-                "includeSnapshotsFrom": [CRD_BINDING_NAME],
-                "queue": CRD_BINDING_NAME,
+                "includeSnapshotsFrom": [binding_name],
+                "queue": binding_name,
             }
         ]
     return hook_config
@@ -192,10 +193,11 @@ def _resources_from_items(items: list[Any], source: str) -> list[RouterFlavorRes
 def deleted_router_flavor_resources_from_binding_context(
     contexts: list[dict[str, Any]],
 ) -> list[RouterFlavorResource]:
+    binding_name = crd_binding_name()
     resources: list[RouterFlavorResource] = []
     for index, context in enumerate(contexts):
         if (
-            context.get("binding") != CRD_BINDING_NAME
+            context.get("binding") != binding_name
             or context.get("type") != "Event"
             or context.get("watchEvent") != "Deleted"
         ):
@@ -204,13 +206,13 @@ def deleted_router_flavor_resources_from_binding_context(
         if not obj:
             LOG.warning(
                 "Deleted %s event has no object; cannot use it for prune credentials",
-                CRD_KIND,
+                crd_kind(),
             )
             continue
         resources.append(
             _resource_from_object(
                 obj,
-                f"Deleted event {CRD_BINDING_NAME}[{index}]",
+                f"Deleted event {binding_name}[{index}]",
             )
         )
 
@@ -220,13 +222,14 @@ def deleted_router_flavor_resources_from_binding_context(
 def router_flavor_resources_from_binding_context(
     contexts: list[dict[str, Any]],
 ) -> list[RouterFlavorResource] | None:
-    items = snapshot_items(contexts, CRD_BINDING_NAME)
+    binding_name = crd_binding_name()
+    items = snapshot_items(contexts, binding_name)
     if items is not None:
-        return _resources_from_items(items, f"Snapshot {CRD_BINDING_NAME}")
+        return _resources_from_items(items, f"Snapshot {binding_name}")
 
-    items = synchronization_items(contexts, CRD_BINDING_NAME)
+    items = synchronization_items(contexts, binding_name)
     if items is not None:
-        return _resources_from_items(items, f"Synchronization {CRD_BINDING_NAME}")
+        return _resources_from_items(items, f"Synchronization {binding_name}")
 
     return None
 
@@ -238,7 +241,7 @@ def load_router_flavor_resources(
         contexts = read_binding_context()
     if not contexts:
         raise ConfigError(
-            f"Shell-operator binding context is required to load {CRD_KIND} objects"
+            f"Shell-operator binding context is required to load {crd_kind()} objects"
         )
 
     resources = router_flavor_resources_from_binding_context(contexts)
@@ -247,7 +250,7 @@ def load_router_flavor_resources(
 
     raise ConfigError(
         f"Shell-operator binding context does not contain "
-        f"{CRD_BINDING_NAME} snapshot or synchronization objects"
+        f"{crd_binding_name()} snapshot or synchronization objects"
     )
 
 
@@ -261,21 +264,22 @@ def patch_flavor_status(
     sync_status: str,
     message: str,
 ) -> None:
+    kind = crd_kind()
     if not resource.name:
         LOG.warning(
             "Unable to patch %s status; Kubernetes metadata.name is missing",
-            CRD_KIND,
+            kind,
         )
         return
     patch_resource_status(
         name=resource.name,
-        namespace=resource.namespace or CRD_NAMESPACE,
+        namespace=resource.namespace or crd_namespace(),
         generation=resource.generation,
         sync_status=sync_status,
         message=message,
-        crd_resource=CRD_RESOURCE,
-        crd_kind=CRD_KIND,
-        status_enabled=STATUS_ENABLED,
+        crd_resource=crd_resource(),
+        crd_kind=kind,
+        status_enabled=status_enabled(),
         current_status=resource.current_status,
     )
 
@@ -397,15 +401,50 @@ def reconcile_router_flavor_resources(
             [resource.flavor for resource in credential_resources],
         )
 
-    if PRUNE_REMOVED_FLAVORS:
+    if prune_removed_flavors_enabled():
         deleted_only_credentials = set(deleted_resources_by_credentials) - set(
             grouped_resources
         )
+        deleted_only_prune_failed = False
         for credentials in sorted(deleted_only_credentials):
             secret_name, cloud_name = credentials
-            conn = get_openstack_connection(secret_name, cloud_name)
-            wait_for_openstack_network(conn)
-            prune_removed_flavors(conn, [], authoritative_empty_desired=True)
+            try:
+                conn = get_openstack_connection(secret_name, cloud_name)
+            except Exception as exc:  # noqa: BLE001
+                deleted_only_prune_failed = True
+                LOG.error(
+                    "Failed to connect to OpenStack for deleted-only prune "
+                    "cloud=%r secret=%r: %s",
+                    cloud_name,
+                    secret_name,
+                    exc,
+                )
+                continue
+            try:
+                wait_for_openstack_network(conn)
+            except Exception as exc:  # noqa: BLE001
+                deleted_only_prune_failed = True
+                LOG.error(
+                    "Neutron API unavailable for deleted-only prune "
+                    "cloud=%r secret=%r: %s",
+                    cloud_name,
+                    secret_name,
+                    exc,
+                )
+                continue
+            try:
+                prune_removed_flavors(conn, [], authoritative_empty_desired=True)
+            except Exception as exc:  # noqa: BLE001
+                deleted_only_prune_failed = True
+                LOG.error(
+                    "Failed to prune deleted-only flavors cloud=%r secret=%r: %s",
+                    cloud_name,
+                    secret_name,
+                    exc,
+                )
+
+        if deleted_only_prune_failed:
+            return 1
 
         if not grouped_resources and not deleted_resources_by_credentials:
             LOG.info(

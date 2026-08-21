@@ -10,6 +10,9 @@ import pytest
 
 import openstack_sync.utils as utils
 from openstack_sync.hooks import router_flavors
+from openstack_sync.plugins.neutron.router_flavors import (
+    router_flavors_common as common,
+)
 
 FAKE_CLOUDS_YAML = """
 clouds:
@@ -60,7 +63,7 @@ def _snapshot_context(*objects: dict) -> list[dict]:
             "binding": "hourly sync",
             "type": "Schedule",
             "snapshots": {
-                router_flavors.CRD_BINDING_NAME: [{"object": obj} for obj in objects],
+                common.CRD_BINDING_NAME: [{"object": obj} for obj in objects],
             },
         }
     ]
@@ -89,7 +92,7 @@ def test_router_flavor_hook_config_omits_schedule_without_crontab(monkeypatch):
 
     config = router_flavors.build_hook_config()
 
-    assert config["kubernetes"][0]["name"] == router_flavors.CRD_BINDING_NAME
+    assert config["kubernetes"][0]["name"] == common.CRD_BINDING_NAME
     assert "schedule" not in config
 
 
@@ -100,7 +103,7 @@ def test_router_flavor_hook_config_omits_schedule_with_empty_crontab(monkeypatch
 
     config = router_flavors.build_hook_config()
 
-    assert config["kubernetes"][0]["name"] == router_flavors.CRD_BINDING_NAME
+    assert config["kubernetes"][0]["name"] == common.CRD_BINDING_NAME
     assert "schedule" not in config
 
 
@@ -114,9 +117,9 @@ def test_router_flavor_hook_config_uses_pod_namespace(monkeypatch):
     assert config["kubernetes"][0]["namespace"] == {
         "nameSelector": {"matchNames": ["openstack"]}
     }
-    assert config["kubernetes"][0]["queue"] == router_flavors.CRD_BINDING_NAME
+    assert config["kubernetes"][0]["queue"] == common.CRD_BINDING_NAME
     assert config["schedule"][0]["crontab"] == "0 * * * *"
-    assert config["schedule"][0]["queue"] == router_flavors.CRD_BINDING_NAME
+    assert config["schedule"][0]["queue"] == common.CRD_BINDING_NAME
     assert "onStartup" not in config
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 from unittest import mock
@@ -18,10 +19,11 @@ ROUTER_ENV_NAMES = (
     "BINDING_CONTEXT_PATH",
     "NEUTRON_ROUTER_FLAVOR_ENABLED",
     "NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB",
-    "NEUTRON_ROUTER_FLAVOR_CRD_API_VERSION",
-    "NEUTRON_ROUTER_FLAVOR_CRD_KIND",
     "NEUTRON_ROUTER_FLAVOR_CRD_BINDING_NAME",
-    "NEUTRON_ROUTER_FLAVOR_CRD_RESOURCE",
+    "NEUTRON_ROUTER_FLAVOR_PRUNE",
+    "NEUTRON_ROUTER_FLAVOR_STATUS_ENABLED",
+    "NEUTRON_ROUTER_FLAVOR_READY_RETRIES",
+    "NEUTRON_ROUTER_FLAVOR_READY_DELAY",
     "POD_NAMESPACE",
 )
 
@@ -94,6 +96,28 @@ def test_disabled_hook_config_is_valid_noop(monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out) == config
 
 
+def test_common_import_is_safe_with_bad_runtime_env(monkeypatch):
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "maybe")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_STATUS_ENABLED", "maybe")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_READY_RETRIES", "soon")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_READY_DELAY", "later")
+
+    importlib.reload(common)
+
+
+def test_disabled_hook_config_does_not_parse_runtime_env(monkeypatch):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "maybe")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_STATUS_ENABLED", "maybe")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_READY_RETRIES", "soon")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_READY_DELAY", "later")
+
+    config = hook.build_hook_config()
+
+    assert config["onStartup"] == 10
+    assert "kubernetes" not in config
+
+
 def test_crontab_does_not_enable_disabled_hook(monkeypatch):
     clear_env(monkeypatch)
     monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_SYNC_CRONTAB", "*/15 * * * *")
@@ -127,8 +151,8 @@ def test_enabled_hook_config_watches_router_flavors(monkeypatch):
     binding = config["kubernetes"][0]
     assert "onStartup" not in config
     assert binding["name"] == common.CRD_BINDING_NAME
-    assert binding["apiVersion"] == common.CRD_API_VERSION
-    assert binding["kind"] == common.CRD_KIND
+    assert binding["apiVersion"] == common.crd_api_version()
+    assert binding["kind"] == common.crd_kind()
     assert binding["executeHookOnEvent"] == ["Added", "Modified", "Deleted"]
     assert binding["jqFilter"] == "."
     assert binding["includeSnapshotsFrom"] == [common.CRD_BINDING_NAME]
@@ -339,7 +363,7 @@ def test_main_prunes_deleted_only_credentials(monkeypatch, tmp_path):
     clear_env(monkeypatch)
     monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
-    monkeypatch.setattr(hook, "PRUNE_REMOVED_FLAVORS", True)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "true")
     conn = mock.MagicMock()
 
     context_path = write_binding_context(
@@ -377,13 +401,103 @@ def test_main_prunes_deleted_only_credentials(monkeypatch, tmp_path):
     mock_prune.assert_called_once_with(conn, [], authoritative_empty_desired=True)
 
 
+def test_main_returns_error_when_deleted_only_connection_fails(monkeypatch, tmp_path):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
+    monkeypatch.setenv("POD_NAMESPACE", "openstack")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "true")
+
+    context_path = write_binding_context(
+        tmp_path,
+        [
+            {
+                "binding": common.CRD_BINDING_NAME,
+                "type": "Event",
+                "watchEvent": "Deleted",
+                "object": router_flavor_object("pa1410"),
+                "snapshots": {common.CRD_BINDING_NAME: []},
+            }
+        ],
+    )
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", context_path)
+
+    with (
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.get_openstack_connection",
+            side_effect=RuntimeError("secret missing"),
+        ) as mock_connect,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.wait_for_openstack_network"
+        ) as mock_wait,
+        mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.prune_removed_flavors"
+        ) as mock_prune,
+        mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
+    ):
+        result = hook.main()
+
+    assert result == 1
+    mock_connect.assert_called_once_with("infrasetup", "understack")
+    mock_wait.assert_not_called()
+    mock_sync.assert_not_called()
+    mock_prune.assert_not_called()
+
+
+def test_main_returns_error_when_deleted_only_prune_fails(monkeypatch, tmp_path):
+    clear_env(monkeypatch)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
+    monkeypatch.setenv("POD_NAMESPACE", "openstack")
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "true")
+    conn = mock.MagicMock()
+
+    context_path = write_binding_context(
+        tmp_path,
+        [
+            {
+                "binding": common.CRD_BINDING_NAME,
+                "type": "Event",
+                "watchEvent": "Deleted",
+                "object": router_flavor_object("pa1410"),
+                "snapshots": {common.CRD_BINDING_NAME: []},
+            }
+        ],
+    )
+    monkeypatch.setenv("BINDING_CONTEXT_PATH", context_path)
+
+    with (
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.get_openstack_connection",
+            return_value=conn,
+        ) as mock_connect,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.wait_for_openstack_network"
+        ) as mock_wait,
+        mock.patch("openstack_sync.hooks.router_flavors.patch_flavor_status"),
+        mock.patch("openstack_sync.hooks.router_flavors.sync_flavor") as mock_sync,
+        mock.patch(
+            "openstack_sync.hooks.router_flavors.prune_removed_flavors",
+            side_effect=RuntimeError("delete failed"),
+        ) as mock_prune,
+        mock.patch.object(hook.sys, "argv", ["router_flavors.py"]),
+    ):
+        result = hook.main()
+
+    assert result == 1
+    mock_connect.assert_called_once_with("infrasetup", "understack")
+    mock_wait.assert_called_once_with(conn)
+    mock_sync.assert_not_called()
+    mock_prune.assert_called_once_with(conn, [], authoritative_empty_desired=True)
+
+
 def test_main_ignores_deleted_only_credentials_when_prune_is_disabled(
     monkeypatch, tmp_path
 ):
     clear_env(monkeypatch)
     monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
-    monkeypatch.setattr(hook, "PRUNE_REMOVED_FLAVORS", False)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "false")
 
     context_path = write_binding_context(
         tmp_path,
@@ -423,7 +537,7 @@ def test_main_prunes_active_and_deleted_only_credentials(monkeypatch, tmp_path):
     clear_env(monkeypatch)
     monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
-    monkeypatch.setattr(hook, "PRUNE_REMOVED_FLAVORS", True)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "true")
     active_conn = mock.MagicMock(name="active_conn")
     deleted_conn = mock.MagicMock(name="deleted_conn")
 
@@ -487,7 +601,7 @@ def test_main_skips_empty_snapshot_prune_without_credentials(monkeypatch, tmp_pa
     clear_env(monkeypatch)
     monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_ENABLED", "true")
     monkeypatch.setenv("POD_NAMESPACE", "openstack")
-    monkeypatch.setattr(hook, "PRUNE_REMOVED_FLAVORS", True)
+    monkeypatch.setenv("NEUTRON_ROUTER_FLAVOR_PRUNE", "true")
 
     context_path = write_binding_context(
         tmp_path,

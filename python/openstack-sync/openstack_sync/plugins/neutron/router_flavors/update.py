@@ -34,13 +34,33 @@ def ensure_flavor(conn: Any, name: str, service_type: str, description: str) -> 
     managed_description = managed_flavor_description(description)
     if flavor:
         LOG.info("Router flavor %s already exists", name)
+
+        current_service_type = get_value(flavor, "service_type", default="")
+        if current_service_type != service_type:
+            raise ConfigError(
+                f"Router flavor {name!r} already exists in Neutron with "
+                f"service_type={current_service_type!r}; "
+                f"expected {service_type!r}. Neutron does not allow updating "
+                f"service_type on an existing flavor. Rename the CR or remove "
+                f"the existing Neutron flavor to let the operator recreate it."
+            )
+
         current_description = get_value(flavor, "description", default="")
         description_changed = clean_flavor_description(
             current_description
         ) != clean_flavor_description(description)
         marker_missing = not flavor_description_has_marker(current_description)
-        if description_changed or marker_missing:
-            return conn.network.update_flavor(flavor, description=managed_description)
+        is_disabled = not get_value(flavor, "is_enabled", default=True)
+
+        if is_disabled:
+            LOG.info("Router flavor %s is disabled in Neutron; re-enabling it", name)
+
+        if description_changed or marker_missing or is_disabled:
+            return conn.network.update_flavor(
+                flavor,
+                description=managed_description,
+                is_enabled=True,
+            )
         return flavor
 
     return create.create_flavor(conn, name, service_type, description)

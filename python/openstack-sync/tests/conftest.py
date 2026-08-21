@@ -1,20 +1,14 @@
 """Pytest configuration and shared fixtures for openstack-sync tests.
 
-Sets environment variables that router_flavors_common.py reads at import time
-(os.environ[...] fail-fast vars). These must be present before the module is
-first imported, so they are set at collection time via a session-scoped
-autouse fixture.
+Sets environment variables that router_flavors_common.py reads at runtime
+via env_required(). These must be present when any function that calls
+crd_kind() / crd_api_version() / crd_resource() runs, so they are set
+via a session-scoped autouse fixture that runs before every test.
 """
 
 from __future__ import annotations
 
-import os
-
 import pytest
-
-# ---------------------------------------------------------------------------
-# Required env vars for router_flavors_common - set before any import
-# ---------------------------------------------------------------------------
 
 _ROUTER_FLAVOR_REQUIRED_ENV = {
     "NEUTRON_ROUTER_FLAVOR_CRD_API_VERSION": (
@@ -25,9 +19,6 @@ _ROUTER_FLAVOR_REQUIRED_ENV = {
         "neutronrouterflavors.neutron.understack.rackspace.net"
     ),
 }
-
-for _key, _value in _ROUTER_FLAVOR_REQUIRED_ENV.items():
-    os.environ.setdefault(_key, _value)
 
 
 @pytest.fixture(autouse=True)
