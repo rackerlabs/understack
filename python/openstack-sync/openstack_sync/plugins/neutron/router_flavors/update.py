@@ -14,7 +14,13 @@ from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import 
     DEFAULT_SERVICE_TYPE,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    ProfileDrift,
+)
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     clean_flavor_description,
+)
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    describe_profile_drift,
 )
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     flavor_description_has_marker,
@@ -93,13 +99,18 @@ def sync_flavor(
     conn: Any,
     flavor_config: dict[str, Any],
     profile_cache: create.ServiceProfileCache,
-) -> None:
+) -> list[ProfileDrift]:
     """Reconcile one router flavor CR to the desired Neutron state.
 
     ``flavor_config`` is the CR spec after cloudCredentialsRef has been
     stripped. Schema-required keys are read via subscript so a missing key
     fails loudly rather than being silently defaulted; schema-optional keys
     (description, meta_info) fall back to their type's empty value.
+
+    Returns the service profile drift detected while reconciling. An empty list
+    means spec and Neutron agree. Drift is not a reconcile failure -- the flavor
+    itself is still converged -- but it needs an operator to act, so the caller
+    is expected to qualify the status it reports rather than dropping it.
     """
     name = flavor_config["name"]
     service_type = flavor_config.get("service_type", DEFAULT_SERVICE_TYPE)
@@ -112,8 +123,9 @@ def sync_flavor(
         name,
         len(profile_specs),
     )
+    drift: list[ProfileDrift] = []
     desired_profiles = [
-        create.ensure_profile(conn, name, profile_spec, profile_cache)
+        create.ensure_profile(conn, name, profile_spec, profile_cache, drift)
         for profile_spec in profile_specs
     ]
     flavor = ensure_flavor(conn, name, service_type, description, is_enabled=is_enabled)
@@ -122,3 +134,10 @@ def sync_flavor(
         "Reconciled router flavor: %s",
         json.dumps(render_flavor(flavor), sort_keys=True),
     )
+    if drift:
+        LOG.warning(
+            "Router flavor %s converged but carries service profile drift: %s",
+            name,
+            describe_profile_drift(drift),
+        )
+    return drift

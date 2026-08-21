@@ -17,6 +17,9 @@ from openstack_sync.plugins.neutron.router_flavors import update
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     FLAVOR_DESCRIPTION_MARKER,
 )
+from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
+    ProfileDrift,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -328,3 +331,47 @@ def test_sync_flavor_passes_is_enabled_false_from_spec():
         update.sync_flavor(conn, _sync_flavor_config(is_enabled=False), {})
 
     assert mock_ensure.call_args.kwargs["is_enabled"] is False
+
+
+# ---------------------------------------------------------------------------
+# sync_flavor: service profile drift reaches the caller
+# ---------------------------------------------------------------------------
+
+
+def test_sync_flavor_returns_empty_drift_when_nothing_drifted():
+    conn = mock.MagicMock()
+    flavor = _make_flavor(is_enabled=True)
+    ensure_patch, profile_patch, attached_patch = _sync_flavor_mocks(flavor)
+    with ensure_patch, profile_patch, attached_patch:
+        result = update.sync_flavor(conn, _sync_flavor_config(is_enabled=True), {})
+
+    assert result == []
+
+
+def test_sync_flavor_propagates_profile_drift():
+    """Drift collected while resolving profiles is returned to the caller.
+
+    The flavor itself is converged, so this is not a reconcile failure -- but
+    the caller must be able to qualify the status it reports.
+    """
+    conn = mock.MagicMock()
+    flavor = _make_flavor(is_enabled=True)
+    ensure_patch, profile_patch, attached_patch = _sync_flavor_mocks(flavor)
+    drifted = ProfileDrift(
+        profile_id="prof-a",
+        driver="neutron_understack.l3_router.vrf.Vrf",
+        field="is_enabled",
+        have=False,
+        want=True,
+    )
+
+    def ensure_profile(conn, name, profile_spec, profile_cache, drift=None):
+        if drift is not None:
+            drift.append(drifted)
+        return types.SimpleNamespace(id="prof-a")
+
+    with ensure_patch, profile_patch as mock_profile, attached_patch:
+        mock_profile.side_effect = ensure_profile
+        result = update.sync_flavor(conn, _sync_flavor_config(is_enabled=True), {})
+
+    assert result == [drifted]

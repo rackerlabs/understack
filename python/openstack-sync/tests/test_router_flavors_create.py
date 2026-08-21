@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import types
 from typing import Any
 from unittest import mock
@@ -23,7 +24,14 @@ def _make_profile(
     meta_info: Any = None,
     managed: bool = True,
     is_enabled: bool = True,
+    description: str = "desc",
 ) -> Any:
+    """Build an openstacksdk-shaped service profile.
+
+    ``description`` defaults to the ``_profile_spec`` default so that a profile
+    and a spec built with defaults are drift-free; drift tests opt in by passing
+    a mismatching value.
+    """
     raw_meta = dict(meta_info or {})
     if managed:
         raw_meta.update(common.operator_meta_info_markers())
@@ -31,6 +39,7 @@ def _make_profile(
         id=profile_id,
         driver=driver,
         is_enabled=is_enabled,
+        description=description,
         meta_info=plugin_common.meta_info_payload(raw_meta),
     )
 
@@ -236,6 +245,292 @@ def test_ensure_profile_does_not_reuse_profiles_across_drivers():
     assert first_result is first_profile
     assert second_result is second_profile
     assert network.create_service_profile.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# find_matching_profile / ensure_profile: only operator-owned profiles are reused
+# ---------------------------------------------------------------------------
+
+
+def _reuse_conn(profile: Any) -> Any:
+    """Build a connection whose only existing service profile is *profile*."""
+    network = mock.MagicMock()
+    network.service_profiles.return_value = [profile]
+    return types.SimpleNamespace(network=network)
+
+
+def test_find_matching_profile_ignores_unowned_match():
+    meta_info = {"vni_alloc": "auto"}
+    unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
+
+    assert create.find_matching_profile([unowned], meta_info) is None
+
+
+def test_find_matching_profile_prefers_owned_over_unowned():
+    meta_info = {"vni_alloc": "auto"}
+    unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
+    owned = _make_profile("owned-profile", meta_info=meta_info, managed=True)
+
+    assert create.find_matching_profile([unowned, owned], meta_info) is owned
+
+
+def test_ensure_profile_creates_owned_profile_instead_of_reusing_unowned():
+    """An unowned profile must never be bound, because it can never be unbound.
+
+    ``reconcile_flavor_profiles`` only unbinds profiles carrying the ownership
+    marker, so reusing somebody else's profile would create a binding that
+    outlives the spec that created it and that nothing can ever remove.
+    """
+    meta_info = {"vni_alloc": "auto"}
+    unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
+    created = _make_profile("new-profile", meta_info=meta_info, managed=True)
+    network = mock.MagicMock()
+    network.service_profiles.return_value = [unowned]
+    network.create_service_profile.return_value = created
+    conn = types.SimpleNamespace(network=network)
+
+    result = create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(meta_info=meta_info),
+        profile_cache={},
+    )
+
+    assert result is created
+    network.create_service_profile.assert_called_once()
+    new_meta = plugin_common.normalize_meta_info(
+        network.create_service_profile.call_args.kwargs["meta_info"]
+    )
+    for key, value in common.operator_meta_info_markers().items():
+        assert new_meta[key] == value
+
+
+def test_ensure_profile_never_adopts_an_unowned_profile():
+    """The unowned profile is left alone, not stamped with the ownership marker.
+
+    Adopting it would enrol somebody else's profile into
+    ``prune_orphaned_service_profiles``, which deletes owned, unattached
+    profiles -- an irreversible side effect on a resource the operator did not
+    create.
+    """
+    meta_info = {"vni_alloc": "auto"}
+    unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
+    network = mock.MagicMock()
+    network.service_profiles.return_value = [unowned]
+    network.create_service_profile.return_value = _make_profile("new-profile")
+    conn = types.SimpleNamespace(network=network)
+
+    create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(meta_info=meta_info),
+        profile_cache={},
+    )
+
+    network.update_service_profile.assert_not_called()
+    network.delete_service_profile.assert_not_called()
+
+
+def test_ensure_profile_reuses_owned_profile_when_unowned_match_also_exists():
+    meta_info = {"vni_alloc": "auto"}
+    unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
+    owned = _make_profile("owned-profile", meta_info=meta_info, managed=True)
+    network = mock.MagicMock()
+    network.service_profiles.return_value = [unowned, owned]
+    conn = types.SimpleNamespace(network=network)
+
+    result = create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(meta_info=meta_info),
+        profile_cache={},
+    )
+
+    assert result is owned
+    network.create_service_profile.assert_not_called()
+
+
+def test_profile_created_beside_unowned_match_can_later_be_unbound():
+    """End-to-end guard for why unowned profiles are not reused.
+
+    Resolve a profile for spec A while an unowned match exists, then reconcile
+    the flavor against spec B. The profile bound for spec A must be unbindable,
+    which holds only because the operator created and owns it.
+    """
+    meta_a = {"vni_alloc": "auto"}
+    unowned = _make_profile("adhoc-profile", meta_info=meta_a, managed=False)
+    created_for_a = _make_profile("prof-a", meta_info=meta_a, managed=True)
+    network = mock.MagicMock()
+    network.service_profiles.return_value = [unowned]
+    network.create_service_profile.return_value = created_for_a
+    conn = types.SimpleNamespace(network=network)
+
+    profile_for_a = create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(meta_info=meta_a),
+        profile_cache={},
+    )
+
+    # The spec moves on to a different profile; the flavor still carries prof-a.
+    flavor = _make_flavor(service_profile_ids=["prof-a"])
+    reconcile_conn = _reconcile_conn(flavor, {"prof-a": profile_for_a})
+
+    create.reconcile_flavor_profiles(
+        reconcile_conn, flavor, [_make_profile("prof-b", managed=True)]
+    )
+
+    disassociate = reconcile_conn.network.disassociate_flavor_from_service_profile
+    disassociate.assert_called_once()
+    assert disassociate.call_args.args[1] is profile_for_a
+
+
+# ---------------------------------------------------------------------------
+# ensure_profile: drift reporting for reused profiles
+# ---------------------------------------------------------------------------
+
+
+def test_ensure_profile_reports_is_enabled_drift_on_reuse(caplog):
+    """A profile disabled out-of-band is reported instead of silently accepted.
+
+    Neutron's ``get_flavor_next_provider`` raises ``ServiceProfileDisabled``
+    when the profile it selects is disabled, so every router create against the
+    flavor fails while the flavor itself still looks converged.
+    """
+    existing = _make_profile("owned-profile", managed=True, is_enabled=False)
+    conn = _reuse_conn(existing)
+    drift: list[common.ProfileDrift] = []
+
+    with caplog.at_level(logging.WARNING):
+        result = create.ensure_profile(
+            conn,
+            flavor_name="test-flavor",
+            profile_spec=_profile_spec(is_enabled=True),
+            profile_cache={},
+            drift=drift,
+        )
+
+    assert result is existing
+    assert [(item.field, item.have, item.want) for item in drift] == [
+        ("is_enabled", False, True)
+    ]
+    assert drift[0].profile_id == "owned-profile"
+    assert "is_enabled" in caplog.text
+    # Neutron rejects updates to a profile bound to any flavor: never try one.
+    conn.network.update_service_profile.assert_not_called()
+
+
+def test_ensure_profile_reports_description_drift_on_reuse():
+    existing = _make_profile("owned-profile", managed=True, description="stale")
+    conn = _reuse_conn(existing)
+    drift: list[common.ProfileDrift] = []
+
+    create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(description="wanted"),
+        profile_cache={},
+        drift=drift,
+    )
+
+    assert [(item.field, item.have, item.want) for item in drift] == [
+        ("description", "stale", "wanted")
+    ]
+
+
+def test_ensure_profile_reports_every_drifted_field():
+    existing = _make_profile(
+        "owned-profile", managed=True, is_enabled=False, description="stale"
+    )
+    conn = _reuse_conn(existing)
+    drift: list[common.ProfileDrift] = []
+
+    create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(description="wanted", is_enabled=True),
+        profile_cache={},
+        drift=drift,
+    )
+
+    assert sorted(item.field for item in drift) == ["description", "is_enabled"]
+
+
+def test_ensure_profile_appends_to_existing_drift_collection():
+    """sync_flavor passes one list across every profile in the spec."""
+    existing = _make_profile("owned-profile", managed=True, is_enabled=False)
+    conn = _reuse_conn(existing)
+    already_found = common.ProfileDrift(
+        profile_id="other-profile",
+        driver="other.Driver",
+        field="is_enabled",
+        have=False,
+        want=True,
+    )
+    drift = [already_found]
+
+    create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(is_enabled=True),
+        profile_cache={},
+        drift=drift,
+    )
+
+    assert len(drift) == 2
+    assert drift[0] is already_found
+
+
+def test_ensure_profile_reports_no_drift_when_profile_matches_spec():
+    existing = _make_profile("owned-profile", managed=True)
+    conn = _reuse_conn(existing)
+    drift: list[common.ProfileDrift] = []
+
+    create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(),
+        profile_cache={},
+        drift=drift,
+    )
+
+    assert drift == []
+
+
+def test_ensure_profile_reports_no_drift_for_freshly_created_profile():
+    """A profile the operator just created from the spec cannot have drifted."""
+    network = mock.MagicMock()
+    network.service_profiles.return_value = []
+    network.create_service_profile.return_value = _make_profile(
+        "new-profile", is_enabled=False
+    )
+    conn = types.SimpleNamespace(network=network)
+    drift: list[common.ProfileDrift] = []
+
+    create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(is_enabled=False),
+        profile_cache={},
+        drift=drift,
+    )
+
+    assert drift == []
+
+
+def test_ensure_profile_drift_collection_is_optional():
+    """Callers that do not track drift keep working unchanged."""
+    existing = _make_profile("owned-profile", managed=True, is_enabled=False)
+    conn = _reuse_conn(existing)
+
+    result = create.ensure_profile(
+        conn,
+        flavor_name="test-flavor",
+        profile_spec=_profile_spec(is_enabled=True),
+        profile_cache={},
+    )
+
+    assert result is existing
 
 
 # ---------------------------------------------------------------------------
