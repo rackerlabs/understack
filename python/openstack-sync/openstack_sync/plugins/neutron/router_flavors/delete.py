@@ -34,14 +34,6 @@ from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import 
 LOG = logging.getLogger(__name__)
 
 
-def configured_service_profile_ids(flavors: list[dict[str, Any]]) -> set[str]:
-    return {
-        str(flavor_config["profile_id"])
-        for flavor_config in flavors
-        if flavor_config.get("profile_id")
-    }
-
-
 def configured_flavor_names(flavors: list[dict[str, Any]]) -> set[str]:
     return {
         str(flavor_config["name"])
@@ -129,20 +121,11 @@ def service_profile_attached_to_any_flavor(
 def maybe_delete_service_profile(
     conn: Any,
     profile_id: str,
-    protected_profile_ids: set[str],
     profile_cache: dict[str, Any | None],
     profile_attachment_counts: Counter[str],
 ) -> None:
     if not delete_unused_service_profiles_enabled():
         LOG.info("Keeping service profile %s; profile pruning is disabled", profile_id)
-        return
-
-    if profile_id in protected_profile_ids:
-        LOG.info(
-            "Keeping service profile %s; it is configured by current router flavor "
-            "config",
-            profile_id,
-        )
         return
 
     profile = get_cached_service_profile(conn, profile_id, profile_cache)
@@ -182,7 +165,6 @@ def maybe_delete_service_profile(
 def delete_removed_flavor(
     conn: Any,
     flavor: Any,
-    protected_profile_ids: set[str],
     profile_cache: dict[str, Any | None],
     profile_attachment_counts: Counter[str],
 ) -> None:
@@ -214,7 +196,6 @@ def delete_removed_flavor(
         maybe_delete_service_profile(
             conn,
             profile_id,
-            protected_profile_ids,
             profile_cache,
             profile_attachment_counts,
         )
@@ -222,7 +203,6 @@ def delete_removed_flavor(
 
 def prune_orphaned_service_profiles(
     conn: Any,
-    protected_profile_ids: set[str],
     profile_cache: dict[str, Any | None],
     profile_attachment_counts: Counter[str],
 ) -> None:
@@ -243,7 +223,6 @@ def prune_orphaned_service_profiles(
         maybe_delete_service_profile(
             conn,
             profile_id,
-            protected_profile_ids,
             profile_cache,
             profile_attachment_counts,
         )
@@ -267,7 +246,6 @@ def prune_removed_flavors(
         return
 
     desired_names = configured_flavor_names(flavors)
-    protected_profile_ids = configured_service_profile_ids(flavors)
     profile_cache: dict[str, Any | None] = {}
 
     LOG.info("Pruning removed router flavors")
@@ -282,7 +260,6 @@ def prune_removed_flavors(
         delete_removed_flavor(
             conn,
             flavor,
-            protected_profile_ids,
             profile_cache,
             profile_attachment_counts,
         )
@@ -291,7 +268,6 @@ def prune_removed_flavors(
     # run (delete_flavor succeeded but maybe_delete_service_profile threw).
     prune_orphaned_service_profiles(
         conn,
-        protected_profile_ids,
         profile_cache,
         profile_attachment_counts,
     )

@@ -1,4 +1,8 @@
-"""Tests for update.ensure_flavor — service_type guard and is_enabled reconcile."""
+"""Tests for update.ensure_flavor and update.sync_flavor.
+
+Covers the service_type guard, is_enabled drift reconcile (both directions),
+create-with-is_enabled-from-spec, and the sync_flavor spec pass-through.
+"""
 
 from __future__ import annotations
 
@@ -51,7 +55,9 @@ def test_ensure_flavor_raises_on_service_type_mismatch():
     ):
         conn = mock.MagicMock()
         with pytest.raises(ConfigError, match="service_type"):
-            update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION)
+            update.ensure_flavor(
+                conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=True
+            )
 
 
 def test_ensure_flavor_error_message_contains_both_service_types():
@@ -62,7 +68,9 @@ def test_ensure_flavor_error_message_contains_both_service_types():
     ):
         conn = mock.MagicMock()
         with pytest.raises(ConfigError) as exc_info:
-            update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION)
+            update.ensure_flavor(
+                conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=True
+            )
     msg = str(exc_info.value)
     assert "WRONG" in msg
     assert _SERVICE_TYPE in msg
@@ -75,6 +83,7 @@ def test_ensure_flavor_error_message_contains_both_service_types():
 
 
 def test_ensure_flavor_reenables_disabled_flavor(caplog):
+    """Neutron has is_enabled=False but spec says True → update to True."""
     flavor = _make_flavor(is_enabled=False)
     with mock.patch(
         "openstack_sync.plugins.neutron.router_flavors.create.find_flavor",
@@ -83,12 +92,54 @@ def test_ensure_flavor_reenables_disabled_flavor(caplog):
         conn = mock.MagicMock()
         conn.network.update_flavor.return_value = _make_flavor(is_enabled=True)
         with caplog.at_level("INFO", logger="openstack_sync"):
-            update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION)
+            update.ensure_flavor(
+                conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=True
+            )
 
     conn.network.update_flavor.assert_called_once()
     _, kwargs = conn.network.update_flavor.call_args
     assert kwargs["is_enabled"] is True
-    assert "re-enabling" in caplog.text
+    assert "is_enabled drift" in caplog.text
+    assert "have=False" in caplog.text
+    assert "want=True" in caplog.text
+
+
+def test_ensure_flavor_disables_enabled_flavor_when_spec_disables(caplog):
+    """Neutron has is_enabled=True but spec says False → update to False."""
+    flavor = _make_flavor(is_enabled=True)
+    with mock.patch(
+        "openstack_sync.plugins.neutron.router_flavors.create.find_flavor",
+        return_value=flavor,
+    ):
+        conn = mock.MagicMock()
+        conn.network.update_flavor.return_value = _make_flavor(is_enabled=False)
+        with caplog.at_level("INFO", logger="openstack_sync"):
+            update.ensure_flavor(
+                conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=False
+            )
+
+    conn.network.update_flavor.assert_called_once()
+    _, kwargs = conn.network.update_flavor.call_args
+    assert kwargs["is_enabled"] is False
+    assert "is_enabled drift" in caplog.text
+    assert "have=True" in caplog.text
+    assert "want=False" in caplog.text
+
+
+def test_ensure_flavor_no_update_when_both_disabled():
+    """Neutron has is_enabled=False and spec says False → no Neutron call."""
+    flavor = _make_flavor(is_enabled=False)
+    with mock.patch(
+        "openstack_sync.plugins.neutron.router_flavors.create.find_flavor",
+        return_value=flavor,
+    ):
+        conn = mock.MagicMock()
+        result = update.ensure_flavor(
+            conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=False
+        )
+
+    conn.network.update_flavor.assert_not_called()
+    assert result is flavor
 
 
 def test_ensure_flavor_reenables_disabled_flavor_even_when_description_matches():
@@ -100,7 +151,7 @@ def test_ensure_flavor_reenables_disabled_flavor_even_when_description_matches()
     ):
         conn = mock.MagicMock()
         conn.network.update_flavor.return_value = _make_flavor(is_enabled=True)
-        update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION)
+        update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=True)
 
     conn.network.update_flavor.assert_called_once()
 
@@ -113,7 +164,9 @@ def test_ensure_flavor_no_update_when_already_correct():
         return_value=flavor,
     ):
         conn = mock.MagicMock()
-        result = update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION)
+        result = update.ensure_flavor(
+            conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=True
+        )
 
     conn.network.update_flavor.assert_not_called()
     assert result is flavor
@@ -132,7 +185,9 @@ def test_ensure_flavor_updates_changed_description():
     ):
         conn = mock.MagicMock()
         conn.network.update_flavor.return_value = _make_flavor()
-        update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, "new description")
+        update.ensure_flavor(
+            conn, _NAME, _SERVICE_TYPE, "new description", is_enabled=True
+        )
 
     conn.network.update_flavor.assert_called_once()
 
@@ -145,7 +200,7 @@ def test_ensure_flavor_adds_missing_marker():
     ):
         conn = mock.MagicMock()
         conn.network.update_flavor.return_value = _make_flavor()
-        update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION)
+        update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=True)
 
     conn.network.update_flavor.assert_called_once()
     _, kwargs = conn.network.update_flavor.call_args
@@ -169,6 +224,107 @@ def test_ensure_flavor_creates_when_not_found():
         ) as mock_create,
     ):
         conn = mock.MagicMock()
-        update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION)
+        update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=True)
 
-    mock_create.assert_called_once_with(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION)
+    mock_create.assert_called_once_with(
+        conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=True
+    )
+
+
+def test_ensure_flavor_creates_with_is_enabled_from_spec():
+    """A CR that opts out of enabled must create the Neutron flavor disabled."""
+    with (
+        mock.patch(
+            "openstack_sync.plugins.neutron.router_flavors.create.find_flavor",
+            return_value=None,
+        ),
+        mock.patch(
+            "openstack_sync.plugins.neutron.router_flavors.create.create_flavor",
+            return_value=_make_flavor(is_enabled=False),
+        ) as mock_create,
+    ):
+        conn = mock.MagicMock()
+        update.ensure_flavor(conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=False)
+
+    mock_create.assert_called_once_with(
+        conn, _NAME, _SERVICE_TYPE, _DESCRIPTION, is_enabled=False
+    )
+
+
+# ---------------------------------------------------------------------------
+# sync_flavor: reads is_enabled from the CR spec
+# ---------------------------------------------------------------------------
+
+
+def _sync_flavor_config(*, is_enabled: bool) -> dict[str, Any]:
+    """Build a CR-shaped flavor_config.
+
+    ``is_enabled`` mirrors the CRD default (true) that the k8s API server
+    materialises on admission; every real spec reaching the hook carries it.
+    """
+    return {
+        "name": _NAME,
+        "description": _DESCRIPTION,
+        "service_type": _SERVICE_TYPE,
+        "is_enabled": is_enabled,
+        "service_profiles": [
+            {
+                "driver": "neutron_understack.l3_router.vrf.Vrf",
+                "description": "profile description",
+                "meta_info": {},
+                "is_enabled": True,
+            }
+        ],
+    }
+
+
+def _sync_flavor_mocks(flavor: Any):
+    """Yield the mock stack used by sync_flavor pass-through tests.
+
+    Uses a real openstacksdk-shaped flavor (SimpleNamespace with
+    ``service_profile_ids``) so ``render_flavor`` succeeds when
+    ``sync_flavor`` logs the reconciled result.
+    """
+    rendered = types.SimpleNamespace(
+        id="flavor-id",
+        name=_NAME,
+        service_type=_SERVICE_TYPE,
+        description=flavor.description,
+        is_enabled=flavor.is_enabled,
+        service_profile_ids=["profile-id"],
+    )
+    return (
+        mock.patch(
+            "openstack_sync.plugins.neutron.router_flavors.update.ensure_flavor",
+            return_value=rendered,
+        ),
+        mock.patch(
+            "openstack_sync.plugins.neutron.router_flavors.create.ensure_profile"
+        ),
+        mock.patch(
+            "openstack_sync.plugins.neutron.router_flavors.create."
+            "reconcile_flavor_profiles",
+            return_value=rendered,
+        ),
+    )
+
+
+def test_sync_flavor_passes_is_enabled_true_from_spec():
+    """The value the k8s API server put on the CR reaches ensure_flavor."""
+    conn = mock.MagicMock()
+    flavor = _make_flavor(is_enabled=True)
+    ensure_patch, profile_patch, attached_patch = _sync_flavor_mocks(flavor)
+    with ensure_patch as mock_ensure, profile_patch, attached_patch:
+        update.sync_flavor(conn, _sync_flavor_config(is_enabled=True), {})
+
+    assert mock_ensure.call_args.kwargs["is_enabled"] is True
+
+
+def test_sync_flavor_passes_is_enabled_false_from_spec():
+    conn = mock.MagicMock()
+    flavor = _make_flavor(is_enabled=False)
+    ensure_patch, profile_patch, attached_patch = _sync_flavor_mocks(flavor)
+    with ensure_patch as mock_ensure, profile_patch, attached_patch:
+        update.sync_flavor(conn, _sync_flavor_config(is_enabled=False), {})
+
+    assert mock_ensure.call_args.kwargs["is_enabled"] is False

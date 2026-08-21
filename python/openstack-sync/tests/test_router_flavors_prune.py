@@ -197,30 +197,11 @@ def test_prune_orphaned_profiles_deletes_unattached_managed_profile(monkeypatch)
 
     delete.prune_orphaned_service_profiles(
         conn,
-        set(),
         {},
         delete.service_profile_attachment_counts([]),
     )
 
     assert "orphan-profile-id" in network.deleted_profiles
-
-
-def test_prune_orphaned_profiles_keeps_protected_profile(monkeypatch):
-    """A profile listed in protected_profile_ids is never deleted."""
-    enable_profile_delete(monkeypatch)
-
-    orphan = _make_orphan_profile("protected-profile-id")
-    network = FakeNetworkWithProfiles(flavors=[], profiles={orphan.id: orphan})
-    conn = SimpleNamespace(network=network)
-
-    delete.prune_orphaned_service_profiles(
-        conn,
-        {"protected-profile-id"},
-        {},
-        delete.service_profile_attachment_counts([]),
-    )
-
-    assert network.deleted_profiles == []
 
 
 def test_prune_orphaned_profiles_keeps_non_managed_profile(monkeypatch):
@@ -238,7 +219,6 @@ def test_prune_orphaned_profiles_keeps_non_managed_profile(monkeypatch):
 
     delete.prune_orphaned_service_profiles(
         conn,
-        set(),
         {},
         delete.service_profile_attachment_counts([]),
     )

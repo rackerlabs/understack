@@ -5,16 +5,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from openstack_sync.plugins.common import ConfigError
 from openstack_sync.plugins.common import get_service_profile
 from openstack_sync.plugins.common import get_value
 from openstack_sync.plugins.common import is_conflict
+from openstack_sync.plugins.common import is_not_found
 from openstack_sync.plugins.common import meta_info_payload
 from openstack_sync.plugins.common import resource_id
 from openstack_sync.plugins.common import service_profile_ids
-from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
-    comparable_meta_info,
-)
 from openstack_sync.plugins.neutron.router_flavors.router_flavors_common import (
     is_managed_service_profile,
 )
@@ -50,6 +47,7 @@ def service_profiles_for_driver(
 
 
 def find_matching_profile(profiles: list[Any], meta_info: Any) -> Any | None:
+    """Return an existing profile matching *meta_info*, preferring managed ones."""
     matching_profiles = []
     for profile in profiles:
         if meta_info_matches(service_profile_meta_info(profile), meta_info):
@@ -62,80 +60,46 @@ def find_matching_profile(profiles: list[Any], meta_info: Any) -> Any | None:
     return matching_profiles[0] if matching_profiles else None
 
 
-def _profile_drifted(profile: Any, driver: str, meta_info: Any) -> list[str]:
-    """Return drift descriptions between *profile* and the desired spec.
-
-    Neutron rejects ``update_service_profile`` with a 409 once the profile is
-    attached to service instances, so we cannot reconcile drift. We still
-    surface it rather than reporting success while spec and reality diverge.
-    """
-    drift = []
-    current_driver = get_value(profile, "driver", default="")
-    if current_driver != driver:
-        drift.append(f"driver: have={current_driver!r} want={driver!r}")
-
-    if not meta_info_matches(service_profile_meta_info(profile), meta_info):
-        current_meta = meta_info_payload(
-            comparable_meta_info(service_profile_meta_info(profile))
-        )
-        desired_meta = meta_info_payload(comparable_meta_info(meta_info))
-        drift.append(f"meta_info: have={current_meta} want={desired_meta}")
-
-    return drift
-
-
 def ensure_profile(
     conn: Any,
-    name: str,
-    driver: str,
-    description: str,
-    meta_info: Any,
-    configured_profile_id: str,
+    flavor_name: str,
+    profile_spec: dict[str, Any],
     profile_cache: ServiceProfileCache,
 ) -> Any:
-    if configured_profile_id:
-        profile = get_service_profile(conn, configured_profile_id)
-        if profile:
-            profile_id = resource_id(profile)
-            drift = _profile_drifted(profile, driver, meta_info)
-            if drift:
-                LOG.warning(
-                    "service profile %s for %s cannot be updated "
-                    "(Neutron rejects updates to in-use profiles). "
-                    "Spec has drifted: %s. To apply changes, detach all "
-                    "routers from this flavor, remove profile_id from the CR, "
-                    "and re-sync.",
-                    profile_id,
-                    name,
-                    "; ".join(drift),
-                )
-            else:
-                LOG.info("Using configured service profile %s for %s", profile_id, name)
-            return profile
+    """Find or create a service profile matching *profile_spec*.
 
-        LOG.error(
-            "Configured service profile %s for %s was not found",
-            configured_profile_id,
-            name,
-        )
-        raise ConfigError(
-            f"Configured service profile {configured_profile_id} "
-            f"for {name} was not found"
-        )
+    The CR schema guarantees ``driver`` is present and ``is_enabled`` carries
+    the CRD default (true). ``description`` and ``meta_info`` are optional in
+    the schema; missing values fall back to empty.
+    """
+    driver = profile_spec["driver"]
+    description = profile_spec.get("description", "")
+    meta_info = profile_spec.get("meta_info", {})
+    is_enabled = profile_spec["is_enabled"]
 
     profiles = service_profiles_for_driver(conn, driver, profile_cache)
     profile = find_matching_profile(profiles, meta_info)
     if profile:
         profile_id = resource_id(profile)
-        LOG.info("Reusing service profile %s for %s", profile_id, name)
+        LOG.info(
+            "Reusing service profile %s for %s driver=%s",
+            profile_id,
+            flavor_name,
+            driver,
+        )
         return profile
 
-    LOG.info("Creating service profile for %s driver=%s", name, driver)
+    LOG.info(
+        "Creating service profile for %s driver=%s is_enabled=%s",
+        flavor_name,
+        driver,
+        is_enabled,
+    )
     new_profile = conn.network.create_service_profile(
         description=description,
         driver=driver,
         meta_info=meta_info_payload(managed_meta_info(meta_info)),
-        is_enabled=True,
+        is_enabled=is_enabled,
     )
     # Make the new profile visible to any later flavor in this same run that
     # has an identical (driver, meta_info) spec, so it gets reused instead of
@@ -154,34 +118,36 @@ def find_flavor(conn: Any, name: str) -> Any | None:
     return None
 
 
-def create_flavor(conn: Any, name: str, service_type: str, description: str) -> Any:
-    LOG.info("Creating router flavor %s service_type=%s", name, service_type)
+def create_flavor(
+    conn: Any,
+    name: str,
+    service_type: str,
+    description: str,
+    *,
+    is_enabled: bool,
+) -> Any:
+    LOG.info(
+        "Creating router flavor %s service_type=%s is_enabled=%s",
+        name,
+        service_type,
+        is_enabled,
+    )
     return conn.network.create_flavor(
         name=name,
         service_type=service_type,
-        is_enabled=True,
+        is_enabled=is_enabled,
         description=managed_flavor_description(description),
     )
 
 
-def ensure_profile_attached(conn: Any, flavor: Any, profile: Any) -> Any:
-    flavor = conn.network.get_flavor(flavor)
+def _associate_profile(conn: Any, flavor: Any, profile: Any) -> None:
+    """Associate *profile* with *flavor*, treating a 409 as already-associated."""
     flavor_id = resource_id(flavor)
     profile_id = resource_id(profile)
-
-    if profile_id in service_profile_ids(flavor):
-        flavor_name = get_value(flavor, "name", default=flavor_id)
-        LOG.info(
-            "Router flavor %s already has service profile %s",
-            flavor_name,
-            profile_id,
-        )
-        return flavor
-
     LOG.info("Binding service profile %s to router flavor %s", profile_id, flavor_id)
     try:
         conn.network.associate_flavor_with_service_profile(flavor, profile)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         if not is_conflict(exc):
             raise
         LOG.info(
@@ -189,5 +155,92 @@ def ensure_profile_attached(conn: Any, flavor: Any, profile: Any) -> Any:
             flavor_id,
             profile_id,
         )
+
+
+def _disassociate_profile(conn: Any, flavor: Any, profile: Any) -> None:
+    """Disassociate *profile* from *flavor*, tolerating not-found/conflict."""
+    flavor_id = resource_id(flavor)
+    profile_id = resource_id(profile)
+    LOG.info(
+        "Unbinding operator-managed service profile %s from router flavor %s",
+        profile_id,
+        flavor_id,
+    )
+    try:
+        conn.network.disassociate_flavor_from_service_profile(flavor, profile)
+    except Exception as exc:  # noqa: BLE001
+        if is_not_found(exc):
+            LOG.info(
+                "Service profile %s already absent from router flavor %s",
+                profile_id,
+                flavor_id,
+            )
+            return
+        if is_conflict(exc):
+            LOG.warning(
+                "Cannot unbind service profile %s from router flavor %s "
+                "(Neutron reports conflict, likely in use); leaving attached",
+                profile_id,
+                flavor_id,
+            )
+            return
+        raise
+
+
+def reconcile_flavor_profiles(
+    conn: Any,
+    flavor: Any,
+    desired_profiles: list[Any],
+) -> Any:
+    """Reconcile the set of service profiles bound to *flavor*.
+
+    ``desired_profiles`` is the list resolved from the CR spec (post
+    ``ensure_profile``). Profiles missing from the flavor are associated;
+    operator-managed profiles present on the flavor but absent from the
+    desired set are disassociated. Unmanaged profiles attached out-of-band
+    are left untouched so an operator's ad-hoc attachments survive reconcile.
+
+    Returns the flavor re-fetched from Neutron so callers see the current
+    ``service_profile_ids``.
+    """
+    flavor = conn.network.get_flavor(flavor)
+    flavor_id = resource_id(flavor)
+    flavor_name = get_value(flavor, "name", default=flavor_id)
+
+    desired_by_id: dict[str, Any] = {resource_id(p): p for p in desired_profiles}
+    current_ids = set(service_profile_ids(flavor))
+    desired_ids = set(desired_by_id)
+
+    to_associate = desired_ids - current_ids
+    to_disassociate_candidates = current_ids - desired_ids
+
+    if not to_associate and not to_disassociate_candidates:
+        LOG.info(
+            "Router flavor %s already has the desired service profiles %s",
+            flavor_name,
+            sorted(current_ids),
+        )
+        return flavor
+
+    for profile_id in sorted(to_associate):
+        _associate_profile(conn, flavor, desired_by_id[profile_id])
+
+    for profile_id in sorted(to_disassociate_candidates):
+        profile = get_service_profile(conn, profile_id)
+        if profile is None:
+            LOG.info(
+                "Service profile %s already absent from Neutron; nothing to unbind",
+                profile_id,
+            )
+            continue
+        if not is_managed_service_profile(profile):
+            LOG.info(
+                "Keeping unmanaged service profile %s on router flavor %s; "
+                "operator only unbinds profiles it owns",
+                profile_id,
+                flavor_name,
+            )
+            continue
+        _disassociate_profile(conn, flavor, profile)
 
     return conn.network.get_flavor(flavor)
