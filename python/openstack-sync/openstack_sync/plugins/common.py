@@ -77,15 +77,6 @@ def env_required(name: str) -> str:
     return value
 
 
-def env_tuple(name: str, default: str) -> tuple[str, ...]:
-    """Return a tuple of strings parsed from a comma-separated env variable."""
-    return tuple(
-        item.strip()
-        for item in os.environ.get(name, default).split(",")
-        if item.strip()
-    )
-
-
 # ---------------------------------------------------------------------------
 # Error type
 # ---------------------------------------------------------------------------
@@ -99,61 +90,25 @@ class ConfigError(Exception):
 # OpenStack SDK resource accessors
 # ---------------------------------------------------------------------------
 
-_MISSING = object()
-
-
-def _mapping_value(mapping: dict[str, Any], name: str) -> Any:
-    """Read *name* from a mapping without invoking default values."""
-    try:
-        return mapping[name]
-    except KeyError:
-        return _MISSING
-
-
-def _attribute_value(resource: Any, name: str) -> Any:
-    """Read *name* through attribute access."""
-    try:
-        return getattr(resource, name)
-    except AttributeError:
-        return _MISSING
-
-
-def _resource_value(resource: Any, name: str) -> Any:
-    """Read *name* from *resource* regardless of type.
-
-    Plain dicts are the operator contract and are read by exact key.
-    OpenStack resources are read through their openstacksdk attribute names,
-    for example ``meta_info`` and ``service_profile_ids``.  Neutron wire names
-    are mapped by openstacksdk before this layer reads them.
-    """
-    if type(resource) is dict:
-        return _mapping_value(resource, name)
-
-    value = _attribute_value(resource, name)
-    if value is not _MISSING:
-        return value
-
-    return _MISSING
-
 
 def get_value(resource: Any, name: str, default: Any = None) -> Any:
-    """Return a non-None value from *resource* by canonical field name."""
-    value = _resource_value(resource, name)
-    if value is not _MISSING and value is not None:
-        return value
-    return default
+    """Return a field from a CR spec dict or an openstacksdk resource.
+
+    Specs are plain dicts read by exact key; OpenStack resources are read by
+    their openstacksdk attribute name (``meta_info``, ``service_profile_ids``),
+    which the SDK has already mapped from the Neutron wire name.
+    """
+    value = (
+        resource.get(name)
+        if isinstance(resource, dict)
+        else getattr(resource, name, None)
+    )
+    return default if value is None else value
 
 
 def resource_id(resource: Any) -> str:
-    """Return the string ID of an OpenStack resource.
-
-    Raises:
-        RuntimeError: When no ID field can be found.
-    """
-    value = get_value(resource, "id")
-    if not value:
-        raise RuntimeError(f"Unable to read ID from resource {resource!r}")
-    return str(value)
+    """Return the string ID of an OpenStack resource."""
+    return str(get_value(resource, "id"))
 
 
 # ---------------------------------------------------------------------------
@@ -188,51 +143,6 @@ def meta_info_payload(value: Any) -> str:
     """Return a canonical compact JSON string representation of *value*."""
     normalized = normalize_meta_info(value)
     return json.dumps(normalized, sort_keys=True, separators=(",", ":"))
-
-
-def comparable_meta_info_without(value: Any, exclude_keys: frozenset[str]) -> Any:
-    """Strip *exclude_keys* from *value* before comparison."""
-    normalized = normalize_meta_info(value)
-    if isinstance(normalized, dict):
-        return {k: v for k, v in normalized.items() if k not in exclude_keys}
-    return normalized
-
-
-def meta_info_matches_without(
-    current: Any, desired: Any, exclude_keys: frozenset[str]
-) -> bool:
-    """Return True when *current* and *desired* are logically equal.
-
-    Keys in *exclude_keys* are stripped before comparison.
-    """
-    return meta_info_payload(
-        comparable_meta_info_without(current, exclude_keys)
-    ) == meta_info_payload(comparable_meta_info_without(desired, exclude_keys))
-
-
-def managed_meta_info(value: Any, markers: dict[str, str]) -> Any:
-    """Merge *markers* into *value*, returning the combined meta_info dict."""
-    normalized = normalize_meta_info(value)
-    if not isinstance(normalized, dict):
-        return normalized
-    managed = dict(normalized)
-    managed.update(markers)
-    return managed
-
-
-# ---------------------------------------------------------------------------
-# Exception classifiers
-# ---------------------------------------------------------------------------
-
-
-def is_not_found(exc: Exception) -> bool:
-    """Return True for openstacksdk 404 exceptions."""
-    return isinstance(exc, openstack_exceptions.NotFoundException)
-
-
-def is_conflict(exc: Exception) -> bool:
-    """Return True for openstacksdk 409 exceptions."""
-    return isinstance(exc, openstack_exceptions.ConflictException)
 
 
 # ---------------------------------------------------------------------------
@@ -274,24 +184,19 @@ def wait_for_openstack_network(
 
 
 def get_service_profile(conn: Any, profile_id: str) -> Any | None:
-    """Fetch a service profile by ID, returning None if not found."""
+    """Fetch a service profile by ID, returning None if it no longer exists."""
     try:
         return conn.network.get_service_profile(profile_id)
-    except Exception as exc:
-        if is_not_found(exc):
-            return None
-        raise
+    except openstack_exceptions.NotFoundException:
+        return None
 
 
 def service_profile_ids(flavor: Any) -> list[str]:
-    """Return the list of service profile IDs attached to *flavor*.
+    """Return the service profile IDs attached to *flavor*.
 
     The openstacksdk ``Flavor.service_profile_ids`` attribute maps Neutron's
     ``service_profiles`` wire field.
     """
-    profiles = get_value(flavor, "service_profile_ids", default=[])
-    if profiles is None:
-        return []
-    if not isinstance(profiles, list):
-        raise TypeError("flavor.service_profile_ids must be a list")
-    return [str(profile) for profile in profiles]
+    return [
+        str(profile) for profile in get_value(flavor, "service_profile_ids", default=[])
+    ]

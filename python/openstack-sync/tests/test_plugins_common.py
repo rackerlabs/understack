@@ -90,17 +90,19 @@ def test_get_value_returns_default_for_missing_or_none_values():
     )
 
 
-def test_service_profile_ids_requires_list():
-    with pytest.raises(TypeError, match="service_profile_ids"):
-        common.service_profile_ids({"service_profile_ids": "profile-id"})
+def test_sdk_not_found_and_conflict_are_independent():
+    """reconcile.py and prune.py catch these in separate except clauses.
 
-
-def test_sdk_exception_classifiers_match_openstacksdk_classes():
-    assert common.is_not_found(sdk_exceptions.NotFoundException("missing"))
-    assert not common.is_not_found(sdk_exceptions.ConflictException("conflict"))
-
-    assert common.is_conflict(sdk_exceptions.ConflictException("conflict"))
-    assert not common.is_conflict(sdk_exceptions.NotFoundException("missing"))
+    If either became a subclass of the other, the first clause would swallow
+    both and, for example, a 409 "still in use" would be logged as "already
+    absent" while the resource stayed attached.
+    """
+    assert not issubclass(
+        sdk_exceptions.ConflictException, sdk_exceptions.NotFoundException
+    )
+    assert not issubclass(
+        sdk_exceptions.NotFoundException, sdk_exceptions.ConflictException
+    )
 
 
 def test_meta_info_payload_canonicalizes_json_strings():
