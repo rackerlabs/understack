@@ -49,12 +49,20 @@ def int_or_none(value: Any) -> int | None:
 
 
 def read_binding_context() -> list[dict[str, Any]]:
-    """Read and parse the shell-operator binding context from BINDING_CONTEXT_PATH."""
+    """Read and parse the shell-operator binding context.
+
+    An absent ``BINDING_CONTEXT_PATH`` or an empty file yields no contexts;
+    shell-operator does invoke hooks with nothing to do. Malformed JSON raises
+    :exc:`json.JSONDecodeError`, a :exc:`ValueError`.
+    """
     path = os.environ.get("BINDING_CONTEXT_PATH")
     if not path:
         return []
     with open(path, encoding="utf-8") as f:
-        contexts = json.load(f)
+        raw = f.read()
+    if not raw.strip():
+        return []
+    contexts = json.loads(raw)
     if not isinstance(contexts, list):
         raise ValueError("Shell-operator binding context must be a list")
     return contexts
