@@ -42,6 +42,26 @@ branches to `rackerlabs` after you confirm each step. It expects a remote named 
 scripts/git-understack-rebase ~/work/neutron 2026.1
 ```
 
+### Patches that landed upstream (possibly tweaked)
+
+Before rebasing, the script checks whether any patch we carry has since landed
+in `upstream/stable/$VERSION`. It matches on the Gerrit `Change-Id:` trailer,
+which survives cherry-picking, so it recognizes our copy of a change even if the
+content drifted. It then splits the matches into two groups:
+
+- **identical** — same content as upstream. `git rebase` drops these on its own;
+  the script just tells you it happened.
+- **MODIFIED** — same `Change-Id` but the content differs. This is the case that
+  bit us in [understack#2232](https://github.com/rackerlabs/understack/pull/2232):
+  a patch was cherry-picked, then tweaked (a reworded release note) before it
+  merged upstream, so git could not drop it by patch-id and it conflicted.
+
+For the MODIFIED group the script prompts you. The default is to **drop them and
+keep upstream's version** (done by scripting an interactive rebase to mark those
+commits `drop`). If you decline, they are replayed as-is and you resolve the
+conflicts by hand, preferring upstream. Either way you are told exactly which
+commits are involved before anything is rewritten.
+
 To do it manually instead:
 
 ```bash

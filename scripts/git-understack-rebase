@@ -53,6 +53,21 @@ UNDERSTACK_BRANCH="understack/${VERSION}"
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
 REPO_NAME=$(basename "$REPO_PATH")
 
+# Fork commits whose Change-Id already exists upstream but whose content differs
+# (a patch we cherry-picked that was tweaked before it landed upstream). These
+# get dropped from the rebase so upstream's version wins.
+DROP_SHAS=()
+
+# Temp files (seq editor + drop list) cleaned up on exit.
+TMP_FILES=()
+cleanup() {
+    local f
+    for f in "${TMP_FILES[@]:-}"; do
+        [[ -n "$f" ]] && rm -f "$f"
+    done
+}
+trap cleanup EXIT
+
 # ---------------------------------------------------------------------------
 # Step 1: pre-flight checks
 # ---------------------------------------------------------------------------
@@ -145,6 +160,86 @@ echo ""
 
 PRE_REBASE_PATCH_COUNT=$(git_c rev-list --count "${RACKERLABS_STABLE_REF}..${UNDERSTACK_BRANCH}")
 
+# ---------------------------------------------------------------------------
+# Step 2b: detect fork patches that have since landed upstream
+# ---------------------------------------------------------------------------
+#
+# OpenStack projects are Gerrit-based, so every commit carries a stable
+# "Change-Id:" trailer that survives cherry-picking and backports. If a patch
+# we cherry-picked into ${UNDERSTACK_BRANCH} now also exists in
+# ${UPSTREAM_STABLE_REF} with the same Change-Id, upstream has adopted it and we
+# should stop carrying our own copy. Two cases:
+#
+#   - identical content: git rebase drops it automatically (informational only)
+#   - tweaked content:   the change was edited (e.g. a reworded release note)
+#     before it merged upstream, so our stale copy will conflict or silently
+#     revert upstream's version. We offer to drop these and prefer upstream.
+
+log "Step 2b: checking for fork patches that already landed upstream"
+
+LANDED_IDENTICAL=()
+LANDED_TWEAKED=()
+
+# Commits that will be replayed by the rebase, oldest first.
+while IFS= read -r sha; do
+    [[ -z "$sha" ]] && continue
+
+    # No Change-Id (e.g. a purely downstream patch) -> nothing to match on.
+    # grep exits non-zero when absent, so guard the pipeline against set -e.
+    change_id=$(git_c log -1 --format=%B "$sha" \
+        | grep -iE '^Change-Id:[[:space:]]*' \
+        | head -1 \
+        | sed -E 's/^[Cc]hange-[Ii]d:[[:space:]]*//' \
+        | tr -d '[:space:]' || true)
+    [[ -z "$change_id" ]] && continue
+
+    up_sha=$(git_c log -1 --format='%H' --fixed-strings \
+        --grep="Change-Id: ${change_id}" "$UPSTREAM_STABLE_REF" 2>/dev/null || true)
+    [[ -z "$up_sha" ]] && continue
+
+    fork_pid=$(git_c show "$sha" | git patch-id --stable | awk '{print $1}')
+    up_pid=$(git_c show "$up_sha" | git patch-id --stable | awk '{print $1}')
+
+    fork_desc=$(git_c show -s --format='%h %s' "$sha")
+    up_desc=$(git_c show -s --format='%h %s' "$up_sha")
+
+    if [[ -n "$fork_pid" && "$fork_pid" == "$up_pid" ]]; then
+        LANDED_IDENTICAL+=("    [identical] ${fork_desc}  ==  upstream ${up_desc}")
+    else
+        LANDED_TWEAKED+=("    [MODIFIED]  ${fork_desc}  ->  upstream ${up_desc}")
+        DROP_SHAS+=("$sha")
+    fi
+done < <(git_c rev-list --reverse "${RACKERLABS_STABLE_REF}..${UNDERSTACK_BRANCH}")
+
+if [[ ${#LANDED_IDENTICAL[@]} -gt 0 ]]; then
+    echo ""
+    log "These fork patches already exist upstream unchanged; git will drop them automatically:"
+    printf '%s\n' "${LANDED_IDENTICAL[@]}"
+fi
+
+if [[ ${#LANDED_TWEAKED[@]} -gt 0 ]]; then
+    echo ""
+    warn "These fork patches share a Change-Id with an upstream commit but the content DIFFERS:"
+    printf '%s\n' "${LANDED_TWEAKED[@]}" >&2
+    echo "" >&2
+    warn "They were cherry-picked into ${UNDERSTACK_BRANCH} and then tweaked before landing"
+    warn "upstream. Replaying our stale copy would conflict or silently revert upstream's version."
+    echo ""
+    echo "  [Y] Drop them from the rebase and keep upstream's version (recommended)"
+    echo "  [n] Keep them; resolve conflicts manually and prefer upstream where appropriate"
+    echo ""
+    read -r -p "Drop the MODIFIED patch(es) and prefer upstream? [Y/n] " drop_ans
+    case "$drop_ans" in
+        [Nn]*)
+            DROP_SHAS=()
+            warn "Keeping the MODIFIED patch(es). Expect conflicts; prefer upstream when resolving."
+            ;;
+        *)
+            log "Will drop ${#DROP_SHAS[@]} patch(es) during the rebase; upstream's version wins."
+            ;;
+    esac
+fi
+
 echo "About to run:"
 echo "  git rebase --onto ${UPSTREAM_STABLE_REF} (${UPSTREAM_STABLE_SHA}) ${RACKERLABS_STABLE_REF} (${RACKERLABS_STABLE_SHA}) ${UNDERSTACK_BRANCH}"
 echo ""
@@ -165,7 +260,77 @@ log "Created local backup tags: ${BACKUP_UNDERSTACK_TAG}, ${BACKUP_STABLE_TAG}"
 
 git_c checkout "$UNDERSTACK_BRANCH"
 
-if ! git_c rebase --onto "$UPSTREAM_STABLE_REF" "$RACKERLABS_STABLE_REF" "$UNDERSTACK_BRANCH"; then
+REBASE_OK=0
+if [[ ${#DROP_SHAS[@]} -gt 0 ]]; then
+    # We need to drop specific commits during the rebase. Plain `git rebase`
+    # gives us no way to say "skip these"; only an *interactive* rebase does,
+    # via its todo list (the "pick <sha> <subject>" file you normally edit by
+    # hand). We run that interactive rebase without a human by scripting the
+    # todo edit:
+    #
+    #   - `git rebase -i` opens the todo list in $GIT_SEQUENCE_EDITOR.
+    #   - We point $GIT_SEQUENCE_EDITOR at a tiny generated script instead of a
+    #     real editor. git runs it with the todo file as its only argument, the
+    #     script rewrites the file in place and exits, and git then executes the
+    #     (now-modified) todo. No terminal, no prompt.
+    #
+    # The generated editor changes `pick <sha> ...` to `drop <sha> ...` for each
+    # commit whose SHA is in DROP_LIST_FILE, leaving every other line untouched.
+    # The list of SHAs to drop is passed in through the UND_DROP_FILE env var
+    # rather than baked into the script, so the same script handles any run.
+    SEQ_EDITOR_FILE=$(mktemp)
+    DROP_LIST_FILE=$(mktemp)
+    TMP_FILES+=("$SEQ_EDITOR_FILE" "$DROP_LIST_FILE")
+    printf '%s\n' "${DROP_SHAS[@]}" > "$DROP_LIST_FILE"
+    cat > "$SEQ_EDITOR_FILE" <<'EDITOR'
+#!/usr/bin/env bash
+# Sequence editor for `git rebase -i`. git invokes this as:
+#     this-script <path-to-todo-file>
+# We rewrite that todo file: any "pick <sha> ..." whose <sha> matches an entry
+# in $UND_DROP_FILE becomes "drop <sha> ...", so the rebase skips that commit.
+set -euo pipefail
+todo="$1"
+tmp="$(mktemp)"
+while IFS= read -r line || [[ -n "$line" ]]; do
+    # Match todo action lines: "pick <hex-sha> <subject>". Blank lines,
+    # "# comment" lines, and other actions fall through unchanged.
+    if [[ "$line" =~ ^(pick|p)[[:space:]]+([0-9a-fA-F]+)[[:space:]] ]]; then
+        sha="${BASH_REMATCH[2]}"
+        drop=0
+        # The todo abbreviates SHAs, DROP_LIST_FILE has full ones, so accept a
+        # match if either is a prefix of the other.
+        while IFS= read -r full; do
+            [[ -z "$full" ]] && continue
+            if [[ "$full" == "$sha"* || "$sha" == "$full"* ]]; then drop=1; break; fi
+        done < "$UND_DROP_FILE"
+        if [[ "$drop" == 1 ]]; then
+            # Swap the leading "pick" for "drop", keep the rest of the line.
+            printf 'drop %s\n' "${line#* }"
+            continue
+        fi
+    fi
+    printf '%s\n' "$line"
+done < "$todo" > "$tmp"
+mv "$tmp" "$todo"
+EDITOR
+    chmod +x "$SEQ_EDITOR_FILE"
+
+    log "Running interactive rebase, dropping ${#DROP_SHAS[@]} patch(es) that landed upstream..."
+    # git -C (not git_c) so the env-var prefix reliably reaches the git process.
+    # --empty=drop: unlike a plain rebase, interactive mode halts on a commit
+    # that becomes empty (an identical patch already upstream) instead of
+    # dropping it; --empty=drop restores the drop-it behavior we want.
+    if UND_DROP_FILE="$DROP_LIST_FILE" GIT_SEQUENCE_EDITOR="$SEQ_EDITOR_FILE" \
+        git -C "$REPO_PATH" rebase -i --empty=drop --onto "$UPSTREAM_STABLE_REF" "$RACKERLABS_STABLE_REF" "$UNDERSTACK_BRANCH"; then
+        REBASE_OK=1
+    fi
+else
+    if git_c rebase --onto "$UPSTREAM_STABLE_REF" "$RACKERLABS_STABLE_REF" "$UNDERSTACK_BRANCH"; then
+        REBASE_OK=1
+    fi
+fi
+
+if [[ "$REBASE_OK" -ne 1 ]]; then
     err "Rebase stopped due to conflicts."
     err "Resolve conflicts, then run 'git rebase --continue' (or 'git rebase --abort' to bail out) in $REPO_PATH."
     err "Re-run this script afterward to continue with the sync/push steps."
