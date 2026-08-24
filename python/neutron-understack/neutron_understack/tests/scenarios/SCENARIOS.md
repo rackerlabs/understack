@@ -155,6 +155,14 @@ mirroring the existing unit tests.
   called for them). The test asserts the desired behavior and is
   `xfail(strict=True)`.
 
+### VRF-DETACH-01 — VRF router detach syncs bound baremetal port physnets
+- given: a VXLAN network with baremetal ports on two physnets and an attached
+  VRF router interface
+- when: the router interface is removed
+- then: undersync should sync each physnet still carrying baremetal ports
+- status: **KNOWN BUG (xfail, rackerlabs/understack#2240)** — the teardown
+  counterpart of VRF-RTR-01; detach does not sync those physnets today.
+
 ### SVI-RTR-01 — SVI router attach syncs bound baremetal port physnets
 - given: a VXLAN network + an address-scoped IPv4 subnet, with baremetal ports
   bound to two different physnets (`physnet1`, `physnet2`)
@@ -281,8 +289,8 @@ VNI:
   router create, so it likely also needs the OVN fake.
 
 Cross-cutting:
-- DRYRUN-01 — `undersync_dry_run=True` routes to dry-run instead of sync.
-- RTR-DETACH-SYNC-01 — router detach should sync the network's bound baremetal
-  physnets (teardown counterpart of #2240; likely xfail).
+- DRYRUN-01 — `undersync_dry_run=True` routes to dry-run instead of sync. This
+  branch lives inside `Undersync.sync()` (an HTTP-client detail) which the
+  scenarios mock, so it has no scenario-observable effect; better unit-tested.
 
 Explicitly out of scope: Cisco ASA floating-IP NAT.

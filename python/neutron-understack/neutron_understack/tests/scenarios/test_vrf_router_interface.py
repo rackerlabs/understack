@@ -60,3 +60,45 @@ class TestVrfRouterInterface(UnderstackMl2RouterScenarioBase):
         }
         assert DEFAULT_PHYSNET in synced
         assert SECOND_PHYSNET in synced
+
+    # BUG: the teardown counterpart of the attach gap -- detaching a VRF router
+    # interface also fails to sync the network's bound baremetal physnets.
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "understack#2240: VRF router interface detach does not sync the "
+            "physnets of baremetal ports still bound on the network"
+        ),
+    )
+    @pytest.mark.scenario("VRF-DETACH-01")
+    def test_vrf_router_interface_detach_syncs_bound_port_physnets(self):
+        net = self._make_network(self.fmt, "vxlan-net", True)
+        net_id = net["network"]["id"]
+        subnet = self._make_subnet(
+            self.fmt, net, gateway="10.0.0.1", cidr="10.0.0.0/24"
+        )["subnet"]
+        self._bind_baremetal_port(net_id, DEFAULT_PHYSNET, "host-a")
+        self._bind_baremetal_port(net_id, SECOND_PHYSNET, "host-b")
+
+        with mock.patch(
+            "neutron_understack.routers._router_has_flavor", return_value=True
+        ):
+            router = self._create_router()
+            self.l3_plugin.add_router_interface(
+                self.context, router["id"], {"subnet_id": subnet["id"]}
+            )
+            # Isolate the detach from the attach/bind sync calls.
+            self.undersync_mock.reset_mock()
+            self.l3_plugin.remove_router_interface(
+                self.context, router["id"], {"subnet_id": subnet["id"]}
+            )
+
+        # Desired: detaching the router reconciles the switches still carrying
+        # the network's baremetal ports.
+        synced = {
+            call.args[0]
+            for call in self.undersync_mock.sync.call_args_list
+            if call.args
+        }
+        assert DEFAULT_PHYSNET in synced
+        assert SECOND_PHYSNET in synced
