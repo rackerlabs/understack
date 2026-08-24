@@ -58,12 +58,31 @@ jobs:
           if [ -e .stestr.conf ]; then
             uv run stestr run
           else
-            uv run pytest --cov --cov-report xml:coverage.xml
+            uv run pytest --cov --cov-report xml:coverage.xml --junitxml=junit.xml
           fi
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-${{ matrix.project }}
           path: python/${{ matrix.project }}/coverage.xml
+          retention-days: 1
+      # Publish the ML2 scenario traceability matrix (scenario ID -> status) to
+      # the job summary and keep the JUnit as an artifact. neutron-understack
+      # only: its scenario tests tag each JUnit case with a `scenario` property.
+      - name: ML2 scenario traceability report
+        if: ${{ always() && matrix.project == 'neutron-understack' }}
+        run: |
+          if [ -f junit.xml ]; then
+            uv run python ../../scripts/scenario-report.py \
+              --catalog neutron_understack/tests/scenarios/SCENARIOS.md \
+              --junit junit.xml >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No junit.xml produced (tests did not run)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: ${{ always() && matrix.project == 'neutron-understack' }}
+        with:
+          name: scenario-junit-${{ matrix.project }}
+          path: python/${{ matrix.project }}/junit.xml
           retention-days: 1
 
 
