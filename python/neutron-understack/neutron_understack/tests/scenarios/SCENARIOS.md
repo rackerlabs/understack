@@ -183,6 +183,31 @@ mirroring the existing unit tests.
 - when: a subnet in a different scope B is attached
 - then: the attach is rejected (per-IP-version scope conflict)
 
+## Router uplink (non-flavored, OVN)
+
+These load an L3 router + flavors + trunk plugin
+(`UnderstackMl2RouterOvnScenarioBase`) and patch `routers.ovn_client` with a
+`FakeOvnClient` (records localnet LSP create/delete; short-circuits the vxlan
+HCG workaround). `utils.fetch_network_node_trunk_id` is mocked to a trunk the
+test creates.
+
+### RTR-ATTACH-01 — non-flavored router attach builds the uplink
+- given: a network+subnet, a network-node trunk, and a non-flavored router
+- when: the subnet is attached on the internal side
+- then: a dynamic uplink segment is allocated, a shared `uplink-` neutron port
+  is created, added to the network-node trunk, and an OVN localnet LSP is
+  created on the network's logical switch
+
+### RTR-SECOND-01 — second router on the same network is a no-op
+- given: a network with two subnets, the first already attached to a router
+- when: a second router attaches the second subnet
+- then: no new uplink is built (`is_only_router_port_on_network` is false)
+
+### RTR-DETACH-01 — remove_router_interface tears down the uplink
+- given: a network with a router interface and its uplink
+- when: the interface is removed
+- then: the OVN uplink LSPs are deleted and the shared `uplink-` port removed
+
 ## Known bugs (surfaced by these tests)
 
 - **Dynamic VLAN segment leaks on vif-detach** (BM-BIND-04, `xfail`,
@@ -223,15 +248,12 @@ SVI validation:
   which the patched-flavor scenarios do not load.
 
 Router (needs an OVN IDL fake for `routers.ovn_client()`):
-- RTR-ATTACH-01 — non-flavored router attach builds the uplink: dynamic segment,
-  shared neutron port, network-node trunk subport, OVN localnet port.
-- RTR-DETACH-01 — `remove_router_interface` tears the uplink down
-  (`handle_router_interface_after_delete`).
-- RTR-DELETE-01 — `delete_router` tears the uplink down
-  (`handle_router_interface_removal`).
-- RTR-SECOND-01 — a second router on the same network is a no-op.
+- RTR-DELETE-01 — `delete_router` cleanup via `handle_router_interface_removal`
+  (PORT PRECOMMIT_DELETE). Not reachable with the standard L3 plugin, which
+  raises RouterInUse unless interfaces are removed first; needs a trigger that
+  deletes a router-interface port directly.
 - RTR-HCG-VXLAN-01 — `link_vxlan_network_ha_chassis_group` populates the unified
-  HCG for a vxlan external gateway.
+  HCG for a vxlan external gateway (needs a deeper OVN NB/SB fake).
 
 VNI / providers:
 - VNI-ALLOC-01 — VRF router create/delete allocates/releases an `evpn_vni`
