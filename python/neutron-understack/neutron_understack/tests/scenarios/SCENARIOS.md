@@ -141,11 +141,61 @@ mirroring the existing unit tests.
   unbound without being deleted. Fix should release the dynamic (bottom) segment
   on the detach transition; the xfail flips to a pass once fixed.
 
-## Planned / future (not yet catalogued IDs)
+## Backlog (not yet covered)
 
-- Router create + `add_router_interface`: assert the `network:router_interface`
-  port is created and `UnderstackDriver.create_port_postcommit` →
-  `routers.create_port_postcommit` runs with the expected data. Requires faking
-  the OVN IDL (`neutron_understack.routers.ovn_client()`).
-- Trunk parent/subport binding: assert per-subport dynamic VLAN allocation and
-  `undersync.sync` calls.
+Proposed scenarios, grouped by area. These are intentionally plain bullets (not
+`###` IDs) so the coverage check does not treat them as catalogued-but-untested;
+promote a bullet to a `### <ID>` heading when its test lands.
+
+Port create / bind / delete (no new test doubles):
+- PROV-BIND-01 — bind a port on the provisioning network (`is_provisioning_network`).
+- PROV-DEL-01 — delete a port on the provisioning network: sync only, segment not
+  released (clean/provision cycle).
+- BM-BIND-REUSE-01 — a second baremetal port on the same network+physnet reuses
+  the existing dynamic VLAN segment (`vlan_segment_for_physnet`), no new alloc.
+- BM-REBIND-01 — rebind on `binding:host_id` change.
+- BM-DEL-NOPHYSNET-01 — delete a bound port whose profile lost `physical_network`
+  (early return, no sync).
+
+Trunk (no new test doubles):
+- TRUNK-CREATE-WITH-SUBPORTS-01 — trunk created with subports present
+  (`trunk_created` path) syncs the parent physnet.
+- TRUNK-DEL-01 — deleting a trunk cleans the parent switchport and syncs.
+- TRUNK-PARENT-UNBIND-01 — unbinding a trunked baremetal parent runs `clean_trunk`
+  (subport teardown) alongside BM-BIND-04's segment handling.
+- TRUNK-PARENT-UNBOUND-01 — subport add with an unbound parent is a no-op (no sync).
+- TRUNK-SEGID-RANGE-01 — subport seg_id outside the allowed range raises
+  `SubportSegmentationIDError` (negative).
+- TRUNK-NOPHYSNET-01 — subport add/remove on a parent with no `physical_network`
+  raises `BadRequest` (negative).
+- TRUNK-MULTI-01 — multiple subports across physnets in one operation.
+
+SVI validation (no new test doubles):
+- SVI-VAL-IPV6-01 — attaching an IPv6 subnet to an SVI router is rejected.
+- SVI-VAL-NOSCOPE-01 — attaching a subnet with no address scope is rejected.
+- SVI-VAL-CONFLICT-01 — attaching subnets with conflicting scopes is rejected.
+- SVI-EXTGW-01 — an SVI router cannot get an external gateway (`BadRequest`).
+
+Router (needs an OVN IDL fake for `routers.ovn_client()`):
+- RTR-ATTACH-01 — non-flavored router attach builds the uplink: dynamic segment,
+  shared neutron port, network-node trunk subport, OVN localnet port.
+- RTR-DETACH-01 — `remove_router_interface` tears the uplink down
+  (`handle_router_interface_after_delete`).
+- RTR-DELETE-01 — `delete_router` tears the uplink down
+  (`handle_router_interface_removal`).
+- RTR-SECOND-01 — a second router on the same network is a no-op.
+- RTR-HCG-VXLAN-01 — `link_vxlan_network_ha_chassis_group` populates the unified
+  HCG for a vxlan external gateway.
+
+VNI / providers:
+- VNI-ALLOC-01 — VRF router create/delete allocates/releases an `evpn_vni`
+  (`UnderstackVniPlugin`).
+- PALO-ADOPT-01 — a Palo Alto flavored router adopts a netdev Ironic node
+  (needs an Ironic client fake).
+
+Cross-cutting:
+- DRYRUN-01 — `undersync_dry_run=True` routes to dry-run instead of sync.
+- RTR-DETACH-SYNC-01 — router detach should sync the network's bound baremetal
+  physnets (teardown counterpart of #2240; likely xfail).
+
+Explicitly out of scope: Cisco ASA floating-IP NAT.
