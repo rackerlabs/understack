@@ -51,3 +51,37 @@ class FakeOvnClient:
 
     def _transaction(self, commands, txn=None):
         return None
+
+
+class FakeIronicClient:
+    """Stand-in for neutron_understack.ironic.IronicClient (netdev pool).
+
+    Models a single-node pool: one node is available until adopted, then the
+    router->node mapping is remembered so release can return it. Records the
+    adopt/release calls for assertions.
+    """
+
+    def __init__(self, node_id="netdev-node-1"):
+        self._node = mock.MagicMock(id=node_id)
+        self._available = True
+        self._by_router = {}
+        self.adopted = []
+        self.released = []
+
+    def available_node_for_resource_class(self, resource_class):
+        return self._node if self._available else None
+
+    def adopt_node_for_router(self, node, project_id, router_id, router_name):
+        self._available = False
+        self._by_router[router_id] = node
+        self.adopted.append(
+            {"node": node, "project_id": project_id, "router_id": router_id}
+        )
+        return node
+
+    def release_node_for_router(self, router_id):
+        node = self._by_router.pop(router_id, None)
+        if node is not None:
+            self._available = True
+            self.released.append(router_id)
+        return node
