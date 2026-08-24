@@ -21,6 +21,7 @@ from unittest import mock
 from neutron.conf.plugins.ml2.drivers import driver_type
 from neutron.tests.unit.plugins.ml2.base import ML2TestFramework
 from neutron.tests.unit.plugins.ml2.test_plugin import Ml2PluginV2TestCase
+from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins import directory
 from oslo_config import cfg
 
@@ -123,3 +124,24 @@ class UnderstackMl2RouterScenarioBase(_UnderstackMl2ScenarioMixin, ML2TestFramew
     ``self.l3_plugin`` is the loaded L3 plugin and ``self._create_router()``
     creates a router directly (bypassing HTTP), both provided by ML2TestFramework.
     """
+
+    def _bind_baremetal_port(self, net_id, physnet, host):
+        """Create a baremetal port on the network and vif-attach it to physnet."""
+        res = self._create_port(
+            self.fmt,
+            net_id,
+            arg_list=(portbindings.VNIC_TYPE,),
+            is_admin=True,
+            **{portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL},
+        )
+        assert res.status_int == 201, res.body
+        port_id = self.deserialize(self.fmt, res)["port"]["id"]
+        data = {
+            "port": {
+                portbindings.HOST_ID: host,
+                portbindings.PROFILE: self.baremetal_binding_profile(physnet=physnet),
+            }
+        }
+        req = self.new_update_request("ports", data, port_id, as_service=True)
+        assert req.get_response(self.api).status_int == 200
+        return port_id
