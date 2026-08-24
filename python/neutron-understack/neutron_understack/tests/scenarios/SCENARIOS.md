@@ -65,6 +65,24 @@ scenarios). Tenant networks are VXLAN; the physnet named in the binding profile
 - then: the dynamic VLAN segment is released (no ports remain bound to it) and
   `undersync.sync(<physnet>)` reconciles the switch
 
+## Router interface (VRF flavor)
+
+These scenarios load a real L3 router + flavors plugin (`ML2TestFramework`). The
+VRF (flavored) router path skips the OVN uplink work, so no OVN IDL fake is
+needed. The flavored path is simulated by patching `routers._router_has_flavor`,
+mirroring the existing unit tests.
+
+### VRF-RTR-01 — VRF router attach syncs bound baremetal port physnets
+- given: a VXLAN network + subnet with baremetal ports bound to two different
+  physnets (`physnet1`, `physnet2`)
+- when: a VRF router is created and the subnet is attached on the internal side
+- then: undersync syncs each physnet carrying the network's baremetal ports so
+  the switches are reconciled for the new router
+- status: **KNOWN BUG (xfail, rackerlabs/understack#2240)** — attaching the VRF
+  router interface does not sync those physnets today (`undersync.sync` is never
+  called for them). The test asserts the desired behavior and is
+  `xfail(strict=True)`.
+
 ## Known bugs (surfaced by these tests)
 
 - **Dynamic VLAN segment leaks on vif-detach** (BM-BIND-04, `xfail`,
