@@ -146,6 +146,22 @@ mirroring the existing unit tests.
   `_router_has_flavor` and `svi._is_svi_router`; the subnet is address-scoped so
   the SVI precommit scope validation passes.
 
+### SVI-VAL-NOSCOPE-01 — SVI rejects a subnet with no address scope
+- given: an SVI router and a subnet not in any address scope
+- when: the subnet is attached on the internal side
+- then: the attach is rejected (the SVI precommit validator raises BadRequest,
+  which the ML2 manager surfaces as MechanismDriverError)
+
+### SVI-VAL-IPV6-01 — SVI rejects an IPv6 subnet
+- given: an SVI router and an IPv6 subnet
+- when: the subnet is attached
+- then: the attach is rejected (SVI routers are IPv4-only)
+
+### SVI-VAL-CONFLICT-01 — SVI rejects conflicting address scopes
+- given: an SVI router with an interface in address scope A
+- when: a subnet in a different scope B is attached
+- then: the attach is rejected (per-IP-version scope conflict)
+
 ## Known bugs (surfaced by these tests)
 
 - **Dynamic VLAN segment leaks on vif-detach** (BM-BIND-04, `xfail`,
@@ -184,11 +200,10 @@ Trunk (no new test doubles):
   raises `BadRequest` (negative).
 - TRUNK-MULTI-01 — multiple subports across physnets in one operation.
 
-SVI validation (no new test doubles):
-- SVI-VAL-IPV6-01 — attaching an IPv6 subnet to an SVI router is rejected.
-- SVI-VAL-NOSCOPE-01 — attaching a subnet with no address scope is rejected.
-- SVI-VAL-CONFLICT-01 — attaching subnets with conflicting scopes is rejected.
-- SVI-EXTGW-01 — an SVI router cannot get an external gateway (`BadRequest`).
+SVI validation:
+- SVI-EXTGW-01 — an SVI router cannot get an external gateway. Needs the real
+  Svi provider + flavor wiring (the `_reject_svi_external_gateway` callback),
+  which the patched-flavor scenarios do not load.
 
 Router (needs an OVN IDL fake for `routers.ovn_client()`):
 - RTR-ATTACH-01 — non-flavored router attach builds the uplink: dynamic segment,
