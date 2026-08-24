@@ -116,6 +116,27 @@ adds/removes must reconcile the parent's switch (VLAN group).
 - then: `undersync.sync(physnet1)` still fires — a parent with no IP does not
   suppress the reconcile
 
+### TRUNK-DEL-01 — trunk delete syncs the parent's physnet
+- given: a bound baremetal parent with a trunk and an attached subport
+- when: the trunk is deleted
+- then: the parent switchport is cleaned and `undersync.sync(physnet1)` fires
+
+### TRUNK-MULTI-01 — adding multiple subports syncs the parent's physnet
+- given: a bound baremetal parent with a trunk
+- when: two subports on different networks are added in one operation
+- then: `undersync.sync(physnet1)` fires
+
+### TRUNK-PARENT-UNBOUND-01 — subport add with an unbound parent is a no-op
+- given: an unbound (plain) parent port with a trunk
+- when: a subport is added
+- then: no switchport config and no `undersync.sync` (nothing to reconcile)
+
+### TRUNK-SEGID-RANGE-01 — subport seg_id outside the allowed range is rejected
+- given: a bound baremetal parent with a trunk
+- when: a subport is added with a segmentation_id outside `[1, 3799]`
+- then: `SubportSegmentationIDError` (raised in the SUBPORTS PRECOMMIT_CREATE
+  callback, surfaced as `CallbackFailure`)
+
 ## Router interface (VRF flavor)
 
 These scenarios load a real L3 router + flavors plugin (`ML2TestFramework`). The
@@ -189,16 +210,12 @@ Port create / bind / delete (no new test doubles):
 
 Trunk (no new test doubles):
 - TRUNK-CREATE-WITH-SUBPORTS-01 — trunk created with subports present
-  (`trunk_created` path) syncs the parent physnet.
-- TRUNK-DEL-01 — deleting a trunk cleans the parent switchport and syncs.
+  (`trunk_created` path); confirm whether it syncs (it may not — possible gap).
 - TRUNK-PARENT-UNBIND-01 — unbinding a trunked baremetal parent runs `clean_trunk`
   (subport teardown) alongside BM-BIND-04's segment handling.
-- TRUNK-PARENT-UNBOUND-01 — subport add with an unbound parent is a no-op (no sync).
-- TRUNK-SEGID-RANGE-01 — subport seg_id outside the allowed range raises
-  `SubportSegmentationIDError` (negative).
-- TRUNK-NOPHYSNET-01 — subport add/remove on a parent with no `physical_network`
-  raises `BadRequest` (negative).
-- TRUNK-MULTI-01 — multiple subports across physnets in one operation.
+- TRUNK-NOPHYSNET-01 — subport add/remove on a parent with no `physical_network`.
+  Not reachable via normal binding (a baremetal port cannot bind without a
+  physnet), so needs an artificially mutated binding profile.
 
 SVI validation:
 - SVI-EXTGW-01 — an SVI router cannot get an external gateway. Needs the real
