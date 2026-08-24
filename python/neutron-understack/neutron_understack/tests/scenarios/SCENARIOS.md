@@ -83,6 +83,18 @@ mirroring the existing unit tests.
   called for them). The test asserts the desired behavior and is
   `xfail(strict=True)`.
 
+### SVI-RTR-01 — SVI router attach syncs bound baremetal port physnets
+- given: a VXLAN network + an address-scoped IPv4 subnet, with baremetal ports
+  bound to two different physnets (`physnet1`, `physnet2`)
+- when: an SVI router is created and the subnet is attached on the internal side
+- then: undersync syncs each physnet carrying the network's baremetal ports so
+  the switches are reconciled for the new router
+- status: **KNOWN BUG (xfail, rackerlabs/understack#2240)** — the same gap as
+  VRF-RTR-01 for the SVI flavor: attaching the SVI router interface does not
+  sync those physnets today. The SVI flavor is simulated by patching
+  `_router_has_flavor` and `svi._is_svi_router`; the subnet is address-scoped so
+  the SVI precommit scope validation passes.
+
 ## Known bugs (surfaced by these tests)
 
 - **Dynamic VLAN segment leaks on vif-detach** (BM-BIND-04, `xfail`,

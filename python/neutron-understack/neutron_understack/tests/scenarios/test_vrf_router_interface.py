@@ -6,7 +6,6 @@ See neutron_understack/tests/scenarios/SCENARIOS.md (VRF-RTR-*) for the catalog.
 from unittest import mock
 
 import pytest
-from neutron_lib.api.definitions import portbindings
 
 from neutron_understack.tests.scenarios.base import DEFAULT_PHYSNET
 from neutron_understack.tests.scenarios.base import SECOND_PHYSNET
@@ -14,27 +13,6 @@ from neutron_understack.tests.scenarios.base import UnderstackMl2RouterScenarioB
 
 
 class TestVrfRouterInterface(UnderstackMl2RouterScenarioBase):
-    def _bind_baremetal_port(self, net_id, physnet, host):
-        """Create a baremetal port on the network and vif-attach it to physnet."""
-        res = self._create_port(
-            self.fmt,
-            net_id,
-            arg_list=(portbindings.VNIC_TYPE,),
-            is_admin=True,
-            **{portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL},
-        )
-        assert res.status_int == 201, res.body
-        port_id = self.deserialize(self.fmt, res)["port"]["id"]
-        data = {
-            "port": {
-                portbindings.HOST_ID: host,
-                portbindings.PROFILE: self.baremetal_binding_profile(physnet=physnet),
-            }
-        }
-        req = self.new_update_request("ports", data, port_id, as_service=True)
-        assert req.get_response(self.api).status_int == 200
-        return port_id
-
     # BUG: attaching a VRF router interface to a network does not reconcile the
     # switches carrying that network's already-bound baremetal ports -- undersync
     # is never asked to sync those physnets. This test asserts the desired
