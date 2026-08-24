@@ -113,26 +113,22 @@ class _UnderstackMl2ScenarioMixin:
             profile["physical_network"] = physnet
         return profile
 
+    def _bind_baremetal_port(self, net_id, physnet, host, fixed_ips=None):
+        """Create a baremetal port on the network and vif-attach it to physnet.
 
-class UnderstackMl2ScenarioBase(_UnderstackMl2ScenarioMixin, Ml2PluginV2TestCase):
-    """Base for port-binding scenarios (no L3/router machinery)."""
-
-
-class UnderstackMl2RouterScenarioBase(_UnderstackMl2ScenarioMixin, ML2TestFramework):
-    """Base for router scenarios: real L3RouterPlugin + flavors plugin.
-
-    ``self.l3_plugin`` is the loaded L3 plugin and ``self._create_router()``
-    creates a router directly (bypassing HTTP), both provided by ML2TestFramework.
-    """
-
-    def _bind_baremetal_port(self, net_id, physnet, host):
-        """Create a baremetal port on the network and vif-attach it to physnet."""
+        Returns the bound port's id. binding:host_id / binding:profile writes
+        require the service role under secure RBAC. Pass ``fixed_ips=[]`` to force
+        a port with no IP even on a subnetted network.
+        """
+        create_kwargs = {portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL}
+        if fixed_ips is not None:
+            create_kwargs["fixed_ips"] = fixed_ips
         res = self._create_port(
             self.fmt,
             net_id,
             arg_list=(portbindings.VNIC_TYPE,),
             is_admin=True,
-            **{portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL},
+            **create_kwargs,
         )
         assert res.status_int == 201, res.body
         port_id = self.deserialize(self.fmt, res)["port"]["id"]
@@ -145,3 +141,33 @@ class UnderstackMl2RouterScenarioBase(_UnderstackMl2ScenarioMixin, ML2TestFramew
         req = self.new_update_request("ports", data, port_id, as_service=True)
         assert req.get_response(self.api).status_int == 200
         return port_id
+
+
+class UnderstackMl2ScenarioBase(_UnderstackMl2ScenarioMixin, Ml2PluginV2TestCase):
+    """Base for port-binding scenarios (no L3/router machinery)."""
+
+
+class UnderstackMl2RouterScenarioBase(_UnderstackMl2ScenarioMixin, ML2TestFramework):
+    """Base for router scenarios: real L3RouterPlugin + flavors plugin.
+
+    ``self.l3_plugin`` is the loaded L3 plugin and ``self._create_router()``
+    creates a router directly (bypassing HTTP), both provided by ML2TestFramework.
+    """
+
+
+class UnderstackMl2TrunkScenarioBase(UnderstackMl2ScenarioBase):
+    """Base for trunk scenarios: loads the real neutron trunk service plugin.
+
+    The understack trunk driver registers against the trunk plugin's AFTER_INIT
+    event, so loading the plugin here wires the SUBPORTS/TRUNK handlers. Exposes
+    ``self.trunk_plugin``.
+    """
+
+    def get_additional_service_plugins(self):
+        plugins = super().get_additional_service_plugins()
+        plugins["trunk_plugin_name"] = "neutron.services.trunk.plugin.TrunkPlugin"
+        return plugins
+
+    def setUp(self):
+        super().setUp()
+        self.trunk_plugin = directory.get_plugin("trunk")
