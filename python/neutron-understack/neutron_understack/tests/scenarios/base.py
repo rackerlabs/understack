@@ -18,6 +18,7 @@ need the OVN IDL faked; the flavored (VRF) router path skips it.
 
 from unittest import mock
 
+from neutron.conf.agent import ovs_conf
 from neutron.conf.plugins.ml2.drivers import driver_type
 from neutron.tests.unit.plugins.ml2.base import ML2TestFramework
 from neutron.tests.unit.plugins.ml2.test_plugin import Ml2PluginV2TestCase
@@ -153,6 +154,36 @@ class UnderstackMl2RouterScenarioBase(_UnderstackMl2ScenarioMixin, ML2TestFramew
     ``self.l3_plugin`` is the loaded L3 plugin and ``self._create_router()``
     creates a router directly (bypassing HTTP), both provided by ML2TestFramework.
     """
+
+
+class UnderstackMl2RouterOvnScenarioBase(UnderstackMl2RouterScenarioBase):
+    """Router base for the non-flavored uplink path (OVN + network-node trunk).
+
+    Loads the trunk plugin (the uplink adds the shared port to the network-node
+    trunk) and configures ``network_node_switchport_physnet``. Scenarios patch
+    ``routers.ovn_client`` with a FakeOvnClient and mock
+    ``utils.fetch_network_node_trunk_id`` to a trunk they create.
+    """
+
+    #: A VLAN physnet the parent setUp configures (physnet3: 400-500), used for
+    #: the router<->network-node uplink segment.
+    NETWORK_NODE_PHYSNET = "physnet3"
+
+    def get_additional_service_plugins(self):
+        plugins = super().get_additional_service_plugins()
+        plugins["trunk_plugin_name"] = "neutron.services.trunk.plugin.TrunkPlugin"
+        return plugins
+
+    def setUp(self):
+        super().setUp()
+        cfg.CONF.set_override(
+            "network_node_switchport_physnet",
+            self.NETWORK_NODE_PHYSNET,
+            group="ml2_understack",
+        )
+        # create_uplink_port reads cfg.CONF.OVS igmp options.
+        ovs_conf.register_ovs_agent_opts(cfg.CONF)
+        self.trunk_plugin = directory.get_plugin("trunk")
 
 
 class UnderstackMl2TrunkScenarioBase(UnderstackMl2ScenarioBase):
