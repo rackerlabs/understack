@@ -79,6 +79,30 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
         # The switch reconcile fired for the port's VLAN group.
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
 
+    @pytest.mark.scenario("BM-BIND-06")
+    def test_vif_attach_without_ip_still_syncs(self):
+        """A bound baremetal port with no IP still emits the physnet sync."""
+        net = self._make_vxlan_network()
+        # Subnet exists on the network, but the port is created with no IP.
+        self._make_subnet(
+            self.fmt, {"network": net}, gateway="10.8.0.1", cidr="10.8.0.0/24"
+        )
+        res = self._create_port(
+            self.fmt,
+            net["id"],
+            arg_list=(portbindings.VNIC_TYPE,),
+            is_admin=True,
+            **{portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL, "fixed_ips": []},
+        )
+        assert res.status_int == 201, res.body
+        port = self.deserialize(self.fmt, res)["port"]
+        assert port["fixed_ips"] == []
+
+        updated = self._vif_attach(port["id"])
+
+        assert updated[portbindings.VIF_TYPE] == portbindings.VIF_TYPE_OTHER
+        self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
+
     @pytest.mark.scenario("BM-BIND-02")
     def test_vif_attach_without_physical_network_refuses_binding(self):
         """A binding profile missing physical_network cannot be bound."""

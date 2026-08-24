@@ -65,6 +65,38 @@ scenarios). Tenant networks are VXLAN; the physnet named in the binding profile
 - then: the dynamic VLAN segment is released (no ports remain bound to it) and
   `undersync.sync(<physnet>)` reconciles the switch
 
+### BM-BIND-06 — vif-attach with no IP still emits the physnet sync
+- given: a VXLAN network with a subnet, and a baremetal port created with no
+  fixed IP (`fixed_ips: []`)
+- when: the port is vif-attached (host + profile with `physical_network`)
+- then: the port binds and `undersync.sync(<physnet>)` still fires — the sync
+  does not depend on the port having an IP
+
+## Trunk subport operations
+
+These scenarios load the real neutron trunk service plugin
+(`UnderstackMl2TrunkScenarioBase`). The parent is a bound baremetal port; subport
+adds/removes must reconcile the parent's switch (VLAN group).
+`utils.fetch_network_node_trunk_id` (live OVN + Ironic discovery) is stubbed.
+
+### TRUNK-SUB-ADD — subport attach syncs the parent's physnet
+- given: a bound baremetal parent port on `physnet1` with a trunk, and a subport
+  port on another network
+- when: the subport is added to the trunk (VLAN segmentation)
+- then: `undersync.sync(physnet1)` reconciles the parent port's switch
+
+### TRUNK-SUB-DEL — subport removal syncs the parent's physnet
+- given: the TRUNK-SUB-ADD setup with the subport attached
+- when: the subport is removed from the trunk
+- then: `undersync.sync(physnet1)` reconciles the parent port's switch
+
+### TRUNK-PARENT-NOIP — subport add syncs when the parent has no IP
+- given: a bound baremetal parent on a subnetted network but with no fixed IP,
+  plus a trunk and a subport on another network
+- when: the subport is added
+- then: `undersync.sync(physnet1)` still fires — a parent with no IP does not
+  suppress the reconcile
+
 ## Router interface (VRF flavor)
 
 These scenarios load a real L3 router + flavors plugin (`ML2TestFramework`). The
