@@ -9,7 +9,7 @@ happens, we need a safe process to inspect the machine again, verify the
 data, and then clean or return it to service.
 
 Operator rule of thumb: start with node state, tenant ownership, the last error,
-and the next safe command. The repository/config details are kept later as
+and the next safe command. The repository/config details are kept below as
 evidence so the process stays auditable without making the first page feel like
 a config review.
 
@@ -21,8 +21,8 @@ This document is only for Ironic baremetal box cleanup.
 - how to decide whether a node is safe to inspect or clean
 - how to handle stale/out-of-sync data before retrying cleanup
 - which Ironic states require manual investigation
-- where existing Ironic runbooks fit today
-- what is not currently automated or configured
+- where Ironic runbooks fit
+- what is automated and what still needs an operator
 
 ## Manual vs Automated
 
@@ -204,9 +204,7 @@ No Port found for <neutron-port-uuid>
 
 How to read this:
 
-- This is not an example of the historical wrong-secondary-switch PXE issue.
-  That older issue came from stale/old inspection behavior and is not expected
-  as a normal cleanup failure pattern.
+- This is not the wrong-secondary-switch PXE issue.
 - In this example, the PXE-enabled port points at the expected primary `-1`
   switch.
 - Ironic still has a cleaning VIF recorded, but Neutron no longer has that
@@ -340,7 +338,7 @@ Check Neutron/Undersync and the Ironic port data before retrying inspection.
 
 ### Enrollment
 
-The enrollment flow is implemented in
+The enrollment flow lives in
 `enroll_server.py`.
 
 Operator-level flow:
@@ -358,6 +356,7 @@ flowchart TD
     I[available]
 
     A --> B --> C --> D --> E --> F --> G --> H --> I
+```
 
 The final state transition in code is:
 
@@ -394,13 +393,9 @@ maintenance.
 
 ## Runbooks Operators May Encounter
 
-Firmware update cleanup is already modeled with Ironic runbooks.
-
-The workflow is defined in
-`server-firmware-update.yaml`.
-
-It finds node traits matching `CUSTOM_FIRMWARE_UPDATE_`, looks up the matching
-Ironic runbook, and runs:
+Firmware update cleanup uses Ironic runbooks through the
+`server-firmware-update.yaml` workflow. It finds node traits matching
+`CUSTOM_FIRMWARE_UPDATE_`, looks up the matching Ironic runbook, and runs:
 
 ```text
 openstack baremetal node clean --runbook <runbook_uuid> --wait 0 <node_id>
@@ -409,7 +404,7 @@ openstack baremetal node clean --runbook <runbook_uuid> --wait 0 <node_id>
 The guide for this is
 [server-firmware-update.md](server-firmware-update.md).
 
-There is also an existing manual-clean example in
+There is also a manual-clean example in
 [openstack-ironic-change-boot-interface.md](openstack-ironic-change-boot-interface.md):
 
 ```text
@@ -422,11 +417,11 @@ box cleanup path.
 ## Repo Evidence
 
 We do not need this section for every cleanup, but it explains why the
-commands above are the current supported process.
+commands above are the supported process.
 
 ### Cleaning Configuration
 
-The current Ironic cleaning configuration is in
+Ironic cleaning configuration is in
 `values.yaml`:
 
 ```yaml
@@ -453,10 +448,10 @@ conf:
       inspection_hooks: "validate-interfaces,ports,port-bios-name,architecture,pci-devices,resource-class"
 ```
 
-Current meaning:
+Configuration meaning:
 
 - Ironic automated cleaning is enabled with `automated_clean: true`.
-- The older default disk erase priorities are set to `0`.
+- Default disk erase steps are disabled by setting their priorities to `0`.
 - `deploy.erase_devices_express` is enabled through
   `clean_step_priority_override: deploy.erase_devices_express:95`.
 - The default box cleanup path is not configured as an Ironic runbook in this
@@ -498,10 +493,9 @@ or event-source logs when verifying this behavior in an environment.
 
 ### Runbook CRD
 
-The runbook CRD is defined under
-`runbook-crd`, and the shell operator hook
-that syncs Kubernetes `IronicRunbook` objects into Ironic is
-`create_runbook.sh`.
+The runbook CRD is defined under `components/openstack-sync-operator/crds/`.
+The `ironic_runbooks.py` hook reconciles Kubernetes `IronicRunbook` objects
+with the Ironic API and patches sync status.
 
 Checked-in sample runbooks include:
 
@@ -518,11 +512,11 @@ they are deployed unless the environment confirms that.
 
 | File | Why it matters |
 | --- | --- |
-| `values.yaml` | Current Ironic cleaning, inspector, DHCP, and Redfish hook configuration |
+| `values.yaml` | Ironic cleaning, inspector, DHCP, and Redfish hook configuration |
 | `enroll_server.py` | Enrollment order and final `provide` transition |
 | `ironic_node.py` | Helper functions for Ironic state transitions, RAID clean steps, and firmware runbooks |
-| `reclean-server.yaml` | Existing Argo reclean workflow |
-| `sensor-ironic-node-reclean.yaml` | Existing clean-failed event sensor |
-| `pr-clean-failed-servers.yaml` | Existing clean-failed Prometheus alert |
-| `server-firmware-update.yaml` | Existing firmware runbook workflow |
-| `runbook-crd/samples` | Sample runbook manifests, not assumed deployed |
+| `reclean-server.yaml` | Argo reclean workflow |
+| `sensor-ironic-node-reclean.yaml` | Clean-failed event sensor |
+| `pr-clean-failed-servers.yaml` | Clean-failed Prometheus alert |
+| `server-firmware-update.yaml` | Firmware runbook workflow |
+| `components/openstack-sync-operator/crds` | OpenStack sync CRD manifests |

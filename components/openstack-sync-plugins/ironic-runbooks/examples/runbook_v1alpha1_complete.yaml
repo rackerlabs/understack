@@ -3,8 +3,8 @@
 # This example demonstrates all available fields in a runbook,
 # including both required and optional fields.
 #
-# Required fields (✅): runbookName, steps, interface, step, order
-# Optional fields (❌): disableRamdisk, public, owner, extra, args
+# Required fields: cloudCredentialsRef, runbookName, steps, interface, step, order
+# Optional fields: description, traits, disableRamdisk, public, owner, extra, args
 
 apiVersion: baremetal.ironicproject.org/v1alpha1
 kind: IronicRunbook
@@ -18,16 +18,28 @@ metadata:
   annotations:
     description: "Complete example showing all available fields"
 spec:
-  # ✅ REQUIRED: Runbook name (must match CUSTOM_* pattern)
-  runbookName: CUSTOM_COMPLETE
+  # REQUIRED: Secret holding the clouds.yaml, and the cloud entry to use
+  cloudCredentialsRef:
+    secretName: infrasetup-system
+    cloudName: understack
 
-  # ✅ REQUIRED: Ordered list of steps (minimum 1 step)
+  # REQUIRED: Runbook name. Any URL-safe string (letters, digits, - . _ ~)
+  runbookName: complete-example
+
+  # OPTIONAL: Human-readable description (max 255 characters)
+  description: "Complete example runbook exercising every field"
+
+  # OPTIONAL: Traits deciding which nodes this runbook may act on
+  traits:
+    - CUSTOM_COMPLETE_EXAMPLE
+
+  # REQUIRED: Ordered list of steps (minimum 1 step)
   steps:
     # Step 1: BIOS Configuration
-    - interface: bios           # ✅ REQUIRED
-      step: apply_configuration # ✅ REQUIRED
-      order: 1                  # ✅ REQUIRED
-      args:                     # ❌ OPTIONAL
+    - interface: bios           # REQUIRED
+      step: apply_configuration # REQUIRED
+      order: 1                  # REQUIRED
+      args:                     # OPTIONAL
         settings:
           - name: LogicalProc
             value: Enabled
@@ -37,10 +49,10 @@ spec:
             value: Enabled
 
     # Step 2: RAID Configuration
-    - interface: raid           # ✅ REQUIRED
-      step: create_configuration # ✅ REQUIRED
-      order: 2                  # ✅ REQUIRED
-      args:                     # ❌ OPTIONAL
+    - interface: raid           # REQUIRED
+      step: create_configuration # REQUIRED
+      order: 2                  # REQUIRED
+      args:                     # OPTIONAL
         logical_disks:
           - size_gb: 100
             raid_level: "1"
@@ -50,24 +62,24 @@ spec:
             is_root_volume: false
 
     # Step 3: Disk Cleaning
-    - interface: deploy         # ✅ REQUIRED
-      step: erase_devices       # ✅ REQUIRED
-      order: 3                  # ✅ REQUIRED
-      args:                     # ❌ OPTIONAL
+    - interface: deploy         # REQUIRED
+      step: erase_devices       # REQUIRED
+      order: 3                  # REQUIRED
+      args:                     # OPTIONAL
         erase_skip_list: []
 
-  # ❌ OPTIONAL: Skip ramdisk booting (default: false)
+  # OPTIONAL: Skip ramdisk booting (default: false)
   disableRamdisk: false
 
-  # ❌ OPTIONAL: Make runbook public (default: false)
+  # OPTIONAL: Make runbook public (default: false)
   # Note: Cannot be true if owner is set
   public: false
 
-  # ❌ OPTIONAL: Project/tenant owner (default: null)
+  # OPTIONAL: Project/tenant owner (default: null)
   # Note: Cannot be set if public is true
   owner: "project-123"
 
-  # ❌ OPTIONAL: Additional metadata (default: {})
+  # OPTIONAL: Additional metadata (default: {})
   extra:
     description: "Complete example runbook with all fields"
     version: "1.0.0"

@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://rackerlabs.github.io/understack/schema/openstack-sync/ironic-runbook.schema.json",
+  "title": "OpenStack Sync Ironic Runbook Spec",
+  "description": "Schema for Ironic runbook spec data consumed by openstack-sync. When attached to an IronicRunbook custom resource, only spec is constrained.",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/ironicRunbookSpec"
+    },
+    {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "spec": {
+          "$ref": "#/definitions/ironicRunbookSpec"
+        }
+      },
+      "required": [
+        "spec"
+      ]
+    }
+  ],
+  "definitions": {
+    "cloudCredentialsRef": {
+      "description": "Reference to a Kubernetes Secret containing the OpenStack clouds.yaml.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["secretName", "cloudName"],
+      "properties": {
+        "secretName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "cloudName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      }
+    },
+    "ironicRunbookSpec": {
+      "description": "Ironic runbook data stored under spec.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cloudCredentialsRef", "runbookName", "steps"],
+      "properties": {
+        "cloudCredentialsRef": {
+          "$ref": "#/definitions/cloudCredentialsRef"
+        },
+        "runbookName": {
+          "description": "Runbook name, and the identity the operator syncs by. Renaming creates a new runbook rather than renaming the existing one.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255,
+          "pattern": "^[A-Za-z0-9._~-]+$"
+        },
+        "description": {
+          "description": "Human-readable runbook description.",
+          "type": "string",
+          "maxLength": 255
+        },
+        "traits": {
+          "description": "Traits deciding which nodes this runbook may act on. A node must carry at least one; a runbook with no traits matches no nodes.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^CUSTOM_[A-Z0-9_]+$"
+          },
+          "default": []
+        },
+        "steps": {
+          "description": "Ordered runbook steps.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/runbookStep"
+          }
+        },
+        "disableRamdisk": {
+          "description": "Whether to run without booting the cleaning ramdisk.",
+          "type": "boolean",
+          "default": false
+        },
+        "public": {
+          "description": "Whether the runbook is available to all projects. A public runbook cannot have an owner.",
+          "type": "boolean",
+          "default": false
+        },
+        "owner": {
+          "description": "Project that owns this runbook. Leave unset to let Ironic assign the credentials' own project.",
+          "type": "string",
+          "maxLength": 255
+        },
+        "extra": {
+          "description": "Additional runbook metadata. The operator also keeps its ownership markers here, under _understack_runbook_ keys.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "runbookStep": {
+      "description": "A single Ironic runbook step.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interface", "step", "order"],
+      "properties": {
+        "interface": {
+          "description": "Interface that owns this cleaning step.",
+          "type": "string",
+          "enum": [
+            "bios",
+            "deploy",
+            "firmware",
+            "management",
+            "power",
+            "raid",
+            "vendor"
+          ]
+        },
+        "step": {
+          "description": "Step name for the selected interface.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "args": {
+          "description": "Step-specific arguments.",
+          "type": "object",
+          "additionalProperties": true
+        },
+        "order": {
+          "description": "Execution order. Lower numbers run first.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

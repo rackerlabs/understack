@@ -3,7 +3,7 @@
 # This runbook configures RAID arrays for storage nodes.
 # Common use case: Setting up RAID 1 for OS and RAID 6 for data.
 #
-# Matches nodes with trait: CUSTOM_STORAGE_RAID
+# Selects nodes carrying the trait: CUSTOM_STORAGE_RAID
 
 apiVersion: baremetal.ironicproject.org/v1alpha1
 kind: IronicRunbook
@@ -14,7 +14,16 @@ metadata:
     use-case: raid-configuration
     hardware-type: storage
 spec:
+  # REQUIRED: Secret holding the clouds.yaml, and the cloud entry to use.
+  cloudCredentialsRef:
+    secretName: infrasetup-system
+    cloudName: understack
+
   runbookName: CUSTOM_STORAGE_RAID
+
+  # Nodes must carry at least one of these traits for this runbook to act on them.
+  traits:
+    - CUSTOM_STORAGE_RAID
 
   steps:
     # Step 1: Delete existing RAID configuration

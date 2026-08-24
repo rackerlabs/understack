@@ -12,7 +12,6 @@ on:
       - "containers/dnsmasq/**"
       - "containers/ironic-nautobot-client/**"
       - "containers/ironic-vnc-container/**"
-      - "containers/shell-operator-ironic/**"
       - "containers/openstack-sync-operator/**"
       - "containers/understack-tests/**"
       - "python/**"
@@ -44,8 +43,6 @@ jobs:
             context_path: "./containers/ironic-vnc-container/"
             prebuild_script: ./sync_from_upstream.sh
             prebuild_script_working_dir: containers/ironic-vnc-container/
-          - name: shell-operator-ironic
-            target: prod
           - name: openstack-sync-operator
             target: prod
           - name: nautobot
