@@ -208,6 +208,23 @@ test creates.
 - when: the interface is removed
 - then: the OVN uplink LSPs are deleted and the shared `uplink-` port removed
 
+## Router flavor providers (Palo Alto)
+
+These register the Palo Alto provider as an L3 service provider and create a real
+flavor + service profile (`driver` = the PaloAlto class, `metainfo.resource_class`
+= the netdev pool). `IronicClient` is faked (single-node pool).
+
+### PALO-ADOPT-01 — Palo Alto router adopts an Ironic netdev node
+- given: the Palo Alto provider registered and a matching flavor
+- when: a router with that flavor is created
+- then: the ROUTER BEFORE_CREATE callback adopts the available netdev node for
+  the router (via the faked Ironic client)
+
+### PALO-RELEASE-01 — deleting a Palo Alto router releases its node
+- given: a Palo Alto router that adopted a node
+- when: the router is deleted
+- then: the ROUTER AFTER_DELETE callback returns the node to the pool
+
 ## Known bugs (surfaced by these tests)
 
 - **Dynamic VLAN segment leaks on vif-detach** (BM-BIND-04, `xfail`,
@@ -255,11 +272,13 @@ Router (needs an OVN IDL fake for `routers.ovn_client()`):
 - RTR-HCG-VXLAN-01 — `link_vxlan_network_ha_chassis_group` populates the unified
   HCG for a vxlan external gateway (needs a deeper OVN NB/SB fake).
 
-VNI / providers:
+VNI:
 - VNI-ALLOC-01 — VRF router create/delete allocates/releases an `evpn_vni`
-  (`UnderstackVniPlugin`).
-- PALO-ADOPT-01 — a Palo Alto flavored router adopts a netdev Ironic node
-  (needs an Ironic client fake).
+  (`UnderstackVniPlugin`). Needs the understack_vni service plugin loaded, its
+  `understack_router_vni_allocations` table created (import the model so the
+  SQLite fixture builds it), and a flavor whose service-profile metainfo sets
+  `vni_alloc`. The Vrf/UserDefined provider it pairs with may pull in OVN L3 on
+  router create, so it likely also needs the OVN fake.
 
 Cross-cutting:
 - DRYRUN-01 — `undersync_dry_run=True` routes to dry-run instead of sync.
