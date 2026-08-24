@@ -15,6 +15,6 @@ spec:
   name: svi
   service_type: L3_ROUTER_NAT
   description: On-Fabric SVI Gateways
-  driver: neutron_understack.l3_router.svi.Svi
-  profile_description: On-Fabric SVI Gateways
-  meta_info: {}
+  service_profiles:
+    - driver: neutron_understack.l3_router.svi.Svi
+      description: On-Fabric SVI Gateways

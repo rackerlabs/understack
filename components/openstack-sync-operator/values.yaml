@@ -1,5 +1,10 @@
 replicaCount: 1
 
+# Operator-level environment variables injected directly into the container.
+# LOG_LEVEL controls both shell-operator and Python hook logging.
+env:
+  LOG_LEVEL: info
+
 image:
   repository: ghcr.io/rackerlabs/understack/openstack-sync-operator
   pullPolicy: IfNotPresent
@@ -13,12 +18,7 @@ serviceAccount:
 rbac:
   create: true
   clusterWide: false
-  # The base placeholder hook has no Kubernetes bindings. Add hook permissions
-  # here with the hook that needs them.
-  rules: []
 
-# Built-in plugin enablement. Site values normally only override these booleans
-# and selected pluginData.<name>.hook.env values.
 # Built-in hook configuration. Site values normally override only:
 # - plugins.<name>: enable or disable a hook
 # - pluginData.<name>.hook.env: override selected hook env values
@@ -48,17 +48,10 @@ pluginData:
       envPrefix: NEUTRON_ROUTER_FLAVOR
       env:
         SYNC_CRONTAB: "0 * * * *"
-        PRUNE: "false"
-        DEFAULT_SECRET: infrasetup
-        DEFAULT_CLOUD: understack
-
-hooks: {}
-
-podAnnotations: {}
-podLabels: {}
-
-resources: {}
-
-nodeSelector: {}
-tolerations: []
-affinity: {}
+        # Neutron readiness wait before a router flavor reconcile fails.
+        # Total wait is READY_RETRIES * READY_DELAY seconds.
+        READY_RETRIES: 30
+        READY_DELAY: 10
+        # When true, removing a NeutronRouterFlavor CR also deletes its unused
+        # operator-managed OpenStack flavor. Enable this before removing the CR.
+        PRUNE: false
