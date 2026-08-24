@@ -134,6 +134,87 @@ class NetAppMinimalLibrary(NetAppNVMeStorageLibrary):
         # Performance monitoring library.
         self.perf_library = perf_cmode.PerformanceCmodeLibrary(self.client)
 
+    def _map_namespace(self, name, host_nqn):
+        """Maps namespace to SVM+ostype subsystem and returns IDs.
+
+        This overrides the upstream implementation to use our custom
+        subsystem naming: {svm}-{ostype} instead of upstream's
+        random openstack-{uuid} naming.
+
+        The SVM itself provides project isolation (SVM = os-{project_id}),
+        so we only need to add the OS type to the subsystem name.
+
+        Args:
+            name: Volume/namespace name
+            host_nqn: NVMe Qualified Name of the host
+
+        Returns:
+            tuple: (subsystem_name, namespace_uuid)
+        """
+        # Get namespace path from metadata
+        metadata = self._get_namespace_attr(name, "metadata")
+        path = metadata["Path"]
+
+        # Build custom subsystem name: {svm}-{ostype}
+        # SVM already encodes project (os-{project_id})
+        # self.namespace_ostype comes from backend config
+        subsystem_name = f"{self.vserver}-{self.namespace_ostype}"
+
+        # Check if namespace is already mapped
+        subsystems = self.client.get_namespace_map(path)
+        ns_uuid = subsystem_uuid = None
+
+        if subsystems:
+            # Already mapped - use existing subsystem
+            subsystem_name = subsystems[0]["subsystem"]
+            subsystem_uuid = subsystems[0]["subsystem_uuid"]
+            ns_uuid = subsystems[0]["uuid"]
+
+            # Add host to subsystem (idempotent)
+            self.client.map_host_with_subsystem(host_nqn, subsystem_uuid)
+        else:
+            # Not mapped yet - ensure subsystem exists and map namespace
+            self._ensure_subsystem_exists(subsystem_name, host_nqn)
+
+            # Map namespace to subsystem
+            ns_uuid = self.client.map_namespace(path, subsystem_name)
+
+        return subsystem_name, ns_uuid
+
+    def _ensure_subsystem_exists(self, subsystem_name, host_nqn):
+        """Ensure subsystem exists, create if it doesn't.
+
+        The subsystem name is predictable ({svm}-{ostype}), so it may
+        already exist from a previous volume attach. Only create if needed.
+        """
+        query = {
+            "name": subsystem_name,
+            "svm.name": self.vserver,
+            "fields": "name,uuid,os_type",
+        }
+        result = self.client.get_records(
+            "/protocols/nvme/subsystems", query=query, enable_tunneling=False
+        )
+
+        if result.get("num_records", 0) > 0:
+            # Subsystem exists - verify os_type matches
+            existing = result["records"][0]
+            existing_ostype = existing.get("os_type")
+
+            if existing_ostype and existing_ostype != self.namespace_ostype:
+                raise exception.VolumeBackendAPIException(
+                    data=(
+                        f"Subsystem {subsystem_name} exists with "
+                        f"os_type={existing_ostype}, but backend is "
+                        f"configured for {self.namespace_ostype}"
+                    )
+                )
+            LOG.debug("Subsystem %s already exists", subsystem_name)
+            return
+
+        # Subsystem doesn't exist - create it
+        self.client.create_subsystem(subsystem_name, self.host_type, host_nqn)
+
 
 @interface.volumedriver
 class NetappCinderDynamicDriver(volume_driver.BaseVD):
@@ -416,8 +497,10 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
             )
 
         volume["host"] = original_host.replace(f"{svm_name}{_SVM_NAME_DELIM}", "")
-        yield lib
-        volume["host"] = original_host
+        try:
+            yield lib
+        finally:
+            volume["host"] = original_host
 
     def create_volume(self, volume):
         """Create a volume."""
@@ -456,10 +539,10 @@ class NetappCinderDynamicDriver(volume_driver.BaseVD):
 
     def initialize_connection(self, volume, connector):
         """Initialize connection to volume."""
-        # TODO: the nova ironic driver sends the field 'initiator' but the NetApp
-        # cinder driver expects the field to be 'nqn' so copy the field over
+        # Translate Ironic 'initiator' field to NetApp 'nqn' field
         if "initiator" in connector and "nqn" not in connector:
             connector["nqn"] = connector["initiator"]
+
         with self._volume_to_library(volume) as lib:
             return lib.initialize_connection(volume, connector)
 
