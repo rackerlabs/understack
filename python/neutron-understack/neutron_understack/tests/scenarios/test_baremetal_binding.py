@@ -9,6 +9,7 @@ from neutron.db import segments_db
 from neutron.plugins.ml2 import db as ml2_db
 from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
+from oslo_config import cfg
 
 from neutron_understack.tests.scenarios.base import DEFAULT_PHYSNET
 from neutron_understack.tests.scenarios.base import UnderstackMl2ScenarioBase
@@ -78,6 +79,55 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
 
         # The switch reconcile fired for the port's VLAN group.
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
+
+    def _bottom_segment_id(self, port_id, host=HOST):
+        levels = ml2_db.get_binding_level_objs(self.context, port_id, host)
+        return levels[-1].segment_id
+
+    @pytest.mark.scenario("BM-BIND-REUSE-01")
+    def test_second_port_same_physnet_reuses_dynamic_segment(self):
+        """A 2nd baremetal port on the same network+physnet reuses the VLAN seg."""
+        net = self._make_vxlan_network()
+        port_a = self._create_unbound_baremetal_port(net["id"])
+        self._vif_attach(port_a["id"], host="host-a")
+        port_b = self._create_unbound_baremetal_port(net["id"])
+        self._vif_attach(port_b["id"], host="host-b")
+
+        seg_a = self._bottom_segment_id(port_a["id"], "host-a")
+        seg_b = self._bottom_segment_id(port_b["id"], "host-b")
+        assert seg_a == seg_b, (seg_a, seg_b)
+
+    @pytest.mark.scenario("PROV-BIND-01")
+    def test_provisioning_network_port_binds(self):
+        """A baremetal port on the provisioning network binds hierarchically."""
+        net = self._make_vxlan_network()
+        cfg.CONF.set_override("provisioning_network", net["id"], group="ml2_understack")
+        port = self._create_unbound_baremetal_port(net["id"])
+
+        updated = self._vif_attach(port["id"])
+
+        assert updated[portbindings.VIF_TYPE] == portbindings.VIF_TYPE_OTHER
+        self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
+
+    @pytest.mark.scenario("PROV-DEL-01")
+    def test_provisioning_network_delete_retains_segment(self):
+        """Deleting a provisioning-network port syncs but keeps the VLAN segment.
+
+        The clean/provision cycle re-uses the segment, so unlike a tenant port
+        (BM-BIND-05) the dynamic VLAN segment is not released on delete.
+        """
+        net = self._make_vxlan_network()
+        cfg.CONF.set_override("provisioning_network", net["id"], group="ml2_understack")
+        port = self._create_unbound_baremetal_port(net["id"])
+        self._vif_attach(port["id"])
+        vlan_segment_id = self._bottom_segment_id(port["id"])
+        self.undersync_mock.reset_mock()
+
+        self._delete("ports", port["id"], as_admin=True)
+
+        # Sync fired, but the segment is retained (provisioning cycle).
+        self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
+        assert segments_db.get_segment_by_id(self.context, vlan_segment_id) is not None
 
     @pytest.mark.scenario("BM-BIND-06")
     def test_vif_attach_without_ip_still_syncs(self):

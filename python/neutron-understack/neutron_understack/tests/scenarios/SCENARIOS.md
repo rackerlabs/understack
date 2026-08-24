@@ -72,6 +72,25 @@ scenarios). Tenant networks are VXLAN; the physnet named in the binding profile
 - then: the port binds and `undersync.sync(<physnet>)` still fires — the sync
   does not depend on the port having an IP
 
+### BM-BIND-REUSE-01 — second port on same network+physnet reuses the VLAN seg
+- given: a VXLAN network with one bound baremetal port on `physnet1`
+- when: a second baremetal port on the same network is vif-attached to `physnet1`
+- then: it reuses the existing dynamic VLAN segment (same segment id), no new
+  allocation
+
+### PROV-BIND-01 — provisioning-network port binds
+- given: a network configured as `ml2_understack.provisioning_network`
+- when: a baremetal port on it is vif-attached
+- then: it binds hierarchically and `undersync.sync(<physnet>)` fires (no special
+  casing on the bind path)
+
+### PROV-DEL-01 — provisioning-network delete retains the VLAN segment
+- given: a bound baremetal port on the provisioning network
+- when: the port is deleted
+- then: `undersync.sync(<physnet>)` fires but the dynamic VLAN segment is
+  retained (the clean/provision cycle reuses it), unlike a tenant port
+  (BM-BIND-05)
+
 ## Trunk subport operations
 
 These scenarios load the real neutron trunk service plugin
@@ -148,11 +167,6 @@ Proposed scenarios, grouped by area. These are intentionally plain bullets (not
 promote a bullet to a `### <ID>` heading when its test lands.
 
 Port create / bind / delete (no new test doubles):
-- PROV-BIND-01 — bind a port on the provisioning network (`is_provisioning_network`).
-- PROV-DEL-01 — delete a port on the provisioning network: sync only, segment not
-  released (clean/provision cycle).
-- BM-BIND-REUSE-01 — a second baremetal port on the same network+physnet reuses
-  the existing dynamic VLAN segment (`vlan_segment_for_physnet`), no new alloc.
 - BM-REBIND-01 — rebind on `binding:host_id` change.
 - BM-DEL-NOPHYSNET-01 — delete a bound port whose profile lost `physical_network`
   (early return, no sync).
