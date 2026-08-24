@@ -65,15 +65,36 @@ test = [
     "pytest-cov>=7,<8",
     "pytest-mock>=3.14.0,<4",
     "sqlalchemy",
+    # Base classes reused from neutron.tests (Ml2PluginV2TestCase et al.) sit on
+    # top of neutron's own test-only stack, which is not pulled in when neutron
+    # is installed as a runtime dependency.
+    "oslotest",
+    "testtools",
+    "fixtures",
+    "webtest",
+    "testresources",
+    "testscenarios",
 ]
 
 [tool.uv]
 default-groups = ["test"]
 
+# Test against the same neutron/neutron-lib the container ships (the
+# understack/2026.1 fork), not PyPI. Keep these revs in lockstep with
+# containers/neutron/Dockerfile (NEUTRON_GIT_REF / NEUTRON_LIB_GIT_REF).
+[tool.uv.sources]
+# renovate: name=openstack/neutron repo=https://github.com/rackerlabs/neutron.git branch=understack/2026.1
+neutron = { git = "https://github.com/rackerlabs/neutron.git", rev = "b0678e56e9c5a7ec2f335c4271465fc1c3202e2a" }
+# renovate: name=openstack/neutron-lib repo=https://github.com/rackerlabs/neutron-lib.git branch=understack/2026.1
+neutron-lib = { git = "https://github.com/rackerlabs/neutron-lib.git", rev = "6d0367183cc92656ba449acefd830cb4e11f2f5b" }
+
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra"
+addopts = "-ra --strict-markers"
 filterwarnings = "ignore::DeprecationWarning"
+markers = [
+    "scenario(id): links a test to a scenario ID in tests/scenarios/SCENARIOS.md",
+]
 
 [tool.ruff]
 # use our default and override anything we need specifically
