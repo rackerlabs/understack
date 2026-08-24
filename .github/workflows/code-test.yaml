@@ -78,11 +78,14 @@ jobs:
           else
             echo "No junit.xml produced (tests did not run)." >> "$GITHUB_STEP_SUMMARY"
           fi
+      # Keep each project's JUnit for the consolidated publish-test-results job.
+      # if-no-files-found=ignore: stestr projects don't emit junit.xml.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: ${{ always() && matrix.project == 'neutron-understack' }}
+        if: ${{ always() }}
         with:
-          name: scenario-junit-${{ matrix.project }}
+          name: junit-${{ matrix.project }}
           path: python/${{ matrix.project }}/junit.xml
+          if-no-files-found: ignore
           retention-days: 1
 
 
@@ -101,3 +104,25 @@ jobs:
           name: coverage.xml
           path: coverage.xml
           retention-days: 1
+
+  # Consolidated pass/fail/skip report from every project's JUnit, posted as a
+  # PR comment + check. Same-repo PRs only get write permissions; fork PRs would
+  # need a separate workflow_run-triggered workflow (not wired up here).
+  publish-test-results:
+    needs: [uv]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: junit-*
+          merge-multiple: true
+          path: junit
+      - uses: EnricoMi/publish-unit-test-result-action@d0a4676d0e0b938bc201470d88276b7c74c712b3 # v2.24.0
+        with:
+          check_name: Python test results
+          junit_files: junit/**/*.xml
