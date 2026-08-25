@@ -69,6 +69,19 @@ spec:
   provider:
     type: Kubernetes
     kubernetes:
+      {{- with .Values.gateways.external.envoyDeployment }}
+      envoyDeployment:
+        {{- if .replicas }}
+        replicas: {{ .replicas }}
+        {{- end }}
+        {{- if .container }}
+        container:
+          {{- if .container.resources }}
+          resources:
+            {{- .container.resources | toYaml | nindent 12 }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
       envoyService:
         annotations:
           {{- .Values.gateways.external.serviceAnnotations | toYaml | nindent 10 }}

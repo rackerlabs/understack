@@ -95,8 +95,15 @@ conf:
         - ServerGroupAffinityFilter
         - JsonFilter
   nova_api_uwsgi:
+    # JIRA:PUC-2007 - tuning the osapi to survive bursts of concurrent requests.
+    # Under load the default 2 uWSGI processes + 100-deep listen queue filled up,
+    # causing connection refusals and liveness probe failures (crash loop).
     uwsgi:
-      processes: 2
+      # more worker processes to serve concurrent requests
+      processes: 8
+      # deeper listen backlog so bursts queue instead of getting refused.
+      # NOTE: values above the node's net.core.somaxconn are silently capped.
+      listen: 1024
 
     # Enable oslo.messaging notifications for Argo Events integration
     oslo_messaging_notifications:
@@ -205,11 +212,38 @@ pod:
         # this should be set to no more than (pod.replicas.osapi - 1)
         # usually set on per-deployment basis.
         min_available: 0
+  # JIRA:PUC-2007 - loosen the osapi liveness probe so a slow response during a
+  # burst of load doesn't trigger a destructive pod restart. A liveness probe
+  # should detect a dead process, not a busy one. Readiness failing under load
+  # is fine (pulls the pod from rotation briefly); liveness failing restarts it.
+  probes:
+    api:
+      default:
+        liveness:
+          enabled: true
+          params:
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 6
+        readiness:
+          enabled: true
+          params:
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
   resources:
     enabled: true
     api:
+      # JIRA:PUC-2007 - raise osapi resources. Heavy all_tenants queries with 8
+      # uWSGI workers need more headroom than the default 2Gi limit / 100m request.
       requests:
-        memory: "256Mi"
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "4"
+        memory: "2Gi"
     conductor:
       requests:
         memory: "256Mi"
