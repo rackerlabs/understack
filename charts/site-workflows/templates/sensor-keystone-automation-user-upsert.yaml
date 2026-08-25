@@ -75,6 +75,10 @@ spec:
                               infra-readwrite)
                                 openstack role add --user "${SVC_ID}" --project-domain infra --project baremetal admin
                                 ;;
+                              system-readwrite)
+                                openstack role add --user "${SVC_ID}" --system all reader
+                                openstack role add --user "${SVC_ID}" --system all member
+                                ;;
                               *)
                                 echo "Invalid role ${svc_role}"
                                 ;;
