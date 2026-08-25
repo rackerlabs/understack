@@ -1,11 +1,12 @@
 """Tests for NetApp NVMe connector translation."""
 
+from unittest import TestCase
 from unittest import mock
 
 from cinder_understack import netapp_nvme
 
 
-class TestNetAppNVMeLibrary:
+class TestNetAppNVMeLibrary(TestCase):
     """Tests for NetAppNVMeLibrary connector field translation."""
 
     def test_initialize_connection_translates_initiator_to_nqn(self):
