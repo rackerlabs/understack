@@ -155,6 +155,13 @@ needed. The flavored path is simulated by patching `routers._router_has_flavor`
 (and `svi._is_svi_router` for the SVI scenarios), mirroring the existing unit
 tests.
 
+The VRF and SVI flavors are close cousins: both realize the router as an SVI
+(switched virtual interface) on the switching fabric. The difference is only
+which VRF the SVI lands in — the VRF flavor first creates a dedicated VRF and
+places the SVI into it, while the SVI flavor drops the SVI into a well-known VRF
+that is part of the base switch configuration. So their scenarios are near
+mirror images of each other.
+
 ### VRF-ROUTER-ATTACH-01 — VRF router attach syncs bound baremetal port physnets
 - given: a VXLAN network + subnet with baremetal ports bound to two different
   physnets (`physnet1`, `physnet2`)
