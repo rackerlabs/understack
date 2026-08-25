@@ -9,7 +9,6 @@ from unittest import mock
 import pytest
 from neutron.common.ovn import utils as ovn_utils
 from neutron.db import segments_db
-from neutron.objects.trunk import SubPort
 from neutron_lib import constants as p_const
 
 from neutron_understack.tests.scenarios.base import UnderstackMl2RouterOvnScenarioBase
@@ -62,16 +61,6 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
             self.context, filters={"network_id": [net_id]}
         )
         return [p for p in ports if (p.get("name") or "").startswith("uplink-")]
-
-    def _trunk_subports(self, trunk_id):
-        return [
-            {
-                "port_id": subport.port_id,
-                "segmentation_type": subport.segmentation_type,
-                "segmentation_id": subport.segmentation_id,
-            }
-            for subport in SubPort.get_objects(self.context, trunk_id=trunk_id)
-        ]
 
     @pytest.mark.scenario("RTR-ATTACH-01")
     def test_nonflavored_router_attach_builds_uplink(self):

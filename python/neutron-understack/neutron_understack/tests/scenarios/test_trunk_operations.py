@@ -74,9 +74,6 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
                 self.context, trunk_id, {"sub_ports": [{"port_id": subport_id}]}
             )
 
-    def _trunk_subports(self, trunk_id):
-        return self.trunk_plugin.get_trunk(self.context, trunk_id)["sub_ports"]
-
     def _assert_subport_bound(self, trunk_id, subport_id, host, seg_id=SUBPORT_VLAN):
         assert {
             subport["port_id"]: subport for subport in self._trunk_subports(trunk_id)
