@@ -1,0 +1,55 @@
+---
+apiVersion: argoproj.io/v1alpha1
+metadata:
+  name: server-create-port-group
+  annotations:
+    workflows.argoproj.io/title: Create Baremetal Port Group for a node/server
+    workflows.argoproj.io/description: |
+      Creates a bonded (802.3ad) port group from a node's ports that have
+      local_link_connection data, and assigns all eligible ports as members.
+
+      Parameters:
+
+      - `node`: required node UUID or name
+
+      To test this workflow you can run it with the following:
+
+      ```
+      argo -n argo-events submit --from workflowtemplate/server-create-port-group \
+        -p node=<node-uuid-or-name>
+      ```
+
+      Defined in `workflows/argo-events/workflowtemplates/server-create-port-group.yaml`
+kind: WorkflowTemplate
+spec:
+  entrypoint: server-create-port-group
+  serviceAccountName: workflow
+  arguments:
+    parameters:
+      - name: node
+        description: Node UUID or name to create a port group for.
+  volumes:
+    - name: baremetal-manage
+      secret:
+        secretName: baremetal-manage
+        items:
+          - key: clouds.yaml
+            path: clouds.yaml
+  templates:
+    - name: server-create-port-group
+      inputs:
+        parameters:
+          - name: node
+      container:
+        image: ghcr.io/rackerlabs/understack/ironic-nautobot-client:latest
+        command:
+          - create-port-group
+        args:
+          - "{{inputs.parameters.node}}"
+        volumeMounts:
+          - mountPath: /etc/openstack
+            name: baremetal-manage
+            readOnly: true
+        env:
+          - name: OS_CLOUD
+            value: understack
