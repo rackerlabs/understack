@@ -1,7 +1,7 @@
 """Scenario tests for SVI router interface attach vs. bound baremetal ports.
 
-Extends the VRF scenario (VRF-RTR-01) to the SVI router flavor. See
-neutron_understack/tests/scenarios/SCENARIOS.md (SVI-RTR-*) for the catalog.
+Extends the VRF scenario (VRF-ROUTER-ATTACH-01) to the SVI router flavor. See
+neutron_understack/tests/scenarios/SCENARIOS.md (SVI-*) for the catalog.
 """
 
 import contextlib
@@ -126,7 +126,7 @@ class TestSviRouterInterface(UnderstackMl2RouterScenarioBase):
             "physnets of baremetal ports already bound on the network"
         ),
     )
-    @pytest.mark.scenario("SVI-RTR-01")
+    @pytest.mark.scenario("SVI-ROUTER-ATTACH-01")
     def test_svi_router_interface_syncs_bound_port_physnets(self):
         net = self._make_network(self.fmt, "vxlan-net", True)
         net_id = net["network"]["id"]

@@ -1,6 +1,6 @@
 """Scenario tests for VRF router interface attach vs. bound baremetal ports.
 
-See neutron_understack/tests/scenarios/SCENARIOS.md (VRF-RTR-*) for the catalog.
+See neutron_understack/tests/scenarios/SCENARIOS.md (VRF-ROUTER-*) for the catalog.
 """
 
 from unittest import mock
@@ -25,7 +25,7 @@ class TestVrfRouterInterface(UnderstackMl2RouterScenarioBase):
             "physnets of baremetal ports already bound on the network"
         ),
     )
-    @pytest.mark.scenario("VRF-RTR-01")
+    @pytest.mark.scenario("VRF-ROUTER-ATTACH-01")
     def test_vrf_router_interface_syncs_bound_port_physnets(self):
         net = self._make_network(self.fmt, "vxlan-net", True)
         net_id = net["network"]["id"]
@@ -70,7 +70,7 @@ class TestVrfRouterInterface(UnderstackMl2RouterScenarioBase):
             "physnets of baremetal ports still bound on the network"
         ),
     )
-    @pytest.mark.scenario("VRF-DETACH-01")
+    @pytest.mark.scenario("VRF-ROUTER-DETACH-01")
     def test_vrf_router_interface_detach_syncs_bound_port_physnets(self):
         net = self._make_network(self.fmt, "vxlan-net", True)
         net_id = net["network"]["id"]

@@ -58,7 +58,7 @@ class TestPaloAltoRouter(UnderstackMl2RouterScenarioBase):
         )
         return flavor["id"]
 
-    @pytest.mark.scenario("PALO-ADOPT-01")
+    @pytest.mark.scenario("PALO-ROUTER-ADOPT-01")
     def test_palo_alto_router_adopts_ironic_node(self):
         fake_ironic = FakeIronicClient()
         flavor_id = self._palo_flavor()
@@ -83,7 +83,7 @@ class TestPaloAltoRouter(UnderstackMl2RouterScenarioBase):
         assert len(fake_ironic.adopted) == 1, fake_ironic.adopted
         assert fake_ironic.adopted[0]["router_id"] == router["id"]
 
-    @pytest.mark.scenario("PALO-RELEASE-01")
+    @pytest.mark.scenario("PALO-ROUTER-RELEASE-01")
     def test_palo_alto_router_delete_releases_ironic_node(self):
         fake_ironic = FakeIronicClient()
         flavor_id = self._palo_flavor()
