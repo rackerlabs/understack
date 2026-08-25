@@ -7,10 +7,11 @@ import from here so the heading format is defined once and cannot diverge.
 
 import re
 
+SCENARIO_ID_PATTERN = r"[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+"
+SCENARIO_ID_RE = re.compile(rf"^{SCENARIO_ID_PATTERN}$")
+
 #: Catalog IDs are declared as headings: "### <ID> — <title>" (title optional).
-_CATALOG_RE = re.compile(
-    r"^#{2,3}\s+([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)(?:\s*[—-]\s*(.*))?$"
-)
+_CATALOG_RE = re.compile(rf"^#{{2,3}}\s+({SCENARIO_ID_PATTERN})(?:\s*[—-]\s*(.*))?$")
 
 
 def parse_catalog(text):
