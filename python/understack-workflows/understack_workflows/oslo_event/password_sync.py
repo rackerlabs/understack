@@ -124,7 +124,10 @@ class CoreBackend(PasswordSyncBackend):
 
 
 class PasswordSafeBackend(PasswordSyncBackend):
-    """Sync BMC password to PasswordSafe. (Future.)"""
+    """Sync BMC password to PasswordSafe.
+
+    Not yet implemented.
+    """
 
     def sync(
         self,
@@ -144,7 +147,10 @@ class PasswordSafeBackend(PasswordSyncBackend):
 
 
 class OnePasswordBackend(PasswordSyncBackend):
-    """Sync BMC password to 1Password. (Future.)"""
+    """Sync BMC password to 1Password.
+
+    Not yet implemented.
+    """
 
     def sync(
         self,
