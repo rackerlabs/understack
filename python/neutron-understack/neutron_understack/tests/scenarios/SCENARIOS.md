@@ -147,12 +147,13 @@ adds/removes must reconcile the parent's switch (VLAN group).
   callback, surfaced as `CallbackFailure`), with no binding level or dynamic
   segment allocated
 
-## Router interface (VRF flavor)
+## Router interface (VRF & SVI flavors)
 
 These scenarios load a real L3 router + flavors plugin (`ML2TestFramework`). The
-VRF (flavored) router path skips the OVN uplink work, so no OVN IDL fake is
-needed. The flavored path is simulated by patching `routers._router_has_flavor`,
-mirroring the existing unit tests.
+VRF and SVI flavored router paths skip the OVN uplink work, so no OVN IDL fake is
+needed. The flavored path is simulated by patching `routers._router_has_flavor`
+(and `svi._is_svi_router` for the SVI scenarios), mirroring the existing unit
+tests.
 
 ### VRF-ROUTER-ATTACH-01 — VRF router attach syncs bound baremetal port physnets
 - given: a VXLAN network + subnet with baremetal ports bound to two different
