@@ -110,7 +110,9 @@ jobs:
   # need a separate workflow_run-triggered workflow (not wired up here).
   publish-test-results:
     needs: [uv]
-    if: ${{ always() }}
+    # Skip on fork PRs: the token is read-only there, so the action cannot post
+    # the check/comment. Forks would need a separate workflow_run workflow.
+    if: ${{ always() && github.event.pull_request.head.repo.fork != true }}
     runs-on: ubuntu-latest
     permissions:
       checks: write

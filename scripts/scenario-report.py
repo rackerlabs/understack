@@ -12,18 +12,19 @@ separately by test_scenario_coverage.py.
 """
 
 import argparse
-import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-# Catalog IDs are declared as headings: "### BM-BIND-01 — title".
-_CATALOG_RE = re.compile(r"^#{2,3}\s+([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\s*[—-]\s*(.*)$")
+# Catalog heading parsing is shared with the coverage meta-test so the format is
+# defined once. Available because the script runs in the neutron-understack env.
+from neutron_understack.tests.scenarios.catalog import parse_catalog as _parse_text
 
 _STATUS = {
     "pass": "✅ pass",
     "fail": "❌ fail",
     "xfail": "⚠️ known bug (xfail)",
+    "xpass": "🎉 fixed — remove xfail",
     "skipped": "⏭️ skipped",
     "missing": "❓ no test",
     "notrun": "· not run",
@@ -32,16 +33,16 @@ _STATUS = {
 
 def parse_catalog(path):
     """Return ordered list of (id, title) from the catalog headings."""
-    entries = []
-    for line in Path(path).read_text().splitlines():
-        match = _CATALOG_RE.match(line)
-        if match:
-            entries.append((match.group(1), match.group(2).strip()))
-    return entries
+    return _parse_text(Path(path).read_text())
 
 
 def _testcase_status(testcase):
-    if testcase.find("failure") is not None or testcase.find("error") is not None:
+    failure = testcase.find("failure")
+    if failure is not None or testcase.find("error") is not None:
+        # A strict xfail that unexpectedly passes is a JUnit <failure> whose
+        # message is "[XPASS(strict)] ...": the bug is fixed, remove the marker.
+        if failure is not None and (failure.get("message") or "").startswith("[XPASS"):
+            return "xpass"
         return "fail"
     skipped = testcase.find("skipped")
     if skipped is not None:
