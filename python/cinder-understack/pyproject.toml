@@ -31,6 +31,9 @@ dependencies = [
 Source = "https://github.com/rackerlabs/understack"
 
 [dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
 test = [
     "ddt>=1.4.4",
     "fixtures>=3.0.0",
