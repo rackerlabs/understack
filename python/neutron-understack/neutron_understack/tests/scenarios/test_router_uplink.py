@@ -9,6 +9,7 @@ from unittest import mock
 import pytest
 from neutron.common.ovn import utils as ovn_utils
 from neutron.db import segments_db
+from neutron.objects.network import NetworkSegment
 from neutron_lib import constants as p_const
 
 from neutron_understack.tests.scenarios.base import UnderstackMl2RouterOvnScenarioBase
@@ -81,6 +82,8 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
         segment = segments_db.get_segment_by_id(self.context, segment_id)
         assert segment[segments_db.NETWORK_TYPE] == p_const.TYPE_VLAN
         assert segment[segments_db.PHYSICAL_NETWORK] == self.NETWORK_NODE_PHYSNET
+        segment_obj = NetworkSegment.get_object(self.context, id=segment_id)
+        assert segment_obj.is_dynamic
 
         assert self._trunk_subports(nn_trunk_id) == [
             {
@@ -126,6 +129,16 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
         assert len(fake._nb_idl.created_ports) == 1, fake._nb_idl.created_ports
         assert len(self._shared_uplink_ports(net_id)) == 1
 
+    # BUG: teardown deletes the OVN LSPs and shared port but leaks the dynamic
+    # uplink VLAN segment -- see SCENARIOS.md "Known bugs". Asserts the desired
+    # release; strict=True flips to a failure once the fix lands.
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "understack#2245: router uplink teardown does not release the "
+            "dynamic VLAN segment on the network-node physnet"
+        ),
+    )
     @pytest.mark.scenario("OVN-ROUTER-DETACH-01")
     def test_remove_router_interface_tears_down_uplink(self):
         nn_trunk_id = self._make_network_node_trunk()
@@ -155,7 +168,9 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
             trunk_id=nn_trunk_id,
             subports={"sub_ports": [{"port_id": shared_port["id"]}]},
         )
+        assert self._trunk_subports(nn_trunk_id) == []
         assert self._shared_uplink_ports(net_id) == []
+        assert segments_db.get_segment_by_id(self.context, segment_id) is None
         assert fake._nb_idl.deleted_ports == [
             {
                 "lport_name": f"uplink-{segment_id}",

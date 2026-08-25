@@ -220,9 +220,9 @@ test creates.
 ### OVN-ROUTER-ATTACH-01 — non-flavored router attach builds the uplink
 - given: a network+subnet, a network-node trunk, and a non-flavored router
 - when: the subnet is attached on the internal side
-- then: a dynamic VLAN uplink segment is allocated on the network-node physnet;
-  the shared `uplink-` neutron port, trunk subport tag, and OVN localnet LSP tag
-  all reference that segment and VLAN on the network's logical switch
+- then: a VLAN uplink segment marked dynamic is allocated on the network-node
+  physnet; the shared `uplink-` neutron port, trunk subport tag, and OVN localnet
+  LSP tag all reference that segment and VLAN on the network's logical switch
 
 ### OVN-ROUTER-SECOND-01 — second router on the same network is a no-op
 - given: a network with two subnets, the first already attached to a router
@@ -234,7 +234,12 @@ test creates.
 - when: the interface is removed
 - then: the shared port is removed from the network-node trunk, both the
   `uplink-<segment-id>` localnet LSP and shared-port LSP are deleted from the
-  exact logical switch, and the shared `uplink-` neutron port is removed
+  exact logical switch, the shared `uplink-` neutron port is removed, and the
+  dynamic segment is released
+- status: **KNOWN BUG (xfail, rackerlabs/understack#2245)** — teardown deletes
+  the ports but leaks the dynamic uplink VLAN segment today. The test asserts
+  the desired release and is `xfail(strict=True)`; a separate fix branch
+  resolves it (flipping this to a pass once merged).
 
 ## Router flavor providers (Palo Alto)
 
@@ -245,8 +250,9 @@ flavor + service profile (`driver` = the PaloAlto class, `metainfo.resource_clas
 ### PALO-ROUTER-ADOPT-01 — Palo Alto router adopts an Ironic netdev node
 - given: the Palo Alto provider registered and a matching flavor
 - when: a router with that flavor is created
-- then: the ROUTER BEFORE_CREATE callback adopts the available netdev node for
-  the router (via the faked Ironic client)
+- then: the ROUTER BEFORE_CREATE callback requests a node using the service
+  profile's resource class and adopts it with the router's project, ID, and name
+  (via the faked Ironic client)
 
 ### PALO-ROUTER-RELEASE-01 — deleting a Palo Alto router releases its node
 - given: a Palo Alto router that adopted a node
