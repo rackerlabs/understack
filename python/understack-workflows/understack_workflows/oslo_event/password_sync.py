@@ -50,7 +50,7 @@ _CORE_ID_KEY = "core_id"
 _EXTERNAL_CMDB_ID_KEY = "external_cmdb_id"
 
 # Extra key that controls which backend to sync to
-_PASSWORD_SYNC_KEY = "password_sync"
+_PASSWORD_SYNC_KEY = "password_sync"  # noqa: S105
 
 # Values that explicitly disable sync
 _DISABLED_VALUES = {"false", "disabled", "none", ""}
@@ -114,7 +114,8 @@ class CoreBackend(PasswordSyncBackend):
         # }]
         # connector.query(query)
         logger.info(
-            "[password_sync:core] Would sync password for node %s (%s) to CORE device %s",
+            "[password_sync:core] Would sync password for"
+            " node %s (%s) to CORE device %s",
             node_uuid,
             node_name,
             device_id,
@@ -123,7 +124,7 @@ class CoreBackend(PasswordSyncBackend):
 
 
 class PasswordSafeBackend(PasswordSyncBackend):
-    """Sync BMC password to PasswordSafe. (Future)"""
+    """Sync BMC password to PasswordSafe. (Future.)"""
 
     def sync(
         self,
@@ -143,7 +144,7 @@ class PasswordSafeBackend(PasswordSyncBackend):
 
 
 class OnePasswordBackend(PasswordSyncBackend):
-    """Sync BMC password to 1Password. (Future)"""
+    """Sync BMC password to 1Password. (Future.)"""
 
     def sync(
         self,
@@ -153,7 +154,8 @@ class OnePasswordBackend(PasswordSyncBackend):
         node_name: str,
     ) -> bool:
         logger.info(
-            "[password_sync:1password] Would sync password for node %s (%s) to 1Password device %s",
+            "[password_sync:1password] Would sync password"
+            " for node %s (%s) to 1Password device %s",
             node_uuid,
             node_name,
             device_id,
@@ -270,7 +272,8 @@ def handle_node_update(
     device_id = _get_device_id(extra)
     if not device_id:
         logger.debug(
-            "[password_sync] Node %s has password_sync enabled but no core_id or external_cmdb_id, skipping",
+            "[password_sync] Node %s has password_sync enabled"
+            " but no core_id or external_cmdb_id, skipping",
             node_uuid,
         )
         return 0
@@ -300,7 +303,8 @@ def handle_node_update(
 
     if stored_hash is None:
         logger.info(
-            "[password_sync:%s] Node %s (%s): initial password detected (no prior hash). Device: %s, key: %s",
+            "[password_sync:%s] Node %s (%s): initial password"
+            " detected (no prior hash). Device: %s, key: %s",
             backend_name,
             node_uuid,
             node_name,
