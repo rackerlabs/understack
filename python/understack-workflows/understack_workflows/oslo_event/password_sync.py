@@ -114,8 +114,7 @@ class CoreBackend(PasswordSyncBackend):
         # }]
         # connector.query(query)
         logger.info(
-            "[password_sync:core] Would sync password for node %s (%s)"
-            " to CORE device %s",
+            "[password_sync:core] Would sync password for node %s (%s) to CORE device %s",
             node_uuid,
             node_name,
             device_id,
@@ -134,8 +133,8 @@ class PasswordSafeBackend(PasswordSyncBackend):
         node_name: str,
     ) -> bool:
         logger.info(
-            "[password_sync:passwordsafe] Would sync password for "
-            "node %s (%s) to PasswordSafe device %s",
+            "[password_sync:passwordsafe] Would sync password"
+            " for node %s (%s) to PasswordSafe device %s",
             node_uuid,
             node_name,
             device_id,
@@ -154,8 +153,7 @@ class OnePasswordBackend(PasswordSyncBackend):
         node_name: str,
     ) -> bool:
         logger.info(
-            "[password_sync:1password] Would sync password for "
-            "node %s (%s) to 1Password device %s",
+            "[password_sync:1password] Would sync password for node %s (%s) to 1Password device %s",
             node_uuid,
             node_name,
             device_id,
@@ -224,8 +222,7 @@ def _get_backend(extra: dict[str, Any]) -> PasswordSyncBackend | None:
     backend = _BACKENDS.get(raw_value)
     if backend is None:
         logger.warning(
-            "[password_sync] Unrecognized backend '%s'. "
-            "Available: %s",
+            "[password_sync] Unrecognized backend '%s'. Available: %s",
             raw_value,
             list(_BACKENDS.keys()),
         )
@@ -273,17 +270,14 @@ def handle_node_update(
     device_id = _get_device_id(extra)
     if not device_id:
         logger.debug(
-            "[password_sync] Node %s has password_sync enabled but "
-            "no core_id or external_cmdb_id, skipping",
+            "[password_sync] Node %s has password_sync enabled but no core_id or external_cmdb_id, skipping",
             node_uuid,
         )
         return 0
 
     # Extract password from driver_info
     driver_info = node.driver_info or {}
-    password_key, password_value = _get_password_from_driver_info(
-        driver_info
-    )
+    password_key, password_value = _get_password_from_driver_info(driver_info)
 
     if not password_value:
         logger.debug(
@@ -306,8 +300,7 @@ def handle_node_update(
 
     if stored_hash is None:
         logger.info(
-            "[password_sync:%s] Node %s (%s): initial password "
-            "detected (no prior hash). Device: %s, key: %s",
+            "[password_sync:%s] Node %s (%s): initial password detected (no prior hash). Device: %s, key: %s",
             backend_name,
             node_uuid,
             node_name,
@@ -316,8 +309,7 @@ def handle_node_update(
         )
     else:
         logger.info(
-            "[password_sync:%s] Node %s (%s): password CHANGED. "
-            "Device: %s, key: %s",
+            "[password_sync:%s] Node %s (%s): password CHANGED. Device: %s, key: %s",
             backend_name,
             node_uuid,
             node_name,
