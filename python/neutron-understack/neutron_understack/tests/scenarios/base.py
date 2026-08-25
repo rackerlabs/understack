@@ -143,6 +143,13 @@ class _UnderstackMl2ScenarioMixin:
         assert req.get_response(self.api).status_int == 200
         return port_id
 
+    def _trunk_subports(self, trunk_id):
+        """Return a trunk's subports as the trunk plugin reports them.
+
+        Requires ``self.trunk_plugin`` (set by the trunk/router-OVN bases).
+        """
+        return self.trunk_plugin.get_trunk(self.context, trunk_id)["sub_ports"]
+
 
 class UnderstackMl2ScenarioBase(_UnderstackMl2ScenarioMixin, Ml2PluginV2TestCase):
     """Base for port-binding scenarios (no L3/router machinery)."""
