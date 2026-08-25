@@ -154,7 +154,7 @@ VRF (flavored) router path skips the OVN uplink work, so no OVN IDL fake is
 needed. The flavored path is simulated by patching `routers._router_has_flavor`,
 mirroring the existing unit tests.
 
-### VRF-RTR-01 — VRF router attach syncs bound baremetal port physnets
+### VRF-ROUTER-ATTACH-01 — VRF router attach syncs bound baremetal port physnets
 - given: a VXLAN network + subnet with baremetal ports bound to two different
   physnets (`physnet1`, `physnet2`)
 - when: a VRF router is created and the subnet is attached on the internal side
@@ -165,22 +165,22 @@ mirroring the existing unit tests.
   called for them). The test asserts the desired behavior and is
   `xfail(strict=True)`.
 
-### VRF-DETACH-01 — VRF router detach syncs bound baremetal port physnets
+### VRF-ROUTER-DETACH-01 — VRF router detach syncs bound baremetal port physnets
 - given: a VXLAN network with baremetal ports on two physnets and an attached
   VRF router interface
 - when: the router interface is removed
 - then: undersync should sync each physnet still carrying baremetal ports
 - status: **KNOWN BUG (xfail, rackerlabs/understack#2240)** — the teardown
-  counterpart of VRF-RTR-01; detach does not sync those physnets today.
+  counterpart of VRF-ROUTER-ATTACH-01; detach does not sync those physnets today.
 
-### SVI-RTR-01 — SVI router attach syncs bound baremetal port physnets
+### SVI-ROUTER-ATTACH-01 — SVI router attach syncs bound baremetal port physnets
 - given: a VXLAN network + an address-scoped IPv4 subnet, with baremetal ports
   bound to two different physnets (`physnet1`, `physnet2`)
 - when: an SVI router is created and the subnet is attached on the internal side
 - then: undersync syncs each physnet carrying the network's baremetal ports so
   the switches are reconciled for the new router
 - status: **KNOWN BUG (xfail, rackerlabs/understack#2240)** — the same gap as
-  VRF-RTR-01 for the SVI flavor: attaching the SVI router interface does not
+  VRF-ROUTER-ATTACH-01 for the SVI flavor: attaching the SVI router interface does not
   sync those physnets today. The SVI flavor is simulated by patching
   `_router_has_flavor` and `svi._is_svi_router`; the subnet is address-scoped so
   the SVI precommit scope validation passes.
@@ -209,19 +209,19 @@ These load an L3 router + flavors + trunk plugin
 HCG workaround). `utils.fetch_network_node_trunk_id` is mocked to a trunk the
 test creates.
 
-### RTR-ATTACH-01 — non-flavored router attach builds the uplink
+### OVN-ROUTER-ATTACH-01 — non-flavored router attach builds the uplink
 - given: a network+subnet, a network-node trunk, and a non-flavored router
 - when: the subnet is attached on the internal side
 - then: a dynamic VLAN uplink segment is allocated on the network-node physnet;
   the shared `uplink-` neutron port, trunk subport tag, and OVN localnet LSP tag
   all reference that segment and VLAN on the network's logical switch
 
-### RTR-SECOND-01 — second router on the same network is a no-op
+### OVN-ROUTER-SECOND-01 — second router on the same network is a no-op
 - given: a network with two subnets, the first already attached to a router
 - when: a second router attaches the second subnet
 - then: no new uplink is built (`is_only_router_port_on_network` is false)
 
-### RTR-DETACH-01 — remove_router_interface tears down the uplink
+### OVN-ROUTER-DETACH-01 — remove_router_interface tears down the uplink
 - given: a network with a router interface and its uplink
 - when: the interface is removed
 - then: the shared port is removed from the network-node trunk, both the
@@ -234,13 +234,13 @@ These register the Palo Alto provider as an L3 service provider and create a rea
 flavor + service profile (`driver` = the PaloAlto class, `metainfo.resource_class`
 = the netdev pool). `IronicClient` is faked (single-node pool).
 
-### PALO-ADOPT-01 — Palo Alto router adopts an Ironic netdev node
+### PALO-ROUTER-ADOPT-01 — Palo Alto router adopts an Ironic netdev node
 - given: the Palo Alto provider registered and a matching flavor
 - when: a router with that flavor is created
 - then: the ROUTER BEFORE_CREATE callback adopts the available netdev node for
   the router (via the faked Ironic client)
 
-### PALO-RELEASE-01 — deleting a Palo Alto router releases its node
+### PALO-ROUTER-RELEASE-01 — deleting a Palo Alto router releases its node
 - given: a Palo Alto router that adopted a node
 - when: the router is deleted
 - then: the ROUTER AFTER_DELETE callback returns the node to the pool
@@ -285,11 +285,11 @@ SVI validation:
   which the patched-flavor scenarios do not load.
 
 Router (needs an OVN IDL fake for `routers.ovn_client()`):
-- RTR-DELETE-01 — `delete_router` cleanup via `handle_router_interface_removal`
+- OVN-ROUTER-DELETE-01 — `delete_router` cleanup via `handle_router_interface_removal`
   (PORT PRECOMMIT_DELETE). Not reachable with the standard L3 plugin, which
   raises RouterInUse unless interfaces are removed first; needs a trigger that
   deletes a router-interface port directly.
-- RTR-HCG-VXLAN-01 — `link_vxlan_network_ha_chassis_group` populates the unified
+- OVN-ROUTER-HCG-VXLAN-01 — `link_vxlan_network_ha_chassis_group` populates the unified
   HCG for a vxlan external gateway (needs a deeper OVN NB/SB fake).
 
 VNI:

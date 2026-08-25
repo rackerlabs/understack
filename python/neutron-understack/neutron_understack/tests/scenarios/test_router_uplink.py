@@ -1,6 +1,6 @@
 """Scenario tests for the non-flavored router uplink path (OVN + trunk).
 
-See neutron_understack/tests/scenarios/SCENARIOS.md (RTR-*) for the catalog.
+See neutron_understack/tests/scenarios/SCENARIOS.md (OVN-ROUTER-*) for the catalog.
 """
 
 import contextlib
@@ -62,7 +62,7 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
         )
         return [p for p in ports if (p.get("name") or "").startswith("uplink-")]
 
-    @pytest.mark.scenario("RTR-ATTACH-01")
+    @pytest.mark.scenario("OVN-ROUTER-ATTACH-01")
     def test_nonflavored_router_attach_builds_uplink(self):
         nn_trunk_id = self._make_network_node_trunk()
         net_id, subnet_id = self._router_net_with_subnet()
@@ -98,7 +98,7 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
         assert created["tag"] == segment[segments_db.SEGMENTATION_ID]
         assert created["options"]["network_name"] == self.NETWORK_NODE_PHYSNET
 
-    @pytest.mark.scenario("RTR-SECOND-01")
+    @pytest.mark.scenario("OVN-ROUTER-SECOND-01")
     def test_second_router_on_network_is_noop(self):
         nn_trunk_id = self._make_network_node_trunk()
         # One network, two subnets (routers can't share a subnet's gateway IP).
@@ -126,7 +126,7 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
         assert len(fake._nb_idl.created_ports) == 1, fake._nb_idl.created_ports
         assert len(self._shared_uplink_ports(net_id)) == 1
 
-    @pytest.mark.scenario("RTR-DETACH-01")
+    @pytest.mark.scenario("OVN-ROUTER-DETACH-01")
     def test_remove_router_interface_tears_down_uplink(self):
         nn_trunk_id = self._make_network_node_trunk()
         net_id, subnet_id = self._router_net_with_subnet()
