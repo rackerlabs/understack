@@ -8,6 +8,9 @@ from unittest import mock
 
 import pytest
 from neutron.common.ovn import utils as ovn_utils
+from neutron.db import segments_db
+from neutron.objects.trunk import SubPort
+from neutron_lib import constants as p_const
 
 from neutron_understack.tests.scenarios.base import UnderstackMl2RouterOvnScenarioBase
 from neutron_understack.tests.scenarios.fakes import FakeOvnClient
@@ -60,6 +63,16 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
         )
         return [p for p in ports if (p.get("name") or "").startswith("uplink-")]
 
+    def _trunk_subports(self, trunk_id):
+        return [
+            {
+                "port_id": subport.port_id,
+                "segmentation_type": subport.segmentation_type,
+                "segmentation_id": subport.segmentation_id,
+            }
+            for subport in SubPort.get_objects(self.context, trunk_id=trunk_id)
+        ]
+
     @pytest.mark.scenario("RTR-ATTACH-01")
     def test_nonflavored_router_attach_builds_uplink(self):
         nn_trunk_id = self._make_network_node_trunk()
@@ -72,13 +85,29 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
                 self.context, router["id"], {"subnet_id": subnet_id}
             )
 
-        # An OVN localnet uplink port was created on this network's switch.
+        shared_ports = self._shared_uplink_ports(net_id)
+        assert len(shared_ports) == 1
+        shared_port = shared_ports[0]
+        segment_id = shared_port["name"].removeprefix("uplink-")
+        segment = segments_db.get_segment_by_id(self.context, segment_id)
+        assert segment[segments_db.NETWORK_TYPE] == p_const.TYPE_VLAN
+        assert segment[segments_db.PHYSICAL_NETWORK] == self.NETWORK_NODE_PHYSNET
+
+        assert self._trunk_subports(nn_trunk_id) == [
+            {
+                "port_id": shared_port["id"],
+                "segmentation_type": p_const.TYPE_VLAN,
+                "segmentation_id": segment[segments_db.SEGMENTATION_ID],
+            }
+        ]
+
         assert len(fake._nb_idl.created_ports) == 1, fake._nb_idl.created_ports
         created = fake._nb_idl.created_ports[0]
         assert created["lswitch_name"] == ovn_utils.ovn_name(net_id)
-        assert created["lport_name"].startswith("uplink-")
-        # A shared "uplink-" neutron port was created on the network.
-        assert self._shared_uplink_ports(net_id)
+        assert created["lport_name"] == shared_port["name"]
+        assert created["type"] == "localnet"
+        assert created["tag"] == segment[segments_db.SEGMENTATION_ID]
+        assert created["options"]["network_name"] == self.NETWORK_NODE_PHYSNET
 
     @pytest.mark.scenario("RTR-SECOND-01")
     def test_second_router_on_network_is_noop(self):
@@ -115,14 +144,36 @@ class TestRouterUplink(UnderstackMl2RouterOvnScenarioBase):
         fake = FakeOvnClient()
         router = self._create_router()
 
-        with self._ovn(fake, nn_trunk_id):
+        with (
+            self._ovn(fake, nn_trunk_id),
+            mock.patch.object(
+                self.trunk_plugin,
+                "remove_subports",
+                wraps=self.trunk_plugin.remove_subports,
+            ) as remove_subports,
+        ):
             self.l3_plugin.add_router_interface(
                 self.context, router["id"], {"subnet_id": subnet_id}
             )
+            shared_port = self._shared_uplink_ports(net_id)[0]
+            segment_id = shared_port["name"].removeprefix("uplink-")
             self.l3_plugin.remove_router_interface(
                 self.context, router["id"], {"subnet_id": subnet_id}
             )
 
-        # The OVN uplink LSPs were deleted and the shared port removed.
-        assert fake._nb_idl.deleted_ports, fake._nb_idl.deleted_ports
+        remove_subports.assert_called_once_with(
+            context=mock.ANY,
+            trunk_id=nn_trunk_id,
+            subports={"sub_ports": [{"port_id": shared_port["id"]}]},
+        )
         assert self._shared_uplink_ports(net_id) == []
+        assert fake._nb_idl.deleted_ports == [
+            {
+                "lport_name": f"uplink-{segment_id}",
+                "lswitch_name": ovn_utils.ovn_name(net_id),
+            },
+            {
+                "lport_name": shared_port["id"],
+                "lswitch_name": ovn_utils.ovn_name(net_id),
+            },
+        ]

@@ -6,9 +6,9 @@ and the **mechanism calls + data** we expect to observe.
 
 Every scenario here must be implemented by at least one test tagged
 `@pytest.mark.scenario("<ID>")`, and every such marker must reference a scenario
-that exists here. `test_scenario_coverage.py` enforces this equivalence in both
-directions, and `conftest.py` fails the run if any scenario test is missing a
-marker. So this file and the tests cannot silently drift apart.
+that exists here. `conftest.py` validates collected markers and enforces this
+equivalence whenever the complete scenario package is collected. So this file
+and the tests cannot silently drift apart in the scenario CI run.
 
 Scenario IDs are declared as `### <ID> — <title>` headings. Ideas under
 "Planned / future" are intentionally *not* IDs (no `###` heading) so they are not
@@ -102,40 +102,50 @@ adds/removes must reconcile the parent's switch (VLAN group).
 - given: a bound baremetal parent port on `physnet1` with a trunk, and a subport
   port on another network
 - when: the subport is added to the trunk (VLAN segmentation)
-- then: `undersync.sync(physnet1)` reconciles the parent port's switch
+- then: the trunk records the subport, a level-0 `understack` binding points it
+  at a dynamic VLAN segment on `physnet1`, and `undersync.sync(physnet1)`
+  reconciles the parent port's switch
 
 ### TRUNK-SUB-DEL — subport removal syncs the parent's physnet
 - given: the TRUNK-SUB-ADD setup with the subport attached
 - when: the subport is removed from the trunk
-- then: `undersync.sync(physnet1)` reconciles the parent port's switch
+- then: the trunk result no longer contains the subport, its synthetic binding
+  level is deleted, its now-unused dynamic VLAN segment is released, and
+  `undersync.sync(physnet1)` reconciles the parent port's switch
 
 ### TRUNK-PARENT-NOIP — subport add syncs when the parent has no IP
 - given: a bound baremetal parent on a subnetted network but with no fixed IP,
   plus a trunk and a subport on another network
 - when: the subport is added
-- then: `undersync.sync(physnet1)` still fires — a parent with no IP does not
-  suppress the reconcile
+- then: the subport binding and dynamic segment are created and
+  `undersync.sync(physnet1)` still fires — a parent with no IP does not suppress
+  the reconcile
 
 ### TRUNK-DEL-01 — trunk delete syncs the parent's physnet
 - given: a bound baremetal parent with a trunk and an attached subport
 - when: the trunk is deleted
-- then: the parent switchport is cleaned and `undersync.sync(physnet1)` fires
+- then: the trunk is gone, the subport binding and now-unused dynamic segment
+  are deleted, the parent switchport is cleaned, and `undersync.sync(physnet1)`
+  fires
 
 ### TRUNK-MULTI-01 — adding multiple subports syncs the parent's physnet
 - given: a bound baremetal parent with a trunk
 - when: two subports on different networks are added in one operation
-- then: `undersync.sync(physnet1)` fires
+- then: each subport has its own level-0 binding to a dynamic VLAN segment on
+  `physnet1`, the segments are distinct, and `undersync.sync(physnet1)` fires
 
 ### TRUNK-PARENT-UNBOUND-01 — subport add with an unbound parent is a no-op
 - given: an unbound (plain) parent port with a trunk
 - when: a subport is added
-- then: no switchport config and no `undersync.sync` (nothing to reconcile)
+- then: trunk membership is recorded, but no subport binding level or dynamic
+  VLAN segment is created and no `undersync.sync` occurs
 
 ### TRUNK-SEGID-RANGE-01 — subport seg_id outside the allowed range is rejected
 - given: a bound baremetal parent with a trunk
 - when: a subport is added with a segmentation_id outside `[1, 3799]`
 - then: `SubportSegmentationIDError` (raised in the SUBPORTS PRECOMMIT_CREATE
-  callback, surfaced as `CallbackFailure`)
+  callback, surfaced as `CallbackFailure`), with no binding level or dynamic
+  segment allocated
 
 ## Router interface (VRF flavor)
 
@@ -202,9 +212,9 @@ test creates.
 ### RTR-ATTACH-01 — non-flavored router attach builds the uplink
 - given: a network+subnet, a network-node trunk, and a non-flavored router
 - when: the subnet is attached on the internal side
-- then: a dynamic uplink segment is allocated, a shared `uplink-` neutron port
-  is created, added to the network-node trunk, and an OVN localnet LSP is
-  created on the network's logical switch
+- then: a dynamic VLAN uplink segment is allocated on the network-node physnet;
+  the shared `uplink-` neutron port, trunk subport tag, and OVN localnet LSP tag
+  all reference that segment and VLAN on the network's logical switch
 
 ### RTR-SECOND-01 — second router on the same network is a no-op
 - given: a network with two subnets, the first already attached to a router
@@ -214,7 +224,9 @@ test creates.
 ### RTR-DETACH-01 — remove_router_interface tears down the uplink
 - given: a network with a router interface and its uplink
 - when: the interface is removed
-- then: the OVN uplink LSPs are deleted and the shared `uplink-` port removed
+- then: the shared port is removed from the network-node trunk, both the
+  `uplink-<segment-id>` localnet LSP and shared-port LSP are deleted from the
+  exact logical switch, and the shared `uplink-` neutron port is removed
 
 ## Router flavor providers (Palo Alto)
 

@@ -1,36 +1,24 @@
-"""Enforce that the scenario catalog and the tests agree, in both directions.
+"""Validate properties of the human-readable scenario catalog.
 
-- Every ``### <ID> — ...`` entry in SCENARIOS.md must be implemented by at least
-  one test tagged ``@pytest.mark.scenario("<ID>")``.
-- Every such marker must reference an ID that exists in SCENARIOS.md.
-
-This is a static cross-check (it scans the catalog and the test sources), so it
-holds regardless of which subset of tests a given run collects.
+The collection hook validates marker shape and checks the catalog against the
+tests pytest actually collects. That avoids source scanning that can count a
+marker in a comment or dead code as an implemented scenario.
 """
 
-import re
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from neutron_understack.tests.scenarios.catalog import catalog_ids
+from neutron_understack.tests.scenarios.conftest import _scenario_id
 
 SCENARIOS_DIR = Path(__file__).parent
 CATALOG = SCENARIOS_DIR / "SCENARIOS.md"
 
-# Markers in test sources: @pytest.mark.scenario("BM-BIND-01").
-_MARKER_ID_RE = re.compile(r"""\.scenario\(\s*["']([^"']+)["']""")
-
 
 def _catalog_ids():
     return catalog_ids(CATALOG.read_text())
-
-
-def _marker_ids():
-    ids = set()
-    for path in SCENARIOS_DIR.glob("test_*.py"):
-        if path.name == Path(__file__).name:
-            continue
-        ids.update(_MARKER_ID_RE.findall(path.read_text()))
-    return ids
 
 
 def test_catalog_has_no_duplicate_ids():
@@ -39,19 +27,28 @@ def test_catalog_has_no_duplicate_ids():
     assert not duplicates, f"duplicate scenario IDs in SCENARIOS.md: {duplicates}"
 
 
-def test_every_catalogued_scenario_has_a_test():
-    catalog = set(_catalog_ids())
-    markers = _marker_ids()
-    untested = sorted(catalog - markers)
-    assert (
-        not untested
-    ), f"catalogued scenarios with no @pytest.mark.scenario test: {untested}"
+def _item_with_marker(marker):
+    return SimpleNamespace(get_closest_marker=lambda _name: marker)
 
 
-def test_every_scenario_marker_is_catalogued():
-    catalog = set(_catalog_ids())
-    markers = _marker_ids()
-    uncataloged = sorted(markers - catalog)
-    assert (
-        not uncataloged
-    ), f"@pytest.mark.scenario IDs missing from SCENARIOS.md: {uncataloged}"
+def test_valid_scenario_marker_returns_id():
+    item = _item_with_marker(pytest.mark.scenario("BM-BIND-01").mark)
+    assert _scenario_id(item) == ("BM-BIND-01", None)
+
+
+@pytest.mark.parametrize(
+    "marker",
+    [
+        None,
+        pytest.mark.scenario().mark,
+        pytest.mark.scenario("BM-BIND-01", "extra").mark,
+        pytest.mark.scenario(id="BM-BIND-01").mark,
+        pytest.mark.scenario(123).mark,
+        pytest.mark.scenario("").mark,
+        pytest.mark.scenario("bm-bind-01").mark,
+    ],
+)
+def test_malformed_scenario_marker_is_rejected(marker):
+    scenario_id, error = _scenario_id(_item_with_marker(marker))
+    assert scenario_id is None
+    assert error
