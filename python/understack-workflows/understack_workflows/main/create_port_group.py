@@ -26,7 +26,10 @@ def parse_port_channel(port_id: str) -> str:
     """
     tail = port_id.rsplit("/", 1)[-1]
     if not tail.isdigit():
-        logger.error("Cannot derive numeric port-channel suffix from port_id='%s'", port_id)
+        logger.error(
+            "Cannot derive numeric port-channel suffix from port_id='%s'",
+            port_id,
+        )
         sys.exit(1)
     return f"{int(tail):02d}"
 
@@ -77,7 +80,10 @@ def create_port_group(node_id: str, dry_run: bool = False) -> None:
             eligible.append(port)
 
     if not eligible:
-        logger.error("No ports with local_link_connection.port_id found for node %s", node.id)
+        logger.error(
+            "No ports with local_link_connection.port_id found for node %s",
+            node.id,
+        )
         sys.exit(1)
 
     def sort_key(port):
@@ -101,7 +107,11 @@ def create_port_group(node_id: str, dry_run: bool = False) -> None:
     pg_name = f"{node_name}-port-channel1{port_channel}"
 
     if dry_run:
-        logger.info("[dry-run] Would create port group '%s' for node %s", pg_name, node.id)
+        logger.info(
+            "[dry-run] Would create port group '%s' for node %s",
+            pg_name,
+            node.id,
+        )
         logger.info("[dry-run] MAC: %s | Eligible ports: %d", mac, len(eligible))
         for port in eligible:
             port_llc = port.local_link_connection or {}
@@ -113,7 +123,12 @@ def create_port_group(node_id: str, dry_run: bool = False) -> None:
             )
         return
 
-    logger.info("Creating port group '%s' for node %s with MAC %s", pg_name, node.id, mac)
+    logger.info(
+        "Creating port group '%s' for node %s with MAC %s",
+        pg_name,
+        node.id,
+        mac,
+    )
 
     pg = conn.baremetal.create_port_group(
         node_id=node.id,
