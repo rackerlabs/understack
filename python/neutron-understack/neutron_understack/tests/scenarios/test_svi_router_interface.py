@@ -73,6 +73,48 @@ class TestSviRouterInterface(UnderstackMl2RouterScenarioBase):
             subnetpool_id=pool["id"],
         )["subnet"]
 
+    def _scoped_ipv6_subnet(self, network):
+        """Create an address-scoped IPv6 subnet.
+
+        Scoped so the SVI no-scope guard cannot be what rejects it -- only the
+        IPv6 guard can -- which is what SVI-VAL-IPV6-01 needs to pin.
+        """
+        scope = self.core_plugin.create_address_scope(
+            self.context,
+            {
+                "address_scope": {
+                    "name": "v6-scope",
+                    "ip_version": 6,
+                    "shared": False,
+                    "tenant_id": self._project_id,
+                }
+            },
+        )
+        pool = self.core_plugin.create_subnetpool(
+            self.context,
+            {
+                "subnetpool": {
+                    "name": "v6-pool",
+                    "prefixes": ["2001:db8::/48"],
+                    "address_scope_id": scope["id"],
+                    "default_prefixlen": 64,
+                    "min_prefixlen": 48,
+                    "max_prefixlen": 128,
+                    "shared": False,
+                    "is_default": False,
+                    "tenant_id": self._project_id,
+                }
+            },
+        )
+        return self._make_subnet(
+            self.fmt,
+            network,
+            gateway="2001:db8::1",
+            cidr="2001:db8::/64",
+            ip_version=6,
+            subnetpool_id=pool["id"],
+        )["subnet"]
+
     # BUG: like the VRF case (#2240), attaching an SVI router interface does not
     # reconcile the switches carrying the network's already-bound baremetal
     # ports -- undersync is never asked to sync those physnets. Asserts the
@@ -135,14 +177,10 @@ class TestSviRouterInterface(UnderstackMl2RouterScenarioBase):
 
     @pytest.mark.scenario("SVI-VAL-IPV6-01")
     def test_svi_rejects_ipv6_subnet(self):
+        # Address-scoped so only the IPv6 guard (not the no-scope guard) can
+        # reject it -- otherwise this would not actually pin IPv6 rejection.
         net = self._make_network(self.fmt, "n", True)
-        subnet = self._make_subnet(
-            self.fmt,
-            net,
-            gateway="fe80::1",
-            cidr="fe80::/64",
-            ip_version=6,
-        )["subnet"]
+        subnet = self._scoped_ipv6_subnet(net)
         router = self._create_router()
         self._attach_expecting_reject(subnet["id"], router["id"])
 

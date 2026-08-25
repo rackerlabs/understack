@@ -11,22 +11,17 @@ holds regardless of which subset of tests a given run collects.
 import re
 from pathlib import Path
 
+from neutron_understack.tests.scenarios.catalog import catalog_ids
+
 SCENARIOS_DIR = Path(__file__).parent
 CATALOG = SCENARIOS_DIR / "SCENARIOS.md"
 
-# Catalog IDs are declared as headings: "### BM-BIND-01 — title".
-_CATALOG_ID_RE = re.compile(r"^#{2,3}\s+([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\b")
 # Markers in test sources: @pytest.mark.scenario("BM-BIND-01").
 _MARKER_ID_RE = re.compile(r"""\.scenario\(\s*["']([^"']+)["']""")
 
 
 def _catalog_ids():
-    ids = []
-    for line in CATALOG.read_text().splitlines():
-        match = _CATALOG_ID_RE.match(line)
-        if match:
-            ids.append(match.group(1))
-    return ids
+    return catalog_ids(CATALOG.read_text())
 
 
 def _marker_ids():
