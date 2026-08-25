@@ -44,11 +44,29 @@ def _require_specific_resource_class(resource_class: str | None) -> str:
     normalized = (resource_class or "").strip()
     if not normalized or normalized.lower() == netdev_reconciler.DEFAULT_RESOURCE_CLASS:
         raise ValueError(
-            "enroll-fw requires an explicit, purpose-made --resource-class "
-            f"got {resource_class!r}. The generic default is not "
-            "allowed"
+            "enroll-fw requires an explicit, purpose-made --resource-class; "
+            f"got {resource_class!r}. The generic default is not allowed."
         )
     return normalized
+
+
+def _require_management_location(
+    management_switch: str, management_switch_port: str
+) -> tuple[str, str]:
+    """Return (switch, port) after checking both are non-empty."""
+    switch = (management_switch or "").strip()
+    port = (management_switch_port or "").strip()
+    missing = []
+    if not switch:
+        missing.append("--management-switch")
+    if not port:
+        missing.append("--management-switch-port")
+    if missing:
+        raise ValueError(
+            f"enroll-fw requires {' and '.join(missing)}: the management switch "
+            "and port cannot be blank."
+        )
+    return switch, port
 
 
 def enroll_fw(
@@ -64,6 +82,9 @@ def enroll_fw(
     mate_serial: str = "",
 ) -> None:
     resource_class = _require_specific_resource_class(resource_class)
+    management_switch, management_switch_port = _require_management_location(
+        management_switch, management_switch_port
+    )
     driver_info, extra = firewall.firewall_metadata(
         management_ip=management_ip,
         management_switch=management_switch,
@@ -244,14 +265,12 @@ def argument_parser():
     )
     parser.add_argument(
         "--management-switch",
-        required=False,
-        default="",
+        required=True,
         help="Management switch name -> driver_info.management_switch",
     )
     parser.add_argument(
         "--management-switch-port",
-        required=False,
-        default="",
+        required=True,
         help="Management switch port -> driver_info.management_switch_port",
     )
     parser.add_argument(
