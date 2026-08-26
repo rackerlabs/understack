@@ -28,3 +28,14 @@ class NetAppNVMeDriver(NetAppCmodeNVMeDriver):
             connector["nqn"] = connector["initiator"]
 
         return super().initialize_connection(volume, connector)
+
+    def terminate_connection(self, volume, connector, **kwargs):
+        """Terminate connection with connector field translation.
+
+        Nova/Ironic send 'initiator' but NetApp driver expects 'nqn'.
+        Translate if needed, then call upstream.
+        """
+        if connector and "initiator" in connector and "nqn" not in connector:
+            connector["nqn"] = connector["initiator"]
+
+        return super().terminate_connection(volume, connector, **kwargs)
