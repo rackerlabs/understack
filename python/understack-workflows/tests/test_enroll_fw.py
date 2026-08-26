@@ -112,14 +112,23 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
     )
 
 
-def test_enroll_fw_without_fw_fields_passes_empty_metadata(mocker):
+def test_enroll_fw_optional_fw_fields_can_be_omitted(mocker):
+    # management_switch/port are required; management_ip, mate_serial and
+    # external_cmdb_id are optional and are simply absent from the metadata.
     _mock_client(mocker, node=None)
     engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
 
-    enroll_fw.enroll_fw(**BASE_ARGS)
+    enroll_fw.enroll_fw(
+        **BASE_ARGS,
+        management_switch="n11-22-1d.dfw3",
+        management_switch_port="Ethernet1/24",
+    )
 
     _, kwargs = engine.call_args
-    assert kwargs["driver_info"] == {}
+    assert kwargs["driver_info"] == {
+        "management_switch": "n11-22-1d.dfw3",
+        "management_switch_port": "Ethernet1/24",
+    }
     assert kwargs["extra"] == {}
 
 
@@ -154,6 +163,29 @@ def test_enroll_fw_normalizes_resource_class_whitespace(mocker):
     enroll_fw.enroll_fw(**args, **FW_FIELDS)
 
     assert engine.call_args.kwargs["resource_class"] == "pa1410"
+
+
+def test_enroll_fw_requires_management_switch(mocker):
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    for bad in ("", "   "):
+        args = {**BASE_ARGS, **FW_FIELDS, "management_switch": bad}
+        with pytest.raises(ValueError, match="management-switch"):
+            enroll_fw.enroll_fw(**args)
+
+    # Rejected before the engine (or any Ironic call) is ever invoked.
+    engine.assert_not_called()
+
+
+def test_enroll_fw_requires_management_switch_port(mocker):
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    for bad in ("", "   "):
+        args = {**BASE_ARGS, **FW_FIELDS, "management_switch_port": bad}
+        with pytest.raises(ValueError, match="management-switch-port"):
+            enroll_fw.enroll_fw(**args)
+
+    engine.assert_not_called()
 
 
 # --- in-service (active) node: metadata-only in place -----------------------
@@ -272,5 +304,23 @@ def test_argument_parser_requires_resource_class():
                 "net",
                 "--ports",
                 "[]",
+            ]
+        )
+
+
+def test_argument_parser_requires_management_switch_and_port():
+    # Everything except the management switch/port -> argparse rejects it.
+    parser = enroll_fw.argument_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(
+            [
+                "--name",
+                "fw1",
+                "--physical-network",
+                "net",
+                "--ports",
+                "[]",
+                "--resource-class",
+                "pa1410",
             ]
         )

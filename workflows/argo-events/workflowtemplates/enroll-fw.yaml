@@ -29,13 +29,12 @@ spec:
         value: ""
       - name: resource_class
       # Firewall management/identity metadata. management_* land in the node's
-      # driver_info; mate_serial lands in extra. Omit (leave "") to skip.
+      # driver_info; mate_serial lands in extra.
+      # management_switch + management_switch_port are REQUIRED (no default)
       - name: management_ip
         value: ""
       - name: management_switch
-        value: ""
       - name: management_switch_port
-        value: ""
       - name: mate_serial
         value: ""
   templates:
