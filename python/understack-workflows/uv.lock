@@ -351,6 +351,20 @@ wheels = [
 ]
 
 [[package]]
+name = "keystoneauth-websso"
+version = "0.2.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "keystoneauth1" },
+    { name = "multipart" },
+    { name = "platformdirs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/59/87/6362ba7b9e48926aa0d81733af3b604ac2063a32a86594ea69ea3743e496/keystoneauth_websso-0.2.5.tar.gz", hash = "sha256:a30289dd4ae70ba56387bb8defe8da6e3eb7f9e6d289692d3cb5b0c7460b071c", size = 9761, upload-time = "2025-08-21T17:28:11.107Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/f9/a97ba7d7c658f2216f378d1c9b8c093dd3bf0a53edf959051089a271192a/keystoneauth_websso-0.2.5-py3-none-any.whl", hash = "sha256:aac9f193546ca462b69025a6fcbca494630000d372608b5da0b345db5f8a5b5a", size = 12281, upload-time = "2025-08-21T17:28:09.627Z" },
+]
+
+[[package]]
 name = "keystoneauth1"
 version = "5.12.0"
 source = { registry = "https://pypi.org/simple" }
@@ -420,6 +434,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "multipart"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/49/c4/f3f0c57ec3e845bae038d3849af0e2b9d3f62a046b2a09af3f697ad882d6/multipart-2.0.0.tar.gz", hash = "sha256:d6076567b489270271d9ec103d404745da1501ad5b70e3a7f1f07f5623d82850", size = 42606, upload-time = "2026-07-18T16:03:23.993Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/71/dd/feb9c23d5c5a382194a9f86b02e98b8724d745e1a1cf4ecb1a5c0f884aa1/multipart-2.0.0-py3-none-any.whl", hash = "sha256:b3d4d473c4b96bb43e0d54b76fcc3b89b904df28387daf54e08405eb2123a081", size = 16418, upload-time = "2026-07-18T16:03:22.599Z" },
 ]
 
 [[package]]
@@ -1085,6 +1108,9 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
+local = [
+    { name = "keystoneauth-websso" },
+]
 test = [
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -1106,6 +1132,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
+local = [{ name = "keystoneauth-websso" }]
 test = [
     { name = "pytest", specifier = ">=9,<10" },
     { name = "pytest-cov", specifier = ">=7,<8" },
