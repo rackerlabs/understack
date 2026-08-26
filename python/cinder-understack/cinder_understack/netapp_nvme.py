@@ -5,11 +5,11 @@ the 'initiator' field from Nova/Ironic to the 'nqn' field expected
 by the NetApp driver.
 """
 
-from cinder.volume.drivers.netapp.dataontap.nvme_library import NetAppNVMeStorageLibrary
+from cinder.volume.drivers.netapp.dataontap.nvme_cmode import NetAppCmodeNVMeDriver
 
 
-class NetAppNVMeLibrary(NetAppNVMeStorageLibrary):
-    """NetApp NVMe library with Nova/Ironic connector compatibility.
+class NetAppNVMeDriver(NetAppCmodeNVMeDriver):
+    """NetApp NVMe driver with Nova/Ironic connector compatibility.
 
     This minimal wrapper only translates connector['initiator'] to
     connector['nqn'] for compatibility with Nova/Ironic which send
