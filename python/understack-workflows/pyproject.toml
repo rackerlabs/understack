@@ -54,6 +54,11 @@ test = [
     "pytest-lazy-fixtures>=1.1.1,<2",
     "requests-mock>=1.12.1,<2",
 ]
+# Only needed when running the OpenStack SDK locally against a WebSSO-backed
+# cloud. Not installed by default; enable with `uv run --group local ...`.
+local = [
+    "keystoneauth-websso",
+]
 
 [tool.uv]
 default-groups = ["test"]
