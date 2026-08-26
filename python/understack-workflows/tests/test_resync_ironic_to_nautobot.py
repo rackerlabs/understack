@@ -21,13 +21,15 @@ class TestArgumentParser:
 class TestSyncNodes:
     """Test cases for sync_nodes function."""
 
+    @patch("understack_workflows.main.resync_ironic_to_nautobot.get_openstack_client")
     @patch("understack_workflows.main.resync_ironic_to_nautobot.IronicClient")
     @patch(
         "understack_workflows.main.resync_ironic_to_nautobot.sync_device_to_nautobot"
     )
-    def test_sync_all_nodes_success(self, mock_sync, mock_ironic_class):
+    def test_sync_all_nodes_success(self, mock_sync, mock_ironic_class, mock_get_conn):
         mock_ironic = MagicMock()
         mock_ironic_class.return_value = mock_ironic
+        mock_get_conn.return_value.config.region_name = "iad3"
         mock_node1 = MagicMock(uuid="uuid-1", name="node-1")
         mock_node2 = MagicMock(uuid="uuid-2", name="node-2")
         mock_ironic.list_nodes.return_value = [mock_node1, mock_node2]
@@ -39,14 +41,19 @@ class TestSyncNodes:
         assert result.total == 2
         assert result.failed == 0
         assert mock_sync.call_count == 2
+        # The region's Location is resolved once and passed to each sync call.
+        location = nautobot.dcim.locations.get.return_value
+        mock_sync.assert_called_with("uuid-2", nautobot, location)
 
+    @patch("understack_workflows.main.resync_ironic_to_nautobot.get_openstack_client")
     @patch("understack_workflows.main.resync_ironic_to_nautobot.IronicClient")
     @patch(
         "understack_workflows.main.resync_ironic_to_nautobot.sync_device_to_nautobot"
     )
-    def test_sync_single_node(self, mock_sync, mock_ironic_class):
+    def test_sync_single_node(self, mock_sync, mock_ironic_class, mock_get_conn):
         mock_ironic = MagicMock()
         mock_ironic_class.return_value = mock_ironic
+        mock_get_conn.return_value.config.region_name = "iad3"
         mock_node = MagicMock(uuid="uuid-1", name="node-1")
         mock_ironic.list_nodes.return_value = [mock_node]
         mock_sync.return_value = 0
@@ -58,13 +65,15 @@ class TestSyncNodes:
         assert result.failed == 0
         mock_ironic.list_nodes.assert_called_once()
 
+    @patch("understack_workflows.main.resync_ironic_to_nautobot.get_openstack_client")
     @patch("understack_workflows.main.resync_ironic_to_nautobot.IronicClient")
     @patch(
         "understack_workflows.main.resync_ironic_to_nautobot.sync_device_to_nautobot"
     )
-    def test_sync_with_failures(self, mock_sync, mock_ironic_class):
+    def test_sync_with_failures(self, mock_sync, mock_ironic_class, mock_get_conn):
         mock_ironic = MagicMock()
         mock_ironic_class.return_value = mock_ironic
+        mock_get_conn.return_value.config.region_name = "iad3"
         mock_node1 = MagicMock(uuid="uuid-1", name="node-1")
         mock_node2 = MagicMock(uuid="uuid-2", name="node-2")
         mock_ironic.list_nodes.return_value = [mock_node1, mock_node2]
@@ -77,13 +86,15 @@ class TestSyncNodes:
         assert result.failed == 1
         assert result.succeeded == 1
 
+    @patch("understack_workflows.main.resync_ironic_to_nautobot.get_openstack_client")
     @patch("understack_workflows.main.resync_ironic_to_nautobot.IronicClient")
     @patch(
         "understack_workflows.main.resync_ironic_to_nautobot.sync_device_to_nautobot"
     )
-    def test_sync_no_nodes(self, mock_sync, mock_ironic_class):
+    def test_sync_no_nodes(self, mock_sync, mock_ironic_class, mock_get_conn):
         mock_ironic = MagicMock()
         mock_ironic_class.return_value = mock_ironic
+        mock_get_conn.return_value.config.region_name = "iad3"
         mock_ironic.list_nodes.return_value = []
 
         nautobot = MagicMock()

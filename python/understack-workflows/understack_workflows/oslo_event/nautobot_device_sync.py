@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
+from typing import cast
 from uuid import UUID
 
 import requests
@@ -21,6 +22,7 @@ from ironicclient.common.apiclient import exceptions as ironic_exceptions
 from openstack.connection import Connection
 from pynautobot import RequestError
 from pynautobot.core.api import Api as Nautobot
+from pynautobot.core.response import Record
 
 from understack_workflows.ironic.client import IronicClient
 from understack_workflows.ironic.provision_state_mapper import ProvisionStateMapper
@@ -39,6 +41,10 @@ RETRY_WAIT_MIN = 2
 RETRY_WAIT_MAX = 30
 
 
+class InvalidRackPositionError(ValueError):
+    """Raised when an explicit rack position cannot be applied safely."""
+
+
 def _is_retryable_error(exc: BaseException) -> bool:
     """Determine if an exception is retryable.
 
@@ -54,6 +60,46 @@ def _is_retryable_error(exc: BaseException) -> bool:
         status_code = getattr(exc.req, "status_code", None)
         return status_code in (502, 503, 504)
     return False
+
+
+@tenacity.retry(
+    retry=tenacity.retry_if_exception(_is_retryable_error),
+    wait=tenacity.wait_random_exponential(
+        multiplier=1, min=RETRY_WAIT_MIN, max=RETRY_WAIT_MAX
+    ),
+    stop=tenacity.stop_after_attempt(RETRY_ATTEMPTS),
+    before_sleep=tenacity.before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def get_location_for_region(nautobot_client: Nautobot, region: str) -> Record:
+    """Resolve an OpenStack region name to its Nautobot Location.
+
+    A deployment manages a single OpenStack region, which maps to a single
+    Nautobot Location (the location name matches the region name). Resolving
+    it once, up front, lets location-scoped Nautobot lookups be scoped to
+    this Location.
+
+    Args:
+        nautobot_client: Nautobot API client
+        region: OpenStack region name
+
+    Transient Nautobot failures (503, connection errors) are retried with
+    exponential backoff, matching the other Nautobot calls in this module; a
+    non-retryable ``ValueError`` (bad or ambiguous region) is raised
+    immediately.
+
+    Returns:
+        The Nautobot Location record for the region.
+
+    Raises:
+        ValueError: if the region does not resolve to exactly one Location.
+    """
+    location = nautobot_client.dcim.locations.get(name=region)
+    if not location or isinstance(location, list):
+        raise ValueError(
+            f"OpenStack region {region!r} did not resolve to a single Nautobot location"
+        )
+    return location
 
 
 @dataclass
@@ -180,6 +226,102 @@ def _generate_device_name(device_info: DeviceInfo) -> None:
         device_info.name = f"{device_info.manufacturer}-{device_info.serial_number}"
 
 
+def _set_location_from_extra(
+    device_info: DeviceInfo,
+    node,
+    nautobot_client: Nautobot,
+    location: Record,
+) -> bool:
+    """Determine device location from the node's ``extra`` field.
+
+    Uses ``extra.rack`` (a Nautobot rack name) and ``extra.position`` (the
+    rack unit the node occupies). Both must be present for this to take
+    effect; when either is missing, or the rack cannot be resolved in
+    Nautobot, this returns ``False`` so the caller falls back to deriving
+    location from the connected switches.
+
+    Rack names are only unique within a location, so the lookup is scoped to
+    ``location`` (this deployment's region).
+
+    Args:
+        device_info: DeviceInfo to update with location, rack and position
+        node: Ironic node object
+        nautobot_client: Nautobot API client
+        location: Nautobot Location used to scope the rack lookup
+
+    Returns:
+        True if rack, location and position were set from ``extra``.
+    """
+    extra = node.extra or {}
+    rack_name = extra.get("rack")
+    position = extra.get("position")
+
+    # Both are required; otherwise fall back to switch-based lookup.
+    if not rack_name or position is None:
+        return False
+
+    try:
+        rack_position = int(position)
+    except (TypeError, ValueError) as e:
+        raise InvalidRackPositionError(
+            f"extra.position {position!r} for node {device_info.uuid} "
+            "must be an integer"
+        ) from e
+
+    try:
+        # Scope by location: rack names are only unique within a location.
+        try:
+            rack = nautobot_client.dcim.racks.get(name=rack_name, location=location.id)
+        except ValueError:
+            # pynautobot's .get() raises when more than one rack matches.
+            logger.warning(
+                "extra.rack %s (location %s) for node %s matched multiple "
+                "Nautobot racks, falling back to switch-based location",
+                rack_name,
+                location.name,
+                device_info.uuid,
+            )
+            return False
+
+        # pynautobot's typing allows .get() to return a list; treat that (and
+        # an empty result) as "did not resolve to a single rack".
+        if not rack or isinstance(rack, list):
+            logger.warning(
+                "extra.rack %s (location %s) for node %s did not resolve to a "
+                "single Nautobot rack, falling back to switch-based location",
+                rack_name,
+                location.name,
+                device_info.uuid,
+            )
+            return False
+
+        rack_height = cast(int, rack.u_height)
+
+        if not 1 <= rack_position <= rack_height:
+            raise InvalidRackPositionError(
+                f"extra.position {rack_position} for node {device_info.uuid} "
+                f"is outside rack {rack_name!r} height 1..{rack_height}"
+            )
+
+        device_info.rack_id = rack.id
+        device_info.location_id = _get_record_value(rack.location, "id")
+        device_info.position = rack_position
+        return True
+
+    except InvalidRackPositionError:
+        # Bad explicit placement is an operator error. Do not fall back and
+        # silently move the device somewhere other than requested.
+        raise
+    except Exception as e:
+        # Re-raise retryable errors (503, connection issues) to trigger retry
+        if _is_retryable_error(e):
+            raise
+        logger.error(
+            "Failed to set location from extra for node %s: %s", device_info.uuid, e
+        )
+        return False
+
+
 def _set_location_from_switches(
     device_info: DeviceInfo,
     ports: list,
@@ -243,6 +385,7 @@ def fetch_node_details(
     node_uuid: str,
     ironic_client: IronicClient,
     nautobot_client: Nautobot,
+    location: Record,
 ) -> tuple[DeviceInfo, dict, list]:
     """Fetch complete device info from Ironic.
 
@@ -250,6 +393,8 @@ def fetch_node_details(
         node_uuid: Ironic node UUID
         ironic_client: Ironic API client
         nautobot_client: Nautobot API client (for switch location lookup)
+        location: Nautobot Location for this deployment's region, used to scope
+            location-scoped Nautobot lookups
 
     Returns:
         Tuple of (DeviceInfo, inventory dict, ports list)
@@ -271,7 +416,10 @@ def fetch_node_details(
     _populate_from_node(device_info, node)
     _populate_from_inventory(device_info, inventory)
     _generate_device_name(device_info)
-    _set_location_from_switches(device_info, ports, nautobot_client)
+    # Prefer an explicit rack/position from the node's extra field; fall back
+    # to deriving location from the connected switches when it isn't set.
+    if not _set_location_from_extra(device_info, node, nautobot_client, location):
+        _set_location_from_switches(device_info, ports, nautobot_client)
 
     return device_info, inventory, ports
 
@@ -370,10 +518,12 @@ def _update_nautobot_device(
             logger.debug("Updating location: %s", device_info.location_id)
 
     # Rack (Record with .id attribute)
+    rack_changed = False
     if device_info.rack_id:
         current_rack = _get_record_value(nautobot_device.rack, "id")
         if current_rack != device_info.rack_id:
             nautobot_device.rack = device_info.rack_id
+            rack_changed = True
             updated = True
             logger.debug("Updating rack: %s", device_info.rack_id)
 
@@ -383,13 +533,21 @@ def _update_nautobot_device(
             nautobot_device.position = device_info.position
             updated = True
             logger.debug("Updating position: %s", device_info.position)
-        # Face is required when position is set
-        target_face = device_info.face or "front"
+        # Face is required when position is set. Fall back to whatever the
+        # device already has so a rear-mounted device isn't flipped to front.
         current_face = _get_record_value(nautobot_device.face, "value")
+        target_face = device_info.face or current_face or "front"
         if current_face != target_face:
             nautobot_device.face = target_face
             updated = True
             logger.debug("Updating face: %s", target_face)
+    elif rack_changed and nautobot_device.position is not None:
+        # A position belongs to a particular rack. When switch-derived
+        # placement moves the device to another rack without supplying a new
+        # position, keep it assigned to the rack but clear the stale rack unit.
+        nautobot_device.position = None
+        updated = True
+        logger.debug("Clearing position after rack change")
 
     # Tenant (Record with .id attribute, from Ironic lessee)
     if device_info.tenant_id:
@@ -455,11 +613,11 @@ def _preserve_location_from_device(device_info: DeviceInfo, nautobot_device) -> 
             device_info.rack_id = old_rack_id
             logger.info("Preserving rack %s from old device", old_rack_id)
 
-    if nautobot_device.position is not None:
+    if nautobot_device.position is not None and device_info.position is None:
         device_info.position = nautobot_device.position
         logger.info("Preserving position %s from old device", nautobot_device.position)
 
-    if nautobot_device.face:
+    if nautobot_device.face and device_info.face is None:
         device_info.face = _get_record_value(nautobot_device.face, "value")
         logger.info("Preserving face %s from old device", device_info.face)
 
@@ -538,6 +696,7 @@ def _find_or_create_nautobot_device(
 def sync_device_to_nautobot(
     node_uuid: str,
     nautobot_client: Nautobot,
+    location: Record,
     sync_interfaces: bool = True,
 ) -> int:
     """Sync an Ironic node to Nautobot.
@@ -553,6 +712,8 @@ def sync_device_to_nautobot(
     Args:
         node_uuid: Ironic node UUID
         nautobot_client: Nautobot API client
+        location: Nautobot Location for this deployment's region, used to scope
+            location-scoped Nautobot lookups
         sync_interfaces: Whether to also sync interfaces (default: True)
 
     Returns:
@@ -566,7 +727,7 @@ def sync_device_to_nautobot(
         ironic_client = IronicClient()
 
         ironic_node_info, inventory, ports = fetch_node_details(
-            node_uuid, ironic_client, nautobot_client
+            node_uuid, ironic_client, nautobot_client, location
         )
 
         nautobot_device = _find_or_create_nautobot_device(
@@ -627,7 +788,7 @@ def _extract_node_uuid_from_event(event_data: dict[str, Any]) -> str | None:
 
 
 def handle_node_event(
-    _conn: Connection, nautobot_client: Nautobot, event_data: dict[str, Any]
+    conn: Connection, nautobot_client: Nautobot, event_data: dict[str, Any]
 ) -> int:
     """Handle any Ironic node event and sync to Nautobot.
 
@@ -639,7 +800,9 @@ def handle_node_event(
     - baremetal.node.maintenance_set.end
 
     Args:
-        _conn: OpenStack connection (unused, kept for handler signature)
+        conn: OpenStack connection; its region resolves the Nautobot Location
+            used to scope location-scoped lookups to the region this deployment
+            manages
         nautobot_client: Nautobot API client
         event_data: Raw event data dict
 
@@ -654,7 +817,8 @@ def handle_node_event(
     event_type = event_data.get("event_type", "unknown")
     logger.info("Handling %s for node %s", event_type, node_uuid)
 
-    return sync_device_to_nautobot(node_uuid, nautobot_client)
+    location = get_location_for_region(nautobot_client, conn.config.region_name)
+    return sync_device_to_nautobot(node_uuid, nautobot_client, location)
 
 
 def delete_device_from_nautobot(node_uuid: str, nautobot_client: Nautobot) -> int:

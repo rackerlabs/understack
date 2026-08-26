@@ -14,6 +14,8 @@ import pynautobot
 from understack_workflows.helpers import parser_nautobot_args
 from understack_workflows.helpers import setup_logger
 from understack_workflows.ironic.client import IronicClient
+from understack_workflows.openstack.client import get_openstack_client
+from understack_workflows.oslo_event.nautobot_device_sync import get_location_for_region
 from understack_workflows.oslo_event.nautobot_device_sync import sync_device_to_nautobot
 from understack_workflows.resync import SyncResult
 from understack_workflows.resync import get_nautobot_client
@@ -30,13 +32,17 @@ def argument_parser() -> argparse.ArgumentParser:
 def sync_nodes(nautobot: pynautobot.api) -> SyncResult:
     """Sync Ironic nodes to Nautobot."""
     ironic = IronicClient()
+    # Resolve the region's Nautobot Location once; it scopes location-scoped
+    # lookups (e.g. racks, whose names are only unique within a location).
+    region = get_openstack_client().config.region_name
+    location = get_location_for_region(nautobot, region)
     nodes = ironic.list_nodes()
     result = SyncResult()
 
     for node in nodes:
         result.total += 1
         logger.info("Syncing node: %s (%s)", node.uuid, node.name)
-        if sync_device_to_nautobot(node.uuid, nautobot) != 0:
+        if sync_device_to_nautobot(node.uuid, nautobot, location) != 0:
             result.failed += 1
             logger.error("Failed to sync node %s", node.uuid)
 
