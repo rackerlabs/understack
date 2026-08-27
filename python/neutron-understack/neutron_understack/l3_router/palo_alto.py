@@ -7,6 +7,7 @@ from neutron_lib import context as n_context
 from neutron_lib import exceptions as n_exc
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import events
+from neutron_lib.callbacks import priority_group
 from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib.plugins import constants as plugin_constants
@@ -30,6 +31,7 @@ TRUNK_NAME_PREFIX = "palo-alto-router-trunk"
 # the existing allowed/gap VLAN validation path. Replace with a configured or
 # allocated model once the trunk-tag semantics are revisited.
 GATEWAY_SUBPORT_VLAN = 200
+INTERFACE_SUBPORT_VLAN_START = GATEWAY_SUBPORT_VLAN + 1
 
 
 # Conflict -> HTTP 409: the request cannot be satisfied because the hardware
@@ -46,6 +48,13 @@ class PaloAltoFlavorMisconfigured(n_exc.BadRequest):
     message = (
         "Router %(router_id)s flavor %(flavor_id)s does not define a "
         "resource_class in its service profile metainfo."
+    )
+
+
+class NoPaloAltoSubportVlanAvailable(n_exc.Conflict):
+    message = (
+        "No Palo Alto trunk subport VLAN is available for router %(router_id)s "
+        "on trunk %(trunk_id)s. Allowed ranges: %(network_segment_ranges)s."
     )
 
 
@@ -98,6 +107,22 @@ class PaloAlto(base.L3ServiceProvider):
             self._process_gateway_delete,
             resources.ROUTER_GATEWAY,
             events.BEFORE_DELETE,
+            cancellable=True,
+        )
+        registry.subscribe(
+            self._process_router_interface_create,
+            resources.ROUTER_INTERFACE,
+            events.AFTER_CREATE,
+            cancellable=True,
+        )
+        # Run before neutron.services.trunk.rules.enforce_port_deletion_rules
+        # (PRIORITY_DEFAULT) so a Palo Alto router-interface port can be removed
+        # from its trunk before Neutron checks whether the port is in use.
+        registry.subscribe(
+            self._process_router_interface_port_delete,
+            resources.PORT,
+            events.BEFORE_DELETE,
+            priority=priority_group.PRIORITY_DEFAULT - 1000,
             cancellable=True,
         )
         LOG.info(
@@ -420,38 +445,72 @@ class PaloAlto(base.L3ServiceProvider):
             return existing
         return self._create_trunk(router, parent_port)
 
-    def _add_gateway_subport(self, router: dict, trunk: dict, gateway_port: dict):
-        """Add the gateway port to the trunk as a VLAN subport (idempotent).
+    def _used_subport_vlans(self, trunk: dict) -> set[int]:
+        """Return VLAN segmentation IDs already used on a router trunk."""
+        return {
+            sp["segmentation_id"]
+            for sp in trunk.get("sub_ports", [])
+            if sp.get("segmentation_type") == "vlan"
+            and sp.get("segmentation_id") is not None
+        }
+
+    def _next_available_subport_vlan(
+        self, router_id: str, trunk: dict, start_vlan: int
+    ) -> int:
+        """Pick the first allowed, unused Palo Alto subport VLAN from start."""
+        used = self._used_subport_vlans(trunk)
+        ranges = sorted(utils.allowed_tenant_vlan_id_ranges())
+        for start, end in ranges:
+            for vlan in range(max(start, start_vlan), end + 1):
+                if vlan not in used:
+                    return vlan
+        raise NoPaloAltoSubportVlanAvailable(
+            router_id=router_id,
+            trunk_id=trunk["id"],
+            network_segment_ranges=utils.printable_ranges(ranges),
+        )
+
+    def _add_router_port_subport(
+        self,
+        router: dict,
+        trunk: dict,
+        port: dict,
+        segmentation_id: int,
+        label: str,
+    ):
+        """Add a router-owned port to the trunk as a VLAN subport.
 
         Adding the subport fires the understack trunk driver (SUBPORTS events),
         which allocates the fabric segment, binds it, and calls undersync to
-        program the switch. No-ops if the gateway port is already a subport.
+        program the switch. No-ops if the port is already a subport.
         """
-        gateway_port_id = gateway_port["id"]
+        port_id = port["id"]
         existing = {sp["port_id"] for sp in trunk.get("sub_ports", [])}
-        if gateway_port_id in existing:
+        if port_id in existing:
             LOG.debug(
-                "Gateway port %s already a subport on trunk %s",
-                gateway_port_id,
+                "Palo Alto %s port %s already a subport on trunk %s",
+                label,
+                port_id,
                 trunk["id"],
             )
             return trunk
 
         admin_context = n_context.get_admin_context()
         LOG.info(
-            "Adding gateway port %s to trunk %s as VLAN %s subport for router %s",
-            gateway_port_id,
+            "Adding Palo Alto %s port %s to trunk %s as VLAN %s subport for router %s",
+            label,
+            port_id,
             trunk["id"],
-            GATEWAY_SUBPORT_VLAN,
+            segmentation_id,
             router["id"],
         )
         # The trunk subport validator rejects a port that has device_id set
-        # (rules.py check_not_in_use). The gateway port has device_id=router_id,
-        # so clear it for the add and restore it afterwards so the router keeps
-        # its gateway-port association (our own lookups depend on it).
-        original_device_id = gateway_port["device_id"]
-        original_device_owner = gateway_port["device_owner"]
-        utils.clear_device_id_for_port(gateway_port_id)
+        # (rules.py check_not_in_use). Router-owned ports have
+        # device_id=router_id, so clear it for the add and restore it
+        # afterwards so the router keeps its port association.
+        original_device_id = port["device_id"]
+        original_device_owner = port["device_owner"]
+        utils.clear_device_id_for_port(port_id)
         try:
             return self._trunk_plugin.add_subports(
                 admin_context,
@@ -459,41 +518,91 @@ class PaloAlto(base.L3ServiceProvider):
                 {
                     "sub_ports": [
                         {
-                            "port_id": gateway_port_id,
+                            "port_id": port_id,
                             "segmentation_type": "vlan",
-                            "segmentation_id": GATEWAY_SUBPORT_VLAN,
+                            "segmentation_id": segmentation_id,
                         }
                     ]
                 },
             )
         finally:
             utils.set_device_id_and_owner_for_port(
-                gateway_port_id, original_device_id, original_device_owner
+                port_id, original_device_id, original_device_owner
             )
 
-    def _remove_gateway_subport(self, trunk: dict, gateway_port_id: str):
-        """Remove the gateway port from the trunk (idempotent).
+    def _add_gateway_subport(self, router: dict, trunk: dict, gateway_port: dict):
+        """Add the gateway port to the trunk as a VLAN subport (idempotent)."""
+        port_id = gateway_port["id"]
+        if port_id in {sp["port_id"] for sp in trunk.get("sub_ports", [])}:
+            LOG.debug(
+                "Palo Alto gateway port %s already a subport on trunk %s",
+                port_id,
+                trunk["id"],
+            )
+            return trunk
+        return self._add_router_port_subport(
+            router,
+            trunk,
+            gateway_port,
+            GATEWAY_SUBPORT_VLAN,
+            "gateway",
+        )
+
+    def _add_interface_subport(self, router: dict, trunk: dict, interface_port: dict):
+        """Add a router-interface port to the trunk as a VLAN subport."""
+        port_id = interface_port["id"]
+        if port_id in {sp["port_id"] for sp in trunk.get("sub_ports", [])}:
+            LOG.debug(
+                "Palo Alto interface port %s already a subport on trunk %s",
+                port_id,
+                trunk["id"],
+            )
+            return trunk
+        return self._add_router_port_subport(
+            router,
+            trunk,
+            interface_port,
+            self._next_available_subport_vlan(
+                router["id"], trunk, INTERFACE_SUBPORT_VLAN_START
+            ),
+            "interface",
+        )
+
+    def _remove_router_port_subport(self, trunk: dict, port_id: str, label: str):
+        """Remove a router-owned port from the trunk (idempotent).
 
         Fires the trunk driver's SUBPORTS delete events, which release the
         fabric segment and update the switchport. No-ops if it is not a subport.
         """
         existing = {sp["port_id"] for sp in trunk.get("sub_ports", [])}
-        if gateway_port_id not in existing:
+        if port_id not in existing:
             LOG.debug(
-                "Gateway port %s is not a subport on trunk %s; skip removal",
-                gateway_port_id,
+                "Palo Alto %s port %s is not a subport on trunk %s; skip removal",
+                label,
+                port_id,
                 trunk["id"],
             )
             return trunk
         admin_context = n_context.get_admin_context()
         LOG.info(
-            "Removing gateway subport %s from trunk %s", gateway_port_id, trunk["id"]
+            "Removing Palo Alto %s subport %s from trunk %s",
+            label,
+            port_id,
+            trunk["id"],
         )
         return self._trunk_plugin.remove_subports(
             admin_context,
             trunk["id"],
-            {"sub_ports": [{"port_id": gateway_port_id}]},
+            {"sub_ports": [{"port_id": port_id}]},
         )
+
+    def _remove_gateway_subport(self, trunk: dict, gateway_port_id: str):
+        """Remove the gateway port from the trunk (idempotent)."""
+        return self._remove_router_port_subport(trunk, gateway_port_id, "gateway")
+
+    def _remove_interface_subport(self, trunk: dict, interface_port_id: str):
+        """Remove a router-interface port from the trunk (idempotent)."""
+        return self._remove_router_port_subport(trunk, interface_port_id, "interface")
 
     def _detach_and_delete_parent(self, router_id: str, parent_id: str) -> None:
         """Detach the parent VIF from the node and delete the parent port."""
@@ -536,7 +645,12 @@ class PaloAlto(base.L3ServiceProvider):
         self._trunk_plugin.delete_trunk(admin_context, trunk["id"])
         self._detach_and_delete_parent(router_id, parent_id)
 
-    def _cleanup_gateway_attachment(self, router: dict, gateway_port: dict) -> None:
+    def _cleanup_router_port_attachment(
+        self,
+        router: dict,
+        port_id: str,
+        label: str,
+    ) -> None:
         """Reverse of the add: remove subport, then tear down the parent stack.
 
         Handles a partially-built attach too: if a prior add failed after the
@@ -560,8 +674,16 @@ class PaloAlto(base.L3ServiceProvider):
                     router_id,
                 )
             return
-        self._remove_gateway_subport(trunk, gateway_port["id"])
+        self._remove_router_port_subport(trunk, port_id, label)
         self._delete_parent_stack_if_unused(router_id, trunk)
+
+    def _cleanup_gateway_attachment(self, router: dict, gateway_port: dict) -> None:
+        """Clean up a gateway port's Palo Alto trunk attachment."""
+        self._cleanup_router_port_attachment(router, gateway_port["id"], "gateway")
+
+    def _cleanup_interface_attachment(self, router: dict, interface_port: dict) -> None:
+        """Clean up a router-interface port's Palo Alto trunk attachment."""
+        self._cleanup_router_port_attachment(router, interface_port["id"], "interface")
 
     @registry.receives(resources.ROUTER, [events.BEFORE_CREATE])
     def _process_router_create(self, resource, event, trigger, payload=None):
@@ -691,4 +813,78 @@ class PaloAlto(base.L3ServiceProvider):
             "Cleaned Palo Alto router %s gateway attachment (port %s)",
             router_id,
             gateway_port["id"],
+        )
+
+    def _process_router_interface_create(self, resource, event, trigger, payload=None):
+        """ROUTER_INTERFACE / AFTER_CREATE: wire a subnet interface port."""
+        context = payload.context
+        router_id = payload.resource_id
+        router = self.l3plugin.get_router(context, router_id)
+        if not self._is_palo_alto_provider(context, router):
+            return
+
+        interface_port = payload.metadata.get("port")
+        if not interface_port:
+            raise n_exc.BadRequest(
+                resource="router",
+                msg=(
+                    f"Palo Alto router {router_id} interface was created but no "
+                    "router interface port was supplied."
+                ),
+            )
+        if interface_port.get("device_owner") not in const.ROUTER_INTERFACE_OWNERS:
+            return
+
+        parent = self._ensure_parent_port(router)
+        parent = self._ensure_parent_vif_attached(router, parent)
+        trunk = self._ensure_trunk(router, parent)
+        self._add_interface_subport(router, trunk, interface_port)
+
+        LOG.info(
+            "Attached Palo Alto router %s interface port %s via parent %s trunk %s",
+            router_id,
+            interface_port["id"],
+            parent["id"],
+            trunk["id"],
+        )
+
+    def _process_router_interface_port_delete(
+        self, resource, event, trigger, payload=None
+    ):
+        """PORT / BEFORE_DELETE: remove Palo Alto interface trunk wiring.
+
+        This runs before the trunk plugin's own port-in-use check. That allows
+        Neutron to delete a router-interface port that we previously attached as
+        a trunk subport.
+        """
+        port = payload.metadata.get("port") if payload else None
+        if not port or port.get("device_owner") not in const.ROUTER_INTERFACE_OWNERS:
+            return
+
+        context = payload.context
+        router_id = port.get("device_id")
+        if not router_id:
+            return
+
+        try:
+            router = self.l3plugin.get_router(context, router_id)
+            is_palo_alto = self._is_palo_alto_provider(context, router)
+        except Exception:
+            LOG.debug(
+                "Skipping Palo Alto interface cleanup for port %s; router %s "
+                "could not be confirmed as Palo Alto",
+                port["id"],
+                router_id,
+                exc_info=True,
+            )
+            return
+
+        if not is_palo_alto:
+            return
+
+        self._cleanup_interface_attachment(router, port)
+        LOG.info(
+            "Cleaned Palo Alto router %s interface attachment (port %s)",
+            router_id,
+            port["id"],
         )
