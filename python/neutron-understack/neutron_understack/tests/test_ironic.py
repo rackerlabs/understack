@@ -41,6 +41,35 @@ class TestAdoptRollback:
         )  # manage + provide
 
 
+class TestVifAttach:
+    def test_attach_calls_proxy(self, mocker):
+        client = _client(mocker)
+        node = mocker.Mock(id="n1")
+
+        client.attach_vif_to_node(node, "port-1")
+
+        client.irclient.attach_vif_to_node.assert_called_once_with(node, "port-1")
+
+    def test_detach_uses_ignore_missing_and_returns_result(self, mocker):
+        client = _client(mocker)
+        node = mocker.Mock(id="n1")
+        client.irclient.detach_vif_from_node.return_value = True
+
+        result = client.detach_vif_from_node(node, "port-1")
+
+        assert result is True
+        client.irclient.detach_vif_from_node.assert_called_once_with(
+            node, "port-1", ignore_missing=True
+        )
+
+    def test_node_vif_ids(self, mocker):
+        client = _client(mocker)
+        node = mocker.Mock(id="n1")
+        client.irclient.list_node_vifs.return_value = ["p1", "p2"]
+
+        assert client.node_vif_ids(node) == ["p1", "p2"]
+
+
 class TestReleaseClearsOwnership:
     def test_active_node_is_undeployed_then_ownership_cleared(self, mocker):
         client = _client(mocker)

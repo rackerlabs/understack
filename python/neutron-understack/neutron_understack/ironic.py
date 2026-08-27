@@ -121,6 +121,26 @@ class IronicClient:
         except StopIteration:
             return None
 
+    def attach_vif_to_node(self, node: str | BaremetalNode, vif_id: str) -> None:
+        """Attach a Neutron port (VIF) to the node."""
+        node_id = node.id if isinstance(node, BaremetalNode) else node
+        LOG.info("Attaching VIF %s to Ironic node %s", vif_id, node_id)
+        self.irclient.attach_vif_to_node(node, vif_id)
+
+    def detach_vif_from_node(self, node: str | BaremetalNode, vif_id: str) -> bool:
+        """Detach a VIF from the node.
+
+        Returns whatever the SDK reports (False when the VIF was not attached);
+        ``ignore_missing=True`` so tearing down an already-detached VIF is a no-op.
+        """
+        node_id = node.id if isinstance(node, BaremetalNode) else node
+        LOG.info("Detaching VIF %s from Ironic node %s", vif_id, node_id)
+        return self.irclient.detach_vif_from_node(node, vif_id, ignore_missing=True)
+
+    def node_vif_ids(self, node: str | BaremetalNode) -> list[str]:
+        """Return the Neutron port (VIF) ids currently attached to the node."""
+        return self.irclient.list_node_vifs(node)
+
     def adopt_node_for_router(
         self,
         node: str | BaremetalNode,
