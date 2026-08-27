@@ -21,9 +21,14 @@ ARG OPENSTACK_VERSION="required_argument"
 ADD https://releases.openstack.org/constraints/upper/${OPENSTACK_VERSION} /upper-constraints.txt
 RUN sed -i '/^neutron-lib==.*/d' /upper-constraints.txt
 
+# --no-sources ignores neutron-understack's [tool.uv.sources] (a dev/test-only
+# pin of neutron/neutron-lib to the understack/2026.1 git forks). Here we install
+# those forks explicitly from /src, so honoring the git sources would just create
+# a conflicting-URL error for neutron-lib.
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install \
       --upgrade \
+      --no-sources \
       --constraint /upper-constraints.txt \
         /src/neutron \
         /src/neutron-lib \
