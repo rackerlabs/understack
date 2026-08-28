@@ -7,6 +7,11 @@ from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 
+# Reserved namespace for the chassis-model trait. Owning a dedicated prefix
+# lets this hook prune stale chassis traits without touching traits managed
+# elsewhere (e.g. CUSTOM_*_SWITCH, CUSTOM_FIRMWARE_UPDATE_*).
+CHASSIS_TRAIT_PREFIX = "CUSTOM_CHASSIS_"
+
 
 class InspectHookChassisModel(base.InspectionHook):
     """Update baremetal node properties with chassis model number from inventory.
@@ -19,16 +24,23 @@ class InspectHookChassisModel(base.InspectionHook):
         chassis_model = _extract_chassis_model(node, inventory)
         manufacturer = _extract_manufacturer(node, inventory)
         trait_name = _trait_name(manufacturer, chassis_model)
-        _set_node_traits(task, "CUSTOM_", trait_name)
+        _set_node_traits(task, trait_name)
 
 
-def _set_node_traits(task, prefix: str, required_trait: str):
-    """Manage the subset of node traits whose names begin with `prefix`."""
+def _set_node_traits(task, required_trait: str):
+    """Set the ``CUSTOM_CHASSIS_{MANUFACTURER}_{MODEL}`` trait on the node.
+
+    Manages only the ``CUSTOM_CHASSIS_`` namespace: the required trait is
+    added and any other ``CUSTOM_CHASSIS_`` trait is removed. All other traits
+    (e.g. ``CUSTOM_*_SWITCH``, ``CUSTOM_FIRMWARE_UPDATE_*``) are left untouched.
+    """
     node = task.node
-    existing_traits = node.traits.get_trait_names()
-    required_trait = prefix + required_trait
+    required_trait = CHASSIS_TRAIT_PREFIX + required_trait
 
-    required_traits = {x for x in existing_traits if not x.startswith(prefix)}
+    existing_traits = set(node.traits.get_trait_names())
+    required_traits = {
+        t for t in existing_traits if not t.startswith(CHASSIS_TRAIT_PREFIX)
+    }
     required_traits.add(required_trait)
 
     LOG.debug(

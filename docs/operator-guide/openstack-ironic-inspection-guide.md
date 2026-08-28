@@ -221,9 +221,12 @@ The `chassis_model` hook adds a custom trait identifying the specific hardware c
 
 1. Extracts chassis model from `system_vendor.product_name`
 2. Normalizes manufacturer name (handles "DELL", "HP" variants)
-3. Creates a trait in the format: `CUSTOM_{MANUFACTURER}_{CHASSIS_MODEL}`
+3. Creates a trait in the format: `CUSTOM_CHASSIS_{MANUFACTURER}_{CHASSIS_MODEL}`
 
-**Example**: A Dell PowerEdge R7615 receives the trait `CUSTOM_DELL_POWEREDGE_R7615`
+**Example**: A Dell PowerEdge R7615 receives the trait `CUSTOM_CHASSIS_DELL_POWEREDGE_R7615`
+
+The hook owns the `CUSTOM_CHASSIS_` namespace: on re-inspection it removes any
+other `CUSTOM_CHASSIS_` trait and leaves all other traits untouched.
 
 This trait enables [flavor definitions](../design-guide/flavors.md) to target specific hardware models. See [hardware traits](../design-guide/hardware-traits.md) for more on how traits work.
 
