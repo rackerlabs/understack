@@ -24,7 +24,7 @@ to already have Python on your system.
     # create Python virtualenv at $HOME/.openstack
     python -m venv $HOME/.openstack
     # install the tools (Python 3.11 and newer)
-    $HOME/.openstack/bin/pip install python-openstackclient python-ironicclient keyring 'keystoneauth>=5.17.0'
+    $HOME/.openstack/bin/pip install python-openstackclient python-ironicclient keyring 'keystoneauth1>=5.17.0'
 
     # install the tools (Python 3.10 and older)
     $HOME/.openstack/bin/pip install python-openstackclient python-ironicclient keystoneauth-websso
