@@ -60,7 +60,7 @@ PATCH
     # obj_path is a jq filter expression (e.g. "." or ".[0].object")
     # pointing at the IronicRunbook object within BINDING_CONTEXT_PATH.
     local obj_path="$1"
-    local resource_name namespace kind runbook_name description public owner
+    local resource_name namespace kind runbook_name description public owner runbook_uuid
 
     resource_name=$(jq -r "${obj_path} | .metadata.name" "${BINDING_CONTEXT_PATH}")
     namespace=$(jq -r "${obj_path} | .metadata.namespace" "${BINDING_CONTEXT_PATH}")
@@ -80,7 +80,16 @@ PATCH
         return 1
     fi
 
-    command_args=(baremetal runbook set "${runbook_name}")
+    # Look up the existing runbook by name to get its UUID. If the show fails
+    # the runbook does not exist yet and we need to create it instead of set.
+    if runbook_uuid=$(openstack baremetal runbook show "${runbook_name}" -f value -c uuid 2>/dev/null); then
+        echo "[update_runbook] Found existing runbook name=${runbook_name} uuid=${runbook_uuid}"
+        command_args=(baremetal runbook set "${runbook_uuid}")
+    else
+        echo "[update_runbook] Runbook name=${runbook_name} not found, creating"
+        runbook_uuid=""
+        command_args=(baremetal runbook create)
+    fi
     command_args+=(--name "${runbook_name}" --steps /tmp/steps.json)
 
     if [[ -n "${description}" ]]; then
@@ -98,19 +107,24 @@ PATCH
         traits_json=$(jq -c "${obj_path} | .spec.traits // []" "${BINDING_CONTEXT_PATH}")
         if [[ "${traits_json}" != "[]" ]]; then
             echo "[update_runbook] Setting traits name=${resource_name} traits=${traits_json}"
+            # The traits endpoint requires the UUID; look it up if we just created
+            # the runbook and don't have it yet.
+            if [[ -z "${runbook_uuid}" ]]; then
+                runbook_uuid=$(openstack baremetal runbook show "${runbook_name}" -f value -c uuid 2>/dev/null)
+            fi
             ironic_endpoint=$(openstack endpoint list --service baremetal --interface internal -f value -c URL 2>/dev/null | head -1)
-            if [[ -n "${ironic_endpoint}" ]]; then
+            if [[ -n "${ironic_endpoint}" && -n "${runbook_uuid}" ]]; then
                 token=$(openstack token issue -f value -c id)
-                echo "[update_runbook] PUT ${ironic_endpoint}/v1/runbooks/${runbook_name}/traits"
+                echo "[update_runbook] PUT ${ironic_endpoint}/v1/runbooks/${runbook_uuid}/traits"
                 trait_response=$(curl -s -X PUT \
                     -H "Content-Type: application/json" \
                     -H "X-Auth-Token: ${token}" \
                     -H "X-OpenStack-Ironic-API-Version: 1.112" \
                     -d "{\"traits\": ${traits_json}}" \
-                    "${ironic_endpoint}/v1/runbooks/${runbook_name}/traits")
+                    "${ironic_endpoint}/v1/runbooks/${runbook_uuid}/traits")
                 echo "[update_runbook] Traits response name=${resource_name} response=${trait_response}"
             else
-                echo "[update_runbook] WARNING: Could not determine Ironic endpoint for traits"
+                echo "[update_runbook] WARNING: Could not determine Ironic endpoint or runbook UUID for traits"
             fi
         else
             echo "[update_runbook] No traits to set name=${resource_name}"
