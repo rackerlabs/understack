@@ -24,11 +24,11 @@ spec:
             value: understack
         volumeMounts:
           - mountPath: /etc/openstack
-            name: baremetal-manage
+            name: infrasetup-system
       volumes:
-        - name: baremetal-manage
+        - name: infrasetup-system
           secret:
-            secretName: baremetal-manage
+            secretName: infrasetup-system
             items:
               - key: clouds.yaml
                 path: clouds.yaml
