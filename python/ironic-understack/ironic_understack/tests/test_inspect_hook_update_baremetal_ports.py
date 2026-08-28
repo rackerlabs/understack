@@ -195,6 +195,64 @@ def test_secondary_network_port_has_pxe_disabled(mocker, caplog):
     mock_port.save.assert_called()
 
 
+def test_missing_parsed_lldp_does_not_raise(mocker, caplog):
+    """A node with no LLDP data should be handled gracefully.
+
+    When the parse-lldp hook produces no data, plugin_data has no
+    'parsed_lldp' key. The hook must not raise KeyError; it should log
+    and return without touching ports or traits.
+    """
+    caplog.set_level(logging.DEBUG)
+
+    mock_context = mocker.Mock()
+    mock_node = mocker.Mock(id=1234, traits=mocker.Mock())
+    mock_task = mocker.Mock(node=mock_node, context=mock_context)
+
+    ports = mocker.patch(
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
+    )
+    trait_create = mocker.patch(
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.objects.TraitList.create"
+    )
+
+    # plugin_data with all_interfaces but NO parsed_lldp key
+    plugin_data = {"all_interfaces": _PLUGIN_DATA["all_interfaces"]}
+
+    InspectHookUpdateBaremetalPorts().__call__(mock_task, _INVENTORY, plugin_data)
+
+    # No ports fetched, no traits set, no exception raised
+    ports.assert_not_called()
+    trait_create.assert_not_called()
+    assert "No LLDP data" in caplog.text
+
+
+def test_empty_parsed_lldp_does_not_raise(mocker, caplog):
+    """An empty parsed_lldp dict should also be handled gracefully."""
+    caplog.set_level(logging.DEBUG)
+
+    mock_context = mocker.Mock()
+    mock_node = mocker.Mock(id=1234, traits=mocker.Mock())
+    mock_task = mocker.Mock(node=mock_node, context=mock_context)
+
+    ports = mocker.patch(
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
+    )
+    trait_create = mocker.patch(
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.objects.TraitList.create"
+    )
+
+    plugin_data = {
+        "all_interfaces": _PLUGIN_DATA["all_interfaces"],
+        "parsed_lldp": {},
+    }
+
+    InspectHookUpdateBaremetalPorts().__call__(mock_task, _INVENTORY, plugin_data)
+
+    ports.assert_not_called()
+    trait_create.assert_not_called()
+    assert "No LLDP data" in caplog.text
+
+
 def test_node_traits_updated(mocker, caplog):
     caplog.set_level(logging.DEBUG)
 
