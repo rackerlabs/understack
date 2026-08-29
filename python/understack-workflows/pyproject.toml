@@ -69,9 +69,6 @@ include = ["understack_workflows"]
 [tool.hatch.build.targets.wheel]
 include = ["understack_workflows"]
 
-[tool.peotry.group.test]
-optional = true
-
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra --cov=understack_workflows"
