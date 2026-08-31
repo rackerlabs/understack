@@ -671,7 +671,7 @@ wheels = [
 
 [[package]]
 name = "neutron"
-version = "28.0.0"
+version = "28.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -726,9 +726,9 @@ dependencies = [
     { name = "tooz" },
     { name = "webob" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c8/df/071c7f72f683f83fd30f1d6d20071efafe95f2fc0ce2a9de2fb9011c4706/neutron-28.0.0.tar.gz", hash = "sha256:c99063615e66f55d02b2a7700385bb89851204942d5150058d18fa01a6b31776", size = 12314767, upload-time = "2026-04-01T10:57:14.322Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/e3/caa88a6acb586291126c2de86d875fc5f7a97bae9dd5fd4263e535e286e9/neutron-28.0.1.tar.gz", hash = "sha256:b1e9d95ab71048d54fcb0f12845c891f75adb4bf72c32293087d59e7857a60e1", size = 12323866, upload-time = "2026-07-01T09:03:39.808Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ff/9a/1b19053a48bef10fe1b9ae8c1b3296c5c08d73834dabab3df312b8544778/neutron-28.0.0-py3-none-any.whl", hash = "sha256:efd6d38497e74e3f532253595c478aef49225aee1fba1615075337314bf1b4e2", size = 4437292, upload-time = "2026-04-01T10:57:11.78Z" },
+    { url = "https://files.pythonhosted.org/packages/28/a0/725847241db37df07c5b4481b47444a2a13d0346e484af6fab2941dae61a/neutron-28.0.1-py3-none-any.whl", hash = "sha256:4d0622a962d9d33aa3cd30bae747b985139574e14c459e79ba425420d1601730", size = 4444738, upload-time = "2026-07-01T09:03:37.496Z" },
 ]
 
 [[package]]
