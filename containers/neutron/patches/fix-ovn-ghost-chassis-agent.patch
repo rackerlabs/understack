@@ -1,0 +1,35 @@
+--- a/neutron/plugins/ml2/drivers/ovn/mech_driver/ovsdb/ovsdb_monitor.py
++++ b/neutron/plugins/ml2/drivers/ovn/mech_driver/ovsdb/ovsdb_monitor.py
+@@ -362,7 +362,11 @@
+     def match_fn(self, event, row, old=None):
+         # On updates to Chassis_Private because the Chassis has been deleted,
+         # don't update the AgentCache. We use chassis_private.chassis to return
+-        # data about the agent.
++        # data about the agent. Require a valid chassis reference for all
++        # events including ROW_CREATE: an orphaned Chassis_Private (where the
++        # Chassis row was already deleted) must not create a ghost agent entry.
++        if not row.chassis:
++            return False
+         return (event == self.ROW_CREATE or
+                 (hasattr(old, 'nb_cfg') and row.chassis))
+ 
+@@ -428,14 +432,13 @@
+         if not self.agent_id(row):
+             # Don't create a cached object with an agent_id of 'None'
+             return False
+-        if event == self.ROW_CREATE:
+-            return True
+-
+-        # On updates to Chassis_Private because the Chassis has been
+-        # deleted, don't update the AgentCache. We use
+-        # chassis_private.chassis to return data about the agent.
++        # Require a valid chassis reference for all events including
++        # ROW_CREATE: an orphaned Chassis_Private (where the Chassis row
++        # was already deleted) must not create a ghost agent entry.
+         if not getattr(row, 'chassis', None):
+             return False
++        if event == self.ROW_CREATE:
++            return True
+ 
+         # Check if both rows have external_ids before comparing nb_cfg
+         if not (hasattr(old, 'external_ids') and row.external_ids):
