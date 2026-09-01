@@ -13,7 +13,7 @@ spec:
   destination:
     namespace: ingress-nginx
     server: {{ $.Values.cluster_server }}
-  project: understack-infra
+  project: understack
   sources:
   - chart: ingress-nginx
     helm:

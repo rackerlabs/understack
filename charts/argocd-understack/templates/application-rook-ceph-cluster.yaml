@@ -16,7 +16,7 @@ spec:
   destination:
     namespace: rook-ceph
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack
   sources:
   {{- if $installApp }}
   - chart: rook-ceph-cluster
