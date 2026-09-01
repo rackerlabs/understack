@@ -20,6 +20,7 @@ from understack_workflows.oslo_event import ironic_port
 from understack_workflows.oslo_event import ironic_portgroup
 from understack_workflows.oslo_event import keystone_project
 from understack_workflows.oslo_event import nautobot_device_sync
+from understack_workflows.oslo_event import password_sync
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,10 @@ _event_handlers: dict[str, EventHandler | list[EventHandler]] = {
     "baremetal.portgroup.create.end": ironic_portgroup.handle_portgroup_create_update,
     "baremetal.portgroup.update.end": ironic_portgroup.handle_portgroup_create_update,
     "baremetal.portgroup.delete.end": ironic_portgroup.handle_portgroup_delete,
-    "baremetal.node.update.end": nautobot_device_sync.handle_node_event,
+    "baremetal.node.update.end": [
+        nautobot_device_sync.handle_node_event,
+        password_sync.handle_node_update,
+    ],
     "baremetal.node.delete.end": nautobot_device_sync.handle_node_delete_event,
     "baremetal.node.provision_set.end": [
         ironic_node.handle_provision_end,
