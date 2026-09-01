@@ -59,3 +59,29 @@ spec:
   rabbitmqClusterReference:
     name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
     namespace: openstack
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Policy
+metadata:
+  name: neutron-ironic-agent-pool-ttl
+  namespace: openstack
+spec:
+  name: neutron-ironic-agent-pool-ttl  # name of the policy
+  vhost: "neutron"  # default to '/' if not provided
+  # The ironic-neutron-agent creates per-member RPC pool queues
+  # (ironic-neutron-agent-member-manager-pool-*) that have no live consumer in
+  # our deployments. Without a policy they grow unbounded and fill the RabbitMQ
+  # pod disk. Expire the queues when idle and cap their length as a backstop.
+  pattern: "^ironic-neutron-agent-member-manager"  # regex used to match queues
+  applyTo: "queues"  # set to 'queues', 'exchanges', or 'all'
+  # Higher priority than neutron-notifications-ttl (priority 1). Only one policy
+  # applies to a queue (highest priority wins); patterns here are non-overlapping.
+  priority: 2
+  definition:  # policy definition
+    message-ttl: 3600000  # drop messages older than 1h
+    expires: 3600000  # delete the queue after 1h with no activity
+    max-length: 10000  # hard cap on queued messages as a disk-safety backstop
+    overflow: drop-head  # discard oldest messages when max-length is reached
+  rabbitmqClusterReference:
+    name: rabbitmq  # rabbitmqCluster must exist in the same namespace as this resource
+    namespace: openstack
