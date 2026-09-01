@@ -51,7 +51,7 @@ metadata:
 spec:
   name: nova-notifications-ttl  # name of the policy
   vhost: "nova"  # default to '/' if not provided
-  pattern: "^notifications.*"  # regex used to match queues and exchanges
+  pattern: "^(notifications|argo_notifications).*"  # regex used to match queues and exchanges
   applyTo: "queues"  # set to 'queues', 'exchanges', or 'all'
   priority: 1  # defaults to 0
   definition:  # policy definition
