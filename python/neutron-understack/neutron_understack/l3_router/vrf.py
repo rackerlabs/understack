@@ -15,6 +15,7 @@ from oslo_serialization import jsonutils
 
 from neutron_understack import config
 from neutron_understack import evpn_compat
+from neutron_understack import maintenance as understack_maintenance
 from neutron_understack.api.definitions import understack_vni as apidef
 from neutron_understack.l3_router import understack_vni_db
 
@@ -128,6 +129,12 @@ class UnderstackVniPlugin(service_base.ServicePluginBase):
 
     def get_plugin_description(self):
         return "Understack router VNI allocation plugin"
+
+    def ovn_maintenance_periodics(self, ovn_client):
+        LOG.warning("NETDEV ovn_maintenance_periodics called")
+        return [
+            understack_maintenance.NetdevRouterMaintenancePeriodics(self, ovn_client)
+        ]
 
     @staticmethod
     @resource_extend.extends([apidef.COLLECTION_NAME])
