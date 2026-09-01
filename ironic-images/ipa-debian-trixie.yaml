@@ -2,6 +2,10 @@
   environment:
     DISTRO_NAME: 'debian'
     DIB_RELEASE: 'trixie'
+    # Enable non-free-firmware (and contrib/non-free) so firmware-intel-misc,
+    # which provides the Intel E810 ice DDP, is installable. diskimage-builder's
+    # debootstrap defaults DIB_DEBIAN_COMPONENTS to "main" only.
+    DIB_DEBIAN_COMPONENTS: 'main,contrib,non-free,non-free-firmware'
   elements:
   - ironic-python-agent-ramdisk
   - debian-minimal
