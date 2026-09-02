@@ -1,7 +1,7 @@
 from ironic.drivers.modules import noop
 from ironic.drivers.modules.storage import noop as noop_storage
 
-from ironic_understack.netdev_hardware import NetdevHardware
+from ironic_understack.drivers.netdev_hardware import NetdevHardware
 
 
 def _interface_names(ifaces):

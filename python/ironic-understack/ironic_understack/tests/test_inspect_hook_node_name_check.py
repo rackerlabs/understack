@@ -2,8 +2,10 @@ import pytest
 from ironic.common import exception
 from oslo_utils import uuidutils
 
-from ironic_understack.inspect_hook_node_name_check import InspectHookNodeNameCheck
-from ironic_understack.inspect_hook_node_name_check import _manufacturer_slug
+from ironic_understack.hooks.inspect_hook_node_name_check import (
+    InspectHookNodeNameCheck,
+)
+from ironic_understack.hooks.inspect_hook_node_name_check import _manufacturer_slug
 
 
 def _make_task(mocker, node_name):

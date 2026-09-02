@@ -3,7 +3,7 @@ import logging
 import ironic.objects
 from oslo_utils import uuidutils
 
-from ironic_understack.inspect_hook_update_baremetal_ports import (
+from ironic_understack.hooks.inspect_hook_update_baremetal_ports import (
     InspectHookUpdateBaremetalPorts,
 )
 
@@ -82,15 +82,15 @@ def test_with_valid_network_port(mocker, caplog):
     )
 
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
         return_value=[mock_port],
     )
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
         MAPPING,
     )
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.objects.TraitList.create"
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.objects.TraitList.create"
     )
     mock_traits.get_trait_names.return_value = ["CUSTOM_BMC_SWITCH", "bar"]
 
@@ -126,15 +126,15 @@ def test_with_valid_storage_port(mocker, caplog):
     )
 
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
         return_value=[mock_port],
     )
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
         MAPPING,
     )
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.objects.TraitList.create"
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.objects.TraitList.create"
     )
     mock_traits.get_trait_names.return_value = ["CUSTOM_BMC_SWITCH", "bar"]
 
@@ -170,15 +170,15 @@ def test_secondary_network_port_has_pxe_disabled(mocker, caplog):
     )
 
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
         return_value=[mock_port],
     )
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
         MAPPING,
     )
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.objects.TraitList.create"
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.objects.TraitList.create"
     )
     mock_traits.get_trait_names.return_value = ["CUSTOM_BMC_SWITCH", "bar"]
 
@@ -204,15 +204,15 @@ def test_node_traits_updated(mocker, caplog):
     mock_task = mocker.Mock(node=mock_node, context=mock_context)
 
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.ironic_ports_for_node",
         return_value=[],
     )
     mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.CONF.ironic_understack.switch_name_vlan_group_mapping",
         MAPPING,
     )
     trait_create = mocker.patch(
-        "ironic_understack.inspect_hook_update_baremetal_ports.objects.TraitList.create"
+        "ironic_understack.hooks.inspect_hook_update_baremetal_ports.objects.TraitList.create"
     )
 
     mock_traits.get_trait_names.return_value = ["CUSTOM_BMC_SWITCH", "bar"]

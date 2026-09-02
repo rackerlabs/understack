@@ -2,12 +2,14 @@ import json
 
 import pytest
 
-from ironic_understack.portgroup_name_middleware import PORT_CHANNEL_MAX
-from ironic_understack.portgroup_name_middleware import PORT_CHANNEL_MIN
-from ironic_understack.portgroup_name_middleware import (
+from ironic_understack.middleware.portgroup_name_middleware import PORT_CHANNEL_MAX
+from ironic_understack.middleware.portgroup_name_middleware import PORT_CHANNEL_MIN
+from ironic_understack.middleware.portgroup_name_middleware import (
     PortgroupNameValidationMiddleware,
 )
-from ironic_understack.portgroup_name_middleware import validate_portgroup_name
+from ironic_understack.middleware.portgroup_name_middleware import (
+    validate_portgroup_name,
+)
 
 
 class TestValidatePortgroupName:
