@@ -13,6 +13,7 @@ from oslo_config import cfg
 from oslo_log import log
 
 from neutron_understack import utils
+from neutron_understack.network_node_trunk import fetch_network_node_trunk_id
 
 LOG = log.getLogger(__name__)
 
@@ -151,7 +152,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         segment VLAN tags allocated to the subports. Therefore, there is no
         possibility of conflict with the native VLAN.
         """
-        if trunk_id == utils.fetch_network_node_trunk_id():
+        if trunk_id == fetch_network_node_trunk_id():
             return
 
         ns_ranges = utils.allowed_tenant_vlan_id_ranges()
