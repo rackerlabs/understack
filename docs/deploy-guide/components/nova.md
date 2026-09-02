@@ -55,3 +55,4 @@ Optional additions:
 ## Notes
 
 - This service is rendered by `application-openstack-helm.yaml`, which also reads the shared site-level `secret-openstack.yaml` and optional `images-openstack.yaml` files before it reads `nova/values.yaml`.
+- The osapi pod's default `uwsgi.processes` (8), `uwsgi.listen` backlog (1024), liveness/readiness probe timings, and `pod.resources.api` requests/limits are tuned in `components/nova/values.yaml` to absorb bursts of concurrent API requests. Override `pod.resources.api` in your deploy repo's `nova/values.yaml` if your cluster needs a different resource footprint, and confirm node `net.core.somaxconn` is at least 1024 so the listen backlog isn't silently capped.
