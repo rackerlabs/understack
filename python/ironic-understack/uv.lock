@@ -385,7 +385,7 @@ wheels = [
 
 [[package]]
 name = "ironic"
-version = "35.1.0"
+version = "38.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -436,9 +436,9 @@ dependencies = [
     { name = "websockify" },
     { name = "zeroconf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/08/2805493019808e1e9913ffacbbddac82a5e07d14387ebe8eb875a8acd767/ironic-35.1.0.tar.gz", hash = "sha256:8d1c198db1ca5b7c583b09216d5abcdecce72cd60a9339ca0889a111e321fce8", size = 3304283, upload-time = "2026-09-02T16:21:55.824Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/25/f1/e87020552276f300b16f49b881503d8f8956ff636c525a0519187e2f8f33/ironic-38.0.0.tar.gz", hash = "sha256:9a493189a43341f7e502aaa945b24640c1f4d205aadd819fe40db872df2ff06d", size = 3137014, upload-time = "2026-07-30T09:26:12.393Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/65/fa89b9927542350317f1d1c1269339b4e84bbb26e6b269dbbf5026f9b3e1/ironic-35.1.0-py3-none-any.whl", hash = "sha256:ca9ba934e734c9dff91457f17cb9c3d188e1afc8624d53525e85191edc901f60", size = 2609022, upload-time = "2026-09-02T16:21:53.961Z" },
+    { url = "https://files.pythonhosted.org/packages/1a/13/5611f777a5767feb099bc50000a55ec453c118bc7e8fe4b00f7c53d80d16/ironic-38.0.0-py3-none-any.whl", hash = "sha256:7d45d1802def8bd94c0a67f51ba1bb6aae660d440ed8c24c5a9fc99d1c013290", size = 2433427, upload-time = "2026-07-30T09:26:10.752Z" },
 ]
 
 [[package]]
@@ -460,7 +460,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ironic", specifier = ">=35.1.0,<36" },
+    { name = "ironic", specifier = ">=35.1.0,<39" },
     { name = "pyyaml", specifier = "~=6.0" },
 ]
 
@@ -967,7 +967,7 @@ wheels = [
 
 [[package]]
 name = "oslo-policy"
-version = "4.7.0"
+version = "6.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "oslo-config" },
@@ -979,9 +979,9 @@ dependencies = [
     { name = "requests" },
     { name = "stevedore" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9e/f8/fe58fb492637d3100b4e77965991e0e80650d35144007f4b12a7b06829e5/oslo_policy-4.7.0.tar.gz", hash = "sha256:984f2414ea805394b1e3af65b172ec1f7c67deafa181b039d02e7408f5dc27cf", size = 120673, upload-time = "2025-11-13T13:51:05.146Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c8/1e/71f9edfe473164f185adc3f9c9795678fb74dbf4dd0036468ef3b9b3d2e1/oslo_policy-6.0.1.tar.gz", hash = "sha256:0983259d3919b15caa3755b22fba1451904f60ac20a48656bc61afaf420f7a67", size = 121527, upload-time = "2026-08-24T14:03:35.7Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ec/25/82ed04c26fe511483fdc07336594194ad1446530b614de3c3efd6795a4d5/oslo_policy-4.7.0-py3-none-any.whl", hash = "sha256:65441442b61ee2fda19129fab70866c74813001edff0e7652a757e4feffc2158", size = 88613, upload-time = "2025-11-13T13:51:03.711Z" },
+    { url = "https://files.pythonhosted.org/packages/43/d9/a8f1ccf1b706ade6cf3d7fa229651a023efa6d1b62b950954134f91e8076/oslo_policy-6.0.1-py3-none-any.whl", hash = "sha256:9509b6c824b3da378e5f11014c05c188791508ad92acb68feb05272b09dd2056", size = 89020, upload-time = "2026-08-24T14:03:34.583Z" },
 ]
 
 [[package]]
@@ -1061,23 +1061,20 @@ wheels = [
 
 [[package]]
 name = "oslo-versionedobjects"
-version = "3.8.0"
+version = "3.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "netaddr" },
-    { name = "oslo-concurrency" },
     { name = "oslo-config" },
     { name = "oslo-context" },
     { name = "oslo-i18n" },
     { name = "oslo-log" },
     { name = "oslo-messaging" },
-    { name = "oslo-serialization" },
     { name = "oslo-utils" },
-    { name = "webob" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bb/7e/d349326371ff424ed58ae7201fe2e153557216df82dc28bbcd2038a0dc1a/oslo_versionedobjects-3.8.0.tar.gz", hash = "sha256:b66e45f62e1d7852183ce570a7f927149b8bf909f218f48ec12d43dcbdb27ffa", size = 154983, upload-time = "2025-08-25T12:48:55.446Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ab/de/2881d6845b0a72f54e5a30d90dbe0404193819249eb73179f6d5053673c7/oslo_versionedobjects-3.12.0.tar.gz", hash = "sha256:7bf14e5845d2f27670ef3b6d9c8757b00363f7f9f1404d23ee969ade70f6ab99", size = 177349, upload-time = "2026-08-24T13:56:52.562Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/24/f8/a40f5180b07c303715077af7e94479fc94e07cfb0738abc5a1b14be08b0e/oslo_versionedobjects-3.8.0-py3-none-any.whl", hash = "sha256:9b0fc25b23e1011ceefa365d0490b47048d077ab6e9d6e8955ff00186491803f", size = 86279, upload-time = "2025-08-25T12:48:54.482Z" },
+    { url = "https://files.pythonhosted.org/packages/77/38/2009e4173dedb4d1bb6ea6849284a4b391ec63141dbc85649b0ee6edf70e/oslo_versionedobjects-3.12.0-py3-none-any.whl", hash = "sha256:d5e7c5f6bcde2e8510dfc25764dac2f4325739a059ca1aebd5f160bf783b971a", size = 108861, upload-time = "2026-08-24T13:56:51.258Z" },
 ]
 
 [[package]]
