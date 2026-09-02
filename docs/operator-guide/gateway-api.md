@@ -489,6 +489,55 @@ The `envoy-configs` chart is deployed via ArgoCD and generates Gateway and Route
 
 **Site-specific values**: `deploy/<site>/envoy-configs/values.yaml`
 
+### Gateway Schema
+
+```yaml
+gateways:
+  external:                     # or internal
+    name: string                 # Required: name of the Gateway resource
+    namespace: string            # Required: namespace where the Gateway is deployed
+    className: string            # Required: GatewayClass name (e.g., "eg")
+    serviceAnnotations: {}       # Optional: annotations for the generated Service
+    externalTrafficPolicy: string # Optional: "Cluster" or "Local"
+    envoyDeployment:             # Optional: tune the Envoy proxy pods for this Gateway
+      replicas: integer          # Number of Envoy proxy pod replicas (minimum: 1)
+      container:
+        resources:
+          requests:
+            cpu: string
+            memory: string
+          limits:
+            cpu: string
+            memory: string
+```
+
+`envoyDeployment` is unset by default, which keeps Envoy Gateway's own defaults
+(a single replica with no resource requests or limits). Raise `replicas` and
+set `container.resources` when a Gateway is fronting a service that needs to
+absorb request bursts, for example:
+
+```yaml
+gateways:
+  external:
+    name: external-gateway
+    namespace: envoy-gateway
+    className: eg
+    envoyDeployment:
+      replicas: 3
+      container:
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+```
+
+Scale the Gateway's Envoy proxies, not the backend service's own pods, when
+the bottleneck is connection handling or TLS termination in front of the
+service rather than the service itself.
+
 ### Route Schema
 
 ```yaml
