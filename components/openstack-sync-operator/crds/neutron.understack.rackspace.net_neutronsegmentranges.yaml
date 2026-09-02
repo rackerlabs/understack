@@ -1,0 +1,216 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: neutronsegmentranges.neutron.understack.rackspace.net
+spec:
+  group: neutron.understack.rackspace.net
+  names:
+    kind: NeutronSegmentRange
+    listKind: NeutronSegmentRangeList
+    plural: neutronsegmentranges
+    shortNames:
+    - nsr
+    singular: neutronsegmentrange
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    additionalPrinterColumns:
+    - name: Name
+      type: string
+      jsonPath: .spec.name
+    - name: Type
+      type: string
+      jsonPath: .spec.network_type
+    - name: Physical
+      type: string
+      jsonPath: .spec.physical_network
+    - name: Min
+      type: integer
+      jsonPath: .spec.minimum
+    - name: Max
+      type: integer
+      jsonPath: .spec.maximum
+    - name: Shared
+      type: boolean
+      jsonPath: .spec.shared
+    - name: SyncStatus
+      type: string
+      jsonPath: .status.syncStatus
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:
+        description: >-
+          NeutronSegmentRange defines one Neutron network segment range
+          (``openstack network segment range``). The operator finds, adopts, or
+          creates the range identified by ``spec.name`` and reconciles its
+          network type, physical network, and minimum/maximum segmentation IDs
+          toward the spec. Creating a CR claims ownership of the matching
+          OpenStack segment range. Neutron does not allow updating the
+          ``network_type`` or ``physical_network`` of an existing range, so a
+          CR that disagrees with an existing range on either field fails loudly
+          rather than silently diverging.
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            type: string
+          kind:
+            type: string
+          metadata:
+            type: object
+          spec:
+            type: object
+            required:
+            - name
+            - network_type
+            - minimum
+            - maximum
+            - cloudCredentialsRef
+            properties:
+              cloudCredentialsRef:
+                description: >-
+                  cloudCredentialsRef points to a Kubernetes Secret containing
+                  an OpenStack clouds.yaml file. The operator reads this secret
+                  directly at reconcile time; no volume mount is required.
+                type: object
+                required:
+                - secretName
+                - cloudName
+                properties:
+                  secretName:
+                    description: >-
+                      Name of a Secret in the same namespace as this resource.
+                      The Secret must contain a key named clouds.yaml holding
+                      an OpenStack clouds.yaml file.
+                    type: string
+                    minLength: 1
+                    maxLength: 253
+                  cloudName:
+                    description: >-
+                      Name of the cloud entry within the clouds.yaml to
+                      authenticate as.
+                    type: string
+                    minLength: 1
+                    maxLength: 256
+              name:
+                description: >-
+                  Neutron network segment range name. This is the identity the
+                  operator uses to find, adopt, create, and prune the range, so
+                  it must be unique per cloud.
+                type: string
+                minLength: 1
+                maxLength: 255
+                pattern: ^[A-Za-z0-9._/-]+$
+              network_type:
+                description: >-
+                  The network type of the segment range. VLAN IDs apply to the
+                  ``vlan`` type; tunnel IDs apply to ``geneve``, ``gre`` and
+                  ``vxlan``.
+                type: string
+                enum:
+                - vlan
+                - vxlan
+                - gre
+                - geneve
+                - flat
+                minLength: 1
+                maxLength: 32
+              physical_network:
+                description: >-
+                  The physical network the segment range is bound to. Required
+                  for ``vlan`` and ``flat`` ranges and must be omitted for the
+                  tunnelled types (``vxlan``, ``gre``, ``geneve``); the operator
+                  enforces this at reconcile time.
+                type: string
+                minLength: 1
+                maxLength: 255
+              minimum:
+                description: >-
+                  The minimum segmentation ID in the range (inclusive). Must be
+                  less than or equal to ``maximum``.
+                type: integer
+                format: int64
+                minimum: 1
+              maximum:
+                description: >-
+                  The maximum segmentation ID in the range (inclusive). Must be
+                  greater than or equal to ``minimum``.
+                type: integer
+                format: int64
+                minimum: 1
+              shared:
+                description: >-
+                  Whether the segment range is shared with all projects. When
+                  false the range is scoped to ``project_id``, which then
+                  becomes required.
+                type: boolean
+                default: true
+              project_id:
+                description: >-
+                  The project the range is scoped to when ``shared`` is false.
+                  Ignored for shared ranges.
+                type: string
+                minLength: 1
+                maxLength: 255
+            x-kubernetes-validations:
+            - rule: self.maximum >= self.minimum
+              message: maximum must be greater than or equal to minimum
+            - rule: "self.shared || has(self.project_id)"
+              message: project_id is required when shared is false
+          status:
+            description: NeutronSegmentRangeStatus defines the observed sync state.
+            type: object
+            properties:
+              syncStatus:
+                description: SyncStatus indicates the synchronization state with Neutron.
+                type: string
+                enum:
+                - Synced
+                - Failed
+                - Unknown
+              lastSyncTime:
+                description: LastSyncTime is the last time the operator attempted to sync the range.
+                type: string
+                format: date-time
+              observedGeneration:
+                description: ObservedGeneration is the metadata generation last processed by the operator.
+                type: integer
+                format: int64
+              message:
+                description: Message provides details about the last sync attempt.
+                type: string
+                maxLength: 2048
+              conditions:
+                description: Conditions describe current observed state.
+                type: array
+                items:
+                  type: object
+                  required:
+                  - type
+                  - status
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                      maxLength: 2048
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+    subresources:
+      status: {}
