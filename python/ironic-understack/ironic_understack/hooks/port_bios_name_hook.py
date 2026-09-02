@@ -3,7 +3,7 @@ from typing import ClassVar
 from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
 
-from ironic_understack.ironic_wrapper import ironic_ports_for_node
+from ironic_understack.utils.ironic_wrapper import ironic_ports_for_node
 
 LOG = logging.getLogger(__name__)
 

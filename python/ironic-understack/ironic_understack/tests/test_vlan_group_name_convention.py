@@ -1,8 +1,8 @@
 import pytest
 
-from ironic_understack.inspected_port import InspectedPort
-from ironic_understack.vlan_group_name_convention import TopologyError
-from ironic_understack.vlan_group_name_convention import vlan_group_names
+from ironic_understack.utils.inspected_port import InspectedPort
+from ironic_understack.utils.vlan_group_name_convention import TopologyError
+from ironic_understack.utils.vlan_group_name_convention import vlan_group_names
 
 mapping = {
     "1": "network",

@@ -2,7 +2,7 @@ import logging
 
 import ironic.objects
 
-from ironic_understack.inspect_hook_chassis_model import InspectHookChassisModel
+from ironic_understack.hooks.inspect_hook_chassis_model import InspectHookChassisModel
 
 # Populate ironic.objects.TraitList so it can be patched below.
 ironic.objects.register_all()
@@ -36,7 +36,7 @@ def test_preserves_other_custom_traits(mocker, caplog):
     ]
     mock_task, mock_node, mock_context = _mock_task(mocker, existing)
     trait_create = mocker.patch(
-        "ironic_understack.inspect_hook_chassis_model.objects.TraitList.create"
+        "ironic_understack.hooks.inspect_hook_chassis_model.objects.TraitList.create"
     )
 
     InspectHookChassisModel().__call__(mock_task, _INVENTORY, _PLUGIN_DATA)
@@ -54,7 +54,7 @@ def test_replaces_stale_chassis_trait(mocker):
     existing = ["CUSTOM_NETWORK_SWITCH", "CUSTOM_CHASSIS_DELL_POWEREDGE_R6615"]
     mock_task, mock_node, mock_context = _mock_task(mocker, existing)
     trait_create = mocker.patch(
-        "ironic_understack.inspect_hook_chassis_model.objects.TraitList.create"
+        "ironic_understack.hooks.inspect_hook_chassis_model.objects.TraitList.create"
     )
 
     InspectHookChassisModel().__call__(mock_task, _INVENTORY, _PLUGIN_DATA)

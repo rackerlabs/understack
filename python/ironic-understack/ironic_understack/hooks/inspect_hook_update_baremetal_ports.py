@@ -7,10 +7,10 @@ from ironic.common import exception
 from ironic.drivers.modules.inspector.hooks import base
 from oslo_log import log as logging
 
-import ironic_understack.vlan_group_name_convention
+import ironic_understack.utils.vlan_group_name_convention
 from ironic_understack.conf import CONF
-from ironic_understack.inspected_port import InspectedPort
-from ironic_understack.ironic_wrapper import ironic_ports_for_node
+from ironic_understack.utils.inspected_port import InspectedPort
+from ironic_understack.utils.ironic_wrapper import ironic_ports_for_node
 
 LOG = logging.getLogger(__name__)
 
@@ -52,9 +52,11 @@ class InspectHookUpdateBaremetalPorts(base.InspectionHook):
 
         ports_by_mac = {p.mac_address: p for p in inspected_ports}
 
-        vlan_groups = ironic_understack.vlan_group_name_convention.vlan_group_names(
-            inspected_ports,
-            CONF.ironic_understack.switch_name_vlan_group_mapping,
+        vlan_groups = (
+            ironic_understack.utils.vlan_group_name_convention.vlan_group_names(
+                inspected_ports,
+                CONF.ironic_understack.switch_name_vlan_group_mapping,
+            )
         )
         LOG.debug(
             "Node=%(node)s vlan_groups=%(groups)s",

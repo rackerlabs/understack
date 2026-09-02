@@ -2,7 +2,7 @@ import logging
 
 from oslo_utils import uuidutils
 
-from ironic_understack.port_bios_name_hook import PortBiosNameHook
+from ironic_understack.hooks.port_bios_name_hook import PortBiosNameHook
 
 _INVENTORY = {
     "memory": {"physical_mb": 98304},
@@ -43,7 +43,7 @@ def test_pxe_fallback(mocker, caplog):
     port2 = _make_port(mocker, "22:22:22:22:22:22")
 
     mocker.patch(
-        "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
+        "ironic_understack.hooks.port_bios_name_hook.ironic_ports_for_node",
         return_value=[port1, port2],
     )
 
@@ -71,7 +71,7 @@ def test_enables_slot_ports_too(mocker, caplog):
     port3 = _make_port(mocker, "33:33:33:33:33:33")
 
     mocker.patch(
-        "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
+        "ironic_understack.hooks.port_bios_name_hook.ironic_ports_for_node",
         return_value=[port1, port2, port3],
     )
 
@@ -100,7 +100,7 @@ def test_retaining_physical_network(mocker, caplog):
     )
 
     mocker.patch(
-        "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
+        "ironic_understack.hooks.port_bios_name_hook.ironic_ports_for_node",
         return_value=[port],
     )
 
@@ -129,7 +129,7 @@ def test_preserves_pxe_on_post_enroll_ports(mocker, caplog):
     )
 
     mocker.patch(
-        "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
+        "ironic_understack.hooks.port_bios_name_hook.ironic_ports_for_node",
         return_value=[port1, port2],
     )
 
@@ -159,7 +159,7 @@ def test_removing_bios_name(mocker, caplog):
     )
 
     mocker.patch(
-        "ironic_understack.port_bios_name_hook.ironic_ports_for_node",
+        "ironic_understack.hooks.port_bios_name_hook.ironic_ports_for_node",
         return_value=[unknown_port, pxe_port],
     )
 

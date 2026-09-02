@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-from ironic_understack.inspected_port import InspectedPort
+from ironic_understack.utils.inspected_port import InspectedPort
 
 
 class TopologyError(Exception):
