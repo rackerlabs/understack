@@ -74,9 +74,18 @@ class InspectHookUpdateBaremetalPorts(base.InspectionHook):
 
 
 def _parse_plugin_data(plugin_data: dict) -> list[InspectedPort]:
+    # The parse-lldp hook only populates parsed_lldp when at least one
+    # interface reports usable LLDP TLVs. Likewise, validate-interfaces
+    # populates all_interfaces. Both may be absent when a node returns no
+    # LLDP data (e.g. switch not emitting LLDP, ports not yet configured).
+    # Read defensively so the caller's "no LLDP data" guard handles it,
+    # rather than failing inspection with a KeyError.
+    parsed_lldp = plugin_data.get("parsed_lldp") or {}
+    all_interfaces = plugin_data.get("all_interfaces") or {}
+
     mac = {
         interface["name"]: interface["mac_address"]
-        for interface in plugin_data["all_interfaces"].values()
+        for interface in all_interfaces.values()
     }
 
     return [
@@ -87,7 +96,7 @@ def _parse_plugin_data(plugin_data: dict) -> list[InspectedPort]:
             switch_chassis_id=str(lldp["switch_chassis_id"]).lower(),
             switch_port_id=str(lldp["switch_port_id"]),
         )
-        for name, lldp in plugin_data["parsed_lldp"].items()
+        for name, lldp in parsed_lldp.items()
     ]
 
 
