@@ -33,7 +33,7 @@ jobs:
             depth = depth + 2
             core.info(`Will fetch ${depth} commits from ${branch}.`)
             return { "depth": depth, "branch": branch }
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{steps.git-intel.outputs.result.branch}}
           fetch-depth: ${{steps.git-intel.outputs.result.depth}}
