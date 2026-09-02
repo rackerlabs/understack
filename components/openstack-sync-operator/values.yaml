@@ -30,6 +30,7 @@ rbac:
 plugins:
   openstackPlaceholder: false
   neutronRouterFlavors: false
+  neutronSegmentRanges: false
 
 pluginData:
   openstackPlaceholder:
@@ -54,4 +55,20 @@ pluginData:
         READY_DELAY: 10
         # When true, removing a NeutronRouterFlavor CR also deletes its unused
         # operator-managed OpenStack flavor. Enable this before removing the CR.
+        PRUNE: false
+
+  neutronSegmentRanges:
+    hook:
+      path: /hooks/segment_ranges.py
+      crd: crds/neutron.understack.rackspace.net_neutronsegmentranges.yaml
+      envPrefix: NEUTRON_SEGMENT_RANGE
+      env:
+        SYNC_CRONTAB: "0 * * * *"
+        # Neutron readiness wait before a segment range reconcile fails.
+        # Total wait is READY_RETRIES * READY_DELAY seconds.
+        READY_RETRIES: 30
+        READY_DELAY: 10
+        # When true, removing a NeutronSegmentRange CR also deletes its
+        # operator-managed OpenStack segment range. Enable this before
+        # removing the CR.
         PRUNE: false
