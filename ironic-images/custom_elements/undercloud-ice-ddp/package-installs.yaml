@@ -1,0 +1,15 @@
+# Intel E810/ice Dynamic Device Personalization (DDP) package.
+#
+# Without this the ice driver cannot find /lib/firmware/intel/ice/ddp/ice.pkg
+# and drops every E810 port into Safe Mode, which keeps the NIC firmware
+# LLDP/DCBX agent active (breaking host-side LLDP inspection and causing switch
+# ports to err-disable).
+#
+# On Debian trixie/sid the ice DDP ships in firmware-intel-misc (amd64), which
+# lives in the non-free-firmware component (enable via DIB_DEBIAN_COMPONENTS in
+# the image build environment).
+#
+# NOTE: This element is release-specific. firmware-intel-misc only exists on
+# trixie/sid; on bookworm the ice DDP is in firmware-misc-nonfree instead. Only
+# add this element to trixie (or newer) image definitions.
+firmware-intel-misc:

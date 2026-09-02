@@ -4,11 +4,3 @@ mtr-tiny:
 tcpdump:
 bind9-dnsutils:
 util-linux-extra:
-# Intel E810/ice Dynamic Device Personalization (DDP) package. Without this the
-# ice driver cannot find /lib/firmware/intel/ice/ddp/ice.pkg and drops every
-# E810 port into Safe Mode, which keeps the NIC firmware LLDP/DCBX agent active
-# (breaking host-side LLDP inspection and causing switch ports to err-disable).
-# On Debian trixie/sid the ice DDP ships in firmware-intel-misc (amd64), which
-# lives in the non-free-firmware component (enabled via DIB_DEBIAN_COMPONENTS
-# in the image build environment).
-firmware-intel-misc:
