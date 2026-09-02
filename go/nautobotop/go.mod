@@ -1,6 +1,6 @@
 module github.com/rackerlabs/understack/go/nautobotop
 
-go 1.24.0
+go 1.25
 
 require (
 	github.com/charmbracelet/log v0.4.2
@@ -14,7 +14,7 @@ require (
 	k8s.io/api v0.33.0
 	k8s.io/apimachinery v0.33.0
 	k8s.io/client-go v0.33.0
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
+	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
 	sigs.k8s.io/controller-runtime v0.21.0
 )
 
