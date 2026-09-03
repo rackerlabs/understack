@@ -16,3 +16,26 @@ volume:
   ovn_ovsdb_sb:
     # let it use the default storage class
     class_name: ""
+
+pod:
+  probes:
+    ovn_controller:
+      controller:
+        liveness:
+          params:
+            # this chart's ovs-ofctl liveness check runs as root, which
+            # bypasses the unix-socket permission check ovn-controller
+            # itself is subject to (it drops to the ovs user), so it
+            # never detects ovn-controller wedged in an EACCES reconnect
+            # loop against br-int.mgmt. Override the check to run as the
+            # ovs user instead, matching ovn-controller's own permissions.
+            # TODO: drop this override once we consume a chart with
+            # https://review.opendev.org/c/openstack/openstack-helm/+/1003849
+            # merged (likely openstack-helm/ovn 2026.1.8 or newer).
+            exec:
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  ovs-appctl -t ovn-controller version >/dev/null 2>&1 || exit 1
+                  su -s /bin/sh openvswitch -c "ovs-ofctl --timeout=5 show br-int" >/dev/null 2>&1 || exit 1
