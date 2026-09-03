@@ -88,6 +88,11 @@ conf:
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#nodes-go-into-maintenance-mode
       sync_power_state_interval: 300
       sync_power_state_workers: 20
+      # Trait Based Networking (TBN): dynamically portgroup category=network
+      # ports at vif_attach time. See trait-based-networking-cm.yaml for the
+      # trait definitions.
+      enable_trait_based_networking: true
+      trait_based_networking_config_file: /etc/ironic/trait-based-networking/trait_based_networking.yaml
     agent:
       # (nicholas.kuechler) tuning for idrac hardware type
       # https://docs.openstack.org/ironic/latest/admin/drivers/idrac.html#timeout-when-powering-off
@@ -269,6 +274,9 @@ pod:
           - name: ironic-inspection-rules
             mountPath: /etc/ironic/inspection-rules/
             readOnly: true
+          - name: ironic-trait-based-networking
+            mountPath: /etc/ironic/trait-based-networking/
+            readOnly: true
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -283,6 +291,9 @@ pod:
             configMap:
               name: ironic-inspection-rules
               optional: true
+          - name: ironic-trait-based-networking
+            configMap:
+              name: ironic-trait-based-networking
   replicas:
     api: 4
     conductor: 1
