@@ -407,7 +407,7 @@ site:
     wave: 2
     # -- Chart version for Neutron
     # renovate: datasource=helm depName=neutron registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2026.1.8+872fd69e7
+    chartVersion: 2026.1.41+7c81bea7c
 
   # -- Placement (Placement Service)
   placement:
