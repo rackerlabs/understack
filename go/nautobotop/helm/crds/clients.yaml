@@ -256,7 +256,8 @@ spec:
                   namespace:
                     description: |-
                       The namespace of the Secret resource being referred to.
-                      Ignored if referent is not cluster-scoped, otherwise defaults to the namespace of the referent.
+                      Ignored if referent is not cluster-scoped. For this cluster-scoped
+                      resource, when unset it falls back to NautobotServiceRef.Namespace.
                     maxLength: 63
                     minLength: 1
                     pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
@@ -277,6 +278,8 @@ spec:
                     minLength: 1
                     pattern: ^[-._a-zA-Z0-9]+$
                     type: string
+                required:
+                - name
                 type: object
               nautobotServiceRef:
                 properties:
@@ -551,6 +554,8 @@ spec:
                   - configMapSelector
                   type: object
                 type: array
+            required:
+            - nautobotSecretRef
             type: object
           status:
             description: NautobotStatus defines the observed state of Nautobot.
