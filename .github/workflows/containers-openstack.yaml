@@ -37,7 +37,6 @@ jobs:
           - glance
           - horizon
           - octavia
-          - openstack-client
           - skyline
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
@@ -90,5 +89,14 @@ jobs:
     with:
       container_name: keystone
       dockerfile_path: containers/keystone/Dockerfile
+      build_args: OPENSTACK_VERSION=2026.1
+      latest_name: "2026.1"
+
+  openstack-client:
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: openstack-client
+      dockerfile_path: containers/openstack-client/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
