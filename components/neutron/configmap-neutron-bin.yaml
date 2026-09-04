@@ -1624,6 +1624,25 @@ data:
     }
 
     $COMMAND
+  neutron-ovn-maintenance-worker.sh: |
+    #!/bin/bash
+
+    set -ex
+    COMMAND="${@:-start}"
+
+    function start () {
+      exec neutron-ovn-maintenance-worker \
+            --config-file /etc/neutron/neutron.conf \
+            --config-file /tmp/pod-shared/ovn.ini \
+            --config-file /etc/neutron/plugins/ml2/ml2_conf.ini \
+            --config-dir /etc/neutron/neutron.conf.d
+    }
+
+    function stop () {
+      kill -TERM 1
+    }
+
+    $COMMAND
   neutron-server.sh: |
     #!/bin/bash
 
