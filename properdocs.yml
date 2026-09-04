@@ -28,7 +28,8 @@ theme:
     - content.code.annotate
     - content.code.copy
     - content.tooltips
-    - navigation.expand
+    # navigation.expand is deliberately absent: with seven tabs and 139 pages,
+    # expand-all is noise. Let readers open the group they came for.
     - navigation.indexes
     - navigation.instant
     - navigation.instant.progress
@@ -97,6 +98,18 @@ plugins:
       module_name: docs/macros
   - callouts
   - mermaid-zoom
+  - redirects:
+      # A redirect_maps key must NOT be a real file under docs/, and its value
+      # MUST be a page in the build, or `properdocs build --strict` fails. So a
+      # redirect always lands in the same commit as the removal or move it
+      # covers, never ahead of it.
+      #
+      # These only help external inbound traffic. They do not satisfy
+      # validation.not_found, which reads the markdown source rather than the
+      # built site, so in-repo links still have to be updated for real.
+      redirect_maps:
+        # was a three-line stub; the Contributing front door replaces it
+        design-guide/intro.md: contributing/index.md
 
 # These only accept warn/info/ignore -- there is no "error" level -- so the
 # `--strict` flag in the Makefile is what actually turns them into build
@@ -114,61 +127,131 @@ extra:
   auth_url: !ENV [OS_AUTH_URL, "https://your.endpoint.url/v3"]
   region_name: !ENV [OS_REGION_NAME, "my-site"]
 
+# Seven tabs, one per audience, plus Home as a router and Reference for lookup.
+# See docs-layout-audit.md for why, and for the rule that governs moves: tab
+# labels and grouping here are free to change, but a file only moves on disk when
+# its audience changes. Phase 1 is nav-only -- every path below is where the file
+# already lives.
 nav:
-  - Home: index.md
-  - Overview:
+  - Home:
+    - index.md
     - vision.md
-    - 'Prerequisites':
-      - kubernetes.md
-      - openstack-helm.md
-    - 'Configuration':
-      - secrets.md
-      - networking.md
-    - Components:
-      - component-overview.md
-      - Networking:
-        - component-networking-neutron.md
-      - component-argo-workflows.md
-      - component-understack-workflows.md
-      - component-ansible.md
-  - 'Design Guide':
-    - design-guide/intro.md
-    - design-guide/architecture.md
-    - design-guide/add-remove-app.md
-    - 'Hardware Definitions':
-      - design-guide/device-types.md
-      - design-guide/hardware-traits.md
-      - design-guide/flavors.md
-    - design-guide/ironic.md
-    - design-guide/neutron-networking.md
-    - design-guide/neutron-understack-config-sample.md
-    - design-guide/argo-workflows.md
-    - design-guide/argo-events.md
-  - 'Deployment Guide':
+  - Deploy:
     - deploy-guide/welcome.md
     - deploy-guide/requirements.md
     - Quick Start: deploy-guide/gitops-install.md
-    - Preparing Our Deployment:
+    - 'Tools and Prerequisites':
+      - kubernetes.md
+    - 'Preparing Our Deployment':
       - deploy-guide/deploy-repo.md
       - deploy-guide/config-dex.md
       - deploy-guide/config-openstack.md
       - deploy-guide/secrets-eso-setup.md
+      - secrets.md
       - deploy-guide/openstack-automation-users.md
       - deploy-guide/nautobot-secrets.md
       - deploy-guide/auth.md
       - deploy-guide/config-argo-workflows.md
-    - Starting the Deployment:
+      - networking.md
+    - 'Starting the Deployment':
       - deploy-guide/management-cluster.md
       - deploy-guide/global-cluster.md
       - deploy-guide/site-cluster.md
-    - Post Deployment:
+    - 'Post Deployment':
       - deploy-guide/load-balancers.md
       - deploy-guide/testing-verification.md
       - deploy-guide/troubleshooting.md
-    - Further Actions:
+    - 'Further Actions':
       - deploy-guide/extra-sites.md
       - deploy-guide/override-openstack-svc-config.md
-    - Component Reference:
+  # Grouped by which operator role reads them: system operators get
+  # Troubleshooting and Architecture, OpenStack Services, Platform Services and
+  # Scripts and Tools; DC techs get Hardware; network operations get Networking.
+  - Operations:
+    - operator-guide/index.md
+    - 'Troubleshooting and Architecture':
+      - operator-guide/troubleshooting.md
+      - design-guide/architecture.md
+      - component-overview.md
+      - component-argo-workflows.md
+      - component-understack-workflows.md
+      - component-networking-neutron.md
+      - component-ansible.md
+      - operator-guide/troubleshooting-osh.md
+      - operator-guide/logging.md
+      - operator-guide/monitoring.md
+    - 'OpenStack Services':
+      - operator-guide/openstack-ironic.md
+      - operator-guide/openstack-ironic-inspection-guide.md
+      - operator-guide/openstack-ironic-change-boot-interface.md
+      - operator-guide/baremetal-ironic-cleanup-runbook.md
+      - operator-guide/openstack-ironic-console.md
+      - operator-guide/openstack-placement.md
+    - 'Networking':
+      - operator-guide/networking.md
+      - operator-guide/openstack-neutron.md
+      - operator-guide/ovs-ovn.md
+      - operator-guide/kubectl-us-net.md
+    - 'Hardware':
+      - operator-guide/hardware.md
+      - operator-guide/device-types.md
+      - operator-guide/flavors.md
+      - operator-guide/server-firmware-update.md
+      - operator-guide/bmc-password.md
+    - 'Platform Services':
+      - operator-guide/argocd-helm-chart.md
+      - operator-guide/workflows.md
+      - operator-guide/gateway-api.md
+      - operator-guide/nautobot.md
+      - operator-guide/nautobotop.md
+      - operator-guide/nautobot-mtls-certificate-renewal.md
+      - operator-guide/openstack-nautobot-sync.md
+      - operator-guide/mariadb-operator.md
+      - operator-guide/mariadb-upgrade-runbook.md
+      - operator-guide/postgres-operator.md
+      - operator-guide/rabbitmq.md
+      - operator-guide/rook-ceph.md
+    - 'Scripts and Tools':
+      - operator-guide/scripts.md
+      - operator-guide/understackctl.md
+      - operator-guide/ansible-local-usage.md
+  # Keep this list newest-series-first and maintain it by hand. Do not switch it
+  # to include_dir_to_nav: that plugin only does an ascending ASCII sort, so
+  # v0.10.md would sort before v0.9.md, and its reverse toggle is global and
+  # would also flip the generated Workflows section.
+  - 'Release Notes':
+    - release-notes/index.md
+    # generated by `make unreleased-notes` from changelog.d/, gitignored
+    - release-notes/unreleased.md
+    - release-notes/v0.5.md
+    - release-notes/v0.4.md
+  - 'Using the Cloud':
+    - user-guide/index.md
+    - user-guide/openstack-cli.md
+    - user-guide/openstack-image.md
+    - user-guide/openstack-resource-controller.md
+    - user-guide/openstack-console.md
+    - user-guide/server-firmware-update.md
+  - Contributing:
+    - contributing/index.md
+    - design-guide/add-remove-app.md
+    - contributing/writing-ironic-drivers.md
+    - 'Design and Background':
+      - openstack-helm.md
+      - design-guide/ironic.md
+      - design-guide/neutron-networking.md
+      - design-guide/argo-workflows.md
+      - design-guide/argo-events.md
+  - Reference:
+    - reference/index.md
+    - 'Hardware Definitions':
+      - design-guide/device-types.md
+      - design-guide/hardware-traits.md
+      - design-guide/flavors.md
+    - 'Configuration Samples':
+      # generated by `make docs` via oslo-config-generator, gitignored
+      - design-guide/neutron-understack-config-sample.md
+    - 'Components':
       - deploy-guide/components/index.md
       - deploy-guide/components/argo-events-workflows.md
       - deploy-guide/components/argo-events.md
@@ -226,59 +309,7 @@ nav:
       - deploy-guide/components/skyline.md
       - deploy-guide/components/snmp-exporter.md
       - deploy-guide/components/undersync.md
-  - 'Operator Guide':
-    - operator-guide/index.md
-    - 'OpenStack':
-      - operator-guide/openstack-ironic.md
-      - operator-guide/openstack-ironic-inspection-guide.md
-      - operator-guide/openstack-ironic-change-boot-interface.md
-      - operator-guide/baremetal-ironic-cleanup-runbook.md
-      - operator-guide/openstack-ironic-console.md
-      - operator-guide/openstack-placement.md
-    - 'Networking':
-      - operator-guide/openstack-neutron.md
-      - operator-guide/ovs-ovn.md
-      - operator-guide/kubectl-us-net.md
-    - 'Infrastructure':
-      - operator-guide/argocd-helm-chart.md
-      - operator-guide/workflows.md
-      - operator-guide/openstack-nautobot-sync.md
-      - operator-guide/monitoring.md
-      - operator-guide/gateway-api.md
-      - operator-guide/bmc-password.md
-      - operator-guide/mariadb-operator.md
-      - operator-guide/mariadb-upgrade-runbook.md
-      - operator-guide/postgres-operator.md
-      - operator-guide/rabbitmq.md
-      - operator-guide/rook-ceph.md
-      - operator-guide/nautobot.md
-      - operator-guide/nautobotop.md
-      - operator-guide/nautobot-mtls-certificate-renewal.md
-      - operator-guide/troubleshooting-osh.md
-      - operator-guide/logging.md
-      - operator-guide/ansible-local-usage.md
-    - 'Hardware':
-      - operator-guide/device-types.md
-      - operator-guide/flavors.md
-      - operator-guide/server-firmware-update.md
-    - 'Scripts and Tools':
-      - operator-guide/scripts.md
-      - operator-guide/understackctl.md
-  # Keep this list newest-series-first and maintain it by hand. Do not switch it
-  # to include_dir_to_nav: that plugin only does an ascending ASCII sort, so
-  # v0.10.md would sort before v0.9.md, and its reverse toggle is global and
-  # would also flip the generated Workflows section.
-  - 'Release Notes':
-    - release-notes/index.md
-    # generated by `make unreleased-notes` from changelog.d/, gitignored
-    - release-notes/unreleased.md
-    - release-notes/v0.5.md
-    - release-notes/v0.4.md
-  - 'User Guide':
-    - user-guide/index.md
-    - user-guide/openstack-cli.md
-    - user-guide/openstack-image.md
-    - user-guide/openstack-resource-controller.md
-    - user-guide/openstack-console.md
-    - user-guide/server-firmware-update.md
-  - Workflows: workflows/
+    # generated by `make wftmpls`, gitignored. include_dir_to_nav recurses into
+    # nested nav lists, so nesting the generated tree here needs no Makefile
+    # change.
+    - 'Workflow Templates': workflows/
