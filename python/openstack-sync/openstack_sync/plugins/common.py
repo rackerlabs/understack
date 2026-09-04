@@ -1,10 +1,4 @@
-"""Generic utilities shared across all openstack-sync plugins.
-
-Provides environment helpers, OpenStack SDK resource accessors,
-meta_info normalisation, exception classifiers, and common API helpers
-that are reusable by any plugin regardless of which OpenStack service it
-targets.
-"""
+"""Generic utilities shared across openstack-sync plugins."""
 
 from __future__ import annotations
 
@@ -12,6 +6,7 @@ import json
 import logging
 import os
 import time
+from collections.abc import Callable
 from typing import Any
 
 from openstack import exceptions as openstack_exceptions
@@ -112,6 +107,34 @@ def resource_id(resource: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
+# API pagination
+# ---------------------------------------------------------------------------
+
+
+def paginated_collection(
+    fetch_page: Callable[[dict[str, Any]], dict[str, Any]],
+    *,
+    collection_key: str,
+    marker_key: str,
+    page_limit: int,
+) -> list[Any]:
+    """Return every item from a marker-paginated OpenStack collection."""
+    items: list[Any] = []
+    marker: Any = None
+
+    while True:
+        params: dict[str, Any] = {"limit": page_limit}
+        if marker is not None:
+            params["marker"] = marker
+
+        page = fetch_page(params).get(collection_key, [])
+        items.extend(page)
+        if len(page) < page_limit:
+            return items
+        marker = page[-1][marker_key]
+
+
+# ---------------------------------------------------------------------------
 # meta_info helpers
 # ---------------------------------------------------------------------------
 
@@ -146,8 +169,30 @@ def meta_info_payload(value: Any) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Neutron network readiness probe
+# API readiness probes
 # ---------------------------------------------------------------------------
+
+
+def wait_for_openstack_api(
+    service: str,
+    probe: Callable[[], Any],
+    retries: int = 30,
+    delay: float = 10.0,
+) -> None:
+    """Poll *probe* until it succeeds, or raise after *retries*."""
+    for attempt in range(1, retries + 1):
+        try:
+            probe()
+            return
+        except ConfigError:
+            raise
+        except Exception as exc:
+            if attempt >= retries:
+                raise RuntimeError(
+                    f"{service} API did not become ready after {retries} attempt(s)"
+                ) from exc
+            LOG.info("Waiting for %s API (%s/%s): %s", service, attempt, retries, exc)
+            time.sleep(delay)
 
 
 def wait_for_openstack_network(
@@ -165,17 +210,12 @@ def wait_for_openstack_network(
     Raises:
         RuntimeError: When the API does not become ready within *retries*.
     """
-    for attempt in range(1, retries + 1):
-        try:
-            next(iter(conn.network.flavors()), None)
-            return
-        except Exception as exc:
-            if attempt >= retries:
-                raise RuntimeError(
-                    f"Neutron API did not become ready after {retries} attempt(s)"
-                ) from exc
-            LOG.info("Waiting for Neutron API (%s/%s): %s", attempt, retries, exc)
-            time.sleep(delay)
+    wait_for_openstack_api(
+        "Neutron",
+        lambda: next(iter(conn.network.flavors()), None),
+        retries=retries,
+        delay=delay,
+    )
 
 
 # ---------------------------------------------------------------------------

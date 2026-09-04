@@ -15,24 +15,25 @@ openstack_sync/
     common.py                   binding-context I/O, CR status patching
     framework.py                HookConfig, SyncPlugin, run_sync(), run_hook()
     placeholder.py              connectivity probe (no CRs)
-    router_flavors.py           NeutronRouterFlavor hook
+    <resource>.py               CRD hook entry point
   plugins/
     common.py                   OpenStack helpers shared by all plugins
-    neutron/router_flavors/
+    <service>/<resource>/
       config.py                 plugin constants
+      client.py                 OpenStack API calls, if needed
       markers.py                ownership markers
       reconcile.py              converge one CR
-      prune.py                  delete resources whose CR was removed
+      prune.py                  delete resources whose CR was removed, if safe
 ```
 
 ## What the framework does for you
 
 `run_sync` groups CRs by the credentials in `spec.cloudCredentialsRef`, opens one
 connection per credential group, waits for the OpenStack service, reconciles each
-CR, patches `Synced`/`Failed` onto the CR status, and then prunes. If any
-reconcile fails, or any CR could not be read at all, it **skips the prune
-entirely** — either way the desired state is unknown, so deleting anything would
-be unsafe.
+CR, patches `Synced`/`Failed` onto the CR status, and then calls the plugin's
+prune step, which most plugins gate on `PRUNE`. If any reconcile fails, or any CR
+could not be read at all, it **skips the prune entirely** - either way the
+desired state is unknown, so deleting anything would be unsafe.
 
 A CR whose spec does not satisfy the framework's contract is named in the log and
 dropped, and the run exits non-zero. The remaining CRs still reconcile: one
@@ -45,47 +46,44 @@ reading the binding context, and the exit code.
 
 1. **Write the CRD** in `components/openstack-sync-operator/crds/`. Include a
    `status` subresource and a required `spec.cloudCredentialsRef` with
-   `secretName` and `cloudName` — the framework relies on both. Put validation
+   `secretName` and `cloudName` - the framework relies on both. Put validation
    (`required`, `enum`, `minLength`, `default`) in the schema so the API server
    rejects bad CRs at admission.
 
-   Schema validation is not a guarantee about what a reconcile receives, though.
-   Kubernetes validates on write, so a CR admitted before a field became
-   required keeps being served by the watch exactly as stored — tightening a CRD
-   neither invalidates nor migrates what already exists. Read schema-optional
-   fields with a default, and treat a missing schema-required field as a reason
-   to fail that one CR loudly and by name, not as impossible.
+   Read optional fields with explicit defaults. Missing required fields are
+   rejected by the CRD schema.
 
 2. **Register it** in `components/openstack-sync-operator/values.yaml`:
 
    ```yaml
    plugins:
-     myResource: false          # opt in per site
+     <resourceName>: false      # opt in per site
    pluginData:
-     myResource:
+     <resourceName>:
        hook:
-         path: /hooks/my_resource.py
+         path: /hooks/<resource>.py
          crd: crds/<group>_<plural>.yaml
-         envPrefix: MY_RESOURCE
+         envPrefix: <ENV_PREFIX>
          env:
            SYNC_CRONTAB: "0 * * * *"
    ```
 
-   The chart derives `MY_RESOURCE_ENABLED`, `_CRD_API_VERSION`, `_CRD_KIND`,
+   The chart derives `<ENV_PREFIX>_ENABLED`, `_CRD_API_VERSION`, `_CRD_KIND`,
    `_CRD_RESOURCE` and `_STATUS_ENABLED` from the CRD file, and turns each `env`
-   key into `MY_RESOURCE_<KEY>`. `HookConfig.from_env` reads only the framework
+   key into `<ENV_PREFIX>_<KEY>`. `HookConfig.from_env` reads only the framework
    keys, such as `PRUNE`, `SYNC_CRONTAB`, `READY_RETRIES` and `READY_DELAY`.
    Plugins read custom prefixed env vars directly.
 
-3. **Write the plugin package** under `plugins/<service>/<resource>/` with the
-   same four modules as `router_flavors`: `config.py` (constants), `markers.py`
-   (how you record that the operator owns a resource), `reconcile.py`, `prune.py`.
+3. **Write the plugin package** under `plugins/<service>/<resource>/`.
+   `config.py` and `reconcile.py` are the usual minimum. Add `markers.py` when
+   the plugin stamps ownership into OpenStack resources, and `prune.py` only
+   when deleting resources after CR removal is safe and implemented.
 
-4. **Write the hook** — subclass `SyncPlugin` and wire it up:
+4. **Write the hook** - subclass `SyncPlugin` and wire it up:
 
    ```python
-   class MyResourcePlugin(SyncPlugin):
-       noun = "my resource"
+   class ResourcePlugin(SyncPlugin):
+       noun = "<resource>"
 
        def wait_for_api(self, conn) -> None: ...
 
@@ -102,7 +100,7 @@ reading the binding context, and the exit code.
            if not hook_enabled(ENV_PREFIX):
                return 0
            config = HookConfig.from_env(ENV_PREFIX, binding_name=BINDING_NAME)
-           return run_sync(MyResourcePlugin(config), hook_inputs(contexts, config))
+           return run_sync(ResourcePlugin(config), hook_inputs(contexts, config))
 
        return run_hook(lambda: build_crd_hook_config(ENV_PREFIX, BINDING_NAME), run)
    ```
@@ -120,10 +118,9 @@ for a hand-made resource unless transferring it to the operator is intentional.
 
 **Report what you cannot fix.** `reconcile` returns a list of notes. Use it for
 state that diverges from the spec but that OpenStack will not let the operator
-correct — for example Neutron rejects `update_service_profile` with a 409 while
-the profile is bound to any flavor. The resource is still `Synced`, but the notes
-appear on the CR status and in the logs so an operator can act. Raise an
-exception only for an actual failure.
+correct. The resource is still `Synced`, but the notes appear on the CR status
+and in the logs so an operator can act. Raise an exception only for an actual
+failure.
 
 ## Tests
 
@@ -134,4 +131,4 @@ uv run pytest
 ```
 
 `tests/test_framework.py` exercises the driver with a stub plugin and no
-OpenStack at all — read it first to understand the contract a plugin gets.
+OpenStack at all - read it first to understand the contract a plugin gets.

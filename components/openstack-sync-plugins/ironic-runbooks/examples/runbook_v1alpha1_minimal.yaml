@@ -1,0 +1,33 @@
+# Minimal Runbook Example - Required Fields Only
+#
+# This example shows the absolute minimum required to create a valid runbook.
+# It includes only the 6 required fields:
+#   1. spec.cloudCredentialsRef (secretName + cloudName)
+#   2. spec.runbookName
+#   3. spec.steps (array with min 1 step)
+#   4. steps[].interface
+#   5. steps[].step
+#   6. steps[].order
+#
+# Use this as a starting point and add optional fields as needed.
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: minimal-runbook
+  namespace: default
+spec:
+  # REQUIRED: Secret holding the clouds.yaml, and the cloud entry to use
+  cloudCredentialsRef:
+    secretName: infrasetup-system
+    cloudName: understack
+
+  # REQUIRED: Runbook name. Any URL-safe string.
+  # Without spec.traits this runbook matches no nodes; see the other samples.
+  runbookName: minimal-example
+
+  # REQUIRED: At least one step
+  steps:
+    - interface: deploy      # REQUIRED: Hardware interface
+      step: erase_devices    # REQUIRED: Step name
+      order: 1               # REQUIRED: Execution order (unique)
