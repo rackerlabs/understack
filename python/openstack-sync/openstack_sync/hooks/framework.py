@@ -174,14 +174,8 @@ class SyncResource:
 class HookInputs:
     """Binding context split by reconciliation purpose.
 
-    The split matters: an event-driven run reconciles only the changed CRs, but
-    must prune against the *full* desired set from the snapshot, and must know
-    which credentials a deleted CR used in order to prune at all.
-
-    ``unreadable_resources`` names the CRs the binding context described but
-    that could not be read (see :class:`_ResourceReader`). They are absent from
-    every other field, so the desired set is not known to be complete while it
-    is non-empty.
+    Event runs reconcile changed CRs and prune against the snapshot. Unreadable
+    CRs are omitted from the resource lists and make the desired set incomplete.
     """
 
     resources_to_reconcile: list[SyncResource]
@@ -223,15 +217,7 @@ def _resource_identity(obj: dict[str, Any]) -> str:
 
 
 def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
-    """Build a :class:`SyncResource` from a Kubernetes object.
-
-    The spec is validated rather than assumed. The CRD marks
-    ``spec.cloudCredentialsRef`` required and its ``secretName`` / ``cloudName``
-    ``minLength: 1``, but that only binds writes: Kubernetes validates on
-    admission, so an object stored before the schema required those fields is
-    still served by the watch exactly as stored. Tightening a CRD neither
-    invalidates nor migrates what already exists.
-    """
+    """Build a resource from a Kubernetes object and validate required spec fields."""
     spec = obj.get("spec")
     if not isinstance(spec, dict):
         raise _MalformedResourceError("spec is missing or not an object")
@@ -265,17 +251,7 @@ def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
 
 
 class _ResourceReader:
-    """Reads watched objects into resources, naming the ones it cannot read.
-
-    An object that fails validation is reported and dropped rather than raised
-    past the batch, so one unusable CR does not stop the others from
-    reconciling. Its identity is retained because a dropped CR leaves the
-    desired set incomplete, which the caller needs in order to decide whether
-    pruning is safe.
-
-    One reader spans a whole binding context, so a CR that appears in both an
-    event and the accompanying snapshot is reported once.
-    """
+    """Reads watched objects into resources and records unreadable CRs."""
 
     def __init__(self) -> None:
         self.unreadable: set[str] = set()
@@ -323,20 +299,23 @@ def _status_is_current(resource: SyncResource) -> bool:
 
 def _split_events(
     contexts: list[dict[str, Any]], config: HookConfig, reader: _ResourceReader
-) -> tuple[list[SyncResource], list[SyncResource], frozenset[str]]:
+) -> tuple[list[SyncResource], list[SyncResource], bool]:
     """Split this binding's Event contexts into changed and deleted resources."""
     changed: list[SyncResource] = []
     deleted: list[SyncResource] = []
-    watch_events: set[str] = set()
+    saw_event_context = False
 
     for context in contexts:
         if context.get("binding") != config.binding_name:
             continue
         if context.get("type") != "Event":
             continue
+        saw_event_context = True
 
-        watch_event = context["watchEvent"]
-        watch_events.add(watch_event)
+        watch_event = context.get("watchEvent")
+        if not watch_event:
+            LOG.warning("%s event carries no watchEvent; ignoring it", config.crd_kind)
+            continue
 
         obj = context.get("object")
         if not obj:
@@ -363,7 +342,7 @@ def _split_events(
             changed.append(resource)
 
     changed.sort(key=lambda r: str(r.spec.get("name", "")))
-    return changed, deleted, frozenset(watch_events)
+    return changed, deleted, saw_event_context
 
 
 def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInputs:
@@ -374,22 +353,17 @@ def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInput
     runs reconcile everything they are given.
     """
     reader = _ResourceReader()
-    changed, deleted, watch_events = _split_events(contexts, config, reader)
+    changed, deleted, saw_event_context = _split_events(contexts, config, reader)
     items = snapshot_items(contexts, config.binding_name)
 
-    if watch_events:
+    if saw_event_context:
         if items is None:
             raise ConfigError(
                 f"Shell-operator {config.binding_name} event context does not "
                 f"contain {config.binding_name} snapshot objects"
             )
         desired = reader.read_all(items)
-        # Only prune when something actually changed. A bare Added/Modified for
-        # an unrelated CR must not trigger a prune sweep.
-        if changed or deleted or "Deleted" in watch_events:
-            prune_credentials = _credentials(desired) | _credentials(deleted)
-        else:
-            prune_credentials = frozenset()
+        prune_credentials = _credentials(changed) | _credentials(deleted)
         return HookInputs(
             changed, desired, deleted, prune_credentials, frozenset(reader.unreadable)
         )

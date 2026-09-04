@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://rackerlabs.github.io/understack/schema/openstack-sync/ironic-runbook.schema.json
+# BMC Maintenance Runbook
+#
+# Clears the BMC job queue and resynchronizes the BMC clock on Dell iDRAC nodes.
+# Runs without booting the cleaning ramdisk, so it is safe for out-of-band only work.
+#
+# Only nodes carrying the traits below are eligible.
+
+apiVersion: baremetal.ironicproject.org/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: bmc-maintenance
+  namespace: openstack
+  labels:
+    app.kubernetes.io/name: openstack-sync-plugins
+    app.kubernetes.io/component: ironic-runbooks
+    app.kubernetes.io/part-of: openstack-sync
+    use-case: bmc-maintenance
+    hardware-type: general
+spec:
+  cloudCredentialsRef:
+    # System-scoped credential: Ironic requires system_scope:all to publish a
+    # runbook, which the project-scoped infrasetup credential cannot satisfy.
+    secretName: infrasetup-system
+    cloudName: understack
+  runbookName: bmc-maintenance
+  description: "Performs BMC maintenance operations including clearing the job queue and synchronizing the BMC clock."
+  public: true
+  disableRamdisk: true
+  traits:
+    - CUSTOM_DELL_IDRAC
+  steps:
+  - interface: management
+    step: clear_job_queue
+    order: 1
+  - interface: management
+    step: set_bmc_clock
+    order: 2
+  extra:
+    version: "1.0.0"
+    use_case: "BMC housekeeping and clock synchronization"
+    warnings:
+      - "Clearing the job queue discards pending BMC jobs, including scheduled firmware updates"

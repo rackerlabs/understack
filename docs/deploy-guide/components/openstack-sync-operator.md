@@ -63,13 +63,13 @@ Important behavior:
 - The plugin Application applies every CR listed in
   `components/openstack-sync-plugins/kustomization.yaml` and
   `<deploy-repo>/<site>/openstack-sync-plugins/kustomization.yaml`.
-- `plugins.neutronRouterFlavors` does not control CR creation. It only controls
-  the operator runtime for that hook: enablement env vars, hook RBAC, and the
-  `verify-hooks` initContainer.
+- `plugins.<name>` does not control CR creation. It only controls the operator
+  runtime for that hook: enablement env vars, hook RBAC, and the `verify-hooks`
+  initContainer.
 
-Because of that split, `NeutronRouterFlavor` CRs can exist while
-`plugins.neutronRouterFlavors: false`. In that state ArgoCD can be Synced, but
-the operator will not reconcile those CRs into OpenStack.
+Because of that split, plugin CRs can exist while their hook is disabled. In
+that state ArgoCD can be Synced, but the operator will not reconcile those CRs
+into OpenStack.
 
 ## Enablement
 
@@ -96,18 +96,18 @@ intend to run in `<deploy-repo>/<site>/openstack-sync-operator/values.yaml`.
 
 Built-in hooks are declared in
 `components/openstack-sync-operator/values.yaml`.
-For Neutron router flavors, the default is:
+For each built-in CRD hook, the chart values use this shape:
 
 ```yaml
 plugins:
-  neutronRouterFlavors: false
+  <name>: false
 
 pluginData:
-  neutronRouterFlavors:
+  <name>:
     hook:
-      path: /hooks/router_flavors.py
-      crd: crds/neutron.understack.rackspace.net_neutronrouterflavors.yaml
-      envPrefix: NEUTRON_ROUTER_FLAVOR
+      path: /hooks/<hook>.py
+      crd: crds/<group>_<plural>.yaml
+      envPrefix: <ENV_PREFIX>
 ```
 
 Enable the hook from the deployment repo after the site is pinned to an
@@ -115,17 +115,16 @@ operator image built from this code:
 
 ```yaml title="$CLUSTER_NAME/openstack-sync-operator/values.yaml"
 plugins:
-  neutronRouterFlavors: true
+  <name>: true
 ```
 
-The image build in `containers/openstack-sync-operator/Dockerfile` copies both
-`python/openstack-sync/openstack_sync/hooks/placeholder.py` and
-`python/openstack-sync/openstack_sync/hooks/router_flavors.py` into `/hooks/`.
+The image build in `containers/openstack-sync-operator/Dockerfile` copies the
+enabled hook executables into `/hooks/`.
 
-When `plugins.neutronRouterFlavors: false`, the router-flavor hook still exists
-in the image but publishes only a no-op startup binding. That keeps
-shell-operator startup valid while preventing any watch, schedule, OpenStack
-sync, or hook-specific RBAC for router flavors.
+When `plugins.<name>: false`, that hook may still exist in the image but
+publishes only a no-op startup binding. That keeps shell-operator startup valid
+while preventing any watch, schedule, OpenStack sync, or hook-specific RBAC for
+that resource.
 
 When a hook is enabled, the chart:
 
@@ -141,7 +140,7 @@ They declare the hook path in `pluginData.<name>.hook.path`, and the chart
 generates one startup check for each enabled hook. The plugin author must still
 copy the hook executable into the operator image at that path.
 
-Rendered example for Neutron router flavors:
+Rendered shape:
 
 ```yaml
 initContainers:
@@ -152,18 +151,15 @@ initContainers:
   - -ec
   - |
     missing=0
-    if [ ! -x "/hooks/router_flavors.py" ]; then
-      echo "enabled hook neutronRouterFlavors missing or not executable: /hooks/router_flavors.py" >&2
+    if [ ! -x "/hooks/<hook>.py" ]; then
+      echo "enabled hook <name> missing or not executable: /hooks/<hook>.py" >&2
       missing=1
     fi
     exit "${missing}"
 ```
 
-For Neutron router flavors, the enabled hook registers a `kubernetes` binding
-that watches `NeutronRouterFlavor` CRs and a `schedule` binding for periodic
-sync. Reconciliation logic (reading CRs, calling `openstacksdk`, and patching CR
-status) is not yet implemented; the hook currently exits 0 without taking action
-on events.
+Hook-specific OpenStack behavior belongs with the plugin's CR examples or schema
+docs. This page documents only the operator deployment contract.
 
 When no hook is enabled, the operator can still start. In that state the Role
 has no custom-resource permissions and no OpenStack sync work is expected.
@@ -194,33 +190,31 @@ The plugin Application should continue to apply only CR manifests.
 
 ## CRDs and Validation
 
-The Neutron router flavor CRD is in:
-`components/openstack-sync-operator/crds/neutron.understack.rackspace.net_neutronrouterflavors.yaml`
+The CRDs live under `components/openstack-sync-operator/crds/`.
 
-It defines:
+Each plugin CRD defines:
 
-- API version: `neutron.understack.rackspace.net/v1alpha1`
-- Kind: `NeutronRouterFlavor`
-- Resource: `neutronrouterflavors`
 - Scope: namespaced
 - Status subresource: enabled
+- Required `spec.cloudCredentialsRef.secretName`
+- Required `spec.cloudCredentialsRef.cloudName`
 
 The chart reads this CRD through
 `components/openstack-sync-operator/templates/_crd.tpl` so
 RBAC and hook environment variables are derived from the same schema Kubernetes
 applies.
 
-Neutron router flavor CR files also reference the editor schema at:
-`schema/openstack-sync/neutron-router-flavor.schema.json`
+Plugin CR files can also reference editor schemas under:
+`schema/openstack-sync/`
 
-That schema focuses on the flavor data under `spec`. Kubernetes validates the
+That schema focuses on plugin data under `spec`. Kubernetes validates the
 full custom resource through the operator-owned CRD when ArgoCD applies it.
 
-## Current Neutron Router Flavor Data
+## Plugin CR Data
 
-Shared Neutron router flavor CRs live here:
+Shared plugin CRs live under:
 
-`components/openstack-sync-plugins/neutron-router-flavors/`
+`components/openstack-sync-plugins/`
 
 Site-specific additions live in the deploy repo:
 
