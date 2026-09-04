@@ -20,7 +20,8 @@ requests in a given tag, see the
 
 | Series | Status |
 | ------ | ------ |
-| [v0.4.x](v0.4.md) | Current |
+| [v0.5.x](v0.5.md) | Current |
+| [v0.4.x](v0.4.md) | Maintenance |
 
 ## How to read these pages
 
