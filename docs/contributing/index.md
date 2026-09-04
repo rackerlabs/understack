@@ -16,6 +16,9 @@ operating it.
   `changelog.d/` fragment, and CI enforces it.
 - [Adding and Removing an Application](../design-guide/add-remove-app.md) — how a
   component becomes an ArgoCD `Application`.
+- [Writing Ironic Drivers and Interfaces](writing-ironic-drivers.md) — how to add
+  a new hardware type or interface to `ironic-understack`, starting from no
+  Ironic knowledge.
 - [Design and Background](../openstack-helm.md) — why the project is shaped the
   way it is, starting with why we diverge from upstream OpenStack Helm.
 
