@@ -385,7 +385,7 @@ wheels = [
 
 [[package]]
 name = "ironic"
-version = "35.1.0"
+version = "37.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -436,9 +436,9 @@ dependencies = [
     { name = "websockify" },
     { name = "zeroconf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ed/08/2805493019808e1e9913ffacbbddac82a5e07d14387ebe8eb875a8acd767/ironic-35.1.0.tar.gz", hash = "sha256:8d1c198db1ca5b7c583b09216d5abcdecce72cd60a9339ca0889a111e321fce8", size = 3304283, upload-time = "2026-09-02T16:21:55.824Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/06/3e/b4415e6965c340a5f7f9055385f106fa9f1d1222635f75d72afbc12f2d2c/ironic-37.0.0.tar.gz", hash = "sha256:6710268d28c81827a035a18dc128c04f65eb0a435877a2801d84793ebea6d7ab", size = 3107964, upload-time = "2026-06-10T15:22:06.676Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/65/fa89b9927542350317f1d1c1269339b4e84bbb26e6b269dbbf5026f9b3e1/ironic-35.1.0-py3-none-any.whl", hash = "sha256:ca9ba934e734c9dff91457f17cb9c3d188e1afc8624d53525e85191edc901f60", size = 2609022, upload-time = "2026-09-02T16:21:53.961Z" },
+    { url = "https://files.pythonhosted.org/packages/95/33/10d566e2a6ebbe1fc2413c7bbd30cd8ba63466c145cf9c0c050b7bb25647/ironic-37.0.0-py3-none-any.whl", hash = "sha256:1d1f081ee08ca8d476b502ae6261e4f782a3388dfc0be169890291740d2d9be0", size = 2410745, upload-time = "2026-06-10T15:22:04.839Z" },
 ]
 
 [[package]]
@@ -460,7 +460,7 @@ test = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ironic", specifier = ">=35.1.0,<36" },
+    { name = "ironic", specifier = ">=37,<38" },
     { name = "pyyaml", specifier = "~=6.0" },
 ]
 
