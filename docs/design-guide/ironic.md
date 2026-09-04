@@ -1,5 +1,9 @@
 # Ironic
 
+See [Writing Ironic Drivers and Interfaces](../contributing/writing-ironic-drivers.md)
+for how to add a new hardware type or interface. This page documents what
+UnderStack ships today.
+
 ## Custom Hardware Types
 
 UnderStack ships additional Ironic hardware types via the `ironic-understack`

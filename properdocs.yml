@@ -235,6 +235,7 @@ nav:
   - Contributing:
     - contributing/index.md
     - design-guide/add-remove-app.md
+    - contributing/writing-ironic-drivers.md
     - 'Design and Background':
       - openstack-helm.md
       - design-guide/ironic.md
