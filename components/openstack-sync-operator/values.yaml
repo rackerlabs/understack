@@ -30,6 +30,7 @@ rbac:
 plugins:
   openstackPlaceholder: false
   neutronRouterFlavors: false
+  ironicRunbooks: false
 
 pluginData:
   openstackPlaceholder:
@@ -54,4 +55,19 @@ pluginData:
         READY_DELAY: 10
         # When true, removing a NeutronRouterFlavor CR also deletes its unused
         # operator-managed OpenStack flavor. Enable this before removing the CR.
+        PRUNE: false
+
+  ironicRunbooks:
+    hook:
+      path: /hooks/ironic_runbooks.py
+      crd: crds/baremetal.ironicproject.org_ironicrunbooks.yaml
+      envPrefix: IRONIC_RUNBOOK
+      env:
+        SYNC_CRONTAB: "0 * * * *"
+        # Ironic readiness wait before a runbook reconcile fails.
+        # Total wait is READY_RETRIES * READY_DELAY seconds.
+        READY_RETRIES: 30
+        READY_DELAY: 10
+        # When true, removing an IronicRunbook CR also deletes its
+        # operator-owned Ironic runbook. Enable this before removing the CR.
         PRUNE: false
