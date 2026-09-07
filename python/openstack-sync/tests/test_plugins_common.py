@@ -166,7 +166,10 @@ def test_wait_for_openstack_network_probes_neutron_flavors():
 
 def test_paginated_collection_uses_the_last_item_marker_for_the_next_page():
     pages = [
-        {"runbooks": [{"uuid": "runbook-1"}, {"uuid": "runbook-2"}]},
+        {
+            "runbooks": [{"uuid": "runbook-1"}, {"uuid": "runbook-2"}],
+            "next": "http://ironic/v1/runbooks?limit=2&marker=runbook-2",
+        },
         {"runbooks": [{"uuid": "runbook-3"}]},
     ]
     params_seen = []
@@ -185,3 +188,50 @@ def test_paginated_collection_uses_the_last_item_marker_for_the_next_page():
         {"limit": 2},
         {"limit": 2, "marker": "runbook-2"},
     ]
+
+
+def test_paginated_collection_keeps_paging_when_the_server_clamps_the_limit():
+    """A short page is not the end when ``next`` is set.
+
+    Ironic caps ``limit`` at ``[api] max_limit``, so a low max_limit makes every
+    page short, and stopping there would silently return only the first one.
+    """
+    pages = [
+        {"runbooks": [{"uuid": "runbook-1"}], "next": "http://ironic/next"},
+        {"runbooks": [{"uuid": "runbook-2"}], "next": "http://ironic/next"},
+        {"runbooks": [{"uuid": "runbook-3"}]},
+    ]
+    params_seen = []
+
+    def fetch(params):
+        params_seen.append(dict(params))
+        return pages.pop(0)
+
+    assert common.paginated_collection(
+        fetch,
+        collection_key="runbooks",
+        marker_key="uuid",
+        page_limit=100,
+    ) == [{"uuid": "runbook-1"}, {"uuid": "runbook-2"}, {"uuid": "runbook-3"}]
+    assert params_seen == [
+        {"limit": 100},
+        {"limit": 100, "marker": "runbook-1"},
+        {"limit": 100, "marker": "runbook-2"},
+    ]
+
+
+def test_paginated_collection_stops_when_the_last_item_has_no_marker():
+    """A bad marker returns what we have; raising would abort the whole sync."""
+    pages = [
+        {"runbooks": [{"uuid": "runbook-1"}, "unexpected"], "next": "http://ironic/x"},
+    ]
+
+    def fetch(params):
+        return pages.pop(0)
+
+    assert common.paginated_collection(
+        fetch,
+        collection_key="runbooks",
+        marker_key="uuid",
+        page_limit=2,
+    ) == [{"uuid": "runbook-1"}, "unexpected"]

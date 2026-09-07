@@ -118,7 +118,12 @@ def paginated_collection(
     marker_key: str,
     page_limit: int,
 ) -> list[Any]:
-    """Return every item from a marker-paginated OpenStack collection."""
+    """Return every item from a marker-paginated OpenStack collection.
+
+    Stops when a response has no ``next`` link. A short page is not the end:
+    Ironic caps ``limit`` at ``[api] max_limit``, so on a deployment that lowers
+    it every page comes back short and we would return only the first one.
+    """
     items: list[Any] = []
     marker: Any = None
 
@@ -127,11 +132,21 @@ def paginated_collection(
         if marker is not None:
             params["marker"] = marker
 
-        page = fetch_page(params).get(collection_key, [])
+        body = fetch_page(params)
+        page = body.get(collection_key, [])
         items.extend(page)
-        if len(page) < page_limit:
+        if not page or not body.get("next"):
             return items
-        marker = page[-1][marker_key]
+
+        marker = get_value(page[-1], marker_key)
+        if marker is None:
+            LOG.warning(
+                "Stopping pagination of %s: the last item has no %s, so this "
+                "list may be incomplete",
+                collection_key,
+                marker_key,
+            )
+            return items
 
 
 # ---------------------------------------------------------------------------

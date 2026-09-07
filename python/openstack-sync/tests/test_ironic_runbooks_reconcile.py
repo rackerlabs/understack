@@ -116,9 +116,14 @@ class FakeBaremetal:
                         if runbook["uuid"] == marker
                     )
                     runbooks = runbooks[start:]
-                if params and "limit" in params:
-                    runbooks = runbooks[: int(params["limit"])]
-                return _response(200, {"runbooks": runbooks})
+                limit = int(params["limit"]) if params and "limit" in params else None
+                if limit is not None:
+                    runbooks = runbooks[:limit]
+                body: dict[str, Any] = {"runbooks": runbooks}
+                # Ironic sends a next link when the page fills the limit.
+                if limit is not None and len(runbooks) == limit:
+                    body["next"] = "http://ironic/v1/runbooks?next"
+                return _response(200, body)
             if method == "POST":
                 book = dict(json)
                 if "traits" in book:
