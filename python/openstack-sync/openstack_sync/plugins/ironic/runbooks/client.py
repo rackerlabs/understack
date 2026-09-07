@@ -68,6 +68,30 @@ def wait_for_runbook_api(
 
 
 # ---------------------------------------------------------------------------
+# Identifiers
+# ---------------------------------------------------------------------------
+
+
+def assigned_uuid(runbook: dict[str, Any], name: str) -> str:
+    """Return the UUID Ironic assigned to *runbook*.
+
+    Every write goes to the UUID rather than the name. Ironic accepts either in
+    the path, but a name can be reassigned to another runbook, so a write
+    addressed to the UUID of the runbook just read cannot be redirected by a
+    rename that lands afterwards. Which runbook this is was still decided by the
+    read that resolved the name.
+    """
+    uuid = str(runbook.get("uuid") or "")
+    if not uuid:
+        raise ConfigError(
+            f"Ironic returned runbook {name!r} without a uuid, so it cannot be "
+            "written to; the response was truncated or the API is not serving "
+            "runbooks as expected"
+        )
+    return uuid
+
+
+# ---------------------------------------------------------------------------
 # Requests
 # ---------------------------------------------------------------------------
 
@@ -145,12 +169,17 @@ def patch_runbook(
     return _json_body(response)
 
 
-def delete_runbook(conn: Any, name: str) -> None:
-    """Delete the runbook named *name*, treating an absent one as success."""
+def delete_runbook(conn: Any, runbook_uuid: str) -> None:
+    """Delete the runbook with UUID *runbook_uuid*, treating an absent one as success.
+
+    Addressed by UUID for the same reason as :func:`patch_runbook`, and with more
+    at stake: the runbook being deleted was chosen from a list snapshot, and the
+    name it carried there may since belong to a different runbook.
+    """
     try:
-        _request(conn, "DELETE", f"{_RUNBOOKS_PATH}/{name}")
+        _request(conn, "DELETE", f"{_RUNBOOKS_PATH}/{runbook_uuid}")
     except openstack_exceptions.NotFoundException:
-        LOG.info("Runbook %s is already absent from Ironic", name)
+        LOG.info("Runbook %s is already absent from Ironic", runbook_uuid)
 
 
 def set_traits(conn: Any, runbook_uuid: str, traits: list[str]) -> None:

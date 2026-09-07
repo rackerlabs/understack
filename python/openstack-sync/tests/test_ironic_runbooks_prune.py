@@ -8,6 +8,7 @@ from unittest import mock
 import pytest
 from openstack import exceptions as openstack_exceptions
 
+from openstack_sync.plugins.common import ConfigError
 from openstack_sync.plugins.ironic.runbooks import client
 from openstack_sync.plugins.ironic.runbooks import markers
 from openstack_sync.plugins.ironic.runbooks import prune
@@ -43,7 +44,7 @@ def test_owned_runbook_absent_from_the_desired_set_is_deleted():
     _prune(fake, [_spec("CUSTOM_KEEP")])
 
     assert sorted(fake.runbooks) == ["CUSTOM_KEEP"]
-    assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE"]
+    assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE-uuid"]
 
 
 def test_owned_runbook_on_the_second_page_is_deleted():
@@ -63,7 +64,7 @@ def test_owned_runbook_on_the_second_page_is_deleted():
         {"detail": "true", "limit": 1, "marker": "CUSTOM_KEEP-uuid"},
         {"detail": "true", "limit": 1, "marker": "CUSTOM_GONE-uuid"},
     ]
-    assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE"]
+    assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE-uuid"]
 
 
 def test_runbook_the_operator_does_not_own_is_kept():
@@ -111,7 +112,7 @@ def test_a_runbook_deleted_out_of_band_is_not_an_error():
     with mock.patch.object(fake, "request", side_effect=vanish):
         _prune(fake, [_spec("CUSTOM_KEEP")])
 
-    assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE"]
+    assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE-uuid"]
 
 
 def test_a_conflict_leaves_the_runbook_in_place():
@@ -126,6 +127,44 @@ def test_a_conflict_leaves_the_runbook_in_place():
         _prune(fake, [_spec("CUSTOM_KEEP")])
 
     assert sorted(fake.runbooks) == ["CUSTOM_GONE"]
+
+
+# ---------------------------------------------------------------------------
+# Identifiers
+# ---------------------------------------------------------------------------
+
+
+def test_the_delete_is_addressed_to_the_uuid_not_the_name():
+    """Prune chose this runbook from a list snapshot taken earlier.
+
+    By the time the DELETE goes out the name may belong to a runbook another CR
+    has just created or adopted. The UUID from the snapshot cannot be reassigned
+    that way, so it is what the delete addresses.
+    """
+    fake = FakeBaremetal([_owned("CUSTOM_GONE")])
+    uuid = fake.uuid_of("CUSTOM_GONE")
+
+    _prune(fake, [_spec("CUSTOM_KEEP")])
+
+    assert fake.calls_for("DELETE") == [f"/runbooks/{uuid}"]
+    assert fake.runbooks == {}
+
+
+def test_a_runbook_with_no_uuid_fails_the_prune_instead_of_deleting():
+    """Better a failed prune than a DELETE to /runbooks/None."""
+    book = _owned("CUSTOM_GONE")
+    del book["uuid"]
+    fake = FakeBaremetal([book])
+
+    with pytest.raises(ConfigError, match="without a uuid"):
+        _prune(fake, [_spec("CUSTOM_KEEP")])
+
+    assert fake.calls_for("DELETE") == []
+
+
+# ---------------------------------------------------------------------------
+# Failures
+# ---------------------------------------------------------------------------
 
 
 def test_a_failure_other_than_conflict_or_not_found_stops_the_prune():

@@ -154,23 +154,6 @@ def _patch_operations(
     return operations
 
 
-def _runbook_uuid(runbook: dict[str, Any], name: str) -> str:
-    """Return the UUID Ironic assigned to *runbook*.
-
-    Every write goes to the UUID rather than the name. Ironic accepts either in
-    the path, but the UUID is what the runbook keeps across a rename, so a
-    write can never land on whatever else answers to that name.
-    """
-    uuid = str(runbook.get("uuid") or "")
-    if not uuid:
-        raise ConfigError(
-            f"Ironic returned runbook {name!r} without a uuid, so it cannot be "
-            "updated; the response was truncated or the API is not serving "
-            "runbooks as expected"
-        )
-    return uuid
-
-
 def ensure_runbook(conn: Any, spec: dict[str, Any]) -> dict[str, Any]:
     """Create or converge the runbook *spec* describes, and return it."""
     name = str(spec["runbookName"])
@@ -201,7 +184,7 @@ def ensure_runbook(conn: Any, spec: dict[str, Any]) -> dict[str, Any]:
         name,
         ", ".join(operation["path"] for operation in operations),
     )
-    return client.patch_runbook(conn, _runbook_uuid(existing, name), operations)
+    return client.patch_runbook(conn, client.assigned_uuid(existing, name), operations)
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +208,7 @@ def reconcile_traits(
         sorted(current),
         sorted(desired),
     )
-    client.set_traits(conn, _runbook_uuid(runbook, name), desired)
+    client.set_traits(conn, client.assigned_uuid(runbook, name), desired)
     return desired
 
 

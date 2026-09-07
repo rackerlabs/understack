@@ -24,14 +24,6 @@ from openstack_sync.plugins.ironic.runbooks.markers import is_managed_runbook
 LOG = logging.getLogger(__name__)
 
 
-def _delete_runbook(conn: Any, name: str) -> None:
-    LOG.info("Deleting removed Ironic runbook %s", name)
-    try:
-        client.delete_runbook(conn, name)
-    except openstack_exceptions.ConflictException:
-        LOG.info("Ironic runbook %s is still in use; skipping delete", name)
-
-
 def prune_removed_runbooks(
     conn: Any,
     desired_specs: list[dict[str, Any]],
@@ -63,4 +55,8 @@ def prune_removed_runbooks(
         if not is_managed_runbook(runbook):
             LOG.info("Keeping Ironic runbook %s; it is not operator-owned", name)
             continue
-        _delete_runbook(conn, str(name))
+        LOG.info("Deleting removed Ironic runbook %s", name)
+        try:
+            client.delete_runbook(conn, client.assigned_uuid(runbook, str(name)))
+        except openstack_exceptions.ConflictException:
+            LOG.info("Ironic runbook %s is still in use; skipping delete", name)

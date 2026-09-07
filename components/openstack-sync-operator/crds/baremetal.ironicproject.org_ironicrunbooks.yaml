@@ -167,9 +167,6 @@ spec:
             description: IronicRunbookStatus defines the observed sync state.
             type: object
             properties:
-              ironicUUID:
-                description: Ironic UUID of this runbook.
-                type: string
               syncStatus:
                 description: SyncStatus indicates the synchronization state with Ironic.
                 type: string
