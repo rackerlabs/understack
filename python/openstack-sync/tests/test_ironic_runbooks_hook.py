@@ -26,9 +26,9 @@ from openstack_sync.plugins.ironic.runbooks.config import ENV_PREFIX
 from openstack_sync.plugins.ironic.runbooks.config import RUNBOOK_MICROVERSION
 from tests.test_ironic_runbooks_reconcile import FakeBaremetal
 
-CRD_API_VERSION = "baremetal.ironicproject.org/v1alpha1"
+CRD_API_VERSION = "ironic.understack.rackspace.net/v1alpha1"
 CRD_KIND = "IronicRunbook"
-CRD_RESOURCE = "ironicrunbooks.baremetal.ironicproject.org"
+CRD_RESOURCE = "ironicrunbooks.ironic.understack.rackspace.net"
 
 RUNBOOK_NAME = "firmware-r740xd"
 

@@ -60,7 +60,7 @@ pluginData:
   ironicRunbooks:
     hook:
       path: /hooks/ironic_runbooks.py
-      crd: crds/baremetal.ironicproject.org_ironicrunbooks.yaml
+      crd: crds/ironic.understack.rackspace.net_ironicrunbooks.yaml
       envPrefix: IRONIC_RUNBOOK
       env:
         SYNC_CRONTAB: "0 * * * *"
