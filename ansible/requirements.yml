@@ -7,4 +7,4 @@ collections:
     type: git
     version: "2.5.0-36-gbcac650"
   - name: networktocode.nautobot
-    version: "==6.1.1"
+    version: "==6.2.0"
