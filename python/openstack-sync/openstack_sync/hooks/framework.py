@@ -427,6 +427,18 @@ class SyncPlugin(ABC):
     ) -> None:
         """Delete resources whose CR was removed.
 
+        *desired_specs* is every credential group's desired specs, not just
+        those of the credentials *conn* authenticates as. A plugin prunes by its
+        own ownership marker, which records no credential, and what a connection
+        lists depends on its token, so a resource one group manages is reachable
+        from another group's connection. The union is what keeps each group's
+        prune to the resources no group asked for.
+
+        One consequence: two credentials managing the same resource name keep
+        each other's resource off the prune list. If they are separate clouds
+        the resource leaks instead. That is the safer direction, since the
+        alternative is deleting a resource whose CR still exists.
+
         Optional: the default does nothing, which is correct for a plugin whose
         resources outlive their CR or that has nothing safe to delete.
         """
@@ -586,6 +598,16 @@ def _run_prune(
     noun = plugin.noun
     prune_failed = False
 
+    # Every group's desired resources, because a resource is not private to the
+    # credentials that manage it. A plugin prunes by its own ownership marker,
+    # which records no credential, and what a connection lists depends on its
+    # token: a system-scoped credential sees what a project-scoped one manages,
+    # and every credential sees what is public. The union is what keeps each
+    # group's prune to the resources no group asked for.
+    all_desired_specs = [
+        resource.spec for resource in inputs.desired_resources_for_prune
+    ]
+
     for credentials in sorted(inputs.prune_credentials):
         secret_name, cloud_name = credentials
         desired = grouped_desired.get(credentials, [])
@@ -624,7 +646,7 @@ def _run_prune(
         try:
             plugin.prune(
                 conn,
-                [resource.spec for resource in desired],
+                all_desired_specs,
                 authoritative_empty=authoritative_empty,
             )
         except Exception as exc:  # noqa: BLE001

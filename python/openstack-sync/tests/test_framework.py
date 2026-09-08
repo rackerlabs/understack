@@ -886,6 +886,51 @@ def test_run_sync_prune_is_authoritative_for_deleted_credentials():
     assert plugin.pruned == [([], True)]
 
 
+def test_run_sync_prunes_against_every_credentials_desired_resources():
+    """Prune is scoped by ownership marker, not by credentials, so the set is the union.
+
+    Here the credential whose only CR was deleted has an authoritative empty
+    desired set of its own, and can still list what the other credential manages.
+    It is handed every group's desired names, which is what keeps the resource
+    the other group still wants from being a prune candidate.
+    """
+    plugin = StubPlugin(make_hook_config(prune=True))
+    keeper = _resource("keeper", secret="infrasetup", cloud="understack")
+    gone = _resource("gone", secret="infrasetup-system", cloud="understack")
+    inputs = _inputs([keeper], desired=[keeper], deleted=[gone])
+
+    code, _, _ = _drive(plugin, inputs)
+
+    assert code == 0
+    # Sorted by credentials: infrasetup, then infrasetup-system. The second
+    # group's desired set is empty and authoritative, and it still sees keeper.
+    assert plugin.pruned == [(["keeper"], False), (["keeper"], True)]
+
+
+def test_run_sync_keeps_a_resource_another_credential_wants_off_the_prune_list():
+    """The bug the union closes, stated on its own.
+
+    Both credentials still want a resource, and each prunes with a connection
+    that can list what the other manages -- a system-scoped token sees another
+    project's runbooks, and every token sees what is public. Prune filters by an
+    ownership marker that records no credential, so a per-credential desired set
+    would offer the other group's resource up for deletion.
+    """
+    plugin = StubPlugin(make_hook_config(prune=True))
+    mine = _resource("mine", secret="infrasetup", cloud="understack")
+    theirs = _resource("theirs", secret="infrasetup-system", cloud="understack")
+    inputs = _inputs([mine, theirs])
+
+    code, _, _ = _drive(plugin, inputs)
+
+    assert code == 0
+    # Neither call may omit a name the other credential still wants.
+    assert [sorted(names) for names, _ in plugin.pruned] == [
+        ["mine", "theirs"],
+        ["mine", "theirs"],
+    ]
+
+
 def test_run_sync_skips_prune_for_credentials_with_no_desired_resources():
     """An empty desired set with no deletion may be an unreadable snapshot."""
     plugin = StubPlugin(make_hook_config(prune=True))
