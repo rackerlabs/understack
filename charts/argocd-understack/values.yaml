@@ -443,7 +443,7 @@ site:
     wave: 3
     # -- Chart version for Octavia
     # renovate: datasource=helm depName=octavia registryUrl=https://tarballs.opendev.org/openstack/openstack-helm
-    chartVersion: 2025.2.8+01c93d867
+    chartVersion: 2025.2.19+c665eedfa
 
   # -- Horizon (Dashboard)
   horizon:
