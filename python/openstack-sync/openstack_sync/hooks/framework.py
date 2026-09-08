@@ -174,8 +174,19 @@ class SyncResource:
 class HookInputs:
     """Binding context split by reconciliation purpose.
 
-    Event runs reconcile changed CRs and prune against the snapshot. Unreadable
-    CRs are omitted from the resource lists and make the desired set incomplete.
+    The split matters: an event-driven run reconciles only the changed CRs, but
+    must prune against the *full* desired set from the snapshot, and must know
+    which credentials a deleted CR used in order to prune at all.
+
+    ``prune_credentials`` is therefore the credentials of the changed and
+    deleted CRs, not of the whole snapshot: a bare event for an unrelated CR
+    must not sweep a cloud nothing asked about. The desired set each prune
+    compares against stays the full one (see :meth:`SyncPlugin.prune`).
+
+    ``unreadable_resources`` names the CRs the binding context described but
+    that could not be read (see :class:`_ResourceReader`). They are absent from
+    every other field, so the desired set is not known to be complete while it
+    is non-empty.
     """
 
     resources_to_reconcile: list[SyncResource]
@@ -217,7 +228,15 @@ def _resource_identity(obj: dict[str, Any]) -> str:
 
 
 def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
-    """Build a resource from a Kubernetes object and validate required spec fields."""
+    """Build a :class:`SyncResource` from a Kubernetes object.
+
+    The spec is validated rather than assumed. The CRD marks
+    ``spec.cloudCredentialsRef`` required and its ``secretName`` / ``cloudName``
+    ``minLength: 1``, but that only binds writes: Kubernetes validates on
+    admission, so an object stored before the schema required those fields is
+    still served by the watch exactly as stored. Tightening a CRD neither
+    invalidates nor migrates what already exists.
+    """
     spec = obj.get("spec")
     if not isinstance(spec, dict):
         raise _MalformedResourceError("spec is missing or not an object")
@@ -251,7 +270,17 @@ def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
 
 
 class _ResourceReader:
-    """Reads watched objects into resources and records unreadable CRs."""
+    """Reads watched objects into resources, naming the ones it cannot read.
+
+    An object that fails validation is reported and dropped rather than raised
+    past the batch, so one unusable CR does not stop the others from
+    reconciling. Its identity is retained because a dropped CR leaves the
+    desired set incomplete, which the caller needs in order to decide whether
+    pruning is safe.
+
+    One reader spans a whole binding context, so a CR that appears in both an
+    event and the accompanying snapshot is reported once.
+    """
 
     def __init__(self) -> None:
         self.unreadable: set[str] = set()
@@ -438,6 +467,13 @@ class SyncPlugin(ABC):
         each other's resource off the prune list. If they are separate clouds
         the resource leaks instead. That is the safer direction, since the
         alternative is deleting a resource whose CR still exists.
+
+        *authoritative_empty* is scoped to this credential group, not to
+        *desired_specs*: it says a CR using *these* credentials was deleted, so
+        an empty desired set is a real one rather than a snapshot that could not
+        be read. Because *desired_specs* is the union, it can be non-empty while
+        this is True; a plugin only needs it to decide whether an empty
+        *desired_specs* may be acted on.
 
         Optional: the default does nothing, which is correct for a plugin whose
         resources outlive their CR or that has nothing safe to delete.

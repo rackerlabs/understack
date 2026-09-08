@@ -50,8 +50,9 @@ reading the binding context, and the exit code.
    (`required`, `enum`, `minLength`, `default`) in the schema so the API server
    rejects bad CRs at admission.
 
-   Read optional fields with explicit defaults. Missing required fields are
-   rejected by the CRD schema.
+   The schema only validates writes, though. A CR stored before you tightened
+   the schema is still served as stored, so give optional fields a default and
+   fail one CR by name when a required field is missing.
 
 2. **Register it** in `components/openstack-sync-operator/values.yaml`:
 

@@ -43,7 +43,7 @@
       "description": "Ironic runbook data stored under spec.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["cloudCredentialsRef", "runbookName", "steps"],
+      "required": ["cloudCredentialsRef", "runbookName", "steps", "traits"],
       "properties": {
         "cloudCredentialsRef": {
           "$ref": "#/definitions/cloudCredentialsRef"
@@ -61,15 +61,15 @@
           "maxLength": 255
         },
         "traits": {
-          "description": "Traits deciding which nodes this runbook may act on. A node must carry at least one; a runbook with no traits matches no nodes.",
+          "description": "Traits deciding which nodes this runbook may act on. A node must carry at least one. Required and non-empty: Ironic rejects a clean or service request naming a runbook with no traits, so an empty list is never a usable state.",
           "type": "array",
+          "minItems": 1,
           "items": {
             "type": "string",
             "minLength": 1,
             "maxLength": 255,
             "pattern": "^CUSTOM_[A-Z0-9_]+$"
-          },
-          "default": []
+          }
         },
         "steps": {
           "description": "Ordered runbook steps.",

@@ -57,6 +57,7 @@ spec:
             - cloudCredentialsRef
             - runbookName
             - steps
+            - traits
             properties:
               cloudCredentialsRef:
                 description: >-
@@ -98,9 +99,11 @@ spec:
               traits:
                 description: >-
                   Traits deciding which nodes this runbook may act on. A node
-                  must carry at least one; a runbook with no traits matches no nodes.
+                  must carry at least one. Required and non-empty: Ironic
+                  rejects a clean or service request naming a runbook with no
+                  traits, so an empty list is never a usable state.
                 type: array
-                default: []
+                minItems: 1
                 items:
                   type: string
                   minLength: 1

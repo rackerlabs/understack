@@ -1,13 +1,14 @@
 # Minimal Runbook Example - Required Fields Only
 #
 # This example shows the absolute minimum required to create a valid runbook.
-# It includes only the 6 required fields:
+# It includes only the 7 required fields:
 #   1. spec.cloudCredentialsRef (secretName + cloudName)
 #   2. spec.runbookName
-#   3. spec.steps (array with min 1 step)
-#   4. steps[].interface
-#   5. steps[].step
-#   6. steps[].order
+#   3. spec.traits (array with min 1 trait)
+#   4. spec.steps (array with min 1 step)
+#   5. steps[].interface
+#   6. steps[].step
+#   7. steps[].order
 #
 # Use this as a starting point and add optional fields as needed.
 
@@ -23,9 +24,14 @@ spec:
     cloudName: understack
 
   # REQUIRED: Runbook name. Any URL-safe string.
-  # Without spec.traits this runbook matches no nodes, and without spec.public or
-  # spec.owner nobody can see or use it; see the other samples.
+  # Note that without spec.public or spec.owner nobody can see or use this
+  # runbook; see the other samples.
   runbookName: minimal-example
+
+  # REQUIRED: At least one trait. A node must carry one of these for the runbook
+  # to run on it, and Ironic refuses a runbook that has none.
+  traits:
+    - CUSTOM_MINIMAL_EXAMPLE
 
   # REQUIRED: At least one step
   steps:

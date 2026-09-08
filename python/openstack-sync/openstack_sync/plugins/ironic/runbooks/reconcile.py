@@ -70,7 +70,17 @@ def desired_steps(spec: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def canonical_steps(steps: Any) -> list[tuple[str, str, str, str]]:
-    """Return *steps* as an order-insensitive comparison key."""
+    """Return *steps* as an order-insensitive comparison key.
+
+    Known limitation: a step argument that looks like a secret (a ``password``
+    key, a URL with credentials in it) comes back from Ironic as ``******``,
+    never as what was written. The CR still holds the real value, so such a step
+    always compares unequal and we rewrite ``/steps`` on every reconcile.
+
+    That is a repeated write of the values already stored, so it is left as is.
+    Ignoring a masked value instead would also hide a genuine edit to it. Steps
+    with no credentials in their arguments are unaffected.
+    """
     if not isinstance(steps, list):
         return []
     return sorted(
@@ -125,6 +135,8 @@ def _patch_operations(
         operations.append({"op": "add", "path": f"/{field}", "value": value})
 
     steps = desired_steps(spec)
+    # A step carrying a credential in its args always compares unequal; see
+    # canonical_steps for why, and why that is accepted.
     if canonical_steps(existing.get("steps")) != canonical_steps(steps):
         set_field("steps", steps)
 

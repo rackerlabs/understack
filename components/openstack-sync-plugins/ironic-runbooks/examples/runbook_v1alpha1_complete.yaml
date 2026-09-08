@@ -29,7 +29,7 @@ spec:
   # OPTIONAL: Human-readable description (max 255 characters)
   description: "Complete example runbook exercising every field"
 
-  # OPTIONAL: Traits deciding which nodes this runbook may act on
+  # REQUIRED: Traits deciding which nodes this runbook may act on (min 1)
   traits:
     - CUSTOM_COMPLETE_EXAMPLE
 

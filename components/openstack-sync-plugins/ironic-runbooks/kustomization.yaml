@@ -2,4 +2,6 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+# Nothing is applied from this component. The IronicRunbook CRs under examples/
+# are references a site copies into its own deploy repo; see examples/README.md.
 resources: []

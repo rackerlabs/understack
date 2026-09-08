@@ -498,12 +498,13 @@ or event-source logs when verifying this behavior in an environment.
 
 ### Runbook CRD
 
-The runbook CRD is defined under
-`runbook-crd`, and the shell operator hook
-that syncs Kubernetes `IronicRunbook` objects into Ironic is
-`create_runbook.sh`.
+The `IronicRunbook` CRD is defined under
+`components/openstack-sync-operator/crds/`, and the hook that syncs Kubernetes
+`IronicRunbook` objects into Ironic is the `ironicRunbooks` hook in
+`openstack-sync-operator` (`ironic_runbooks.py`).
 
-Checked-in sample runbooks include:
+Reference runbooks live under
+`components/openstack-sync-plugins/ironic-runbooks/examples/` and include:
 
 | File | Runbook name |
 | --- | --- |
@@ -511,8 +512,11 @@ Checked-in sample runbooks include:
 | `runbook_raid_config.yaml` | `CUSTOM_STORAGE_RAID` |
 | `runbook_firmware_update.yaml` | `CUSTOM_FIRMWARE_UPDATE` |
 
-These are sample manifests in the repository. This document does not assume
-they are deployed unless the environment confirms that.
+These are reference manifests in the repository, and nothing in that directory
+is applied. This document does not assume they are deployed unless the
+environment confirms that. Using one means copying it into the deploy repo under
+`<deploy-repo>/<site>/openstack-sync-plugins/` and setting
+`spec.cloudCredentialsRef`; see that directory's `README.md`.
 
 ## Key Files
 
@@ -525,4 +529,4 @@ they are deployed unless the environment confirms that.
 | `sensor-ironic-node-reclean.yaml` | Existing clean-failed event sensor |
 | `pr-clean-failed-servers.yaml` | Existing clean-failed Prometheus alert |
 | `server-firmware-update.yaml` | Existing firmware runbook workflow |
-| `runbook-crd/samples` | Sample runbook manifests, not assumed deployed |
+| `openstack-sync-plugins/ironic-runbooks/examples` | Reference runbook manifests, not applied |
