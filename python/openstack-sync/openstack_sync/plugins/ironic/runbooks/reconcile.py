@@ -144,12 +144,15 @@ def _patch_operations(
     if str(existing.get("description") or "") != description:
         set_field("description", description)
 
+    # Ironic's field unless the CR claims it. A project-scoped create is assigned
+    # the caller's own project, and only a system-scoped token may patch /owner
+    # afterwards, so an unset spec.owner leaves the field to Ironic rather than
+    # asking for it to be empty. Making a runbook public clears the owner, and
+    # Ironic does that itself.
     if spec.get("owner"):
         owner = str(spec["owner"])
         if str(existing.get("owner") or "") != owner:
             set_field("owner", owner)
-    elif not public and existing.get("owner") is not None:
-        set_field("owner", None)
 
     return operations
 
@@ -241,6 +244,34 @@ def render_runbook(runbook: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def usability_notes(runbook: dict[str, Any]) -> list[str]:
+    """Return notes for a converged runbook no project can reach at all.
+
+    Ironic reaches a runbook through its owner. ``runbook:get`` resolves
+    ``project_id:%(runbook.owner)s`` and, failing that, falls back to the
+    runbook being public; a project-scoped list is filtered to
+    ``owner == project OR public``. So one that is neither public nor owned
+    converges and is still invisible to every project. A system-scoped
+    credential and an unset ``spec.owner`` is the ordinary way to arrive there,
+    since Ironic assigns an owner only on a project-scoped create.
+
+    ``runbook:use`` has no such fallback: it resolves the owner alone, so a
+    public runbook is visible to every project and usable only by a
+    system-scoped or ``role:service`` token. Which token that is belongs to the
+    caller running the clean or service request, not to this CR, so it is not
+    noted here.
+    """
+    if get_value(runbook, "public", default=False):
+        return []
+    if get_value(runbook, "owner") is not None:
+        return []
+    return [
+        "the runbook is neither public nor owned, so no project can see it and "
+        "no project-scoped token can use it; set spec.owner to the project that "
+        "should own it, or spec.public to let every project see it"
+    ]
+
+
 def sync_runbook(conn: Any, spec: dict[str, Any], _cache: Any = None) -> list[str]:
     """Converge one IronicRunbook spec."""
     name = validate_spec(spec)
@@ -249,9 +280,10 @@ def sync_runbook(conn: Any, spec: dict[str, Any], _cache: Any = None) -> list[st
     runbook = ensure_runbook(conn, spec)
     traits = reconcile_traits(conn, runbook, spec)
 
+    # The traits the PUT just set are not in the body it answered with.
+    reconciled = {**runbook, "traits": traits}
     LOG.info(
         "Reconciled Ironic runbook: %s",
-        # The traits the PUT just set are not in the body it answered with.
-        json.dumps(render_runbook({**runbook, "traits": traits}), sort_keys=True),
+        json.dumps(render_runbook(reconciled), sort_keys=True),
     )
-    return []
+    return usability_notes(reconciled)

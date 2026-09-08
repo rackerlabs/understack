@@ -23,7 +23,8 @@ spec:
     cloudName: understack
 
   # REQUIRED: Runbook name. Any URL-safe string.
-  # Without spec.traits this runbook matches no nodes; see the other samples.
+  # Without spec.traits this runbook matches no nodes, and without spec.public or
+  # spec.owner nobody can see or use it; see the other samples.
   runbookName: minimal-example
 
   # REQUIRED: At least one step

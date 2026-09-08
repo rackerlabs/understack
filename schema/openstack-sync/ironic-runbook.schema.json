@@ -85,13 +85,14 @@
           "default": false
         },
         "public": {
-          "description": "Whether the runbook is available to all projects. A public runbook cannot have an owner.",
+          "description": "Whether every project can see the runbook. A public runbook cannot have an owner, and only a system-scoped credential can create one or set this on an existing runbook. Note that public governs visibility, not use: Ironic authorises a clean or service request against the runbook's owner alone, so a public runbook can be used only by a system-scoped or role:service token, never by a project-scoped one.",
           "type": "boolean",
           "default": false
         },
         "owner": {
-          "description": "Project that owns this runbook. Leave unset to let Ironic assign the credentials' own project.",
+          "description": "Project that owns this runbook, and the only project whose manager or admin may use it. Unset leaves the field to Ironic, which fills it in for a project-scoped credential and leaves it empty for a system-scoped one; a runbook that is neither public nor owned can be seen and used by nobody. Removing this field from a CR does not clear an owner Ironic already assigned -- set public to true to clear it, which Ironic does itself. Moving a runbook between public and owned needs a system-scoped credential either way.",
           "type": "string",
+          "minLength": 1,
           "maxLength": 255
         },
         "extra": {

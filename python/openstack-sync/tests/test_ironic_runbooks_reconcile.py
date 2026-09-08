@@ -40,7 +40,16 @@ def _response(status_code: int, body: Any = None) -> requests.Response:
 class FakeBaremetal:
     """In-memory stand-in for Ironic's runbook endpoints."""
 
-    def __init__(self, runbooks: list[dict[str, Any]] | None = None) -> None:
+    def __init__(
+        self,
+        runbooks: list[dict[str, Any]] | None = None,
+        *,
+        project_id: str | None = None,
+    ) -> None:
+        # project_id models a project-scoped credential: Ironic assigns the owner
+        # itself on such a create, and refuses a patch of /owner or /public,
+        # both of which are gated on the system-scoped SYSTEM_MEMBER.
+        self.project_id = project_id
         self.runbooks = {book["name"]: dict(book) for book in runbooks or []}
         self.calls: list[tuple[str, str]] = []
         self.bodies: list[Any] = []
@@ -129,6 +138,20 @@ class FakeBaremetal:
                 if "traits" in book:
                     return _response(400, {"error_message": "traits not allowed"})
                 book["traits"] = []
+                if self.project_id is not None:
+                    if book.get("public"):
+                        # Ironic refuses outright rather than creating a
+                        # runbook the caller could not have shared.
+                        return _response(
+                            400,
+                            {
+                                "error_message": "Cannot create a public runbook "
+                                "as a project scoped admin."
+                            },
+                        )
+                    # A project-scoped create carries the caller's own project,
+                    # whatever the request asked for.
+                    book["owner"] = self.project_id
                 # Ironic generates the UUID on create and returns it, which is
                 # what the caller then addresses its traits PUT to.
                 book.setdefault("uuid", f"{book['name']}-uuid")
@@ -143,6 +166,19 @@ class FakeBaremetal:
             if method == "GET":
                 return _response(200, book)
             if method == "PATCH":
+                if self.project_id is not None:
+                    gated = [
+                        operation["path"]
+                        for operation in json
+                        if operation["path"].lstrip("/") in ("owner", "public")
+                    ]
+                    if gated:
+                        # Authorised before anything is applied, so the whole
+                        # patch is refused.
+                        return _response(
+                            403,
+                            {"error_message": f"policy forbids patching {gated[0]}"},
+                        )
                 for operation in json:
                     field = operation["path"].lstrip("/")
                     if field == "traits":
@@ -150,6 +186,11 @@ class FakeBaremetal:
                     book[field] = operation["value"]
                     if field == "public" and operation["value"] is True:
                         book["owner"] = None
+                # Ironic nulls the owner whenever /public is patched at all and
+                # then applies the patch, so an /owner operation in the same
+                # body still wins. Clearing only on True is the same outcome
+                # here, because a public runbook always has a null owner, so
+                # patching /public to False can never find one to clear.
                 return _response(200, book)
             if method == "DELETE":
                 del self.runbooks[book["name"]]
@@ -503,14 +544,42 @@ def test_a_dropped_description_is_cleared():
     assert patch == [{"op": "add", "path": "/description", "value": ""}]
 
 
-def test_owner_is_cleared_when_the_spec_drops_it():
-    fake = FakeBaremetal([_runbook(public=False, owner="project-123")])
-    private = _spec(public=False)
+def test_an_owner_the_spec_does_not_name_is_left_alone():
+    """An unset spec.owner leaves the field to Ironic.
 
-    reconcile.sync_runbook(_conn(fake), private)
-    (patch,) = fake.patches
-    assert patch == [{"op": "add", "path": "/owner", "value": None}]
-    assert fake.runbooks[_NAME]["owner"] is None
+    A project-scoped create is assigned the caller's own project, so a spec that
+    names no owner still reads one back on every reconcile after the first. It
+    stays as Ironic set it: ``/owner`` is patchable only by a system-scoped
+    token, which is not the token that was given the owner.
+    """
+    fake = FakeBaremetal([_runbook(public=False, owner="project-123")])
+
+    reconcile.sync_runbook(_conn(fake), _spec(public=False))
+
+    assert fake.patches == []
+    assert fake.runbooks[_NAME]["owner"] == "project-123"
+
+
+def test_a_project_scoped_runbook_reconciles_twice_without_touching_owner():
+    """Two passes against project-scoped Ironic over a spec that names no owner.
+
+    The owner assigned on the create is the one piece of drift the second pass
+    must leave alone, and the fake refuses a patch of ``/owner`` exactly as the
+    policy does.
+    """
+    fake = FakeBaremetal(project_id="project-abc")
+    spec = _spec(public=False)
+
+    first = reconcile.sync_runbook(_conn(fake), spec)
+    assert fake.runbooks[_NAME]["owner"] == "project-abc"
+
+    # Raises rather than returns if the second pass emits a patch of /owner.
+    second = reconcile.sync_runbook(_conn(fake), spec)
+
+    assert fake.calls_for("PATCH") == []
+    # Ironic gave it an owner, so there is nothing to warn about either.
+    assert first == []
+    assert second == []
 
 
 def test_owner_is_patched_when_the_spec_claims_one():
@@ -530,6 +599,57 @@ def test_switching_to_public_clears_owner_through_ironic():
     (patch,) = fake.patches
     assert patch == [{"op": "add", "path": "/public", "value": True}]
     assert fake.runbooks[_NAME]["owner"] is None
+
+
+def test_switching_from_public_to_owned_sets_both_fields_in_one_patch():
+    """The reverse transition, which Ironic only accepts atomically.
+
+    Ironic rejects an owner on a runbook that stays public, so /public and
+    /owner have to travel in the same body. It nulls the owner as soon as it
+    sees /public and then applies the patch, so the /owner operation is what
+    the runbook ends up with.
+    """
+    fake = FakeBaremetal([_runbook(public=True, owner=None)])
+
+    reconcile.sync_runbook(_conn(fake), {**_spec(public=False), "owner": "project-1"})
+
+    (patch,) = fake.patches
+    assert patch == [
+        {"op": "add", "path": "/public", "value": False},
+        {"op": "add", "path": "/owner", "value": "project-1"},
+    ]
+    assert fake.runbooks[_NAME]["public"] is False
+    assert fake.runbooks[_NAME]["owner"] == "project-1"
+
+
+def test_a_project_scoped_credential_cannot_move_a_runbook_between_public_and_owned():
+    """Both /public and /owner are system-scoped, and Ironic demands both.
+
+    A patch naming either path is authorised against that path's own policy, so
+    a project-scoped token is refused whichever direction it is going.
+    """
+    fake = FakeBaremetal([_runbook(public=True, owner=None)], project_id="project-abc")
+
+    with pytest.raises(openstack_exceptions.HttpException):
+        reconcile.sync_runbook(
+            _conn(fake), {**_spec(public=False), "owner": "project-abc"}
+        )
+
+    assert fake.runbooks[_NAME]["public"] is True
+
+
+def test_a_project_scoped_credential_cannot_create_a_public_runbook():
+    """Ironic refuses the create rather than making an unshareable runbook.
+
+    Only a system-scoped credential can create a public runbook, so a CR that
+    asks for one has to name a system-scoped secret in cloudCredentialsRef.
+    """
+    fake = FakeBaremetal(project_id="project-abc")
+
+    with pytest.raises(openstack_exceptions.HttpException):
+        reconcile.sync_runbook(_conn(fake), _spec(public=True))
+
+    assert fake.runbooks == {}
 
 
 def test_patch_uses_add_so_it_works_on_fields_ironic_omits():
@@ -704,3 +824,53 @@ def test_render_runbook_summarises_steps_without_their_args():
     assert rendered["traits"] == ["CUSTOM_DELL_IDRAC"]
     assert rendered["description"] == "Performs BMC maintenance"
     assert rendered["extra_keys"] == sorted(markers.managed_extra({"version": "1.0.0"}))
+
+
+# ---------------------------------------------------------------------------
+# Usability
+# ---------------------------------------------------------------------------
+
+
+def test_a_public_runbook_needs_no_owner_to_be_reachable():
+    """Public is what makes it visible; who may use it is the caller's scope."""
+    assert reconcile.usability_notes(_runbook(public=True, owner=None)) == []
+
+
+def test_an_owned_runbook_is_usable_by_the_project_that_owns_it():
+    assert reconcile.usability_notes(_runbook(public=False, owner="project-123")) == []
+
+
+def test_a_runbook_that_is_neither_public_nor_owned_reports_that_nobody_can_see_it():
+    """Ironic will serve it to no project, and reconciling it raises nothing.
+
+    ``runbook:get`` resolves ``project_id:%(runbook.owner)s`` before falling
+    back to the runbook being public, and a project-scoped list filters on
+    ``owner == project OR public``, so neither one finds it. The note is the
+    only signal there is, since the runbook converges as readily as a
+    reachable one.
+    """
+    (note,) = reconcile.usability_notes(_runbook(public=False, owner=None))
+
+    assert "no project can see it" in note
+    assert "spec.owner" in note
+    assert "spec.public" in note
+
+
+def test_sync_reports_the_unusable_runbook_it_just_created():
+    """A system-scoped credential leaves the owner empty.
+
+    Ironic assigns one only on a project-scoped create, so this is the default
+    outcome of the credential every shipped CR uses.
+    """
+    fake = FakeBaremetal()
+
+    notes = reconcile.sync_runbook(_conn(fake), _spec(public=False))
+
+    assert fake.runbooks[_NAME]["owner"] is None
+    assert notes and "no project can see it" in notes[0]
+
+
+def test_sync_reports_nothing_for_a_runbook_projects_can_see():
+    fake = FakeBaremetal()
+
+    assert reconcile.sync_runbook(_conn(fake), _spec(public=True)) == []

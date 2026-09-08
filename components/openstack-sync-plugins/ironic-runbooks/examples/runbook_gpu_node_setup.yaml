@@ -21,6 +21,14 @@ spec:
 
   runbookName: CUSTOM_GPU_SETUP
 
+  # Fleet-wide operator tooling, so every project may see it. public governs
+  # visibility only: Ironic authorises a clean or service request against the
+  # runbook's owner, so a public runbook is usable by a system-scoped or
+  # role:service token and not by a project-scoped one. Set spec.owner instead
+  # to hand use to one project. A runbook that is neither public nor owned can
+  # be seen and used by nobody.
+  public: true
+
   # Nodes must carry at least one of these traits for this runbook to act on them.
   traits:
     - CUSTOM_GPU_SETUP

@@ -76,7 +76,11 @@ spec:
   public: false
 
   # OPTIONAL: Project/tenant owner (default: null)
-  # Note: Cannot be set if public is true
+  # Note: Cannot be set if public is true. Unset leaves the field to Ironic,
+  # which fills it in only for a project-scoped credential; a runbook that is
+  # neither public nor owned can be seen and used by nobody. The owning project
+  # is the only one whose manager or admin may use the runbook. Removing this
+  # field later does not clear an owner Ironic already assigned.
   owner: "project-123"
 
   # OPTIONAL: Additional metadata (default: {})

@@ -382,3 +382,81 @@ def test_main_creates_then_prunes_against_a_fake_ironic(
     ]
     assert run(deleted, "true") == 0
     assert fake.runbooks == {}
+
+
+@pytest.mark.parametrize(
+    ("project_id", "expected_owner", "expect_note"),
+    [
+        pytest.param("project-abc", "project-abc", False, id="project-scoped"),
+        pytest.param(None, None, True, id="system-scoped"),
+    ],
+)
+def test_main_reconciles_a_non_public_runbook_twice_without_patching_owner(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    project_id: str | None,
+    expected_owner: str | None,
+    expect_note: bool,
+):
+    """The whole chain twice, over a CR that names no owner, for both credentials.
+
+    A project-scoped create is assigned the caller's own project, which the
+    second pass reads back as an owner the spec never asked for and has to leave
+    alone: ``/owner`` is patchable only by a system-scoped token, and the fake
+    refuses it the way the policy does.
+
+    A system-scoped create leaves the owner empty, and that is a runbook no
+    project can get, list or use. Ironic is satisfied either way, so the note on
+    the CR is the only thing that says which one this is.
+    """
+    fake = FakeBaremetal(project_id=project_id)
+    conn = types.SimpleNamespace(baremetal=fake)
+    contexts = [
+        {
+            "binding": BINDING_NAME,
+            "type": "Schedule",
+            "snapshots": {
+                BINDING_NAME: [
+                    {"object": ironic_runbook_object(RUNBOOK_NAME, {"public": False})}
+                ]
+            },
+        }
+    ]
+
+    def run() -> tuple[int, Any]:
+        monkeypatch.setenv(
+            "BINDING_CONTEXT_PATH", write_binding_context(tmp_path, contexts)
+        )
+        with (
+            mock.patch.object(hook.sys, "argv", ["ironic_runbooks.py"]),
+            mock.patch(
+                "openstack_sync.hooks.framework.get_openstack_connection",
+                return_value=conn,
+            ),
+            mock.patch(
+                "openstack_sync.hooks.framework.patch_resource_status"
+            ) as patch_status,
+            mock.patch.object(
+                hook.client.openstack_utils,
+                "maximum_supported_microversion",
+                return_value=RUNBOOK_MICROVERSION,
+            ),
+        ):
+            return hook.main(), patch_status
+
+    clear_env(monkeypatch)
+    set_crd_identity(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    monkeypatch.setenv(f"{ENV_PREFIX}_PRUNE", "false")
+
+    code, _ = run()
+    assert code == 0
+    assert fake.runbooks[RUNBOOK_NAME]["owner"] == expected_owner
+
+    code, patch_status = run()
+
+    assert code == 0
+    assert fake.calls_for("PATCH") == []
+    assert patch_status.call_args.kwargs["sync_status"] == "Synced"
+    message = patch_status.call_args.kwargs["message"]
+    assert ("no project can see it" in message) is expect_note
