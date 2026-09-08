@@ -178,6 +178,11 @@ class HookInputs:
     must prune against the *full* desired set from the snapshot, and must know
     which credentials a deleted CR used in order to prune at all.
 
+    ``prune_credentials`` is therefore the credentials of the changed and
+    deleted CRs, not of the whole snapshot: a bare event for an unrelated CR
+    must not sweep a cloud nothing asked about. The desired set each prune
+    compares against stays the full one (see :meth:`SyncPlugin.prune`).
+
     ``unreadable_resources`` names the CRs the binding context described but
     that could not be read (see :class:`_ResourceReader`). They are absent from
     every other field, so the desired set is not known to be complete while it
@@ -323,20 +328,23 @@ def _status_is_current(resource: SyncResource) -> bool:
 
 def _split_events(
     contexts: list[dict[str, Any]], config: HookConfig, reader: _ResourceReader
-) -> tuple[list[SyncResource], list[SyncResource], frozenset[str]]:
+) -> tuple[list[SyncResource], list[SyncResource], bool]:
     """Split this binding's Event contexts into changed and deleted resources."""
     changed: list[SyncResource] = []
     deleted: list[SyncResource] = []
-    watch_events: set[str] = set()
+    saw_event_context = False
 
     for context in contexts:
         if context.get("binding") != config.binding_name:
             continue
         if context.get("type") != "Event":
             continue
+        saw_event_context = True
 
-        watch_event = context["watchEvent"]
-        watch_events.add(watch_event)
+        watch_event = context.get("watchEvent")
+        if not watch_event:
+            LOG.warning("%s event carries no watchEvent; ignoring it", config.crd_kind)
+            continue
 
         obj = context.get("object")
         if not obj:
@@ -363,7 +371,7 @@ def _split_events(
             changed.append(resource)
 
     changed.sort(key=lambda r: str(r.spec.get("name", "")))
-    return changed, deleted, frozenset(watch_events)
+    return changed, deleted, saw_event_context
 
 
 def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInputs:
@@ -374,22 +382,17 @@ def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInput
     runs reconcile everything they are given.
     """
     reader = _ResourceReader()
-    changed, deleted, watch_events = _split_events(contexts, config, reader)
+    changed, deleted, saw_event_context = _split_events(contexts, config, reader)
     items = snapshot_items(contexts, config.binding_name)
 
-    if watch_events:
+    if saw_event_context:
         if items is None:
             raise ConfigError(
                 f"Shell-operator {config.binding_name} event context does not "
                 f"contain {config.binding_name} snapshot objects"
             )
         desired = reader.read_all(items)
-        # Only prune when something actually changed. A bare Added/Modified for
-        # an unrelated CR must not trigger a prune sweep.
-        if changed or deleted or "Deleted" in watch_events:
-            prune_credentials = _credentials(desired) | _credentials(deleted)
-        else:
-            prune_credentials = frozenset()
+        prune_credentials = _credentials(changed) | _credentials(deleted)
         return HookInputs(
             changed, desired, deleted, prune_credentials, frozenset(reader.unreadable)
         )
@@ -452,6 +455,25 @@ class SyncPlugin(ABC):
         authoritative_empty: bool,
     ) -> None:
         """Delete resources whose CR was removed.
+
+        *desired_specs* is every credential group's desired specs, not just
+        those of the credentials *conn* authenticates as. A plugin prunes by its
+        own ownership marker, which records no credential, and what a connection
+        lists depends on its token, so a resource one group manages is reachable
+        from another group's connection. The union is what keeps each group's
+        prune to the resources no group asked for.
+
+        One consequence: two credentials managing the same resource name keep
+        each other's resource off the prune list. If they are separate clouds
+        the resource leaks instead. That is the safer direction, since the
+        alternative is deleting a resource whose CR still exists.
+
+        *authoritative_empty* is scoped to this credential group, not to
+        *desired_specs*: it says a CR using *these* credentials was deleted, so
+        an empty desired set is a real one rather than a snapshot that could not
+        be read. Because *desired_specs* is the union, it can be non-empty while
+        this is True; a plugin only needs it to decide whether an empty
+        *desired_specs* may be acted on.
 
         Optional: the default does nothing, which is correct for a plugin whose
         resources outlive their CR or that has nothing safe to delete.
@@ -612,6 +634,16 @@ def _run_prune(
     noun = plugin.noun
     prune_failed = False
 
+    # Every group's desired resources, because a resource is not private to the
+    # credentials that manage it. A plugin prunes by its own ownership marker,
+    # which records no credential, and what a connection lists depends on its
+    # token: a system-scoped credential sees what a project-scoped one manages,
+    # and every credential sees what is public. The union is what keeps each
+    # group's prune to the resources no group asked for.
+    all_desired_specs = [
+        resource.spec for resource in inputs.desired_resources_for_prune
+    ]
+
     for credentials in sorted(inputs.prune_credentials):
         secret_name, cloud_name = credentials
         desired = grouped_desired.get(credentials, [])
@@ -650,7 +682,7 @@ def _run_prune(
         try:
             plugin.prune(
                 conn,
-                [resource.spec for resource in desired],
+                all_desired_specs,
                 authoritative_empty=authoritative_empty,
             )
         except Exception as exc:  # noqa: BLE001

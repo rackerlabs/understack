@@ -285,7 +285,13 @@ def test_enabled_hook_config_omits_namespace_without_pod_namespace(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def _cr(name: str, generation: int = 3, status: dict | None = None) -> dict:
+def _cr(
+    name: str,
+    generation: int = 3,
+    status: dict | None = None,
+    secret: str = "infrasetup",
+    cloud: str = "understack",
+) -> dict:
     obj = {
         "apiVersion": CRD_API_VERSION,
         "kind": CRD_KIND,
@@ -293,8 +299,8 @@ def _cr(name: str, generation: int = 3, status: dict | None = None) -> dict:
         "spec": {
             "name": name,
             "cloudCredentialsRef": {
-                "secretName": "infrasetup",
-                "cloudName": "understack",
+                "secretName": secret,
+                "cloudName": cloud,
             },
         },
     }
@@ -394,6 +400,29 @@ def test_added_event_reconciles_only_the_changed_resource():
     ]
 
 
+def test_event_prune_credentials_are_limited_to_changed_resource():
+    config = make_hook_config()
+    changed = _cr("changed", secret="group-a", cloud="cloud-a")
+    other = _cr("other", secret="group-b", cloud="cloud-b")
+    contexts = [
+        {
+            "binding": BINDING,
+            "type": "Event",
+            "watchEvent": "Modified",
+            "object": changed,
+            "snapshots": {BINDING: [{"object": changed}, {"object": other}]},
+        }
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.spec["name"] for r in inputs.desired_resources_for_prune] == [
+        "changed",
+        "other",
+    ]
+    assert inputs.prune_credentials == frozenset({("group-a", "cloud-a")})
+
+
 def test_deleted_event_reconciles_nothing_but_prunes():
     config = make_hook_config()
     contexts = [
@@ -411,6 +440,25 @@ def test_deleted_event_reconciles_nothing_but_prunes():
     assert inputs.resources_to_reconcile == []
     assert [r.spec["name"] for r in inputs.deleted_resources] == ["gone"]
     assert inputs.prune_credentials == frozenset({("infrasetup", "understack")})
+
+
+def test_event_without_watch_event_is_ignored_without_snapshot_reconcile(caplog):
+    config = make_hook_config()
+    contexts = [
+        {
+            "binding": BINDING,
+            "type": "Event",
+            "object": _cr("bad"),
+            "snapshots": {BINDING: [{"object": _cr("kept")}]},
+        }
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.desired_resources_for_prune] == ["kept"]
+    assert inputs.prune_credentials == frozenset()
+    assert "event carries no watchEvent" in caplog.text
 
 
 def test_modified_event_skipped_when_status_already_current():
@@ -471,17 +519,10 @@ def test_unrecognised_context_is_an_error():
 
 # ---------------------------------------------------------------------------
 # Unreadable CRs
-#
-# A CRD's required fields bind writes only. Kubernetes validates on admission,
-# so an object stored before the schema required a field is still served by the
-# watch exactly as stored, and admission is no guarantee about what a hook
-# reads. The contract: name the offending CR, drop it, reconcile the rest, and
-# never prune against the resulting incomplete desired set.
 # ---------------------------------------------------------------------------
 
 
 def _cr_without_credentials(name: str, generation: int = 1) -> dict:
-    """A CR stored before the CRD required spec.cloudCredentialsRef."""
     return {
         "apiVersion": CRD_API_VERSION,
         "kind": CRD_KIND,
@@ -501,7 +542,6 @@ def _snapshot_context(*objects: dict) -> list[dict]:
 
 
 def test_unreadable_cr_does_not_discard_the_readable_ones():
-    """One malformed CR must not take down the whole batch."""
     config = make_hook_config()
     contexts = _snapshot_context(
         _cr("good"), _cr_without_credentials("legacy"), _cr("also-good")
@@ -539,7 +579,6 @@ def test_unreadable_cr_is_reported_by_namespace_and_name(caplog):
     ],
 )
 def test_incomplete_cloud_credentials_ref_is_unreadable(creds, reason):
-    """minLength: 1 in the CRD does not constrain what is already stored."""
     config = make_hook_config()
     obj = _cr_without_credentials("legacy")
     obj["spec"]["cloudCredentialsRef"] = creds
@@ -643,12 +682,6 @@ def test_readable_crs_leave_nothing_unreadable():
 
 
 def test_unreadable_crs_do_not_stall_a_whole_namespace():
-    """Enabling a hook on a namespace that predates the CRD's required fields.
-
-    The mixture that matters: several CRs stored under the older schema
-    alongside conforming ones. The conforming CRs must converge, the run must
-    still report failure, and prune must not act on the partial desired set.
-    """
     config = make_hook_config(prune=True)
     plugin = StubPlugin(config)
     contexts = [
@@ -853,6 +886,51 @@ def test_run_sync_prune_is_authoritative_for_deleted_credentials():
     assert plugin.pruned == [([], True)]
 
 
+def test_run_sync_prunes_against_every_credentials_desired_resources():
+    """Prune is scoped by ownership marker, not by credentials, so the set is the union.
+
+    Here the credential whose only CR was deleted has an authoritative empty
+    desired set of its own, and can still list what the other credential manages.
+    It is handed every group's desired names, which is what keeps the resource
+    the other group still wants from being a prune candidate.
+    """
+    plugin = StubPlugin(make_hook_config(prune=True))
+    keeper = _resource("keeper", secret="infrasetup", cloud="understack")
+    gone = _resource("gone", secret="infrasetup-system", cloud="understack")
+    inputs = _inputs([keeper], desired=[keeper], deleted=[gone])
+
+    code, _, _ = _drive(plugin, inputs)
+
+    assert code == 0
+    # Sorted by credentials: infrasetup, then infrasetup-system. The second
+    # group's desired set is empty and authoritative, and it still sees keeper.
+    assert plugin.pruned == [(["keeper"], False), (["keeper"], True)]
+
+
+def test_run_sync_keeps_a_resource_another_credential_wants_off_the_prune_list():
+    """The bug the union closes, stated on its own.
+
+    Both credentials still want a resource, and each prunes with a connection
+    that can list what the other manages -- a system-scoped token sees another
+    project's runbooks, and every token sees what is public. Prune filters by an
+    ownership marker that records no credential, so a per-credential desired set
+    would offer the other group's resource up for deletion.
+    """
+    plugin = StubPlugin(make_hook_config(prune=True))
+    mine = _resource("mine", secret="infrasetup", cloud="understack")
+    theirs = _resource("theirs", secret="infrasetup-system", cloud="understack")
+    inputs = _inputs([mine, theirs])
+
+    code, _, _ = _drive(plugin, inputs)
+
+    assert code == 0
+    # Neither call may omit a name the other credential still wants.
+    assert [sorted(names) for names, _ in plugin.pruned] == [
+        ["mine", "theirs"],
+        ["mine", "theirs"],
+    ]
+
+
 def test_run_sync_skips_prune_for_credentials_with_no_desired_resources():
     """An empty desired set with no deletion may be an unreadable snapshot."""
     plugin = StubPlugin(make_hook_config(prune=True))
@@ -887,11 +965,6 @@ def test_run_sync_returns_error_when_prune_fails():
 
 
 def test_run_sync_skips_prune_when_a_cr_was_unreadable():
-    """An unreadable CR is missing from the desired set.
-
-    Pruning against that set would delete the resource the unreadable CR still
-    describes, the same hazard as pruning after a failed reconcile.
-    """
     plugin = StubPlugin(make_hook_config(prune=True))
     inputs = _inputs([_resource("a")], unreadable=frozenset({"openstack/legacy"}))
 

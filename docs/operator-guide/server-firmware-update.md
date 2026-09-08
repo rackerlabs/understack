@@ -38,7 +38,13 @@ Traits are applied to a node during inspection. Ironic Inspection Rules can be u
 
 ## Ironic Runbooks
 
-Deployment of the Ironic Runbooks are done via Kubernetes manifests. A kubernetes Runbook CRD has been created to define a Runbook resource. To sync and maintain the state of these Runbook resources to the Openstack API, a Kubernetes Runbook operator was created.
+Deployment of the Ironic Runbooks are done via Kubernetes manifests. An `IronicRunbook` CRD defines a runbook resource, and the `ironicRunbooks` hook in `openstack-sync-operator` reconciles those resources against the Openstack Ironic API.
+
+Reference CRs live in [`components/openstack-sync-plugins/ironic-runbooks/examples/`](https://github.com/rackerlabs/understack/tree/main/components/openstack-sync-plugins/ironic-runbooks/examples). Nothing in that directory is applied. Copy a file to `<deploy-repo>/<site>/openstack-sync-plugins/`, add it to that directory's `kustomization.yaml`, and set `spec.cloudCredentialsRef` to the Secret holding the `clouds.yaml` to authenticate with.
+
+The hook is enabled per site with `plugins.ironicRunbooks: true` in `<deploy-repo>/<site>/openstack-sync-operator/values.yaml`, and only after the site is pinned to an operator image containing `/hooks/ironic_runbooks.py`.
+
+The workflow below resolves each runbook by trait name, so it can only drive a runbook whose `spec.runbookName` is itself the `CUSTOM_FIRMWARE_UPDATE_*` trait that selects the node. Runbooks named some other way are still reconciled by the hook and still usable directly with `openstack baremetal node clean --runbook`; they are just not picked up by that workflow. The runbooks deployed from `hardware/runbooks/` in the deploy repo are named by component and version, so they fall in the second group.
 
 ## Workflows
 
@@ -64,7 +70,13 @@ flowchart TB
 
 ## Runbook Operator
 
-The Ironic Runbook Operator was written using [shell-operator](https://github.com/flant/shell-operator). Essentially it listens for create, update or delete events on any Runbook resources, and then issues the appropriate calls to the Openstack Ironic API. These operations are defined by basic shell hooks, which can be found [here](https://github.com/rackerlabs/understack/tree/main/containers/shell-operator-ironic/hooks)
+Runbooks are reconciled by the `ironicRunbooks` hook in [openstack-sync-operator](../deploy-guide/components/openstack-sync-operator.md), which is built on [shell-operator](https://github.com/flant/shell-operator). It listens for create, update or delete events on any `IronicRunbook` resource, and then issues the appropriate calls to the Openstack Ironic API. A cron schedule reconciles every CR periodically as well, so drift is corrected without a CR change.
+
+The hook entrypoint is [`ironic_runbooks.py`](https://github.com/rackerlabs/understack/blob/main/python/openstack-sync/openstack_sync/hooks/ironic_runbooks.py), and the Ironic-specific reconcile, prune and ownership logic lives under [`plugins/ironic/runbooks/`](https://github.com/rackerlabs/understack/tree/main/python/openstack-sync/openstack_sync/plugins/ironic/runbooks).
+
+It requires Ironic API microversion 1.112, which is the first with runbook descriptions and the `/runbooks/{id}/traits` sub-resource. The hook refuses to run against an older Ironic rather than syncing partial state.
+
+One known limitation: Ironic masks secret-looking step arguments in every runbook read, so a runbook whose step `args` carry a password (or a URL with credentials in it) always reads back as differing from its CR. The hook then rewrites `steps` on every reconcile, logging `Updating Ironic runbook <name>: /steps` on each scheduled run. The runbook stays correct; the repeated write is noise, not drift. Runbooks whose step arguments hold no credentials are unaffected.
 
 ```mermaid
 architecture-beta
@@ -93,3 +105,25 @@ architecture-beta
     ironic:L --> R:ir
 
 ```
+
+## Removing a runbook
+
+Deleting an `IronicRunbook` CR does not by itself delete the runbook from Ironic. The hook only prunes when `PRUNE` is enabled for it, and the chart default is `false`, so a removed CR otherwise leaves the runbook in Ironic with nothing reconciling it.
+
+To have the hook delete it, enable pruning for the site before removing the CR:
+
+```yaml title="<deploy-repo>/<site>/openstack-sync-operator/values.yaml"
+pluginData:
+  ironicRunbooks:
+    hook:
+      env:
+        PRUNE: "true"
+```
+
+With pruning left off, remove both: delete the CR, then delete the runbook directly.
+
+```bash
+openstack baremetal runbook delete <runbook-name>
+```
+
+Pruning only ever deletes runbooks the operator owns. A runbook the hook created or adopted carries `_understack_runbook_*` markers in its `extra`, and one without them is left in place and logged. A runbook Ironic reports as in use is also left in place.

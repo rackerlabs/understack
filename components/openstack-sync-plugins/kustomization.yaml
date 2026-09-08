@@ -4,3 +4,4 @@ kind: Kustomization
 
 resources:
   - neutron-router-flavors
+  - ironic-runbooks

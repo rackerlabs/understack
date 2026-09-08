@@ -1,0 +1,77 @@
+# BIOS Configuration Runbook
+#
+# This runbook configures BIOS settings for compute nodes.
+# Common use case: Enabling virtualization features for hypervisor nodes.
+#
+# Selects nodes carrying the trait: CUSTOM_COMPUTE_BIOS
+
+apiVersion: ironic.understack.rackspace.net/v1alpha1
+kind: IronicRunbook
+metadata:
+  name: compute-bios-config
+  namespace: baremetal-system
+  labels:
+    use-case: bios-configuration
+    hardware-type: compute
+spec:
+  # REQUIRED: Secret holding the clouds.yaml, and the cloud entry to use.
+  cloudCredentialsRef:
+    secretName: infrasetup-system
+    cloudName: understack
+
+  runbookName: CUSTOM_COMPUTE_BIOS
+
+  # Fleet-wide operator tooling, so every project may see it. public governs
+  # visibility only: Ironic authorises a clean or service request against the
+  # runbook's owner, so a public runbook is usable by a system-scoped or
+  # role:service token and not by a project-scoped one. Set spec.owner instead
+  # to hand use to one project. A runbook that is neither public nor owned can
+  # be seen and used by nobody.
+  public: true
+
+  # Nodes must carry at least one of these traits for this runbook to act on them.
+  traits:
+    - CUSTOM_COMPUTE_BIOS
+
+  steps:
+    - interface: bios
+      step: apply_configuration
+      order: 1
+      args:
+        settings:
+          # Enable logical processors (hyperthreading)
+          - name: LogicalProc
+            value: Enabled
+
+          # Enable virtualization technology
+          - name: VirtualizationTechnology
+            value: Enabled
+
+          # Enable Intel VT-d (IOMMU)
+          - name: VtForDirectIo
+            value: Enabled
+
+          # Enable SR-IOV support
+          - name: SRIOV
+            value: Enabled
+
+          # Set boot mode to UEFI
+          - name: BootMode
+            value: Uefi
+
+          # Enable secure boot
+          - name: SecureBoot
+            value: Enabled
+
+  extra:
+    description: "BIOS configuration for compute nodes with virtualization support"
+    version: "1.0.0"
+    use_case: "Hypervisor node preparation"
+    hardware_compatibility:
+      - "Dell PowerEdge R740"
+      - "Dell PowerEdge R640"
+      - "HPE ProLiant DL380 Gen10"
+    notes: |
+      This runbook enables common virtualization features required for
+      running KVM/QEMU workloads. Adjust settings based on your specific
+      hardware and requirements.

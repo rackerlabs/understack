@@ -1,0 +1,301 @@
+"""Reconcile an IronicRunbook CR onto Ironic."""
+
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any
+
+from openstack_sync.plugins.common import ConfigError
+from openstack_sync.plugins.common import get_value
+from openstack_sync.plugins.ironic.runbooks import client
+from openstack_sync.plugins.ironic.runbooks.markers import is_managed_runbook
+from openstack_sync.plugins.ironic.runbooks.markers import managed_extra
+from openstack_sync.plugins.ironic.runbooks.markers import runbook_extra
+
+LOG = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Spec -> Ironic payload
+# ---------------------------------------------------------------------------
+
+
+def validate_spec(spec: dict[str, Any]) -> str:
+    """Return the runbook name once the spec is valid."""
+    name = str(spec.get("runbookName") or "")
+    if not name:
+        raise ConfigError("spec.runbookName must be set")
+    if spec.get("public") and spec.get("owner"):
+        raise ConfigError(
+            f"Runbook {name!r} sets both public and owner. Ironic does not allow "
+            "an owner on a public runbook. Drop spec.owner to share it with every "
+            "project, or set spec.public to false to keep it owned."
+        )
+    return name
+
+
+def _step_payload(index: int, step: Any) -> dict[str, Any]:
+    """Return one CR step as Ironic's runbook step."""
+    if not isinstance(step, dict):
+        raise ConfigError(f"spec.steps[{index}] must be an object, got {step!r}")
+
+    missing = [key for key in ("interface", "step", "order") if step.get(key) is None]
+    if missing:
+        raise ConfigError(
+            f"spec.steps[{index}] is missing required field(s): {', '.join(missing)}"
+        )
+
+    try:
+        order = int(step["order"])
+    except (TypeError, ValueError) as exc:
+        raise ConfigError(
+            f"spec.steps[{index}].order must be an integer, got {step['order']!r}"
+        ) from exc
+
+    return {
+        "interface": str(step["interface"]),
+        "step": str(step["step"]),
+        "args": step.get("args") or {},
+        "order": order,
+    }
+
+
+def desired_steps(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the runbook steps *spec* describes, in Ironic's shape."""
+    steps = spec.get("steps")
+    if not isinstance(steps, list) or not steps:
+        raise ConfigError("spec.steps must be a non-empty list")
+    return [_step_payload(index, step) for index, step in enumerate(steps)]
+
+
+def canonical_steps(steps: Any) -> list[tuple[str, str, str, str]]:
+    """Return *steps* as an order-insensitive comparison key.
+
+    Known limitation: a step argument that looks like a secret (a ``password``
+    key, a URL with credentials in it) comes back from Ironic as ``******``,
+    never as what was written. The CR still holds the real value, so such a step
+    always compares unequal and we rewrite ``/steps`` on every reconcile.
+
+    That is a repeated write of the values already stored, so it is left as is.
+    Ignoring a masked value instead would also hide a genuine edit to it. Steps
+    with no credentials in their arguments are unaffected.
+    """
+    if not isinstance(steps, list):
+        return []
+    return sorted(
+        (
+            str(step.get("interface", "")),
+            str(step.get("step", "")),
+            str(step.get("order", "")),
+            json.dumps(step.get("args") or {}, sort_keys=True),
+        )
+        for step in steps
+        if isinstance(step, dict)
+    )
+
+
+def desired_extra(spec: dict[str, Any]) -> dict[str, Any]:
+    """Return the ``extra`` to store, with the ownership markers merged in."""
+    return managed_extra(spec.get("extra") or {})
+
+
+def desired_traits(spec: dict[str, Any]) -> list[str]:
+    """Return the traits *spec* asks for."""
+    return [str(trait) for trait in spec.get("traits") or []]
+
+
+def build_payload(spec: dict[str, Any]) -> dict[str, Any]:
+    """Return the body that creates the runbook *spec* describes."""
+    payload: dict[str, Any] = {
+        "name": spec["runbookName"],
+        "steps": desired_steps(spec),
+        "public": bool(spec.get("public", False)),
+        "disable_ramdisk": bool(spec.get("disableRamdisk", False)),
+        "extra": desired_extra(spec),
+        "owner": str(spec["owner"]) if spec.get("owner") else None,
+    }
+    if spec.get("description"):
+        payload["description"] = str(spec["description"])
+    return payload
+
+
+# ---------------------------------------------------------------------------
+# The runbook
+# ---------------------------------------------------------------------------
+
+
+def _patch_operations(
+    existing: dict[str, Any], spec: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Return the JSON patch that converges *existing* onto *spec*."""
+    operations: list[dict[str, Any]] = []
+
+    def set_field(field: str, value: Any) -> None:
+        operations.append({"op": "add", "path": f"/{field}", "value": value})
+
+    steps = desired_steps(spec)
+    # A step carrying a credential in its args always compares unequal; see
+    # canonical_steps for why, and why that is accepted.
+    if canonical_steps(existing.get("steps")) != canonical_steps(steps):
+        set_field("steps", steps)
+
+    extra = desired_extra(spec)
+    if runbook_extra(existing) != extra:
+        set_field("extra", extra)
+
+    public = bool(spec.get("public", False))
+    if bool(existing.get("public", False)) != public:
+        set_field("public", public)
+
+    disable_ramdisk = bool(spec.get("disableRamdisk", False))
+    if bool(existing.get("disable_ramdisk", False)) != disable_ramdisk:
+        set_field("disable_ramdisk", disable_ramdisk)
+
+    description = str(spec.get("description") or "")
+    if str(existing.get("description") or "") != description:
+        set_field("description", description)
+
+    # Ironic's field unless the CR claims it. A project-scoped create is assigned
+    # the caller's own project, and only a system-scoped token may patch /owner
+    # afterwards, so an unset spec.owner leaves the field to Ironic rather than
+    # asking for it to be empty. Making a runbook public clears the owner, and
+    # Ironic does that itself.
+    if spec.get("owner"):
+        owner = str(spec["owner"])
+        if str(existing.get("owner") or "") != owner:
+            set_field("owner", owner)
+
+    return operations
+
+
+def ensure_runbook(conn: Any, spec: dict[str, Any]) -> dict[str, Any]:
+    """Create or converge the runbook *spec* describes, and return it."""
+    name = str(spec["runbookName"])
+    existing = client.get_runbook(conn, name)
+
+    if existing is None:
+        payload = build_payload(spec)
+        LOG.info(
+            "Creating Ironic runbook %s with %s step(s)", name, len(payload["steps"])
+        )
+        return client.create_runbook(conn, payload)
+
+    if is_managed_runbook(existing):
+        LOG.info("Ironic runbook %s already exists and is operator-owned", name)
+    else:
+        LOG.info(
+            "Adopting existing Ironic runbook %s; the CR is an ownership claim "
+            "for it, so the operator markers are being written to its extra",
+            name,
+        )
+
+    operations = _patch_operations(existing, spec)
+    if not operations:
+        return existing
+
+    LOG.info(
+        "Updating Ironic runbook %s: %s",
+        name,
+        ", ".join(operation["path"] for operation in operations),
+    )
+    return client.patch_runbook(conn, client.assigned_uuid(existing, name), operations)
+
+
+# ---------------------------------------------------------------------------
+# Traits
+# ---------------------------------------------------------------------------
+
+
+def reconcile_traits(
+    conn: Any, runbook: dict[str, Any], spec: dict[str, Any]
+) -> list[str]:
+    """Converge the traits of *runbook* onto *spec*, and return the result."""
+    name = str(spec["runbookName"])
+    desired = desired_traits(spec)
+    current = [str(trait) for trait in runbook.get("traits") or []]
+    if sorted(current) == sorted(desired):
+        return current
+
+    LOG.info(
+        "Setting traits on Ironic runbook %s: have=%s want=%s",
+        name,
+        sorted(current),
+        sorted(desired),
+    )
+    client.set_traits(conn, client.assigned_uuid(runbook, name), desired)
+    return desired
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+
+def render_runbook(runbook: dict[str, Any]) -> dict[str, Any]:
+    """Return the reconciled runbook as a loggable dict.
+
+    Step arguments are summarised, not logged: they carry hardware settings and,
+    for some interfaces, credentials.
+    """
+    steps = runbook.get("steps") if isinstance(runbook.get("steps"), list) else []
+    return {
+        "uuid": get_value(runbook, "uuid"),
+        "name": get_value(runbook, "name"),
+        "description": get_value(runbook, "description"),
+        "public": get_value(runbook, "public"),
+        "owner": get_value(runbook, "owner"),
+        "disable_ramdisk": get_value(runbook, "disable_ramdisk"),
+        "traits": sorted(str(trait) for trait in runbook.get("traits") or []),
+        "steps": [
+            f"{step.get('order')}:{step.get('interface')}.{step.get('step')}"
+            for step in steps
+            if isinstance(step, dict)
+        ],
+        "extra_keys": sorted(runbook_extra(runbook)),
+    }
+
+
+def usability_notes(runbook: dict[str, Any]) -> list[str]:
+    """Return notes for a converged runbook no project can reach at all.
+
+    Ironic reaches a runbook through its owner. ``runbook:get`` resolves
+    ``project_id:%(runbook.owner)s`` and, failing that, falls back to the
+    runbook being public; a project-scoped list is filtered to
+    ``owner == project OR public``. So one that is neither public nor owned
+    converges and is still invisible to every project. A system-scoped
+    credential and an unset ``spec.owner`` is the ordinary way to arrive there,
+    since Ironic assigns an owner only on a project-scoped create.
+
+    ``runbook:use`` has no such fallback: it resolves the owner alone, so a
+    public runbook is visible to every project and usable only by a
+    system-scoped or ``role:service`` token. Which token that is belongs to the
+    caller running the clean or service request, not to this CR, so it is not
+    noted here.
+    """
+    if get_value(runbook, "public", default=False):
+        return []
+    if get_value(runbook, "owner") is not None:
+        return []
+    return [
+        "the runbook is neither public nor owned, so no project can see it and "
+        "no project-scoped token can use it; set spec.owner to the project that "
+        "should own it, or spec.public to let every project see it"
+    ]
+
+
+def sync_runbook(conn: Any, spec: dict[str, Any], _cache: Any = None) -> list[str]:
+    """Converge one IronicRunbook spec."""
+    name = validate_spec(spec)
+
+    LOG.info("Reconciling Ironic runbook %s", name)
+    runbook = ensure_runbook(conn, spec)
+    traits = reconcile_traits(conn, runbook, spec)
+
+    # The traits the PUT just set are not in the body it answered with.
+    reconciled = {**runbook, "traits": traits}
+    LOG.info(
+        "Reconciled Ironic runbook: %s",
+        json.dumps(render_runbook(reconciled), sort_keys=True),
+    )
+    return usability_notes(reconciled)

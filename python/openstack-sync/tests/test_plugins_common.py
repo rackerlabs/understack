@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 from openstack import exceptions as sdk_exceptions
 from openstack.network.v2 import flavor as sdk_flavor
@@ -111,3 +113,125 @@ def test_meta_info_payload_canonicalizes_json_strings():
 
 def test_normalize_meta_info_leaves_non_json_strings_unchanged():
     assert common.normalize_meta_info("{'b': 2, 'a': 1}") == "{'b': 2, 'a': 1}"
+
+
+# ---------------------------------------------------------------------------
+# API readiness
+# ---------------------------------------------------------------------------
+
+
+def test_wait_for_openstack_api_returns_as_soon_as_the_probe_succeeds():
+    probe = mock.Mock(side_effect=[RuntimeError("not yet"), None])
+
+    with mock.patch.object(common.time, "sleep") as sleep:
+        common.wait_for_openstack_api("Ironic", probe, retries=5, delay=1)
+
+    assert probe.call_count == 2
+    sleep.assert_called_once_with(1)
+
+
+def test_wait_for_openstack_api_gives_up_after_retries():
+    probe = mock.Mock(side_effect=RuntimeError("down"))
+
+    with (
+        mock.patch.object(common.time, "sleep"),
+        pytest.raises(RuntimeError, match="Ironic API did not become ready after 3"),
+    ):
+        common.wait_for_openstack_api("Ironic", probe, retries=3, delay=0)
+
+    assert probe.call_count == 3
+
+
+def test_wait_for_openstack_api_does_not_retry_a_config_error():
+    """A misconfigured or too-old API does not become ready by waiting."""
+    probe = mock.Mock(side_effect=common.ConfigError("this cloud is too old"))
+
+    with (
+        mock.patch.object(common.time, "sleep") as sleep,
+        pytest.raises(common.ConfigError),
+    ):
+        common.wait_for_openstack_api("Ironic", probe, retries=30, delay=10)
+
+    assert probe.call_count == 1
+    sleep.assert_not_called()
+
+
+def test_wait_for_openstack_network_probes_neutron_flavors():
+    conn = mock.MagicMock()
+
+    common.wait_for_openstack_network(conn, retries=1, delay=0)
+
+    conn.network.flavors.assert_called_once_with()
+
+
+def test_paginated_collection_uses_the_last_item_marker_for_the_next_page():
+    pages = [
+        {
+            "runbooks": [{"uuid": "runbook-1"}, {"uuid": "runbook-2"}],
+            "next": "http://ironic/v1/runbooks?limit=2&marker=runbook-2",
+        },
+        {"runbooks": [{"uuid": "runbook-3"}]},
+    ]
+    params_seen = []
+
+    def fetch(params):
+        params_seen.append(dict(params))
+        return pages.pop(0)
+
+    assert common.paginated_collection(
+        fetch,
+        collection_key="runbooks",
+        marker_key="uuid",
+        page_limit=2,
+    ) == [{"uuid": "runbook-1"}, {"uuid": "runbook-2"}, {"uuid": "runbook-3"}]
+    assert params_seen == [
+        {"limit": 2},
+        {"limit": 2, "marker": "runbook-2"},
+    ]
+
+
+def test_paginated_collection_keeps_paging_when_the_server_clamps_the_limit():
+    """A short page is not the end when ``next`` is set.
+
+    Ironic caps ``limit`` at ``[api] max_limit``, so a low max_limit makes every
+    page short, and stopping there would silently return only the first one.
+    """
+    pages = [
+        {"runbooks": [{"uuid": "runbook-1"}], "next": "http://ironic/next"},
+        {"runbooks": [{"uuid": "runbook-2"}], "next": "http://ironic/next"},
+        {"runbooks": [{"uuid": "runbook-3"}]},
+    ]
+    params_seen = []
+
+    def fetch(params):
+        params_seen.append(dict(params))
+        return pages.pop(0)
+
+    assert common.paginated_collection(
+        fetch,
+        collection_key="runbooks",
+        marker_key="uuid",
+        page_limit=100,
+    ) == [{"uuid": "runbook-1"}, {"uuid": "runbook-2"}, {"uuid": "runbook-3"}]
+    assert params_seen == [
+        {"limit": 100},
+        {"limit": 100, "marker": "runbook-1"},
+        {"limit": 100, "marker": "runbook-2"},
+    ]
+
+
+def test_paginated_collection_stops_when_the_last_item_has_no_marker():
+    """A bad marker returns what we have; raising would abort the whole sync."""
+    pages = [
+        {"runbooks": [{"uuid": "runbook-1"}, "unexpected"], "next": "http://ironic/x"},
+    ]
+
+    def fetch(params):
+        return pages.pop(0)
+
+    assert common.paginated_collection(
+        fetch,
+        collection_key="runbooks",
+        marker_key="uuid",
+        page_limit=2,
+    ) == [{"uuid": "runbook-1"}, "unexpected"]
