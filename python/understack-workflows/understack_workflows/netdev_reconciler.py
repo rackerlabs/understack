@@ -24,7 +24,7 @@ REENROLLABLE_STATES = {"enroll", "manageable", "available"}
 # that converge on re-runs. switch_id is optional: when omitted the placeholder
 # is used (and an existing real value is preserved).
 REQUIRED_PORT_FIELDS = ("label", "mac", "switch", "intf")
-OPTIONAL_PORT_FIELDS = ("switch_id",)
+OPTIONAL_PORT_FIELDS = ("switch_id", "bios_name")
 ALLOWED_PORT_FIELDS = frozenset(REQUIRED_PORT_FIELDS + OPTIONAL_PORT_FIELDS)
 
 
@@ -35,6 +35,10 @@ class NetdevPort:
     switch: str
     interface: str
     switch_id: str | None = None
+    # The device's own interface name (e.g. "ethernet1/19"), stored in the
+    # Ironic port's extra.bios_name. The Nautobot device sync uses it to name
+    # the interface. Defaults to the label when not supplied.
+    bios_name: str | None = None
 
 
 def _has_cmdb_id(external_cmdb_id: int | str | None) -> bool:
@@ -91,6 +95,11 @@ def build_netdev_ports(ports: list[dict]) -> list[NetdevPort]:
             raise ValueError(
                 f"Port {index} switch_id must be a string, got {switch_id!r}"
             )
+        bios_name = entry.get("bios_name")
+        if bios_name is not None and not isinstance(bios_name, str):
+            raise ValueError(
+                f"Port {index} bios_name must be a string, got {bios_name!r}"
+            )
         unknown = set(entry) - ALLOWED_PORT_FIELDS
         if unknown:
             raise ValueError(
@@ -113,6 +122,9 @@ def build_netdev_ports(ports: list[dict]) -> list[NetdevPort]:
                 switch=entry["switch"],
                 interface=entry["intf"],
                 switch_id=entry.get("switch_id"),
+                # bios_name is the device's interface name; for firewalls it
+                # equals the label, so default to it when not supplied.
+                bios_name=entry.get("bios_name") or entry["label"],
             )
         )
     return result
@@ -127,18 +139,20 @@ def enroll(
     resource_class: str | None = DEFAULT_RESOURCE_CLASS,
     driver_info: dict | None = None,
     extra: dict | None = None,
+    properties: dict | None = None,
 ) -> None:
     effective_resource_class = resource_class or DEFAULT_RESOURCE_CLASS
     netdev_ports = build_netdev_ports(ports)
 
-    # driver_info/extra are generic Ironic node metadata a caller may want set
-    # (e.g. the firewall workflow records management access in driver_info).
-    # They are written inside the enrollment lifecycle -- at node create, or
-    # patched before the node is made available -- so the node is never
-    # allocatable in an under-described state. external_cmdb_id is folded into
-    # extra for convenience.
+    # driver_info/extra/properties are generic Ironic node metadata a caller may
+    # want set (e.g. the firewall workflow records management access in
+    # driver_info and vendor/model in properties). They are written inside the
+    # enrollment lifecycle -- at node create, or patched before the node is made
+    # available -- so the node is never allocatable in an under-described state.
+    # external_cmdb_id is folded into extra for convenience.
     node_driver_info = dict(driver_info or {})
     node_extra = dict(extra or {})
+    node_properties = dict(properties or {})
     if _has_cmdb_id(external_cmdb_id):
         node_extra["external_cmdb_id"] = external_cmdb_id
 
@@ -154,6 +168,8 @@ def enroll(
         logger.info("Recording driver_info=%s on the Ironic node", node_driver_info)
     if node_extra:
         logger.info("Recording extra=%s on the Ironic node", node_extra)
+    if node_properties:
+        logger.info("Recording properties=%s on the Ironic node", node_properties)
 
     client = IronicClient()
     node, created = find_or_create_netdev_node(
@@ -162,6 +178,7 @@ def enroll(
         resource_class=effective_resource_class,
         driver_info=node_driver_info,
         extra=node_extra,
+        properties=node_properties,
     )
 
     node_ports = list(client.list_ports(node.uuid))
@@ -216,6 +233,7 @@ def enroll(
             resource_class=effective_resource_class,
             driver_info=node_driver_info,
             extra=node_extra,
+            properties=node_properties,
         )
 
     if not pending and state == "available":
@@ -277,6 +295,7 @@ def find_or_create_netdev_node(
     resource_class: str,
     driver_info: dict,
     extra: dict,
+    properties: dict | None = None,
 ) -> tuple[Node, bool]:
     """Find an existing netdev node by name, or create one.
 
@@ -293,6 +312,7 @@ def find_or_create_netdev_node(
             resource_class=resource_class,
             driver_info=driver_info,
             extra=extra,
+            properties=properties or {},
         )
         return node, True
 
@@ -325,12 +345,13 @@ def update_node_metadata(
     resource_class: str,
     driver_info: dict,
     extra: dict,
+    properties: dict | None = None,
 ) -> bool:
-    """Patch resource_class/driver_info/extra keys that differ from the node.
+    """Patch resource_class/driver_info/extra/properties keys that differ.
 
-    Only the supplied driver_info/extra keys are considered; existing keys the
-    request does not mention are left untouched. Returns True if a patch was
-    sent, so the caller can report accurately.
+    Only the supplied driver_info/extra/properties keys are considered; existing
+    keys the request does not mention are left untouched. Returns True if a patch
+    was sent, so the caller can report accurately.
     """
     updates = []
     if getattr(node, "resource_class", None) != resource_class:
@@ -345,6 +366,11 @@ def update_node_metadata(
     for key, value in extra.items():
         if node_extra.get(key) != value:
             updates.append(f"extra/{key}={value}")
+
+    node_properties = getattr(node, "properties", None) or {}
+    for key, value in (properties or {}).items():
+        if node_properties.get(key) != value:
+            updates.append(f"properties/{key}={value}")
 
     if not updates:
         return False
@@ -361,6 +387,7 @@ def create_netdev_node(
     resource_class: str,
     driver_info: dict,
     extra: dict,
+    properties: dict | None = None,
 ) -> Node:
     node_data = {
         "automated_clean": False,
@@ -372,6 +399,8 @@ def create_netdev_node(
         node_data["driver_info"] = driver_info
     if extra:
         node_data["extra"] = extra
+    if properties:
+        node_data["properties"] = properties
 
     logger.info(
         "Creating netdev Ironic node name=%s driver=%s "
@@ -455,6 +484,13 @@ def plan_netdev_port(
         )
     if getattr(existing, "category", None) != "network":
         patch.append({"op": "add", "path": "/category", "value": "network"})
+    # Converge extra.bios_name (the device's interface name) so re-runs update
+    # it. Replace the whole extra object is unsafe (would drop other keys), so
+    # patch the single nested key.
+    bios_name = port.bios_name or port.label
+    current_extra = getattr(existing, "extra", None) or {}
+    if current_extra.get("bios_name") != bios_name:
+        patch.append({"op": "add", "path": "/extra/bios_name", "value": bios_name})
     if any(current_llc.get(key) != value for key, value in desired_llc.items()):
         # Replace the whole object rather than nested keys: Ironic allows
         # local_link_connection to be null, and a nested JSON patch would fail
@@ -520,9 +556,11 @@ def create_netdev_port(
 ) -> None:
     port_name = f"{node_name}:{port.label}"
     switch_id = port.switch_id or PLACEHOLDER_SWITCH_ID
+    bios_name = port.bios_name or port.label
     port_data = {
         "address": port.mac,
         "category": "network",
+        "extra": {"bios_name": bios_name},
         "local_link_connection": {
             "switch_id": switch_id,
             "switch_info": port.switch,

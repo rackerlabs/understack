@@ -32,6 +32,9 @@ def main() -> None:
         management_switch=args.management_switch,
         management_switch_port=args.management_switch_port,
         mate_serial=args.mate_serial,
+        serial=args.serial,
+        vendor=args.vendor,
+        model=args.model,
     )
 
 
@@ -80,16 +83,22 @@ def enroll_fw(
     management_switch: str = "",
     management_switch_port: str = "",
     mate_serial: str = "",
+    serial: str = "",
+    vendor: str = "",
+    model: str = "",
 ) -> None:
     resource_class = _require_specific_resource_class(resource_class)
     management_switch, management_switch_port = _require_management_location(
         management_switch, management_switch_port
     )
-    driver_info, extra = firewall.firewall_metadata(
+    driver_info, extra, properties = firewall.firewall_metadata(
         management_ip=management_ip,
         management_switch=management_switch,
         management_switch_port=management_switch_port,
         mate_serial=mate_serial,
+        serial=serial,
+        vendor=vendor,
+        model=model,
     )
 
     # Look up the node first so we can tell an in-service (active) firewall from
@@ -110,6 +119,7 @@ def enroll_fw(
             external_cmdb_id=external_cmdb_id,
             driver_info=driver_info,
             extra=extra,
+            properties=properties,
         )
         return
 
@@ -124,6 +134,7 @@ def enroll_fw(
         external_cmdb_id=external_cmdb_id,
         driver_info=driver_info,
         extra=extra,
+        properties=properties,
     )
 
 
@@ -146,6 +157,7 @@ def _update_active_firewall(
     external_cmdb_id: int | str | None,
     driver_info: dict,
     extra: dict,
+    properties: dict,
 ) -> None:
     """Update firewall metadata on an in-service (active) node, in place.
 
@@ -187,7 +199,7 @@ def _update_active_firewall(
         "updating firewall metadata only",
         node.uuid,
     )
-    firewall.apply_node_metadata(client, node, driver_info, active_extra)
+    firewall.apply_node_metadata(client, node, driver_info, active_extra, properties)
 
 
 def _reject_structural_drift(
@@ -242,7 +254,10 @@ def argument_parser():
     parser.add_argument(
         "--ports",
         required=True,
-        help="JSON array of ports (same format as enroll-netdev)",
+        help="JSON array of ports (same format as enroll-netdev). 'switch' must "
+        "be the switch FQDN (e.g. n11-22-1.dfw3.rackspace.net) so the Nautobot "
+        "sync can resolve the cable. Optional per-port 'bios_name' (the device "
+        "interface name); defaults to the label.",
     )
     parser.add_argument(
         "--resource-class",
@@ -278,6 +293,24 @@ def argument_parser():
         required=False,
         default="",
         help="HA mate serial number -> extra.mate_serial",
+    )
+    parser.add_argument(
+        "--serial",
+        required=False,
+        default="",
+        help="Device's own serial number -> extra.serial (Nautobot sync)",
+    )
+    parser.add_argument(
+        "--vendor",
+        required=False,
+        default="Palo Alto",
+        help="Device vendor -> properties.vendor (Nautobot sync)",
+    )
+    parser.add_argument(
+        "--model",
+        required=False,
+        default="",
+        help="Device model, e.g. PA-1410 -> properties.model (Nautobot sync)",
     )
     return parser
 

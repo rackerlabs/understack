@@ -37,6 +37,14 @@ spec:
       - name: management_switch_port
       - name: mate_serial
         value: ""
+      # Device identity, read by the Nautobot device sync. serial -> extra;
+      # vendor/model -> properties. 'switch' in ports must be the switch FQDN.
+      - name: serial
+        value: ""
+      - name: vendor
+        value: "Palo Alto"
+      - name: model
+        value: ""
   templates:
     - name: main
       steps:
@@ -66,6 +74,12 @@ spec:
           - "{{workflow.parameters.management_switch_port}}"
           - --mate-serial
           - "{{workflow.parameters.mate_serial}}"
+          - --serial
+          - "{{workflow.parameters.serial}}"
+          - --vendor
+          - "{{workflow.parameters.vendor}}"
+          - --model
+          - "{{workflow.parameters.model}}"
         volumeMounts:
           - mountPath: /etc/openstack
             name: baremetal-manage
