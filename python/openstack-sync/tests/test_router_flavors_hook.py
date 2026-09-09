@@ -156,7 +156,7 @@ def test_plugin_wait_for_api_uses_configured_retry_budget():
     wait.assert_called_once_with(conn, retries=5, delay=0.25)
 
 
-def test_plugin_prune_is_a_noop_when_disabled():
+def test_plugin_prune_deletes_no_flavor_when_disabled():
     plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
 
     with mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune:
@@ -165,15 +165,31 @@ def test_plugin_prune_is_a_noop_when_disabled():
     prune.assert_not_called()
 
 
+def test_plugin_prune_sweeps_orphaned_profiles_when_disabled():
+    """PRUNE gates flavor deletion; an unattached owned profile is collected anyway."""
+    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
+    conn = mock.MagicMock()
+
+    with mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep:
+        plugin.prune(conn, [{"name": "a"}], authoritative_empty=False)
+
+    sweep.assert_called_once_with(conn)
+
+
 def test_plugin_prune_forwards_authoritative_empty_when_enabled():
     plugin = hook.RouterFlavorPlugin(make_hook_config(prune=True))
     conn = mock.MagicMock()
     specs = [{"name": "a"}]
 
-    with mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune:
+    with (
+        mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune,
+        mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep,
+    ):
         plugin.prune(conn, specs, authoritative_empty=True)
 
     prune.assert_called_once_with(conn, specs, authoritative_empty=True)
+    # prune_removed_flavors sweeps internally; a second call would re-list.
+    sweep.assert_not_called()
 
 
 def test_plugin_cache_is_per_credential_group():
@@ -239,6 +255,19 @@ def _schedule_context(*names: str) -> list[dict]:
             "snapshots": {
                 BINDING_NAME: [{"object": router_flavor_object(n)} for n in names]
             },
+        }
+    ]
+
+
+def _deleted_context(name: str) -> list[dict]:
+    """A Deleted event with the empty snapshot that follows the last CR."""
+    return [
+        {
+            "binding": BINDING_NAME,
+            "type": "Event",
+            "watchEvent": "Deleted",
+            "object": router_flavor_object(name),
+            "snapshots": {BINDING_NAME: []},
         }
     ]
 
@@ -326,6 +355,40 @@ def test_main_prunes_after_a_successful_reconcile(monkeypatch, tmp_path):
     assert code == 0
     prune.assert_called_once()
     assert [spec["name"] for spec in prune.call_args.args[1]] == ["pa1410"]
+
+
+def test_main_sweeps_an_orphaned_profile_when_the_last_cr_is_deleted(
+    monkeypatch, tmp_path
+):
+    """Deleting the last CR still collects an unbound managed profile.
+
+    The run reconciles nothing, so the sweep opens the connection itself.
+    """
+    clear_env(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    conn = _neutron_conn()
+    bound_profile = conn.network.service_profiles.return_value[0]
+    orphan = types.SimpleNamespace(
+        id="orphan-profile-id",
+        driver="neutron_understack.l3_router.vrf.Vrf",
+        is_enabled=True,
+        description="pa1410 profile",
+        meta_info=markers.managed_meta_info({"vni_alloc": "auto"}),
+    )
+    conn.network.service_profiles.return_value = [bound_profile, orphan]
+
+    code, patch_status = _run_main(
+        monkeypatch, tmp_path, _deleted_context("pa1410"), conn
+    )
+
+    assert code == 0
+    patch_status.assert_not_called()
+    # The orphan, and only the orphan: the bound profile stays.
+    assert [
+        call.args[0] for call in conn.network.delete_service_profile.call_args_list
+    ] == [orphan]
+    # PRUNE gates flavor deletion, and it is off.
+    conn.network.delete_flavor.assert_not_called()
 
 
 def test_main_fails_loudly_on_a_cr_missing_cloud_credentials(monkeypatch, tmp_path):

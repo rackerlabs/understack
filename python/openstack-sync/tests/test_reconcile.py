@@ -1,9 +1,7 @@
 """Tests for router flavor reconciliation.
 
-Covers the profile cache, create-or-adopt by ``(driver, meta_info)``, profile
-ownership transfer, drift reporting on reused profiles, the flavor
-``service_type`` guard and ``is_enabled``/description reconcile, and the
-flavor-to-profile binding set.
+Covers the profile cache, create-or-adopt by ``(driver, meta_info)``, ownership
+transfer, drift reporting, the ``service_type`` guard, and the binding set.
 """
 
 from __future__ import annotations
@@ -216,9 +214,8 @@ def test_ensure_profile_reuses_existing_owned_profile():
 def test_ensure_profile_appends_created_profile_to_driver_cache():
     """A profile created for one flavor must be visible to the next flavor.
 
-    The cache is shared across all flavors in a credential group, so two
-    flavors with an identical ``(driver, meta_info)`` spec share one profile
-    rather than each creating a duplicate.
+    The cache is shared across the credential group, so two flavors with the
+    same ``(driver, meta_info)`` share one profile instead of duplicating it.
     """
     meta_info = {"vni_alloc": "auto"}
     created = _make_profile("new-profile", meta_info=meta_info)
@@ -277,7 +274,7 @@ def test_find_matching_profile_returns_unowned_match():
     meta_info = {"vni_alloc": "auto"}
     unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
 
-    assert reconcile.find_matching_profile([unowned], meta_info) is unowned
+    assert reconcile.find_matching_profile([unowned], _DRIVER, meta_info) is unowned
 
 
 def test_find_matching_profile_prefers_owned_over_unowned():
@@ -285,7 +282,37 @@ def test_find_matching_profile_prefers_owned_over_unowned():
     unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
     owned = _make_profile("owned-profile", meta_info=meta_info)
 
-    assert reconcile.find_matching_profile([unowned, owned], meta_info) is owned
+    assert (
+        reconcile.find_matching_profile([unowned, owned], _DRIVER, meta_info) is owned
+    )
+
+
+def test_find_matching_profile_ignores_a_profile_with_another_driver():
+    """The candidate list is Neutron's driver filter; the match must not trust it."""
+    meta_info = {"vni_alloc": "auto"}
+    other_driver = _make_profile(
+        "other-driver-profile", driver="some.other.Driver", meta_info=meta_info
+    )
+
+    assert reconcile.find_matching_profile([other_driver], _DRIVER, meta_info) is None
+
+
+def test_ensure_profile_creates_rather_than_adopting_another_driver():
+    """A wrong-driver profile in the candidate list must not be bound to a flavor."""
+    meta_info = {"vni_alloc": "auto"}
+    other_driver = _make_profile(
+        "other-driver-profile", driver="some.other.Driver", meta_info=meta_info
+    )
+    created = _make_profile("new-profile", meta_info=meta_info)
+    conn = _create_conn(created, existing=[other_driver])
+
+    result = reconcile.ensure_profile(
+        conn, _NAME, _profile_spec(meta_info=meta_info), {}, []
+    )
+
+    assert result is created
+    conn.network.update_service_profile.assert_not_called()
+    assert conn.network.create_service_profile.call_args.kwargs["driver"] == _DRIVER
 
 
 def test_ensure_profile_adopts_unowned_match():
@@ -374,9 +401,8 @@ def test_adopted_unowned_match_can_later_be_unbound():
 def test_ensure_profile_reports_is_enabled_drift_on_reuse(caplog):
     """A profile disabled out-of-band is reported, not silently accepted.
 
-    Neutron's get_flavor_next_provider raises ServiceProfileDisabled for the
-    profile it selects, so every router create against the flavor fails while
-    the flavor itself still looks converged.
+    A disabled profile fails every router create against the flavor while the
+    flavor itself still looks converged.
     """
     existing = _make_profile("owned-profile", is_enabled=False)
     conn = _reuse_conn(existing)
@@ -725,8 +751,8 @@ def test_sync_flavor_returns_no_notes_when_nothing_drifted():
 def test_sync_flavor_reports_profile_drift():
     """Drift found while resolving profiles reaches the caller as notes.
 
-    The flavor itself is converged, so this is not a failure -- but the caller
-    must be able to qualify the status it reports.
+    Not a failure -- the flavor converged -- but the caller must be able to
+    qualify the status it reports.
     """
     flavor = _make_flavor(service_profile_ids=["owned-profile"])
     drifted_profile = _make_profile("owned-profile", is_enabled=False)

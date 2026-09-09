@@ -33,9 +33,8 @@ class RouterFlavorPlugin(SyncPlugin):
         )
 
     def new_cache(self) -> reconcile_module.ProfileCache:
-        # Keyed by driver and shared across every flavor in one credential
-        # group, so two flavors wanting the same profile share one lookup and
-        # end up sharing one profile.
+        # Keyed by driver, shared across the credential group, so two flavors
+        # wanting the same profile share one lookup and one profile.
         return {}
 
     def reconcile(
@@ -51,7 +50,10 @@ class RouterFlavorPlugin(SyncPlugin):
         authoritative_empty: bool,
     ) -> None:
         if not self.config.prune:
+            # PRUNE gates flavor deletion, not the orphan sweep.
+            prune_module.prune_orphaned_profiles(conn)
             return
+        # prune_removed_flavors sweeps orphans itself.
         prune_module.prune_removed_flavors(
             conn, desired_specs, authoritative_empty=authoritative_empty
         )

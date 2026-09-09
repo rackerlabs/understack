@@ -47,13 +47,9 @@ ProfileCache = dict[str, list[Any]]
 class ProfileDrift:
     """One field of a reused service profile that diverged from the CR spec.
 
-    Profile drift is reported, never auto-corrected. Neutron's
-    ``update_service_profile`` calls ``_ensure_service_profile_not_in_use`` and
-    raises ``ServiceProfileInUse`` (HTTP 409) while *any* flavor binding exists
-    -- not merely while a router is using it -- and this operator binds every
-    profile it manages. An update attempt would fail every cycle. Correcting
-    drift means unbinding the profile from every flavor first, which is an
-    operator decision.
+    Reported, never auto-corrected: Neutron rejects an update to a profile bound
+    to any flavor (HTTP 409), and this operator binds every profile it manages,
+    so unbinding first is an operator decision.
     """
 
     profile_id: str
@@ -80,16 +76,21 @@ def profiles_for_driver(conn: Any, driver: str, cache: ProfileCache) -> list[Any
     return cache[driver]
 
 
-def find_matching_profile(profiles: list[Any], meta_info: Any) -> Any | None:
-    """Return a service profile matching *meta_info*, preferring owned profiles.
+def find_matching_profile(
+    profiles: list[Any], driver: str, meta_info: Any
+) -> Any | None:
+    """Return a profile matching *driver* and *meta_info*, preferring owned ones.
 
-    A NeutronRouterFlavor CR is an ownership claim for the flavor and the service
-    profiles described under it. If a matching profile already exists without
-    the marker, ``ensure_profile`` adopts it before binding or pruning depends on
-    that marker.
+    A CR claims ownership of the profiles under it, so an unowned match is
+    returned for ``ensure_profile`` to adopt.
+
+    *driver* is re-checked, not trusted from the candidate list: binding the
+    wrong driver would send routers to the wrong service provider.
     """
     unowned_match: Any | None = None
     for profile in profiles:
+        if get_value(profile, "driver") != driver:
+            continue
         if not meta_info_matches(service_profile_meta_info(profile), meta_info):
             continue
         if is_managed_service_profile(profile):
@@ -131,14 +132,11 @@ def _profile_drift(
 ) -> list[ProfileDrift]:
     """Return the spec fields a reused *profile* disagrees with.
 
-    ``meta_info`` is excluded by construction -- the profile was selected by
-    matching it -- and ``driver`` is excluded because profiles are queried per
-    driver. That leaves ``is_enabled`` and ``description``.
+    Only ``is_enabled`` and ``description``; the profile was selected by matching
+    ``driver`` and ``meta_info``.
 
-    ``is_enabled`` is the consequential one: Neutron's
-    ``get_flavor_next_provider`` raises ``ServiceProfileDisabled`` (HTTP 503)
-    when the profile it selects is disabled, so every router create against the
-    flavor fails while the flavor still looks healthy.
+    ``is_enabled`` is the consequential one: a disabled profile fails every
+    router create against the flavor (HTTP 503) while the flavor looks healthy.
     """
     checks = (
         (
@@ -183,17 +181,15 @@ def ensure_profile(
 ) -> Any:
     """Find or create the service profile *spec* describes.
 
-    The CRD guarantees ``driver`` and ``is_enabled`` are present; ``description``
-    and ``meta_info`` are optional and fall back to empty. Drift on a reused
-    profile is appended to *drift* -- this is the only place holding both the
-    desired spec value and the Neutron state, so it is the only place drift can
-    be detected.
+    The CRD guarantees ``driver`` and ``is_enabled``; ``description`` and
+    ``meta_info`` fall back to empty. Drift on a reused profile is appended to
+    *drift*, the only place holding both the spec value and the Neutron state.
     """
     driver = spec["driver"]
     meta_info = spec.get("meta_info", {})
 
     profiles = profiles_for_driver(conn, driver, cache)
-    profile = find_matching_profile(profiles, meta_info)
+    profile = find_matching_profile(profiles, driver, meta_info)
     if profile:
         profile_id = resource_id(profile)
         if not is_managed_service_profile(profile):
@@ -224,8 +220,7 @@ def ensure_profile(
         meta_info=meta_info_payload(managed_meta_info(meta_info)),
         is_enabled=spec["is_enabled"],
     )
-    # Visible to any later flavor this run with an identical (driver, meta_info)
-    # spec, so it reuses this profile instead of creating a duplicate.
+    # So a later flavor with the same (driver, meta_info) reuses it.
     profiles.append(created)
     return created
 
@@ -238,9 +233,8 @@ def ensure_profile(
 def find_flavor(conn: Any, name: str) -> Any | None:
     """Return the flavor named *name*, or None.
 
-    The SDK passes ``name=`` as a server-side query parameter which Neutron
-    filters in SQL, so at most one record comes back; the equality check guards
-    against a future change to substring semantics.
+    Neutron filters ``name=`` in SQL, so at most one record comes back; the
+    equality check guards against a switch to substring semantics.
     """
     for flavor in conn.network.flavors(name=name):
         if get_value(flavor, "name") == name:
@@ -354,9 +348,8 @@ def reconcile_flavor_profiles(
 ) -> Any:
     """Converge the set of service profiles bound to *flavor*.
 
-    Profiles missing from the flavor are bound; operator-owned profiles bound to
-    it but absent from the desired set are unbound. Profiles attached
-    out-of-band are left alone -- the operator only unbinds what it owns.
+    Missing profiles are bound; owned profiles absent from the desired set are
+    unbound. A profile attached out-of-band is left alone.
     """
     flavor = conn.network.get_flavor(flavor)
     flavor_name = get_value(flavor, "name", default=resource_id(flavor))

@@ -55,6 +55,7 @@ pluginData:
         READY_DELAY: 10
         # When true, removing a NeutronRouterFlavor CR also deletes its unused
         # operator-managed OpenStack flavor. Enable this before removing the CR.
+        # Gates flavor deletion only; unbound managed profiles go either way.
         PRUNE: false
 
   ironicRunbooks:

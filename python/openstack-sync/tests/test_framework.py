@@ -944,15 +944,41 @@ def test_run_sync_skips_prune_for_credentials_with_no_desired_resources():
     assert plugin.pruned == []
 
 
-def test_run_sync_does_not_connect_for_prune_when_prune_disabled():
-    """A deleted-only run must not open a connection just to do nothing."""
+def test_run_sync_connects_to_prune_a_deletion_whatever_prune_says():
+    """A deletion reconciles nothing, so the prune opens the connection itself.
+
+    ``PRUNE`` is the plugin's flag, not the driver's: a prune can have work the
+    flag does not gate, so the driver hands over a connection and lets the
+    plugin decide. It does not wait for the API first -- the prune's own first
+    call is the probe.
+    """
     plugin = StubPlugin(make_hook_config(prune=False))
     inputs = _inputs([], desired=[], deleted=[_resource("gone")])
 
     code, _, connect = _drive(plugin, inputs)
 
     assert code == 0
-    assert connect.call_count == 0
+    assert connect.call_count == 1
+    assert plugin.waits == 0
+    assert plugin.pruned == [([], True)]
+
+
+def test_run_sync_reports_a_prune_whose_connection_cannot_be_built():
+    """Credentials that cannot be loaded fail the run rather than pruning."""
+    plugin = StubPlugin(make_hook_config(prune=True))
+    inputs = _inputs([], desired=[], deleted=[_resource("gone")])
+
+    with (
+        mock.patch.object(
+            framework,
+            "get_openstack_connection",
+            side_effect=RuntimeError("no clouds.yaml in secret"),
+        ),
+        mock.patch.object(framework, "patch_resource_status"),
+    ):
+        code = run_sync(plugin, inputs)
+
+    assert code == 1
     assert plugin.pruned == []
 
 

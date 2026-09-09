@@ -663,15 +663,13 @@ def _run_prune(
 
         conn = connections.get(credentials)
         if conn is None:
-            if not plugin.config.prune:
-                continue
             try:
                 conn = get_openstack_connection(secret_name, cloud_name)
-                plugin.wait_for_api(conn)
             except Exception as exc:  # noqa: BLE001
                 prune_failed = True
                 LOG.error(
-                    "Cannot reach OpenStack for %s prune cloud=%r secret=%r: %s",
+                    "Cannot build an OpenStack connection for the %s prune "
+                    "cloud=%r secret=%r: %s",
                     noun,
                     cloud_name,
                     secret_name,

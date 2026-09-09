@@ -1,9 +1,7 @@
 """Delete router flavors and service profiles whose CR was removed.
 
-Everything here is gated on the operator's ownership markers. A hand-made flavor
-or profile is untouched until a CR causes the operator to create or adopt it; a
-resource carrying the marker is in the operator-managed set, which makes any
-further filtering redundant.
+Every deletion is gated on the operator's ownership marker, so a hand-made
+flavor or profile is never touched.
 """
 
 from __future__ import annotations
@@ -119,18 +117,32 @@ def _delete_flavor(
         maybe_delete_profile(conn, profile_id, cache, counts)
 
 
-def _prune_orphaned_profiles(
+def _sweep_orphaned_profiles(
     conn: Any, cache: ProfileCache, counts: Counter[str]
 ) -> None:
-    """Delete owned, unattached profiles left behind by an earlier partial failure.
+    """Delete owned, unattached profiles left behind by a partial failure.
 
-    Safe to run every cycle: it only ever touches operator-owned profiles that
-    no flavor is bound to.
+    Safe every cycle: only owned profiles with no flavor bound to them.
     """
     LOG.info("Scanning for orphaned operator-owned service profiles")
     for profile in list(conn.network.service_profiles()):
-        if is_managed_service_profile(profile):
-            maybe_delete_profile(conn, resource_id(profile), cache, counts)
+        if not is_managed_service_profile(profile):
+            continue
+        profile_id = resource_id(profile)
+        # The listing already gave us the profile; skip the per-profile GET.
+        cache.setdefault(profile_id, profile)
+        maybe_delete_profile(conn, profile_id, cache, counts)
+
+
+def prune_orphaned_profiles(conn: Any) -> None:
+    """Sweep owned, unattached service profiles, deleting no flavor.
+
+    The entry point when ``PRUNE`` is off. That flag gates flavor deletion,
+    which needs a trustworthy desired set; an unbound owned profile needs none.
+    Only reaches credential groups the run already has a connection for.
+    """
+    flavors = list(conn.network.flavors(service_type=SERVICE_TYPE))
+    _sweep_orphaned_profiles(conn, {}, _attachment_counts(flavors))
 
 
 def prune_removed_flavors(
@@ -141,8 +153,8 @@ def prune_removed_flavors(
 ) -> None:
     """Delete operator-owned router flavors absent from *desired_specs*.
 
-    An empty *desired_specs* is only acted on when *authoritative_empty* says a
-    CR really was deleted; otherwise it may be a snapshot we could not read, and
+    An empty *desired_specs* is acted on only when *authoritative_empty* says a
+    CR really was deleted; otherwise it may be an unreadable snapshot, and
     pruning against it would delete every managed flavor.
     """
     if not desired_specs and not authoritative_empty:
@@ -166,4 +178,4 @@ def prune_removed_flavors(
             continue
         _delete_flavor(conn, flavor, cache, counts)
 
-    _prune_orphaned_profiles(conn, cache, counts)
+    _sweep_orphaned_profiles(conn, cache, counts)
