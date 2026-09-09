@@ -1,4 +1,4 @@
-"""Tests for openstack_sync.hooks.common — generic shell-operator utilities."""
+"""Tests for openstack_sync.hooks.common -- generic shell-operator utilities."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import logging
 from unittest import mock
 
 import pytest
+from kubernetes.client.exceptions import ApiException
 
 from openstack_sync.hooks import common as hc
 
@@ -242,100 +243,83 @@ def test_status_is_current_detects_real_status_differences(
 # ---------------------------------------------------------------------------
 
 
+API_VERSION = "neutron.understack.rackspace.net/v1alpha1"
+RESOURCE = "neutronrouterflavors.neutron.understack.rackspace.net"
+
+
+def _patch(**overrides):
+    """Call patch_resource_status against a mocked API, returning the mock."""
+    kwargs = {
+        "name": "test-flavor",
+        "namespace": "openstack",
+        "generation": 2,
+        "sync_status": "Synced",
+        "message": "all good",
+        "crd_api_version": API_VERSION,
+        "crd_resource": RESOURCE,
+        "crd_kind": "NeutronRouterFlavor",
+        "status_enabled": True,
+    }
+    kwargs.update(overrides)
+    api = mock.MagicMock()
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        hc.patch_resource_status(**kwargs)
+    return api.patch_namespaced_custom_object_status
+
+
 def test_patch_resource_status_skips_when_disabled():
-    with mock.patch("subprocess.run") as mock_run:
-        hc.patch_resource_status(
-            name="test-flavor",
-            namespace="openstack",
-            generation=1,
-            sync_status="Synced",
-            message="ok",
-            crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
-            crd_kind="NeutronRouterFlavor",
-            status_enabled=False,
-        )
-
-    mock_run.assert_not_called()
+    assert not _patch(status_enabled=False).called
 
 
-def test_patch_resource_status_calls_kubectl():
-    with mock.patch("subprocess.run") as mock_run:
-        mock_run.return_value = mock.MagicMock(returncode=0)
-        hc.patch_resource_status(
-            name="test-flavor",
-            namespace="openstack",
-            generation=2,
-            sync_status="Synced",
-            message="all good",
-            crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
-            crd_kind="NeutronRouterFlavor",
-            status_enabled=True,
-        )
+def test_patch_resource_status_calls_the_api():
+    call = _patch()
 
-    mock_run.assert_called_once()
-    cmd = mock_run.call_args[0][0]
-    assert "kubectl" in cmd
-    assert "test-flavor" in cmd
-    assert "-n" in cmd
-    assert "openstack" in cmd
+    call.assert_called_once()
+    kwargs = call.call_args.kwargs
+    assert kwargs["group"] == "neutron.understack.rackspace.net"
+    assert kwargs["version"] == "v1alpha1"
+    assert kwargs["plural"] == "neutronrouterflavors"
+    assert kwargs["namespace"] == "openstack"
+    assert kwargs["name"] == "test-flavor"
+
+    status = kwargs["body"]["status"]
+    assert status["syncStatus"] == "Synced"
+    assert status["observedGeneration"] == 2
+    assert [c["type"] for c in status["conditions"]] == ["Synced"]
+
+
+def test_patch_resource_status_omits_generation_when_absent():
+    status = _patch(generation=None).call_args.kwargs["body"]["status"]
+    assert "observedGeneration" not in status
 
 
 def test_patch_resource_status_skips_when_current_status_matches():
-    with mock.patch("subprocess.run") as mock_run:
-        hc.patch_resource_status(
-            name="test-flavor",
-            namespace="openstack",
-            generation=1,
-            sync_status="Synced",
-            message="ok",
-            crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
-            crd_kind="NeutronRouterFlavor",
-            status_enabled=True,
-            current_status=_matching_status(),
-        )
-
-    mock_run.assert_not_called()
+    call = _patch(generation=1, message="ok", current_status=_matching_status())
+    assert not call.called
 
 
-def test_patch_resource_status_no_namespace():
-    with mock.patch("subprocess.run") as mock_run:
-        mock_run.return_value = mock.MagicMock(returncode=0)
-        hc.patch_resource_status(
-            name="test-flavor",
-            namespace=None,
-            generation=None,
-            sync_status="Failed",
-            message="error",
-            crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
-            crd_kind="NeutronRouterFlavor",
-            status_enabled=True,
-        )
+def test_patch_resource_status_skips_without_a_namespace(caplog):
+    with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+        call = _patch(namespace=None)
 
-    cmd = mock_run.call_args[0][0]
-    assert "-n" not in cmd
+    assert not call.called
+    assert "no namespace to address it in" in caplog.text
 
 
-def test_patch_resource_status_logs_on_kubectl_not_found(caplog):
-    with mock.patch("subprocess.run", side_effect=FileNotFoundError):
-        with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
-            hc.patch_resource_status(
-                name="test-flavor",
-                namespace=None,
-                generation=None,
-                sync_status="Synced",
-                message="ok",
-                crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
-                crd_kind="NeutronRouterFlavor",
-                status_enabled=True,
-            )
-    assert "kubectl not found" in caplog.text
+def test_patch_resource_status_skips_on_unusable_crd_identity(caplog):
+    with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+        call = _patch(crd_api_version="no-version-here")
+
+    assert not call.called
+    assert "cannot derive a CRD request target" in caplog.text
 
 
-def test_patch_resource_status_logs_on_kubectl_failure(caplog):
-    with mock.patch("subprocess.run") as mock_run:
-        mock_run.return_value = mock.MagicMock(
-            returncode=1, stderr="not found", stdout=""
-        )
+def test_patch_resource_status_logs_api_errors(caplog):
+    api = mock.MagicMock()
+    api.patch_namespaced_custom_object_status.side_effect = ApiException(
+        status=403, reason="Forbidden"
+    )
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
         with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
             hc.patch_resource_status(
                 name="test-flavor",
@@ -343,8 +327,85 @@ def test_patch_resource_status_logs_on_kubectl_failure(caplog):
                 generation=None,
                 sync_status="Synced",
                 message="ok",
-                crd_resource="neutronrouterflavors.neutron.understack.rackspace.net",
+                crd_api_version=API_VERSION,
+                crd_resource=RESOURCE,
                 crd_kind="NeutronRouterFlavor",
                 status_enabled=True,
             )
+
     assert "failed to patch" in caplog.text
+    # The point of moving off kubectl: the HTTP status survives into the log.
+    assert "403" in caplog.text
+    assert "Forbidden" in caplog.text
+
+
+def test_patch_resource_status_logs_unexpected_errors(caplog):
+    with mock.patch.object(
+        hc, "_customobjects_api", side_effect=RuntimeError("no kubeconfig")
+    ):
+        with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+            hc.patch_resource_status(
+                name="test-flavor",
+                namespace="openstack",
+                generation=None,
+                sync_status="Synced",
+                message="ok",
+                crd_api_version=API_VERSION,
+                crd_resource=RESOURCE,
+                crd_kind="NeutronRouterFlavor",
+                status_enabled=True,
+            )
+
+    assert "failed to patch" in caplog.text
+    assert "RuntimeError" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# crd_request_target
+# ---------------------------------------------------------------------------
+
+
+def test_crd_request_target_splits_the_chart_supplied_values():
+    assert hc.crd_request_target(API_VERSION, RESOURCE) == (
+        "neutron.understack.rackspace.net",
+        "v1alpha1",
+        "neutronrouterflavors",
+    )
+
+
+@pytest.mark.parametrize(
+    ("api_version", "resource"),
+    [
+        ("", RESOURCE),
+        ("neutron.understack.rackspace.net", RESOURCE),  # no version
+        ("/v1alpha1", RESOURCE),  # no group
+        (API_VERSION, ""),  # no plural
+    ],
+)
+def test_crd_request_target_rejects_unusable_values(api_version, resource):
+    with pytest.raises(ValueError, match="cannot derive a CRD request target"):
+        hc.crd_request_target(api_version, resource)
+
+
+# ---------------------------------------------------------------------------
+# _api_error_detail
+# ---------------------------------------------------------------------------
+
+
+def test_api_error_detail_without_a_body():
+    exc = ApiException(status=404, reason="Not Found")
+    assert hc._api_error_detail(exc) == "HTTP 404 Not Found"
+
+
+def test_api_error_detail_flattens_and_truncates_the_body():
+    exc = ApiException(status=422, reason="Unprocessable Entity")
+    exc.body = "line one\n" + "x" * 4000
+
+    detail = hc._api_error_detail(exc)
+
+    assert detail.startswith("HTTP 422 Unprocessable Entity: line one ")
+    assert "\n" not in detail
+    # The prefix plus a 512-character body at most, so one apiserver Status
+    # object cannot flood the log.
+    assert len(detail) <= len("HTTP 422 Unprocessable Entity: ") + 512
+    assert detail.endswith("...")

@@ -325,7 +325,7 @@ def test_main_creates_then_prunes_against_a_fake_ironic(
 
     Binding context -> framework -> reconcile -> runbook client -> Ironic routes,
     then the same for prune once the CR is gone. Only the connection, the
-    microversion discovery and kubectl are stood in for.
+    microversion discovery and the status patch are stood in for.
     """
     fake = FakeBaremetal()
     conn = types.SimpleNamespace(baremetal=fake)

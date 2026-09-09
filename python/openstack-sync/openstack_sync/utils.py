@@ -17,12 +17,20 @@ from kubernetes import config as k8s_config
 from openstack.config import loader as os_config_loader
 
 
-def read_secret_key(secret_name: str, secret_key: str, namespace: str) -> str:
-    """Read a single key from a Kubernetes Secret and return its decoded value.
+def load_kubernetes_config() -> None:
+    """Configure the Kubernetes client for wherever this is running.
 
-    Configures the client automatically:
     - Inside a cluster: uses the pod's service-account token.
     - Outside a cluster: falls back to the local kubeconfig (development).
+    """
+    try:
+        k8s_config.load_incluster_config()
+    except k8s_config.ConfigException:
+        k8s_config.load_kube_config()
+
+
+def read_secret_key(secret_name: str, secret_key: str, namespace: str) -> str:
+    """Read a single key from a Kubernetes Secret and return its decoded value.
 
     Args:
         secret_name: Name of the Kubernetes Secret to read.
@@ -35,10 +43,7 @@ def read_secret_key(secret_name: str, secret_key: str, namespace: str) -> str:
     Raises:
         KeyError: When ``secret_key`` is not present in the Secret's data.
     """
-    try:
-        k8s_config.load_incluster_config()
-    except k8s_config.ConfigException:
-        k8s_config.load_kube_config()
+    load_kubernetes_config()
 
     v1 = client.CoreV1Api()
     secret = v1.read_namespaced_secret(name=secret_name, namespace=namespace)
@@ -89,7 +94,7 @@ def get_openstack_connection(secret_name: str, cloud_name: str) -> Any:
     # openstack.connect(cloud=name) resolves the named cloud from files on
     # disk, which fails inside a container with no clouds.yaml present.
     # Instead, parse the YAML from the Secret and inject it directly into
-    # the SDK config loader — no filesystem writes required.
+    # the SDK config loader -- no filesystem writes required.
     loader = os_config_loader.OpenStackConfig(
         config_files=[],
         vendor_files=[],

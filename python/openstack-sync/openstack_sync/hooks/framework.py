@@ -502,6 +502,7 @@ def _patch_status(
         generation=resource.generation,
         sync_status=sync_status,
         message=message,
+        crd_api_version=config.crd_api_version,
         crd_resource=config.crd_resource,
         crd_kind=config.crd_kind,
         status_enabled=config.status_enabled,
