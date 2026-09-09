@@ -21,6 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -33,6 +34,8 @@ import (
 var _ = Describe("Nautobot Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
+		const secretName = "nautobot-secret"
+		const secretNamespace = "default"
 
 		ctx := context.Background()
 
@@ -43,15 +46,41 @@ var _ = Describe("Nautobot Controller", func() {
 		nautobot := &syncv1alpha1.Nautobot{}
 
 		BeforeEach(func() {
+			By("creating the referenced auth Secret")
+			secret := &corev1.Secret{}
+			secretKey := types.NamespacedName{Name: secretName, Namespace: secretNamespace}
+			if err := k8sClient.Get(ctx, secretKey, secret); err != nil && errors.IsNotFound(err) {
+				secret = &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretName,
+						Namespace: secretNamespace,
+					},
+					Data: map[string][]byte{
+						"username": []byte("admin"),
+						"token":    []byte("test-token"),
+					},
+				}
+				Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+			}
+
 			By("creating the custom resource for the Kind Nautobot")
 			err := k8sClient.Get(ctx, typeNamespacedName, nautobot)
 			if err != nil && errors.IsNotFound(err) {
+				secretNs := secretNamespace
 				resource := &syncv1alpha1.Nautobot{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: syncv1alpha1.NautobotSpec{
+						// nautobotSecretRef.Name is required by the CRD schema.
+						NautobotSecretRef: syncv1alpha1.SecretKeySelector{
+							Name:        secretName,
+							Namespace:   &secretNs,
+							UsernameKey: "username",
+							TokenKey:    "token",
+						},
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -65,6 +94,13 @@ var _ = Describe("Nautobot Controller", func() {
 
 			By("Cleanup the specific resource instance Nautobot")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+
+			By("Cleanup the referenced auth Secret")
+			secret := &corev1.Secret{}
+			secretKey := types.NamespacedName{Name: secretName, Namespace: secretNamespace}
+			if err := k8sClient.Get(ctx, secretKey, secret); err == nil {
+				Expect(k8sClient.Delete(ctx, secret)).To(Succeed())
+			}
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
