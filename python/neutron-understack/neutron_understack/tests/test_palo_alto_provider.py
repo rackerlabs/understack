@@ -1,8 +1,26 @@
+import copy
+from types import MethodType
+from types import SimpleNamespace
+
 import pytest
+from neutron.db import l3_db
+from neutron.services.trunk import rules as trunk_rules
 from neutron_lib import constants as const
 from neutron_lib import exceptions as n_exc
+from neutron_lib.callbacks import events
+from neutron_lib.callbacks import exceptions as callback_exc
+from neutron_lib.callbacks import manager
+from neutron_lib.callbacks import priority_group
+from neutron_lib.callbacks import registry
+from neutron_lib.callbacks import resources
+from neutron_lib.exceptions import l3 as l3_exc
 
 from neutron_understack.l3_router import palo_alto
+
+
+@pytest.fixture(autouse=True)
+def _isolated_callbacks(mocker):
+    mocker.patch.object(registry, "_CALLBACK_MANAGER", manager.CallbacksManager())
 
 
 class FakeFlavorPlugin:
@@ -780,6 +798,8 @@ class TestRouterInterfaceCreateHandler:
         )
         m_trunk = mocker.patch.object(provider, "_ensure_trunk", return_value=trunk)
         m_sub = mocker.patch.object(provider, "_add_interface_subport")
+        mocker.patch.object(provider, "_parent_port_for_router", return_value=None)
+        mocker.patch.object(provider, "_trunk_for_router", return_value=None)
 
         provider._process_router_interface_create("r", "e", "t", self._payload(mocker))
 
@@ -952,11 +972,32 @@ class TestGatewayDeleteHandler:
 
 class TestRouterInterfacePortDeleteHandler:
     def _payload(self, mocker, port=None):
+        mocker.patch.object(
+            palo_alto.l3_obj.RouterPort, "objects_exist", return_value=True
+        )
         payload = mocker.Mock()
         payload.context = "ctx"
         payload.resource_id = "intf-1"
-        payload.metadata = {"port": port if port is not None else dict(_INTERFACE_PORT)}
+        payload.metadata = {
+            "port": port if port is not None else dict(_INTERFACE_PORT),
+            "port_check": False,
+        }
         return payload
+
+    @pytest.mark.parametrize("port_check", [True, None, "missing"])
+    def test_skips_unless_l3_explicitly_authorized_removal(self, mocker, port_check):
+        provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
+        cleanup = mocker.patch.object(provider, "_cleanup_interface_attachment")
+        payload = self._payload(mocker)
+        if port_check == "missing":
+            payload.metadata.pop("port_check")
+        else:
+            payload.metadata["port_check"] = port_check
+
+        provider._process_router_interface_port_delete("r", "e", "t", payload)
+
+        cleanup.assert_not_called()
+        provider.l3plugin.get_router.assert_not_called()
 
     def test_cleans_up_before_port_delete_when_palo_alto(self, mocker):
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
@@ -1078,3 +1119,427 @@ class TestGatewayCleanupPartialAdd:
 
         core.delete_port.assert_not_called()
         ironic.detach_vif_from_node.assert_not_called()
+
+
+@pytest.fixture
+def interface_lifecycle(mocker):
+    """Run Neutron's L3 flow/guards with stateful core, trunk and Ironic doubles."""
+    state = SimpleNamespace(
+        ports={}, trunks={}, vifs=set(), associations=set(), fail=None
+    )
+
+    def fail_at(stage):
+        if state.fail == stage:
+            raise RuntimeError(f"{stage} failed")
+
+    core = mocker.Mock()
+    trunk_plugin = mocker.Mock()
+    ironic = mocker.Mock()
+    context = mocker.Mock()
+    context.session.is_active = True
+    context.project_id = "admin-project"
+    router = SimpleNamespace(id="r1", project_id="project-1", gw_port=None)
+    router_dict = {"id": router.id, "flavor_id": "f1"}
+    interface_port = {
+        **_INTERFACE_PORT,
+        "network_id": "tenant-net",
+        "project_id": router.project_id,
+        "fixed_ips": [{"subnet_id": "subnet-1", "ip_address": "10.0.0.1"}],
+    }
+    subnet = {"id": "subnet-1", "cidr": "10.0.0.0/24"}
+
+    def create_port(_context, body):
+        port = copy.deepcopy(body["port"])
+        is_parent = port.get("name", "").startswith("palo-alto-router-anchor-")
+        port["id"] = "parent-1" if is_parent else "intf-1"
+        state.ports[port["id"]] = port
+        if is_parent:
+            fail_at("parent_create")
+        return copy.deepcopy(port)
+
+    def update_port(_context, port_id, body):
+        state.ports[port_id].update(body["port"])
+        return copy.deepcopy(state.ports[port_id])
+
+    def delete_port(ctx, port_id, l3_port_check=True):
+        registry.publish(
+            resources.PORT,
+            events.BEFORE_DELETE,
+            core,
+            payload=events.DBEventPayload(
+                ctx,
+                resource_id=port_id,
+                metadata={
+                    "port": copy.deepcopy(state.ports[port_id]),
+                    "port_check": l3_port_check,
+                },
+            ),
+        )
+        del state.ports[port_id]
+        state.associations.discard(port_id)
+
+    core.create_port.side_effect = create_port
+    core.update_port.side_effect = update_port
+    core.delete_port.side_effect = delete_port
+    core.get_port.side_effect = lambda _ctx, port_id: copy.deepcopy(
+        state.ports[port_id]
+    )
+    core.get_ports.side_effect = lambda _ctx, filters: [
+        copy.deepcopy(port)
+        for port in state.ports.values()
+        if all(port.get(key) in values for key, values in filters.items())
+    ]
+    core.get_networks.return_value = [{"id": "anchor-net"}]
+
+    def create_trunk(_context, body):
+        trunk = {"id": "trunk-1", **copy.deepcopy(body["trunk"])}
+        state.trunks[trunk["id"]] = trunk
+        fail_at("trunk_create")
+        return copy.deepcopy(trunk)
+
+    def add_subports(_context, trunk_id, body):
+        fail_at("subport_precommit")
+        state.trunks[trunk_id]["sub_ports"].extend(copy.deepcopy(body["sub_ports"]))
+        fail_at("subport_postcommit")
+        return copy.deepcopy(state.trunks[trunk_id])
+
+    def remove_subports(_context, trunk_id, body):
+        removed = {sp["port_id"] for sp in body["sub_ports"]}
+        state.trunks[trunk_id]["sub_ports"] = [
+            sp
+            for sp in state.trunks[trunk_id]["sub_ports"]
+            if sp["port_id"] not in removed
+        ]
+        return copy.deepcopy(state.trunks[trunk_id])
+
+    trunk_plugin.create_trunk.side_effect = create_trunk
+    trunk_plugin.add_subports.side_effect = add_subports
+    trunk_plugin.remove_subports.side_effect = remove_subports
+    trunk_plugin.get_trunks.side_effect = lambda _ctx, filters: [
+        copy.deepcopy(trunk)
+        for trunk in state.trunks.values()
+        if trunk["name"] in filters["name"]
+    ]
+    trunk_plugin.get_trunk.side_effect = lambda _ctx, tid: copy.deepcopy(
+        state.trunks[tid]
+    )
+    trunk_plugin.delete_trunk.side_effect = lambda _ctx, tid: state.trunks.pop(tid)
+    mocker.patch.object(
+        palo_alto.utils, "fetch_trunk_plugin", return_value=trunk_plugin
+    )
+    mocker.patch.object(
+        palo_alto.utils,
+        "allowed_tenant_vlan_id_ranges",
+        side_effect=lambda: (
+            [(200, 200)] if state.fail == "vlan_allocation" else [(200, 210)]
+        ),
+    )
+    mocker.patch.object(
+        palo_alto.utils,
+        "clear_device_id_for_port",
+        side_effect=lambda pid: update_port(context, pid, {"port": {"device_id": ""}}),
+    )
+    mocker.patch.object(
+        palo_alto.utils,
+        "set_device_id_and_owner_for_port",
+        side_effect=lambda pid, did, owner: update_port(
+            context, pid, {"port": {"device_id": did, "device_owner": owner}}
+        ),
+    )
+
+    def attach_vif(_node, port_id):
+        fail_at("vif_attach")
+        state.vifs.add(port_id)
+        fail_at("vif_annotation")
+        state.ports[port_id].update(
+            {
+                "binding:host_id": "node-1",
+                "binding:profile": {
+                    "physical_network": "physnet-1",
+                    "local_link_information": [
+                        {"switch_info": "switch-1", "port_id": "Eth1"}
+                    ],
+                },
+            }
+        )
+
+    ironic.node_by_instance_uuid.return_value = SimpleNamespace(id="node-1")
+    ironic.node_vif_ids.side_effect = lambda _node: list(state.vifs)
+    ironic.attach_vif_to_node.side_effect = attach_vif
+    ironic.detach_vif_from_node.side_effect = lambda _node, pid: state.vifs.discard(pid)
+    provider = _make_provider(
+        mocker, FakeFlavorPlugin(_palo_alto_driver()), ironic=ironic, core_plugin=core
+    )
+    palo_alto.n_context.get_admin_context.return_value = context
+
+    # Bind the installed Neutron methods, including its real rollback context
+    # managers. Only persistence and pre-event subnet validation are doubled.
+    l3 = SimpleNamespace(
+        _core_plugin=core,
+        _get_router=mocker.Mock(return_value=router),
+        get_router=mocker.Mock(return_value=router_dict),
+        _get_device_owner=mocker.Mock(return_value=const.DEVICE_OWNER_ROUTER_INTF),
+        _validate_interface_info=mocker.Mock(
+            side_effect=lambda info: ("port_id" in info, "subnet_id" in info)
+        ),
+        _check_router_port=mocker.Mock(
+            side_effect=lambda _ctx, pid, _owner: copy.deepcopy(state.ports[pid])
+        ),
+        _validate_router_port_info=mocker.Mock(
+            side_effect=lambda _ctx, _router, pid: (
+                copy.deepcopy(state.ports[pid]),
+                [subnet],
+            )
+        ),
+        _add_interface_by_subnet=mocker.Mock(
+            side_effect=lambda _ctx, _router, _sid, _owner: (
+                create_port(context, {"port": interface_port}),
+                [subnet],
+                True,
+            )
+        ),
+        router_device_owners=l3_db.L3_NAT_dbonly_mixin.router_device_owners,
+    )
+    for method in (
+        "add_router_interface",
+        "_notify_attaching_interface",
+        "_add_interface_by_port",
+        "_add_router_port",
+        "prevent_l3_port_deletion",
+    ):
+        setattr(l3, method, MethodType(getattr(l3_db.L3_NAT_dbonly_mixin, method), l3))
+    l3._make_router_interface_info = (
+        l3_db.L3_NAT_dbonly_mixin._make_router_interface_info
+    )
+    router_port = mocker.patch.object(l3_db.l3_obj, "RouterPort")
+    router_port.return_value.create.side_effect = lambda: state.associations.add(
+        "intf-1"
+    )
+    router_port.get_objects.return_value = []
+    router_port.objects_exist.side_effect = lambda _ctx, router_id, port_id: (
+        port_id in state.associations
+    )
+    mocker.patch.object(l3_db.l3_obj.Router, "objects_exist", return_value=True)
+    provider.l3plugin = l3
+    mocker.patch.object(
+        palo_alto.directory,
+        "get_plugin",
+        side_effect=lambda plugin=None: (
+            l3 if plugin == palo_alto.plugin_constants.L3 else core
+        ),
+    )
+    registry.subscribe(
+        l3_db.L3_NAT_dbonly_mixin._prevent_l3_port_delete_callback,
+        resources.PORT,
+        events.BEFORE_DELETE,
+    )
+    registry.subscribe(
+        trunk_rules.enforce_port_deletion_rules, resources.PORT, events.BEFORE_DELETE
+    )
+    mocker.patch.object(
+        trunk_rules.trunk_objects.SubPort,
+        "get_object",
+        side_effect=lambda _ctx, port_id: next(
+            (
+                SimpleNamespace(trunk_id=trunk["id"])
+                for trunk in state.trunks.values()
+                for sp in trunk["sub_ports"]
+                if sp["port_id"] == port_id
+            ),
+            None,
+        ),
+    )
+    mocker.patch.object(
+        trunk_rules.trunk_objects.Trunk, "get_object", return_value=None
+    )
+    return SimpleNamespace(
+        state=state,
+        provider=provider,
+        core=core,
+        trunk_plugin=trunk_plugin,
+        ironic=ironic,
+        context=context,
+        l3=l3,
+        router_port=router_port,
+        interface_port=interface_port,
+        router=router_dict,
+    )
+
+
+class TestRouterInterfaceLifecycle:
+    def _add(self, env, by_port=False):
+        info = {"port_id": "intf-1"} if by_port else {"subnet_id": "subnet-1"}
+        return env.l3.add_router_interface(env.context, "r1", info)
+
+    def test_rejected_direct_delete_preserves_live_subport(self, interface_lifecycle):
+        env = interface_lifecycle
+        self._add(env)
+        before = copy.deepcopy(env.state)
+
+        with pytest.raises(callback_exc.CallbackFailure) as error:
+            env.core.delete_port(env.context, "intf-1")
+
+        assert any(
+            isinstance(exc, n_exc.ServicePortInUse)
+            for exc in error.value.inner_exceptions
+        )
+        assert env.state == before
+        env.trunk_plugin.remove_subports.assert_not_called()
+        env.ironic.detach_vif_from_node.assert_not_called()
+
+    def test_authorized_delete_unwires_before_trunk_guard(self, interface_lifecycle):
+        env = interface_lifecycle
+        self._add(env)
+
+        env.core.delete_port(env.context, "intf-1", l3_port_check=False)
+
+        assert not env.state.ports
+        assert not env.state.trunks
+        assert not env.state.vifs
+        assert not env.state.associations
+
+    @pytest.mark.parametrize("by_port", [False, True], ids=["by-subnet", "by-port"])
+    @pytest.mark.parametrize(
+        "stage",
+        [
+            "parent_create",
+            "vif_attach",
+            "vif_annotation",
+            "trunk_create",
+            "vlan_allocation",
+            "subport_precommit",
+            "subport_postcommit",
+        ],
+    )
+    def test_attach_failure_unwinds_and_allows_retry(
+        self, interface_lifecycle, by_port, stage
+    ):
+        env = interface_lifecycle
+        original = {**env.interface_port, "device_id": "", "device_owner": ""}
+        if by_port:
+            env.state.ports["intf-1"] = copy.deepcopy(original)
+        env.state.fail = stage
+
+        with pytest.raises(l3_exc.RouterInterfaceAttachmentConflict):
+            self._add(env, by_port)
+
+        env.router_port.assert_not_called()
+        assert not env.state.associations
+        assert not env.state.trunks
+        assert not env.state.vifs
+        assert env.state.ports == ({"intf-1": original} if by_port else {})
+        if by_port:
+            assert all(
+                call.args[1] != "intf-1" for call in env.core.delete_port.call_args_list
+            )
+
+        env.state.fail = None
+        self._add(env, by_port)
+        assert env.state.associations == {"intf-1"}
+        assert env.state.trunks["trunk-1"]["sub_ports"] == [
+            {"port_id": "intf-1", "segmentation_type": "vlan", "segmentation_id": 201}
+        ]
+
+    @pytest.mark.parametrize(
+        "priority",
+        [
+            priority_group.PRIORITY_DEFAULT,
+            priority_group.PRIORITY_ROUTER_DRIVER + 1,
+        ],
+        ids=["earlier-validator", "later-validator"],
+    )
+    def test_other_callback_rejection_unwinds_successful_attach(
+        self, interface_lifecycle, mocker, priority
+    ):
+        env = interface_lifecycle
+        env.state.ports["intf-1"] = {
+            **env.interface_port,
+            "device_id": "",
+            "device_owner": "",
+        }
+        reject = mocker.Mock(
+            side_effect=n_exc.BadRequest(resource="router", msg="validation failed")
+        )
+        registry.subscribe(
+            reject, resources.ROUTER_INTERFACE, events.BEFORE_CREATE, priority=priority
+        )
+
+        with pytest.raises(l3_exc.RouterInterfaceAttachmentConflict):
+            self._add(env, by_port=True)
+
+        env.router_port.assert_not_called()
+        assert not env.state.trunks
+        assert not env.state.vifs
+        assert set(env.state.ports) == {"intf-1"}
+        assert env.state.ports["intf-1"]["device_id"] == ""
+
+    @pytest.mark.parametrize("existing_trunk", [False, True])
+    @pytest.mark.parametrize("existing_vif", [False, True])
+    def test_failure_preserves_preexisting_empty_stack(
+        self, interface_lifecycle, existing_trunk, existing_vif
+    ):
+        env = interface_lifecycle
+        parent = env.provider._ensure_parent_port(env.router)
+        if existing_vif:
+            env.provider._ensure_parent_vif_attached(env.router, parent)
+        if existing_trunk:
+            env.provider._ensure_trunk(env.router, parent)
+        trunks = copy.deepcopy(env.state.trunks)
+        vifs = set(env.state.vifs)
+        env.state.fail = "subport_postcommit"
+
+        with pytest.raises(l3_exc.RouterInterfaceAttachmentConflict):
+            self._add(env)
+
+        assert env.state.trunks == trunks
+        assert env.state.vifs == vifs
+        assert set(env.state.ports) == {"parent-1"}
+        assert not env.state.associations
+
+    def test_failed_subnet_preserves_existing_gateway(self, interface_lifecycle):
+        env = interface_lifecycle
+        parent = env.provider._ensure_parent_port(env.router)
+        env.provider._ensure_parent_vif_attached(env.router, parent)
+        env.provider._ensure_trunk(env.router, parent)
+        env.state.trunks["trunk-1"]["sub_ports"] = [
+            {"port_id": "gw-1", "segmentation_type": "vlan", "segmentation_id": 200}
+        ]
+        before = copy.deepcopy(env.state)
+        env.state.fail = "subport_postcommit"
+
+        with pytest.raises(l3_exc.RouterInterfaceAttachmentConflict):
+            self._add(env)
+
+        assert env.state.ports == before.ports
+        assert env.state.trunks == before.trunks
+        assert env.state.vifs == before.vifs
+        env.ironic.detach_vif_from_node.assert_not_called()
+
+    def test_abort_retries_failed_compensation(
+        self, interface_lifecycle, mocker, caplog
+    ):
+        env = interface_lifecycle
+        env.state.fail = "subport_postcommit"
+        cleanup = env.provider._remove_interface_subport
+        attempts = []
+
+        def fail_once(*args):
+            attempts.append(args)
+            if len(attempts) == 1:
+                raise RuntimeError("transient cleanup failure")
+            return cleanup(*args)
+
+        mocker.patch.object(
+            env.provider, "_remove_interface_subport", side_effect=fail_once
+        )
+        with pytest.raises(
+            l3_exc.RouterInterfaceAttachmentConflict, match="subport_postcommit"
+        ):
+            self._add(env)
+
+        assert len(attempts) == 2
+        assert "attachment cleanup is incomplete" in caplog.text
+        assert not env.state.trunks
+        assert not env.state.vifs
+        assert not env.state.ports
+        assert not env.state.associations

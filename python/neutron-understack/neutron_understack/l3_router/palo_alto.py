@@ -1,6 +1,9 @@
 import json
 import logging
+import weakref
+from dataclasses import dataclass
 
+from neutron.objects import router as l3_obj
 from neutron.services.l3_router.service_providers import base
 from neutron_lib import constants as const
 from neutron_lib import context as n_context
@@ -32,6 +35,16 @@ TRUNK_NAME_PREFIX = "palo-alto-router-trunk"
 # allocated model once the trunk-tag semantics are revisited.
 GATEWAY_SUBPORT_VLAN = 200
 INTERFACE_SUBPORT_VLAN_START = GATEWAY_SUBPORT_VLAN + 1
+
+
+@dataclass(frozen=True)
+class _InterfaceAttachment:
+    router_id: str
+    port_id: str
+    parent_id: str | None
+    trunk_id: str | None
+    subport_present: bool
+    parent_vif_attached: bool
 
 
 # Conflict -> HTTP 409: the request cannot be satisfied because the hardware
@@ -90,6 +103,7 @@ class PaloAlto(base.L3ServiceProvider):
     def __init__(self, l3_plugin):
         super().__init__(l3_plugin)
         self._palo_alto_provider = f"{__name__}.{self.__class__.__name__}"
+        self._interface_attachments = weakref.WeakKeyDictionary()
         # Gateway attach must run on AFTER_CREATE (the gateway port does not
         # exist earlier) and must be cancellable so a wiring failure returns a
         # real API error instead of a swallowed 200. @registry.receives cannot
@@ -112,8 +126,14 @@ class PaloAlto(base.L3ServiceProvider):
         registry.subscribe(
             self._process_router_interface_create,
             resources.ROUTER_INTERFACE,
-            events.AFTER_CREATE,
+            events.BEFORE_CREATE,
+            priority=priority_group.PRIORITY_ROUTER_DRIVER,
             cancellable=True,
+        )
+        registry.subscribe(
+            self._process_router_interface_abort,
+            resources.ROUTER_INTERFACE,
+            events.ABORT_CREATE,
         )
         # Run before neutron.services.trunk.rules.enforce_port_deletion_rules
         # (PRIORITY_DEFAULT) so a Palo Alto router-interface port can be removed
@@ -858,7 +878,7 @@ class PaloAlto(base.L3ServiceProvider):
         )
 
     def _process_router_interface_create(self, resource, event, trigger, payload=None):
-        """ROUTER_INTERFACE / AFTER_CREATE: wire a subnet interface port."""
+        """Wire the interface before Neutron commits its RouterPort association."""
         context = payload.context
         router_id = payload.resource_id
         router = self.l3plugin.get_router(context, router_id)
@@ -870,17 +890,42 @@ class PaloAlto(base.L3ServiceProvider):
             raise n_exc.BadRequest(
                 resource="router",
                 msg=(
-                    f"Palo Alto router {router_id} interface was created but no "
-                    "router interface port was supplied."
+                    f"Palo Alto router {router_id} interface attachment has no "
+                    "router interface port."
                 ),
             )
         if interface_port.get("device_owner") not in const.ROUTER_INTERFACE_OWNERS:
             return
 
-        parent = self._ensure_parent_port(router)
-        parent = self._ensure_parent_vif_attached(router, parent)
-        trunk = self._ensure_trunk(router, parent)
-        self._add_interface_subport(router, trunk, interface_port)
+        previous_parent = self._parent_port_for_router(router_id)
+        previous_trunk = self._trunk_for_router(router_id)
+        parent_vif_attached = False
+        if previous_parent is not None:
+            node = self._ironic.node_by_instance_uuid(router_id)
+            if node is not None:
+                vif_ids = self._ironic.node_vif_ids(node)
+                parent_vif_attached = previous_parent["id"] in vif_ids
+        self._interface_attachments[payload] = _InterfaceAttachment(
+            router_id=router_id,
+            port_id=interface_port["id"],
+            parent_id=previous_parent["id"] if previous_parent else None,
+            trunk_id=previous_trunk["id"] if previous_trunk else None,
+            subport_present=any(
+                sp["port_id"] == interface_port["id"]
+                for sp in (previous_trunk or {}).get("sub_ports", [])
+            ),
+            parent_vif_attached=parent_vif_attached,
+        )
+        try:
+            parent = self._ensure_parent_port(router)
+            parent = self._ensure_parent_vif_attached(router, parent)
+            trunk = self._ensure_trunk(router, parent)
+            self._add_interface_subport(router, trunk, interface_port)
+        except Exception:
+            # Attach-by-port is reverted with a port update by Neutron, so it
+            # cannot rely on PORT/BEFORE_DELETE to undo partial realization.
+            self._rollback_interface_attachment(payload)
+            raise
 
         LOG.info(
             "Attached Palo Alto router %s interface port %s via parent %s trunk %s",
@@ -889,6 +934,50 @@ class PaloAlto(base.L3ServiceProvider):
             parent["id"],
             trunk["id"],
         )
+
+    def _rollback_interface_attachment(self, payload):
+        """Undo this request's changes, including calls that failed postcommit."""
+        attachment = self._interface_attachments.get(payload)
+        if attachment is None:
+            return
+        try:
+            trunk = self._trunk_for_router(attachment.router_id)
+            if trunk is not None:
+                if not attachment.subport_present:
+                    self._remove_interface_subport(trunk, attachment.port_id)
+                admin_context = n_context.get_admin_context()
+                trunk = self._trunk_plugin.get_trunk(admin_context, trunk["id"])
+                if trunk.get("sub_ports"):
+                    # Other interfaces still need the shared parent and VIF.
+                    self._interface_attachments.pop(payload, None)
+                    return
+                if trunk["id"] != attachment.trunk_id:
+                    self._trunk_plugin.delete_trunk(admin_context, trunk["id"])
+
+            parent = self._parent_port_for_router(attachment.router_id)
+            if parent is not None:
+                if parent["id"] != attachment.parent_id:
+                    self._detach_and_delete_parent(attachment.router_id, parent["id"])
+                elif not attachment.parent_vif_attached:
+                    node = self._ironic.node_by_instance_uuid(attachment.router_id)
+                    if node is not None:
+                        self._ironic.detach_vif_from_node(node, parent["id"])
+            self._interface_attachments.pop(payload, None)
+        except Exception:
+            # Preserve the original attach error. Keep the snapshot so the
+            # subsequent ABORT_CREATE can retry compensation if it failed here.
+            LOG.exception(
+                "Failed to roll back Palo Alto router %s interface port %s; "
+                "attachment cleanup is incomplete",
+                attachment.router_id,
+                attachment.port_id,
+            )
+
+    def _process_router_interface_abort(self, resource, event, trigger, payload=None):
+        # The registry continues invoking callbacks after validation errors. An
+        # error in another subscriber must unwind even a successful attachment.
+        if payload is not None:
+            self._rollback_interface_attachment(payload)
 
     def _process_router_interface_port_delete(
         self, resource, event, trigger, payload=None
@@ -899,7 +988,9 @@ class PaloAlto(base.L3ServiceProvider):
         Neutron to delete a router-interface port that we previously attached as
         a trunk subport.
         """
-        port = payload.metadata.get("port") if payload else None
+        if payload is None or payload.metadata.get("port_check") is not False:
+            return
+        port = payload.metadata.get("port")
         if not port or port.get("device_owner") not in const.ROUTER_INTERFACE_OWNERS:
             return
 
@@ -922,6 +1013,14 @@ class PaloAlto(base.L3ServiceProvider):
             return
 
         if not is_palo_alto:
+            return
+
+        # Neutron also deletes newly-created ports when attachment aborts. That
+        # request already compensated its changes; it must not remove a shared
+        # stack which existed beforehand and has no RouterPort for this port.
+        if not l3_obj.RouterPort.objects_exist(
+            context, router_id=router_id, port_id=port["id"]
+        ):
             return
 
         self._cleanup_interface_attachment(router, port)
