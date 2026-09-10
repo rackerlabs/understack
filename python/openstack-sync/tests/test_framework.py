@@ -7,6 +7,7 @@ these tests describe the contract any future plugin can rely on.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -72,7 +73,9 @@ class StubPlugin(SyncPlugin):
         self.notes_for = notes_for or {}
         self.prune_raises = prune_raises
         self.reconciled: list[str] = []
-        self.pruned: list[tuple[list[str], bool]] = []
+        self.pruned: list[tuple[list[str], list[str]]] = []
+        # One entry per prune call, in step with ``pruned``.
+        self.swept: list[bool] = []
         self.waits = 0
         self.caches: list[Any] = []
 
@@ -96,13 +99,18 @@ class StubPlugin(SyncPlugin):
         conn: Any,
         desired_specs: list[dict[str, Any]],
         *,
-        authoritative_empty: bool,
+        deleted_specs: list[dict[str, Any]],
+        sweep_unseen: bool,
     ) -> None:
         if self.prune_raises:
             raise RuntimeError("prune exploded")
         self.pruned.append(
-            ([spec["name"] for spec in desired_specs], authoritative_empty)
+            (
+                [spec["name"] for spec in desired_specs],
+                [spec["name"] for spec in deleted_specs],
+            )
         )
+        self.swept.append(sweep_unseen)
 
 
 def _resource(
@@ -442,6 +450,162 @@ def test_deleted_event_reconciles_nothing_but_prunes():
     assert inputs.prune_credentials == frozenset({("infrasetup", "understack")})
 
 
+def _event(watch_event: str, obj: dict, snapshot: list[dict] | None = None) -> dict:
+    """Build one Event context.
+
+    *snapshot* is the desired set the prune compares against. It defaults to the
+    event's own object, as a live CR really sends. A Deleted event must say what
+    is left instead: a snapshot still listing it would make a prune test pass
+    while the prune does nothing.
+    """
+    assert not (
+        watch_event == "Deleted" and snapshot is None
+    ), "a Deleted event needs its snapshot spelled out"
+    return {
+        "binding": BINDING,
+        "type": "Event",
+        "watchEvent": watch_event,
+        "object": obj,
+        "snapshots": {BINDING: [{"object": obj}] if snapshot is None else snapshot},
+    }
+
+
+def test_repeated_events_for_one_cr_reconcile_it_once():
+    """A failing run accumulates a backlog; one CR must stay one reconcile."""
+    config = make_hook_config()
+    live = _cr("probe", generation=3)
+    contexts = [
+        _event("Added", _cr("probe", generation=1), [{"object": live}]),
+        _event("Modified", _cr("probe", generation=2), [{"object": live}]),
+        _event("Modified", live, [{"object": live}]),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.spec["name"] for r in inputs.resources_to_reconcile] == ["probe"]
+    # The last event is the current one.
+    assert inputs.resources_to_reconcile[0].generation == 3
+
+
+def test_collapsed_batch_still_prunes_against_the_whole_snapshot():
+    """A backlog for one CR must not narrow the desired set the prune sees.
+
+    The snapshot names every CR that should exist; pruning against less deletes
+    a resource whose CR is still there.
+    """
+    config = make_hook_config(prune=True, status_enabled=True)
+    live = _cr("probe", generation=3)
+    snapshot = [{"object": live}, {"object": _cr("untouched")}]
+    contexts = [_event("Added", _cr("probe", generation=1), snapshot)]
+    contexts += [_event("Modified", live, snapshot) for _ in range(29)]
+
+    inputs = hook_inputs(contexts, config)
+    plugin = StubPlugin(config)
+    code, patch_status, _ = _drive(plugin, inputs)
+
+    assert code == 0
+    assert plugin.reconciled == ["probe"]
+    assert patch_status.call_count == 1
+    assert plugin.pruned == [(["probe", "untouched"], [])]
+
+
+def test_a_recreate_after_a_delete_in_the_same_batch_is_reconciled():
+    """Order decides: a change after a Deleted is a new CR under the same name."""
+    config = make_hook_config()
+    recreated = _cr("probe", generation=1)
+    contexts = [
+        _event("Deleted", _cr("probe", generation=7), []),
+        _event("Added", recreated, [{"object": recreated}]),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.generation for r in inputs.resources_to_reconcile] == [1]
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+
+
+def test_deleted_event_cancels_an_earlier_change_in_the_same_batch():
+    config = make_hook_config()
+    contexts = [
+        _event("Added", _cr("probe"), []),
+        _event("Modified", _cr("probe"), []),
+        _event("Deleted", _cr("probe"), []),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+    assert inputs.prune_credentials == frozenset({("infrasetup", "understack")})
+
+
+def test_repeated_delete_events_prune_once():
+    config = make_hook_config()
+    contexts = [
+        _event("Deleted", _cr("probe"), []),
+        _event("Deleted", _cr("probe"), []),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+
+
+def test_distinct_crs_in_one_batch_are_all_reconciled():
+    config = make_hook_config()
+    snapshot = [{"object": _cr("a")}, {"object": _cr("b")}]
+    contexts = [
+        _event("Added", _cr("a"), snapshot),
+        _event("Modified", _cr("b"), snapshot),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.spec["name"] for r in inputs.resources_to_reconcile] == ["a", "b"]
+
+
+def test_a_deleted_cr_does_not_wedge_the_reconcile(caplog):
+    """Replays a backlog of events for a CR that was deleted mid-backlog.
+
+    Shell-operator replays the whole backlog on every retry, so a failing run
+    keeps being handed events for an object that is already gone. None of them
+    is reconciled and no status is written for it. The prune still reports,
+    because a cloud it cannot reach is not one it can safely sweep -- that is
+    the only failure left, where there were once one per queued event.
+    """
+    config = make_hook_config(prune=True, status_enabled=True)
+
+    def gone() -> dict:
+        return _cr("zz-probe", secret="missing-secret")
+
+    contexts = [_event("Added", gone(), [])]
+    contexts += [_event("Modified", gone(), []) for _ in range(30)]
+    contexts += [_event("Deleted", gone(), [])]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["zz-probe"]
+
+    plugin = StubPlugin(config)
+    with (
+        mock.patch.object(
+            framework,
+            "get_openstack_connection",
+            side_effect=RuntimeError('secrets "missing-secret" not found'),
+        ),
+        mock.patch.object(framework, "patch_resource_status") as patch_status,
+        caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.framework"),
+    ):
+        code = run_sync(plugin, inputs)
+
+    assert plugin.reconciled == []
+    assert patch_status.call_count == 0
+    assert code == 1
+    assert "Cannot build an OpenStack connection for the widget prune" in caplog.text
+    assert "failed to reconcile" not in caplog.text
+
+
 def test_event_without_watch_event_is_ignored_without_snapshot_reconcile(caplog):
     config = make_hook_config()
     contexts = [
@@ -635,8 +799,12 @@ def test_unreadable_cr_event_is_dropped():
     assert inputs.unreadable_resources == frozenset({"openstack/legacy"})
 
 
-def test_unreadable_delete_event_is_dropped():
-    """A CR that cannot be read cannot be used to drive a deletion either."""
+def test_unreadable_delete_event_is_dropped_without_holding_back_the_prune(caplog):
+    """A CR that cannot be read cannot drive a deletion, but is not missing either.
+
+    A deleted CR was never in the desired set, so counting it as unreadable
+    would skip the prune on every replay of that batch -- forever.
+    """
     config = make_hook_config()
     contexts = [
         {
@@ -648,10 +816,12 @@ def test_unreadable_delete_event_is_dropped():
         }
     ]
 
-    inputs = hook_inputs(contexts, config)
+    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.framework"):
+        inputs = hook_inputs(contexts, config)
 
     assert inputs.deleted_resources == []
-    assert inputs.unreadable_resources == frozenset({"openstack/legacy"})
+    assert inputs.unreadable_resources == frozenset()
+    assert "Ignoring unreadable Deleted CR openstack/legacy" in caplog.text
 
 
 def test_unreadable_cr_is_reported_once_across_event_and_snapshot():
@@ -704,7 +874,9 @@ def test_unreadable_crs_do_not_stall_a_whole_namespace():
     assert plugin.reconciled == ["firmware-bios-r740xd", "firmware-idrac9"]
     statuses = {call.kwargs["sync_status"] for call in patch_status.call_args_list}
     assert statuses == {"Synced"}
-    assert code == 1
+    # Reported in the log, not the exit code: these three stay unreadable on
+    # every retry, and a failing run blocks this hook's queue.
+    assert code == 0
     assert plugin.pruned == []
     assert inputs.unreadable_resources == frozenset(
         {
@@ -806,8 +978,12 @@ def test_run_sync_reports_notes_without_failing():
     assert "thing drifted" in message
 
 
-def test_run_sync_marks_failure_and_skips_prune():
-    """A failed reconcile means the desired set is unknown, so prune must not run."""
+def test_run_sync_marks_failure_and_does_not_sweep():
+    """A failed reconcile leaves the desired set unsafe to delete by absence.
+
+    Nothing was deleted here, so there is no prune to run at all -- but the run
+    still reports failure so shell-operator retries it.
+    """
     plugin = StubPlugin(make_hook_config(prune=True), fail_for=("b",))
 
     code, patch_status, _ = _drive(plugin, _inputs([_resource("a"), _resource("b")]))
@@ -819,6 +995,24 @@ def test_run_sync_marks_failure_and_skips_prune():
         for call in patch_status.call_args_list
     }
     assert by_name == {"a": "Synced", "b": "Failed"}
+
+
+def test_run_sync_still_deletes_a_removed_cr_when_another_failed():
+    """A deletion names its resource, so an unrelated failure cannot make it wrong.
+
+    The failing CR stays in the desired set and so stays protected; only the
+    absence-based sweep is withheld.
+    """
+    plugin = StubPlugin(make_hook_config(prune=True), fail_for=("broken",))
+    broken = _resource("broken")
+    gone = _resource("gone")
+    inputs = _inputs([broken], desired=[broken], deleted=[gone])
+
+    code, _, _ = _drive(plugin, inputs)
+
+    assert code == 1
+    assert plugin.pruned == [(["broken"], ["gone"])]
+    assert plugin.swept == [False]
 
 
 def test_run_sync_continues_after_one_failure():
@@ -871,10 +1065,10 @@ def test_run_sync_prunes_after_successful_reconcile():
     code, _, _ = _drive(plugin, _inputs([_resource("a")]))
 
     assert code == 0
-    assert plugin.pruned == [(["a"], False)]
+    assert plugin.pruned == [(["a"], [])]
 
 
-def test_run_sync_prune_is_authoritative_for_deleted_credentials():
+def test_run_sync_passes_the_deleted_specs_for_deleted_credentials():
     """A confirmed deletion lets prune act on an empty desired set."""
     plugin = StubPlugin(make_hook_config(prune=True))
     deleted = _resource("gone")
@@ -883,16 +1077,16 @@ def test_run_sync_prune_is_authoritative_for_deleted_credentials():
     code, _, _ = _drive(plugin, inputs)
 
     assert code == 0
-    assert plugin.pruned == [([], True)]
+    assert plugin.pruned == [([], ["gone"])]
 
 
 def test_run_sync_prunes_against_every_credentials_desired_resources():
     """Prune is scoped by ownership marker, not by credentials, so the set is the union.
 
-    Here the credential whose only CR was deleted has an authoritative empty
-    desired set of its own, and can still list what the other credential manages.
-    It is handed every group's desired names, which is what keeps the resource
-    the other group still wants from being a prune candidate.
+    Here the credential whose only CR was deleted has an empty desired set of
+    its own, and can still list what the other credential manages. It is handed
+    every group's desired names, which is what keeps the resource the other
+    group still wants from being a prune candidate.
     """
     plugin = StubPlugin(make_hook_config(prune=True))
     keeper = _resource("keeper", secret="infrasetup", cloud="understack")
@@ -903,8 +1097,8 @@ def test_run_sync_prunes_against_every_credentials_desired_resources():
 
     assert code == 0
     # Sorted by credentials: infrasetup, then infrasetup-system. The second
-    # group's desired set is empty and authoritative, and it still sees keeper.
-    assert plugin.pruned == [(["keeper"], False), (["keeper"], True)]
+    # group's own desired set is empty, and it still sees keeper.
+    assert plugin.pruned == [(["keeper"], []), (["keeper"], ["gone"])]
 
 
 def test_run_sync_keeps_a_resource_another_credential_wants_off_the_prune_list():
@@ -960,7 +1154,7 @@ def test_run_sync_connects_to_prune_a_deletion_whatever_prune_says():
     assert code == 0
     assert connect.call_count == 1
     assert plugin.waits == 0
-    assert plugin.pruned == [([], True)]
+    assert plugin.pruned == [([], ["gone"])]
 
 
 def test_run_sync_reports_a_prune_whose_connection_cannot_be_built():
@@ -991,7 +1185,43 @@ def test_run_sync_returns_error_when_prune_fails():
 
 
 def test_run_sync_skips_prune_when_a_cr_was_unreadable():
+    """An unreadable CR withholds every prune, deletions included.
+
+    Its resource names cannot be read, so they cannot be subtracted from the
+    deletions either, and a deletion naming one of them is indistinguishable
+    from a real removal.
+    """
     plugin = StubPlugin(make_hook_config(prune=True))
+    inputs = _inputs(
+        [_resource("a")],
+        deleted=[_resource("gone")],
+        unreadable=frozenset({"openstack/legacy"}),
+    )
+
+    code, _, _ = _drive(plugin, inputs)
+
+    assert plugin.pruned == []
+    assert code == 0
+
+
+def test_run_sync_does_not_fail_the_run_for_an_unreadable_cr_alone():
+    """A malformed CR is stored state, so a non-zero exit could only wedge us.
+
+    Shell-operator re-runs a failing hook and blocks the rest of its queue until
+    it succeeds. An unreadable CR is unreadable on every retry, so reporting it
+    as a failure would stop the readable CRs from reconciling for good.
+    """
+    plugin = StubPlugin(make_hook_config(prune=True))
+    inputs = _inputs([_resource("a")], unreadable=frozenset({"openstack/legacy"}))
+
+    code, _, _ = _drive(plugin, inputs)
+
+    assert code == 0
+
+
+def test_run_sync_fails_when_a_reconcile_failed_alongside_an_unreadable_cr():
+    """The retryable failure still decides the exit code."""
+    plugin = StubPlugin(make_hook_config(prune=True), fail_for=("a",))
     inputs = _inputs([_resource("a")], unreadable=frozenset({"openstack/legacy"}))
 
     code, _, _ = _drive(plugin, inputs)
@@ -1008,9 +1238,9 @@ def test_run_sync_reconciles_readable_crs_despite_an_unreadable_one():
 
     code, patch_status, _ = _drive(plugin, inputs)
 
-    # Non-zero keeps the problem visible, but the healthy CRs still converge and
+    # The error log keeps the problem visible; the healthy CRs still converge and
     # still get their status patched.
-    assert code == 1
+    assert code == 0
     assert plugin.reconciled == ["a", "b"]
     statuses = {call.kwargs["sync_status"] for call in patch_status.call_args_list}
     assert statuses == {"Synced"}

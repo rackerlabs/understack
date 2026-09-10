@@ -40,12 +40,16 @@ class IronicRunbookPlugin(SyncPlugin):
         conn: Any,
         desired_specs: list[dict[str, Any]],
         *,
-        authoritative_empty: bool,
+        deleted_specs: list[dict[str, Any]],
+        sweep_unseen: bool,
     ) -> None:
         if not self.config.prune:
             return
         prune_module.prune_removed_runbooks(
-            conn, desired_specs, authoritative_empty=authoritative_empty
+            conn,
+            desired_specs,
+            deleted_specs=deleted_specs,
+            sweep_unseen=sweep_unseen,
         )
 
 

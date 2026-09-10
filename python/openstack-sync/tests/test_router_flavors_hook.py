@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import logging
 import types
 from pathlib import Path
 from typing import Any
@@ -160,7 +161,9 @@ def test_plugin_prune_deletes_no_flavor_when_disabled():
     plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
 
     with mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune:
-        plugin.prune(mock.MagicMock(), [{"name": "a"}], authoritative_empty=False)
+        plugin.prune(
+            mock.MagicMock(), [{"name": "a"}], deleted_specs=[], sweep_unseen=True
+        )
 
     prune.assert_not_called()
 
@@ -171,25 +174,56 @@ def test_plugin_prune_sweeps_orphaned_profiles_when_disabled():
     conn = mock.MagicMock()
 
     with mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep:
-        plugin.prune(conn, [{"name": "a"}], authoritative_empty=False)
+        plugin.prune(conn, [{"name": "a"}], deleted_specs=[], sweep_unseen=True)
 
     sweep.assert_called_once_with(conn)
 
 
-def test_plugin_prune_forwards_authoritative_empty_when_enabled():
-    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=True))
+def test_plugin_prune_ignores_a_deletion_when_disabled():
+    """PRUNE off means a lost CR's flavor is left in place, not deleted by name."""
+    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
     conn = mock.MagicMock()
-    specs = [{"name": "a"}]
 
     with (
         mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune,
         mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep,
     ):
-        plugin.prune(conn, specs, authoritative_empty=True)
+        plugin.prune(conn, [], deleted_specs=[{"name": "gone"}], sweep_unseen=True)
 
-    prune.assert_called_once_with(conn, specs, authoritative_empty=True)
+    prune.assert_not_called()
+    sweep.assert_called_once_with(conn)
+
+
+def test_plugin_prune_forwards_deleted_specs_when_enabled():
+    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=True))
+    conn = mock.MagicMock()
+    specs = [{"name": "a"}]
+    deleted = [{"name": "gone"}]
+
+    with (
+        mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune,
+        mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep,
+    ):
+        plugin.prune(conn, specs, deleted_specs=deleted, sweep_unseen=True)
+
+    prune.assert_called_once_with(conn, specs, deleted_specs=deleted, sweep_unseen=True)
     # prune_removed_flavors sweeps internally; a second call would re-list.
     sweep.assert_not_called()
+
+
+def test_plugin_prune_forwards_a_withheld_sweep():
+    """The framework's decision not to delete by absence must reach the module."""
+    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=True))
+    conn = mock.MagicMock()
+    specs = [{"name": "a"}]
+    deleted = [{"name": "gone"}]
+
+    with mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune:
+        plugin.prune(conn, specs, deleted_specs=deleted, sweep_unseen=False)
+
+    prune.assert_called_once_with(
+        conn, specs, deleted_specs=deleted, sweep_unseen=False
+    )
 
 
 def test_plugin_cache_is_per_credential_group():
@@ -391,14 +425,19 @@ def test_main_sweeps_an_orphaned_profile_when_the_last_cr_is_deleted(
     conn.network.delete_flavor.assert_not_called()
 
 
-def test_main_fails_loudly_on_a_cr_missing_cloud_credentials(monkeypatch, tmp_path):
-    """A CR without credentials must fail the run, not be skipped.
+def test_main_reports_a_cr_missing_cloud_credentials_without_failing(
+    monkeypatch, tmp_path, caplog
+):
+    """A CR without credentials is reported and skipped, and prunes nothing.
 
     The CRD marks cloudCredentialsRef required, so the API server should reject
-    it first; this guards the case where something bypasses that.
+    it first; this guards the case where something bypasses that. The run does
+    not fail, because the object is stored that way and would be unreadable on
+    every retry, and a failing hook blocks its own queue in shell-operator.
     """
     clear_env(monkeypatch)
     monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    monkeypatch.setenv(f"{ENV_PREFIX}_PRUNE", "true")
     obj = router_flavor_object("pa1410")
     del obj["spec"]["cloudCredentialsRef"]
     contexts = [
@@ -409,9 +448,16 @@ def test_main_fails_loudly_on_a_cr_missing_cloud_credentials(monkeypatch, tmp_pa
         }
     ]
 
-    code, _ = _run_main(monkeypatch, tmp_path, contexts, _neutron_conn())
+    with (
+        caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.framework"),
+        mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune,
+    ):
+        code, patch_status = _run_main(monkeypatch, tmp_path, contexts, _neutron_conn())
 
-    assert code == 1
+    assert code == 0
+    prune.assert_not_called()
+    patch_status.assert_not_called()
+    assert "openstack/pa1410" in caplog.text
 
 
 def test_main_uses_the_credentials_named_by_each_cr(monkeypatch, tmp_path):

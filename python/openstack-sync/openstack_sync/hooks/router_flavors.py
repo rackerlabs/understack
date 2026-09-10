@@ -47,7 +47,8 @@ class RouterFlavorPlugin(SyncPlugin):
         conn: Any,
         desired_specs: list[dict[str, Any]],
         *,
-        authoritative_empty: bool,
+        deleted_specs: list[dict[str, Any]],
+        sweep_unseen: bool,
     ) -> None:
         if not self.config.prune:
             # PRUNE gates flavor deletion, not the orphan sweep.
@@ -55,7 +56,10 @@ class RouterFlavorPlugin(SyncPlugin):
             return
         # prune_removed_flavors sweeps orphans itself.
         prune_module.prune_removed_flavors(
-            conn, desired_specs, authoritative_empty=authoritative_empty
+            conn,
+            desired_specs,
+            deleted_specs=deleted_specs,
+            sweep_unseen=sweep_unseen,
         )
 
 

@@ -208,14 +208,33 @@ def test_plugin_prunes_only_when_the_chart_enabled_it():
 
     with mock.patch.object(hook.prune_module, "prune_removed_runbooks") as do_prune:
         hook.IronicRunbookPlugin(make_ironic_config(prune=False)).prune(
-            conn, specs, authoritative_empty=False
+            conn, specs, deleted_specs=[], sweep_unseen=True
         )
         do_prune.assert_not_called()
 
+        deleted = [{"runbookName": "CUSTOM_GONE", "steps": []}]
         hook.IronicRunbookPlugin(make_ironic_config(prune=True)).prune(
-            conn, specs, authoritative_empty=True
+            conn, specs, deleted_specs=deleted, sweep_unseen=True
         )
-        do_prune.assert_called_once_with(conn, specs, authoritative_empty=True)
+        do_prune.assert_called_once_with(
+            conn, specs, deleted_specs=deleted, sweep_unseen=True
+        )
+
+
+def test_plugin_prune_forwards_a_withheld_sweep():
+    """The framework's decision not to delete by absence must reach the module."""
+    conn = mock.MagicMock()
+    specs = [{"runbookName": "CUSTOM_KEEP", "steps": []}]
+    deleted = [{"runbookName": "CUSTOM_GONE", "steps": []}]
+
+    with mock.patch.object(hook.prune_module, "prune_removed_runbooks") as do_prune:
+        hook.IronicRunbookPlugin(make_ironic_config(prune=True)).prune(
+            conn, specs, deleted_specs=deleted, sweep_unseen=False
+        )
+
+    do_prune.assert_called_once_with(
+        conn, specs, deleted_specs=deleted, sweep_unseen=False
+    )
 
 
 def test_main_returns_zero_when_hook_disabled(

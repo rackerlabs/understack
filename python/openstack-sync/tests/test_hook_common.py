@@ -339,6 +339,143 @@ def test_patch_resource_status_logs_api_errors(caplog):
     assert "Forbidden" in caplog.text
 
 
+# Bodies below are what a real API server sends, read off a live cluster. The
+# body is the whole basis for telling a deleted CR from a misconfigured chart.
+
+GROUP = API_VERSION.split("/")[0]
+PLURAL = RESOURCE.split(".")[0]
+
+#: A plural, group or version the API server does not serve. Not JSON.
+MISSING_RESOURCE_BODY = "404 page not found"
+
+
+def _status_body(name: str, *, code: int, reason: str, message: str) -> str:
+    """Build the Status the API server returns for a named object."""
+    return json.dumps(
+        {
+            "kind": "Status",
+            "apiVersion": "v1",
+            "metadata": {},
+            "status": "Failure",
+            "message": message,
+            "reason": reason,
+            "details": {"name": name, "group": GROUP, "kind": PLURAL},
+            "code": code,
+        }
+    )
+
+
+def _missing_object(name: str) -> ApiException:
+    exc = ApiException(status=404, reason="Not Found")
+    exc.body = _status_body(
+        name, code=404, reason="NotFound", message=f'{RESOURCE} "{name}" not found'
+    )
+    return exc
+
+
+def _forbidden(name: str) -> ApiException:
+    """A 403 names the object in ``details.name`` exactly as a 404 does."""
+    exc = ApiException(status=403, reason="Forbidden")
+    exc.body = _status_body(
+        name,
+        code=403,
+        reason="Forbidden",
+        message=f'{RESOURCE} "{name}" is forbidden: User "sa" cannot patch',
+    )
+    return exc
+
+
+def _not_found(body: str) -> ApiException:
+    exc = ApiException(status=404, reason="Not Found")
+    exc.body = body
+    return exc
+
+
+def _patch_status_with(exc: ApiException, name: str = "deleted-flavor") -> None:
+    api = mock.MagicMock()
+    api.patch_namespaced_custom_object_status.side_effect = exc
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        hc.patch_resource_status(
+            name=name,
+            namespace="openstack",
+            generation=None,
+            sync_status="Failed",
+            message="OpenStack connection failed",
+            crd_api_version=API_VERSION,
+            crd_resource=RESOURCE,
+            crd_kind="NeutronRouterFlavor",
+            status_enabled=True,
+        )
+
+
+def test_patch_resource_status_does_not_error_when_the_cr_is_gone(caplog):
+    """A CR deleted mid-reconcile is a race, not a fault worth an error line."""
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.common"):
+        _patch_status_with(_missing_object("deleted-flavor"))
+
+    assert "the CR is gone" in caplog.text
+    assert "404" in caplog.text
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_patch_resource_status_warns_when_the_crd_is_the_thing_missing(caplog):
+    """A 404 for the resource, not the object, is a chart misconfiguration.
+
+    It leaves every CR without a status and nothing else reports it, since the
+    patch never fails a reconcile.
+    """
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.common"):
+        _patch_status_with(_not_found(MISSING_RESOURCE_BODY))
+
+    assert "failed to patch" in caplog.text
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_patch_resource_status_warns_when_denied_for_the_very_same_object(caplog):
+    """A 403 names the object just as a 404 does, and is not a deleted CR.
+
+    Matching on the body alone would read an RBAC gap as a race.
+    """
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.common"):
+        _patch_status_with(_forbidden("deleted-flavor"))
+
+    assert "failed to patch" in caplog.text
+    assert "403" in caplog.text
+
+
+def test_patch_resource_status_warns_when_a_404_names_a_different_object(caplog):
+    """The name has to match; a 404 about something else is not this CR's race."""
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.common"):
+        _patch_status_with(_missing_object("other-flavor"))
+
+    assert "failed to patch" in caplog.text
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+@pytest.mark.parametrize(
+    ("body", "shape"),
+    [
+        (
+            json.dumps({"kind": "Status", "reason": "NotFound", "code": 404}),
+            "no details",
+        ),
+        (json.dumps({"kind": "Status", "details": None, "code": 404}), "null details"),
+        (json.dumps(["not", "a", "status"]), "not an object"),
+    ],
+)
+def test_patch_resource_status_warns_when_a_404_body_names_nothing(body, shape, caplog):
+    """A body naming no object cannot clear a CR as gone, and must not raise.
+
+    This runs inside the ApiException handler, where a raise escapes the handler
+    below it and fails the reconcile.
+    """
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.common"):
+        _patch_status_with(_not_found(body))
+
+    assert "failed to patch" in caplog.text, shape
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
 def test_patch_resource_status_logs_unexpected_errors(caplog):
     with mock.patch.object(
         hc, "_customobjects_api", side_effect=RuntimeError("no kubeconfig")

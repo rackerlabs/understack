@@ -31,13 +31,28 @@ openstack_sync/
 `run_sync` groups CRs by the credentials in `spec.cloudCredentialsRef`, opens one
 connection per credential group, waits for the OpenStack service, reconciles each
 CR, patches `Synced`/`Failed` onto the CR status, and then calls the plugin's
-prune step, which most plugins gate on `PRUNE`. If any reconcile fails, or any CR
-could not be read at all, it **skips the prune entirely** - either way the
-desired state is unknown, so deleting anything would be unsafe.
+prune step, which most plugins gate on `PRUNE`.
+
+How much of that prune runs depends on how trustworthy the desired set is:
+
+- **All CRs reconciled.** The full prune: resources a deletion names, plus any
+  owned resource the desired set does not name, which catches a CR whose removal
+  was never observed.
+- **A reconcile failed.** Deleting by absence is withheld, because the failing
+  CR's resource would read as unwanted. Deletions still go through: they name
+  their resources, and the failing CR is still in the desired set and so still
+  protected. The run exits non-zero so shell-operator retries it.
+- **A CR could not be read.** No prune at all. The desired set is short by
+  however many CRs were dropped, and their resource names are unknown, so they
+  cannot be protected from a deletion that happens to name one of them.
 
 A CR whose spec does not satisfy the framework's contract is named in the log and
-dropped, and the run exits non-zero. The remaining CRs still reconcile: one
-unusable object must not stall a whole namespace.
+dropped. The remaining CRs still reconcile: one unusable object must not stall a
+whole namespace. The run does **not** exit non-zero for this alone, because the
+object is stored that way and would be dropped again on every retry -- and
+shell-operator re-runs a failing hook every few seconds while blocking the rest
+of its queue, so reporting it as a failure would stop the healthy CRs from
+reconciling for as long as the malformed CR exists. Alert on the error log.
 
 `run_hook` handles the shell-operator calling convention: `--config`, logging,
 reading the binding context, and the exit code.
@@ -91,10 +106,12 @@ reading the binding context, and the exit code.
        def reconcile(self, conn, spec, cache) -> list[str]:
            return reconcile_module.sync(conn, spec, cache)
 
-       def prune(self, conn, desired_specs, *, authoritative_empty) -> None:
+       def prune(self, conn, desired_specs, *, deleted_specs,
+                 sweep_unseen) -> None:
            if self.config.prune:
                prune_module.prune(conn, desired_specs,
-                                  authoritative_empty=authoritative_empty)
+                                  deleted_specs=deleted_specs,
+                                  sweep_unseen=sweep_unseen)
 
    def main() -> int:
        def run(contexts):

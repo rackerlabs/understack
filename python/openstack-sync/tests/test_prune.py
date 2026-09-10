@@ -87,6 +87,21 @@ def _conn(flavors: list[dict[str, Any]], profiles: dict[str, Any] | None = None)
     return SimpleNamespace(network=FakeNetwork(flavors, profiles or {}))
 
 
+def _prune(
+    conn: Any,
+    desired: list[dict[str, Any]],
+    deleted: list[dict[str, Any]] | None = None,
+    *,
+    sweep_unseen: bool = True,
+) -> None:
+    prune.prune_removed_flavors(
+        conn,
+        desired,
+        deleted_specs=deleted if deleted is not None else [],
+        sweep_unseen=sweep_unseen,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Ownership gates deletion
 # ---------------------------------------------------------------------------
@@ -103,7 +118,7 @@ def test_prune_keeps_unowned_flavor_even_with_owned_profile():
     profile = _owned_profile("owned-profile-id")
     conn = _conn([flavor], {profile.id: profile})
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    _prune(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_flavors == []
 
@@ -111,7 +126,7 @@ def test_prune_keeps_unowned_flavor_even_with_owned_profile():
 def test_prune_deletes_removed_owned_flavor():
     conn = _conn([_owned_flavor("managed-flavor-id", "removed-managed-flavor")])
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    _prune(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_flavors == ["managed-flavor-id"]
 
@@ -121,7 +136,7 @@ def test_prune_deletes_removed_flavor_and_its_unused_profile():
     flavor = _owned_flavor("managed-flavor-id", "removed-managed-flavor", [profile.id])
     conn = _conn([flavor], {profile.id: profile})
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    _prune(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_flavors == ["managed-flavor-id"]
     assert conn.network.deleted_profiles == ["managed-profile-id"]
@@ -136,18 +151,88 @@ def test_prune_keeps_owned_flavors_when_desired_list_is_empty():
     """An empty desired set may be an unreadable snapshot, not a deletion."""
     conn = _conn([_owned_flavor("managed-flavor-id", "removed-managed-flavor")])
 
-    prune.prune_removed_flavors(conn, [])
+    _prune(conn, [])
 
     assert conn.network.deleted_flavors == []
 
 
-def test_prune_deletes_when_empty_desired_is_authoritative():
-    """A confirmed CR deletion makes the empty desired set actionable."""
-    conn = _conn([_owned_flavor("managed-flavor-id", "removed-managed-flavor")])
+def test_prune_deletes_only_the_named_deleted_flavors_without_a_desired_set():
+    """Without a desired set to diff, only the lost CRs may be acted on."""
+    conn = _conn(
+        [
+            _owned_flavor("managed-flavor-id", "removed-managed-flavor"),
+            _owned_flavor("unrelated-flavor-id", "unrelated-flavor"),
+        ]
+    )
 
-    prune.prune_removed_flavors(conn, [], authoritative_empty=True)
+    _prune(conn, [], [{"name": "removed-managed-flavor"}])
 
     assert conn.network.deleted_flavors == ["managed-flavor-id"]
+
+
+def test_prune_keeps_a_deleted_flavor_another_cr_still_wants():
+    """The desired set wins over a deletion naming the same flavor."""
+    conn = _conn([_owned_flavor("shared-flavor-id", "shared-flavor")])
+
+    _prune(conn, [{"name": "shared-flavor"}], [{"name": "shared-flavor"}])
+
+    assert conn.network.deleted_flavors == []
+
+
+# ---------------------------------------------------------------------------
+# A withheld sweep
+# ---------------------------------------------------------------------------
+
+
+def test_prune_without_the_sweep_deletes_only_what_was_deleted():
+    """With sweeping off, a desired set is a protection list and nothing more.
+
+    The framework withholds the sweep when a CR failed to reconcile, so the
+    desired set may be missing names. An owned flavor absent from it is left
+    alone; only the flavors a deletion names go.
+    """
+    conn = _conn(
+        [
+            _owned_flavor("gone-flavor-id", "gone-flavor"),
+            _owned_flavor("unnamed-flavor-id", "absent-from-desired"),
+        ]
+    )
+
+    _prune(
+        conn,
+        [{"name": "kept-flavor"}],
+        [{"name": "gone-flavor"}],
+        sweep_unseen=False,
+    )
+
+    assert conn.network.deleted_flavors == ["gone-flavor-id"]
+
+
+def test_prune_without_the_sweep_still_protects_the_desired_set():
+    """A deletion cannot remove a flavor the desired set still names.
+
+    This is what makes deleting by name safe while a reconcile is failing: the
+    failing CR is still in the desired set, so it cannot be deleted.
+    """
+    conn = _conn([_owned_flavor("shared-flavor-id", "shared-flavor")])
+
+    _prune(
+        conn,
+        [{"name": "shared-flavor"}],
+        [{"name": "shared-flavor"}],
+        sweep_unseen=False,
+    )
+
+    assert conn.network.deleted_flavors == []
+
+
+def test_prune_without_the_sweep_and_nothing_deleted_does_nothing():
+    conn = _conn([_owned_flavor("managed-flavor-id", "removed-managed-flavor")])
+
+    _prune(conn, [{"name": "kept-flavor"}], [], sweep_unseen=False)
+
+    assert conn.network.deleted_flavors == []
+    assert conn.network.deleted_profiles == []
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +245,7 @@ def test_prune_deletes_orphaned_owned_profile():
     orphan = _owned_profile("orphan-profile-id")
     conn = _conn([], {orphan.id: orphan})
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    _prune(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_profiles == ["orphan-profile-id"]
 
@@ -174,7 +259,7 @@ def test_prune_keeps_unowned_profile():
     )
     conn = _conn([], {unowned.id: unowned})
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    _prune(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_profiles == []
 
@@ -185,7 +270,7 @@ def test_prune_keeps_attached_profile():
     kept = _owned_flavor("kept-flavor-id", "kept-flavor", [attached.id])
     conn = _conn([kept], {attached.id: attached})
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    _prune(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_flavors == []
     assert conn.network.deleted_profiles == []
@@ -208,7 +293,7 @@ def test_prune_lists_flavors_once_for_all_profile_checks():
         },
     )
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    _prune(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.flavor_list_calls == 1
     # Only the deleted flavor's profile needs a GET; the orphan came from the
@@ -227,7 +312,7 @@ def test_prune_skips_flavor_still_used_by_routers():
     conn = _conn([flavor])
     conn.network.routers = lambda flavor_id: [{"id": "router-1"}]
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    _prune(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_flavors == []
 

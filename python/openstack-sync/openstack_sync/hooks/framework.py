@@ -165,6 +165,15 @@ class SyncResource:
         return (self.secret_name, self.cloud_name)
 
     @property
+    def identity(self) -> str:
+        """Key identifying this CR across a batch of events.
+
+        Unique among live objects. It does not separate a recreated CR from the
+        one it replaced, so :func:`_split_events` reads events in order.
+        """
+        return f"{self.namespace}/{self.name}"
+
+    @property
     def display_name(self) -> str:
         """Return the OpenStack resource name, falling back to the CR name."""
         return str(self.spec.get("name") or self.name or "<unknown>")
@@ -256,7 +265,7 @@ def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
             f"got secretName={secret_name!r}, cloudName={cloud_name!r}"
         )
 
-    metadata = obj.get("metadata", {})
+    metadata = obj.get("metadata") or {}
 
     return SyncResource(
         spec=spec,
@@ -285,13 +294,24 @@ class _ResourceReader:
     def __init__(self) -> None:
         self.unreadable: set[str] = set()
 
-    def read(self, obj: dict[str, Any], description: str = "CR") -> SyncResource | None:
-        """Return the resource for *obj*, or None when it cannot be read."""
+    def read(
+        self,
+        obj: dict[str, Any],
+        description: str = "CR",
+        *,
+        in_desired_set: bool = True,
+    ) -> SyncResource | None:
+        """Return the resource for *obj*, or None when it cannot be read.
+
+        ``in_desired_set`` is False for a departing object: its read failure
+        says nothing about the desired set, so it must not hold back the prune.
+        """
         try:
             return _resource_from_object(obj)
         except _MalformedResourceError as exc:
             identity = _resource_identity(obj)
-            self.unreadable.add(identity)
+            if in_desired_set:
+                self.unreadable.add(identity)
             LOG.error("Ignoring unreadable %s %s: %s", description, identity, exc)
             return None
 
@@ -329,10 +349,23 @@ def _status_is_current(resource: SyncResource) -> bool:
 def _split_events(
     contexts: list[dict[str, Any]], config: HookConfig, reader: _ResourceReader
 ) -> tuple[list[SyncResource], list[SyncResource], bool]:
-    """Split this binding's Event contexts into changed and deleted resources."""
-    changed: list[SyncResource] = []
-    deleted: list[SyncResource] = []
+    """Split this binding's Event contexts into changed and deleted resources.
+
+    Shell-operator replays its whole backlog, so a batch can carry dozens of
+    events for one CR. Both maps are keyed by identity to collapse them.
+
+    Order decides the rest. A Deleted cancels an earlier change -- removing the
+    resource is the prune's business, which ``deleted`` still carries -- while a
+    change after a Deleted is a recreated CR that must still reconcile. The
+    binding's queue is FIFO, so the last context for a CR is the current one.
+    """
+    changed: dict[str, SyncResource] = {}
+    deleted: dict[str, SyncResource] = {}
     saw_event_context = False
+    # Counted apart from ``changed`` so a cancelled CR reads as neither a
+    # duplicate nor a reconcile.
+    changed_events = 0
+    changed_identities: set[str] = set()
 
     for context in contexts:
         if context.get("binding") != config.binding_name:
@@ -355,12 +388,21 @@ def _split_events(
             )
             continue
 
-        resource = reader.read(obj, f"{watch_event} CR")
+        resource = reader.read(
+            obj, f"{watch_event} CR", in_desired_set=watch_event != "Deleted"
+        )
         if resource is None:
             continue
 
         if watch_event == "Deleted":
-            deleted.append(resource)
+            deleted[resource.identity] = resource
+            superseded = changed.pop(resource.identity, None)
+            if superseded is not None:
+                LOG.info(
+                    "Not reconciling %s %s; a later event in this batch deleted it",
+                    config.crd_kind,
+                    superseded.display_name,
+                )
         elif watch_event == "Modified" and _status_is_current(resource):
             LOG.info(
                 "Skipping %s Modified event; generation %s is already Synced",
@@ -368,10 +410,20 @@ def _split_events(
                 resource.generation,
             )
         else:
-            changed.append(resource)
+            changed_events += 1
+            changed_identities.add(resource.identity)
+            changed[resource.identity] = resource
 
-    changed.sort(key=lambda r: str(r.spec.get("name", "")))
-    return changed, deleted, saw_event_context
+    if changed_events > len(changed_identities):
+        LOG.info(
+            "Collapsed %s %s event(s) into %s changed CR(s)",
+            changed_events,
+            config.crd_kind,
+            len(changed_identities),
+        )
+
+    resources = sorted(changed.values(), key=lambda r: str(r.spec.get("name", "")))
+    return resources, list(deleted.values()), saw_event_context
 
 
 def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInputs:
@@ -452,31 +504,31 @@ class SyncPlugin(ABC):
         conn: Any,
         desired_specs: list[dict[str, Any]],
         *,
-        authoritative_empty: bool,
+        deleted_specs: list[dict[str, Any]],
+        sweep_unseen: bool,
     ) -> None:
         """Delete resources whose CR was removed.
 
-        *desired_specs* is every credential group's desired specs, not just
-        those of the credentials *conn* authenticates as. A plugin prunes by its
-        own ownership marker, which records no credential, and what a connection
-        lists depends on its token, so a resource one group manages is reachable
-        from another group's connection. The union is what keeps each group's
-        prune to the resources no group asked for.
+        *deleted_specs* names the CRs this credential group just lost. Delete
+        what they name; this is the bounded, ordinary case.
 
-        One consequence: two credentials managing the same resource name keep
-        each other's resource off the prune list. If they are separate clouds
-        the resource leaks instead. That is the safer direction, since the
-        alternative is deleting a resource whose CR still exists.
+        *desired_specs* is what must survive. It is every group's specs, not
+        just this one's, because a plugin prunes by an ownership marker that
+        records no credential and what a connection lists depends on its token,
+        so one group's resource is reachable from another's. Two credentials
+        sharing a resource name therefore keep it off each other's prune, and it
+        leaks rather than being deleted while a CR still wants it.
 
-        *authoritative_empty* is scoped to this credential group, not to
-        *desired_specs*: it says a CR using *these* credentials was deleted, so
-        an empty desired set is a real one rather than a snapshot that could not
-        be read. Because *desired_specs* is the union, it can be non-empty while
-        this is True; a plugin only needs it to decide whether an empty
-        *desired_specs* may be acted on.
+        *sweep_unseen* additionally allows deleting by absence: anything managed
+        that *desired_specs* does not name, which catches a CR that went away
+        while the hook was down and left no *deleted_specs* behind. It requires
+        *desired_specs* to be complete, so the framework clears it when a CR
+        failed to reconcile -- that CR's resource would otherwise read as
+        unwanted. An empty *desired_specs* is never sweepable for the same
+        reason: nothing can be diffed against it.
 
         Optional: the default does nothing, which is correct for a plugin whose
-        resources outlive their CR or that has nothing safe to delete.
+        resources outlive their CR.
         """
         LOG.debug("%s defines no prune step", type(self).__name__)
 
@@ -604,16 +656,40 @@ def run_sync(plugin: SyncPlugin, inputs: HookInputs) -> int:
                 )
             _patch_status(plugin, resource, "Synced", synced_message(noun, notes))
 
-    if failed or unreadable:
-        # Pruning deletes resources absent from the desired set. A CR that
-        # failed to reconcile or could not be read at all means the desired set
-        # could not be established, so deleting anything now risks removing a
-        # resource that should exist.
+    # Two separate questions below. What may be pruned depends on how complete
+    # the desired set is; the exit code depends on whether retrying this run
+    # could ever help. They do not have the same answer.
+    if unreadable:
+        # Nothing may be pruned. The desired set is short by however many CRs
+        # could not be read, and their resource names are unknown, so a deletion
+        # naming one of them cannot be told apart from a real removal.
+        LOG.error("Skipping %s prune; %s could not be read", noun, unreadable)
+        # Exit 0 unless something retryable also failed. An unreadable CR is
+        # stored state, not a transient fault, so it is still unreadable on the
+        # next run: shell-operator re-runs a failing hook every few seconds and
+        # blocks the rest of its queue until it succeeds, so reporting this as a
+        # failure would stop the readable CRs from reconciling for as long as
+        # the malformed CR exists. The error log above is the signal.
+        return 1 if failed else 0
+
+    if failed:
+        # Deleting by absence is off: a CR that failed to reconcile may want a
+        # resource this run would otherwise read as unwanted. A deletion is
+        # different, because it names its resources, and the failing CR is still
+        # in the desired set and so still protected from being one of them.
         LOG.error(
-            "Skipping %s prune; %s failed to reconcile and %s could not be read",
+            "Pruning only %s deletions; %s failed to reconcile so the desired "
+            "set cannot be swept against",
             noun,
             failed,
-            unreadable,
+        )
+        _run_prune(
+            plugin,
+            inputs,
+            grouped_desired,
+            grouped_deleted,
+            connections,
+            sweep_unseen=False,
         )
         return 1
 
@@ -631,6 +707,8 @@ def _run_prune(
     grouped_desired: dict[CredentialKey, list[SyncResource]],
     grouped_deleted: dict[CredentialKey, list[SyncResource]],
     connections: dict[CredentialKey, Any],
+    *,
+    sweep_unseen: bool = True,
 ) -> int:
     noun = plugin.noun
     prune_failed = False
@@ -648,13 +726,15 @@ def _run_prune(
     for credentials in sorted(inputs.prune_credentials):
         secret_name, cloud_name = credentials
         desired = grouped_desired.get(credentials, [])
-        # An empty desired set is only authoritative when we know a CR was
-        # deleted; otherwise it may just be a snapshot we could not read, and
-        # pruning against it would delete everything.
-        authoritative_empty = credentials in grouped_deleted and not desired
-        if not desired and not authoritative_empty:
+        deleted = grouped_deleted.get(credentials, [])
+        # With nothing deleted, a prune has work to do only if it may sweep, and
+        # only then against a desired set that exists. Nothing desired and
+        # nothing deleted means the snapshot does not yet show the CR whose event
+        # brought us here; sweeping against it would delete resources it simply
+        # has not listed.
+        if not deleted and (not desired or not sweep_unseen):
             LOG.info(
-                "Skipping %s prune for cloud=%r secret=%r; no desired resources",
+                "Skipping %s prune for cloud=%r secret=%r; nothing to delete",
                 noun,
                 cloud_name,
                 secret_name,
@@ -682,7 +762,8 @@ def _run_prune(
             plugin.prune(
                 conn,
                 all_desired_specs,
-                authoritative_empty=authoritative_empty,
+                deleted_specs=[resource.spec for resource in deleted],
+                sweep_unseen=sweep_unseen,
             )
         except Exception as exc:  # noqa: BLE001
             prune_failed = True

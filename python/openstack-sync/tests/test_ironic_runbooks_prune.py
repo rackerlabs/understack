@@ -34,8 +34,19 @@ def _spec(name: str) -> dict[str, Any]:
     return {"runbookName": name, "steps": []}
 
 
-def _prune(fake: FakeBaremetal, specs: list[dict[str, Any]], **kwargs: Any) -> None:
-    prune.prune_removed_runbooks(_conn(fake), specs, **kwargs)
+def _prune(
+    fake: FakeBaremetal,
+    specs: list[dict[str, Any]],
+    deleted: list[dict[str, Any]] | None = None,
+    *,
+    sweep_unseen: bool = True,
+) -> None:
+    prune.prune_removed_runbooks(
+        _conn(fake),
+        specs,
+        deleted_specs=deleted if deleted is not None else [],
+        sweep_unseen=sweep_unseen,
+    )
 
 
 def test_owned_runbook_absent_from_the_desired_set_is_deleted():
@@ -86,16 +97,82 @@ def test_runbook_without_a_name_is_skipped():
     assert fake.calls_for("DELETE") == []
 
 
-def test_empty_desired_set_is_refused_unless_a_cr_was_deleted():
+def test_empty_desired_set_deletes_nothing_on_its_own():
     """An unreadable snapshot must not read as "delete everything"."""
     fake = FakeBaremetal([_owned("CUSTOM_GONE")])
 
     _prune(fake, [])
+
     assert sorted(fake.runbooks) == ["CUSTOM_GONE"]
     assert fake.calls == []
 
-    _prune(fake, [], authoritative_empty=True)
-    assert fake.runbooks == {}
+
+def test_empty_desired_set_deletes_only_the_named_deleted_runbooks():
+    """Without a desired set to diff, only the lost CRs may be acted on."""
+    fake = FakeBaremetal([_owned("CUSTOM_GONE"), _owned("CUSTOM_UNRELATED")])
+
+    _prune(fake, [], [_spec("CUSTOM_GONE")])
+
+    assert sorted(fake.runbooks) == ["CUSTOM_UNRELATED"]
+    assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE-uuid"]
+
+
+def test_a_deleted_runbook_another_cr_still_wants_is_kept():
+    """The desired set wins over a deletion naming the same runbook."""
+    fake = FakeBaremetal([_owned("CUSTOM_SHARED")])
+
+    _prune(fake, [_spec("CUSTOM_SHARED")], [_spec("CUSTOM_SHARED")])
+
+    assert sorted(fake.runbooks) == ["CUSTOM_SHARED"]
+    assert fake.calls_for("DELETE") == []
+
+
+# ---------------------------------------------------------------------------
+# A withheld sweep
+# ---------------------------------------------------------------------------
+
+
+def test_without_the_sweep_only_the_deleted_runbooks_go():
+    """With sweeping off, a desired set is a protection list and nothing more.
+
+    The framework withholds the sweep when a CR failed to reconcile, so the
+    desired set may be missing names. An owned runbook absent from it is left
+    alone; only the runbooks a deletion names go.
+    """
+    fake = FakeBaremetal([_owned("CUSTOM_GONE"), _owned("CUSTOM_ABSENT")])
+
+    _prune(fake, [_spec("CUSTOM_KEEP")], [_spec("CUSTOM_GONE")], sweep_unseen=False)
+
+    assert sorted(fake.runbooks) == ["CUSTOM_ABSENT"]
+    assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE-uuid"]
+
+
+def test_without_the_sweep_the_desired_set_still_protects():
+    """A deletion cannot remove a runbook the desired set still names.
+
+    This is what makes deleting by name safe while a reconcile is failing: the
+    failing CR is still in the desired set, so it cannot be deleted.
+    """
+    fake = FakeBaremetal([_owned("CUSTOM_SHARED")])
+
+    _prune(
+        fake,
+        [_spec("CUSTOM_SHARED")],
+        [_spec("CUSTOM_SHARED")],
+        sweep_unseen=False,
+    )
+
+    assert sorted(fake.runbooks) == ["CUSTOM_SHARED"]
+    assert fake.calls_for("DELETE") == []
+
+
+def test_without_the_sweep_and_nothing_deleted_nothing_happens():
+    fake = FakeBaremetal([_owned("CUSTOM_GONE")])
+
+    _prune(fake, [_spec("CUSTOM_KEEP")], [], sweep_unseen=False)
+
+    assert sorted(fake.runbooks) == ["CUSTOM_GONE"]
+    assert fake.calls == []
 
 
 def test_a_runbook_deleted_out_of_band_is_not_an_error():

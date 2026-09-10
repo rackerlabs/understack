@@ -30,10 +30,22 @@ is turned on in the operator values and its script is in the image.
 
 ### Runtime model
 
-There's no always-running loop or work queue. shell-operator watches the CRDs and
+There's no always-running loop of our own. shell-operator watches the CRDs and
 runs a hook script on each `Added` / `Modified` / `Deleted` event, plus a
-periodic full resync on a timer (`SYNC_CRONTAB`). Retries are implicit: if a run
-fails, it waits for the next event or the next scheduled resync.
+periodic full resync on a timer (`SYNC_CRONTAB`).
+
+Retries are not implicit, and this matters. Per the
+[shell-operator docs](https://github.com/flant/shell-operator/blob/main/docs/src/HOOKS.md),
+each queue runs its hooks strictly in sequence, and a hook that exits non-zero is
+re-run every few seconds until it succeeds, with everything else in that queue
+blocked until it does. `allowFailure` would change that and we don't set it. Each
+hook gets its own queue (`queue: <binding name>`), so the blockage is contained to
+one resource type.
+
+The consequence: exiting non-zero is only useful for a fault that a retry could
+clear. For a permanent one -- a malformed CR already stored in etcd, say -- a
+non-zero exit buys nothing and pins the queue, which stops the healthy CRs from
+reconciling too. Those get reported in the log and the run exits zero.
 
 ### Core framework
 
@@ -44,12 +56,20 @@ resource type is a `SyncPlugin` subclass that provides four things:
 - `reconcile(conn, spec, cache)` — bring one CR spec in line with OpenStack, and
   return any notes about things it won't fix on its own.
 - `new_cache()` — a scratch cache shared by all CRs using the same credentials.
-- `prune(conn, desired_specs, authoritative_empty)` — delete resources whose CR
-  is gone (optional; does nothing by default).
+- `prune(conn, desired_specs, deleted_specs, sweep_unseen)` — delete resources
+  whose CR is gone: `deleted_specs` names the CRs just lost, `desired_specs` is
+  what must survive, and `sweep_unseen` additionally allows deleting anything
+  managed that `desired_specs` does not name, which catches a CR whose removal
+  was never observed (optional; does nothing by default).
 
 `run_sync()` handles the rest: grouping CRs by credentials, opening one OpenStack
 connection per group, reconciling each CR and updating its status, and running a
-guarded prune at the end.
+guarded prune at the end. The guard scales with how trustworthy the desired set
+is: everything reconciled means a full prune; a failed reconcile withholds
+`sweep_unseen` but still lets deletions through, since those name their resources
+and the failing CR is still in the desired set; an unreadable CR withholds the
+prune entirely, because its resource names are unknown and so cannot be protected
+from a deletion naming one of them.
 
 ### Reconcile behavior (per resource)
 
@@ -79,8 +99,9 @@ and are otherwise left alone.
 
 The CRDs have a status subresource with `syncStatus` (Synced/Failed/Unknown),
 `lastSyncTime`, `observedGeneration`, `message`, and a standard `conditions[]`
-list. Status is written by running `kubectl patch --subresource status` in a
-subprocess (`hooks/common.py`).
+list. The hook writes status through the Kubernetes Python client's status
+subresource API (`hooks/common.py`). Failed status writes are logged but do not
+fail the reconcile itself, because status is reporting, not the OpenStack work.
 
 ### Safety details worth noting
 
@@ -92,6 +113,9 @@ The framework handles a few tricky cases carefully:
   endless loop.
 - **Skips no-op status writes**: it doesn't rewrite status when the important
   fields already match, which avoids extra Modified events.
+- **Tolerates stale status targets**: if the CR disappears between reconcile and
+  status patch, a 404 for that CR is logged at info and ignored; a missing CRD or
+  other API failure is still reported.
 - **Guards prune**: if any CR failed to reconcile or couldn't be read, prune is
   skipped completely, since it can't know the full desired set and might delete
   something it shouldn't.
@@ -128,20 +152,15 @@ The framework handles a few tricky cases carefully:
    an hour depending on `SYNC_CRONTAB`. A short OpenStack hiccup can leave a CR
    `Failed` for a while.
 
-3. **Status uses a `kubectl` subprocess.** This starts a process per patch and
-   needs the `kubectl` binary in the image, even though the code already uses the
-   Python Kubernetes client to read Secrets. `common.py` even has a
-   "kubectl not found" branch to handle its absence.
-
-4. **Single replica, no leader election.** `replicaCount: 1` and no HA. That's
+3. **Single replica, no leader election.** `replicaCount: 1` and no HA. That's
    fine for config sync, but together with the missed-delete gap, any downtime is
    a window where deletes get lost.
 
-5. **No per-resource metrics.** Only shell-operator's built-in metrics (port
+4. **No per-resource metrics.** Only shell-operator's built-in metrics (port
    9115) and TCP probes are available. There's nothing per-CRD like reconcile
    count, failure count, or drift-note count for dashboards or alerts.
 
-6. **Markers are defined per plugin.** Each plugin rolls its own marker scheme
+5. **Markers are defined per plugin.** Each plugin rolls its own marker scheme
    (router flavors in `meta_info`, flavors in `description`, runbooks similar).
    There's no shared, versioned marker format, so a new plugin could do it a
    little differently.
@@ -156,26 +175,21 @@ Roughly in order of value. None of these mean dropping shell-operator.
    (patching `metadata.finalizers`), so it's worth checking the leak actually
    matters for a resource before adding it everywhere.
 
-2. **Switch status writes to the Python Kubernetes client.** The client is
-   already a dependency. This drops the per-patch subprocess, removes the
-   `kubectl` binary requirement, gives cleaner error handling, and gets rid of the
-   "kubectl not found" case.
-
-3. **Add retry/backoff for temporary failures.** shell-operator doesn't do
+2. **Add retry/backoff for temporary failures.** shell-operator doesn't do
    per-object requeue timing, but its queue retry settings can be tuned, or
    `SYNC_CRONTAB` shortened, so a temporary failure retries sooner than the next
    full resync. At least document how long a retry actually takes.
 
-4. **Add per-resource metrics.** Reconcile count, failure count, and drift-note
+3. **Add per-resource metrics.** Reconcile count, failure count, and drift-note
    count per CRD would make the operator easier to watch. shell-operator can
    export hook metrics; surface them in the chart.
 
-5. **Say the single-replica choice out loud.** If missed deletes matter and
+4. **Say the single-replica choice out loud.** If missed deletes matter and
    finalizers aren't added, HA on its own doesn't fully fix it (the event is still
    lost during a gap). Writing down that this is single-replica on purpose, and
    why, helps operators reason about the tradeoff.
 
-6. **Make the marker scheme a shared, versioned contract.** A shared marker module
+5. **Make the marker scheme a shared, versioned contract.** A shared marker module
    with one versioned key format keeps adoption and prune rules consistent across
    plugins and easier to check.
 
