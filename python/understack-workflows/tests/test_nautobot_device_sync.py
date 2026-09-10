@@ -509,7 +509,7 @@ class TestSetLocationFromExtra:
             MagicMock(local_link_connection={"switch_info": "switch1.example.com"})
         ]
 
-        device_info, _, _ = fetch_node_details(
+        device_info, _, _, _ = fetch_node_details(
             "test-uuid", ironic_client, mock_nautobot, location
         )
 
@@ -838,7 +838,7 @@ class TestSyncDeviceToNautobot:
             location_id="location-uuid",
             status="Active",
         )
-        mock_fetch.return_value = (device_info, {}, [])
+        mock_fetch.return_value = (device_info, {}, [], MagicMock())
         mock_nautobot.dcim.devices.get.return_value = None
         mock_nautobot.dcim.devices.create.return_value = MagicMock()
         mock_sync_interfaces.return_value = EXIT_STATUS_SUCCESS
@@ -867,7 +867,7 @@ class TestSyncDeviceToNautobot:
             name="Dell-ABC123",
             status="Active",
         )
-        mock_fetch.return_value = (device_info, {}, [])
+        mock_fetch.return_value = (device_info, {}, [], MagicMock())
 
         existing_device = MagicMock()
         existing_device.status = MagicMock(name="Planned")
@@ -898,7 +898,7 @@ class TestSyncDeviceToNautobot:
         """Test that sync skips gracefully for uninspected nodes without location."""
         node_uuid = str(uuid.uuid4())
         device_info = DeviceInfo(uuid=node_uuid)  # No location
-        mock_fetch.return_value = (device_info, {}, [])
+        mock_fetch.return_value = (device_info, {}, [], MagicMock())
         mock_nautobot.dcim.devices.get.return_value = None
 
         result = sync_device_to_nautobot(node_uuid, mock_nautobot, location)
@@ -932,7 +932,7 @@ class TestSyncDeviceToNautobot:
             location_id="location-uuid",
             status="Active",
         )
-        mock_fetch.return_value = (device_info, {}, [])
+        mock_fetch.return_value = (device_info, {}, [], MagicMock())
 
         # First get by ID returns None
         # Second get by name returns device with different UUID
@@ -976,7 +976,7 @@ class TestSyncDeviceToNautobot:
             location_id="location-uuid",
             status="Active",
         )
-        mock_fetch.return_value = (device_info, {}, [])
+        mock_fetch.return_value = (device_info, {}, [], MagicMock())
 
         # Both lookups return None
         mock_nautobot.dcim.devices.get.side_effect = [None, None]
@@ -1016,7 +1016,7 @@ class TestSyncDeviceToNautobot:
             # No location_id from switch lookup
             status="Active",
         )
-        mock_fetch.return_value = (device_info, {}, [])
+        mock_fetch.return_value = (device_info, {}, [], MagicMock())
 
         # Old device has location
         existing_device = MagicMock()
