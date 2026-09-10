@@ -767,8 +767,8 @@ def test_run_sync_connects_with_each_resources_own_credentials():
 def test_run_sync_forwards_crd_identity_and_current_status_to_the_patch():
     """Forward everything patch_resource_status needs.
 
-    The CRD identity targets kubectl, and the current status decides whether the
-    patch can be skipped.
+    The CRD identity addresses the object on the API, and the current status
+    decides whether the patch can be skipped.
     """
     config = make_hook_config(status_enabled=True)
     plugin = StubPlugin(config)

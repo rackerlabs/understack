@@ -1,6 +1,6 @@
 """Generic shell-operator hook utilities shared across all hooks.
 
-Provides binding context I/O and status patching via kubectl.
+Provides binding context I/O and CR status patching.
 """
 
 from __future__ import annotations
@@ -9,9 +9,13 @@ import datetime as dt
 import json
 import logging
 import os
-import subprocess
 import sys
 from typing import Any
+
+from kubernetes import client as k8s_client
+from kubernetes.client.exceptions import ApiException
+
+from openstack_sync.utils import load_kubernetes_config
 
 LOG = logging.getLogger(__name__)
 
@@ -181,6 +185,49 @@ def _status_is_current(
     return True
 
 
+#: Memoised CustomObjectsApi, so one config load serves every patch in a run.
+_custom_objects_api: Any = None
+
+
+def _customobjects_api() -> Any:
+    """Return the shared ``CustomObjectsApi``, configuring the client once."""
+    global _custom_objects_api
+    if _custom_objects_api is None:
+        load_kubernetes_config()
+        _custom_objects_api = k8s_client.CustomObjectsApi()
+    return _custom_objects_api
+
+
+def crd_request_target(crd_api_version: str, crd_resource: str) -> tuple[str, str, str]:
+    """Return ``(group, version, plural)`` for addressing a CR.
+
+    Derived from the two environment values the chart already injects, rather
+    than from new ones: ``<prefix>_CRD_API_VERSION`` is ``<group>/<version>``
+    and ``<prefix>_CRD_RESOURCE`` is ``<plural>.<group>``, which between them
+    carry everything the API needs.
+
+    Raises:
+        ValueError: When either value is not in the expected shape.
+    """
+    group, _, version = crd_api_version.partition("/")
+    plural = crd_resource.partition(".")[0]
+    if not group or not version or not plural:
+        raise ValueError(
+            f"cannot derive a CRD request target from "
+            f"api_version={crd_api_version!r} and resource={crd_resource!r}"
+        )
+    return group, version, plural
+
+
+def _api_error_detail(exc: ApiException, max_body: int = 512) -> str:
+    """Return a one-line description of *exc* for a log message."""
+    body = str(exc.body or "").strip().replace("\n", " ")
+    detail = f"HTTP {exc.status} {exc.reason or ''}".strip()
+    if not body:
+        return detail
+    return f"{detail}: {truncate_message(body, max_body)}"
+
+
 def patch_resource_status(
     *,
     name: str,
@@ -188,20 +235,24 @@ def patch_resource_status(
     generation: int | None,
     sync_status: str,
     message: str,
+    crd_api_version: str,
     crd_resource: str,
     crd_kind: str,
     status_enabled: bool,
     current_status: dict[str, Any] | None = None,
 ) -> None:
-    """Patch the status subresource of a CR via kubectl.
+    """Patch the status subresource of a CR.
 
     Args:
         name: CR metadata.name.
-        namespace: CR metadata.namespace (optional).
+        namespace: CR metadata.namespace. Required to address the object; the
+            patch is skipped with a warning when it is absent.
         generation: CR metadata.generation for observedGeneration (optional).
         sync_status: One of ``"Synced"`` or ``"Failed"``.
         message: Human-readable detail for the status message.
-        crd_resource: Fully-qualified CRD resource name for kubectl (e.g.
+        crd_api_version: CRD API version as ``<group>/<version>`` (e.g.
+            ``neutron.understack.rackspace.net/v1alpha1``).
+        crd_resource: Fully-qualified CRD resource name (e.g.
             ``neutronrouterflavors.neutron.understack.rackspace.net``).
         crd_kind: CRD kind used in log messages (e.g. ``NeutronRouterFlavor``).
         status_enabled: When False the function returns immediately.
@@ -231,32 +282,46 @@ def patch_resource_status(
     if generation is not None:
         status["observedGeneration"] = generation
 
-    command = [
-        "kubectl",
-        "patch",
-        crd_resource,
-        name,
-        "--type",
-        "merge",
-        "--subresource",
-        "status",
-        "-p",
-        json.dumps({"status": status}, sort_keys=True),
-    ]
-    if namespace:
-        command.extend(["-n", namespace])
-
-    try:
-        result = subprocess.run(  # noqa: S603,S607
-            command,
-            capture_output=True,
-            check=False,
-            text=True,
+    if not namespace:
+        LOG.warning(
+            "unable to patch %s status for %s; no namespace to address it in",
+            crd_kind,
+            name,
         )
-    except FileNotFoundError:
-        LOG.warning("kubectl not found; unable to patch %s status", crd_kind)
         return
 
-    if result.returncode != 0:
-        error = (result.stderr or result.stdout or "unknown error").strip()
-        LOG.warning("failed to patch %s status for %s: %s", crd_kind, name, error)
+    try:
+        group, version, plural = crd_request_target(crd_api_version, crd_resource)
+    except ValueError as exc:
+        LOG.warning("unable to patch %s status for %s: %s", crd_kind, name, exc)
+        return
+
+    # The client's default content type here is merge-patch+json, which is what
+    # `kubectl patch --type merge --subresource status` sent before this moved
+    # off kubectl, so the request on the wire is unchanged.
+    try:
+        _customobjects_api().patch_namespaced_custom_object_status(
+            group=group,
+            version=version,
+            namespace=namespace,
+            plural=plural,
+            name=name,
+            body={"status": status},
+        )
+    except ApiException as exc:
+        LOG.warning(
+            "failed to patch %s status for %s: %s",
+            crd_kind,
+            name,
+            _api_error_detail(exc),
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Config load and transport failures reach here. A status patch is
+        # reporting, never the work itself, so it must not fail the reconcile.
+        LOG.warning(
+            "failed to patch %s status for %s: %s: %s",
+            crd_kind,
+            name,
+            type(exc).__name__,
+            exc,
+        )
