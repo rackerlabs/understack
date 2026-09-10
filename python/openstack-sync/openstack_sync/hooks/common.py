@@ -127,31 +127,54 @@ def truncate_message(message: Any, max_length: int = 2048) -> str:
     return f"{text[: max_length - 3]}..."
 
 
-def _condition_status(sync_status: str) -> str:
-    return "True" if sync_status == "Synced" else "False"
+def _desired_condition(
+    sync_status: str, message: str, generation: int | None = None
+) -> dict[str, Any]:
+    """Return the Ready condition to write, without its timestamp.
 
-
-def _condition_reason(sync_status: str) -> str:
-    return "ReconcileSucceeded" if sync_status == "Synced" else "ReconcileFailed"
-
-
-def _desired_condition(sync_status: str, message: str) -> dict[str, str]:
-    return {
-        "type": "Synced",
-        "status": _condition_status(sync_status),
-        "reason": _condition_reason(sync_status),
+    A CR has one notion of success, so it reports one condition. ``Ready`` is
+    the name Kubernetes tooling expects: ``kubectl wait --for=condition=Ready``
+    and kubernetes-entrypoint's ``custom_resources`` dependency both work off it.
+    """
+    synced = sync_status == "Synced"
+    condition: dict[str, Any] = {
+        "type": "Ready",
+        "status": "True" if synced else "False",
+        "reason": "Reconciled" if synced else "ReconcileError",
         "message": truncate_message(message),
     }
+    if generation is not None:
+        condition["observedGeneration"] = generation
+    return condition
 
 
-def _synced_condition(current: dict[str, Any]) -> dict[str, Any] | None:
-    conditions = current.get("conditions")
+def _ready_condition(status: dict[str, Any]) -> dict[str, Any] | None:
+    """Return the Ready condition in *status*, or None when it has none."""
+    conditions = status.get("conditions")
     if not isinstance(conditions, list):
         return None
     for condition in conditions:
-        if isinstance(condition, dict) and condition.get("type") == "Synced":
+        if isinstance(condition, dict) and condition.get("type") == "Ready":
             return condition
     return None
+
+
+def _transition_time(
+    current: dict[str, Any] | None, condition_status: str, now: str
+) -> str:
+    """Return the ``lastTransitionTime`` to write.
+
+    Kept from the existing condition while its ``status`` is unchanged, so the
+    timestamp marks the last True/False flip rather than the last write. A
+    message-only change leaves it alone.
+    """
+    if not current:
+        return now
+    existing = _ready_condition(current)
+    if existing is None or existing.get("status") != condition_status:
+        return now
+    existing_time = existing.get("lastTransitionTime")
+    return existing_time if isinstance(existing_time, str) and existing_time else now
 
 
 def _status_is_current(
@@ -176,13 +199,11 @@ def _status_is_current(
     if generation is not None and current.get("observedGeneration") != generation:
         return False
 
-    current_condition = _synced_condition(current)
-    if current_condition is None:
+    existing = _ready_condition(current)
+    if existing is None:
         return False
-    for key, value in _desired_condition(sync_status, truncated_message).items():
-        if current_condition.get(key) != value:
-            return False
-    return True
+    desired = _desired_condition(sync_status, truncated_message, generation)
+    return all(existing.get(key) == value for key, value in desired.items())
 
 
 #: Memoised CustomObjectsApi, so one config load serves every patch in a run.
@@ -201,10 +222,9 @@ def _customobjects_api() -> Any:
 def crd_request_target(crd_api_version: str, crd_resource: str) -> tuple[str, str, str]:
     """Return ``(group, version, plural)`` for addressing a CR.
 
-    Derived from the two environment values the chart already injects, rather
-    than from new ones: ``<prefix>_CRD_API_VERSION`` is ``<group>/<version>``
-    and ``<prefix>_CRD_RESOURCE`` is ``<plural>.<group>``, which between them
-    carry everything the API needs.
+    Both arguments come from the hook's environment: ``<prefix>_CRD_API_VERSION``
+    is ``<group>/<version>`` and ``<prefix>_CRD_RESOURCE`` is
+    ``<plural>.<group>``.
 
     Raises:
         ValueError: When either value is not in the expected shape.
@@ -220,8 +240,16 @@ def crd_request_target(crd_api_version: str, crd_resource: str) -> tuple[str, st
 
 
 def _api_error_detail(exc: ApiException, max_body: int = 512) -> str:
-    """Return a one-line description of *exc* for a log message."""
-    body = str(exc.body or "").strip().replace("\n", " ")
+    """Return a one-line description of *exc* for a log message.
+
+    The client hands over the apiserver's body as bytes, which is decoded first:
+    formatting bytes directly logs a repr, where a newline is two characters and
+    survives the flattening.
+    """
+    body = exc.body or ""
+    if isinstance(body, bytes):
+        body = body.decode("utf-8", "replace")
+    body = str(body).strip().replace("\n", " ")
     detail = f"HTTP {exc.status} {exc.reason or ''}".strip()
     if not body:
         return detail
@@ -243,10 +271,14 @@ def patch_resource_status(
 ) -> None:
     """Patch the status subresource of a CR.
 
+    A failed write is logged and swallowed: status is reporting, not the work
+    itself. It logs at error level even so, because a CR that cannot report
+    leaves anything waiting on its ``Ready`` condition stuck.
+
     Args:
         name: CR metadata.name.
         namespace: CR metadata.namespace. Required to address the object; the
-            patch is skipped with a warning when it is absent.
+            patch is skipped when it is absent.
         generation: CR metadata.generation for observedGeneration (optional).
         sync_status: One of ``"Synced"`` or ``"Failed"``.
         message: Human-readable detail for the status message.
@@ -270,20 +302,8 @@ def patch_resource_status(
         )
         return
 
-    timestamp = utc_timestamp()
-    condition = _desired_condition(sync_status, message)
-    condition["lastTransitionTime"] = timestamp
-    status: dict[str, Any] = {
-        "syncStatus": sync_status,
-        "lastSyncTime": timestamp,
-        "message": truncate_message(message),
-        "conditions": [condition],
-    }
-    if generation is not None:
-        status["observedGeneration"] = generation
-
     if not namespace:
-        LOG.warning(
+        LOG.error(
             "unable to patch %s status for %s; no namespace to address it in",
             crd_kind,
             name,
@@ -293,12 +313,23 @@ def patch_resource_status(
     try:
         group, version, plural = crd_request_target(crd_api_version, crd_resource)
     except ValueError as exc:
-        LOG.warning("unable to patch %s status for %s: %s", crd_kind, name, exc)
+        LOG.error("unable to patch %s status for %s: %s", crd_kind, name, exc)
         return
 
-    # The client's default content type here is merge-patch+json, which is what
-    # `kubectl patch --type merge --subresource status` sent before this moved
-    # off kubectl, so the request on the wire is unchanged.
+    timestamp = utc_timestamp()
+    condition = _desired_condition(sync_status, message, generation)
+    condition["lastTransitionTime"] = _transition_time(
+        current_status, str(condition["status"]), timestamp
+    )
+    status: dict[str, Any] = {
+        "syncStatus": sync_status,
+        "lastSyncTime": timestamp,
+        "message": truncate_message(message),
+        "conditions": [condition],
+    }
+    if generation is not None:
+        status["observedGeneration"] = generation
+
     try:
         _customobjects_api().patch_namespaced_custom_object_status(
             group=group,
@@ -307,21 +338,26 @@ def patch_resource_status(
             plural=plural,
             name=name,
             body={"status": status},
+            # Replaces the stored status field by field, and conditions
+            # wholesale, so the CR keeps exactly one condition. Named here so
+            # the request does not depend on the client's own default.
+            _content_type="application/merge-patch+json",
         )
     except ApiException as exc:
-        LOG.warning(
+        LOG.error(
             "failed to patch %s status for %s: %s",
             crd_kind,
             name,
             _api_error_detail(exc),
         )
     except Exception as exc:  # noqa: BLE001
-        # Config load and transport failures reach here. A status patch is
-        # reporting, never the work itself, so it must not fail the reconcile.
-        LOG.warning(
+        # Config load and transport failures land here, and so would a bad call
+        # into the client -- hence the traceback.
+        LOG.error(
             "failed to patch %s status for %s: %s: %s",
             crd_kind,
             name,
             type(exc).__name__,
             exc,
+            exc_info=True,
         )

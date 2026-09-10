@@ -185,14 +185,25 @@ spec:
               conditions:
                 description: Conditions describe current observed state.
                 type: array
+                x-kubernetes-list-type: map
+                x-kubernetes-list-map-keys:
+                - type
                 items:
                   type: object
                   required:
                   - type
                   - status
+                  - reason
+                  - message
+                  - lastTransitionTime
                   properties:
                     type:
+                      description: >-
+                        Condition type in CamelCase. A CR reports one
+                        condition, Ready.
                       type: string
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                     status:
                       type: string
                       enum:
@@ -200,10 +211,24 @@ spec:
                       - "False"
                       - Unknown
                     reason:
+                      description: >-
+                        CamelCase programmatic identifier for the reason of the
+                        last transition.
                       type: string
+                      minLength: 1
+                      maxLength: 1024
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
                     message:
                       type: string
                       maxLength: 2048
+                    observedGeneration:
+                      description: >-
+                        The metadata.generation this condition was computed
+                        from. A value behind the current generation means the
+                        condition is out of date.
+                      type: integer
+                      format: int64
+                      minimum: 0
                     lastTransitionTime:
                       type: string
                       format: date-time

@@ -199,6 +199,39 @@ Each plugin CRD defines:
 - Required `spec.cloudCredentialsRef.secretName`
 - Required `spec.cloudCredentialsRef.cloudName`
 
+### Status and readiness
+
+Every plugin CR reports the same status:
+
+- `conditions` -- one `Ready` condition, reason `Reconciled` or
+  `ReconcileError`.
+- `syncStatus` -- `Synced` or `Failed`. This is the field the `SyncStatus`
+  printer column shows.
+- `message` -- detail from the last reconcile.
+- `lastSyncTime` -- when the status last changed. A reconcile that finds
+  nothing to change writes nothing, so this is not a heartbeat.
+- `observedGeneration` -- the `metadata.generation` this status was computed
+  from. A value behind `metadata.generation` means the latest spec has not been
+  applied yet.
+
+So a CR is waitable:
+
+```bash
+kubectl -n openstack wait --for=condition=Ready ironicrunbook/<name> --timeout=60s
+```
+
+`lastTransitionTime` marks the last time the condition's `status` changed rather
+than the last reconcile, so a message-only change leaves it alone.
+
+A CR that converged but needs manual attention is still `Ready`, with the detail
+appended to the message after `needs manual action:`. That is deliberate -- the
+resource really is converged, and reporting a bare success while state diverges
+from the spec is how a broken resource stays invisible until it is used.
+
+A failed status write never fails the reconcile, because status is reporting and
+not the work itself. It is logged at error level even so: anything waiting on
+`Ready` stays stuck until someone reads that log.
+
 The chart reads this CRD through
 `components/openstack-sync-operator/templates/_crd.tpl` so
 RBAC and hook environment variables are derived from the same schema Kubernetes

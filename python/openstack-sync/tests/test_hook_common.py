@@ -7,6 +7,7 @@ import logging
 from unittest import mock
 
 import pytest
+from kubernetes import client as k8s_client
 from kubernetes.client.exceptions import ApiException
 
 from openstack_sync.hooks import common as hc
@@ -183,21 +184,21 @@ def _matching_status(
     message: str = "ok",
     generation: int | None = 1,
 ) -> dict:
-    condition_status = "True" if sync_status == "Synced" else "False"
-    reason = "ReconcileSucceeded" if sync_status == "Synced" else "ReconcileFailed"
+    condition = {
+        "type": "Ready",
+        "status": "True" if sync_status == "Synced" else "False",
+        "reason": "Reconciled" if sync_status == "Synced" else "ReconcileError",
+        "message": message,
+        "lastTransitionTime": "2026-08-19T06:20:21Z",
+    }
+    if generation is not None:
+        condition["observedGeneration"] = generation
+
     status = {
         "syncStatus": sync_status,
         "lastSyncTime": "2026-08-19T06:20:21Z",
         "message": message,
-        "conditions": [
-            {
-                "type": "Synced",
-                "status": condition_status,
-                "reason": reason,
-                "message": message,
-                "lastTransitionTime": "2026-08-19T06:20:21Z",
-            }
-        ],
+        "conditions": [condition],
     }
     if generation is not None:
         status["observedGeneration"] = generation
@@ -227,6 +228,15 @@ def test_status_is_current_ignores_timestamps():
         (_matching_status(message="old"), "Synced", "new", 1),
         (_matching_status(generation=1), "Synced", "ok", 2),
         ({**_matching_status(), "conditions": []}, "Synced", "ok", 1),
+        (
+            {
+                **_matching_status(),
+                "conditions": [{"type": "Reachable", "status": "True"}],
+            },
+            "Synced",
+            "ok",
+            1,
+        ),
     ],
 )
 def test_status_is_current_detects_real_status_differences(
@@ -238,6 +248,13 @@ def test_status_is_current_detects_real_status_differences(
     assert not hc._status_is_current(current, sync_status, message, generation)
 
 
+def test_status_is_current_rejects_a_stale_condition_generation():
+    current = _matching_status(generation=2)
+    current["conditions"][0]["observedGeneration"] = 1
+
+    assert not hc._status_is_current(current, "Synced", "ok", 2)
+
+
 # ---------------------------------------------------------------------------
 # patch_resource_status
 # ---------------------------------------------------------------------------
@@ -245,6 +262,16 @@ def test_status_is_current_detects_real_status_differences(
 
 API_VERSION = "neutron.understack.rackspace.net/v1alpha1"
 RESOURCE = "neutronrouterflavors.neutron.understack.rackspace.net"
+
+
+def _fake_api():
+    """Return a CustomObjectsApi mock that only accepts real client calls.
+
+    Specced against the real class, because an unspecced mock accepts any method
+    name and any signature: a call the client does not have would pass here and
+    surface in production only as a logged error.
+    """
+    return mock.create_autospec(k8s_client.CustomObjectsApi, instance=True)
 
 
 def _patch(**overrides):
@@ -261,10 +288,16 @@ def _patch(**overrides):
         "status_enabled": True,
     }
     kwargs.update(overrides)
-    api = mock.MagicMock()
+    api = _fake_api()
     with mock.patch.object(hc, "_customobjects_api", return_value=api):
         hc.patch_resource_status(**kwargs)
     return api.patch_namespaced_custom_object_status
+
+
+def _written_condition(**overrides) -> dict:
+    """Return the one condition the patch wrote."""
+    (condition,) = _patch(**overrides).call_args.kwargs["body"]["status"]["conditions"]
+    return condition
 
 
 def test_patch_resource_status_skips_when_disabled():
@@ -281,16 +314,72 @@ def test_patch_resource_status_calls_the_api():
     assert kwargs["plural"] == "neutronrouterflavors"
     assert kwargs["namespace"] == "openstack"
     assert kwargs["name"] == "test-flavor"
+    assert kwargs["_content_type"] == "application/merge-patch+json"
 
     status = kwargs["body"]["status"]
     assert status["syncStatus"] == "Synced"
     assert status["observedGeneration"] == 2
-    assert [c["type"] for c in status["conditions"]] == ["Synced"]
+    assert [c["type"] for c in status["conditions"]] == ["Ready"]
+
+
+def test_patch_resource_status_writes_the_ready_condition():
+    condition = _written_condition()
+
+    assert condition["type"] == "Ready"
+    assert condition["status"] == "True"
+    assert condition["reason"] == "Reconciled"
+    assert condition["message"] == "all good"
+    assert condition["observedGeneration"] == 2
+    assert condition["lastTransitionTime"].endswith("Z")
+
+
+def test_patch_resource_status_condition_goes_false_on_failure():
+    condition = _written_condition(sync_status="Failed", message="boom")
+
+    assert condition["status"] == "False"
+    assert condition["reason"] == "ReconcileError"
+
+
+def test_patch_resource_status_omits_condition_generation_when_absent():
+    assert "observedGeneration" not in _written_condition(generation=None)
 
 
 def test_patch_resource_status_omits_generation_when_absent():
     status = _patch(generation=None).call_args.kwargs["body"]["status"]
     assert "observedGeneration" not in status
+
+
+def test_patch_resource_status_keeps_transition_time_when_status_is_unchanged():
+    """A message-only change must not restamp lastTransitionTime."""
+    condition = _written_condition(
+        generation=1,
+        message="ok, with more detail",
+        current_status=_matching_status(message="ok"),
+    )
+
+    assert condition["lastTransitionTime"] == "2026-08-19T06:20:21Z"
+
+
+def test_patch_resource_status_restamps_transition_time_when_status_flips():
+    condition = _written_condition(
+        generation=1,
+        sync_status="Failed",
+        message="boom",
+        current_status=_matching_status(message="ok"),
+    )
+
+    assert condition["lastTransitionTime"] != "2026-08-19T06:20:21Z"
+
+
+def test_patch_resource_status_restamps_a_condition_missing_a_transition_time():
+    current = _matching_status(message="ok")
+    del current["conditions"][0]["lastTransitionTime"]
+
+    condition = _written_condition(
+        generation=1, message="changed", current_status=current
+    )
+
+    assert condition["lastTransitionTime"].endswith("Z")
 
 
 def test_patch_resource_status_skips_when_current_status_matches():
@@ -299,7 +388,7 @@ def test_patch_resource_status_skips_when_current_status_matches():
 
 
 def test_patch_resource_status_skips_without_a_namespace(caplog):
-    with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
         call = _patch(namespace=None)
 
     assert not call.called
@@ -307,7 +396,7 @@ def test_patch_resource_status_skips_without_a_namespace(caplog):
 
 
 def test_patch_resource_status_skips_on_unusable_crd_identity(caplog):
-    with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
         call = _patch(crd_api_version="no-version-here")
 
     assert not call.called
@@ -315,12 +404,12 @@ def test_patch_resource_status_skips_on_unusable_crd_identity(caplog):
 
 
 def test_patch_resource_status_logs_api_errors(caplog):
-    api = mock.MagicMock()
+    api = _fake_api()
     api.patch_namespaced_custom_object_status.side_effect = ApiException(
         status=403, reason="Forbidden"
     )
     with mock.patch.object(hc, "_customobjects_api", return_value=api):
-        with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+        with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
             hc.patch_resource_status(
                 name="test-flavor",
                 namespace="openstack",
@@ -343,7 +432,7 @@ def test_patch_resource_status_logs_unexpected_errors(caplog):
     with mock.patch.object(
         hc, "_customobjects_api", side_effect=RuntimeError("no kubeconfig")
     ):
-        with caplog.at_level(logging.WARNING, logger="openstack_sync.hooks.common"):
+        with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
             hc.patch_resource_status(
                 name="test-flavor",
                 namespace="openstack",
@@ -395,6 +484,17 @@ def test_crd_request_target_rejects_unusable_values(api_version, resource):
 def test_api_error_detail_without_a_body():
     exc = ApiException(status=404, reason="Not Found")
     assert hc._api_error_detail(exc) == "HTTP 404 Not Found"
+
+
+def test_api_error_detail_decodes_the_bytes_body_the_client_supplies():
+    exc = ApiException(status=422, reason="Unprocessable Entity")
+    exc.body = b'{"kind":"Status",\n "message":"conditions in body is required"}'
+
+    detail = hc._api_error_detail(exc)
+
+    assert "conditions in body is required" in detail
+    assert "\\n" not in detail
+    assert not detail.startswith("HTTP 422 Unprocessable Entity: b'")
 
 
 def test_api_error_detail_flattens_and_truncates_the_body():
