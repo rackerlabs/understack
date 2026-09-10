@@ -14,9 +14,9 @@ ENV_PREFIX = "NEUTRON_SEGMENT_RANGE"
 #: shell-operator binding label for the CRD watch.
 BINDING_NAME = "neutron-segment-ranges"
 
-#: Network types Neutron binds to a physical network. VLAN and flat ranges
-#: require ``physical_network``; the tunnelled types must omit it.
-PHYSICAL_NETWORK_TYPES = frozenset({"vlan", "flat"})
+#: Network types Neutron binds to a physical network. VLAN ranges require
+#: ``physical_network``; the tunnelled types must omit it.
+PHYSICAL_NETWORK_TYPES = frozenset({"vlan"})
 
 #: Network types carried over a tunnel, which must not set ``physical_network``.
 TUNNEL_NETWORK_TYPES = frozenset({"vxlan", "gre", "geneve"})

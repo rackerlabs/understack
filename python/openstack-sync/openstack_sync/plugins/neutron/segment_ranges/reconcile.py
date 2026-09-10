@@ -33,8 +33,8 @@ def _validate_spec(spec: dict[str, Any]) -> None:
     """Reject a spec whose physical_network does not match its network_type.
 
     The CRD constrains ranges but cannot express the cross-field rule that VLAN
-    and flat ranges need a physical network while tunnelled types must not carry
-    one. Enforce it here so a bad spec fails its own CR by name rather than
+    ranges need a physical network while tunnelled types must not carry one.
+    Enforce it here so a bad spec fails its own CR by name rather than
     reaching Neutron and erroring in a way that is harder to attribute.
     """
     network_type = spec["network_type"]
