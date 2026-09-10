@@ -64,6 +64,7 @@ def _actual_port(
         address=mac,
         physical_network=physnet,
         category="network",
+        extra={"bios_name": label},
         local_link_connection={
             "switch_id": switch_id,
             "switch_info": switch,
@@ -109,6 +110,7 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
             "management_switch_port": "Ethernet1/24",
         },
         extra={"mate_serial": "026701010045"},
+        properties={},
     )
 
 

@@ -49,6 +49,9 @@ def existing_port(label, mac, switch, interface, name=None, category="network"):
         name=name or f"leaf01:{label}",
         physical_network="f20-1-network",
         category=category,
+        # bios_name defaults to the label, matching what the engine writes, so
+        # an otherwise-matching port is a true no-op.
+        extra={"bios_name": label},
         local_link_connection={
             "switch_id": "00:00:00:00:00:00",
             "switch_info": switch,
@@ -90,6 +93,7 @@ def test_enroll_creates_node_ports_logs_and_makes_available(mocker, caplog):
             call(
                 address="00:11:22:33:44:55",
                 category="network",
+                extra={"bios_name": "port1"},
                 local_link_connection={
                     "switch_id": "00:00:00:00:00:00",
                     "switch_info": "spine01.example.net",
@@ -102,6 +106,7 @@ def test_enroll_creates_node_ports_logs_and_makes_available(mocker, caplog):
             call(
                 address="00:11:22:33:44:66",
                 category="network",
+                extra={"bios_name": "port2"},
                 local_link_connection={
                     "switch_id": "00:00:00:00:00:00",
                     "switch_info": "spine02.example.net",
@@ -328,6 +333,7 @@ def test_enroll_updates_existing_port_and_creates_missing_one(mocker):
     fake_ironic.port.create.assert_called_once_with(
         address="00:11:22:33:44:66",
         category="network",
+        extra={"bios_name": "port2"},
         local_link_connection={
             "switch_id": "00:00:00:00:00:00",
             "switch_info": "spine02.example.net",
@@ -856,6 +862,7 @@ def test_enroll_switch_id_override_on_create(mocker):
     fake_ironic.port.create.assert_called_once_with(
         address="00:11:22:33:44:55",
         category="network",
+        extra={"bios_name": "port1"},
         local_link_connection={
             "switch_id": "aa:bb:cc:dd:ee:ff",
             "switch_info": "spine01.example.net",
