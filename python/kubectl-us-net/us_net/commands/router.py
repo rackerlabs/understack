@@ -10,15 +10,15 @@ from openstack import exceptions as os_exc
 
 from us_net import osclient
 from us_net import ovn
+from us_net.commands import router_health
+from us_net.commands.router_common import GATEWAY_DEVICE_OWNER
+from us_net.commands.router_common import NEUTRON_PREFIX
+from us_net.commands.router_common import ROUTER_INTERFACE_DEVICE_OWNERS
+from us_net.commands.router_common import rows_by_uuid
 from us_net.connection import ConnectionContext
 from us_net.connection import print_connection_banner
 
 app = typer.Typer(no_args_is_help=True, help="Inspect a Neutron router's OVN state.")
-
-NEUTRON_PREFIX = "neutron-"
-
-GATEWAY_DEVICE_OWNER = "network:router_gateway"
-INTERFACE_DEVICE_OWNER = "network:router_interface"
 
 
 def _lrp_role(
@@ -30,11 +30,6 @@ def _lrp_role(
     if port_id in interface_port_ids:
         return "internal"
     return "unknown"
-
-
-def _rows_by_uuid(rows: list[dict], uuids: set[str]) -> list[dict]:
-    """Filter a full OVN table dump down to rows referenced by a parent's uuid set."""
-    return [row for row in rows if row.get("_uuid") in uuids]
 
 
 def _chassis_physical_networks(chassis_row: dict | None) -> str:
@@ -180,7 +175,7 @@ def _localnet_tags(
     if switch_row is None:
         return "(switch not found)"
     lsp_uuids = set(ovn.as_list(switch_row.get("ports")))
-    candidate_lsps = _rows_by_uuid(all_lsp_rows, lsp_uuids)
+    candidate_lsps = rows_by_uuid(all_lsp_rows, lsp_uuids)
     tags = [
         tag
         for lsp in candidate_lsps
@@ -219,7 +214,7 @@ def show(
         port_fixed_ips[port.id] = port.fixed_ips
         if port.device_owner == GATEWAY_DEVICE_OWNER:
             gateway_port_id = port.id
-        elif port.device_owner == INTERFACE_DEVICE_OWNER:
+        elif port.device_owner in ROUTER_INTERFACE_DEVICE_OWNERS:
             interface_port_ids.add(port.id)
 
     ovn_name = f"{NEUTRON_PREFIX}{router.id}"
@@ -246,7 +241,7 @@ def show(
 
     lrp_uuids = set(ovn.as_list(lr.get("ports")))
     all_lrps = ovn.nbctl_list(conn_ctx, "Logical_Router_Port")
-    lrps = _rows_by_uuid(all_lrps, lrp_uuids)
+    lrps = rows_by_uuid(all_lrps, lrp_uuids)
 
     hcg_rows = {
         row["_uuid"]: row for row in ovn.nbctl_list(conn_ctx, "HA_Chassis_Group")
@@ -337,7 +332,7 @@ def show(
     print("\nNAT rules:")
     nat_uuids = set(ovn.as_list(lr.get("nat")))
     all_nat_rows = ovn.nbctl_list(conn_ctx, "NAT")
-    nat_rows = _rows_by_uuid(all_nat_rows, nat_uuids)
+    nat_rows = rows_by_uuid(all_nat_rows, nat_uuids)
     resolved_ports: dict[str, Any] = {}
     if not nat_rows:
         print("  (none)")
@@ -430,3 +425,6 @@ def list_routers(ctx: typer.Context) -> None:
         id_col = f"{router_id:<{id_width}}"
         os_col = f"{in_openstack:<9}"
         print(f"{name_col}  {id_col}  {os_col}  {in_ovn}")
+
+
+router_health.register(app)

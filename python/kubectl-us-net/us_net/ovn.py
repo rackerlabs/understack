@@ -73,6 +73,20 @@ def nbctl_list(ctx: ConnectionContext, table: str) -> list[dict]:
     return parse_ovn_json(nbctl_raw(ctx, ["--format=json", "list", table]))
 
 
+def nbctl_list_records(
+    ctx: ConnectionContext, table: str, records: list[str]
+) -> list[dict]:
+    """List specific NB records by name or UUID, ignoring missing records."""
+    if not records:
+        return []
+    return parse_ovn_json(
+        nbctl_raw(
+            ctx,
+            ["--format=json", "--if-exists", "list", table, *records],
+        )
+    )
+
+
 def sbctl_list(ctx: ConnectionContext, table: str) -> list[dict]:
     """`ovn-sbctl list <table>` as parsed JSON rows."""
     return parse_ovn_json(sbctl_raw(ctx, ["--format=json", "list", table]))
