@@ -129,8 +129,17 @@ def _prune_orphaned_profiles(
     """
     LOG.info("Scanning for orphaned operator-owned service profiles")
     for profile in list(conn.network.service_profiles()):
-        if is_managed_service_profile(profile):
-            maybe_delete_profile(conn, resource_id(profile), cache, counts)
+        if not is_managed_service_profile(profile):
+            continue
+        profile_id = resource_id(profile)
+        cache.setdefault(profile_id, profile)
+        maybe_delete_profile(conn, profile_id, cache, counts)
+
+
+def prune_orphaned_profiles(conn: Any) -> None:
+    """Delete owned, unattached service profiles without deleting any flavor."""
+    current = list(conn.network.flavors(service_type=SERVICE_TYPE))
+    _prune_orphaned_profiles(conn, {}, _attachment_counts(current))
 
 
 def prune_removed_flavors(
