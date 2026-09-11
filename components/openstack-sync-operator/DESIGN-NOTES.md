@@ -79,8 +79,10 @@ and are otherwise left alone.
 
 The CRDs have a status subresource with `syncStatus` (Synced/Failed/Unknown),
 `lastSyncTime`, `observedGeneration`, `message`, and a standard `conditions[]`
-list. Status is written by running `kubectl patch --subresource status` in a
-subprocess (`hooks/common.py`).
+list. The hook writes status through the Kubernetes Python client's status
+subresource API (`hooks/common.py`). Each CR reports one `Ready` condition so
+`kubectl wait --for=condition=Ready` and kubernetes-entrypoint dependencies can
+observe readiness directly.
 
 ### Safety details worth noting
 
@@ -92,6 +94,9 @@ The framework handles a few tricky cases carefully:
   endless loop.
 - **Skips no-op status writes**: it doesn't rewrite status when the important
   fields already match, which avoids extra Modified events.
+- **Preserves transition time**: a status write keeps the existing
+  `lastTransitionTime` while the `Ready` condition's `status` is unchanged, so
+  message-only updates don't look like readiness transitions.
 - **Guards prune**: if any CR failed to reconcile or couldn't be read, prune is
   skipped completely, since it can't know the full desired set and might delete
   something it shouldn't.

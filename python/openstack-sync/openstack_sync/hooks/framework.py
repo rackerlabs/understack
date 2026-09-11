@@ -491,7 +491,7 @@ def _patch_status(
 ) -> None:
     config = plugin.config
     if not resource.name:
-        LOG.warning(
+        LOG.error(
             "Unable to patch %s status; Kubernetes metadata.name is missing",
             config.crd_kind,
         )
