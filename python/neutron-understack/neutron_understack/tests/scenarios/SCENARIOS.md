@@ -259,6 +259,20 @@ flavor + service profile (`driver` = the PaloAlto class, `metainfo.resource_clas
 - when: the router is deleted
 - then: the ROUTER AFTER_DELETE callback returns the node to the pool
 
+## Current limitations and follow-up
+
+- The Palo Alto external-gateway lifecycle landed on `main` after this scenario
+  suite was started. Its parent-port creation, Ironic VIF attachment, trunk and
+  gateway-subport wiring, idempotency, partial-failure cleanup, and detach/delete
+  paths have focused unit coverage, but are not yet exercised through this
+  in-process scenario harness. Add end-to-end attach and detach scenarios in a
+  follow-up.
+- Known-bug scenarios currently apply `xfail(strict=True)` to the whole test.
+  This makes fixed behavior visible as an XPASS, but an unrelated failure in the
+  same test could also be reported as the expected failure. A follow-up should
+  constrain each xfail to the known failure signature (or make only the affected
+  assertion an expected failure) so regressions elsewhere remain failures.
+
 ## Known bugs (surfaced by these tests)
 
 - **Dynamic VLAN segment leaks on vif-detach** (BM-BIND-04, `xfail`,
