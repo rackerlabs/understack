@@ -1,0 +1,37 @@
+<response status="success"><result>
+  <info>
+    <speed_c>auto</speed_c>
+    <duplex_c>auto</duplex_c>
+    <state_c>auto</state_c>
+    <speed>1000</speed>
+    <duplex>full</duplex>
+    <state>up</state>
+    <interface_type>RJ45</interface_type>
+    <hwaddr>8c:36:7a:23:3a:3a</hwaddr>
+    <ip>10.15.149.107</ip>
+    <netmask>255.255.255.0</netmask>
+    <gw>10.15.149.1</gw>
+    <ipv6>unknown</ipv6>
+    <ipv6ll>fe80::8e36:7aff:fe23:3a3a/64</ipv6ll>
+    <ipv6gw/>
+    <name>Management Interface</name>
+  </info>
+  <counters>
+    <rx-bytes>18607536</rx-bytes>
+    <rx-compressed>0</rx-compressed>
+    <rx-drop>0</rx-drop>
+    <rx-errs>0</rx-errs>
+    <rx-fifo>0</rx-fifo>
+    <rx-frame>0</rx-frame>
+    <rx-multicast>0</rx-multicast>
+    <rx-packets>130042</rx-packets>
+    <tx-bytes>1256501</tx-bytes>
+    <tx-carrier>0</tx-carrier>
+    <tx-colls>0</tx-colls>
+    <tx-compressed>0</tx-compressed>
+    <tx-drop>0</tx-drop>
+    <tx-errs>0</tx-errs>
+    <tx-fifo>0</tx-fifo>
+    <tx-packets>4063</tx-packets>
+  </counters>
+</result></response>
