@@ -1,4 +1,5 @@
 from us_net.ovn import as_list
+from us_net.ovn import nbctl_list_records
 from us_net.ovn import parse_ovn_json
 
 
@@ -26,3 +27,22 @@ def test_as_list_normalizes_single_value_and_empty():
     assert as_list("") == []
     assert as_list("solo") == ["solo"]
     assert as_list(["a", "b"]) == ["a", "b"]
+
+
+def test_nbctl_list_records_uses_if_exists(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "us_net.ovn.nbctl_raw",
+        lambda ctx, args: calls.append(args) or '{"headings": [], "data": []}',
+    )
+
+    assert nbctl_list_records(None, "Logical_Router_Port", ["uuid-1"]) == []
+    assert calls == [
+        [
+            "--format=json",
+            "--if-exists",
+            "list",
+            "Logical_Router_Port",
+            "uuid-1",
+        ]
+    ]
