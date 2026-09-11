@@ -7,6 +7,7 @@ these tests describe the contract any future plugin can rely on.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -291,6 +292,7 @@ def _cr(
     status: dict | None = None,
     secret: str = "infrasetup",
     cloud: str = "understack",
+    uid: str | None = None,
 ) -> dict:
     obj = {
         "apiVersion": CRD_API_VERSION,
@@ -306,6 +308,8 @@ def _cr(
     }
     if status is not None:
         obj["status"] = status
+    if uid is not None:
+        obj["metadata"]["uid"] = uid
     return obj
 
 
@@ -440,6 +444,166 @@ def test_deleted_event_reconciles_nothing_but_prunes():
     assert inputs.resources_to_reconcile == []
     assert [r.spec["name"] for r in inputs.deleted_resources] == ["gone"]
     assert inputs.prune_credentials == frozenset({("infrasetup", "understack")})
+
+
+def _event(watch_event: str, obj: dict, snapshot: list[dict] | None = None) -> dict:
+    """Build one Event context.
+
+    *snapshot* is the desired set the prune compares against. It defaults to the
+    event's own object, as a live CR really sends. A Deleted event must say what
+    is left instead: a snapshot still listing it would make a prune test pass
+    while the prune does nothing.
+    """
+    assert not (
+        watch_event == "Deleted" and snapshot is None
+    ), "a Deleted event needs its snapshot spelled out"
+    return {
+        "binding": BINDING,
+        "type": "Event",
+        "watchEvent": watch_event,
+        "object": obj,
+        "snapshots": {BINDING: [{"object": obj}] if snapshot is None else snapshot},
+    }
+
+
+def test_repeated_events_for_one_cr_reconcile_it_once():
+    """A failing run accumulates a backlog; one CR must stay one reconcile."""
+    config = make_hook_config()
+    live = _cr("probe", generation=3)
+    contexts = [
+        _event("Added", _cr("probe", generation=1), [{"object": live}]),
+        _event("Modified", _cr("probe", generation=2), [{"object": live}]),
+        _event("Modified", live, [{"object": live}]),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.spec["name"] for r in inputs.resources_to_reconcile] == ["probe"]
+    # The last event is the current one.
+    assert inputs.resources_to_reconcile[0].generation == 3
+
+
+def test_collapsed_batch_still_prunes_against_the_whole_snapshot():
+    """A backlog for one CR must not narrow the desired set the prune sees.
+
+    The snapshot names every CR that should exist; pruning against less deletes
+    a resource whose CR is still there.
+    """
+    config = make_hook_config(prune=True, status_enabled=True)
+    live = _cr("probe", generation=3)
+    snapshot = [{"object": live}, {"object": _cr("untouched")}]
+    contexts = [_event("Added", _cr("probe", generation=1), snapshot)]
+    contexts += [_event("Modified", live, snapshot) for _ in range(29)]
+
+    inputs = hook_inputs(contexts, config)
+    plugin = StubPlugin(config)
+    code, patch_status, _ = _drive(plugin, inputs)
+
+    assert code == 0
+    assert plugin.reconciled == ["probe"]
+    assert patch_status.call_count == 1
+    assert plugin.pruned == [(["probe", "untouched"], False)]
+
+
+def test_a_recreate_after_a_delete_in_the_same_batch_is_reconciled():
+    """Order decides: a change after a Deleted is a new CR under the same name."""
+    config = make_hook_config()
+    recreated = _cr("probe", generation=1, uid="new")
+    contexts = [
+        _event("Deleted", _cr("probe", generation=7, uid="old"), []),
+        _event("Added", recreated, [{"object": recreated}]),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.generation for r in inputs.resources_to_reconcile] == [1]
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+
+
+def test_deleted_event_cancels_an_earlier_change_in_the_same_batch():
+    config = make_hook_config()
+    contexts = [
+        _event("Added", _cr("probe"), []),
+        _event("Modified", _cr("probe"), []),
+        _event("Deleted", _cr("probe"), []),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+    assert inputs.prune_credentials == frozenset({("infrasetup", "understack")})
+
+
+def test_repeated_delete_events_for_one_cr_are_collapsed():
+    config = make_hook_config()
+    contexts = [
+        _event("Deleted", _cr("probe"), []),
+        _event("Deleted", _cr("probe"), []),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+
+
+def test_one_deleted_cr_does_not_drop_another_changed_cr():
+    config = make_hook_config()
+    contexts = [
+        _event("Added", _cr("a"), []),
+        _event("Added", _cr("b"), []),
+        _event("Deleted", _cr("a"), []),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.spec["name"] for r in inputs.resources_to_reconcile] == ["b"]
+
+
+def test_a_deleted_cr_does_not_wedge_the_reconcile(caplog):
+    """Replays a backlog of events for a CR that was deleted mid-backlog.
+
+    Shell-operator replays the whole backlog on every retry, so a failing run
+    keeps being handed events for an object that is already gone. None of them
+    is reconciled and no status is written for it. The prune still reports,
+    because a cloud it cannot reach is not one it can safely sweep -- that is
+    the only failure left, where there were once one per queued event.
+    """
+    config = make_hook_config(prune=True, status_enabled=True)
+
+    def gone() -> dict:
+        return _cr(
+            "zz-probe",
+            secret="missing-secret",
+            status={"syncStatus": "Failed", "message": "not yet"},
+        )
+
+    contexts = [_event("Added", gone(), [])]
+    contexts += [_event("Modified", gone(), []) for _ in range(29)]
+    contexts += [_event("Deleted", gone(), [])]
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["zz-probe"]
+
+    plugin = StubPlugin(config)
+    with (
+        mock.patch.object(
+            framework,
+            "get_openstack_connection",
+            side_effect=RuntimeError('secrets "missing-secret" not found'),
+        ),
+        mock.patch.object(framework, "patch_resource_status") as patch_status,
+        caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.framework"),
+    ):
+        code = run_sync(plugin, inputs)
+
+    assert plugin.reconciled == []
+    assert patch_status.call_count == 0
+    assert code == 1
+    assert "Cannot reach OpenStack for widget prune" in caplog.text
+    assert "Failed to reconcile" not in caplog.text
 
 
 def test_event_without_watch_event_is_ignored_without_snapshot_reconcile(caplog):
