@@ -80,16 +80,23 @@ def profiles_for_driver(conn: Any, driver: str, cache: ProfileCache) -> list[Any
     return cache[driver]
 
 
-def find_matching_profile(profiles: list[Any], meta_info: Any) -> Any | None:
-    """Return a service profile matching *meta_info*, preferring owned profiles.
+def find_matching_profile(
+    profiles: list[Any], driver: str, meta_info: Any
+) -> Any | None:
+    """Return a profile matching *driver* and *meta_info*, preferring owned ones.
 
     A NeutronRouterFlavor CR is an ownership claim for the flavor and the service
     profiles described under it. If a matching profile already exists without
     the marker, ``ensure_profile`` adopts it before binding or pruning depends on
     that marker.
+
+    The driver is re-checked rather than trusting the candidate list, so a stale
+    or wider cache cannot bind a profile for the wrong service provider.
     """
     unowned_match: Any | None = None
     for profile in profiles:
+        if get_value(profile, "driver") != driver:
+            continue
         if not meta_info_matches(service_profile_meta_info(profile), meta_info):
             continue
         if is_managed_service_profile(profile):
@@ -131,9 +138,8 @@ def _profile_drift(
 ) -> list[ProfileDrift]:
     """Return the spec fields a reused *profile* disagrees with.
 
-    ``meta_info`` is excluded by construction -- the profile was selected by
-    matching it -- and ``driver`` is excluded because profiles are queried per
-    driver. That leaves ``is_enabled`` and ``description``.
+    ``meta_info`` and ``driver`` are excluded by construction -- the profile was
+    selected by matching them. That leaves ``is_enabled`` and ``description``.
 
     ``is_enabled`` is the consequential one: Neutron's
     ``get_flavor_next_provider`` raises ``ServiceProfileDisabled`` (HTTP 503)
@@ -193,7 +199,7 @@ def ensure_profile(
     meta_info = spec.get("meta_info", {})
 
     profiles = profiles_for_driver(conn, driver, cache)
-    profile = find_matching_profile(profiles, meta_info)
+    profile = find_matching_profile(profiles, driver, meta_info)
     if profile:
         profile_id = resource_id(profile)
         if not is_managed_service_profile(profile):

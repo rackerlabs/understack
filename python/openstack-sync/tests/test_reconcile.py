@@ -277,7 +277,7 @@ def test_find_matching_profile_returns_unowned_match():
     meta_info = {"vni_alloc": "auto"}
     unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
 
-    assert reconcile.find_matching_profile([unowned], meta_info) is unowned
+    assert reconcile.find_matching_profile([unowned], _DRIVER, meta_info) is unowned
 
 
 def test_find_matching_profile_prefers_owned_over_unowned():
@@ -285,7 +285,37 @@ def test_find_matching_profile_prefers_owned_over_unowned():
     unowned = _make_profile("adhoc-profile", meta_info=meta_info, managed=False)
     owned = _make_profile("owned-profile", meta_info=meta_info)
 
-    assert reconcile.find_matching_profile([unowned, owned], meta_info) is owned
+    assert (
+        reconcile.find_matching_profile([unowned, owned], _DRIVER, meta_info) is owned
+    )
+
+
+def test_find_matching_profile_ignores_a_profile_with_another_driver():
+    """The candidate list is Neutron's driver filter; the match must not trust it."""
+    meta_info = {"vni_alloc": "auto"}
+    other_driver = _make_profile(
+        "other-driver-profile", driver="some.other.Driver", meta_info=meta_info
+    )
+
+    assert reconcile.find_matching_profile([other_driver], _DRIVER, meta_info) is None
+
+
+def test_ensure_profile_creates_rather_than_adopting_another_driver():
+    """A wrong-driver profile in the candidate list must not be bound to a flavor."""
+    meta_info = {"vni_alloc": "auto"}
+    other_driver = _make_profile(
+        "other-driver-profile", driver="some.other.Driver", meta_info=meta_info
+    )
+    created = _make_profile("new-profile", meta_info=meta_info)
+    conn = _create_conn(created, existing=[other_driver])
+
+    result = reconcile.ensure_profile(
+        conn, _NAME, _profile_spec(meta_info=meta_info), {}, []
+    )
+
+    assert result is created
+    conn.network.update_service_profile.assert_not_called()
+    assert conn.network.create_service_profile.call_args.kwargs["driver"] == _DRIVER
 
 
 def test_ensure_profile_adopts_unowned_match():
