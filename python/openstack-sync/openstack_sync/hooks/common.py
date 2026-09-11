@@ -228,6 +228,22 @@ def _api_error_detail(exc: ApiException, max_body: int = 512) -> str:
     return f"{detail}: {truncate_message(body, max_body)}"
 
 
+def _api_error_is_missing_object(exc: ApiException, name: str) -> bool:
+    """Return whether a 404 is for *name* itself rather than for its CRD.
+
+    A missing object answers with a Status naming it in ``details.name``; an
+    unserved plural, group or version answers with plain text. A 403 Status
+    names it the same way, so the status check is not redundant.
+    """
+    if exc.status != 404:
+        return False
+    try:
+        return json.loads(exc.body or "")["details"]["name"] == name
+    except (ValueError, TypeError, LookupError):
+        # Not JSON, or JSON the API server did not shape like a Status.
+        return False
+
+
 def patch_resource_status(
     *,
     name: str,
@@ -309,6 +325,16 @@ def patch_resource_status(
             body={"status": status},
         )
     except ApiException as exc:
+        if _api_error_is_missing_object(exc, name):
+            # The CR went away between the reconcile and this write, so nothing
+            # is waiting on its status. A 404 for the CRD still warns below.
+            LOG.info(
+                "not patching %s status for %s; the CR is gone: %s",
+                crd_kind,
+                name,
+                _api_error_detail(exc),
+            )
+            return
         LOG.warning(
             "failed to patch %s status for %s: %s",
             crd_kind,

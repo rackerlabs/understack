@@ -159,10 +159,21 @@ class SyncResource:
     secret_name: str
     cloud_name: str
     current_status: dict[str, Any] | None = None
+    uid: str | None = None
 
     @property
     def credentials(self) -> CredentialKey:
         return (self.secret_name, self.cloud_name)
+
+    @property
+    def identity(self) -> str:
+        """Key identifying this CR across a batch of events.
+
+        UID separates a recreated CR from the one it replaced. Older or
+        malformed objects can still fall back to namespace/name, so
+        :func:`_split_events` reads events in order.
+        """
+        return self.uid or f"{self.namespace}/{self.name}"
 
     @property
     def display_name(self) -> str:
@@ -266,6 +277,7 @@ def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
         secret_name=str(secret_name),
         cloud_name=str(cloud_name),
         current_status=obj.get("status"),
+        uid=metadata.get("uid"),
     )
 
 
@@ -329,10 +341,23 @@ def _status_is_current(resource: SyncResource) -> bool:
 def _split_events(
     contexts: list[dict[str, Any]], config: HookConfig, reader: _ResourceReader
 ) -> tuple[list[SyncResource], list[SyncResource], bool]:
-    """Split this binding's Event contexts into changed and deleted resources."""
-    changed: list[SyncResource] = []
-    deleted: list[SyncResource] = []
+    """Split this binding's Event contexts into changed and deleted resources.
+
+    Shell-operator replays its whole backlog, so a batch can carry dozens of
+    events for one CR. Both maps are keyed by identity to collapse them.
+
+    Order decides the rest. A Deleted cancels an earlier change -- removing the
+    resource is the prune's business, which ``deleted`` still carries -- while a
+    change after a Deleted is a recreated CR that must still reconcile. The
+    binding's queue is FIFO, so the last context for a CR is the current one.
+    """
+    changed: dict[str, SyncResource] = {}
+    deleted: dict[str, SyncResource] = {}
     saw_event_context = False
+    # Counted apart from ``changed`` so a cancelled CR reads as neither a
+    # duplicate nor a reconcile.
+    changed_events = 0
+    changed_identities: set[str] = set()
 
     for context in contexts:
         if context.get("binding") != config.binding_name:
@@ -360,7 +385,14 @@ def _split_events(
             continue
 
         if watch_event == "Deleted":
-            deleted.append(resource)
+            deleted[resource.identity] = resource
+            superseded = changed.pop(resource.identity, None)
+            if superseded is not None:
+                LOG.info(
+                    "Not reconciling %s %s; a later event in this batch deleted it",
+                    config.crd_kind,
+                    superseded.display_name,
+                )
         elif watch_event == "Modified" and _status_is_current(resource):
             LOG.info(
                 "Skipping %s Modified event; generation %s is already Synced",
@@ -368,10 +400,20 @@ def _split_events(
                 resource.generation,
             )
         else:
-            changed.append(resource)
+            changed_events += 1
+            changed_identities.add(resource.identity)
+            changed[resource.identity] = resource
 
-    changed.sort(key=lambda r: str(r.spec.get("name", "")))
-    return changed, deleted, saw_event_context
+    if changed_events > len(changed_identities):
+        LOG.info(
+            "Collapsed %s %s event(s) into %s changed CR(s)",
+            changed_events,
+            config.crd_kind,
+            len(changed_identities),
+        )
+
+    resources = sorted(changed.values(), key=lambda r: str(r.spec.get("name", "")))
+    return resources, list(deleted.values()), saw_event_context
 
 
 def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInputs:
