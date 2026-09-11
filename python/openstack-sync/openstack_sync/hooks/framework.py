@@ -480,6 +480,15 @@ class SyncPlugin(ABC):
         """
         LOG.debug("%s defines no prune step", type(self).__name__)
 
+    def needs_prune_connection(self) -> bool:
+        """Return whether prune can do useful work and needs a connection.
+
+        Most plugins only prune when their chart prune flag is enabled. Plugins
+        with narrower cleanup that is safe without destructive pruning can
+        override this so deletion-only runs still get a connection.
+        """
+        return self.config.prune
+
 
 # ---------------------------------------------------------------------------
 # Status
@@ -663,7 +672,7 @@ def _run_prune(
 
         conn = connections.get(credentials)
         if conn is None:
-            if not plugin.config.prune:
+            if not plugin.needs_prune_connection():
                 continue
             try:
                 conn = get_openstack_connection(secret_name, cloud_name)

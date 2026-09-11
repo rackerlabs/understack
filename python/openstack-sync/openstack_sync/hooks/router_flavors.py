@@ -51,10 +51,14 @@ class RouterFlavorPlugin(SyncPlugin):
         authoritative_empty: bool,
     ) -> None:
         if not self.config.prune:
+            prune_module.prune_orphaned_profiles(conn)
             return
         prune_module.prune_removed_flavors(
             conn, desired_specs, authoritative_empty=authoritative_empty
         )
+
+    def needs_prune_connection(self) -> bool:
+        return True
 
 
 def main() -> int:

@@ -17,6 +17,8 @@ import pytest
 
 import openstack_sync.utils as utils
 from openstack_sync.hooks import router_flavors as hook
+from openstack_sync.hooks.framework import HookInputs
+from openstack_sync.hooks.framework import SyncResource
 from openstack_sync.plugins.neutron.router_flavors import markers
 from openstack_sync.plugins.neutron.router_flavors.config import BINDING_NAME
 from openstack_sync.plugins.neutron.router_flavors.config import ENV_PREFIX
@@ -156,13 +158,29 @@ def test_plugin_wait_for_api_uses_configured_retry_budget():
     wait.assert_called_once_with(conn, retries=5, delay=0.25)
 
 
-def test_plugin_prune_is_a_noop_when_disabled():
+def test_plugin_prune_deletes_no_flavor_when_disabled():
     plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
+    conn = mock.MagicMock()
 
-    with mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune:
-        plugin.prune(mock.MagicMock(), [{"name": "a"}], authoritative_empty=False)
+    with (
+        mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune,
+        mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep,
+    ):
+        plugin.prune(conn, [{"name": "a"}], authoritative_empty=False)
 
     prune.assert_not_called()
+    sweep.assert_called_once_with(conn)
+
+
+def test_plugin_prune_sweeps_orphaned_profiles_when_disabled():
+    """PRUNE gates flavor deletion; an unattached owned profile is collected anyway."""
+    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
+    conn = mock.MagicMock()
+
+    with mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep:
+        plugin.prune(conn, [{"name": "a"}], authoritative_empty=False)
+
+    sweep.assert_called_once_with(conn)
 
 
 def test_plugin_prune_forwards_authoritative_empty_when_enabled():
@@ -181,6 +199,61 @@ def test_plugin_cache_is_per_credential_group():
 
     assert plugin.new_cache() == {}
     assert plugin.new_cache() is not plugin.new_cache()
+
+
+# ---------------------------------------------------------------------------
+# Integration through run_sync()
+# ---------------------------------------------------------------------------
+
+
+def test_run_sync_sweeps_orphaned_profile_on_deletion_when_prune_disabled():
+    """Deletion-only input must still open a connection for safe orphan cleanup."""
+    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
+    deleted = SyncResource(
+        spec={"name": "pa1410"},
+        name="pa1410",
+        namespace="openstack",
+        generation=3,
+        secret_name="infrasetup",
+        cloud_name="understack",
+    )
+    conn = _neutron_conn()
+    orphan = types.SimpleNamespace(
+        id="orphan-profile-id",
+        driver="neutron_understack.l3_router.vrf.Vrf",
+        is_enabled=True,
+        description="pa1410 profile",
+        meta_info=markers.managed_meta_info({"vni_alloc": "auto"}),
+    )
+    conn.network.service_profiles.return_value = [
+        conn.network.service_profiles.return_value[0],
+        orphan,
+    ]
+    inputs = HookInputs(
+        resources_to_reconcile=[],
+        desired_resources_for_prune=[],
+        deleted_resources=[deleted],
+        prune_credentials=frozenset({deleted.credentials}),
+        unreadable_resources=frozenset(),
+    )
+
+    with (
+        mock.patch(
+            "openstack_sync.hooks.framework.get_openstack_connection",
+            return_value=conn,
+        ) as connect,
+        mock.patch("openstack_sync.hooks.framework.patch_resource_status"),
+        mock.patch.object(hook, "wait_for_openstack_network") as wait,
+    ):
+        code = hook.run_sync(plugin, inputs)
+
+    assert code == 0
+    connect.assert_called_once_with("infrasetup", "understack")
+    wait.assert_called_once_with(conn, retries=30, delay=10.0)
+    conn.network.delete_flavor.assert_not_called()
+    assert [
+        call.args[0] for call in conn.network.delete_service_profile.call_args_list
+    ] == [orphan]
 
 
 # ---------------------------------------------------------------------------

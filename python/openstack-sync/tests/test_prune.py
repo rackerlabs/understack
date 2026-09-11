@@ -29,6 +29,7 @@ class FakeNetwork:
         self.deleted_flavors: list[str] = []
         self.deleted_profiles: list[str] = []
         self.flavor_list_calls = 0
+        self.profile_get_calls = 0
 
     def flavors(self, service_type: str | None = None) -> list[dict[str, Any]]:
         self.flavor_list_calls += 1
@@ -45,6 +46,7 @@ class FakeNetwork:
         return [p for p in self._profiles.values() if p is not None]
 
     def get_service_profile(self, profile_id: str) -> Any:
+        self.profile_get_calls += 1
         profile = self._profiles.get(profile_id)
         if profile is None:
             raise openstack_exceptions.NotFoundException(f"no profile {profile_id}")
@@ -226,3 +228,66 @@ def test_prune_skips_flavor_still_used_by_routers():
     prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_flavors == []
+
+
+# ---------------------------------------------------------------------------
+# The orphaned profile sweep on its own, with PRUNE off
+# ---------------------------------------------------------------------------
+
+
+def test_prune_orphaned_profiles_deletes_an_owned_unattached_profile():
+    orphan = _owned_profile("orphan-profile-id")
+    conn = _conn([], {orphan.id: orphan})
+
+    prune.prune_orphaned_profiles(conn)
+
+    assert conn.network.deleted_profiles == ["orphan-profile-id"]
+
+
+def test_prune_orphaned_profiles_keeps_an_unowned_profile():
+    unowned = SimpleNamespace(
+        id="unmanaged-profile-id",
+        driver=_DRIVER,
+        meta_info={"vni_alloc": "auto"},  # no ownership marker
+    )
+    conn = _conn([], {unowned.id: unowned})
+
+    prune.prune_orphaned_profiles(conn)
+
+    assert conn.network.deleted_profiles == []
+
+
+def test_prune_orphaned_profiles_keeps_an_attached_profile():
+    """The sweep needs its own attachment counts, or it deletes a bound profile."""
+    attached = _owned_profile("attached-profile-id")
+    kept = _owned_flavor("kept-flavor-id", "kept-flavor", [attached.id])
+    conn = _conn([kept], {attached.id: attached})
+
+    prune.prune_orphaned_profiles(conn)
+
+    assert conn.network.deleted_profiles == []
+
+
+def test_prune_orphaned_profiles_reuses_the_listing_instead_of_refetching():
+    """The sweep already holds the profile, so it must not GET it again."""
+    orphan = _owned_profile("orphan-profile-id")
+    conn = _conn([], {orphan.id: orphan})
+
+    prune.prune_orphaned_profiles(conn)
+
+    assert conn.network.profile_get_calls == 0
+    assert conn.network.deleted_profiles == ["orphan-profile-id"]
+
+
+def test_prune_orphaned_profiles_deletes_no_flavor():
+    """The sweep must not delete a flavor; that still needs PRUNE."""
+    orphan = _owned_profile("orphan-profile-id")
+    conn = _conn(
+        [_owned_flavor("removed-flavor-id", "removed-flavor")],
+        {orphan.id: orphan},
+    )
+
+    prune.prune_orphaned_profiles(conn)
+
+    assert conn.network.deleted_flavors == []
+    assert conn.network.deleted_profiles == ["orphan-profile-id"]
