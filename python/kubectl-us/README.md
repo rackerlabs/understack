@@ -1,11 +1,15 @@
-# kubectl-us-net
+# kubectl-us
 
-A `kubectl` plugin for troubleshooting UnderStack's Neutron/OVN data plane.
-Wraps `kubectl exec` into the OVN NB/SB pods (and, for `ovs-vsctl`/`ovs-appctl`,
-whichever pod is running on a given node) alongside OpenStack API calls, so
-you don't have to remember pod names, container names, or the
-`neutron-<uuid>` naming convention OVN uses for objects it syncs from
-Neutron.
+A `kubectl` plugin for operating and troubleshooting UnderStack. Commands are
+grouped by concern:
+
+- `kubectl us net ...` -- Neutron/OVN data-plane troubleshooting. Wraps
+  `kubectl exec` into the OVN NB/SB pods (and, for `ovs-vsctl`/`ovs-appctl`,
+  whichever pod is running on a given node) alongside OpenStack API calls, so
+  you don't have to remember pod names, container names, or the
+  `neutron-<uuid>` naming convention OVN uses for objects it syncs from
+  Neutron.
+- `kubectl us backup ...` -- pull local backups of the platform databases.
 
 This is intentionally a plain Python CLI for now (no compiled binary, no
 krew packaging) so the command surface and output can be iterated on
@@ -14,9 +18,9 @@ quickly. Distributing it via krew is planned once the behavior settles.
 ## Setup
 
 ```
-cd python/kubectl-us-net
+cd python/kubectl-us
 uv sync
-export PATH="$PWD/.venv/bin:$PATH"   # so `kubectl us-net ...` finds it
+export PATH="$PWD/.venv/bin:$PATH"   # so `kubectl us ...` finds it
 ```
 
 Requires `kubectl` (pointed at the target cluster) and OpenStack credentials
@@ -29,13 +33,16 @@ Every command starts by printing a banner showing the kube context, OVN
 namespace/pod names, and (for OpenStack-backed commands) the OpenStack cloud
 target -- so it's always clear what you're actually talking to.
 
-### Raw passthrough
+Global options (see [below](#global-options)) go before the command group,
+e.g. `kubectl us --context my-cluster net router list`.
+
+### `net` -- raw passthrough
 
 ```
-kubectl us-net nbctl -- show
-kubectl us-net sbctl -- list Chassis
-kubectl us-net vsctl --node <nodename> -- show
-kubectl us-net appctl --node <nodename> -- version
+kubectl us net nbctl -- show
+kubectl us net sbctl -- list Chassis
+kubectl us net vsctl --node <nodename> -- show
+kubectl us net appctl --node <nodename> -- version
 ```
 
 `vsctl`/`appctl` resolve the target pod by node name. On UnderStack's OVN
@@ -45,23 +52,23 @@ separate `openvswitch` pod), so both commands default to the
 `--pod <name>` (and, if needed, `--container <name>`) to target it directly,
 or `--target <prefix>` on `appctl` to change the discovery prefix.
 
-### `router list`
+### `net router list`
 
 ```
-kubectl us-net router list
+kubectl us net router list
 ```
 
 A table of every router seen in OpenStack and/or OVN, so you can spot
 mismatches (present on only one side) before drilling into one with
-`router show`. Flavored routers (e.g. VRF) are handled by a different L3
+`net router show`. Flavored routers (e.g. VRF) are handled by a different L3
 backend and never get an OVN `Logical_Router`, so they're marked
 `n/a (flavored)` in the OVN column rather than a false "NO".
 
-### `router show`
+### `net router show`
 
 ```
-kubectl us-net router show <router-name-or-id>
-kubectl us-net router show <router-name-or-id> --flows   # also dump SB logical flows
+kubectl us net router show <router-name-or-id>
+kubectl us net router show <router-name-or-id> --flows   # also dump SB logical flows
 ```
 
 Resolves the router in OpenStack, maps it to its OVN `Logical_Router`
@@ -87,10 +94,10 @@ Resolves the router in OpenStack, maps it to its OVN `Logical_Router`
   from the router-port-level HCG shown above).
 - Optionally, southbound logical flows (`ovn-sbctl lflow-list`).
 
-### `router audit`
+### `net router audit`
 
 ```
-kubectl us-net router audit <router-name-or-id>
+kubectl us net router audit <router-name-or-id>
 ```
 
 Checks native OVN routers for their logical router, LRP/LSP attachments,
@@ -110,11 +117,11 @@ whether the router has an unambiguous live chassis from which to repair it.
 Flavored routers are skipped because their realization is outside this
 command's scope. Any failed check produces a nonzero exit status.
 
-### `router repair`
+### `net router repair`
 
 ```
-kubectl us-net router repair <router-name-or-id>          # dry-run plan
-kubectl us-net router repair <router-name-or-id> --apply  # write and verify
+kubectl us net router repair <router-name-or-id>          # dry-run plan
+kubectl us net router repair <router-name-or-id> --apply  # write and verify
 ```
 
 Narrowly repairs the `type`, `addresses`, `router-port`, and gateway-only
@@ -140,8 +147,43 @@ one does not block safe changes in the other, but a partial repair exits `2`.
 For fleet-wide stale-member cleanup and group repopulation, see
 [`cleanup_dead_ovn_ha_chassis.py`](../../scripts/cleanup_dead_ovn_ha_chassis.py).
 See the
-[operator guide](../../docs/operator-guide/kubectl-us-net.md#router-repair) for
+[operator guide](../../docs/operator-guide/kubectl-us.md#net-router-repair) for
 the complete safety contract.
+
+### `backup local`
+
+```
+kubectl us backup local                          # into the current directory
+kubectl us backup local --directory ./backups    # into a specific directory
+kubectl us backup local --skip-mariadb           # OVN NB/SB only
+kubectl us backup local --skip-ovn               # MariaDB only
+```
+
+Downloads a consistent set of backups to your local machine, wrapping the
+manual runbook steps into one command so you don't have to hand-copy pod
+names, container names, and socket paths before an upgrade. It writes three
+files into `--directory` (default: the current directory):
+
+- `mariadb_backup_<context>_<epoch>.sql` -- a logical dump of every database
+  (`mariadb-dump --single-transaction --routines --triggers --all-databases`)
+  taken against `mariadb-0`'s `mariadb` container. The root password is never
+  read locally: the dump runs via `sh -c` and expands the pod's own
+  `$MARIADB_ROOT_PASSWORD` (injected by the mariadb-operator) into `MYSQL_PWD`
+  inside the container, so the secret never touches the local process, the
+  `kubectl` argv, or the exec request.
+- `ovnnb_backup_<context>_<epoch>.db` -- `ovsdb-client backup` of the OVN
+  Northbound DB from `ovn-ovsdb-nb-0`.
+- `ovnsb_backup_<context>_<epoch>.db` -- `ovsdb-client backup` of the OVN
+  Southbound DB from `ovn-ovsdb-sb-0`.
+
+`<context>` is the kube context (sanitized for filenames, e.g.
+`rax_prod_iad3_rxdb_mt` -> `rax-prod-iad3-rxdb-mt`) and all files in one run
+share a single `<epoch>` timestamp so they sort together as a set. These are
+the same `ovsdb-client backup` / `mariadb-dump` operations documented in the
+[RXDB upgrade runbook](../../docs/environments/rxdb-upgrades.md) and the
+[MariaDB upgrade runbook](../../docs/operator-guide/mariadb-upgrade-runbook.md);
+as there, the exec deliberately uses `-i` without `-t` (a TTY corrupts the
+backup byte stream).
 
 ## Global options
 

@@ -3,8 +3,8 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "kubectl-us-net"
-description = "kubectl plugin for troubleshooting UnderStack's Neutron/OVN data plane"
+name = "kubectl-us"
+description = "kubectl plugin for operating and troubleshooting UnderStack"
 authors = [{ name = "Understack Developers" }]
 requires-python = ">=3.12"
 readme = "README.md"
@@ -17,7 +17,7 @@ license = { text = "Apache-2.0" }
 dynamic = ["version"]
 
 [project.scripts]
-kubectl-us-net = "us_net.cli:app"
+kubectl-us = "us_cli.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/rackerlabs/understack"
@@ -33,18 +33,18 @@ test = [
 default-groups = ["test"]
 
 [tool.hatch.build.targets.sdist]
-include = ["us_net"]
+include = ["us_cli"]
 
 [tool.hatch.build.targets.wheel]
-include = ["us_net"]
+include = ["us_cli"]
 
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.version.raw-options]
 root = "../../"
-tag_regex = "^kubectl-us-net/v(?P<version>.*)$"
-git_describe_command = "git describe --dirty --tags --long --match kubectl-us-net/v*"
+tag_regex = "^kubectl-us/v(?P<version>.*)$"
+git_describe_command = "git describe --dirty --tags --long --match kubectl-us/v*"
 fallback_version = "0.0.1"
 
 [tool.ruff]

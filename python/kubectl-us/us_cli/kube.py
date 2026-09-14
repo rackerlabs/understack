@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
+import tempfile
 
-from us_net.connection import ConnectionContext
+from us_cli.connection import ConnectionContext
 
 
 def _exec_argv(
@@ -34,6 +36,62 @@ def stream_exec_in_pod(
     """Run `kubectl exec` with stdout/stderr inherited, for raw passthrough commands."""
     result = subprocess.run(_exec_argv(ctx, pod, container, argv))
     return result.returncode
+
+
+def exec_to_file(
+    ctx: ConnectionContext,
+    pod: str,
+    container: str | None,
+    argv: list[str],
+    dest_path: str,
+) -> None:
+    """Run `kubectl exec -i` and stream its stdout into a local file.
+
+    Used for the backup commands, which produce binary/large output on
+    stdout that we redirect to a file exactly like the documented
+    `kubectl ... exec -i ... > file` runbook commands. `-i` (and the
+    deliberate absence of `-t`) matters here: a TTY corrupts the
+    ovsdb-client/mariadb-dump byte stream, so it's never allocated.
+
+    stderr is captured and included in the raised error on failure so the
+    caller can surface why kubectl/the in-pod command failed.
+    """
+    cmd = ctx.kubectl_base() + ["exec", "-i", "-n", ctx.namespace, pod]
+    if container:
+        cmd += ["-c", container]
+    cmd += ["--", *argv]
+
+    dest = os.fspath(dest_path)
+    dest_dir = os.path.dirname(dest) or "."
+    # Stream into a uniquely named temp file in the *same* directory (so the
+    # final os.replace is an atomic rename, not a cross-filesystem copy), and
+    # only move it into place after a clean exit. This way a failed/partial
+    # run never leaves a truncated file under the real name, and never
+    # clobbers an existing same-name backup.
+    tmp_fd, tmp_path = tempfile.mkstemp(
+        dir=dest_dir, prefix=os.path.basename(dest) + ".", suffix=".partial"
+    )
+    try:
+        with os.fdopen(tmp_fd, "wb") as tmp:
+            result = subprocess.run(cmd, stdout=tmp, stderr=subprocess.PIPE)
+        if result.returncode != 0:
+            stderr = result.stderr.decode(errors="replace").strip()
+            raise BackupExecError(
+                f"kubectl exec into {pod} failed (exit {result.returncode}):\n{stderr}"
+            )
+        os.replace(tmp_path, dest)
+    except BaseException:
+        # Any failure -- nonzero exit, a raised exception, or an interrupt --
+        # must remove the temp file and leave any existing destination intact.
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+class BackupExecError(RuntimeError):
+    """Raised when a `kubectl exec` backup stream fails."""
 
 
 def pods_on_node(ctx: ConnectionContext, node_name: str, name_prefix: str) -> list[str]:

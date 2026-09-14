@@ -7,14 +7,14 @@ from typing import Any
 
 import typer
 
-from us_net import osclient
-from us_net import ovn
-from us_net.commands.router_common import GATEWAY_DEVICE_OWNER
-from us_net.commands.router_common import NEUTRON_PREFIX
-from us_net.commands.router_common import ROUTER_INTERFACE_DEVICE_OWNERS
-from us_net.commands.router_common import rows_by_uuid
-from us_net.connection import ConnectionContext
-from us_net.connection import print_connection_banner
+from us_cli import osclient
+from us_cli import ovn
+from us_cli.commands.router_common import GATEWAY_DEVICE_OWNER
+from us_cli.commands.router_common import NEUTRON_PREFIX
+from us_cli.commands.router_common import ROUTER_INTERFACE_DEVICE_OWNERS
+from us_cli.commands.router_common import rows_by_uuid
+from us_cli.connection import ConnectionContext
+from us_cli.connection import print_connection_banner
 
 OVN_NETWORK_ID_EXT_ID_KEY = "neutron:network_id"
 OVN_ROUTER_ID_EXT_ID_KEY = "neutron:router_id"

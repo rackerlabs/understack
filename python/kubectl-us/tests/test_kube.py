@@ -3,8 +3,8 @@ import subprocess
 
 import pytest
 
-from us_net import kube
-from us_net.connection import ConnectionContext
+from us_cli import kube
+from us_cli.connection import ConnectionContext
 
 
 def make_ctx(**overrides):
@@ -139,3 +139,89 @@ def test_resolve_node_pod_exits_on_multiple_candidates(monkeypatch):
     monkeypatch.setattr(kube, "pods_on_node", lambda ctx, node, prefix: ["a", "b"])
     with pytest.raises(SystemExit):
         kube.resolve_node_pod(make_ctx(), "node-1", "ovn-controller", None)
+
+
+def test_exec_to_file_writes_stdout_and_uses_dash_i(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        # emulate kubectl streaming bytes to the redirected stdout file
+        kwargs["stdout"].write(b"backup-bytes")
+        return subprocess.CompletedProcess(cmd, 0, stderr=b"")
+
+    monkeypatch.setattr(kube.subprocess, "run", fake_run)
+    dest = tmp_path / "out.db"
+    kube.exec_to_file(
+        make_ctx(),
+        "ovn-ovsdb-nb-0",
+        "ovsdb",
+        ["ovsdb-client", "backup", "unix:/x.sock"],
+        str(dest),
+    )
+    assert dest.read_bytes() == b"backup-bytes"
+    # a clean run leaves only the final file, no leftover temp/partial file
+    assert list(tmp_path.iterdir()) == [dest]
+    # -i must be present, -t must NOT be (a TTY corrupts the byte stream)
+    assert "-i" in captured["cmd"]
+    assert "-t" not in captured["cmd"]
+    assert captured["cmd"][-3:] == ["ovsdb-client", "backup", "unix:/x.sock"]
+
+
+def test_exec_to_file_raises_backup_exec_error_on_failure(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        kube.subprocess,
+        "run",
+        lambda cmd, **kwargs: subprocess.CompletedProcess(cmd, 1, stderr=b"nope"),
+    )
+    with pytest.raises(kube.BackupExecError, match="nope"):
+        kube.exec_to_file(make_ctx(), "pod", None, ["cmd"], str(tmp_path / "x"))
+
+
+def test_exec_to_file_failure_creates_no_final_file_and_leaves_no_temp(
+    monkeypatch, tmp_path
+):
+    # even after writing partial bytes, a nonzero exit must not leave a file
+    def fake_run(cmd, **kwargs):
+        kwargs["stdout"].write(b"partial-junk")
+        return subprocess.CompletedProcess(cmd, 1, stderr=b"boom")
+
+    monkeypatch.setattr(kube.subprocess, "run", fake_run)
+    dest = tmp_path / "backup.db"
+    with pytest.raises(kube.BackupExecError):
+        kube.exec_to_file(make_ctx(), "pod", None, ["cmd"], str(dest))
+
+    assert not dest.exists()
+    # no leftover temp/partial files in the destination directory
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_exec_to_file_failure_does_not_clobber_existing_backup(monkeypatch, tmp_path):
+    dest = tmp_path / "backup.db"
+    dest.write_bytes(b"previous-good-backup")
+
+    def fake_run(cmd, **kwargs):
+        kwargs["stdout"].write(b"partial-junk")
+        return subprocess.CompletedProcess(cmd, 1, stderr=b"boom")
+
+    monkeypatch.setattr(kube.subprocess, "run", fake_run)
+    with pytest.raises(kube.BackupExecError):
+        kube.exec_to_file(make_ctx(), "pod", None, ["cmd"], str(dest))
+
+    # the pre-existing backup is untouched, and no temp file lingers
+    assert dest.read_bytes() == b"previous-good-backup"
+    assert list(tmp_path.iterdir()) == [dest]
+
+
+def test_exec_to_file_failure_to_spawn_leaves_no_temp(monkeypatch, tmp_path):
+    # a raised exception (e.g. kubectl not found) must also clean up the temp
+    def raise_oserror(cmd, **kwargs):
+        raise OSError("kubectl not found")
+
+    monkeypatch.setattr(kube.subprocess, "run", raise_oserror)
+    dest = tmp_path / "backup.db"
+    with pytest.raises(OSError, match="kubectl not found"):
+        kube.exec_to_file(make_ctx(), "pod", None, ["cmd"], str(dest))
+
+    assert not dest.exists()
+    assert list(tmp_path.iterdir()) == []

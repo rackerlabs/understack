@@ -191,7 +191,7 @@ nav:
       - operator-guide/networking.md
       - operator-guide/openstack-neutron.md
       - operator-guide/ovs-ovn.md
-      - operator-guide/kubectl-us-net.md
+      - operator-guide/kubectl-us.md
     - 'Hardware':
       - operator-guide/hardware.md
       - operator-guide/device-types.md

@@ -1,16 +1,25 @@
-"""kubectl-us-net: kubectl plugin for troubleshooting UnderStack's Neutron/OVN."""
+"""kubectl-us: kubectl plugin for operating and troubleshooting UnderStack."""
 
 from __future__ import annotations
 
 import typer
 
-from us_net.commands import raw
-from us_net.commands import router
-from us_net.connection import ConnectionContext
+from us_cli.commands import backup
+from us_cli.commands import raw
+from us_cli.commands import router
+from us_cli.connection import ConnectionContext
 
 app = typer.Typer(
-    name="kubectl-us-net",
+    name="kubectl-us",
     add_completion=False,
+    no_args_is_help=True,
+    help="Operate and troubleshoot UnderStack.",
+)
+
+# `net` groups the Neutron/OVN data-plane troubleshooting commands
+# (nbctl/sbctl/vsctl/appctl/router) so they live under `kubectl us net ...`,
+# leaving room for other top-level groups like `backup`.
+net_app = typer.Typer(
     no_args_is_help=True,
     help="Troubleshoot UnderStack's Neutron/OVN data plane.",
 )
@@ -47,8 +56,11 @@ def main(
     )
 
 
-raw.register(app)
-app.add_typer(router.app, name="router")
+raw.register(net_app)
+net_app.add_typer(router.app, name="router")
+
+app.add_typer(net_app, name="net")
+backup.register(app)
 
 
 if __name__ == "__main__":

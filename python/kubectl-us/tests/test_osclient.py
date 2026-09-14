@@ -1,6 +1,6 @@
 import pytest
 
-from us_net import osclient
+from us_cli import osclient
 
 
 class FakeConfig:

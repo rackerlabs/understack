@@ -37,7 +37,7 @@ site by subsystem; this page is the index into it.
   the difference between a request id you can trace and a wall of text.
 - [Monitoring Stack](monitoring.md) — reaching Prometheus and AlertManager, and
   what the shipped alerts mean.
-- [kubectl-us-net](kubectl-us-net.md) — inspecting UnderStack networking objects
+- [kubectl-us](kubectl-us.md) — inspecting UnderStack networking objects
   from `kubectl` rather than through the OpenStack API, which is what you want
   when the API itself is the thing that is broken.
 

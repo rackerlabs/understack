@@ -1,16 +1,21 @@
-# kubectl-us-net
+# kubectl-us
 
-`kubectl-us-net` is a `kubectl` plugin for troubleshooting UnderStack's
-Neutron/OVN data plane. It wraps `kubectl exec` into the OVN NB/SB pods
-(and, for `ovs-vsctl`/`ovs-appctl`, whichever pod is running on a given
-node) alongside OpenStack API calls, so you don't have to remember pod
-names, container names, or the `neutron-<uuid>` naming convention OVN uses
-for objects it syncs from Neutron.
+`kubectl-us` is a `kubectl` plugin for operating and troubleshooting
+UnderStack. Its commands are grouped by concern:
 
-It's a companion to the manual debugging steps in
+- `kubectl us net ...` -- Neutron/OVN data-plane troubleshooting. Wraps
+  `kubectl exec` into the OVN NB/SB pods (and, for `ovs-vsctl`/`ovs-appctl`,
+  whichever pod is running on a given node) alongside OpenStack API calls, so
+  you don't have to remember pod names, container names, or the
+  `neutron-<uuid>` naming convention OVN uses for objects it syncs from
+  Neutron.
+- `kubectl us backup ...` -- pull local backups of the platform databases
+  (MariaDB and the OVN NB/SB databases).
+
+The `net` commands are a companion to the manual debugging steps in
 [OVN / Open vSwitch](ovs-ovn.md) -- for example, the walkthrough in
 [Verifying a router port is bound to an HA_Chassis_Group](ovs-ovn.md#verifying-a-router-port-is-bound-to-an-ha_chassis_group)
-is exactly what `router show` (below) automates in one command.
+is exactly what `net router show` (below) automates in one command.
 
 This is intentionally a plain Python CLI for now (no compiled binary, no
 krew packaging) so the command surface and output can be iterated on
@@ -19,9 +24,9 @@ quickly. Distributing it via krew is planned once the behavior settles.
 ## Installation
 
 ```bash
-cd python/kubectl-us-net
+cd python/kubectl-us
 uv sync
-export PATH="$PWD/.venv/bin:$PATH"   # so `kubectl us-net ...` finds it
+export PATH="$PWD/.venv/bin:$PATH"   # so `kubectl us ...` finds it
 ```
 
 ## Prerequisites
@@ -47,15 +52,18 @@ Every command starts by printing a banner showing the kube context, OVN
 namespace/pod names, and (for OpenStack-backed commands) the OpenStack cloud
 target, so it's always clear what you're actually talking to.
 
+Global options go before the command group, e.g.
+`kubectl us --context my-cluster net router list`.
+
 ## Commands
 
-### Raw passthrough
+### net -- raw passthrough
 
 ```bash
-kubectl us-net nbctl -- show
-kubectl us-net sbctl -- list Chassis
-kubectl us-net vsctl --node <nodename> -- show
-kubectl us-net appctl --node <nodename> -- version
+kubectl us net nbctl -- show
+kubectl us net sbctl -- list Chassis
+kubectl us net vsctl --node <nodename> -- show
+kubectl us net appctl --node <nodename> -- version
 ```
 
 Thin wrappers around `ovn-nbctl`, `ovn-sbctl`, `ovs-vsctl`, and
@@ -71,20 +79,20 @@ separate `openvswitch` pod), so both commands default to the
 directly, or `--target <prefix>` on `appctl` to change the discovery
 prefix.
 
-### router list
+### net router list
 
 ```bash
-kubectl us-net router list
+kubectl us net router list
 ```
 
 A table of every router seen in OpenStack and/or OVN, so you can spot
 mismatches (present on only one side) before drilling into one with
-`router show`. Flavored routers (e.g. VRF) are handled by a different L3
+`net router show`. Flavored routers (e.g. VRF) are handled by a different L3
 backend and never get an OVN `Logical_Router`, so they're marked
 `n/a (flavored)` in the OVN column rather than a false "NO".
 
 ```console
-$ kubectl us-net router list
+$ kubectl us net router list
 NAME             ID                                    OPENSTACK  OVN
 ---------------------------------------------------------------------
 tenant-router    769be712-d084-4846-bd21-a85f6494f3b6  yes        yes
@@ -93,11 +101,11 @@ vrf-router       df9746b3-d1da-484c-bf4c-86248279dddb  yes        n/a (flavored)
 vrf-router-2     8f3492e8-d4d9-4f27-817c-b53a19b91f67  yes        n/a (flavored)
 ```
 
-### router show
+### net router show
 
 ```bash
-kubectl us-net router show <router-name-or-id>
-kubectl us-net router show <router-name-or-id> --flows   # also dump SB logical flows
+kubectl us net router show <router-name-or-id>
+kubectl us net router show <router-name-or-id> --flows   # also dump SB logical flows
 ```
 
 Resolves the router in OpenStack, maps it to its OVN `Logical_Router`
@@ -136,14 +144,14 @@ Resolves the router in OpenStack, maps it to its OVN `Logical_Router`
     wired to that server's physical network, and is unrelated to router
     centralization. If a router port ever shows a linked HCG of its own, or
     a baremetal external port has none, treat it as a red flag worth
-    investigating with `router show`'s "likely bug" diagnostics.
+    investigating with `net router show`'s "likely bug" diagnostics.
 
 Example output (IPs and hostnames below are illustrative, not real):
 
 ```console
-$ kubectl us-net --context my-cluster-dev --os-cloud example-cloud router show patch-router
+$ kubectl us --context my-cluster-dev --os-cloud example-cloud net router show patch-router
 ================================================================
-kubectl-us-net -- target environment
+kubectl-us -- target environment
 ================================================================
   Kubernetes context : my-cluster-dev
   OVN namespace/pods : openstack (nb=ovn-ovsdb-nb-0, sb=ovn-ovsdb-sb-0)
@@ -187,10 +195,10 @@ Here the router port shows a **pinned chassis** (expected for a centralized
 router), while the baremetal server's external port shows its own
 **`HA_Chassis_Group`** -- exactly the split described in the note above.
 
-### router audit
+### net router audit
 
 ```bash
-kubectl us-net router audit <router-name-or-id>
+kubectl us net router audit <router-name-or-id>
 ```
 
 Compares Neutron's native OVN router and port state with its realized state.
@@ -238,14 +246,14 @@ Backend: native OVN
   FAIL  gateway 6718...: nat-addresses option: expected router, found (missing)
 ```
 
-### router repair
+### net router repair
 
 ```bash
 # Plan only; this never writes to OVN.
-kubectl us-net router repair <router-name-or-id>
+kubectl us net router repair <router-name-or-id>
 
 # Apply the displayed plan and verify the result.
-kubectl us-net router repair <router-name-or-id> --apply
+kubectl us net router repair <router-name-or-id> --apply
 ```
 
 `router repair` is deliberately narrower than Neutron's fleet-wide OVN DB
@@ -298,21 +306,56 @@ refuses the affected repair domain when:
   chassis.
 
 Those conditions require investigation rather than field-level repair. Run
-`router audit` after resolving them.
+`net router audit` after resolving them.
 
 LSP repair and HA chassis group repair are independent safety domains. A
 refusal in one domain does not block safe work in the other. When `--apply`
 performs only the safe portion, the command verifies that work and exits `2`
 to report that part of the router remains unresolved.
 
+### backup local
+
+```bash
+kubectl us backup local                          # into the current directory
+kubectl us backup local --directory ./backups    # into a specific directory
+kubectl us backup local --skip-mariadb           # OVN NB/SB only
+kubectl us backup local --skip-ovn               # MariaDB only
+```
+
+Downloads a consistent set of backups to your local machine, wrapping the
+manual runbook steps into one command so you don't have to hand-copy pod
+names, container names, and socket paths before an upgrade. It writes three
+files into `--directory` (default: the current directory):
+
+- `mariadb_backup_<context>_<epoch>.sql` -- a logical dump of every database
+  (`mariadb-dump --single-transaction --routines --triggers --all-databases`)
+  taken against `mariadb-0`'s `mariadb` container. The root password is never
+  read locally: the dump runs via `sh -c` and expands the pod's own
+  `$MARIADB_ROOT_PASSWORD` (injected by the mariadb-operator) into `MYSQL_PWD`
+  inside the container, so the secret never touches the local process, the
+  `kubectl` argv, or the exec request.
+- `ovnnb_backup_<context>_<epoch>.db` -- `ovsdb-client backup` of the OVN
+  Northbound DB from `ovn-ovsdb-nb-0`.
+- `ovnsb_backup_<context>_<epoch>.db` -- `ovsdb-client backup` of the OVN
+  Southbound DB from `ovn-ovsdb-sb-0`.
+
+`<context>` is the kube context (sanitized for filenames, e.g.
+`rax_prod_iad3_rxdb_mt` -> `rax-prod-iad3-rxdb-mt`) and all files in one run
+share a single `<epoch>` timestamp so they sort together as a set. These are
+the same `ovsdb-client backup` / `mariadb-dump` operations documented in the
+RXDB and MariaDB upgrade runbooks; as there, the exec deliberately uses `-i`
+without `-t` (a TTY corrupts the backup byte stream). `--skip-mariadb` and
+`--skip-ovn` narrow the set; skipping both is an error.
+
 ## Development
 
-Each command is a self-contained module under `us_net/commands/` that
-registers into the top-level `typer` app (`us_net/cli.py`). Low-level OVSDB
-access lives in `us_net/ovn.py` (JSON unwrap ported from
+Each command is a self-contained module under `us_cli/commands/` that
+registers into the `typer` app (`us_cli/cli.py`), where the `net` commands
+are grouped under a `net` sub-app and `backup` is mounted at the top level.
+Low-level OVSDB access lives in `us_cli/ovn.py` (JSON unwrap ported from
 `scripts/cleanup_dead_ovn_ha_chassis.py`), `kubectl exec` plumbing in
-`us_net/kube.py`, and OpenStack SDK connection setup in
-`us_net/osclient.py`. Run tests and linting from `python/kubectl-us-net/`:
+`us_cli/kube.py`, and OpenStack SDK connection setup in
+`us_cli/osclient.py`. Run tests and linting from `python/kubectl-us/`:
 
 ```bash
 uv run pytest
