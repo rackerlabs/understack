@@ -54,7 +54,7 @@ class PanosInspect(base.InspectInterface):
         }
 
     def validate(self, task):
-        """Validate the driver_info contains required credentials.
+        """Validate the driver_info contains required connection information.
 
         :param task: a TaskManager instance.
         :raises: MissingParameterValue if required parameters are missing.
@@ -62,21 +62,34 @@ class PanosInspect(base.InspectInterface):
         """
         driver_info = task.node.driver_info
 
-        # TODO: Implement validation
-        # Check that panos_address, panos_username, panos_password are present
-        # Optionally validate that we can connect to the device
-
-        missing = []
-        if not driver_info.get("panos_address"):
-            missing.append("panos_address")
-        if not driver_info.get("panos_username"):
-            missing.append("panos_username")
-        if not driver_info.get("panos_password"):
-            missing.append("panos_password")
-
-        if missing:
+        # Validate that we have the management IP (set by enroll-fw)
+        # Credentials come from the panos-credentials K8s secret mounted at
+        # /etc/panos-credentials/, not from driver_info
+        if not driver_info.get("management_ip"):
             raise exception.MissingParameterValue(
-                f'Missing required driver_info parameters: {", ".join(missing)}'
+                f"Node {task.node.uuid} missing required driver_info parameter: "
+                "management_ip"
+            )
+
+        # Check if credentials exist (but don't fail - just log warning)
+        # This allows understack to deploy before undercloud-deploy
+        import os
+
+        cred_path = "/etc/panos-credentials"
+        if not os.path.exists(cred_path):
+            LOG.warning(
+                "[node:%s] PAN-OS credentials directory %s does not exist. "
+                "Inspection will fail until panos-credentials secret is deployed.",
+                task.node.uuid,
+                cred_path,
+            )
+        elif not os.path.exists(f"{cred_path}/standard_password"):
+            LOG.warning(
+                "[node:%s] PAN-OS credentials are incomplete in %s. "
+                "Expected files: standard_password, preconfig_password, "
+                "factory_password",
+                task.node.uuid,
+                cred_path,
             )
 
     def inspect_hardware(self, task):
@@ -103,21 +116,45 @@ class PanosInspect(base.InspectInterface):
         address = node.driver_info.get("management_ip")
         if not address:
             raise exception.InvalidParameterValue(
-                "Node %s missing management_ip in driver_info"
+                f"Node {node.uuid} missing management_ip in driver_info"
             )
 
-        LOG.info("[node:%s] Starting PAN-OS inspection", node.uuid)
-
-        # TODO: Get connection details from driver_info
-        # username = admin
-        # password = from secrets https://github.com/RSS-Engineering/undercloud-deploy/pull/2141
-        # verify_ssl = False
+        LOG.info("[node:%s] Starting PAN-OS inspection for %s", node.uuid, address)
 
         try:
-            # TODO: Connect to PAN-OS API
-            # session = _build_panos_session(verify_ssl)
-            # api_key = _get_api_key(address, username, password, session)
-            # will need to try multiple creds options until one works
+            # Get credentials from Kubernetes secret
+            # (mounted at /etc/panos-credentials/)
+            # Try in order: standard -> preconfig -> factory
+            # If credentials don't exist yet, fail gracefully
+            try:
+                from understack_workflows.helpers import credential
+
+                passwords = [
+                    credential("panos-credentials", "standard_password"),
+                    credential("panos-credentials", "preconfig_password"),
+                    credential("panos-credentials", "factory_password"),
+                ]
+            except FileNotFoundError as e:
+                raise exception.HardwareInspectionFailure(
+                    f"PAN-OS credentials not found for node {node.uuid}. "
+                    "The panos-credentials secret may not be deployed yet. "
+                    f"Missing file: {e}"
+                ) from e
+
+            username = "admin"  # PAN-OS always uses 'admin'
+            verify_ssl = False  # Devices have self-signed certs
+
+            # Build session and authenticate
+            session = _build_panos_session(verify_ssl)
+            api_key, password_type = _try_authenticate(
+                address, username, passwords, session
+            )
+            LOG.info(
+                "[node:%s] Connected to %s with %s password",
+                node.uuid,
+                address,
+                password_type,
+            )
 
             # TODO: Collect system information
             # system_info = _collect_system_info(address, api_key, session)
@@ -183,15 +220,64 @@ def _get_api_key(address, username, password, session):
     """Obtain API key from PAN-OS device.
 
     :param address: Management IP or hostname
-    :param username: API username
-    :param password: API password
+    :param username: API username (always 'admin')
+    :param password: API password to try
     :param session: requests.Session
-    :returns: API key string
-    :raises: Exception if authentication fails
+    :returns: API key string or None if authentication fails
     """
     # TODO: Implement
-    # - Call /api/?type=keygen
+    # - Call /api/?type=keygen&user={username}&password={password}
     # - Parse XML response for key
+    # - Return key on success, None on auth failure
+    # - Raise exception for connection errors (not auth failures)
+
+
+def _try_authenticate(address, username, passwords, session):
+    """Try to authenticate with PAN-OS device using credential fallback.
+
+    Tries passwords in order: standard -> preconfig -> factory
+
+    :param address: Management IP or hostname
+    :param username: API username (always 'admin')
+    :param passwords: list of passwords to try [standard, preconfig, factory]
+    :param session: requests.Session
+    :returns: tuple (api_key, password_used) on success
+    :raises: Exception if all passwords fail or connection error
+    """
+    last_error = None
+
+    for idx, password in enumerate(passwords):
+        password_type = ["standard", "preconfig", "factory"][idx]
+        LOG.info(
+            "[%s] Attempting authentication with %s password",
+            address,
+            password_type,
+        )
+
+        try:
+            api_key = _get_api_key(address, username, password, session)
+            if api_key:
+                LOG.info(
+                    "[%s] Authentication successful with %s password",
+                    address,
+                    password_type,
+                )
+                return api_key, password_type
+        except Exception as e:
+            LOG.debug(
+                "[%s] Authentication failed with %s password: %s",
+                address,
+                password_type,
+                e,
+            )
+            last_error = e
+            continue
+
+    # All passwords failed
+    raise exception.HardwareInspectionFailure(
+        f"Failed to authenticate to {address} with any of the configured "
+        f"passwords. Last error: {last_error}"
+    )
 
 
 def _collect_system_info(address, api_key, session):

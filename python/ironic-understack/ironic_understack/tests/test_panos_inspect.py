@@ -69,18 +69,15 @@ class TestPanosInspect:
         mock_task.node.driver_info = {}
         inspector = PanosInspect()
 
-        # Should raise since panos_address (or management_ip) is missing
-        with pytest.raises(exception.MissingParameterValue):
+        # Should raise since management_ip is missing
+        with pytest.raises(exception.MissingParameterValue) as exc_info:
             inspector.validate(mock_task)
 
+        assert "management_ip" in str(exc_info.value)
+
     def test_validate_success(self, mock_task):
-        """Test validate succeeds with required fields present."""
-        # Set the fields that the driver actually needs
-        mock_task.node.driver_info = {
-            "panos_address": "10.15.149.107",
-            "panos_username": "admin",
-            "panos_password": "password",
-        }
+        """Test validate succeeds with management_ip present."""
+        # management_ip is already in the mock_task fixture
         inspector = PanosInspect()
         # Should not raise
         inspector.validate(mock_task)
