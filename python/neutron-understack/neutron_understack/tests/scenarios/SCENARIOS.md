@@ -84,12 +84,22 @@ scenarios). Tenant networks are VXLAN; the physnet named in the binding profile
 - then: it binds hierarchically and `undersync.sync(<physnet>)` fires (no special
   casing on the bind path)
 
-### PROV-DEL-01 — provisioning-network delete retains the VLAN segment
-- given: a bound baremetal port on the provisioning network
+### PROV-DEL-01 — provisioning-network port delete releases the VLAN segment if unused
+- given: a bound baremetal port on the network configured as
+  `ml2_understack.provisioning_network`
 - when: the port is deleted
-- then: `undersync.sync(<physnet>)` fires but the dynamic VLAN segment is
-  retained (the clean/provision cycle reuses it), unlike a tenant port
-  (BM-BIND-05)
+- then: the provisioning network behaves like any other network —
+  `undersync.sync(<physnet>)` fires and the dynamic VLAN segment is released if
+  no ports remain bound to it. While other nodes are still provisioning on the
+  same VLAN group, their binding levels hold the segment open; once the last
+  provisioning port goes away the VLAN id returns to the pool, and the next
+  provision allocates again.
+- note: the delete path used to return early for the provisioning network and
+  skip the release entirely. There is no reason for it to be special here —
+  `release_segment_if_unused` is already the safe, reference-counted operation,
+  so the unconditional skip could only leak VLAN ids. The early return is gone;
+  the `undersync.sync` that signals the end of the provisioning / cleaning cycle
+  is the same call every other network gets.
 
 ## Trunk subport operations
 

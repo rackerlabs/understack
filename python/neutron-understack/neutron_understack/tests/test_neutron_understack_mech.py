@@ -222,19 +222,26 @@ class TestDeletePortPostCommit:
 
         release.assert_not_called()
 
-    def test_syncs_and_skips_release_on_provisioning_network(
-        self, mocker, understack_driver, port_context
+    def test_releases_unused_segment_on_provisioning_network(
+        self, mocker, understack_driver, port_context, oslo_config, port_dict
     ):
-        mocker.patch(
-            "neutron_understack.neutron_understack_mech.is_provisioning_network",
-            return_value=True,
+        """The provisioning network is not special: an unused segment is freed.
+
+        Its dynamic segment is reference counted like any other, so the last
+        provisioning port to go away returns the VLAN to the pool.
+        """
+        oslo_config.config(
+            provisioning_network=port_dict["network_id"], group="ml2_understack"
         )
+        segment = mocker.Mock(id="segment-a", is_dynamic=True)
+        mocker.patch(f"{MECH_UTILS}.network_segment_by_physnet", return_value=segment)
+        mocker.patch(f"{MECH_UTILS}.ports_bound_to_segment", return_value=[])
         release = mocker.patch(f"{MECH_UTILS}.release_dynamic_segment")
 
         understack_driver.delete_port_postcommit(port_context)
 
         understack_driver.undersync.sync.assert_called_once_with("physnet")
-        release.assert_not_called()
+        release.assert_called_once_with("segment-a")
 
 
 class TestBindPort:

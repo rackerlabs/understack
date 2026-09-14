@@ -110,11 +110,12 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
 
     @pytest.mark.scenario("PROV-DEL-01")
-    def test_provisioning_network_delete_retains_segment(self):
-        """Deleting a provisioning-network port syncs but keeps the VLAN segment.
+    def test_provisioning_network_delete_releases_unused_segment(self):
+        """Deleting a provisioning-network port syncs and frees an unused segment.
 
-        The clean/provision cycle re-uses the segment, so unlike a tenant port
-        (BM-BIND-05) the dynamic VLAN segment is not released on delete.
+        The provisioning network is not special on the delete path: its dynamic
+        VLAN segment is reference counted like any other, so the last port to
+        go away returns the VLAN to the pool (as in BM-BIND-05).
         """
         net = self._make_vxlan_network()
         cfg.CONF.set_override("provisioning_network", net["id"], group="ml2_understack")
@@ -125,9 +126,8 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
 
         self._delete("ports", port["id"], as_admin=True)
 
-        # Sync fired, but the segment is retained (provisioning cycle).
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
-        assert segments_db.get_segment_by_id(self.context, vlan_segment_id) is not None
+        assert segments_db.get_segment_by_id(self.context, vlan_segment_id) is None
 
     @pytest.mark.scenario("BM-BIND-06")
     def test_vif_attach_without_ip_still_syncs(self):
