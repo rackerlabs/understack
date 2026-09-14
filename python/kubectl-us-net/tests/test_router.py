@@ -1,10 +1,12 @@
 import types
 
+import pytest
 import typer
 from openstack import exceptions as os_exc
 from typer.testing import CliRunner
 
 from us_net.commands import router
+from us_net.commands import router_common
 from us_net.connection import ConnectionContext
 
 runner = CliRunner()
@@ -365,6 +367,33 @@ def test_router_show_reports_gateway_and_internal_ports(monkeypatch):
     assert "-> port vm-port-1" in result.output
     assert "snat" in result.output
     assert "logical=192.168.0.0/24" in result.output
+
+
+@pytest.mark.parametrize(
+    "device_owner",
+    sorted(
+        router_common.ROUTER_INTERFACE_DEVICE_OWNERS
+        - {router_common.INTERFACE_DEVICE_OWNER}
+    ),
+)
+def test_router_show_recognizes_migrated_interface_owners(monkeypatch, device_owner):
+    patch_common(monkeypatch)
+    ports = make_ports()
+    ports[1].device_owner = device_owner
+    monkeypatch.setattr(
+        router.osclient,
+        "get_connection",
+        lambda os_cloud: FakeConnection(
+            ports,
+            all_ports=[*ports, make_bound_port()],
+            servers={"server-1": types.SimpleNamespace(name="my-server")},
+        ),
+    )
+
+    result = runner.invoke(make_app(), ["router", "show", "test-router"])
+
+    assert result.exit_code == 0
+    assert "lrp-int-1 [internal]" in result.output
     assert "FLOW_TABLE_OUTPUT" not in result.output  # --flows not passed
 
 
@@ -658,7 +687,7 @@ def test_rows_by_uuid_filters_to_matching_rows_only():
         {"_uuid": "b", "name": "drop-b"},
         {"_uuid": "c", "name": "keep-c"},
     ]
-    result = router._rows_by_uuid(rows, {"a", "c"})
+    result = router_common.rows_by_uuid(rows, {"a", "c"})
     assert result == [
         {"_uuid": "a", "name": "keep-a"},
         {"_uuid": "c", "name": "keep-c"},
@@ -667,12 +696,12 @@ def test_rows_by_uuid_filters_to_matching_rows_only():
 
 def test_rows_by_uuid_ignores_rows_missing_uuid_key():
     rows = [{"name": "no-uuid-field"}, {"_uuid": "a", "name": "keep-a"}]
-    assert router._rows_by_uuid(rows, {"a"}) == [{"_uuid": "a", "name": "keep-a"}]
+    assert router_common.rows_by_uuid(rows, {"a"}) == [{"_uuid": "a", "name": "keep-a"}]
 
 
 def test_rows_by_uuid_returns_empty_for_no_matches():
     rows = [{"_uuid": "a"}, {"_uuid": "b"}]
-    assert router._rows_by_uuid(rows, {"z"}) == []
+    assert router_common.rows_by_uuid(rows, {"z"}) == []
 
 
 def test_router_show_flags_dangling_hcg_reference(monkeypatch):

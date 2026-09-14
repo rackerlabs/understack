@@ -87,6 +87,62 @@ Resolves the router in OpenStack, maps it to its OVN `Logical_Router`
   from the router-port-level HCG shown above).
 - Optionally, southbound logical flows (`ovn-sbctl lflow-list`).
 
+### `router audit`
+
+```
+kubectl us-net router audit <router-name-or-id>
+```
+
+Checks native OVN routers for their logical router, LRP/LSP attachments,
+router peer LSP type, addresses, required options, and `requested-chassis`
+membership with `binding:host_id`. Gateway LSPs must use the network logical
+switch. Router interfaces use it today; a segment-stamped interface is also
+accepted on its segment switch as a defensive forward-compatibility path.
+Attached LRPs and peer LSPs without a Neutron router port are reported as
+orphans.
+For each router network, the audit also verifies that its single shared
+Neutron `uplink-*` port has a matching `localnet` LSP on the network logical
+switch with `addresses=unknown` and exactly one VLAN tag.
+Router-owned per-network `HA_Chassis_Group` rows are also checked for at least
+one member backed by a live Southbound chassis. An empty or stale-only group is
+reported as requiring per-network HA chassis group repopulation, along with
+whether the router has an unambiguous live chassis from which to repair it.
+Flavored routers are skipped because their realization is outside this
+command's scope. Any failed check produces a nonzero exit status.
+
+### `router repair`
+
+```
+kubectl us-net router repair <router-name-or-id>          # dry-run plan
+kubectl us-net router repair <router-name-or-id> --apply  # write and verify
+```
+
+Narrowly repairs the `type`, `addresses`, `router-port`, and gateway-only
+`nat-addresses`/`exclude-lb-vips-from-garp` fields of existing, correctly
+attached native-OVN peer LSPs. Map keys are updated individually, so unrelated
+options such as `requested-chassis` are preserved.
+Shared `uplink-*` localnet LSPs are audit-only and are not recreated by this
+command.
+
+The same transaction repopulates a router-owned per-network HA chassis group
+when it has no live members. The target must be unambiguous: a live
+`Logical_Router.options:chassis`, or, for a distributed router, exactly one
+live chassis resolved through the router's own HA chassis group. Stale member
+references are removed from the affected per-network group, a replacement is
+created at priority `32767`, and the result is read back for verification.
+Verification checks that the selected chassis was added at that priority and
+that every stale member reference in the plan was removed.
+
+Repair refuses flavored routers, missing objects, wrong attachments, attached
+LRPs without Neutron router ports, and HA chassis placement that is unavailable
+or ambiguous. LSP and HA chassis group repairs are independent: a refusal in
+one does not block safe changes in the other, but a partial repair exits `2`.
+For fleet-wide stale-member cleanup and group repopulation, see
+[`cleanup_dead_ovn_ha_chassis.py`](../../scripts/cleanup_dead_ovn_ha_chassis.py).
+See the
+[operator guide](../../docs/operator-guide/kubectl-us-net.md#router-repair) for
+the complete safety contract.
+
 ## Global options
 
 - `--context` -- kubectl context (default: current context)

@@ -187,6 +187,124 @@ Here the router port shows a **pinned chassis** (expected for a centralized
 router), while the baremetal server's external port shows its own
 **`HA_Chassis_Group`** -- exactly the split described in the note above.
 
+### router audit
+
+```bash
+kubectl us-net router audit <router-name-or-id>
+```
+
+Compares Neutron's native OVN router and port state with its realized state.
+The command exits nonzero when any check fails, so it can also be used as a
+pre/post-upgrade check. Flavored routers are skipped because their realization
+is outside this command's scope.
+
+For a native OVN router, the audit verifies:
+
+- the `Logical_Router` exists;
+- every Neutron gateway and interface port has an attached
+  `Logical_Router_Port` and a peer `Logical_Switch_Port` on the expected
+  switch. Gateway ports must use `neutron-<network-id>`. Router interfaces
+  currently use the same base-network switch because ML2/OVN does not
+  host-bind them. The audit defensively accepts a future segment-stamped
+  interface on its `neutron-<segment-id>` switch;
+- every LRP attached to the logical router, and its peer LSP when present,
+  corresponds to a current Neutron router port;
+- each router network has exactly one shared Neutron `uplink-*` port, with a
+  matching `localnet` LSP attached to `neutron-<network-id>` and
+  `addresses=unknown`, and exactly one VLAN tag;
+- the peer LSP has `type=router`, `addresses=router`, and the matching
+  `options:router-port`;
+- gateway LSPs additionally have `options:nat-addresses=router` and
+  `options:exclude-lb-vips-from-garp=true`; and
+- Neutron's `binding:host_id` is present in the comma-separated
+  `options:requested-chassis` value. An absent value on both sides is healthy;
+  it should not be added to an unbound port; and
+- each router-owned per-network `HA_Chassis_Group` has at least one
+  `HA_Chassis` member whose chassis is live in the Southbound database. This
+  reports empty and stale-only groups as requiring per-network HA chassis
+  group repopulation; and
+- when repopulation is required, a live `options:chassis` value or an
+  unambiguous router-level HA chassis group is available as its source.
+
+Example of the corruption detected in issue 2330:
+
+```console
+Router tenant-router (7a4b...)
+Backend: native OVN
+  PASS  logical router: neutron-7a4b...
+  FAIL  gateway 6718...: LSP type: expected router, found (empty)
+  FAIL  gateway 6718...: LSP addresses: expected ['router'], found []
+  FAIL  gateway 6718...: router-port option: expected lrp-6718..., found (missing)
+  FAIL  gateway 6718...: nat-addresses option: expected router, found (missing)
+```
+
+### router repair
+
+```bash
+# Plan only; this never writes to OVN.
+kubectl us-net router repair <router-name-or-id>
+
+# Apply the displayed plan and verify the result.
+kubectl us-net router repair <router-name-or-id> --apply
+```
+
+`router repair` is deliberately narrower than Neutron's fleet-wide OVN DB
+sync repair mode. It repairs only the selected native-OVN router. Existing
+gateway/interface peer LSP rows must already be attached to both the expected
+logical router port and logical switch. Its LSP writes are:
+
+- `type=router`;
+- `addresses=router`;
+- `options:router-port=lrp-<port-id>`; and, for gateway ports only,
+- `options:nat-addresses=router` and
+  `options:exclude-lb-vips-from-garp=true`.
+
+The command updates option keys individually, preserving unrelated options
+such as `requested-chassis`.
+
+Repair also repopulates router-owned per-network HA chassis groups that have
+no live members. It selects the target chassis from the logical router's live
+`options:chassis` value. When that option is absent, it uses the router's own
+HA chassis group only when that group resolves to exactly one live chassis.
+For each affected per-network group, repair removes its non-live member
+references, creates a replacement `HA_Chassis` at priority `32767`, and adds
+the replacement to the group.
+
+This per-router repair overlaps the stale-member cleanup and per-network group
+repopulation performed fleet-wide by
+`scripts/cleanup_dead_ovn_ha_chassis.py`.
+The script also has a separate, opt-in orphan-network teardown mode that this
+command does not provide. The command is preferable when diagnosing and
+repairing one known router; use the script when intentionally auditing the
+fleet-wide HA chassis state.
+
+Shared `uplink-*` localnet LSPs are audit-only. `router repair` does not
+recreate them because doing so also requires coordinating Neutron port and
+trunk state.
+
+With `--apply`, all planned LSP and HA chassis group updates are sent in one
+`ovn-nbctl` transaction and the affected state is read back for verification.
+HA chassis group verification checks the exact plan: the selected chassis is
+present at priority `32767` and the stale member references are absent.
+
+Repair refuses a router with a flavor entirely. For native OVN routers, it
+refuses the affected repair domain when:
+
+- a logical router, router port, or switch port is missing; or
+- an existing port is attached to the wrong logical router or switch; or
+- an LRP is attached to the logical router without a corresponding Neutron
+  router port; or
+- an affected per-network HA chassis group has no unambiguous live target
+  chassis.
+
+Those conditions require investigation rather than field-level repair. Run
+`router audit` after resolving them.
+
+LSP repair and HA chassis group repair are independent safety domains. A
+refusal in one domain does not block safe work in the other. When `--apply`
+performs only the safe portion, the command verifies that work and exits `2`
+to report that part of the router remains unresolved.
+
 ## Development
 
 Each command is a self-contained module under `us_net/commands/` that
