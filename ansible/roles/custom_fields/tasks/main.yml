@@ -100,6 +100,21 @@
       - ipam.prefix
     filter_logic: exact
 
+- name: Create Custom Field Address Scope
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: OpenStack address scope to associate with this subnet pool prefix
+    label: Address Scope
+    key: address_scope
+    type: text
+    required: false
+    weight: 100
+    content_types:
+      - ipam.prefix
+    filter_logic: exact
+
 - name: Create Custom Field Subnet Pool Default Prefixlen
   networktocode.nautobot.custom_field:
     state: present
@@ -149,4 +164,36 @@
       - ipam.prefix
     validation_minimum: 1
     validation_maximum: 32
+    filter_logic: exact
+
+- name: Create Custom Field Subnet Pool VNI tag
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: OpenStack Subnet Pool VNI tag
+    label: VNI
+    key: vni
+    type: integer
+    required: false
+    weight: 100
+    content_types:
+      - ipam.prefix
+    validation_minimum: 1
+    validation_maximum: 16777215
+    filter_logic: exact
+
+- name: Create Custom Field Subnet Pool VRF tag
+  networktocode.nautobot.custom_field:
+    state: present
+    url: "{{ nautobot_url }}"
+    token: "{{ nautobot_token }}"
+    description: OpenStack Subnet Pool VRF tag
+    label: VRF tag
+    key: vrf_custom
+    type: text
+    required: false
+    weight: 100
+    content_types:
+      - ipam.prefix
     filter_logic: exact

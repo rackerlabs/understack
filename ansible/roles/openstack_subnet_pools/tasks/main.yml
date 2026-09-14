@@ -1,7 +1,18 @@
 ---
-# Create OpenStack subnet pools from Nautobot prefixes
+# Create OpenStack address scopes and subnet pools from Nautobot prefixes
 # This role reads prefixes tagged with 'openstack-subnet-pool' and creates
-# corresponding OpenStack subnet pools with the configured allocation settings
+# corresponding OpenStack address scopes and subnet pools with the configured
+# allocation settings.
+# Nautobot source path:
+# ipam.prefix -> custom_fields.subnet_pool_name -> custom_fields.address_scope
+# Optional subnet pool tag source path:
+# ipam.prefix.custom_fields.vrf_custom -> subnet pool tag "VRF=<value>"
+# ipam.prefix.custom_fields.vni -> subnet pool tag "vni=<value>"
+# Missing or empty values mean no tag for that subnet pool.
+# The IP block is owned by Rackspace, but its purpose is for the prefix role,
+# such as role: Public or role: ServiceNet.
+# OpenStack target path:
+# subnet -> subnetpool_id -> subnet pool -> address_scope_id -> address scope
 
 - name: Get site location from environment variable
   ansible.builtin.set_fact:
@@ -31,47 +42,376 @@
       '{{ site_location }}'; skipping OpenStack subnet pool creation
   when: prefixes_query.json.count | int == 0
 
-- name: Create OpenStack subnet pools from matching prefixes
+- name: Create OpenStack address scopes and subnet pools from matching prefixes
   when: prefixes_query.json.count | int > 0
   block:
+    - name: Validate Nautobot subnet pool custom fields
+      ansible.builtin.assert:
+        that:
+          - >-
+            (prefix_custom_fields.get('subnet_pool_name')
+            | default('', true) | string | length) > 0
+          - >-
+            (prefix_custom_fields.get('address_scope')
+            | default('', true) | string | length) > 0
+          - >-
+            (prefix_custom_fields.get('subnet_pool_default_prefixlen')
+            | default(0, true) | int) > 0
+          - >-
+            (prefix_custom_fields.get('subnet_pool_min_prefixlen')
+            | default(0, true) | int) > 0
+          - >-
+            (prefix_custom_fields.get('subnet_pool_max_prefixlen')
+            | default(0, true) | int) > 0
+          - >-
+            (prefix_custom_fields.get('subnet_pool_min_prefixlen')
+            | default(0, true) | int)
+            <=
+            (prefix_custom_fields.get('subnet_pool_default_prefixlen')
+            | default(0, true) | int)
+          - >-
+            (prefix_custom_fields.get('subnet_pool_default_prefixlen')
+            | default(0, true) | int)
+            <=
+            (prefix_custom_fields.get('subnet_pool_max_prefixlen')
+            | default(0, true) | int)
+        fail_msg: >-
+          Prefix '{{ prefix_item.prefix }}' is tagged '{{ subnet_pool_tag }}'
+          but is missing one of the required custom fields: subnet_pool_name,
+          address_scope, subnet_pool_default_prefixlen,
+          subnet_pool_min_prefixlen, subnet_pool_max_prefixlen, or has an
+          invalid prefix length range.
+        quiet: true
+      vars:
+        prefix_custom_fields: "{{ prefix_item.custom_fields | default({}, true) }}"
+      loop: "{{ prefixes_query.json.results }}"
+      loop_control:
+        loop_var: prefix_item
+        label: "{{ prefix_item.prefix }}"
+
+    - name: Initialize subnet pool map
+      ansible.builtin.set_fact:
+        subnet_pool_map: {}
+
     - name: Group prefixes by subnet pool name
       ansible.builtin.set_fact:
-        subnet_pools: |
+        subnet_pool_map: >-
           {{
-            prefixes_query.json.results
-            | selectattr('custom_fields.subnet_pool_name', 'defined')
-            | groupby('custom_fields.subnet_pool_name')
-            | map(attribute='1')
-            | map('list')
+            subnet_pool_map | combine({
+              prefix_item.custom_fields.subnet_pool_name:
+                subnet_pool_map.get(prefix_item.custom_fields.subnet_pool_name, []) + [prefix_item]
+            })
           }}
+      loop: "{{ prefixes_query.json.results }}"
+      loop_control:
+        loop_var: prefix_item
+        label: "{{ prefix_item.custom_fields.subnet_pool_name }}"
 
-    - name: Log discovered subnet pools
+    - name: Validate grouped subnet pool settings are consistent
+      ansible.builtin.assert:
+        that:
+          - pool_address_scopes | length == 1
+          - pool_default_prefix_lengths | length == 1
+          - pool_minimum_prefix_lengths | length == 1
+          - pool_maximum_prefix_lengths | length == 1
+          - pool_vrf_custom_values | length <= 1
+          - pool_vni_values | length <= 1
+        fail_msg: >-
+          Prefixes grouped into subnet pool '{{ subnet_pool_item.key }}' must
+          use one address_scope, one prefix length configuration, and at most
+          one non-empty VRF tag value and VNI tag value.
+        quiet: true
+      vars:
+        pool_address_scopes: >-
+          {{
+            subnet_pool_item.value
+            | map(attribute='custom_fields.address_scope')
+            | unique
+            | list
+          }}
+        pool_default_prefix_lengths: >-
+          {{
+            subnet_pool_item.value
+            | map(attribute='custom_fields.subnet_pool_default_prefixlen')
+            | unique
+            | list
+          }}
+        pool_minimum_prefix_lengths: >-
+          {{
+            subnet_pool_item.value
+            | map(attribute='custom_fields.subnet_pool_min_prefixlen')
+            | unique
+            | list
+          }}
+        pool_maximum_prefix_lengths: >-
+          {{
+            subnet_pool_item.value
+            | map(attribute='custom_fields.subnet_pool_max_prefixlen')
+            | unique
+            | list
+          }}
+        pool_vrf_custom_values: >-
+          {{
+            subnet_pool_item.value
+            | map(attribute='custom_fields.vrf_custom')
+            | reject('undefined')
+            | reject('none')
+            | map('string')
+            | map('trim')
+            | reject('equalto', '')
+            | unique
+            | list
+          }}
+        pool_vni_values: >-
+          {{
+            subnet_pool_item.value
+            | map(attribute='custom_fields.vni')
+            | reject('undefined')
+            | reject('none')
+            | map('string')
+            | map('trim')
+            | reject('equalto', '')
+            | unique
+            | list
+          }}
+      loop: "{{ subnet_pool_map | dict2items }}"
+      loop_control:
+        loop_var: subnet_pool_item
+        label: "{{ subnet_pool_item.key }}"
+
+    - name: Initialize address scope list
+      ansible.builtin.set_fact:
+        address_scope_names: []
+
+    - name: Collect address scopes from Nautobot subnet pools
+      ansible.builtin.set_fact:
+        address_scope_names: >-
+          {{
+            (
+              address_scope_names
+              + [subnet_pool_item.value[0].custom_fields.address_scope]
+            ) | unique | sort
+          }}
+      loop: "{{ subnet_pool_map | dict2items }}"
+      loop_control:
+        loop_var: subnet_pool_item
+        label: "{{ subnet_pool_item.value[0].custom_fields.address_scope }}"
+
+    - name: Initialize subnet pool tag map
+      ansible.builtin.set_fact:
+        subnet_pool_tag_map: {}
+
+    - name: Build OpenStack subnet pool tags from Nautobot custom fields
+      ansible.builtin.set_fact:
+        subnet_pool_tag_map: >-
+          {{
+            subnet_pool_tag_map | combine({
+              subnet_pool_item.key: (
+                []
+                + (
+                  ['VRF=' ~ pool_vrf_custom_values[0]]
+                  if pool_vrf_custom_values | length > 0
+                  else []
+                )
+                + (
+                  ['vni=' ~ pool_vni_values[0]]
+                  if pool_vni_values | length > 0
+                  else []
+                )
+              )
+            })
+          }}
+      vars:
+        pool_vrf_custom_values: >-
+          {{
+            subnet_pool_item.value
+            | map(attribute='custom_fields.vrf_custom')
+            | reject('undefined')
+            | reject('none')
+            | map('string')
+            | map('trim')
+            | reject('equalto', '')
+            | unique
+            | list
+          }}
+        pool_vni_values: >-
+          {{
+            subnet_pool_item.value
+            | map(attribute='custom_fields.vni')
+            | reject('undefined')
+            | reject('none')
+            | map('string')
+            | map('trim')
+            | reject('equalto', '')
+            | unique
+            | list
+          }}
+      loop: "{{ subnet_pool_map | dict2items }}"
+      loop_control:
+        loop_var: subnet_pool_item
+        label: "{{ subnet_pool_item.key }}"
+
+    - name: Log discovered address scopes and subnet pools
       ansible.builtin.debug:
         msg: |
+          Discovered address scopes:
+          {{ address_scope_names }}
+
           Discovered subnet pools:
-          {{ subnet_pools | map(attribute='0.custom_fields.subnet_pool_name') | list }}
+          {{ subnet_pool_map | dict2items | map(attribute='key') | sort | list }}
+
+    - name: Create or update OpenStack address scopes
+      openstack.cloud.address_scope:
+        state: present
+        name: "{{ address_scope_name }}"
+        ip_version: 4
+        is_shared: true
+      loop: "{{ address_scope_names }}"
+      loop_control:
+        loop_var: address_scope_name
+        label: "{{ address_scope_name }}"
+      register: address_scope_results
+
+    - name: Log address scope creation results
+      ansible.builtin.debug:
+        msg: >-
+          Address scope '{{ item.address_scope_name }}':
+          {{ 'created/updated' if item is changed else 'unchanged' }}
+      loop: "{{ address_scope_results.results }}"
+      loop_control:
+        label: "{{ item.address_scope_name }}"
+      when: item is not skipped
 
     - name: Create or update OpenStack subnet pools
       openstack.cloud.subnet_pool:
         state: present
-        name: "{{ pool_item[0].custom_fields.subnet_pool_name }}"
-        prefixes: "{{ pool_item | map(attribute='prefix') | list }}"
-        default_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_default_prefixlen }}"
-        minimum_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_min_prefixlen }}"
-        maximum_prefix_length: "{{ pool_item[0].custom_fields.subnet_pool_max_prefixlen }}"
+        name: "{{ subnet_pool_item.key }}"
+        address_scope: >-
+          {{ subnet_pool_item.value[0].custom_fields.address_scope }}
+        prefixes: "{{ subnet_pool_item.value | map(attribute='prefix') | sort | list }}"
+        default_prefix_length: >-
+          {{ subnet_pool_item.value[0].custom_fields.subnet_pool_default_prefixlen }}
+        minimum_prefix_length: >-
+          {{ subnet_pool_item.value[0].custom_fields.subnet_pool_min_prefixlen }}
+        maximum_prefix_length: >-
+          {{ subnet_pool_item.value[0].custom_fields.subnet_pool_max_prefixlen }}
         is_shared: true
-      loop: "{{ subnet_pools }}"
+      loop: "{{ subnet_pool_map | dict2items }}"
       loop_control:
-        loop_var: pool_item
-        label: "{{ pool_item[0].custom_fields.subnet_pool_name }}"
+        loop_var: subnet_pool_item
+        label: "{{ subnet_pool_item.key }}"
       register: subnet_pool_results
 
     - name: Log subnet pool creation results
       ansible.builtin.debug:
-        msg: "Subnet pool '{{ item.pool_item[0].custom_fields.subnet_pool_name }}': {{ 'created' if item is changed else 'unchanged' }}"
+        msg: >-
+          Subnet pool '{{ item.subnet_pool_item.key }}':
+          {{ 'created/updated' if item is changed else 'unchanged' }}
       loop: "{{ subnet_pool_results.results }}"
+      loop_control:
+        label: "{{ item.subnet_pool_item.key }}"
       when: item is not skipped
 
-    - name: Verify subnet pools were created
+    - name: Query current OpenStack subnet pool tags
+      ansible.builtin.command:
+        argv:
+          - openstack
+          - subnet
+          - pool
+          - show
+          - "{{ subnet_pool_item.key }}"
+          - "-f"
+          - json
+      loop: "{{ subnet_pool_map | dict2items }}"
+      loop_control:
+        loop_var: subnet_pool_item
+        label: "{{ subnet_pool_item.key }}"
+      register: subnet_pool_show_results
+      changed_when: false
+      check_mode: false
+
+    - name: Initialize subnet pool tag sync plan
+      ansible.builtin.set_fact:
+        subnet_pool_tag_sync_plan: {}
+
+    - name: Build OpenStack subnet pool tag sync plan
+      ansible.builtin.set_fact:
+        subnet_pool_tag_sync_plan: >-
+          {{
+            subnet_pool_tag_sync_plan | combine({
+              pool_name: {
+                'current': current_tags,
+                'desired': desired_tags,
+                'add': tags_to_add,
+                'remove': tags_to_remove,
+                'changed': ((tags_to_add | length) > 0 or (tags_to_remove | length) > 0)
+              }
+            })
+          }}
+      vars:
+        pool_name: "{{ item.subnet_pool_item.key }}"
+        current_tags: "{{ (item.stdout | from_json).tags | default([], true) | sort }}"
+        current_managed_tags: "{{ current_tags | select('match', '^(VRF=|vni=)') | list | sort }}"
+        desired_tags: "{{ subnet_pool_tag_map[pool_name] | default([]) | sort }}"
+        tags_to_add: "{{ desired_tags | difference(current_tags) | sort }}"
+        tags_to_remove: "{{ current_managed_tags | difference(desired_tags) | sort }}"
+      loop: "{{ subnet_pool_show_results.results }}"
+      loop_control:
+        label: "{{ item.subnet_pool_item.key }}"
+
+    - name: Remove stale OpenStack subnet pool tags
+      ansible.builtin.command:
+        argv:
+          - openstack
+          - subnet
+          - pool
+          - unset
+          - --tag
+          - "{{ tag_item.1 }}"
+          - "{{ tag_item.0.key }}"
+      loop: "{{ subnet_pool_tag_sync_plan | dict2items | subelements('value.remove') }}"
+      loop_control:
+        loop_var: tag_item
+        label: "{{ tag_item.0.key }} {{ tag_item.1 }}"
+      when: not ansible_check_mode
+      changed_when: true
+
+    - name: Add desired OpenStack subnet pool tags
+      ansible.builtin.command:
+        argv:
+          - openstack
+          - subnet
+          - pool
+          - set
+          - --tag
+          - "{{ tag_item.1 }}"
+          - "{{ tag_item.0.key }}"
+      loop: "{{ subnet_pool_tag_sync_plan | dict2items | subelements('value.add') }}"
+      loop_control:
+        loop_var: tag_item
+        label: "{{ tag_item.0.key }} {{ tag_item.1 }}"
+      when: not ansible_check_mode
+      changed_when: true
+
+    - name: Log subnet pool tag sync plan
       ansible.builtin.debug:
-        msg: "Successfully created/updated {{ subnet_pool_results.results | length }} subnet pools"
+        msg: >-
+          Subnet pool '{{ item.key }}' tags:
+          {{ 'updated' if item.value.changed else 'unchanged' }}
+          (desired managed: {{ item.value.desired }},
+          add: {{ item.value.add }},
+          remove: {{ item.value.remove }})
+      loop: "{{ subnet_pool_tag_sync_plan | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Summarize address scope and subnet pool sync
+      ansible.builtin.debug:
+        msg: >-
+          Processed {{ address_scope_results.results | length }} address scopes
+          ({{ address_scope_results.results | selectattr('changed') | list | length }}
+          changed) and {{ subnet_pool_results.results | length }} subnet pools
+          ({{ subnet_pool_results.results | selectattr('changed') | list | length }}
+          changed), and synced subnet pool tags
+          ({{ subnet_pool_tag_sync_plan | dict2items | selectattr('value.changed') | list | length }}
+          changed)
