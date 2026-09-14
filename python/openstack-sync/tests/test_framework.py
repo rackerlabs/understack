@@ -7,6 +7,7 @@ these tests describe the contract any future plugin can rely on.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -105,8 +106,46 @@ class StubPlugin(SyncPlugin):
         )
 
 
+class NoPrunePlugin(SyncPlugin):
+    """Plugin that intentionally inherits the framework's no-op prune."""
+
+    noun = "no-prune widget"
+
+    def __init__(self, config: HookConfig) -> None:
+        super().__init__(config)
+        self.reconciled: list[str] = []
+        self.waits = 0
+
+    def wait_for_api(self, conn: Any) -> None:
+        self.waits += 1
+
+    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> list[str]:
+        self.reconciled.append(spec["name"])
+        return []
+
+
+class AlwaysPrunePlugin(StubPlugin):
+    """Plugin whose prune is best-effort, so it runs even when PRUNE is off.
+
+    Mirrors RouterFlavorPlugin: it overrides should_run_prune to always run a
+    non-destructive sweep, but leaves uses_finalizer at the default, so with
+    PRUNE=false it installs no finalizer and holds nothing back on delete.
+    """
+
+    noun = "always-prune widget"
+
+    def should_run_prune(self) -> bool:
+        return True
+
+
 def _resource(
-    name: str, secret: str = "infrasetup", cloud: str = "understack"
+    name: str,
+    secret: str = "infrasetup",
+    cloud: str = "understack",
+    finalizers: tuple[str, ...] = (),
+    deletion_timestamp: str | None = None,
+    resource_version: str | None = None,
+    uid: str | None = None,
 ) -> SyncResource:
     return SyncResource(
         spec={"name": name},
@@ -115,6 +154,10 @@ def _resource(
         generation=1,
         secret_name=secret,
         cloud_name=cloud,
+        finalizers=finalizers,
+        deletion_timestamp=deletion_timestamp,
+        resource_version=resource_version,
+        uid=uid,
     )
 
 
@@ -137,6 +180,11 @@ def _drive(plugin: StubPlugin, inputs: HookInputs):
     with (
         mock.patch.object(framework, "get_openstack_connection") as connect,
         mock.patch.object(framework, "patch_resource_status") as patch_status,
+        mock.patch.object(framework, "add_resource_finalizer", return_value=True),
+        mock.patch.object(framework, "remove_resource_finalizer", return_value=True),
+        mock.patch.object(
+            framework, "release_deleted_resource_finalizer", return_value=True
+        ),
     ):
         code = run_sync(plugin, inputs)
     return code, patch_status, connect
@@ -291,11 +339,25 @@ def _cr(
     status: dict | None = None,
     secret: str = "infrasetup",
     cloud: str = "understack",
+    finalizers: list[str] | None = None,
+    deletion_timestamp: str | None = None,
+    uid: str | None = None,
 ) -> dict:
+    metadata: dict[str, Any] = {
+        "name": name,
+        "namespace": "openstack",
+        "generation": generation,
+        "uid": uid or f"uid-{name}",
+    }
+    if finalizers is not None:
+        metadata["finalizers"] = finalizers
+    if deletion_timestamp is not None:
+        metadata["deletionTimestamp"] = deletion_timestamp
+
     obj = {
         "apiVersion": CRD_API_VERSION,
         "kind": CRD_KIND,
-        "metadata": {"name": name, "namespace": "openstack", "generation": generation},
+        "metadata": metadata,
         "spec": {
             "name": name,
             "cloudCredentialsRef": {
@@ -438,6 +500,197 @@ def test_deleted_event_reconciles_nothing_but_prunes():
     inputs = hook_inputs(contexts, config)
 
     assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["gone"]
+    assert inputs.prune_credentials == frozenset({("infrasetup", "understack")})
+
+
+def _event(watch_event: str, obj: dict, snapshot: list[dict] | None = None) -> dict:
+    """Build one Event context with its associated snapshot."""
+    assert not (
+        watch_event == "Deleted" and snapshot is None
+    ), "a Deleted event needs its snapshot spelled out"
+    return {
+        "binding": BINDING,
+        "type": "Event",
+        "watchEvent": watch_event,
+        "object": obj,
+        "snapshots": {BINDING: [{"object": obj}] if snapshot is None else snapshot},
+    }
+
+
+def test_repeated_events_for_one_cr_reconcile_it_once():
+    """A failing run can accumulate a backlog; one CR stays one reconcile."""
+    config = make_hook_config()
+    live = _cr("probe", generation=3)
+    contexts = [
+        _event("Added", _cr("probe", generation=1), [{"object": live}]),
+        _event("Modified", _cr("probe", generation=2), [{"object": live}]),
+        _event("Modified", live, [{"object": live}]),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.spec["name"] for r in inputs.resources_to_reconcile] == ["probe"]
+    assert inputs.resources_to_reconcile[0].generation == 3
+
+
+def test_collapsed_batch_still_prunes_against_the_whole_snapshot():
+    """Collapsing changed events must not narrow the prune desired set."""
+    config = make_hook_config(prune=True, status_enabled=True)
+    live = _cr("probe", generation=3)
+    snapshot = [{"object": live}, {"object": _cr("untouched")}]
+    contexts = [_event("Added", _cr("probe", generation=1), snapshot)]
+    contexts += [_event("Modified", live, snapshot) for _ in range(2)]
+
+    inputs = hook_inputs(contexts, config)
+    plugin = StubPlugin(config)
+    code, patch_status, _ = _drive(plugin, inputs)
+
+    assert code == 0
+    assert plugin.reconciled == ["probe"]
+    assert patch_status.call_count == 1
+    assert plugin.pruned == [(["probe", "untouched"], False)]
+
+
+def test_deleted_event_cancels_an_earlier_change_in_the_same_batch():
+    config = make_hook_config()
+    contexts = [
+        _event("Added", _cr("probe"), []),
+        _event("Modified", _cr("probe"), []),
+        _event("Deleted", _cr("probe"), []),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+    assert inputs.prune_credentials == frozenset({("infrasetup", "understack")})
+
+
+def test_deleted_event_batch_does_not_log_zero_changed_crs(caplog):
+    config = make_hook_config()
+    contexts = [
+        _event("Added", _cr("probe"), []),
+        _event("Modified", _cr("probe"), []),
+        _event("Deleted", _cr("probe"), []),
+    ]
+
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.framework"):
+        inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+    assert "Collapsed 2 NeutronRouterFlavor changed event(s) across 1 CR(s)" in (
+        caplog.text
+    )
+    assert "into 0 changed CR(s)" not in caplog.text
+
+
+def test_repeated_delete_events_for_one_cr_are_collapsed():
+    config = make_hook_config()
+    contexts = [
+        _event("Deleted", _cr("probe"), []),
+        _event("Deleted", _cr("probe"), []),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+
+
+def test_a_recreate_after_a_delete_in_the_same_batch_is_reconciled():
+    """UID separates a recreated CR from the object it replaced."""
+    config = make_hook_config()
+    recreated = _cr("probe", generation=1, uid="new")
+    contexts = [
+        _event("Deleted", _cr("probe", generation=7, uid="old"), []),
+        _event("Added", recreated, [{"object": recreated}]),
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.generation for r in inputs.resources_to_reconcile] == [1]
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["probe"]
+
+
+def test_a_deleted_cr_does_not_wedge_the_reconcile(caplog):
+    """A backlogged deleted CR is pruned once and never status-patched."""
+    config = make_hook_config(prune=True, status_enabled=True)
+
+    def gone() -> dict:
+        return _cr(
+            "zz-probe",
+            secret="missing-secret",
+            status={"syncStatus": "Failed", "message": "not yet"},
+        )
+
+    contexts = [_event("Added", gone(), [])]
+    contexts += [_event("Modified", gone(), []) for _ in range(2)]
+    contexts += [_event("Deleted", gone(), [])]
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["zz-probe"]
+
+    plugin = StubPlugin(config)
+    with (
+        mock.patch.object(
+            framework,
+            "get_openstack_connection",
+            side_effect=RuntimeError('secrets "missing-secret" not found'),
+        ),
+        mock.patch.object(framework, "patch_resource_status") as patch_status,
+        caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.framework"),
+    ):
+        code = run_sync(plugin, inputs)
+
+    assert code == 1
+    assert plugin.reconciled == []
+    assert patch_status.call_count == 0
+    assert "Cannot reach OpenStack for widget prune" in caplog.text
+    assert "Failed to reconcile" not in caplog.text
+
+
+def test_deletion_timestamp_reconciles_nothing_but_prunes():
+    """A finalizer-protected delete arrives as Modified, not only Deleted."""
+    config = make_hook_config()
+    gone = _cr(
+        "gone",
+        finalizers=[framework.FINALIZER],
+        deletion_timestamp="2026-09-14T12:00:00Z",
+    )
+    contexts = [
+        {
+            "binding": BINDING,
+            "type": "Event",
+            "watchEvent": "Modified",
+            "object": gone,
+            "snapshots": {BINDING: [{"object": gone}, {"object": _cr("kept")}]},
+        }
+    ]
+
+    inputs = hook_inputs(contexts, config)
+
+    assert inputs.resources_to_reconcile == []
+    assert [r.spec["name"] for r in inputs.desired_resources_for_prune] == ["kept"]
+    assert [r.spec["name"] for r in inputs.deleted_resources] == ["gone"]
+    assert inputs.deleted_resources[0].has_finalizer is True
+
+
+def test_snapshot_deletion_timestamp_is_pruned_on_periodic_runs():
+    """A restart can recover a delete because the terminating CR remains listed."""
+    config = make_hook_config()
+    gone = _cr(
+        "gone",
+        finalizers=[framework.FINALIZER],
+        deletion_timestamp="2026-09-14T12:00:00Z",
+    )
+
+    inputs = hook_inputs(_snapshot_context(gone, _cr("kept")), config)
+
+    assert [r.spec["name"] for r in inputs.resources_to_reconcile] == ["kept"]
+    assert [r.spec["name"] for r in inputs.desired_resources_for_prune] == ["kept"]
     assert [r.spec["name"] for r in inputs.deleted_resources] == ["gone"]
     assert inputs.prune_credentials == frozenset({("infrasetup", "understack")})
 
@@ -874,6 +1127,137 @@ def test_run_sync_prunes_after_successful_reconcile():
     assert plugin.pruned == [(["a"], False)]
 
 
+def test_run_sync_adds_finalizer_before_reconcile_when_prune_enabled():
+    plugin = StubPlugin(make_hook_config(prune=True))
+    events: list[str] = []
+
+    def add_finalizer(**kwargs):
+        events.append("finalizer")
+        assert kwargs["finalizer"] == framework.FINALIZER
+        assert kwargs["target"].name == "a"
+        assert kwargs["target"].kind == CRD_KIND
+        assert kwargs["resource_version"] == "12345"
+        return True
+
+    def connect(*args):
+        events.append("connect")
+        return mock.sentinel.conn
+
+    with (
+        mock.patch.object(
+            framework, "add_resource_finalizer", side_effect=add_finalizer
+        ),
+        mock.patch.object(framework, "get_openstack_connection", side_effect=connect),
+        mock.patch.object(framework, "patch_resource_status"),
+        mock.patch.object(framework, "remove_resource_finalizer", return_value=True),
+        mock.patch.object(
+            framework, "release_deleted_resource_finalizer", return_value=True
+        ),
+    ):
+        code = run_sync(plugin, _inputs([_resource("a", resource_version="12345")]))
+
+    assert code == 0
+    assert events == ["finalizer", "connect"]
+    assert plugin.reconciled == ["a"]
+
+
+def test_run_sync_does_not_reconcile_when_finalizer_add_fails():
+    plugin = StubPlugin(make_hook_config(prune=True))
+
+    with (
+        mock.patch.object(framework, "add_resource_finalizer", return_value=False),
+        mock.patch.object(framework, "get_openstack_connection") as connect,
+        mock.patch.object(framework, "patch_resource_status") as patch_status,
+        mock.patch.object(framework, "remove_resource_finalizer", return_value=True),
+        mock.patch.object(
+            framework, "release_deleted_resource_finalizer", return_value=True
+        ),
+    ):
+        code = run_sync(plugin, _inputs([_resource("a")]))
+
+    assert code == 1
+    connect.assert_not_called()
+    assert plugin.reconciled == []
+    assert plugin.pruned == []
+    assert patch_status.call_args.kwargs["sync_status"] == "Failed"
+    assert "finalizer" in patch_status.call_args.kwargs["message"]
+
+
+def test_run_sync_does_not_add_finalizer_for_base_noop_prune():
+    plugin = NoPrunePlugin(make_hook_config(prune=True))
+
+    with (
+        mock.patch.object(framework, "add_resource_finalizer") as add,
+        mock.patch.object(framework, "get_openstack_connection"),
+        mock.patch.object(framework, "patch_resource_status"),
+        mock.patch.object(framework, "remove_resource_finalizer", return_value=True),
+    ):
+        code = run_sync(plugin, _inputs([_resource("a")]))
+
+    assert code == 0
+    add.assert_not_called()
+    assert plugin.reconciled == ["a"]
+
+
+def test_run_sync_removes_live_finalizer_when_prune_disabled():
+    plugin = StubPlugin(make_hook_config(prune=False))
+
+    with (
+        mock.patch.object(framework, "add_resource_finalizer") as add,
+        mock.patch.object(framework, "get_openstack_connection") as connect,
+        mock.patch.object(framework, "patch_resource_status"),
+        mock.patch.object(
+            framework, "remove_resource_finalizer", return_value=True
+        ) as remove,
+    ):
+        code = run_sync(
+            plugin,
+            _inputs([_resource("a", finalizers=(framework.FINALIZER,))]),
+        )
+
+    assert code == 0
+    add.assert_not_called()
+    connect.assert_called_once()
+    remove.assert_called_once()
+    assert remove.call_args.kwargs["target"].name == "a"
+    assert remove.call_args.kwargs["finalizer"] == framework.FINALIZER
+    assert plugin.reconciled == ["a"]
+
+
+def test_run_sync_does_not_run_prune_after_reconcile_when_prune_disabled():
+    plugin = StubPlugin(make_hook_config(prune=False))
+
+    code, _, connect = _drive(plugin, _inputs([_resource("a")]))
+
+    assert code == 0
+    connect.assert_called_once()
+    assert plugin.reconciled == ["a"]
+    assert plugin.pruned == []
+
+
+def test_run_sync_does_not_reconcile_when_disabled_finalizer_remove_fails():
+    plugin = StubPlugin(make_hook_config(prune=False))
+
+    with (
+        mock.patch.object(framework, "add_resource_finalizer") as add,
+        mock.patch.object(framework, "get_openstack_connection") as connect,
+        mock.patch.object(framework, "patch_resource_status") as patch_status,
+        mock.patch.object(framework, "remove_resource_finalizer", return_value=False),
+    ):
+        code = run_sync(
+            plugin,
+            _inputs([_resource("a", finalizers=(framework.FINALIZER,))]),
+        )
+
+    assert code == 1
+    add.assert_not_called()
+    connect.assert_not_called()
+    assert plugin.reconciled == []
+    assert plugin.pruned == []
+    assert patch_status.call_args.kwargs["sync_status"] == "Failed"
+    assert "finalizer" in patch_status.call_args.kwargs["message"]
+
+
 def test_run_sync_prune_is_authoritative_for_deleted_credentials():
     """A confirmed deletion lets prune act on an empty desired set."""
     plugin = StubPlugin(make_hook_config(prune=True))
@@ -884,6 +1268,140 @@ def test_run_sync_prune_is_authoritative_for_deleted_credentials():
 
     assert code == 0
     assert plugin.pruned == [([], True)]
+
+
+def test_run_sync_removes_finalizer_after_successful_prune():
+    plugin = StubPlugin(make_hook_config(prune=True))
+    deleted = _resource(
+        "gone",
+        finalizers=(framework.FINALIZER,),
+        deletion_timestamp="2026-09-14T12:00:00Z",
+    )
+    inputs = _inputs([], desired=[], deleted=[deleted])
+
+    with (
+        mock.patch.object(framework, "add_resource_finalizer", return_value=True),
+        mock.patch.object(framework, "get_openstack_connection"),
+        mock.patch.object(framework, "patch_resource_status"),
+        mock.patch.object(
+            framework, "release_deleted_resource_finalizer", return_value=True
+        ) as release,
+    ):
+        code = run_sync(plugin, inputs)
+
+    assert code == 0
+    assert plugin.pruned == [([], True)]
+    release.assert_called_once()
+    assert release.call_args.kwargs["target"].name == "gone"
+    assert release.call_args.kwargs["finalizer"] == framework.FINALIZER
+
+
+def test_run_sync_keeps_finalizer_when_prune_fails():
+    plugin = StubPlugin(make_hook_config(prune=True), prune_raises=True)
+    deleted = _resource(
+        "gone",
+        finalizers=(framework.FINALIZER,),
+        deletion_timestamp="2026-09-14T12:00:00Z",
+    )
+    inputs = _inputs([], desired=[], deleted=[deleted])
+
+    with (
+        mock.patch.object(framework, "add_resource_finalizer", return_value=True),
+        mock.patch.object(framework, "get_openstack_connection"),
+        mock.patch.object(framework, "patch_resource_status"),
+        mock.patch.object(framework, "release_deleted_resource_finalizer") as release,
+    ):
+        code = run_sync(plugin, inputs)
+
+    assert code == 1
+    release.assert_not_called()
+
+
+def test_run_sync_removes_existing_finalizer_when_prune_disabled():
+    plugin = StubPlugin(make_hook_config(prune=False))
+    deleted = _resource(
+        "gone",
+        finalizers=(framework.FINALIZER,),
+        deletion_timestamp="2026-09-14T12:00:00Z",
+    )
+    inputs = _inputs([], desired=[], deleted=[deleted])
+
+    with (
+        mock.patch.object(framework, "add_resource_finalizer", return_value=True),
+        mock.patch.object(framework, "get_openstack_connection") as connect,
+        mock.patch.object(framework, "patch_resource_status"),
+        mock.patch.object(
+            framework, "release_deleted_resource_finalizer", return_value=True
+        ) as release,
+    ):
+        code = run_sync(plugin, inputs)
+
+    assert code == 0
+    connect.assert_not_called()
+    assert plugin.pruned == []
+    release.assert_called_once()
+
+
+def test_run_sync_removes_existing_finalizer_for_base_noop_prune_without_connection():
+    plugin = NoPrunePlugin(make_hook_config(prune=True))
+    deleted = _resource(
+        "gone",
+        finalizers=(framework.FINALIZER,),
+        deletion_timestamp="2026-09-14T12:00:00Z",
+    )
+    inputs = _inputs([], desired=[], deleted=[deleted])
+
+    with (
+        mock.patch.object(framework, "add_resource_finalizer") as add,
+        mock.patch.object(framework, "get_openstack_connection") as connect,
+        mock.patch.object(framework, "patch_resource_status"),
+        mock.patch.object(
+            framework, "release_deleted_resource_finalizer", return_value=True
+        ) as release,
+    ):
+        code = run_sync(plugin, inputs)
+
+    assert code == 0
+    add.assert_not_called()
+    connect.assert_not_called()
+    release.assert_called_once()
+
+
+def test_run_sync_releases_stale_finalizer_when_best_effort_prune_cannot_connect():
+    """A finalizer the plugin no longer uses must not wedge a delete on prune.
+
+    The plugin runs a best-effort sweep even with PRUNE off (should_run_prune is
+    True), so uses_finalizer is False. When that sweep cannot reach OpenStack the
+    run still reports failure, but the stale finalizer -- left from when the
+    plugin did use one -- is released so the CR can finish deleting.
+    """
+    plugin = AlwaysPrunePlugin(make_hook_config(prune=False))
+    deleted = _resource(
+        "gone",
+        finalizers=(framework.FINALIZER,),
+        deletion_timestamp="2026-09-14T12:00:00Z",
+    )
+    inputs = _inputs([], desired=[], deleted=[deleted])
+
+    with (
+        mock.patch.object(
+            framework,
+            "get_openstack_connection",
+            side_effect=RuntimeError("no route to keystone"),
+        ),
+        mock.patch.object(framework, "patch_resource_status"),
+        mock.patch.object(
+            framework, "release_deleted_resource_finalizer", return_value=True
+        ) as release,
+    ):
+        code = run_sync(plugin, inputs)
+
+    # The unreachable sweep is still surfaced as a failure...
+    assert code == 1
+    assert plugin.pruned == []
+    # ...but the stale finalizer is released regardless, so the CR is not stuck.
+    release.assert_called_once()
+    assert release.call_args.kwargs["target"].name == "gone"
 
 
 def test_run_sync_prunes_against_every_credentials_desired_resources():

@@ -28,12 +28,34 @@ openstack_sync/
 
 ## What the framework does for you
 
-`run_sync` groups CRs by the credentials in `spec.cloudCredentialsRef`, opens one
-connection per credential group, waits for the OpenStack service, reconciles each
-CR, patches `Synced`/`Failed` onto the CR status, and then calls the plugin's
-prune step, which most plugins gate on `PRUNE`. If any reconcile fails, or any CR
-could not be read at all, it **skips the prune entirely** - either way the
-desired state is unknown, so deleting anything would be unsafe.
+`run_sync` groups CRs by the credentials in `spec.cloudCredentialsRef`, adds the
+framework finalizer to live CRs that need delete cleanup, opens one connection
+per credential group, waits for the OpenStack service, reconciles each CR,
+patches `Synced`/`Failed` onto the CR status, and then calls the plugin's prune
+step. If any reconcile fails, or any CR could not be read at all, it **skips the
+prune entirely** - either way the desired state is unknown, so deleting anything
+would be unsafe.
+
+Deleting a finalized CR is a two-phase operation. Kubernetes sets
+`metadata.deletionTimestamp` and keeps the object listed; the framework routes
+that CR to the plugin's prune path instead of reconciling it. When the plugin
+uses a finalizer, the framework removes it only after prune finishes
+successfully, so a failed prune keeps the CR around for the next run to retry.
+This also makes missed delete events recoverable: terminating CRs in the next
+snapshot are still treated as pending deletes.
+
+A finalizer left on a CR the plugin no longer uses is always released, even if a
+best-effort prune could not connect. Such a finalizer guards no outstanding
+cleanup, so holding it back would only wedge the CR in `Terminating` for a step
+it does not depend on.
+
+The framework does not add finalizers by default. It adds one only when
+`PRUNE=true` and the plugin has a real prune step. A finalizer tells Kubernetes
+to keep a deleted CR around until the controller finishes required cleanup. When
+`PRUNE=false`, deleting the CR does not delete anything in OpenStack, so there is
+no cleanup for Kubernetes to wait for. The framework leaves finalizers off. If
+`PRUNE` is turned off later, the next run removes any finalizer that this
+framework added earlier.
 
 A CR whose spec does not satisfy the framework's contract is named in the log and
 dropped, and the run exits non-zero. The remaining CRs still reconcile: one
@@ -107,7 +129,12 @@ reading the binding context, and the exit code.
    ```
 
    `wait_for_api` and `reconcile` are required; `new_cache` and `prune` have
-   working defaults.
+   working defaults. The framework installs finalizers only for plugins that
+   override `prune` and have `PRUNE` enabled. If a plugin needs finalizers for a
+   different cleanup model, override `uses_finalizer()`. If a plugin's prune is
+   safe to run even when `PRUNE` is disabled (for example non-destructive
+   cleanup), override `should_run_prune()` to always return `True`; the
+   framework then opens a connection for prune even on a delete-only run.
 
 ## Two rules worth knowing
 

@@ -298,6 +298,14 @@ def _run_main(monkeypatch, tmp_path, contexts: list[dict], conn: Any):
         mock.patch(
             "openstack_sync.hooks.framework.patch_resource_status"
         ) as patch_status,
+        mock.patch(
+            "openstack_sync.hooks.framework.add_resource_finalizer",
+            return_value=True,
+        ),
+        mock.patch(
+            "openstack_sync.hooks.framework.remove_resource_finalizer",
+            return_value=True,
+        ),
         mock.patch.object(hook, "wait_for_openstack_network"),
     ):
         code = hook.main()
