@@ -14,12 +14,92 @@ Scenario IDs are declared as `### <ID> — <title>` headings. Ideas under
 "Planned / future" are intentionally *not* IDs (no `###` heading) so they are not
 treated as catalogued-but-untested.
 
+## How the mechanism works (read this first)
+
+If you have never worked on these drivers, read this section before the
+scenarios. Every scenario below is phrased in terms of the vocabulary and the
+lifecycle described here.
+
+### The problem being solved
+
+A tenant network in UnderStack is a **VXLAN** network: it has one VXLAN segment
+with a VNI, and that VNI is the network's identity as far as Neutron and OVN are
+concerned. A baremetal server, though, has no vSwitch. Its NIC is cabled into a
+physical leaf switch, and the only thing you can tell a physical switchport
+about is a **VLAN**.
+
+So for every tenant network that has to reach baremetal, something must pick a
+VLAN id *on that particular switch pair* and stretch the VXLAN network onto it.
+That something is the `understack` mechanism driver, and the mechanism it uses
+is Neutron's **hierarchical port binding**.
+
+### Vocabulary
+
+| Term | What it means here |
+| --- | --- |
+| **VLAN group**, a.k.a. **physnet** | One pair of leaf switches. Neutron calls it a `physical_network`; we call it a VLAN group. The tests use `physnet1` / `physnet2`. Ironic tells us which VLAN group a baremetal port lives on via `binding_profile["physical_network"]`. |
+| **VLAN id pool** | The VLAN ranges configured for a physnet. VLAN ids are only unique *within* a VLAN group, so two switch pairs can independently hand out the same VLAN id for different networks. The pool is finite, which is why leaking VLAN ids matters. |
+| **dynamic segment** | A VLAN segment Neutron allocates on demand for one `(network, physnet)` pair and flags `is_dynamic`. It is the VXLAN network's local VLAN representation on that one switch pair. |
+| **binding level** | A row in `ml2_port_binding_levels` recording "driver *D* bound port *P* at level *N* to segment *S*". Hierarchical binding produces one row per level. These rows are also what we count to decide whether a segment is still in use. |
+| **undersync** | The service that renders and pushes the desired switch configuration. `undersync.sync(<physnet>)` means "go reconcile that VLAN group's switches"; it is a whole-group reconcile, not a per-port delta. |
+
+### The binding chain
+
+The deployed driver order is
+`mechanism_drivers = ovn,understack,baremetal,undersync`. For a baremetal
+vif-attach the interesting part is:
+
+1. Ironic sets `binding:host_id` and a `binding_profile` on the Neutron port.
+   The profile carries `physical_network` (which VLAN group) and
+   `local_link_information` (which switch and interface).
+2. `understack.bind_port` finds the network's VXLAN segment, obtains the dynamic
+   VLAN segment for `(network, physnet)` — see the next section — and calls
+   `continue_binding`, handing that VLAN segment down to the next driver.
+3. `undersync.bind_port` accepts the VLAN segment and calls `set_binding`
+   (`vif_type=OTHER`), which ends the chain.
+4. The port now has **two binding levels**: level 0 = `understack` on the VXLAN
+   segment, level 1 = `undersync` on the dynamic VLAN segment.
+5. `understack.update_port_postcommit` calls `undersync.sync(<physnet>)`, which
+   is what actually makes the switch configuration match.
+
+This is why most scenarios assert three things: the binding levels and their
+segments (did we model the network correctly?), the segment's allocation state
+(did we manage the VLAN pool correctly?), and that `undersync.sync` was called
+for the right physnet (did we ask for the switches to be reconciled?).
+
+### The dynamic VLAN segment is shared, so it is reference-counted
+
+This is the single most important thing to understand, and most of the
+segment-related assertions below exist to pin it down.
+
+A dynamic VLAN segment belongs to a `(network, physnet)` pair, **not** to a
+port. Ten baremetal ports on the same tenant network in the same VLAN group all
+share one VLAN id — that is the whole point, they need to be in the same
+broadcast domain on that switch pair. So:
+
+- **On the way in, we allocate *or* reuse.** Binding a port looks for an
+  existing VLAN segment for that `(network, physnet)` pair. If one exists, the
+  port is bound to it and no new VLAN id is taken from the pool. Only if there
+  is none do we allocate a new dynamic segment. (See `BM-BIND-REUSE-01`.)
+- **On the way out, we release *only if* nothing else is using it.** Unbinding
+  or deleting a port must *not* free the VLAN id just because that port is
+  gone — its neighbours on the same network and switch pair are still using it.
+  The release is conditional: `utils.release_segment_if_unused` frees the
+  segment only when no binding level rows still reference it *and* the segment
+  is dynamic. If any port (or trunk subport) remains bound to it, the segment
+  and its VLAN id stay.
+
+Read every "releases the VLAN segment" phrase below as "releases the VLAN
+segment **if and only if** it is dynamic and no other port is still bound to
+it". The scenarios that assert a release do so in a setup with a single
+consumer, precisely so that the release is the expected outcome.
+
 ## Baremetal port binding (Ironic vif-attach)
 
-Runtime chain: `mechanism_drivers = ovn,understack,baremetal,undersync`. These
-scenarios load `logger,understack,undersync` (OVN is only needed for router
-scenarios). Tenant networks are VXLAN; the physnet named in the binding profile
-(`physnet1` in tests) is a VLAN group.
+These scenarios load `logger,understack,undersync` rather than the full
+deployed chain (OVN is only needed for the router scenarios). Tenant networks
+are VXLAN; the physnet named in the binding profile (`physnet1` in tests) is a
+VLAN group.
 
 ### BM-BIND-01 — baremetal vif-attach binds hierarchically
 - given: a VXLAN tenant network and an unbound baremetal port
@@ -48,22 +128,45 @@ scenarios). Tenant networks are VXLAN; the physnet named in the binding profile
 - then: neither `understack` nor `undersync` binds it (`binding_failed`), and
   `undersync.sync` is not called
 
-### BM-BIND-04 — vif-detach unbinds, reconciles, and releases the VLAN segment
-- given: a bound baremetal port (per BM-BIND-01)
+### BM-BIND-04 — vif-detach unbinds, reconciles, and releases the VLAN segment if unused
+- given: a bound baremetal port (per BM-BIND-01), and it is the **only** port
+  bound to that dynamic VLAN segment
 - when: the binding is cleared (`binding:host_id=""`, empty profile)
-- then: the port returns to `binding:vif_type=unbound`,
-  `undersync.sync(<physnet>)` reconciles the switch, and the dynamic VLAN segment
-  is **released** so its VLAN id returns to the pool
-- status: **KNOWN BUG (xfail)** — the driver does not release the segment on
-  detach today (see "Known bugs"). The test asserts the desired behavior and is
-  marked `xfail(strict=True)`, so it will start failing (prompting removal of the
-  xfail) once the bug is fixed.
+- then:
+  - the port returns to `binding:vif_type=unbound`
+  - `undersync.sync(<physnet>)` reconciles the switch
+  - the dynamic VLAN segment is **released** — but only because no other port
+    is still bound to it. The release is conditional
+    (`release_segment_if_unused`): had a sibling port on the same network and
+    physnet still been bound, the segment and its VLAN id would have to stay.
+    This scenario sets up a single consumer so that the release is the correct
+    outcome; `BM-BIND-REUSE-01` covers the sharing that makes the condition
+    necessary.
+- status: **KNOWN BUG (xfail, rackerlabs/understack#2239)** — the driver does not
+  release the segment on detach today (see "Known bugs"). The test asserts the
+  desired behavior and is marked `xfail(strict=True)`, so it will start failing
+  (prompting removal of the xfail) once the bug is fixed.
 
-### BM-BIND-05 — port delete releases the dynamic VLAN segment
-- given: a bound baremetal port (per BM-BIND-01)
+### BM-BIND-05 — port delete releases the dynamic VLAN segment if unused
+- given: a bound baremetal port (per BM-BIND-01), and it is the **only** port
+  bound to that dynamic VLAN segment
 - when: the port is deleted
-- then: the dynamic VLAN segment is released (no ports remain bound to it) and
-  `undersync.sync(<physnet>)` reconciles the switch
+- then: `undersync.sync(<physnet>)` reconciles the switch, and the dynamic VLAN
+  segment is released **because, and only because, no ports remain bound to
+  it**. Deleting a port is not by itself a reason to free the VLAN id: if any
+  other port on the same `(network, physnet)` pair is still bound, the segment
+  must survive the delete.
+
+### BM-DEL-SHARED-01 — deleting one of two ports sharing a segment keeps it
+- given: two baremetal ports on the same VXLAN network, both bound on
+  `physnet1` and therefore sharing one dynamic VLAN segment (per
+  BM-BIND-REUSE-01)
+- when: the first port is deleted
+- then: `undersync.sync(physnet1)` reconciles the switch but the dynamic VLAN
+  segment is **retained** — the surviving port is still bound to it and still
+  needs that VLAN on the switch. This is the negative half of BM-BIND-05: it
+  pins down that the release is conditional rather than an unconditional
+  consequence of deleting a port.
 
 ### BM-BIND-06 — vif-attach with no IP still emits the physnet sync
 - given: a VXLAN network with a subnet, and a baremetal port created with no
@@ -76,7 +179,9 @@ scenarios). Tenant networks are VXLAN; the physnet named in the binding profile
 - given: a VXLAN network with one bound baremetal port on `physnet1`
 - when: a second baremetal port on the same network is vif-attached to `physnet1`
 - then: it reuses the existing dynamic VLAN segment (same segment id), no new
-  allocation
+  allocation — both servers must land in the same broadcast domain on that
+  switch pair, and the physnet's VLAN pool is finite. This shared segment is
+  what makes the release in BM-BIND-04 / BM-BIND-05 necessarily conditional.
 
 ### PROV-BIND-01 — provisioning-network port binds
 - given: a network configured as `ml2_understack.provisioning_network`
@@ -103,6 +208,26 @@ scenarios). Tenant networks are VXLAN; the physnet named in the binding profile
 
 ## Trunk subport operations
 
+A trunk lets one baremetal NIC carry several networks: the parent port's
+network is the untagged/native VLAN on the switchport, and each **subport** is
+an additional network carried as a tagged VLAN on the same switchport.
+
+The subport's VLAN comes from the same `(network, physnet)` dynamic segment
+machinery as a normal bound port, on the **parent's** physnet — the switch pair
+the parent is cabled to is the one that has to carry the extra VLAN. A subport
+never binds through the ML2 chain (nothing does a vif-attach for it), so the
+trunk driver writes the level-0 `ml2_port_binding_levels` row itself
+(`utils.create_binding_profile_level`, driver `understack`, level 0). That
+synthetic row is what records "this subport's network is carried on VLAN *X* of
+the parent's switchport", and it is also what keeps the shared segment
+reference-counted: removing a subport deletes its row and then releases the
+segment only if no rows are left pointing at it.
+
+Note that a subport carries *two* VLAN ids that are easy to confuse: the
+tenant-facing `segmentation_id` the user chose in the trunk API (what the
+instance tags its frames with), and the fabric VLAN id of the dynamic segment on
+the parent's physnet. The scenarios below are about the latter.
+
 These scenarios load the real neutron trunk service plugin
 (`UnderstackMl2TrunkScenarioBase`). The parent is a bound baremetal port; subport
 adds/removes must reconcile the parent's switch (VLAN group).
@@ -112,16 +237,27 @@ adds/removes must reconcile the parent's switch (VLAN group).
 - given: a bound baremetal parent port on `physnet1` with a trunk, and a subport
   port on another network
 - when: the subport is added to the trunk (VLAN segmentation)
-- then: the trunk records the subport, a level-0 `understack` binding points it
-  at a dynamic VLAN segment on `physnet1`, and `undersync.sync(physnet1)`
-  reconciles the parent port's switch
+- then:
+  - the trunk records the subport
+  - the trunk driver obtains the dynamic VLAN segment for the subport's network
+    on the parent's physnet (`physnet1`), reusing an existing one for that
+    `(network, physnet)` pair if there is one and allocating a new one
+    otherwise
+  - it writes a level-0 `ml2_port_binding_levels` row for the subport (driver
+    `understack`, host = the parent's binding host) pointing at that segment —
+    that row is the record that the subport's network is carried on this VLAN
+    of the parent's switchport
+  - `undersync.sync(physnet1)` reconciles the parent port's switch
 
 ### TRUNK-SUB-DEL — subport removal syncs the parent's physnet
 - given: the TRUNK-SUB-ADD setup with the subport attached
 - when: the subport is removed from the trunk
-- then: the trunk result no longer contains the subport, its synthetic binding
-  level is deleted, its now-unused dynamic VLAN segment is released, and
-  `undersync.sync(physnet1)` reconciles the parent port's switch
+- then: the trunk result no longer contains the subport, its synthetic level-0
+  binding row is deleted, the dynamic VLAN segment it pointed at is released
+  **because that row was the last reference to it**, and
+  `undersync.sync(physnet1)` reconciles the parent port's switch. Had another
+  port or subport still been bound to that segment, only the row would go and
+  the segment would stay.
 
 ### TRUNK-PARENT-NOIP — subport add syncs when the parent has no IP
 - given: a bound baremetal parent on a subnetted network but with no fixed IP,
@@ -134,21 +270,28 @@ adds/removes must reconcile the parent's switch (VLAN group).
 ### TRUNK-DEL-01 — trunk delete syncs the parent's physnet
 - given: a bound baremetal parent with a trunk and an attached subport
 - when: the trunk is deleted
-- then: the trunk is gone, the subport binding and now-unused dynamic segment
-  are deleted, the parent switchport is cleaned, and `undersync.sync(physnet1)`
-  fires
+- then: the trunk is gone, the subport's level-0 binding row is deleted and the
+  dynamic segment released as no reference to it remains, the parent switchport
+  is cleaned, and `undersync.sync(physnet1)` fires
 
 ### TRUNK-MULTI-01 — adding multiple subports syncs the parent's physnet
 - given: a bound baremetal parent with a trunk
 - when: two subports on different networks are added in one operation
-- then: each subport has its own level-0 binding to a dynamic VLAN segment on
-  `physnet1`, the segments are distinct, and `undersync.sync(physnet1)` fires
+- then: each subport gets its own level-0 binding row pointing at the dynamic
+  VLAN segment for *its* network on `physnet1` — reusing the existing segment
+  for that `(network, physnet)` pair if one is already in use, otherwise
+  allocating a fresh one from the physnet's pool. Here the two subports are on
+  different networks, so they end up on two distinct segments (two VLAN ids);
+  two subports on the *same* network would share one. `undersync.sync(physnet1)`
+  fires.
 
 ### TRUNK-PARENT-UNBOUND-01 — subport add with an unbound parent is a no-op
 - given: an unbound (plain) parent port with a trunk
 - when: a subport is added
-- then: trunk membership is recorded, but no subport binding level or dynamic
-  VLAN segment is created and no `undersync.sync` occurs
+- then: trunk membership is recorded, but no subport binding level row or
+  dynamic VLAN segment is created and no `undersync.sync` occurs — with no
+  parent binding there is no physnet to carry the subport on and nothing to
+  reconcile
 
 ### TRUNK-SEGID-RANGE-01 — subport seg_id outside the allowed range is rejected
 - given: a bound baremetal parent with a trunk
@@ -220,6 +363,16 @@ mirror images of each other.
 - then: the attach is rejected (per-IP-version scope conflict)
 
 ## Router uplink (non-flavored, OVN)
+
+A non-flavored router is realized by OVN, which runs on the **network nodes**,
+not on the leaf switches. So when such a router gains an interface on a tenant
+network, that network has to be extended from the fabric up to the network
+nodes. That extension is the **uplink**: a dynamic VLAN segment on the network
+nodes' physnet, a shared Neutron port named `uplink-<segment-id>` holding it, a
+subport on the network-node trunk tagging that VLAN, and an OVN `localnet`
+logical switch port on the network's logical switch carrying the same tag. One
+uplink per network, built by the first router interface and torn down by the
+last — hence OVN-ROUTER-SECOND-01 being a no-op.
 
 These load an L3 router + flavors + trunk plugin
 (`UnderstackMl2RouterOvnScenarioBase`) and patch `routers.ovn_client` with a
@@ -294,8 +447,10 @@ flavor + service profile (`driver` = the PaloAlto class, `metainfo.resource_clas
   never freed on detach. It is only released on port **delete**
   (`_delete_port_baremetal`, BM-BIND-05), which contradicts the comment there that
   says detach "normally" releases it. Result: VLAN ids leak whenever a port is
-  unbound without being deleted. Fix should release the dynamic (bottom) segment
-  on the detach transition; the xfail flips to a pass once fixed.
+  unbound without being deleted. The fix is to pass the dynamic (bottom) segment
+  to `release_segment_if_unused` on the detach transition — still conditional, so
+  a segment shared with a sibling port on the same `(network, physnet)` pair is
+  left alone. The xfail flips to a pass once fixed.
 
 ## Backlog (not yet covered)
 
@@ -313,9 +468,6 @@ Trunk (no new test doubles):
   (`trunk_created` path); confirm whether it syncs (it may not — possible gap).
 - TRUNK-PARENT-UNBIND-01 — unbinding a trunked baremetal parent runs `clean_trunk`
   (subport teardown) alongside BM-BIND-04's segment handling.
-- TRUNK-NOPHYSNET-01 — subport add/remove on a parent with no `physical_network`.
-  Not reachable via normal binding (a baremetal port cannot bind without a
-  physnet), so needs an artificially mutated binding profile.
 
 SVI validation:
 - SVI-EXTGW-01 — an SVI router cannot get an external gateway. Needs the real

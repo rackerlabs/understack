@@ -129,6 +129,28 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
         assert segments_db.get_segment_by_id(self.context, vlan_segment_id) is None
 
+    @pytest.mark.scenario("BM-DEL-SHARED-01")
+    def test_delete_keeps_segment_still_in_use(self):
+        """Deleting one of two ports sharing a VLAN segment must not free it.
+
+        The dynamic segment belongs to the (network, physnet) pair, so the
+        surviving port still needs its VLAN on the switch.
+        """
+        net = self._make_vxlan_network()
+        first = self._create_unbound_baremetal_port(net["id"])
+        self._vif_attach(first["id"])
+        vlan_segment_id = self._bottom_segment_id(first["id"])
+
+        second = self._create_unbound_baremetal_port(net["id"])
+        self._vif_attach(second["id"])
+        assert self._bottom_segment_id(second["id"]) == vlan_segment_id
+        self.undersync_mock.reset_mock()
+
+        self._delete("ports", first["id"], as_admin=True)
+
+        self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
+        assert segments_db.get_segment_by_id(self.context, vlan_segment_id) is not None
+
     @pytest.mark.scenario("BM-BIND-06")
     def test_vif_attach_without_ip_still_syncs(self):
         """A bound baremetal port with no IP still emits the physnet sync."""
