@@ -93,6 +93,12 @@ conf:
       amqp_durable_queues: true
       # https://docs.openstack.org/large-scale/journey/configure/rabbitmq.html#rabbit-transient-queues-ttl
       rabbit_transient_queues_ttl: 300
+      rabbit_ha_queues: false
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: true
+      rabbit_qos_prefetch_count: 1
+      use_queue_manager: true
+      rabbit_stream_fanout: true
     service_providers:
       service_provider:
         type: multistring
