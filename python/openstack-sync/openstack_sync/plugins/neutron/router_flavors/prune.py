@@ -68,37 +68,40 @@ def _flavor_has_routers(conn: Any, flavor: Any, flavor_name: str) -> bool:
 
 def maybe_delete_profile(
     conn: Any, profile_id: str, cache: ProfileCache, counts: Counter[str]
-) -> None:
+) -> bool:
     """Delete *profile_id* when the operator owns it and nothing is bound to it."""
     profile = _cached_profile(conn, profile_id, cache)
     if not profile:
-        return
+        return True
     if not is_managed_service_profile(profile):
         LOG.info("Keeping service profile %s; it is not operator-owned", profile_id)
-        return
+        return True
     if counts[profile_id] > 0:
         LOG.info("Keeping service profile %s; it is still attached", profile_id)
-        return
+        return True
 
     LOG.info("Deleting unused service profile %s", profile_id)
     try:
         conn.network.delete_service_profile(profile, ignore_missing=True)
         cache[profile_id] = None
+        return True
     except openstack_exceptions.NotFoundException:
         cache[profile_id] = None
+        return True
     except openstack_exceptions.ConflictException:
         LOG.info("Service profile %s is still in use; skipping delete", profile_id)
+        return False
 
 
 def _delete_flavor(
     conn: Any, flavor: Any, cache: ProfileCache, counts: Counter[str]
-) -> None:
+) -> tuple[bool, list[str]]:
     flavor_id = resource_id(flavor)
     flavor_name = get_value(flavor, "name", default=flavor_id)
     profile_ids = service_profile_ids(flavor)
 
     if _flavor_has_routers(conn, flavor, flavor_name):
-        return
+        return False, []
 
     LOG.info("Deleting removed router flavor %s (%s)", flavor_name, flavor_id)
     try:
@@ -107,7 +110,7 @@ def _delete_flavor(
         LOG.info("Router flavor %s (%s) is already absent", flavor_name, flavor_id)
     except openstack_exceptions.ConflictException:
         LOG.info("Router flavor %s is still in use; skipping delete", flavor_name)
-        return
+        return False, []
 
     # The flavor is gone, so its profiles lost one attachment each.
     for profile_id in profile_ids:
@@ -115,25 +118,31 @@ def _delete_flavor(
         if counts[profile_id] <= 0:
             del counts[profile_id]
 
+    incomplete_profiles = []
     for profile_id in profile_ids:
-        maybe_delete_profile(conn, profile_id, cache, counts)
+        if not maybe_delete_profile(conn, profile_id, cache, counts):
+            incomplete_profiles.append(profile_id)
+    return True, incomplete_profiles
 
 
 def _prune_orphaned_profiles(
     conn: Any, cache: ProfileCache, counts: Counter[str]
-) -> None:
+) -> list[str]:
     """Delete owned, unattached profiles left behind by an earlier partial failure.
 
     Safe to run every cycle: it only ever touches operator-owned profiles that
     no flavor is bound to.
     """
     LOG.info("Scanning for orphaned operator-owned service profiles")
+    incomplete_profiles = []
     for profile in list(conn.network.service_profiles()):
         if not is_managed_service_profile(profile):
             continue
         profile_id = resource_id(profile)
         cache.setdefault(profile_id, profile)
-        maybe_delete_profile(conn, profile_id, cache, counts)
+        if not maybe_delete_profile(conn, profile_id, cache, counts):
+            incomplete_profiles.append(profile_id)
+    return incomplete_profiles
 
 
 def prune_orphaned_profiles(conn: Any) -> None:
@@ -167,12 +176,28 @@ def prune_removed_flavors(
     LOG.info("Pruning removed router flavors")
     current = list(conn.network.flavors(service_type=SERVICE_TYPE))
     counts = _attachment_counts(current)
+    incomplete_flavors = []
+    incomplete_profiles = []
     for flavor in current:
         name = get_value(flavor, "name")
         if not name or name in desired_names:
             continue
         if not is_managed_flavor(flavor):
             continue
-        _delete_flavor(conn, flavor, cache, counts)
+        deleted, profiles = _delete_flavor(conn, flavor, cache, counts)
+        if not deleted:
+            incomplete_flavors.append(str(name))
+        incomplete_profiles.extend(profiles)
 
-    _prune_orphaned_profiles(conn, cache, counts)
+    incomplete_profiles.extend(_prune_orphaned_profiles(conn, cache, counts))
+    if incomplete_flavors or incomplete_profiles:
+        failures = []
+        if incomplete_flavors:
+            failures.append(
+                "router flavors still present: " + ", ".join(incomplete_flavors)
+            )
+        if incomplete_profiles:
+            failures.append(
+                "service profiles still present: " + ", ".join(incomplete_profiles)
+            )
+        raise RuntimeError("; ".join(failures))

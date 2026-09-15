@@ -18,7 +18,9 @@ from unittest import mock
 import pytest
 
 from openstack_sync.hooks import ironic_runbooks as hook
+from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import HookConfig
+from openstack_sync.hooks.framework import PruneRequest
 from openstack_sync.plugins.common import ConfigError
 from openstack_sync.plugins.ironic.runbooks import markers
 from openstack_sync.plugins.ironic.runbooks.config import BINDING_NAME
@@ -201,21 +203,32 @@ def test_plugin_waits_for_the_runbook_api_with_the_configured_budget():
     wait.assert_called_once_with(conn, retries=5, delay=2)
 
 
-def test_plugin_prunes_only_when_the_chart_enabled_it():
-    """PRUNE is opt-in: deleting a runbook is not undone by re-adding the CR."""
+def test_plugin_prune_forwards_authoritative_empty():
     conn = mock.MagicMock()
     specs = [{"runbookName": "CUSTOM_KEEP", "steps": []}]
 
     with mock.patch.object(hook.prune_module, "prune_removed_runbooks") as do_prune:
-        hook.IronicRunbookPlugin(make_ironic_config(prune=False)).prune(
-            conn, specs, authoritative_empty=False
-        )
-        do_prune.assert_not_called()
-
-        hook.IronicRunbookPlugin(make_ironic_config(prune=True)).prune(
-            conn, specs, authoritative_empty=True
+        hook.IronicRunbookPlugin(make_ironic_config(prune=True)).prune_resources(
+            conn,
+            PruneRequest(
+                credentials=("infrasetup", "understack"),
+                desired_specs=specs,
+                authoritative_empty=True,
+            ),
         )
         do_prune.assert_called_once_with(conn, specs, authoritative_empty=True)
+
+
+def test_plugin_uses_finalizers_only_when_destructive_prune_is_enabled():
+    disabled = hook.IronicRunbookPlugin(make_ironic_config(prune=False))
+    enabled = hook.IronicRunbookPlugin(make_ironic_config(prune=True))
+
+    assert disabled.should_run_prune() is False
+    assert disabled.uses_finalizer() is False
+    assert disabled.cleanup_policy() is CleanupPolicy.NONE
+    assert enabled.should_run_prune() is True
+    assert enabled.uses_finalizer() is True
+    assert enabled.cleanup_policy() is CleanupPolicy.FINALIZED_PRUNE
 
 
 def test_main_returns_zero_when_hook_disabled(
@@ -297,6 +310,14 @@ def test_main_reports_failed_when_the_runbook_cannot_be_reconciled(
             return_value=mock.MagicMock(),
         ),
         mock.patch("openstack_sync.hooks.framework.patch_resource_status") as status,
+        mock.patch(
+            "openstack_sync.hooks.framework.add_resource_finalizer",
+            return_value=True,
+        ),
+        mock.patch(
+            "openstack_sync.hooks.framework.remove_resource_finalizer",
+            return_value=True,
+        ),
         mock.patch.object(hook.client, "wait_for_runbook_api"),
         mock.patch.object(
             hook.reconcile_module,
@@ -342,6 +363,14 @@ def test_main_creates_then_prunes_against_a_fake_ironic(
                 return_value=conn,
             ),
             mock.patch("openstack_sync.hooks.framework.patch_resource_status"),
+            mock.patch(
+                "openstack_sync.hooks.framework.add_resource_finalizer",
+                return_value=True,
+            ),
+            mock.patch(
+                "openstack_sync.hooks.framework.remove_resource_finalizer",
+                return_value=True,
+            ),
             mock.patch.object(
                 hook.client.openstack_utils,
                 "maximum_supported_microversion",

@@ -1,4 +1,4 @@
-"""Tests for openstack_sync.hooks.common -- generic shell-operator utilities."""
+"""Tests for framework common shell-operator utilities."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import pytest
 from kubernetes import client as k8s_client
 from kubernetes.client.exceptions import ApiException
 
-from openstack_sync.hooks import common as hc
+from openstack_sync.hooks.framework import common as hc
 
 # ---------------------------------------------------------------------------
 # configure_logging
@@ -262,6 +262,67 @@ def test_status_is_current_rejects_a_stale_condition_generation():
 
 API_VERSION = "neutron.understack.rackspace.net/v1alpha1"
 RESOURCE = "neutronrouterflavors.neutron.understack.rackspace.net"
+FINALIZER = "openstack-sync.understack.rackspace.net/finalizer"
+PLURAL = RESOURCE.split(".")[0]
+MISSING_RESOURCE_BODY = "404 page not found"
+
+
+def _status_body(name: str, *, code: int, reason: str, message: str) -> str:
+    """Build the Status the API server returns for a named object."""
+    return json.dumps(
+        {
+            "kind": "Status",
+            "apiVersion": "v1",
+            "metadata": {},
+            "status": "Failure",
+            "message": message,
+            "reason": reason,
+            "details": {
+                "name": name,
+                "group": API_VERSION.partition("/")[0],
+                "kind": "neutronrouterflavors",
+            },
+            "code": code,
+        }
+    )
+
+
+def _missing_object(name: str) -> ApiException:
+    exc = ApiException(status=404, reason="Not Found")
+    exc.body = _status_body(
+        name, code=404, reason="NotFound", message=f'{PLURAL} "{name}" not found'
+    )
+    return exc
+
+
+def _forbidden(name: str) -> ApiException:
+    """A 403 names the object in ``details.name`` exactly as a 404 does."""
+    exc = ApiException(status=403, reason="Forbidden")
+    exc.body = _status_body(
+        name,
+        code=403,
+        reason="Forbidden",
+        message=f'{PLURAL} "{name}" is forbidden',
+    )
+    return exc
+
+
+def _not_found(body: str) -> ApiException:
+    exc = ApiException(status=404, reason="Not Found")
+    exc.body = body
+    return exc
+
+
+def _target(**overrides):
+    kwargs = {
+        "name": "test-flavor",
+        "namespace": "openstack",
+        "api_version": API_VERSION,
+        "resource": RESOURCE,
+        "kind": "NeutronRouterFlavor",
+    }
+    kwargs.update(overrides)
+    return hc.CustomResourceTarget(**kwargs)
 
 
 def _fake_api():
@@ -272,6 +333,269 @@ def _fake_api():
     surface in production only as a logged error.
     """
     return mock.create_autospec(k8s_client.CustomObjectsApi, instance=True)
+
+
+def _add_finalizer(**overrides):
+    kwargs = {
+        "target": _target(),
+        "finalizer": FINALIZER,
+        "current_finalizers": [],
+    }
+    kwargs.update(overrides)
+    api = _fake_api()
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        ok = hc.add_resource_finalizer(**kwargs)
+    return ok, api.patch_namespaced_custom_object
+
+
+def _remove_finalizer(**overrides):
+    kwargs = {
+        "target": _target(),
+        "finalizer": FINALIZER,
+        "current_finalizers": [FINALIZER],
+    }
+    kwargs.update(overrides)
+    api = _fake_api()
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        ok = hc.remove_resource_finalizer(**kwargs)
+    return ok, api.patch_namespaced_custom_object
+
+
+def test_add_resource_finalizer_creates_finalizer_list():
+    ok, call = _add_finalizer(resource_version="12345")
+
+    assert ok is True
+    call.assert_called_once()
+    kwargs = call.call_args.kwargs
+    assert kwargs["group"] == "neutron.understack.rackspace.net"
+    assert kwargs["version"] == "v1alpha1"
+    assert kwargs["plural"] == "neutronrouterflavors"
+    assert kwargs["namespace"] == "openstack"
+    assert kwargs["name"] == "test-flavor"
+    assert kwargs["_content_type"] == "application/json-patch+json"
+    assert kwargs["body"] == [
+        {"op": "test", "path": "/metadata/resourceVersion", "value": "12345"},
+        {"op": "add", "path": "/metadata/finalizers", "value": [FINALIZER]},
+    ]
+
+
+def test_add_resource_finalizer_appends_without_replacing_existing_finalizers():
+    ok, call = _add_finalizer(
+        current_finalizers=["example.com/other"], resource_version="12345"
+    )
+
+    assert ok is True
+    assert call.call_args.kwargs["body"] == [
+        {"op": "test", "path": "/metadata/resourceVersion", "value": "12345"},
+        {"op": "add", "path": "/metadata/finalizers/-", "value": FINALIZER},
+    ]
+
+
+def test_add_resource_finalizer_skips_when_already_present():
+    ok, call = _add_finalizer(current_finalizers=[FINALIZER])
+
+    assert ok is True
+    call.assert_not_called()
+
+
+def test_add_resource_finalizer_requires_resource_version_before_patching(caplog):
+    api = _fake_api()
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        with caplog.at_level(
+            logging.ERROR, logger="openstack_sync.hooks.framework.common"
+        ):
+            ok = hc.add_resource_finalizer(
+                target=_target(),
+                finalizer=FINALIZER,
+                current_finalizers=[],
+            )
+
+    assert ok is False
+    api.patch_namespaced_custom_object.assert_not_called()
+    assert "metadata.resourceVersion is missing" in caplog.text
+
+
+def test_remove_resource_finalizer_tests_then_removes_the_known_index():
+    ok, call = _remove_finalizer(current_finalizers=["example.com/other", FINALIZER])
+
+    assert ok is True
+    assert call.call_args.kwargs["body"] == [
+        {"op": "test", "path": "/metadata/finalizers/1", "value": FINALIZER},
+        {"op": "remove", "path": "/metadata/finalizers/1"},
+    ]
+
+
+def test_remove_resource_finalizer_skips_when_absent():
+    ok, call = _remove_finalizer(current_finalizers=["example.com/other"])
+
+    assert ok is True
+    call.assert_not_called()
+
+
+def test_finalizer_patch_failure_is_reported_to_the_caller(caplog):
+    api = _fake_api()
+    api.patch_namespaced_custom_object.side_effect = ApiException(
+        status=409, reason="Conflict"
+    )
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        with caplog.at_level(
+            logging.ERROR, logger="openstack_sync.hooks.framework.common"
+        ):
+            ok = hc.add_resource_finalizer(
+                target=_target(),
+                finalizer=FINALIZER,
+                current_finalizers=[],
+                resource_version="12345",
+            )
+
+    assert ok is False
+    assert "failed to add finalizer" in caplog.text
+    assert "409" in caplog.text
+
+
+def test_add_finalizer_patch_failure_succeeds_when_live_object_already_has_it(caplog):
+    api = _fake_api()
+    api.patch_namespaced_custom_object.side_effect = ApiException(
+        status=422, reason="Unprocessable Entity"
+    )
+    api.get_namespaced_custom_object.return_value = {
+        "metadata": {"finalizers": [FINALIZER]}
+    }
+
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        with caplog.at_level(
+            logging.INFO, logger="openstack_sync.hooks.framework.common"
+        ):
+            ok = hc.add_resource_finalizer(
+                target=_target(),
+                finalizer=FINALIZER,
+                current_finalizers=[],
+                resource_version="12345",
+            )
+
+    assert ok is True
+    api.get_namespaced_custom_object.assert_called_once()
+    assert "desired finalizer state" in caplog.text
+    assert "failed to add finalizer" not in caplog.text
+
+
+def test_add_finalizer_patch_failure_fails_when_live_object_is_missing(caplog):
+    api = _fake_api()
+    api.patch_namespaced_custom_object.side_effect = ApiException(
+        status=404, reason="Not Found"
+    )
+    api.get_namespaced_custom_object.side_effect = _missing_object("test-flavor")
+
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        with caplog.at_level(
+            logging.ERROR, logger="openstack_sync.hooks.framework.common"
+        ):
+            ok = hc.add_resource_finalizer(
+                target=_target(),
+                finalizer=FINALIZER,
+                current_finalizers=[],
+                resource_version="12345",
+            )
+
+    assert ok is False
+    api.get_namespaced_custom_object.assert_called_once()
+    assert "failed to add finalizer" in caplog.text
+    assert "404" in caplog.text
+
+
+def test_remove_finalizer_patch_failure_succeeds_when_live_object_lacks_it(caplog):
+    api = _fake_api()
+    api.patch_namespaced_custom_object.side_effect = ApiException(
+        status=422, reason="Unprocessable Entity"
+    )
+    api.get_namespaced_custom_object.return_value = {"metadata": {"finalizers": []}}
+
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        with caplog.at_level(
+            logging.INFO, logger="openstack_sync.hooks.framework.common"
+        ):
+            ok = hc.remove_resource_finalizer(
+                target=_target(),
+                finalizer=FINALIZER,
+                current_finalizers=[FINALIZER],
+            )
+
+    assert ok is True
+    api.get_namespaced_custom_object.assert_called_once()
+    assert "desired finalizer state" in caplog.text
+    assert "failed to remove finalizer" not in caplog.text
+
+
+def test_remove_finalizer_patch_failure_fails_when_live_object_is_missing(caplog):
+    api = _fake_api()
+    api.patch_namespaced_custom_object.side_effect = ApiException(
+        status=404, reason="Not Found"
+    )
+    api.get_namespaced_custom_object.side_effect = _missing_object("test-flavor")
+
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        with caplog.at_level(
+            logging.ERROR, logger="openstack_sync.hooks.framework.common"
+        ):
+            ok = hc.remove_resource_finalizer(
+                target=_target(),
+                finalizer=FINALIZER,
+                current_finalizers=[FINALIZER],
+            )
+
+    assert ok is False
+    api.get_namespaced_custom_object.assert_called_once()
+    assert "failed to remove finalizer" in caplog.text
+    assert "404" in caplog.text
+
+
+def test_release_deleted_finalizer_patch_failure_succeeds_when_object_is_missing(
+    caplog,
+):
+    api = _fake_api()
+    api.patch_namespaced_custom_object.side_effect = ApiException(
+        status=404, reason="Not Found"
+    )
+    api.get_namespaced_custom_object.side_effect = _missing_object("test-flavor")
+
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        with caplog.at_level(
+            logging.INFO, logger="openstack_sync.hooks.framework.common"
+        ):
+            ok = hc.release_deleted_resource_finalizer(
+                target=_target(),
+                finalizer=FINALIZER,
+                current_finalizers=[FINALIZER],
+            )
+
+    assert ok is True
+    api.get_namespaced_custom_object.assert_called_once()
+    assert "desired finalizer state" in caplog.text
+    assert "failed to remove finalizer" not in caplog.text
+
+
+def test_release_deleted_finalizer_patch_failure_fails_when_the_crd_is_missing(
+    caplog,
+):
+    api = _fake_api()
+    api.patch_namespaced_custom_object.side_effect = ApiException(
+        status=404, reason="Not Found"
+    )
+    api.get_namespaced_custom_object.side_effect = _not_found(MISSING_RESOURCE_BODY)
+
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        with caplog.at_level(
+            logging.ERROR, logger="openstack_sync.hooks.framework.common"
+        ):
+            ok = hc.release_deleted_resource_finalizer(
+                target=_target(),
+                finalizer=FINALIZER,
+                current_finalizers=[FINALIZER],
+            )
+
+    assert ok is False
+    assert "failed to verify finalizers" in caplog.text
+    assert "failed to remove finalizer" in caplog.text
 
 
 def _patch(**overrides):
@@ -388,7 +712,7 @@ def test_patch_resource_status_skips_when_current_status_matches():
 
 
 def test_patch_resource_status_skips_without_a_namespace(caplog):
-    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
+    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.framework.common"):
         call = _patch(namespace=None)
 
     assert not call.called
@@ -396,7 +720,7 @@ def test_patch_resource_status_skips_without_a_namespace(caplog):
 
 
 def test_patch_resource_status_skips_on_unusable_crd_identity(caplog):
-    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
+    with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.framework.common"):
         call = _patch(crd_api_version="no-version-here")
 
     assert not call.called
@@ -409,7 +733,9 @@ def test_patch_resource_status_logs_api_errors(caplog):
         status=403, reason="Forbidden"
     )
     with mock.patch.object(hc, "_customobjects_api", return_value=api):
-        with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
+        with caplog.at_level(
+            logging.ERROR, logger="openstack_sync.hooks.framework.common"
+        ):
             hc.patch_resource_status(
                 name="test-flavor",
                 namespace="openstack",
@@ -428,11 +754,86 @@ def test_patch_resource_status_logs_api_errors(caplog):
     assert "Forbidden" in caplog.text
 
 
+def _patch_status_with(exc: ApiException, name: str = "deleted-flavor") -> None:
+    api = mock.MagicMock()
+    api.patch_namespaced_custom_object_status.side_effect = exc
+    with mock.patch.object(hc, "_customobjects_api", return_value=api):
+        hc.patch_resource_status(
+            name=name,
+            namespace="openstack",
+            generation=None,
+            sync_status="Failed",
+            message="already gone",
+            crd_api_version=API_VERSION,
+            crd_resource=RESOURCE,
+            crd_kind="NeutronRouterFlavor",
+            status_enabled=True,
+        )
+
+
+def test_patch_resource_status_does_not_error_when_the_cr_is_gone(caplog):
+    """A CR deleted mid-reconcile is a race, not a fault."""
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.framework.common"):
+        _patch_status_with(_missing_object("deleted-flavor"))
+
+    assert "the CR is gone" in caplog.text
+    assert "404" in caplog.text
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_patch_resource_status_warns_when_the_crd_is_the_thing_missing(caplog):
+    """A 404 for the resource path is a chart or API configuration problem."""
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.framework.common"):
+        _patch_status_with(_not_found(MISSING_RESOURCE_BODY))
+
+    assert "failed to patch" in caplog.text
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_patch_resource_status_warns_when_denied_for_the_same_object(caplog):
+    """Matching ``details.name`` alone must not turn an RBAC gap into success."""
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.framework.common"):
+        _patch_status_with(_forbidden("deleted-flavor"))
+
+    assert "failed to patch" in caplog.text
+    assert "403" in caplog.text
+
+
+def test_patch_resource_status_warns_when_a_404_names_a_different_object(caplog):
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.framework.common"):
+        _patch_status_with(_missing_object("other-flavor"))
+
+    assert "failed to patch" in caplog.text
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+@pytest.mark.parametrize(
+    ("body", "shape"),
+    [
+        (
+            json.dumps({"kind": "Status", "reason": "NotFound", "code": 404}),
+            "no details",
+        ),
+        (json.dumps({"kind": "Status", "details": None, "code": 404}), "null details"),
+        (json.dumps(["not", "a", "status"]), "not an object"),
+    ],
+)
+def test_patch_resource_status_warns_when_a_404_body_names_nothing(body, shape, caplog):
+    """Malformed 404 bodies must not escape the ApiException handler."""
+    with caplog.at_level(logging.INFO, logger="openstack_sync.hooks.framework.common"):
+        _patch_status_with(_not_found(body))
+
+    assert "failed to patch" in caplog.text, shape
+    assert [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
 def test_patch_resource_status_logs_unexpected_errors(caplog):
     with mock.patch.object(
         hc, "_customobjects_api", side_effect=RuntimeError("no kubeconfig")
     ):
-        with caplog.at_level(logging.ERROR, logger="openstack_sync.hooks.common"):
+        with caplog.at_level(
+            logging.ERROR, logger="openstack_sync.hooks.framework.common"
+        ):
             hc.patch_resource_status(
                 name="test-flavor",
                 namespace="openstack",
