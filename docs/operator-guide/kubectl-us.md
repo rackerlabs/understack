@@ -224,9 +224,6 @@ For a native OVN router, the audit verifies:
   `options:router-port`;
 - gateway LSPs additionally have `options:nat-addresses=router` and
   `options:exclude-lb-vips-from-garp=true`; and
-- Neutron's `binding:host_id` is present in the comma-separated
-  `options:requested-chassis` value. An absent value on both sides is healthy;
-  it should not be added to an unbound port; and
 - each router-owned per-network `HA_Chassis_Group` has at least one
   `HA_Chassis` member whose chassis is live in the Southbound database. This
   reports empty and stale-only groups as requiring per-network HA chassis
