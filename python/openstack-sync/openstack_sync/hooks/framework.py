@@ -11,7 +11,6 @@ See ``README.md`` for the steps to add a plugin.
 
 from __future__ import annotations
 
-import json
 import logging
 import sys
 from collections.abc import Callable
@@ -32,6 +31,7 @@ from openstack_sync.hooks.contracts import HookConfig
 from openstack_sync.hooks.contracts import HookInputs
 from openstack_sync.hooks.contracts import SyncPlugin
 from openstack_sync.hooks.contracts import SyncResource
+from openstack_sync.hooks.entrypoint import run_hook as _run_hook
 from openstack_sync.hooks.finalizers import release_deleted_finalizers
 from openstack_sync.hooks.finalizers import resource_target
 from openstack_sync.hooks.finalizers import sync_live_finalizers
@@ -339,33 +339,10 @@ def run_hook(
     build_config: Callable[[], dict[str, Any]],
     run: Callable[[list[dict[str, Any]]], int],
 ) -> int:
-    """Handle the shell-operator calling convention shared by every hook.
-
-    ``--config`` prints the hook config and exits; otherwise the binding
-    context is read and handed to *run*. An empty or absent binding context is
-    not an error -- shell-operator invokes hooks with no work to do.
-    """
-    if len(sys.argv) > 1 and sys.argv[1] == "--config":
-        print(json.dumps(build_config(), indent=2))
-        return 0
-
-    configure_logging()
-
-    try:
-        contexts = read_binding_context()
-    except ValueError as exc:
-        LOG.error("failed to parse binding context: %s", exc)
-        return 1
-
-    if not contexts:
-        return 0
-
-    try:
-        return run(contexts)
-    except Exception as exc:  # noqa: BLE001
-        # Type and traceback, not just the message: several builtins stringify
-        # to something unusable on their own, a KeyError to nothing but the
-        # missing key. This is the hook's last line, so whatever it omits is
-        # lost.
-        LOG.error("hook failed: %s: %s", type(exc).__name__, exc, exc_info=True)
-        return 1
+    return _run_hook(
+        build_config,
+        run,
+        argv=sys.argv,
+        configure_logging=configure_logging,
+        read_binding_context=read_binding_context,
+    )
