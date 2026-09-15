@@ -1,9 +1,9 @@
 import subprocess
 
-from us_net import connection
-from us_net.connection import ConnectionContext
-from us_net.connection import print_connection_banner
-from us_net.connection import resolve_kube_context
+from us_cli import connection
+from us_cli.connection import ConnectionContext
+from us_cli.connection import print_connection_banner
+from us_cli.connection import resolve_kube_context
 
 
 def make_ctx(**overrides):

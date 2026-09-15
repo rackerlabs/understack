@@ -416,7 +416,7 @@ wheels = [
 ]
 
 [[package]]
-name = "kubectl-us-net"
+name = "kubectl-us"
 source = { editable = "." }
 dependencies = [
     { name = "keystoneauth-websso" },

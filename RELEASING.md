@@ -6,7 +6,7 @@ to publish container images, and `release-notes.yaml` to assemble the release
 notes and create the GitHub release.
 
 Per-artifact tags (`understackctl/vX.Y.Z`, `nautobotop-vX.Y.Z`,
-`kubectl-us-net/vX.Y.Z`, `ironic-hardware-exporter/vX.Y.Z`, `dexop-vX.Y.Z`,
+`kubectl-us/vX.Y.Z`, `ironic-hardware-exporter/vX.Y.Z`, `dexop-vX.Y.Z`,
 `ironic-ipxe/vX.Y.Z`) are released independently. See
 [Separately released artifacts](#separately-released-artifacts) below.
 

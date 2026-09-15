@@ -1,12 +1,19 @@
 from typer.testing import CliRunner
 
-from us_net.cli import app
+from us_cli.cli import app
 
 runner = CliRunner()
 
 
-def test_help_lists_all_commands():
+def test_help_lists_top_level_groups():
     result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    for command in ("net", "backup"):
+        assert command in result.output
+
+
+def test_net_help_lists_all_net_commands():
+    result = runner.invoke(app, ["net", "--help"])
     assert result.exit_code == 0
     for command in ("nbctl", "sbctl", "vsctl", "appctl", "router"):
         assert command in result.output
@@ -15,20 +22,28 @@ def test_help_lists_all_commands():
 def test_bare_invocation_shows_usage_instead_of_missing_command_error():
     result = runner.invoke(app, [])
     assert "Usage:" in result.output
+    for command in ("net", "backup"):
+        assert command in result.output
+    assert "Missing command" not in result.output
+
+
+def test_bare_net_shows_usage_instead_of_missing_command_error():
+    result = runner.invoke(app, ["net"])
+    assert "Usage:" in result.output
     for command in ("nbctl", "sbctl", "vsctl", "appctl", "router"):
         assert command in result.output
     assert "Missing command" not in result.output
 
 
 def test_bare_router_shows_usage_instead_of_missing_command_error():
-    result = runner.invoke(app, ["router"])
+    result = runner.invoke(app, ["net", "router"])
     assert "Usage:" in result.output
     assert "show" in result.output
     assert "Missing command" not in result.output
 
 
 def test_callback_builds_connection_context(monkeypatch):
-    import us_net.commands.raw as raw
+    import us_cli.commands.raw as raw
 
     captured = {}
     monkeypatch.setattr(
@@ -47,6 +62,7 @@ def test_callback_builds_connection_context(monkeypatch):
             "my-nb-pod",
             "--os-cloud",
             "my-cloud",
+            "net",
             "nbctl",
             "--",
             "show",

@@ -1,6 +1,6 @@
-from us_net.ovn import as_list
-from us_net.ovn import nbctl_list_records
-from us_net.ovn import parse_ovn_json
+from us_cli.ovn import as_list
+from us_cli.ovn import nbctl_list_records
+from us_cli.ovn import parse_ovn_json
 
 
 def test_parse_ovn_json_unwraps_uuid_and_set():
@@ -32,7 +32,7 @@ def test_as_list_normalizes_single_value_and_empty():
 def test_nbctl_list_records_uses_if_exists(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        "us_net.ovn.nbctl_raw",
+        "us_cli.ovn.nbctl_raw",
         lambda ctx, args: calls.append(args) or '{"headings": [], "data": []}',
     )
 

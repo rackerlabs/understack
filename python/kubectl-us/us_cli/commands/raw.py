@@ -6,10 +6,10 @@ from typing import Annotated
 
 import typer
 
-from us_net import kube
-from us_net.connection import ConnectionContext
-from us_net.connection import print_connection_banner
-from us_net.ovn import OVSDB_CONTAINER
+from us_cli import kube
+from us_cli.connection import ConnectionContext
+from us_cli.connection import print_connection_banner
+from us_cli.ovn import OVSDB_CONTAINER
 
 PASSTHROUGH_SETTINGS = {"ignore_unknown_options": True, "allow_extra_args": True}
 

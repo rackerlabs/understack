@@ -5,9 +5,9 @@ import typer
 from openstack import exceptions as os_exc
 from typer.testing import CliRunner
 
-from us_net.commands import router
-from us_net.commands import router_common
-from us_net.connection import ConnectionContext
+from us_cli.commands import router
+from us_cli.commands import router_common
+from us_cli.connection import ConnectionContext
 
 runner = CliRunner()
 

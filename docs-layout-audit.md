@@ -125,7 +125,7 @@ one first.
 
 It is spread across `deploy-guide/troubleshooting.md` (16 lines, exactly **one**
 failure mode), `operator-guide/troubleshooting-osh.md`, `operator-guide/ovs-ovn.md`,
-`operator-guide/kubectl-us-net.md` and `operator-guide/logging.md`. Nothing ties
+`operator-guide/kubectl-us.md` and `operator-guide/logging.md`. Nothing ties
 them together, so there is nowhere to land from a pager.
 
 ### Operator Guide grouping
@@ -265,7 +265,7 @@ one: "the supporting services", not "everything else".
 
 Two notes on judgement calls this list originally got wrong:
 
-- `ovs-ovn.md` and `kubectl-us-net.md` are **network operations** tools, so they
+- `ovs-ovn.md` and `kubectl-us.md` are **network operations** tools, so they
   stay in **Networking**. An earlier draft of this document listed them in both
   Networking and the group then called "Architecture & Troubleshooting", which is
   not a thing nav can do.

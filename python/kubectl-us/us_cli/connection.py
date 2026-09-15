@@ -9,7 +9,7 @@ from __future__ import annotations
 import subprocess
 from dataclasses import dataclass
 
-from us_net import osclient
+from us_cli import osclient
 
 
 @dataclass
@@ -42,7 +42,7 @@ def print_connection_banner(
 ) -> None:
     """Print what cluster/namespace/pods/cloud this invocation is targeting."""
     print("=" * 64)
-    print("kubectl-us-net -- target environment")
+    print("kubectl-us -- target environment")
     print("=" * 64)
     print(f"  Kubernetes context : {resolve_kube_context(ctx.kube_context)}")
     print(f"  OVN namespace/pods : {ctx.namespace} (nb={ctx.nb_pod}, sb={ctx.sb_pod})")

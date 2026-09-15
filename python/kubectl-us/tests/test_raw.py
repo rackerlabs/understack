@@ -1,8 +1,8 @@
 import typer
 from typer.testing import CliRunner
 
-from us_net.commands import raw
-from us_net.connection import ConnectionContext
+from us_cli.commands import raw
+from us_cli.connection import ConnectionContext
 
 runner = CliRunner()
 
