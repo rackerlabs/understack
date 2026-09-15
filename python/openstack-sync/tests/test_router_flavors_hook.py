@@ -194,6 +194,14 @@ def test_plugin_prune_forwards_authoritative_empty_when_enabled():
     prune.assert_called_once_with(conn, specs, authoritative_empty=True)
 
 
+def test_plugin_best_effort_prune_does_not_use_finalizers():
+    """Router flavor orphan cleanup can run with PRUNE=false without wedging CRs."""
+    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
+
+    assert plugin.should_run_prune() is True
+    assert plugin.uses_finalizer() is False
+
+
 def test_plugin_cache_is_per_credential_group():
     plugin = hook.RouterFlavorPlugin(make_hook_config())
 
@@ -298,6 +306,14 @@ def _run_main(monkeypatch, tmp_path, contexts: list[dict], conn: Any):
         mock.patch(
             "openstack_sync.hooks.framework.patch_resource_status"
         ) as patch_status,
+        mock.patch(
+            "openstack_sync.hooks.framework.add_resource_finalizer",
+            return_value=True,
+        ),
+        mock.patch(
+            "openstack_sync.hooks.framework.remove_resource_finalizer",
+            return_value=True,
+        ),
         mock.patch.object(hook, "wait_for_openstack_network"),
     ):
         code = hook.main()

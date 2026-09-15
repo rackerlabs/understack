@@ -218,6 +218,16 @@ def test_plugin_prunes_only_when_the_chart_enabled_it():
         do_prune.assert_called_once_with(conn, specs, authoritative_empty=True)
 
 
+def test_plugin_uses_finalizers_only_when_destructive_prune_is_enabled():
+    disabled = hook.IronicRunbookPlugin(make_ironic_config(prune=False))
+    enabled = hook.IronicRunbookPlugin(make_ironic_config(prune=True))
+
+    assert disabled.should_run_prune() is False
+    assert disabled.uses_finalizer() is False
+    assert enabled.should_run_prune() is True
+    assert enabled.uses_finalizer() is True
+
+
 def test_main_returns_zero_when_hook_disabled(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ):
@@ -297,6 +307,14 @@ def test_main_reports_failed_when_the_runbook_cannot_be_reconciled(
             return_value=mock.MagicMock(),
         ),
         mock.patch("openstack_sync.hooks.framework.patch_resource_status") as status,
+        mock.patch(
+            "openstack_sync.hooks.framework.add_resource_finalizer",
+            return_value=True,
+        ),
+        mock.patch(
+            "openstack_sync.hooks.framework.remove_resource_finalizer",
+            return_value=True,
+        ),
         mock.patch.object(hook.client, "wait_for_runbook_api"),
         mock.patch.object(
             hook.reconcile_module,
@@ -342,6 +360,14 @@ def test_main_creates_then_prunes_against_a_fake_ironic(
                 return_value=conn,
             ),
             mock.patch("openstack_sync.hooks.framework.patch_resource_status"),
+            mock.patch(
+                "openstack_sync.hooks.framework.add_resource_finalizer",
+                return_value=True,
+            ),
+            mock.patch(
+                "openstack_sync.hooks.framework.remove_resource_finalizer",
+                return_value=True,
+            ),
             mock.patch.object(
                 hook.client.openstack_utils,
                 "maximum_supported_microversion",
