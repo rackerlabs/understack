@@ -319,27 +319,16 @@ def test_audit_requires_one_router():
     assert "Missing argument 'NAME_OR_ID'" in result.output
 
 
-def test_audit_accepts_requested_chassis_when_it_matches_binding(monkeypatch):
+def test_audit_ignores_requested_chassis_on_router_lsps(monkeypatch):
+    """OVN ignores requested-chassis on type=router LSPs, so drift is not a fault."""
     conn, tables = native_state(healthy=True, requested_chassis="infra3.example.net")
+    del tables["Logical_Switch_Port"][0]["options"]["requested-chassis"]
     patch_environment(monkeypatch, conn, tables)
 
     result = runner.invoke(make_app(), ["router", "audit", "native-router"])
 
     assert result.exit_code == 0
-    assert "PASS  gateway gw-1: requested-chassis: infra3.example.net" in result.output
-    assert "FAIL" not in result.output
-
-
-def test_audit_accepts_host_in_requested_chassis_list(monkeypatch):
-    conn, tables = native_state(healthy=True, requested_chassis="infra3.example.net")
-    tables["Logical_Switch_Port"][0]["options"]["requested-chassis"] = (
-        "infra2.example.net,infra3.example.net"
-    )
-    patch_environment(monkeypatch, conn, tables)
-
-    result = runner.invoke(make_app(), ["router", "audit", "native-router"])
-
-    assert result.exit_code == 0
+    assert "requested-chassis" not in result.output
     assert "FAIL" not in result.output
 
 

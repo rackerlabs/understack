@@ -100,11 +100,11 @@ Resolves the router in OpenStack, maps it to its OVN `Logical_Router`
 kubectl us net router audit <router-name-or-id>
 ```
 
-Checks native OVN routers for their logical router, LRP/LSP attachments,
-router peer LSP type, addresses, required options, and `requested-chassis`
-membership with `binding:host_id`. Gateway LSPs must use the network logical
-switch. Router interfaces use it today; a segment-stamped interface is also
-accepted on its segment switch as a defensive forward-compatibility path.
+Checks native OVN routers for their logical router, LRP/LSP attachments, and
+router peer LSP type, addresses, and required options. Gateway LSPs must use
+the network logical switch. Router interfaces use it today; a segment-stamped
+interface is also accepted on its segment switch as a defensive
+forward-compatibility path.
 Attached LRPs and peer LSPs without a Neutron router port are reported as
 orphans.
 For each router network, the audit also verifies that its single shared

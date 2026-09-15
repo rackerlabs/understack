@@ -315,10 +315,6 @@ def _audit_ha_chassis_repopulation_source(
     ]
 
 
-def _binding_host(port) -> str:
-    return _value(port, "binding_host_id") or _value(port, "binding:host_id") or ""
-
-
 def _router_ports(conn, router_id: str) -> list[Any]:
     return [
         port
@@ -353,11 +349,6 @@ def _expected_switch(port, lsp: dict | None) -> str:
         )
         switch_id = segment_id or switch_id
     return f"{NEUTRON_PREFIX}{switch_id}"
-
-
-def _requested_chassis_matches(requested: str, host: str) -> bool:
-    requested_hosts = {item.strip() for item in requested.split(",") if item.strip()}
-    return host in requested_hosts if host else not requested_hosts
 
 
 def _attached_names(
@@ -512,16 +503,9 @@ def _audit_native_router(
                 f"{options.get('exclude-lb-vips-from-garp') or '(missing)'}",
             )
 
-        requested = options.get("requested-chassis", "")
-        host = _binding_host(port)
-        _check(
-            findings,
-            _requested_chassis_matches(requested, host),
-            f"{role} {port_id}: requested-chassis",
-            requested or "not requested (port is not host-bound)",
-            f"Neutron binding:host_id={host or '(empty)'}, "
-            f"OVN requested-chassis={requested or '(empty)'}",
-        )
+        # ``options:requested-chassis`` is not audited: OVN only honors it for
+        # VIF ports, and these are all ``type=router`` LSPs, which bind with
+        # their peer LRP.
         if network_id not in audited_networks:
             findings.extend(
                 _audit_network_uplink(
