@@ -534,6 +534,209 @@ def _event(watch_event: str, obj: dict, snapshot: list[dict] | None = None) -> d
     }
 
 
+def _cr_without_credentials(name: str, generation: int = 1) -> dict:
+    return {
+        "apiVersion": CRD_API_VERSION,
+        "kind": CRD_KIND,
+        "metadata": {"name": name, "namespace": "openstack", "generation": generation},
+        "spec": {"name": name},
+    }
+
+
+def _snapshot_context(*objects: dict) -> list[dict]:
+    return [
+        {
+            "binding": BINDING,
+            "type": "Schedule",
+            "snapshots": {BINDING: [{"object": obj} for obj in objects]},
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    (
+        "scenario",
+        "contexts",
+        "expected_reconcile",
+        "expected_desired",
+        "expected_deleted",
+        "expected_prune_credentials",
+        "expected_unreadable",
+    ),
+    [
+        pytest.param(
+            "schedule reconciles every live CR and separates terminating CRs",
+            _snapshot_context(
+                _cr("b"),
+                _cr(
+                    "gone",
+                    deletion_timestamp="2026-09-14T12:00:00Z",
+                    finalizers=[framework.FINALIZER],
+                ),
+                _cr("a"),
+            ),
+            ["a", "b"],
+            ["a", "b"],
+            ["gone"],
+            frozenset({("infrasetup", "understack")}),
+            frozenset(),
+            id="schedule-live-and-terminating",
+        ),
+        pytest.param(
+            "added event reconciles the changed CR but prunes against snapshot",
+            [
+                _event(
+                    "Added",
+                    _cr("new", secret="group-a", cloud="cloud-a"),
+                    [
+                        {"object": _cr("old", secret="group-b", cloud="cloud-b")},
+                        {"object": _cr("new", secret="group-a", cloud="cloud-a")},
+                    ],
+                )
+            ],
+            ["new"],
+            ["new", "old"],
+            [],
+            frozenset({("group-a", "cloud-a")}),
+            frozenset(),
+            id="event-reconcile-one-prune-full-snapshot",
+        ),
+        pytest.param(
+            "current status event is ignored and does not trigger prune creds",
+            [
+                _event(
+                    "Modified",
+                    _cr(
+                        "patched",
+                        status={"syncStatus": "Synced", "observedGeneration": 3},
+                    ),
+                    [{"object": _cr("patched")}],
+                )
+            ],
+            [],
+            ["patched"],
+            [],
+            frozenset(),
+            frozenset(),
+            id="status-patch-feedback-loop",
+        ),
+        pytest.param(
+            "deleted event prunes with the deleted CR credentials",
+            [_event("Deleted", _cr("gone"), [{"object": _cr("kept")}])],
+            [],
+            ["kept"],
+            ["gone"],
+            frozenset({("infrasetup", "understack")}),
+            frozenset(),
+            id="deleted-event-authorizes-prune",
+        ),
+        pytest.param(
+            "deletion timestamp is treated as delete even on modified events",
+            [
+                _event(
+                    "Modified",
+                    _cr(
+                        "gone",
+                        deletion_timestamp="2026-09-14T12:00:00Z",
+                        finalizers=[framework.FINALIZER],
+                    ),
+                    [
+                        {
+                            "object": _cr(
+                                "gone",
+                                deletion_timestamp="2026-09-14T12:00:00Z",
+                                finalizers=[framework.FINALIZER],
+                            )
+                        },
+                        {"object": _cr("kept")},
+                    ],
+                )
+            ],
+            [],
+            ["kept"],
+            ["gone"],
+            frozenset({("infrasetup", "understack")}),
+            frozenset(),
+            id="modified-with-deletion-timestamp",
+        ),
+        pytest.param(
+            "delete cancels earlier changes for the same CR identity",
+            [
+                _event("Added", _cr("probe"), []),
+                _event("Modified", _cr("probe"), []),
+                _event("Deleted", _cr("probe"), []),
+            ],
+            [],
+            [],
+            ["probe"],
+            frozenset({("infrasetup", "understack")}),
+            frozenset(),
+            id="same-uid-delete-wins",
+        ),
+        pytest.param(
+            "recreate after delete keeps both logical CRs by UID",
+            [
+                _event("Deleted", _cr("probe", generation=7, uid="old"), []),
+                _event(
+                    "Added",
+                    _cr("probe", generation=1, uid="new"),
+                    [{"object": _cr("probe", generation=1, uid="new")}],
+                ),
+            ],
+            ["probe"],
+            ["probe"],
+            ["probe"],
+            frozenset({("infrasetup", "understack")}),
+            frozenset(),
+            id="recreate-after-delete",
+        ),
+        pytest.param(
+            "unreadable snapshot keeps desired set incomplete",
+            [
+                _event(
+                    "Deleted",
+                    _cr("gone"),
+                    [
+                        {"object": _cr("kept")},
+                        {"object": _cr_without_credentials("legacy")},
+                    ],
+                )
+            ],
+            [],
+            ["kept"],
+            ["gone"],
+            frozenset({("infrasetup", "understack")}),
+            frozenset({"openstack/legacy"}),
+            id="deleted-event-unreadable-snapshot",
+        ),
+    ],
+)
+def test_hook_inputs_golden_scenarios(
+    scenario,
+    contexts,
+    expected_reconcile,
+    expected_desired,
+    expected_deleted,
+    expected_prune_credentials,
+    expected_unreadable,
+):
+    config = make_hook_config()
+
+    inputs = hook_inputs(contexts, config)
+
+    assert [r.spec["name"] for r in inputs.resources_to_reconcile] == (
+        expected_reconcile
+    ), scenario
+    assert [r.spec["name"] for r in inputs.desired_resources_for_prune] == (
+        expected_desired
+    ), scenario
+    assert [
+        r.spec["name"] for r in inputs.deleted_resources
+    ] == expected_deleted, scenario
+    assert inputs.prune_credentials == expected_prune_credentials, scenario
+    assert inputs.unreadable_resources == expected_unreadable, scenario
+
+
 def test_event_batch_ignores_contexts_for_other_bindings():
     """An unrelated binding's snapshot must not drive this hook's prune plan."""
     config = make_hook_config(prune=True)
@@ -815,25 +1018,6 @@ def test_unrecognised_context_is_an_error():
 # ---------------------------------------------------------------------------
 # Unreadable CRs
 # ---------------------------------------------------------------------------
-
-
-def _cr_without_credentials(name: str, generation: int = 1) -> dict:
-    return {
-        "apiVersion": CRD_API_VERSION,
-        "kind": CRD_KIND,
-        "metadata": {"name": name, "namespace": "openstack", "generation": generation},
-        "spec": {"name": name},
-    }
-
-
-def _snapshot_context(*objects: dict) -> list[dict]:
-    return [
-        {
-            "binding": BINDING,
-            "type": "Schedule",
-            "snapshots": {BINDING: [{"object": obj} for obj in objects]},
-        }
-    ]
 
 
 def test_unreadable_cr_does_not_discard_the_readable_ones():
