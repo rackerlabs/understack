@@ -46,6 +46,8 @@ images:
     neutron_server: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_rpc_server: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_ovn_maintenance_worker: "ghcr.io/rackerlabs/understack/neutron:2026.1"
+    neutron_ironic_agent: "ghcr.io/rackerlabs/understack/neutron:2026.1"
+    neutron_ironic_agent_init: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_bagpipe_bgp: "ghcr.io/rackerlabs/understack/neutron:2026.1"
     neutron_netns_cleanup_cron: "ghcr.io/rackerlabs/understack/neutron:2026.1"
 
