@@ -191,6 +191,33 @@ def test_group_by_credentials_is_public_contract():
     assert [r.spec["name"] for r in grouped[expected_key]] == ["first", "second"]
 
 
+def test_framework_public_facade_exports_expected_names():
+    expected = {
+        "CredentialKey",
+        "FINALIZER",
+        "HookConfig",
+        "HookInputs",
+        "SyncPlugin",
+        "SyncResource",
+        "add_resource_finalizer",
+        "build_crd_hook_config",
+        "get_openstack_connection",
+        "group_by_credentials",
+        "hook_enabled",
+        "hook_inputs",
+        "patch_resource_status",
+        "release_deleted_resource_finalizer",
+        "remove_resource_finalizer",
+        "run_hook",
+        "run_sync",
+        "synced_message",
+    }
+
+    assert set(framework.__all__) == expected
+    for name in expected:
+        assert hasattr(framework, name)
+
+
 def _drive(plugin: StubPlugin, inputs: HookInputs):
     """Run the driver with connections and status patching stubbed out."""
     with (

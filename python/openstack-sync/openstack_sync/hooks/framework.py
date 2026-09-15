@@ -1,10 +1,12 @@
-"""Framework for CR-driven OpenStack resource sync plugins.
+"""Compatibility facade for CR-driven OpenStack resource sync plugins.
 
 A plugin supplies four things: how to wait for its OpenStack service, how to
 converge one CR spec, an optional per-credential-group cache, and an optional
-prune. This module supplies everything else -- shell-operator hook config,
-credential grouping, connection setup, per-resource status patching, the
-reconcile-then-prune ordering, and the exit code contract.
+prune.
+
+The implementation lives in sibling modules, but hooks and tests import through
+this module. Keep public names here stable so operational monkeypatches and the
+documented framework surface keep working as internals move around.
 
 See ``README.md`` for the steps to add a plugin.
 """
