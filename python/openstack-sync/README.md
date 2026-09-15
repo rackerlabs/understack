@@ -2,9 +2,10 @@
 
 Shell-operator package for OpenStack reconciliation hooks.
 
-Each hook reconciles one Kubernetes CRD into one kind of OpenStack resource. The
-generic machinery lives in `openstack_sync/hooks/framework.py`; a plugin supplies
-only the parts that are specific to its resource.
+Each hook reconciles one Kubernetes CRD into one kind of OpenStack resource. A
+plugin supplies only the parts that are specific to its resource; the shared
+hook framework supplies the shell-operator entrypoint, binding-context planning,
+connection grouping, status updates, finalizers, and prune ordering.
 
 ## Layout
 
@@ -13,7 +14,16 @@ openstack_sync/
   utils.py                      Kubernetes Secret access + memoised connections
   hooks/
     common.py                   binding-context I/O, CR status patching
-    framework.py                HookConfig, SyncPlugin, run_sync(), run_hook()
+    framework.py                compatibility facade for hook imports
+    contracts.py                HookConfig, SyncPlugin, sync dataclasses
+    config.py                   hook enablement + shell-operator config
+    resources.py                CR parsing, identity, credential grouping
+    planner.py                  binding-context to HookInputs planning
+    finalizers.py               framework finalizer orchestration
+    status.py                   CR status patch assembly
+    pruning.py                  credential-scoped prune execution
+    runner.py                   reconcile/prune/finalizer driver
+    entrypoint.py               run_hook implementation
     placeholder.py              connectivity probe (no CRs)
     <resource>.py               CRD hook entry point
   plugins/
@@ -25,6 +35,14 @@ openstack_sync/
       reconcile.py              converge one CR
       prune.py                  delete resources whose CR was removed, if safe
 ```
+
+`framework.py` is intentionally still the public import surface for hooks and
+tests. New hooks should import `HookConfig`, `SyncPlugin`, `hook_inputs`,
+`run_sync`, and `run_hook` from `openstack_sync.hooks.framework`, even though the
+implementation now lives in the sibling modules listed above. That keeps
+framework-level monkeypatches, operational tests, and older imports stable while
+the internals remain free to move. The sibling implementation modules should
+import each other directly, not import back through the facade.
 
 ## What the framework does for you
 
