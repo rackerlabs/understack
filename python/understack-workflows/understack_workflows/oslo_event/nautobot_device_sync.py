@@ -45,6 +45,62 @@ class InvalidRackPositionError(ValueError):
     """Raised when an explicit rack position cannot be applied safely."""
 
 
+def _is_netdev_appliance(node) -> bool:
+    """Check if node is a network appliance (netdev driver).
+
+    Network appliances (firewalls, load balancers, network security devices)
+    use the netdev driver and require different handling than servers:
+    - No hardware inventory (no inspection process yet for most)
+    - Manufacturer/model come from node properties, not inventory
+    - Device role determined by device type (firewall, load balancer, etc.)
+    """
+    return getattr(node, "driver", None) == "netdev"
+
+
+def _determine_device_role(node) -> str:
+    """Determine Nautobot device role from node properties.
+
+    For servers: role is 'server'
+    For netdev appliances: infer from model or resource_class
+    - PA-* models → 'firewall'
+    - F5-* models → 'load balancer' (future)
+    - rubrik-* resource_class → 'backup appliance' (future)
+    Default to 'firewall' for netdev if can't determine
+    """
+    if not _is_netdev_appliance(node):
+        return "server"
+
+    # Try to determine from properties.model
+    props = node.properties or {}
+    model = props.get("model", "")
+
+    if model.startswith("PA-"):
+        return "firewall"
+    elif model.startswith("F5-"):
+        return "load balancer"
+
+    # Try from resource_class as fallback
+    rc = getattr(node, "resource_class", "")
+    if rc.startswith("pa"):
+        return "firewall"
+    elif rc.startswith("f5"):
+        return "load balancer"
+    elif "rubrik" in rc.lower():
+        return "backup appliance"
+
+    # Default for netdev
+    logger.warning(
+        (
+            "Could not determine role for netdev node %s (model=%s, rc=%s), "
+            "defaulting to 'firewall'"
+        ),
+        getattr(node, "uuid", "unknown"),
+        model,
+        rc,
+    )
+    return "firewall"
+
+
 def _is_retryable_error(exc: BaseException) -> bool:
     """Determine if an exception is retryable.
 
@@ -155,14 +211,16 @@ def _normalise_manufacturer(name: str) -> str:
         return "Dell"
     elif "HP" in name.upper():
         return "HPE"
-    raise ValueError(f"Server manufacturer {name} not supported")
+    elif "PALO ALTO" in name.upper():
+        return "Palo Alto"
+    raise ValueError(f"Manufacturer {name} not supported")
 
 
 def _populate_from_node(device_info: DeviceInfo, node) -> None:
     """Populate device info from Ironic node object."""
     props = node.properties or {}
 
-    # Hardware specs
+    # Hardware specs (servers only - netdev appliances have empty properties)
     if props.get("memory_mb"):
         device_info.memory_mb = int(props["memory_mb"])
     if props.get("cpus"):
@@ -174,6 +232,9 @@ def _populate_from_node(device_info: DeviceInfo, node) -> None:
     # Traits
     if hasattr(node, "traits") and node.traits:
         device_info.traits = list(node.traits)
+
+    # Device role - determine from driver and properties
+    device_info.role = _determine_device_role(node)
 
     # Provision state -> Nautobot status
     device_info.status = ProvisionStateMapper.translate_to_nautobot(
@@ -218,6 +279,58 @@ def _populate_from_inventory(device_info: DeviceInfo, inventory: dict | None) ->
 
     if system_vendor.get("serial_number"):
         device_info.serial_number = system_vendor.get("serial_number")
+
+
+def _populate_from_netdev_properties(device_info: DeviceInfo, node) -> None:
+    """Populate device info from node properties for netdev appliances.
+
+    Network appliances (firewalls, load balancers, etc.) are enrolled with
+    manufacturer, model, and serial set in node properties and extra fields
+    during enrollment. They do not currently have an inspection process.
+
+    Future work: Build an inspect process for netdev devices that would fetch
+    device info directly (e.g., via API or SSH) and populate these same fields,
+    similar to how servers use Redfish inspection.
+    """
+    props = node.properties or {}
+    extra = node.extra or {}
+
+    # Manufacturer from properties.vendor
+    vendor = props.get("vendor")
+    if vendor:
+        device_info.manufacturer = vendor
+    else:
+        # Infer from model if it starts with known prefix
+        model = props.get("model", "")
+        if model.startswith("PA-"):
+            device_info.manufacturer = "Palo Alto"
+            logger.debug(
+                "[node:%s] Inferred manufacturer 'Palo Alto' from model '%s'",
+                device_info.uuid,
+                model,
+            )
+        else:
+            logger.warning(
+                (
+                    "[node:%s] Could not determine manufacturer from properties "
+                    "(vendor=%s, model=%s)"
+                ),
+                device_info.uuid,
+                vendor,
+                model,
+            )
+
+    # Model from properties
+    if props.get("model"):
+        device_info.model = props.get("model")
+
+    # Serial from extra (netdev devices store it there during enrollment)
+    if extra.get("serial"):
+        device_info.serial_number = extra.get("serial")
+
+    # HA mate serial for firewalls (informational only until proper HA design exists)
+    if extra.get("mate_serial"):
+        device_info.custom_fields["mate_serial"] = str(extra["mate_serial"])
 
 
 def _generate_device_name(device_info: DeviceInfo) -> None:
@@ -386,7 +499,7 @@ def fetch_node_details(
     ironic_client: IronicClient,
     nautobot_client: Nautobot,
     location: Record,
-) -> tuple[DeviceInfo, dict, list]:
+) -> tuple[DeviceInfo, dict, list, object]:
     """Fetch complete device info from Ironic.
 
     Args:
@@ -397,31 +510,46 @@ def fetch_node_details(
             location-scoped Nautobot lookups
 
     Returns:
-        Tuple of (DeviceInfo, inventory dict, ports list)
+        Tuple of (DeviceInfo, inventory dict, ports list, node object)
     """
     device_info = DeviceInfo(uuid=node_uuid)
 
     node = ironic_client.get_node(node_uuid)
 
-    # Inventory may not exist yet for newly created nodes (pre-inspection)
+    # Inventory only exists for servers that have been inspected
+    # Netdev appliances (firewalls, etc.) don't have inventory
     try:
         inventory = ironic_client.get_node_inventory(node_ident=node_uuid)
     except ironic_exceptions.NotFound:
-        logger.info("No inventory yet for node %s (not inspected)", node_uuid)
+        if _is_netdev_appliance(node):
+            logger.debug(
+                "[node:%s] No inventory for netdev appliance (expected)", node_uuid
+            )
+        else:
+            logger.info(
+                "[node:%s] No inventory yet for server (not inspected)", node_uuid
+            )
         inventory = {}
 
     ports = ironic_client.list_ports(node_id=node_uuid)
 
     # Populate in order
     _populate_from_node(device_info, node)
-    _populate_from_inventory(device_info, inventory)
+
+    # Use different population method based on device type
+    if _is_netdev_appliance(node):
+        _populate_from_netdev_properties(device_info, node)
+    else:
+        _populate_from_inventory(device_info, inventory)
+
     _generate_device_name(device_info)
+
     # Prefer an explicit rack/position from the node's extra field; fall back
     # to deriving location from the connected switches when it isn't set.
     if not _set_location_from_extra(device_info, node, nautobot_client, location):
         _set_location_from_switches(device_info, ports, nautobot_client)
 
-    return device_info, inventory, ports
+    return device_info, inventory, ports, node
 
 
 def _create_nautobot_device(device_info: DeviceInfo, nautobot_client: Nautobot):
@@ -726,7 +854,7 @@ def sync_device_to_nautobot(
     try:
         ironic_client = IronicClient()
 
-        ironic_node_info, inventory, ports = fetch_node_details(
+        ironic_node_info, inventory, ports, node = fetch_node_details(
             node_uuid, ironic_client, nautobot_client, location
         )
 
@@ -738,7 +866,7 @@ def sync_device_to_nautobot(
 
         if sync_interfaces:
             interface_result = sync_interfaces_from_data(
-                node_uuid, inventory, ports, nautobot_client
+                node_uuid, inventory, ports, nautobot_client, node
             )
             if interface_result != EXIT_STATUS_SUCCESS:
                 logger.warning(
