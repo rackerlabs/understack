@@ -1,6 +1,7 @@
 #!/bin/bash
 set -ex
-UPSTREAM_COMMIT="738b83a3d42ba884393c4ba4eb15b35e758a26a7"
+UPSTREAM_REPO="https://opendev.org/openstack/ironic.git"
+UPSTREAM_COMMIT="9ed35c6360ea02a8c90c53bb38425eb1902f4ca6"
 
 if ! [[ -f sync_from_upstream.sh ]]; then
   echo "Run ./sync_from_upstream.sh only from the containers/ironic-vnc-console folder."
@@ -9,7 +10,7 @@ fi
 
 DST=$(mktemp -d)
 
-git clone https://opendev.org/openstack/ironic.git "$DST" --depth 1 --revision "$UPSTREAM_COMMIT"
+git clone "$UPSTREAM_REPO" "$DST" --depth 1 --revision "$UPSTREAM_COMMIT"
 
 for folder in bin drivers extension; do
   rm -rf "$folder"
@@ -21,5 +22,5 @@ cp "$DST/LICENSE" LICENSE
 rm -rf "$DST"
 
 echo "# Attribution" > NOTICE
-echo "Obtained from https://opendev.org/openstack/ironic.git /tools/vnc-container" >> NOTICE
+echo "Obtained from $UPSTREAM_REPO /tools/vnc-container" >> NOTICE
 echo "Upstream commit: $UPSTREAM_COMMIT" >> NOTICE
