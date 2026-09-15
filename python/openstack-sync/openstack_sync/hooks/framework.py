@@ -35,6 +35,10 @@ from openstack_sync.hooks.contracts import CredentialKey
 from openstack_sync.hooks.contracts import HookConfig
 from openstack_sync.hooks.contracts import HookInputs
 from openstack_sync.hooks.contracts import SyncResource
+from openstack_sync.hooks.finalizers import release_deleted_finalizers
+from openstack_sync.hooks.finalizers import resource_target
+from openstack_sync.hooks.finalizers import sync_live_finalizers
+from openstack_sync.hooks.finalizers import write_finalizer
 from openstack_sync.hooks.resources import _credentials
 from openstack_sync.hooks.resources import _dedupe_resources
 from openstack_sync.hooks.resources import _resource_key
@@ -480,86 +484,43 @@ def _fail_group(plugin: SyncPlugin, group: list[SyncResource], message: str) -> 
 def _resource_target(
     plugin: SyncPlugin, resource: SyncResource
 ) -> CustomResourceTarget | None:
-    """Return the Kubernetes patch target for *resource*, or None if unusable."""
-    if not resource.name:
-        LOG.error(
-            "Unable to patch finalizers on %s; Kubernetes metadata.name is missing",
-            plugin.config.crd_kind,
-        )
-        return None
-    return CustomResourceTarget(
-        name=resource.name,
-        namespace=resource.namespace or plugin.config.namespace,
-        api_version=plugin.config.crd_api_version,
-        resource=plugin.config.crd_resource,
-        kind=plugin.config.crd_kind,
-    )
+    return resource_target(plugin.config, resource)
 
 
 def _write_finalizer(
     plugin: SyncPlugin, resource: SyncResource, *, present: bool
 ) -> bool:
-    """Add or remove the framework finalizer on a live CR.
-
-    ``present`` says which state the CR should end in. This helper is for live
-    CRs; deleted CRs use ``_release_deleted_finalizers`` so an already-gone
-    object can be treated as success.
-    """
-    target = _resource_target(plugin, resource)
-    if target is None:
-        return False
-    if present:
-        return add_resource_finalizer(
-            target=target,
-            finalizer=FINALIZER,
-            current_finalizers=list(resource.finalizers),
-            resource_version=resource.resource_version,
-        )
-    return remove_resource_finalizer(
-        target=target,
-        finalizer=FINALIZER,
-        current_finalizers=list(resource.finalizers),
+    return write_finalizer(
+        plugin.config,
+        resource,
+        present=present,
+        add_finalizer=add_resource_finalizer,
+        remove_finalizer=remove_resource_finalizer,
     )
 
 
 def _sync_live_finalizers(
     plugin: SyncPlugin, resources: list[SyncResource]
 ) -> set[tuple[str | None, str | None]]:
-    """Make live CR finalizers match the plugin's current cleanup policy."""
-    should_have_finalizer = plugin.uses_finalizer()
-    failed: set[tuple[str | None, str | None]] = set()
-    for resource in resources:
-        if resource.has_finalizer == should_have_finalizer:
-            continue
-        if _write_finalizer(plugin, resource, present=should_have_finalizer):
-            continue
-
-        failed.add(_resource_key(resource))
-        message = (
-            "Unable to add finalizer before reconciling"
-            if should_have_finalizer
-            else "Unable to remove disabled finalizer before reconciling"
-        )
-        _patch_status(plugin, resource, "Failed", message)
-    return failed
+    return sync_live_finalizers(
+        plugin,
+        resources,
+        add_finalizer=add_resource_finalizer,
+        remove_finalizer=remove_resource_finalizer,
+        fail_resource=lambda resource, message: _patch_status(
+            plugin, resource, "Failed", message
+        ),
+    )
 
 
 def _release_deleted_finalizers(
     plugin: SyncPlugin, resources: list[SyncResource]
 ) -> int:
-    """Remove finalizers from deleted CRs after cleanup has succeeded."""
-    failed = 0
-    for resource in resources:
-        if not resource.has_finalizer:
-            continue
-        target = _resource_target(plugin, resource)
-        if target is None or not release_deleted_resource_finalizer(
-            target=target,
-            finalizer=FINALIZER,
-            current_finalizers=list(resource.finalizers),
-        ):
-            failed += 1
-    return 1 if failed else 0
+    return release_deleted_finalizers(
+        plugin.config,
+        resources,
+        release_finalizer=release_deleted_resource_finalizer,
+    )
 
 
 def _run_prune(
