@@ -40,6 +40,8 @@ from openstack_sync.hooks.finalizers import write_finalizer
 from openstack_sync.hooks.planner import hook_inputs
 from openstack_sync.hooks.resources import _resource_key
 from openstack_sync.hooks.resources import group_by_credentials
+from openstack_sync.hooks.status import patch_status
+from openstack_sync.hooks.status import synced_message
 from openstack_sync.utils import get_openstack_connection
 
 LOG = logging.getLogger(__name__)
@@ -175,38 +177,13 @@ def _plugin_has_prune_step(plugin: SyncPlugin) -> bool:
 def _patch_status(
     plugin: SyncPlugin, resource: SyncResource, sync_status: str, message: str
 ) -> None:
-    config = plugin.config
-    if not resource.name:
-        LOG.error(
-            "Unable to patch %s status; Kubernetes metadata.name is missing",
-            config.crd_kind,
-        )
-        return
-    patch_resource_status(
-        name=resource.name,
-        namespace=resource.namespace or config.namespace,
-        generation=resource.generation,
-        sync_status=sync_status,
-        message=message,
-        crd_api_version=config.crd_api_version,
-        crd_resource=config.crd_resource,
-        crd_kind=config.crd_kind,
-        status_enabled=config.status_enabled,
-        current_status=resource.current_status,
+    patch_status(
+        plugin.config,
+        resource,
+        sync_status,
+        message,
+        patch_resource_status=patch_resource_status,
     )
-
-
-def synced_message(noun: str, notes: list[str]) -> str:
-    """Return the Synced message, qualified by anything needing manual action.
-
-    The resource really is converged, so the status stays Synced. Reporting a
-    bare success while state diverges from the spec is how a broken resource
-    stays invisible until it is used.
-    """
-    message = f"Successfully reconciled {noun}"
-    if not notes:
-        return message
-    return f"{message}; needs manual action: {'; '.join(notes)}"
 
 
 # ---------------------------------------------------------------------------
