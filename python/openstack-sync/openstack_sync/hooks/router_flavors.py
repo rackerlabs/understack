@@ -57,7 +57,7 @@ class RouterFlavorPlugin(SyncPlugin):
             conn, desired_specs, authoritative_empty=authoritative_empty
         )
 
-    def needs_prune_connection(self) -> bool:
+    def should_run_prune(self) -> bool:
         return True
 
 

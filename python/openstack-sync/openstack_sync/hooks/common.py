@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from typing import Any
 
 from kubernetes import client as k8s_client
@@ -256,6 +257,258 @@ def _api_error_detail(exc: ApiException, max_body: int = 512) -> str:
     return f"{detail}: {truncate_message(body, max_body)}"
 
 
+def _api_error_is_missing_object(exc: ApiException, name: str) -> bool:
+    """Return whether a 404 is for *name* itself rather than for its CRD."""
+    if exc.status != 404:
+        return False
+    try:
+        return json.loads(exc.body or "")["details"]["name"] == name
+    except (ValueError, TypeError, LookupError):
+        # Not JSON, or JSON the API server did not shape like a Status.
+        return False
+
+
+@dataclass(frozen=True)
+class CustomResourceTarget:
+    """Kubernetes identity for patching one namespaced custom resource."""
+
+    name: str
+    namespace: str | None
+    api_version: str
+    resource: str
+    kind: str
+
+    def request_parts(self) -> tuple[str, str, str]:
+        return crd_request_target(self.api_version, self.resource)
+
+
+@dataclass(frozen=True)
+class _FinalizerExpectation:
+    """Live state that makes a rejected finalizer patch harmless."""
+
+    finalizer: str
+    present: bool
+    missing_resource_ok: bool = False
+
+
+def _patch_resource_metadata(
+    *,
+    target: CustomResourceTarget,
+    body: list[dict[str, Any]],
+    action: str,
+    finalizer_expectation: _FinalizerExpectation | None = None,
+) -> bool:
+    """Patch CR metadata with JSON Patch, returning whether it succeeded."""
+    if not target.namespace:
+        LOG.error(
+            "unable to %s %s %s; no namespace to address it in",
+            action,
+            target.kind,
+            target.name,
+        )
+        return False
+
+    try:
+        group, version, plural = target.request_parts()
+    except ValueError as exc:
+        LOG.error("unable to %s %s %s: %s", action, target.kind, target.name, exc)
+        return False
+
+    try:
+        _customobjects_api().patch_namespaced_custom_object(
+            group=group,
+            version=version,
+            namespace=target.namespace,
+            plural=plural,
+            name=target.name,
+            body=body,
+            _content_type="application/json-patch+json",
+        )
+    except ApiException as exc:
+        if finalizer_expectation is not None:
+            if _resource_finalizer_state_matches(
+                target=target,
+                group=group,
+                version=version,
+                plural=plural,
+                expectation=finalizer_expectation,
+            ):
+                LOG.info(
+                    "%s %s already has the desired finalizer state "
+                    "after a rejected metadata patch",
+                    target.kind,
+                    target.name,
+                )
+                return True
+        LOG.error(
+            "failed to %s %s %s: %s",
+            action,
+            target.kind,
+            target.name,
+            _api_error_detail(exc),
+        )
+        return False
+    except Exception as exc:  # noqa: BLE001
+        LOG.error(
+            "failed to %s %s %s: %s: %s",
+            action,
+            target.kind,
+            target.name,
+            type(exc).__name__,
+            exc,
+            exc_info=True,
+        )
+        return False
+
+    return True
+
+
+def _resource_finalizer_state_matches(
+    *,
+    target: CustomResourceTarget,
+    group: str,
+    version: str,
+    plural: str,
+    expectation: _FinalizerExpectation,
+) -> bool:
+    """Return whether the live CR already has the requested finalizer state."""
+    try:
+        obj = _customobjects_api().get_namespaced_custom_object(
+            group=group,
+            version=version,
+            namespace=target.namespace,
+            plural=plural,
+            name=target.name,
+        )
+    except ApiException as exc:
+        if expectation.missing_resource_ok and _api_error_is_missing_object(
+            exc, target.name
+        ):
+            return expectation.missing_resource_ok
+        LOG.error(
+            "failed to verify finalizers on %s/%s: %s",
+            target.namespace,
+            target.name,
+            _api_error_detail(exc),
+        )
+        return False
+    except Exception as exc:  # noqa: BLE001
+        LOG.error(
+            "failed to verify finalizers on %s/%s: %s: %s",
+            target.namespace,
+            target.name,
+            type(exc).__name__,
+            exc,
+            exc_info=True,
+        )
+        return False
+
+    if not isinstance(obj, dict):
+        return False
+    metadata = obj.get("metadata", {})
+    if not isinstance(metadata, dict):
+        return False
+    finalizers = metadata.get("finalizers", [])
+    if not isinstance(finalizers, list):
+        finalizers = []
+    return (expectation.finalizer in finalizers) is expectation.present
+
+
+def add_resource_finalizer(
+    *,
+    target: CustomResourceTarget,
+    finalizer: str,
+    current_finalizers: list[str],
+    resource_version: str | None = None,
+) -> bool:
+    """Add *finalizer* to a CR without replacing unrelated finalizers."""
+    if finalizer in current_finalizers:
+        return True
+
+    if current_finalizers:
+        body = [{"op": "add", "path": "/metadata/finalizers/-", "value": finalizer}]
+    else:
+        body = [
+            {"op": "add", "path": "/metadata/finalizers", "value": [finalizer]},
+        ]
+    if resource_version:
+        body.insert(
+            0,
+            {
+                "op": "test",
+                "path": "/metadata/resourceVersion",
+                "value": resource_version,
+            },
+        )
+
+    return _patch_resource_metadata(
+        target=target,
+        body=body,
+        action="add finalizer to",
+        finalizer_expectation=_FinalizerExpectation(finalizer, present=True),
+    )
+
+
+def _remove_resource_finalizer(
+    *,
+    target: CustomResourceTarget,
+    finalizer: str,
+    current_finalizers: list[str],
+    missing_resource_ok: bool,
+) -> bool:
+    """Remove *finalizer* from a CR without replacing unrelated finalizers."""
+    try:
+        index = current_finalizers.index(finalizer)
+    except ValueError:
+        return True
+
+    path = f"/metadata/finalizers/{index}"
+    body = [
+        {"op": "test", "path": path, "value": finalizer},
+        {"op": "remove", "path": path},
+    ]
+    return _patch_resource_metadata(
+        target=target,
+        body=body,
+        action="remove finalizer from",
+        finalizer_expectation=_FinalizerExpectation(
+            finalizer,
+            present=False,
+            missing_resource_ok=missing_resource_ok,
+        ),
+    )
+
+
+def remove_resource_finalizer(
+    *,
+    target: CustomResourceTarget,
+    finalizer: str,
+    current_finalizers: list[str],
+) -> bool:
+    """Remove *finalizer* from a live CR without replacing unrelated finalizers."""
+    return _remove_resource_finalizer(
+        target=target,
+        finalizer=finalizer,
+        current_finalizers=current_finalizers,
+        missing_resource_ok=False,
+    )
+
+
+def release_deleted_resource_finalizer(
+    *,
+    target: CustomResourceTarget,
+    finalizer: str,
+    current_finalizers: list[str],
+) -> bool:
+    """Remove *finalizer* from a deleting CR, accepting an already-gone object."""
+    return _remove_resource_finalizer(
+        target=target,
+        finalizer=finalizer,
+        current_finalizers=current_finalizers,
+        missing_resource_ok=True,
+    )
+
+
 def patch_resource_status(
     *,
     name: str,
@@ -344,6 +597,14 @@ def patch_resource_status(
             _content_type="application/merge-patch+json",
         )
     except ApiException as exc:
+        if _api_error_is_missing_object(exc, name):
+            LOG.info(
+                "not patching %s status for %s; the CR is gone: %s",
+                crd_kind,
+                name,
+                _api_error_detail(exc),
+            )
+            return
         LOG.error(
             "failed to patch %s status for %s: %s",
             crd_kind,

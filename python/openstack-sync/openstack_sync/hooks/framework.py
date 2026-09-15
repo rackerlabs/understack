@@ -21,9 +21,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from openstack_sync.hooks.common import CustomResourceTarget
+from openstack_sync.hooks.common import add_resource_finalizer
 from openstack_sync.hooks.common import configure_logging
 from openstack_sync.hooks.common import patch_resource_status
 from openstack_sync.hooks.common import read_binding_context
+from openstack_sync.hooks.common import release_deleted_resource_finalizer
+from openstack_sync.hooks.common import remove_resource_finalizer
 from openstack_sync.hooks.common import snapshot_items
 from openstack_sync.hooks.common import synchronization_items
 from openstack_sync.plugins.common import ConfigError
@@ -37,6 +41,9 @@ LOG = logging.getLogger(__name__)
 
 #: A plugin's OpenStack credentials: ``(secret_name, cloud_name)``.
 CredentialKey = tuple[str, str]
+
+#: Finalizer used to keep CRs around until their OpenStack cleanup has finished.
+FINALIZER = "openstack-sync.understack.rackspace.net/finalizer"
 
 
 # ---------------------------------------------------------------------------
@@ -159,10 +166,29 @@ class SyncResource:
     secret_name: str
     cloud_name: str
     current_status: dict[str, Any] | None = None
+    finalizers: tuple[str, ...] = ()
+    deletion_timestamp: str | None = None
+    resource_version: str | None = None
+    uid: str | None = None
 
     @property
     def credentials(self) -> CredentialKey:
         return (self.secret_name, self.cloud_name)
+
+    @property
+    def identity(self) -> str:
+        """Key identifying this CR across a batch of events."""
+        return self.uid or f"{self.namespace}/{self.name}"
+
+    @property
+    def has_finalizer(self) -> bool:
+        """Return whether this CR already carries the framework finalizer."""
+        return FINALIZER in self.finalizers
+
+    @property
+    def is_deleting(self) -> bool:
+        """Return whether Kubernetes has started deleting this CR."""
+        return self.deletion_timestamp is not None
 
     @property
     def display_name(self) -> str:
@@ -257,6 +283,11 @@ def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
         )
 
     metadata = obj.get("metadata", {})
+    raw_finalizers = metadata.get("finalizers", [])
+    if isinstance(raw_finalizers, list):
+        finalizers = tuple(str(value) for value in raw_finalizers)
+    else:
+        finalizers = ()
 
     return SyncResource(
         spec=spec,
@@ -266,6 +297,10 @@ def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
         secret_name=str(secret_name),
         cloud_name=str(cloud_name),
         current_status=obj.get("status"),
+        finalizers=finalizers,
+        deletion_timestamp=metadata.get("deletionTimestamp"),
+        resource_version=metadata.get("resourceVersion"),
+        uid=metadata.get("uid"),
     )
 
 
@@ -295,19 +330,46 @@ class _ResourceReader:
             LOG.error("Ignoring unreadable %s %s: %s", description, identity, exc)
             return None
 
-    def read_all(self, items: list[Any]) -> list[SyncResource]:
-        """Read snapshot or Synchronization items into sorted resources.
+    def read_all(
+        self, items: list[Any]
+    ) -> tuple[list[SyncResource], list[SyncResource]]:
+        """Read snapshot or Synchronization items into live and deleting resources.
 
         Snapshot items wrap the object as ``{"object": {...}}``; Synchronization
         items are the object itself.
         """
-        resources = [
-            resource
-            for item in items
-            if (resource := self.read(item.get("object", item))) is not None
-        ]
-        resources.sort(key=lambda r: str(r.spec.get("name", "")))
-        return resources
+        live: list[SyncResource] = []
+        deleting: list[SyncResource] = []
+        for item in items:
+            resource = self.read(item.get("object", item))
+            if resource is None:
+                continue
+            if resource.is_deleting:
+                deleting.append(resource)
+            else:
+                live.append(resource)
+
+        live.sort(key=lambda r: str(r.spec.get("name", "")))
+        deleting.sort(key=lambda r: str(r.spec.get("name", "")))
+        return live, deleting
+
+
+def _resource_key(resource: SyncResource) -> tuple[str | None, str | None]:
+    """Return a stable enough identity key for de-duplicating CR events."""
+    return (resource.namespace, resource.name)
+
+
+def _dedupe_resources(resources: list[SyncResource]) -> list[SyncResource]:
+    """Return resources de-duplicated by namespace/name, preserving order."""
+    seen: set[tuple[str | None, str | None]] = set()
+    deduped: list[SyncResource] = []
+    for resource in resources:
+        key = _resource_key(resource)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(resource)
+    return deduped
 
 
 def _status_is_current(resource: SyncResource) -> bool:
@@ -329,10 +391,17 @@ def _status_is_current(resource: SyncResource) -> bool:
 def _split_events(
     contexts: list[dict[str, Any]], config: HookConfig, reader: _ResourceReader
 ) -> tuple[list[SyncResource], list[SyncResource], bool]:
-    """Split this binding's Event contexts into changed and deleted resources."""
-    changed: list[SyncResource] = []
-    deleted: list[SyncResource] = []
+    """Split this binding's Event contexts into changed and deleted resources.
+
+    Shell-operator can replay a backlog of events for one CR. Collapsing by CR
+    identity keeps one logical resource from producing repeated finalizer,
+    status, reconcile, and prune work in the same hook run.
+    """
+    changed: dict[str, SyncResource] = {}
+    deleted: dict[str, SyncResource] = {}
     saw_event_context = False
+    changed_events = 0
+    changed_identities: set[str] = set()
 
     for context in contexts:
         if context.get("binding") != config.binding_name:
@@ -359,8 +428,15 @@ def _split_events(
         if resource is None:
             continue
 
-        if watch_event == "Deleted":
-            deleted.append(resource)
+        if resource.is_deleting or watch_event == "Deleted":
+            deleted[resource.identity] = resource
+            superseded = changed.pop(resource.identity, None)
+            if superseded is not None:
+                LOG.info(
+                    "Not reconciling %s %s; a later event in this batch deleted it",
+                    config.crd_kind,
+                    superseded.display_name,
+                )
         elif watch_event == "Modified" and _status_is_current(resource):
             LOG.info(
                 "Skipping %s Modified event; generation %s is already Synced",
@@ -368,10 +444,21 @@ def _split_events(
                 resource.generation,
             )
         else:
-            changed.append(resource)
+            deleted.pop(resource.identity, None)
+            changed_events += 1
+            changed_identities.add(resource.identity)
+            changed[resource.identity] = resource
 
-    changed.sort(key=lambda r: str(r.spec.get("name", "")))
-    return changed, deleted, saw_event_context
+    if changed_events > len(changed_identities):
+        LOG.info(
+            "Collapsed %s %s changed event(s) across %s CR(s)",
+            changed_events,
+            config.crd_kind,
+            len(changed_identities),
+        )
+
+    resources = sorted(changed.values(), key=lambda r: str(r.spec.get("name", "")))
+    return resources, list(deleted.values()), saw_event_context
 
 
 def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInputs:
@@ -391,7 +478,8 @@ def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInput
                 f"Shell-operator {config.binding_name} event context does not "
                 f"contain {config.binding_name} snapshot objects"
             )
-        desired = reader.read_all(items)
+        desired, snapshot_deleted = reader.read_all(items)
+        deleted = _dedupe_resources(deleted + snapshot_deleted)
         prune_credentials = _credentials(changed) | _credentials(deleted)
         return HookInputs(
             changed, desired, deleted, prune_credentials, frozenset(reader.unreadable)
@@ -405,9 +493,13 @@ def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInput
             f"{config.binding_name} event, snapshot, or synchronization objects"
         )
 
-    resources = reader.read_all(items)
+    resources, deleted = reader.read_all(items)
     return HookInputs(
-        resources, resources, [], _credentials(resources), frozenset(reader.unreadable)
+        resources,
+        resources,
+        deleted,
+        _credentials(resources) | _credentials(deleted),
+        frozenset(reader.unreadable),
     )
 
 
@@ -480,14 +572,36 @@ class SyncPlugin(ABC):
         """
         LOG.debug("%s defines no prune step", type(self).__name__)
 
-    def needs_prune_connection(self) -> bool:
-        """Return whether prune can do useful work and needs a connection.
+    def should_run_prune(self) -> bool:
+        """Return whether ``run_sync`` should call this plugin's prune step.
 
-        Most plugins only prune when their chart prune flag is enabled. Plugins
-        with narrower cleanup that is safe without destructive pruning can
-        override this so deletion-only runs still get a connection.
+        This asks a different question from :meth:`uses_finalizer`: whether
+        there is *any* prune work to do this run, destructive or not. The
+        default runs prune only when the chart prune flag is on and the plugin
+        actually has a prune step. A plugin whose prune also does safe cleanup
+        when destructive pruning is off overrides this to always run (see
+        ``RouterFlavorPlugin``); such a run still installs no finalizer, because
+        that cleanup does not need to block a CR's deletion.
         """
-        return self.config.prune
+        return self.config.prune and _plugin_has_prune_step(self)
+
+    def uses_finalizer(self) -> bool:
+        """Return whether live CRs should be held by a finalizer until cleanup.
+
+        This asks a different question from :meth:`should_run_prune`: whether
+        deleting a CR must run a destructive, CR-scoped cleanup that Kubernetes
+        has to wait for. The default installs a finalizer only when the chart
+        prune flag is on and the plugin has a prune step. A plugin with a
+        different cleanup model can override this, but leaving it tied to the
+        destructive prune flag is why a plugin that prunes non-destructively
+        with ``PRUNE=false`` still leaves its CRs free to delete immediately.
+        """
+        return self.config.prune and _plugin_has_prune_step(self)
+
+
+def _plugin_has_prune_step(plugin: SyncPlugin) -> bool:
+    """Return whether *plugin* replaced the framework's no-op prune."""
+    return type(plugin).prune is not SyncPlugin.prune
 
 
 # ---------------------------------------------------------------------------
@@ -543,9 +657,6 @@ def run_sync(plugin: SyncPlugin, inputs: HookInputs) -> int:
     resources = inputs.resources_to_reconcile
     LOG.info("Found %s %s(s) to reconcile", len(resources), noun)
 
-    grouped = group_by_credentials(resources)
-    grouped_desired = group_by_credentials(inputs.desired_resources_for_prune)
-    grouped_deleted = group_by_credentials(inputs.deleted_resources)
     connections: dict[CredentialKey, Any] = {}
     failed = 0
 
@@ -557,6 +668,17 @@ def run_sync(plugin: SyncPlugin, inputs: HookInputs) -> int:
             noun,
             ", ".join(sorted(inputs.unreadable_resources)),
         )
+
+    finalizer_failures = _sync_live_finalizers(plugin, resources)
+    if finalizer_failures:
+        failed += len(finalizer_failures)
+        resources = [
+            resource
+            for resource in resources
+            if _resource_key(resource) not in finalizer_failures
+        ]
+
+    grouped = group_by_credentials(resources)
 
     for credentials in sorted(grouped):
         secret_name, cloud_name = credentials
@@ -626,7 +748,21 @@ def run_sync(plugin: SyncPlugin, inputs: HookInputs) -> int:
         )
         return 1
 
-    return _run_prune(plugin, inputs, grouped_desired, grouped_deleted, connections)
+    prune_code = _run_prune(plugin, inputs, connections)
+
+    # A finalizer is only held while destructive, CR-scoped cleanup could still
+    # be outstanding, so it is released once that cleanup has run. When
+    # uses_finalizer() is false there is no such cleanup to wait for: any
+    # finalizer still on a deleted CR is stale (left from when the plugin did
+    # use one), and it must be released even if a best-effort prune could not
+    # connect -- otherwise the CR is wedged in Terminating for a step it does
+    # not depend on. When uses_finalizer() is true a failed prune keeps the
+    # finalizer, because the cleanup it guards did not complete.
+    if plugin.uses_finalizer() and prune_code != 0:
+        return prune_code
+
+    release_code = _release_deleted_finalizers(plugin, inputs.deleted_resources)
+    return prune_code or release_code
 
 
 def _fail_group(plugin: SyncPlugin, group: list[SyncResource], message: str) -> None:
@@ -634,15 +770,104 @@ def _fail_group(plugin: SyncPlugin, group: list[SyncResource], message: str) -> 
         _patch_status(plugin, resource, "Failed", message)
 
 
+def _resource_target(
+    plugin: SyncPlugin, resource: SyncResource
+) -> CustomResourceTarget | None:
+    """Return the Kubernetes patch target for *resource*, or None if unusable."""
+    if not resource.name:
+        LOG.error(
+            "Unable to patch finalizers on %s; Kubernetes metadata.name is missing",
+            plugin.config.crd_kind,
+        )
+        return None
+    return CustomResourceTarget(
+        name=resource.name,
+        namespace=resource.namespace or plugin.config.namespace,
+        api_version=plugin.config.crd_api_version,
+        resource=plugin.config.crd_resource,
+        kind=plugin.config.crd_kind,
+    )
+
+
+def _write_finalizer(
+    plugin: SyncPlugin, resource: SyncResource, *, present: bool
+) -> bool:
+    """Add or remove the framework finalizer on a live CR.
+
+    ``present`` says which state the CR should end in. This helper is for live
+    CRs; deleted CRs use ``_release_deleted_finalizers`` so an already-gone
+    object can be treated as success.
+    """
+    target = _resource_target(plugin, resource)
+    if target is None:
+        return False
+    if present:
+        return add_resource_finalizer(
+            target=target,
+            finalizer=FINALIZER,
+            current_finalizers=list(resource.finalizers),
+            resource_version=resource.resource_version,
+        )
+    return remove_resource_finalizer(
+        target=target,
+        finalizer=FINALIZER,
+        current_finalizers=list(resource.finalizers),
+    )
+
+
+def _sync_live_finalizers(
+    plugin: SyncPlugin, resources: list[SyncResource]
+) -> set[tuple[str | None, str | None]]:
+    """Make live CR finalizers match the plugin's current cleanup policy."""
+    should_have_finalizer = plugin.uses_finalizer()
+    failed: set[tuple[str | None, str | None]] = set()
+    for resource in resources:
+        if resource.has_finalizer == should_have_finalizer:
+            continue
+        if _write_finalizer(plugin, resource, present=should_have_finalizer):
+            continue
+
+        failed.add(_resource_key(resource))
+        message = (
+            "Unable to add finalizer before reconciling"
+            if should_have_finalizer
+            else "Unable to remove disabled finalizer before reconciling"
+        )
+        _patch_status(plugin, resource, "Failed", message)
+    return failed
+
+
+def _release_deleted_finalizers(
+    plugin: SyncPlugin, resources: list[SyncResource]
+) -> int:
+    """Remove finalizers from deleted CRs after cleanup has succeeded."""
+    failed = 0
+    for resource in resources:
+        if not resource.has_finalizer:
+            continue
+        target = _resource_target(plugin, resource)
+        if target is None or not release_deleted_resource_finalizer(
+            target=target,
+            finalizer=FINALIZER,
+            current_finalizers=list(resource.finalizers),
+        ):
+            failed += 1
+    return 1 if failed else 0
+
+
 def _run_prune(
     plugin: SyncPlugin,
     inputs: HookInputs,
-    grouped_desired: dict[CredentialKey, list[SyncResource]],
-    grouped_deleted: dict[CredentialKey, list[SyncResource]],
     connections: dict[CredentialKey, Any],
 ) -> int:
     noun = plugin.noun
     prune_failed = False
+    if not plugin.should_run_prune():
+        LOG.info("Finished reconciling %s(s)", noun)
+        return 0
+
+    grouped_desired = group_by_credentials(inputs.desired_resources_for_prune)
+    grouped_deleted = group_by_credentials(inputs.deleted_resources)
 
     # Every group's desired resources, because a resource is not private to the
     # credentials that manage it. A plugin prunes by its own ownership marker,
@@ -672,8 +897,6 @@ def _run_prune(
 
         conn = connections.get(credentials)
         if conn is None:
-            if not plugin.needs_prune_connection():
-                continue
             try:
                 conn = get_openstack_connection(secret_name, cloud_name)
                 plugin.wait_for_api(conn)
