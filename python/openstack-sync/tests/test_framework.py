@@ -38,6 +38,27 @@ PREFIX = "NEUTRON_ROUTER_FLAVOR"
 BINDING = "neutron-router-flavors"
 HOOKS_DIR = Path(__file__).parents[1] / "openstack_sync" / "hooks"
 
+FRAMEWORK_PUBLIC_NAMES = [
+    "CredentialKey",
+    "FINALIZER",
+    "HookConfig",
+    "HookInputs",
+    "SyncPlugin",
+    "SyncResource",
+    "add_resource_finalizer",
+    "build_crd_hook_config",
+    "get_openstack_connection",
+    "group_by_credentials",
+    "hook_enabled",
+    "hook_inputs",
+    "patch_resource_status",
+    "release_deleted_resource_finalizer",
+    "remove_resource_finalizer",
+    "run_hook",
+    "run_sync",
+    "synced_message",
+]
+
 ENV_NAMES = (
     "BINDING_CONTEXT_PATH",
     f"{PREFIX}_ENABLED",
@@ -217,29 +238,8 @@ def test_group_by_credentials_is_public_contract():
 
 
 def test_framework_public_facade_exports_expected_names():
-    expected = {
-        "CredentialKey",
-        "FINALIZER",
-        "HookConfig",
-        "HookInputs",
-        "SyncPlugin",
-        "SyncResource",
-        "add_resource_finalizer",
-        "build_crd_hook_config",
-        "get_openstack_connection",
-        "group_by_credentials",
-        "hook_enabled",
-        "hook_inputs",
-        "patch_resource_status",
-        "release_deleted_resource_finalizer",
-        "remove_resource_finalizer",
-        "run_hook",
-        "run_sync",
-        "synced_message",
-    }
-
-    assert set(framework.__all__) == expected
-    for name in expected:
+    assert framework.__all__ == FRAMEWORK_PUBLIC_NAMES
+    for name in FRAMEWORK_PUBLIC_NAMES:
         assert hasattr(framework, name)
 
 
