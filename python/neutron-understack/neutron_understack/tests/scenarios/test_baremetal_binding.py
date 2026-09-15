@@ -110,11 +110,12 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
 
     @pytest.mark.scenario("PROV-DEL-01")
-    def test_provisioning_network_delete_retains_segment(self):
-        """Deleting a provisioning-network port syncs but keeps the VLAN segment.
+    def test_provisioning_network_delete_releases_unused_segment(self):
+        """Deleting a provisioning-network port syncs and frees an unused segment.
 
-        The clean/provision cycle re-uses the segment, so unlike a tenant port
-        (BM-BIND-05) the dynamic VLAN segment is not released on delete.
+        The provisioning network is not special on the delete path: its dynamic
+        VLAN segment is reference counted like any other, so the last port to
+        go away returns the VLAN to the pool (as in BM-BIND-05).
         """
         net = self._make_vxlan_network()
         cfg.CONF.set_override("provisioning_network", net["id"], group="ml2_understack")
@@ -125,7 +126,28 @@ class TestBaremetalBinding(UnderstackMl2ScenarioBase):
 
         self._delete("ports", port["id"], as_admin=True)
 
-        # Sync fired, but the segment is retained (provisioning cycle).
+        self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
+        assert segments_db.get_segment_by_id(self.context, vlan_segment_id) is None
+
+    @pytest.mark.scenario("BM-DEL-SHARED-01")
+    def test_delete_keeps_segment_still_in_use(self):
+        """Deleting one of two ports sharing a VLAN segment must not free it.
+
+        The dynamic segment belongs to the (network, physnet) pair, so the
+        surviving port still needs its VLAN on the switch.
+        """
+        net = self._make_vxlan_network()
+        first = self._create_unbound_baremetal_port(net["id"])
+        self._vif_attach(first["id"])
+        vlan_segment_id = self._bottom_segment_id(first["id"])
+
+        second = self._create_unbound_baremetal_port(net["id"])
+        self._vif_attach(second["id"])
+        assert self._bottom_segment_id(second["id"]) == vlan_segment_id
+        self.undersync_mock.reset_mock()
+
+        self._delete("ports", first["id"], as_admin=True)
+
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
         assert segments_db.get_segment_by_id(self.context, vlan_segment_id) is not None
 

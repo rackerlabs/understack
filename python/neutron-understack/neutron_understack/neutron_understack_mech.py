@@ -320,17 +320,11 @@ class UnderstackDriver(MechanismDriver):
         if not vlan_group_name:
             return
 
-        if is_provisioning_network(port["network_id"]):
-            # Signals end of the provisioning / cleaning cycle, so we
-            # put the port back to its normal tenant mode:
-            self.undersync.sync(vlan_group_name)
-            return
-
-        # A tenant network port normally has its dynamic VLAN segment released
-        # by _tenant_network_port_cleanup, but that only runs on the
+        # A port's dynamic VLAN segment is normally released by
+        # _tenant_network_port_cleanup, but that only runs on the
         # update_port_postcommit bound->unbound transition. A port deleted
-        # directly (still bound) skips that transition entirely, so without
-        # this the segment -- and its VLAN -- leaks forever.
+        # while still bound skips that transition entirely, so without this
+        # the segment -- and its VLAN -- leaks forever.
         segment = utils.network_segment_by_physnet(port["network_id"], vlan_group_name)
         if segment:
             utils.release_segment_if_unused(segment)
@@ -434,7 +428,3 @@ class UnderstackDriver(MechanismDriver):
 
     def check_vlan_transparency(self, context):
         pass
-
-
-def is_provisioning_network(network_id: str) -> bool:
-    return network_id == cfg.CONF.ml2_understack.provisioning_network
