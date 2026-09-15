@@ -17,7 +17,6 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
-from openstack_sync.hooks.common import CustomResourceTarget
 from openstack_sync.hooks.common import add_resource_finalizer
 from openstack_sync.hooks.common import configure_logging
 from openstack_sync.hooks.common import patch_resource_status
@@ -34,9 +33,7 @@ from openstack_sync.hooks.contracts import SyncPlugin
 from openstack_sync.hooks.contracts import SyncResource
 from openstack_sync.hooks.entrypoint import run_hook as _run_hook
 from openstack_sync.hooks.finalizers import release_deleted_finalizers
-from openstack_sync.hooks.finalizers import resource_target
 from openstack_sync.hooks.finalizers import sync_live_finalizers
-from openstack_sync.hooks.finalizers import write_finalizer
 from openstack_sync.hooks.planner import hook_inputs
 from openstack_sync.hooks.pruning import run_prune
 from openstack_sync.hooks.resources import group_by_credentials
@@ -98,24 +95,6 @@ def run_sync(plugin: SyncPlugin, inputs: HookInputs) -> int:
         sync_live_finalizers=_sync_live_finalizers,
         run_prune=_run_prune,
         release_deleted_finalizers=_release_deleted_finalizers,
-    )
-
-
-def _resource_target(
-    plugin: SyncPlugin, resource: SyncResource
-) -> CustomResourceTarget | None:
-    return resource_target(plugin.config, resource)
-
-
-def _write_finalizer(
-    plugin: SyncPlugin, resource: SyncResource, *, present: bool
-) -> bool:
-    return write_finalizer(
-        plugin.config,
-        resource,
-        present=present,
-        add_finalizer=add_resource_finalizer,
-        remove_finalizer=remove_resource_finalizer,
     )
 
 
