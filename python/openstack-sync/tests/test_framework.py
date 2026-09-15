@@ -17,9 +17,12 @@ from unittest import mock
 import pytest
 
 from openstack_sync.hooks import framework
+from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import CredentialKey
 from openstack_sync.hooks.framework import HookConfig
 from openstack_sync.hooks.framework import HookInputs
+from openstack_sync.hooks.framework import PruneRequest
+from openstack_sync.hooks.framework import SyncPlan
 from openstack_sync.hooks.framework import SyncPlugin
 from openstack_sync.hooks.framework import SyncResource
 from openstack_sync.hooks.framework import build_crd_hook_config
@@ -39,10 +42,13 @@ BINDING = "neutron-router-flavors"
 HOOKS_DIR = Path(__file__).parents[1] / "openstack_sync" / "hooks"
 
 FRAMEWORK_PUBLIC_NAMES = [
+    "CleanupPolicy",
     "CredentialKey",
     "FINALIZER",
     "HookConfig",
     "HookInputs",
+    "PruneRequest",
+    "SyncPlan",
     "SyncPlugin",
     "SyncResource",
     "add_resource_finalizer",
@@ -186,6 +192,17 @@ class AlwaysPrunePlugin(StubPlugin):
         return True
 
 
+class RequestPrunePlugin(StubPlugin):
+    """Plugin using the new request-shaped prune API."""
+
+    def __init__(self, config: HookConfig) -> None:
+        super().__init__(config)
+        self.prune_requests: list[PruneRequest] = []
+
+    def prune_resources(self, conn: Any, request: PruneRequest) -> None:
+        self.prune_requests.append(request)
+
+
 def _resource(
     name: str,
     secret: str = "infrasetup",
@@ -215,12 +232,12 @@ def _inputs(
     deleted: list[SyncResource] | None = None,
     prune_credentials: frozenset[tuple[str, str]] | None = None,
     unreadable: frozenset[str] = frozenset(),
-) -> HookInputs:
+) -> SyncPlan:
     desired = reconcile if desired is None else desired
     deleted = deleted or []
     if prune_credentials is None:
         prune_credentials = frozenset(r.credentials for r in desired + deleted)
-    return HookInputs(reconcile, desired, deleted, prune_credentials, unreadable)
+    return SyncPlan(reconcile, desired, deleted, prune_credentials, unreadable)
 
 
 def test_group_by_credentials_is_public_contract():
@@ -235,6 +252,40 @@ def test_group_by_credentials_is_public_contract():
 
     assert list(grouped) == [expected_key, ("alpha", "region-two")]
     assert [r.spec["name"] for r in grouped[expected_key]] == ["first", "second"]
+
+
+def test_hook_inputs_is_sync_plan_compatibility_alias():
+    assert HookInputs is SyncPlan
+
+
+def test_cleanup_policy_names_all_legacy_boolean_combinations():
+    assert (
+        CleanupPolicy.from_flags(run_prune=False, uses_finalizer=False)
+        is CleanupPolicy.NONE
+    )
+    assert (
+        CleanupPolicy.from_flags(run_prune=True, uses_finalizer=False)
+        is CleanupPolicy.BEST_EFFORT_PRUNE
+    )
+    assert (
+        CleanupPolicy.from_flags(run_prune=True, uses_finalizer=True)
+        is CleanupPolicy.FINALIZED_PRUNE
+    )
+    assert (
+        CleanupPolicy.from_flags(run_prune=False, uses_finalizer=True)
+        is CleanupPolicy.FINALIZER_ONLY
+    )
+
+
+def test_cleanup_policy_override_drives_legacy_boolean_methods():
+    class PolicyPlugin(StubPlugin):
+        def cleanup_policy(self) -> CleanupPolicy:
+            return CleanupPolicy.BEST_EFFORT_PRUNE
+
+    plugin = PolicyPlugin(make_hook_config(prune=False))
+
+    assert plugin.should_run_prune() is True
+    assert plugin.uses_finalizer() is False
 
 
 def test_framework_public_facade_exports_expected_names():
@@ -286,7 +337,7 @@ def test_extracted_modules_keep_framework_log_channel(module_name):
     assert module.LOG.name == "openstack_sync.hooks.framework"
 
 
-def _drive(plugin: StubPlugin, inputs: HookInputs):
+def _drive(plugin: StubPlugin, inputs: SyncPlan):
     """Run the driver with connections and status patching stubbed out."""
     with (
         mock.patch.object(framework, "get_openstack_connection") as connect,
@@ -1617,6 +1668,24 @@ def test_run_sync_prune_is_authoritative_for_deleted_credentials():
 
     assert code == 0
     assert plugin.pruned == [([], True)]
+
+
+def test_run_sync_passes_explicit_prune_request_to_new_api():
+    plugin = RequestPrunePlugin(make_hook_config(prune=True))
+    deleted = _resource("gone")
+    inputs = _inputs([], desired=[], deleted=[deleted])
+
+    code, _, _ = _drive(plugin, inputs)
+
+    assert code == 0
+    assert plugin.pruned == []
+    assert plugin.prune_requests == [
+        PruneRequest(
+            credentials=("infrasetup", "understack"),
+            desired_specs=[],
+            authoritative_empty=True,
+        )
+    ]
 
 
 def test_run_sync_removes_finalizer_after_successful_prune():

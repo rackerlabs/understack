@@ -26,9 +26,12 @@ from openstack_sync.hooks.common import remove_resource_finalizer
 from openstack_sync.hooks.config import build_crd_hook_config
 from openstack_sync.hooks.config import hook_enabled
 from openstack_sync.hooks.contracts import FINALIZER
+from openstack_sync.hooks.contracts import CleanupPolicy
 from openstack_sync.hooks.contracts import CredentialKey
 from openstack_sync.hooks.contracts import HookConfig
 from openstack_sync.hooks.contracts import HookInputs
+from openstack_sync.hooks.contracts import PruneRequest
+from openstack_sync.hooks.contracts import SyncPlan
 from openstack_sync.hooks.contracts import SyncPlugin
 from openstack_sync.hooks.contracts import SyncResource
 from openstack_sync.hooks.entrypoint import run_hook as _run_hook
@@ -43,10 +46,13 @@ from openstack_sync.hooks.status import synced_message
 from openstack_sync.utils import get_openstack_connection
 
 __all__ = [
+    "CleanupPolicy",
     "CredentialKey",
     "FINALIZER",
     "HookConfig",
     "HookInputs",
+    "PruneRequest",
+    "SyncPlan",
     "SyncPlugin",
     "SyncResource",
     "add_resource_finalizer",
@@ -86,7 +92,7 @@ def _patch_status(
 # ---------------------------------------------------------------------------
 
 
-def run_sync(plugin: SyncPlugin, inputs: HookInputs) -> int:
+def run_sync(plugin: SyncPlugin, inputs: SyncPlan) -> int:
     return _run_sync(
         plugin,
         inputs,
@@ -99,11 +105,14 @@ def run_sync(plugin: SyncPlugin, inputs: HookInputs) -> int:
 
 
 def _sync_live_finalizers(
-    plugin: SyncPlugin, resources: list[SyncResource]
+    plugin: SyncPlugin,
+    resources: list[SyncResource],
+    cleanup_policy: CleanupPolicy,
 ) -> set[tuple[str | None, str | None]]:
     return sync_live_finalizers(
         plugin,
         resources,
+        cleanup_policy=cleanup_policy,
         add_finalizer=add_resource_finalizer,
         remove_finalizer=remove_resource_finalizer,
         fail_resource=lambda resource, message: _patch_status(
@@ -124,13 +133,15 @@ def _release_deleted_finalizers(
 
 def _run_prune(
     plugin: SyncPlugin,
-    inputs: HookInputs,
+    inputs: SyncPlan,
     connections: dict[CredentialKey, Any],
+    cleanup_policy: CleanupPolicy,
 ) -> int:
     return run_prune(
         plugin,
         inputs,
         connections,
+        cleanup_policy=cleanup_policy,
         get_connection=get_openstack_connection,
     )
 

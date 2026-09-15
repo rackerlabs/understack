@@ -15,10 +15,10 @@ openstack_sync/
   hooks/
     common.py                   binding-context I/O, CR status patching
     framework.py                compatibility facade for hook imports
-    contracts.py                HookConfig, SyncPlugin, sync dataclasses
+    contracts.py                HookConfig, SyncPlugin, SyncPlan, cleanup dataclasses
     config.py                   hook enablement + shell-operator config
     resources.py                CR parsing, identity, credential grouping
-    planner.py                  binding-context to HookInputs planning
+    planner.py                  binding-context to SyncPlan planning
     finalizers.py               framework finalizer orchestration
     status.py                   CR status patch assembly
     pruning.py                  credential-scoped prune execution
@@ -37,12 +37,14 @@ openstack_sync/
 ```
 
 `framework.py` is intentionally still the public import surface for hooks and
-tests. New hooks should import `HookConfig`, `SyncPlugin`, `hook_inputs`,
-`run_sync`, and `run_hook` from `openstack_sync.hooks.framework`, even though the
-implementation now lives in the sibling modules listed above. That keeps
-framework-level monkeypatches, operational tests, and older imports stable while
-the internals remain free to move. The sibling implementation modules should
-import each other directly, not import back through the facade.
+tests. New hooks should import `HookConfig`, `SyncPlugin`, `SyncPlan`,
+`PruneRequest`, `CleanupPolicy`, `hook_inputs`, `run_sync`, and `run_hook` from
+`openstack_sync.hooks.framework`, even though the implementation now lives in
+the sibling modules listed above. `HookInputs` remains as a compatibility alias
+for `SyncPlan`. That keeps framework-level monkeypatches, operational tests, and
+older imports stable while the internals remain free to move. The sibling
+implementation modules should import each other directly, not import back
+through the facade.
 
 ## What the framework does for you
 
@@ -131,10 +133,10 @@ reading the binding context, and the exit code.
        def reconcile(self, conn, spec, cache) -> list[str]:
            return reconcile_module.sync(conn, spec, cache)
 
-       def prune(self, conn, desired_specs, *, authoritative_empty) -> None:
+       def prune_resources(self, conn, request: PruneRequest) -> None:
            if self.config.prune:
-               prune_module.prune(conn, desired_specs,
-                                  authoritative_empty=authoritative_empty)
+               prune_module.prune(conn, request.desired_specs,
+                                  authoritative_empty=request.authoritative_empty)
 
    def main() -> int:
        def run(contexts):
@@ -146,13 +148,21 @@ reading the binding context, and the exit code.
        return run_hook(lambda: build_crd_hook_config(ENV_PREFIX, BINDING_NAME), run)
    ```
 
-   `wait_for_api` and `reconcile` are required; `new_cache` and `prune` have
-   working defaults. The framework installs finalizers only for plugins that
-   override `prune` and have `PRUNE` enabled. If a plugin needs finalizers for a
-   different cleanup model, override `uses_finalizer()`. If a plugin's prune is
-   safe to run even when `PRUNE` is disabled (for example non-destructive
-   cleanup), override `should_run_prune()` to always return `True`; the
-   framework then opens a connection for prune even on a delete-only run.
+   `wait_for_api` and `reconcile` are required; `new_cache` and
+   `prune_resources` have working defaults. `PruneRequest` carries the
+   credential group being pruned, the full desired spec union, and whether an
+   empty desired set is authoritative for that credential group. The framework
+   installs finalizers only for plugins that have a prune step and have
+   `PRUNE=true`, which maps to `CleanupPolicy.FINALIZED_PRUNE`. If a plugin has
+   a different cleanup model, override `cleanup_policy()`. For example,
+   RouterFlavor returns `CleanupPolicy.BEST_EFFORT_PRUNE` with `PRUNE=false` so
+   its non-destructive profile sweep still runs without holding CR deletion on a
+   finalizer.
+
+   Existing plugins that override the legacy `prune(conn, desired_specs, *,
+   authoritative_empty)` method still work. Existing overrides of
+   `should_run_prune()` and `uses_finalizer()` also continue to feed the default
+   `cleanup_policy()`.
 
 ## Two rules worth knowing
 

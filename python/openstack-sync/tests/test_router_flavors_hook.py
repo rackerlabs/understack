@@ -17,7 +17,9 @@ import pytest
 
 import openstack_sync.utils as utils
 from openstack_sync.hooks import router_flavors as hook
+from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import HookInputs
+from openstack_sync.hooks.framework import PruneRequest
 from openstack_sync.hooks.framework import SyncResource
 from openstack_sync.plugins.neutron.router_flavors import markers
 from openstack_sync.plugins.neutron.router_flavors.config import BINDING_NAME
@@ -166,7 +168,14 @@ def test_plugin_prune_deletes_no_flavor_when_disabled():
         mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune,
         mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep,
     ):
-        plugin.prune(conn, [{"name": "a"}], authoritative_empty=False)
+        plugin.prune_resources(
+            conn,
+            PruneRequest(
+                credentials=("infrasetup", "understack"),
+                desired_specs=[{"name": "a"}],
+                authoritative_empty=False,
+            ),
+        )
 
     prune.assert_not_called()
     sweep.assert_called_once_with(conn)
@@ -178,7 +187,14 @@ def test_plugin_prune_sweeps_orphaned_profiles_when_disabled():
     conn = mock.MagicMock()
 
     with mock.patch.object(hook.prune_module, "prune_orphaned_profiles") as sweep:
-        plugin.prune(conn, [{"name": "a"}], authoritative_empty=False)
+        plugin.prune_resources(
+            conn,
+            PruneRequest(
+                credentials=("infrasetup", "understack"),
+                desired_specs=[{"name": "a"}],
+                authoritative_empty=False,
+            ),
+        )
 
     sweep.assert_called_once_with(conn)
 
@@ -189,7 +205,14 @@ def test_plugin_prune_forwards_authoritative_empty_when_enabled():
     specs = [{"name": "a"}]
 
     with mock.patch.object(hook.prune_module, "prune_removed_flavors") as prune:
-        plugin.prune(conn, specs, authoritative_empty=True)
+        plugin.prune_resources(
+            conn,
+            PruneRequest(
+                credentials=("infrasetup", "understack"),
+                desired_specs=specs,
+                authoritative_empty=True,
+            ),
+        )
 
     prune.assert_called_once_with(conn, specs, authoritative_empty=True)
 
@@ -198,8 +221,17 @@ def test_plugin_best_effort_prune_does_not_use_finalizers():
     """Router flavor orphan cleanup can run with PRUNE=false without wedging CRs."""
     plugin = hook.RouterFlavorPlugin(make_hook_config(prune=False))
 
+    assert plugin.cleanup_policy() is CleanupPolicy.BEST_EFFORT_PRUNE
     assert plugin.should_run_prune() is True
     assert plugin.uses_finalizer() is False
+
+
+def test_plugin_uses_finalized_prune_when_destructive_prune_is_enabled():
+    plugin = hook.RouterFlavorPlugin(make_hook_config(prune=True))
+
+    assert plugin.cleanup_policy() is CleanupPolicy.FINALIZED_PRUNE
+    assert plugin.should_run_prune() is True
+    assert plugin.uses_finalizer() is True
 
 
 def test_plugin_cache_is_per_credential_group():

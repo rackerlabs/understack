@@ -8,7 +8,7 @@ from typing import Any
 from openstack_sync.hooks.common import snapshot_items
 from openstack_sync.hooks.common import synchronization_items
 from openstack_sync.hooks.contracts import HookConfig
-from openstack_sync.hooks.contracts import HookInputs
+from openstack_sync.hooks.contracts import SyncPlan
 from openstack_sync.hooks.contracts import SyncResource
 from openstack_sync.hooks.resources import _credentials
 from openstack_sync.hooks.resources import _dedupe_resources
@@ -107,7 +107,7 @@ def _split_events(
     return resources, list(deleted.values()), saw_event_context
 
 
-def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInputs:
+def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> SyncPlan:
     """Split a shell-operator binding context by reconciliation purpose.
 
     Event-driven runs reconcile only the changed CRs but prune against the full
@@ -133,7 +133,7 @@ def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInput
         desired, snapshot_deleted = reader.read_all(items)
         deleted = _dedupe_resources(deleted + snapshot_deleted)
         prune_credentials = _credentials(changed) | _credentials(deleted)
-        return HookInputs(
+        return SyncPlan(
             changed, desired, deleted, prune_credentials, frozenset(reader.unreadable)
         )
 
@@ -147,7 +147,7 @@ def hook_inputs(contexts: list[dict[str, Any]], config: HookConfig) -> HookInput
         )
 
     resources, deleted = reader.read_all(items)
-    return HookInputs(
+    return SyncPlan(
         resources,
         resources,
         deleted,

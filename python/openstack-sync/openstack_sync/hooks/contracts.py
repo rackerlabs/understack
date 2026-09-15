@@ -7,6 +7,7 @@ import os
 from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 from openstack_sync.plugins.common import env_bool
@@ -114,7 +115,7 @@ class SyncResource:
 
 
 @dataclass(frozen=True)
-class HookInputs:
+class SyncPlan:
     """Binding context split by reconciliation purpose.
 
     The split matters: an event-driven run reconciles only the changed CRs, but
@@ -139,11 +140,49 @@ class HookInputs:
     unreadable_resources: frozenset[str]
 
 
+HookInputs = SyncPlan
+
+
+@dataclass(frozen=True)
+class PruneRequest:
+    """One credential-scoped prune call with explicit safety metadata."""
+
+    credentials: CredentialKey
+    desired_specs: list[dict[str, Any]]
+    authoritative_empty: bool
+
+
+class CleanupPolicy(Enum):
+    """How a plugin wants the framework to handle prune and finalizers."""
+
+    NONE = (False, False)
+    BEST_EFFORT_PRUNE = (True, False)
+    FINALIZED_PRUNE = (True, True)
+    FINALIZER_ONLY = (False, True)
+
+    def __init__(self, run_prune: bool, uses_finalizer: bool) -> None:
+        self.run_prune = run_prune
+        self.uses_finalizer = uses_finalizer
+
+    @classmethod
+    def from_flags(cls, *, run_prune: bool, uses_finalizer: bool) -> CleanupPolicy:
+        """Return the policy that matches the legacy boolean decisions."""
+        for policy in cls:
+            if (
+                policy.run_prune == run_prune
+                and policy.uses_finalizer == uses_finalizer
+            ):
+                return policy
+        raise ValueError(
+            "cleanup policy flags must match a supported prune/finalizer mode"
+        )
+
+
 class SyncPlugin(ABC):
     """One CR-driven OpenStack resource sync.
 
     Subclasses implement ``wait_for_api`` and ``reconcile``; ``new_cache`` and
-    ``prune`` have usable defaults. ``run_sync`` drives the rest.
+    ``prune_resources`` have usable defaults. ``run_sync`` drives the rest.
     """
 
     #: Human-readable singular noun used in logs and CR status messages.
@@ -203,6 +242,26 @@ class SyncPlugin(ABC):
         """
         LOG.debug("%s defines no prune step", type(self).__name__)
 
+    def prune_resources(self, conn: Any, request: PruneRequest) -> None:
+        """Prune with an explicit request object.
+
+        New plugins should override this method. The legacy :meth:`prune`
+        method is still called by default so existing plugins keep their
+        behavior while moving to the request-shaped API can happen gradually.
+        """
+        self.prune(
+            conn,
+            request.desired_specs,
+            authoritative_empty=request.authoritative_empty,
+        )
+
+    def cleanup_policy(self) -> CleanupPolicy:
+        """Return this plugin's cleanup mode for the current configuration."""
+        return CleanupPolicy.from_flags(
+            run_prune=self.should_run_prune(),
+            uses_finalizer=self.uses_finalizer(),
+        )
+
     def should_run_prune(self) -> bool:
         """Return whether ``run_sync`` should call this plugin's prune step.
 
@@ -214,6 +273,8 @@ class SyncPlugin(ABC):
         ``RouterFlavorPlugin``); such a run still installs no finalizer, because
         that cleanup does not need to block a CR's deletion.
         """
+        if type(self).cleanup_policy is not SyncPlugin.cleanup_policy:
+            return self.cleanup_policy().run_prune
         return self.config.prune and _plugin_has_prune_step(self)
 
     def uses_finalizer(self) -> bool:
@@ -227,9 +288,14 @@ class SyncPlugin(ABC):
         destructive prune flag is why a plugin that prunes non-destructively
         with ``PRUNE=false`` still leaves its CRs free to delete immediately.
         """
+        if type(self).cleanup_policy is not SyncPlugin.cleanup_policy:
+            return self.cleanup_policy().uses_finalizer
         return self.config.prune and _plugin_has_prune_step(self)
 
 
 def _plugin_has_prune_step(plugin: SyncPlugin) -> bool:
     """Return whether *plugin* replaced the framework's no-op prune."""
-    return type(plugin).prune is not SyncPlugin.prune
+    return (
+        type(plugin).prune is not SyncPlugin.prune
+        or type(plugin).prune_resources is not SyncPlugin.prune_resources
+    )

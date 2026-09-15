@@ -18,7 +18,9 @@ from unittest import mock
 import pytest
 
 from openstack_sync.hooks import ironic_runbooks as hook
+from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import HookConfig
+from openstack_sync.hooks.framework import PruneRequest
 from openstack_sync.plugins.common import ConfigError
 from openstack_sync.plugins.ironic.runbooks import markers
 from openstack_sync.plugins.ironic.runbooks.config import BINDING_NAME
@@ -207,13 +209,23 @@ def test_plugin_prunes_only_when_the_chart_enabled_it():
     specs = [{"runbookName": "CUSTOM_KEEP", "steps": []}]
 
     with mock.patch.object(hook.prune_module, "prune_removed_runbooks") as do_prune:
-        hook.IronicRunbookPlugin(make_ironic_config(prune=False)).prune(
-            conn, specs, authoritative_empty=False
+        hook.IronicRunbookPlugin(make_ironic_config(prune=False)).prune_resources(
+            conn,
+            PruneRequest(
+                credentials=("infrasetup", "understack"),
+                desired_specs=specs,
+                authoritative_empty=False,
+            ),
         )
         do_prune.assert_not_called()
 
-        hook.IronicRunbookPlugin(make_ironic_config(prune=True)).prune(
-            conn, specs, authoritative_empty=True
+        hook.IronicRunbookPlugin(make_ironic_config(prune=True)).prune_resources(
+            conn,
+            PruneRequest(
+                credentials=("infrasetup", "understack"),
+                desired_specs=specs,
+                authoritative_empty=True,
+            ),
         )
         do_prune.assert_called_once_with(conn, specs, authoritative_empty=True)
 
@@ -224,8 +236,10 @@ def test_plugin_uses_finalizers_only_when_destructive_prune_is_enabled():
 
     assert disabled.should_run_prune() is False
     assert disabled.uses_finalizer() is False
+    assert disabled.cleanup_policy() is CleanupPolicy.NONE
     assert enabled.should_run_prune() is True
     assert enabled.uses_finalizer() is True
+    assert enabled.cleanup_policy() is CleanupPolicy.FINALIZED_PRUNE
 
 
 def test_main_returns_zero_when_hook_disabled(

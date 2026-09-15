@@ -8,6 +8,7 @@ from typing import Protocol
 
 from openstack_sync.hooks.common import CustomResourceTarget
 from openstack_sync.hooks.contracts import FINALIZER
+from openstack_sync.hooks.contracts import CleanupPolicy
 from openstack_sync.hooks.contracts import HookConfig
 from openstack_sync.hooks.contracts import SyncResource
 from openstack_sync.hooks.resources import _resource_key
@@ -17,9 +18,6 @@ LOG = logging.getLogger("openstack_sync.hooks.framework")
 
 class _FinalizerPlugin(Protocol):
     config: HookConfig
-
-    def uses_finalizer(self) -> bool:
-        """Return whether live CRs should carry the framework finalizer."""
 
 
 def resource_target(
@@ -76,12 +74,13 @@ def sync_live_finalizers(
     plugin: _FinalizerPlugin,
     resources: list[SyncResource],
     *,
+    cleanup_policy: CleanupPolicy,
     add_finalizer: Callable[..., bool],
     remove_finalizer: Callable[..., bool],
     fail_resource: Callable[[SyncResource, str], None],
 ) -> set[tuple[str | None, str | None]]:
     """Make live CR finalizers match the plugin's current cleanup policy."""
-    should_have_finalizer = plugin.uses_finalizer()
+    should_have_finalizer = cleanup_policy.uses_finalizer
     failed: set[tuple[str | None, str | None]] = set()
     for resource in resources:
         if resource.has_finalizer == should_have_finalizer:

@@ -6,8 +6,10 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from openstack_sync.hooks.contracts import CleanupPolicy
 from openstack_sync.hooks.contracts import CredentialKey
-from openstack_sync.hooks.contracts import HookInputs
+from openstack_sync.hooks.contracts import PruneRequest
+from openstack_sync.hooks.contracts import SyncPlan
 from openstack_sync.hooks.contracts import SyncPlugin
 from openstack_sync.hooks.resources import group_by_credentials
 
@@ -16,15 +18,16 @@ LOG = logging.getLogger("openstack_sync.hooks.framework")
 
 def run_prune(
     plugin: SyncPlugin,
-    inputs: HookInputs,
+    inputs: SyncPlan,
     connections: dict[CredentialKey, Any],
     *,
+    cleanup_policy: CleanupPolicy,
     get_connection: Callable[[str, str], Any],
 ) -> int:
     """Run the plugin's prune step for credential groups that need cleanup."""
     noun = plugin.noun
     prune_failed = False
-    if not plugin.should_run_prune():
+    if not cleanup_policy.run_prune:
         LOG.info("Finished reconciling %s(s)", noun)
         return 0
 
@@ -72,13 +75,16 @@ def run_prune(
                     exc,
                 )
                 continue
-            connections[credentials] = conn
+        connections[credentials] = conn
 
         try:
-            plugin.prune(
+            plugin.prune_resources(
                 conn,
-                all_desired_specs,
-                authoritative_empty=authoritative_empty,
+                PruneRequest(
+                    credentials=credentials,
+                    desired_specs=all_desired_specs,
+                    authoritative_empty=authoritative_empty,
+                ),
             )
         except Exception as exc:  # noqa: BLE001
             prune_failed = True

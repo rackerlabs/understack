@@ -6,7 +6,9 @@ from __future__ import annotations
 import sys
 from typing import Any
 
+from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import HookConfig
+from openstack_sync.hooks.framework import PruneRequest
 from openstack_sync.hooks.framework import SyncPlugin
 from openstack_sync.hooks.framework import build_crd_hook_config
 from openstack_sync.hooks.framework import hook_enabled
@@ -43,22 +45,20 @@ class RouterFlavorPlugin(SyncPlugin):
     ) -> list[str]:
         return reconcile_module.sync_flavor(conn, spec, cache)
 
-    def prune(
-        self,
-        conn: Any,
-        desired_specs: list[dict[str, Any]],
-        *,
-        authoritative_empty: bool,
-    ) -> None:
+    def prune_resources(self, conn: Any, request: PruneRequest) -> None:
         if not self.config.prune:
             prune_module.prune_orphaned_profiles(conn)
             return
         prune_module.prune_removed_flavors(
-            conn, desired_specs, authoritative_empty=authoritative_empty
+            conn,
+            request.desired_specs,
+            authoritative_empty=request.authoritative_empty,
         )
 
-    def should_run_prune(self) -> bool:
-        return True
+    def cleanup_policy(self) -> CleanupPolicy:
+        if self.config.prune:
+            return CleanupPolicy.FINALIZED_PRUNE
+        return CleanupPolicy.BEST_EFFORT_PRUNE
 
 
 def main() -> int:

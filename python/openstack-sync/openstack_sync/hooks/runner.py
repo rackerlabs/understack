@@ -6,8 +6,9 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+from openstack_sync.hooks.contracts import CleanupPolicy
 from openstack_sync.hooks.contracts import CredentialKey
-from openstack_sync.hooks.contracts import HookInputs
+from openstack_sync.hooks.contracts import SyncPlan
 from openstack_sync.hooks.contracts import SyncPlugin
 from openstack_sync.hooks.contracts import SyncResource
 from openstack_sync.hooks.resources import _resource_key
@@ -18,15 +19,18 @@ LOG = logging.getLogger("openstack_sync.hooks.framework")
 
 PatchStatus = Callable[[SyncPlugin, SyncResource, str, str], None]
 SyncLiveFinalizers = Callable[
-    [SyncPlugin, list[SyncResource]], set[tuple[str | None, str | None]]
+    [SyncPlugin, list[SyncResource], CleanupPolicy],
+    set[tuple[str | None, str | None]],
 ]
 ReleaseDeletedFinalizers = Callable[[SyncPlugin, list[SyncResource]], int]
-RunPrune = Callable[[SyncPlugin, HookInputs, dict[CredentialKey, Any]], int]
+RunPrune = Callable[
+    [SyncPlugin, SyncPlan, dict[CredentialKey, Any], CleanupPolicy], int
+]
 
 
 def run_sync(
     plugin: SyncPlugin,
-    inputs: HookInputs,
+    inputs: SyncPlan,
     *,
     get_connection: Callable[[str, str], Any],
     patch_status: PatchStatus,
@@ -37,6 +41,7 @@ def run_sync(
     """Reconcile every CR, then prune. Returns a process exit code."""
     noun = plugin.noun
     resources = inputs.resources_to_reconcile
+    cleanup_policy = plugin.cleanup_policy()
     LOG.info("Found %s %s(s) to reconcile", len(resources), noun)
 
     connections: dict[CredentialKey, Any] = {}
@@ -51,7 +56,7 @@ def run_sync(
             ", ".join(sorted(inputs.unreadable_resources)),
         )
 
-    finalizer_failures = sync_live_finalizers(plugin, resources)
+    finalizer_failures = sync_live_finalizers(plugin, resources, cleanup_policy)
     if finalizer_failures:
         failed += len(finalizer_failures)
         resources = [
@@ -134,17 +139,17 @@ def run_sync(
         )
         return 1
 
-    prune_code = run_prune(plugin, inputs, connections)
+    prune_code = run_prune(plugin, inputs, connections, cleanup_policy)
 
     # A finalizer is only held while destructive, CR-scoped cleanup could still
     # be outstanding, so it is released once that cleanup has run. When
-    # uses_finalizer() is false there is no such cleanup to wait for: any
-    # finalizer still on a deleted CR is stale (left from when the plugin did
-    # use one), and it must be released even if a best-effort prune could not
-    # connect -- otherwise the CR is wedged in Terminating for a step it does
-    # not depend on. When uses_finalizer() is true a failed prune keeps the
-    # finalizer, because the cleanup it guards did not complete.
-    if plugin.uses_finalizer() and prune_code != 0:
+    # cleanup_policy.uses_finalizer is false there is no such cleanup to wait
+    # for: any finalizer still on a deleted CR is stale (left from when the
+    # plugin did use one), and it must be released even if a best-effort prune
+    # could not connect -- otherwise the CR is wedged in Terminating for a step
+    # it does not depend on. When cleanup_policy.uses_finalizer is true a failed
+    # prune keeps the finalizer, because the cleanup it guards did not complete.
+    if cleanup_policy.uses_finalizer and prune_code != 0:
         return prune_code
 
     release_code = release_deleted_finalizers(plugin, inputs.deleted_resources)
