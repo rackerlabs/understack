@@ -13,12 +13,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sys
 from abc import ABC
 from abc import abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any
 
 from openstack_sync.hooks.common import CustomResourceTarget
@@ -30,346 +28,48 @@ from openstack_sync.hooks.common import release_deleted_resource_finalizer
 from openstack_sync.hooks.common import remove_resource_finalizer
 from openstack_sync.hooks.common import snapshot_items
 from openstack_sync.hooks.common import synchronization_items
+from openstack_sync.hooks.config import build_crd_hook_config
+from openstack_sync.hooks.config import hook_enabled
+from openstack_sync.hooks.contracts import FINALIZER
+from openstack_sync.hooks.contracts import CredentialKey
+from openstack_sync.hooks.contracts import HookConfig
+from openstack_sync.hooks.contracts import HookInputs
+from openstack_sync.hooks.contracts import SyncResource
+from openstack_sync.hooks.resources import _credentials
+from openstack_sync.hooks.resources import _dedupe_resources
+from openstack_sync.hooks.resources import _resource_key
+from openstack_sync.hooks.resources import _ResourceReader
+from openstack_sync.hooks.resources import group_by_credentials
 from openstack_sync.plugins.common import ConfigError
-from openstack_sync.plugins.common import env_bool
-from openstack_sync.plugins.common import env_float
-from openstack_sync.plugins.common import env_int
-from openstack_sync.plugins.common import env_required
 from openstack_sync.utils import get_openstack_connection
 
 LOG = logging.getLogger(__name__)
 
-#: A plugin's OpenStack credentials: ``(secret_name, cloud_name)``.
-CredentialKey = tuple[str, str]
-
-#: Finalizer used to keep CRs around until their OpenStack cleanup has finished.
-FINALIZER = "openstack-sync.understack.rackspace.net/finalizer"
-
-
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class HookConfig:
-    """Runtime configuration for one hook, built from its chart env prefix.
-
-    The Helm chart injects ``<prefix>_ENABLED`` for each hook,
-    ``<prefix>_CRD_API_VERSION``, ``<prefix>_CRD_KIND``,
-    ``<prefix>_CRD_RESOURCE`` and ``<prefix>_STATUS_ENABLED`` for CRD hooks, and
-    one variable per ``pluginData.<name>.hook.env`` key. ``HookConfig`` reads
-    only the framework keys; plugins read custom prefixed env vars directly.
-
-    Nothing here is read at import time. Shell-operator invokes ``--config``
-    before the full environment is guaranteed to be present, so ``from_env`` is
-    called from ``main`` and only once the hook is known to be enabled.
-    """
-
-    prefix: str
-    crd_api_version: str
-    crd_kind: str
-    crd_resource: str
-    binding_name: str
-    namespace: str | None
-    status_enabled: bool
-    prune: bool
-    sync_crontab: str
-    ready_retries: int
-    ready_delay: float
-
-    @classmethod
-    def from_env(cls, prefix: str, *, binding_name: str) -> HookConfig:
-        """Build config from the environment the Helm chart injected."""
-        return cls(
-            prefix=prefix,
-            crd_api_version=env_required(f"{prefix}_CRD_API_VERSION"),
-            crd_kind=env_required(f"{prefix}_CRD_KIND"),
-            crd_resource=env_required(f"{prefix}_CRD_RESOURCE"),
-            binding_name=binding_name,
-            namespace=os.environ.get("POD_NAMESPACE"),
-            status_enabled=env_bool(f"{prefix}_STATUS_ENABLED", False),
-            prune=env_bool(f"{prefix}_PRUNE", False),
-            sync_crontab=os.environ.get(f"{prefix}_SYNC_CRONTAB", "").strip(),
-            ready_retries=env_int(f"{prefix}_READY_RETRIES", 30),
-            ready_delay=env_float(f"{prefix}_READY_DELAY", 10),
-        )
-
-
-def hook_enabled(prefix: str) -> bool:
-    """Return whether the chart enabled the plugin behind *prefix*."""
-    return env_bool(f"{prefix}_ENABLED", False)
-
-
-def build_crd_hook_config(prefix: str, binding_name: str) -> dict[str, Any]:
-    """Return the shell-operator hook config for a CRD-watching plugin.
-
-    When the plugin is disabled the config carries only an ``onStartup``
-    binding, because shell-operator requires every hook to declare at least
-    one binding but the hook must not register Kubernetes watches it will not
-    service.
-    """
-    hook_config: dict[str, Any] = {
-        "configVersion": "v1",
-        "settings": {"executionMinInterval": "30s", "executionBurst": 1},
-    }
-
-    if not hook_enabled(prefix):
-        hook_config["onStartup"] = 10
-        return hook_config
-
-    config = HookConfig.from_env(prefix, binding_name=binding_name)
-    binding: dict[str, Any] = {
-        "name": config.binding_name,
-        "apiVersion": config.crd_api_version,
-        "kind": config.crd_kind,
-        "executeHookOnEvent": ["Added", "Modified", "Deleted"],
-        "jqFilter": ".",
-        "includeSnapshotsFrom": [config.binding_name],
-        # Dedicated queue so a slow readiness wait or reconcile only delays
-        # this hook's own tasks, not other hooks sharing the default queue.
-        "queue": config.binding_name,
-    }
-    if config.namespace:
-        binding["namespace"] = {"nameSelector": {"matchNames": [config.namespace]}}
-
-    hook_config["kubernetes"] = [binding]
-    if config.sync_crontab:
-        hook_config["schedule"] = [
-            {
-                "name": "periodic sync",
-                "crontab": config.sync_crontab,
-                "includeSnapshotsFrom": [config.binding_name],
-                "queue": config.binding_name,
-            }
-        ]
-    return hook_config
+__all__ = [
+    "CredentialKey",
+    "FINALIZER",
+    "HookConfig",
+    "HookInputs",
+    "SyncPlugin",
+    "SyncResource",
+    "add_resource_finalizer",
+    "build_crd_hook_config",
+    "get_openstack_connection",
+    "group_by_credentials",
+    "hook_enabled",
+    "hook_inputs",
+    "patch_resource_status",
+    "release_deleted_resource_finalizer",
+    "remove_resource_finalizer",
+    "run_hook",
+    "run_sync",
+    "synced_message",
+]
 
 
 # ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class SyncResource:
-    """One CR with its resolved OpenStack credentials.
-
-    ``spec`` is the CR spec with ``cloudCredentialsRef`` removed, so a plugin
-    sees only its own fields.
-    """
-
-    spec: dict[str, Any]
-    name: str | None
-    namespace: str | None
-    generation: int | None
-    secret_name: str
-    cloud_name: str
-    current_status: dict[str, Any] | None = None
-    finalizers: tuple[str, ...] = ()
-    deletion_timestamp: str | None = None
-    resource_version: str | None = None
-    uid: str | None = None
-
-    @property
-    def credentials(self) -> CredentialKey:
-        return (self.secret_name, self.cloud_name)
-
-    @property
-    def identity(self) -> str:
-        """Key identifying this CR across a batch of events."""
-        return self.uid or f"{self.namespace}/{self.name}"
-
-    @property
-    def has_finalizer(self) -> bool:
-        """Return whether this CR already carries the framework finalizer."""
-        return FINALIZER in self.finalizers
-
-    @property
-    def is_deleting(self) -> bool:
-        """Return whether Kubernetes has started deleting this CR."""
-        return self.deletion_timestamp is not None
-
-    @property
-    def display_name(self) -> str:
-        """Return the OpenStack resource name, falling back to the CR name."""
-        return str(self.spec.get("name") or self.name or "<unknown>")
-
-
-@dataclass(frozen=True)
-class HookInputs:
-    """Binding context split by reconciliation purpose.
-
-    The split matters: an event-driven run reconciles only the changed CRs, but
-    must prune against the *full* desired set from the snapshot, and must know
-    which credentials a deleted CR used in order to prune at all.
-
-    ``prune_credentials`` is therefore the credentials of the changed and
-    deleted CRs, not of the whole snapshot: a bare event for an unrelated CR
-    must not sweep a cloud nothing asked about. The desired set each prune
-    compares against stays the full one (see :meth:`SyncPlugin.prune`).
-
-    ``unreadable_resources`` names the CRs the binding context described but
-    that could not be read (see :class:`_ResourceReader`). They are absent from
-    every other field, so the desired set is not known to be complete while it
-    is non-empty.
-    """
-
-    resources_to_reconcile: list[SyncResource]
-    desired_resources_for_prune: list[SyncResource]
-    deleted_resources: list[SyncResource]
-    prune_credentials: frozenset[CredentialKey]
-    unreadable_resources: frozenset[str]
-
-
-def group_by_credentials(
-    resources: list[SyncResource],
-) -> dict[CredentialKey, list[SyncResource]]:
-    """Group *resources* by the credentials they authenticate with."""
-    grouped: dict[CredentialKey, list[SyncResource]] = {}
-    for resource in resources:
-        grouped.setdefault(resource.credentials, []).append(resource)
-    return grouped
-
-
-def _credentials(resources: list[SyncResource]) -> frozenset[CredentialKey]:
-    return frozenset(resource.credentials for resource in resources)
-
-
-# ---------------------------------------------------------------------------
-# Binding context -> resources
-# ---------------------------------------------------------------------------
-
-
-class _MalformedResourceError(Exception):
-    """Raised when a watched object does not satisfy the CRD's spec contract."""
-
-
-def _resource_identity(obj: dict[str, Any]) -> str:
-    """Return ``namespace/name`` for *obj*, for logs and error messages."""
-    metadata = obj.get("metadata") or {}
-    name = metadata.get("name") or "<unnamed>"
-    namespace = metadata.get("namespace")
-    return f"{namespace}/{name}" if namespace else str(name)
-
-
-def _resource_from_object(obj: dict[str, Any]) -> SyncResource:
-    """Build a :class:`SyncResource` from a Kubernetes object.
-
-    The spec is validated rather than assumed. The CRD marks
-    ``spec.cloudCredentialsRef`` required and its ``secretName`` / ``cloudName``
-    ``minLength: 1``, but that only binds writes: Kubernetes validates on
-    admission, so an object stored before the schema required those fields is
-    still served by the watch exactly as stored. Tightening a CRD neither
-    invalidates nor migrates what already exists.
-    """
-    spec = obj.get("spec")
-    if not isinstance(spec, dict):
-        raise _MalformedResourceError("spec is missing or not an object")
-
-    spec = dict(spec)
-    creds = spec.pop("cloudCredentialsRef", None)
-    if not isinstance(creds, dict):
-        raise _MalformedResourceError(
-            "spec.cloudCredentialsRef is missing or not an object"
-        )
-
-    secret_name = creds.get("secretName")
-    cloud_name = creds.get("cloudName")
-    if not secret_name or not cloud_name:
-        raise _MalformedResourceError(
-            "spec.cloudCredentialsRef must set both secretName and cloudName; "
-            f"got secretName={secret_name!r}, cloudName={cloud_name!r}"
-        )
-
-    metadata = obj.get("metadata", {})
-    raw_finalizers = metadata.get("finalizers", [])
-    if isinstance(raw_finalizers, list):
-        finalizers = tuple(str(value) for value in raw_finalizers)
-    else:
-        finalizers = ()
-
-    return SyncResource(
-        spec=spec,
-        name=metadata.get("name"),
-        namespace=metadata.get("namespace"),
-        generation=metadata.get("generation"),
-        secret_name=str(secret_name),
-        cloud_name=str(cloud_name),
-        current_status=obj.get("status"),
-        finalizers=finalizers,
-        deletion_timestamp=metadata.get("deletionTimestamp"),
-        resource_version=metadata.get("resourceVersion"),
-        uid=metadata.get("uid"),
-    )
-
-
-class _ResourceReader:
-    """Reads watched objects into resources, naming the ones it cannot read.
-
-    An object that fails validation is reported and dropped rather than raised
-    past the batch, so one unusable CR does not stop the others from
-    reconciling. Its identity is retained because a dropped CR leaves the
-    desired set incomplete, which the caller needs in order to decide whether
-    pruning is safe.
-
-    One reader spans a whole binding context, so a CR that appears in both an
-    event and the accompanying snapshot is reported once.
-    """
-
-    def __init__(self) -> None:
-        self.unreadable: set[str] = set()
-
-    def read(self, obj: dict[str, Any], description: str = "CR") -> SyncResource | None:
-        """Return the resource for *obj*, or None when it cannot be read."""
-        try:
-            return _resource_from_object(obj)
-        except _MalformedResourceError as exc:
-            identity = _resource_identity(obj)
-            self.unreadable.add(identity)
-            LOG.error("Ignoring unreadable %s %s: %s", description, identity, exc)
-            return None
-
-    def read_all(
-        self, items: list[Any]
-    ) -> tuple[list[SyncResource], list[SyncResource]]:
-        """Read snapshot or Synchronization items into live and deleting resources.
-
-        Snapshot items wrap the object as ``{"object": {...}}``; Synchronization
-        items are the object itself.
-        """
-        live: list[SyncResource] = []
-        deleting: list[SyncResource] = []
-        for item in items:
-            resource = self.read(item.get("object", item))
-            if resource is None:
-                continue
-            if resource.is_deleting:
-                deleting.append(resource)
-            else:
-                live.append(resource)
-
-        live.sort(key=lambda r: str(r.spec.get("name", "")))
-        deleting.sort(key=lambda r: str(r.spec.get("name", "")))
-        return live, deleting
-
-
-def _resource_key(resource: SyncResource) -> tuple[str | None, str | None]:
-    """Return a stable enough identity key for de-duplicating CR events."""
-    return (resource.namespace, resource.name)
-
-
-def _dedupe_resources(resources: list[SyncResource]) -> list[SyncResource]:
-    """Return resources de-duplicated by namespace/name, preserving order."""
-    seen: set[tuple[str | None, str | None]] = set()
-    deduped: list[SyncResource] = []
-    for resource in resources:
-        key = _resource_key(resource)
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(resource)
-    return deduped
 
 
 def _status_is_current(resource: SyncResource) -> bool:
