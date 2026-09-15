@@ -6,6 +6,8 @@ these tests describe the contract any future plugin can rely on.
 
 from __future__ import annotations
 
+import ast
+import importlib
 import json
 import logging
 from pathlib import Path
@@ -34,6 +36,7 @@ from tests.conftest import make_hook_config
 
 PREFIX = "NEUTRON_ROUTER_FLAVOR"
 BINDING = "neutron-router-flavors"
+HOOKS_DIR = Path(__file__).parents[1] / "openstack_sync" / "hooks"
 
 ENV_NAMES = (
     "BINDING_CONTEXT_PATH",
@@ -45,6 +48,28 @@ ENV_NAMES = (
     f"{PREFIX}_READY_DELAY",
     "POD_NAMESPACE",
 )
+
+
+def _framework_imports(path: Path) -> list[str]:
+    imports: list[str] = []
+    tree = ast.parse(path.read_text(), filename=str(path))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.extend(
+                alias.name
+                for alias in node.names
+                if alias.name == "openstack_sync.hooks.framework"
+            )
+        elif isinstance(node, ast.ImportFrom):
+            if node.module == "openstack_sync.hooks.framework":
+                imports.append(node.module)
+            elif node.module == "openstack_sync.hooks":
+                imports.extend(
+                    f"{node.module}.{alias.name}"
+                    for alias in node.names
+                    if alias.name == "framework"
+                )
+    return imports
 
 
 def clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -216,6 +241,49 @@ def test_framework_public_facade_exports_expected_names():
     assert set(framework.__all__) == expected
     for name in expected:
         assert hasattr(framework, name)
+
+
+def test_framework_import_boundary_keeps_facade_at_edges():
+    extracted_modules = {
+        "config.py",
+        "contracts.py",
+        "entrypoint.py",
+        "finalizers.py",
+        "planner.py",
+        "pruning.py",
+        "resources.py",
+        "runner.py",
+        "status.py",
+    }
+    hook_entrypoints = {
+        "ironic_runbooks.py",
+        "placeholder.py",
+        "router_flavors.py",
+    }
+
+    for module_name in extracted_modules:
+        assert _framework_imports(HOOKS_DIR / module_name) == [], module_name
+    for module_name in hook_entrypoints:
+        assert _framework_imports(HOOKS_DIR / module_name), module_name
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "contracts",
+        "entrypoint",
+        "finalizers",
+        "planner",
+        "pruning",
+        "resources",
+        "runner",
+        "status",
+    ],
+)
+def test_extracted_modules_keep_framework_log_channel(module_name):
+    module = importlib.import_module(f"openstack_sync.hooks.{module_name}")
+
+    assert module.LOG.name == "openstack_sync.hooks.framework"
 
 
 def _drive(plugin: StubPlugin, inputs: HookInputs):
