@@ -5,14 +5,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from openstack_sync.hooks.common import snapshot_items
-from openstack_sync.hooks.common import synchronization_items
-from openstack_sync.hooks.contracts import HookConfig
-from openstack_sync.hooks.contracts import SyncPlan
-from openstack_sync.hooks.contracts import SyncResource
-from openstack_sync.hooks.resources import _credentials
-from openstack_sync.hooks.resources import _dedupe_resources
-from openstack_sync.hooks.resources import _ResourceReader
+from openstack_sync.hooks.framework.common import snapshot_items
+from openstack_sync.hooks.framework.common import synchronization_items
+from openstack_sync.hooks.framework.contracts import HookConfig
+from openstack_sync.hooks.framework.contracts import SyncPlan
+from openstack_sync.hooks.framework.contracts import SyncResource
+from openstack_sync.hooks.framework.resources import _credentials
+from openstack_sync.hooks.framework.resources import _dedupe_resources
+from openstack_sync.hooks.framework.resources import _ResourceReader
 from openstack_sync.plugins.common import ConfigError
 
 LOG = logging.getLogger("openstack_sync.hooks.framework")

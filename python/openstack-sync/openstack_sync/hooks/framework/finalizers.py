@@ -6,12 +6,12 @@ import logging
 from collections.abc import Callable
 from typing import Protocol
 
-from openstack_sync.hooks.common import CustomResourceTarget
-from openstack_sync.hooks.contracts import FINALIZER
-from openstack_sync.hooks.contracts import CleanupPolicy
-from openstack_sync.hooks.contracts import HookConfig
-from openstack_sync.hooks.contracts import SyncResource
-from openstack_sync.hooks.resources import _resource_key
+from openstack_sync.hooks.framework.common import CustomResourceTarget
+from openstack_sync.hooks.framework.contracts import FINALIZER
+from openstack_sync.hooks.framework.contracts import CleanupPolicy
+from openstack_sync.hooks.framework.contracts import HookConfig
+from openstack_sync.hooks.framework.contracts import SyncResource
+from openstack_sync.hooks.framework.resources import _resource_key
 
 LOG = logging.getLogger("openstack_sync.hooks.framework")
 

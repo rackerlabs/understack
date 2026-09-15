@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from openstack_sync.hooks.contracts import CredentialKey
-from openstack_sync.hooks.contracts import SyncResource
+from openstack_sync.hooks.framework.contracts import CredentialKey
+from openstack_sync.hooks.framework.contracts import SyncResource
 
 LOG = logging.getLogger("openstack_sync.hooks.framework")
 

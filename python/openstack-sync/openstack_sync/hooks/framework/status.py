@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from openstack_sync.hooks.contracts import HookConfig
-from openstack_sync.hooks.contracts import SyncResource
+from openstack_sync.hooks.framework.contracts import HookConfig
+from openstack_sync.hooks.framework.contracts import SyncResource
 
 LOG = logging.getLogger("openstack_sync.hooks.framework")
 

@@ -13,17 +13,18 @@ connection grouping, status updates, finalizers, and prune ordering.
 openstack_sync/
   utils.py                      Kubernetes Secret access + memoised connections
   hooks/
-    common.py                   binding-context I/O, CR status patching
-    framework.py                compatibility facade for hook imports
-    contracts.py                HookConfig, SyncPlugin, SyncPlan, cleanup dataclasses
-    config.py                   hook enablement + shell-operator config
-    resources.py                CR parsing, identity, credential grouping
-    planner.py                  binding-context to SyncPlan planning
-    finalizers.py               framework finalizer orchestration
-    status.py                   CR status patch assembly
-    pruning.py                  credential-scoped prune execution
-    runner.py                   reconcile/prune/finalizer driver
-    entrypoint.py               run_hook implementation
+    framework/
+      __init__.py               compatibility facade for hook imports
+      common.py                 binding-context I/O, CR status patching
+      contracts.py              HookConfig, SyncPlugin, SyncPlan, cleanup dataclasses
+      config.py                 hook enablement + shell-operator config
+      resources.py              CR parsing, identity, credential grouping
+      planner.py                binding-context to SyncPlan planning
+      finalizers.py             framework finalizer orchestration
+      status.py                 CR status patch assembly
+      pruning.py                credential-scoped prune execution
+      runner.py                 reconcile/prune/finalizer driver
+      entrypoint.py             run_hook implementation
     placeholder.py              connectivity probe (no CRs)
     <resource>.py               CRD hook entry point
   plugins/
@@ -36,15 +37,15 @@ openstack_sync/
       prune.py                  delete resources whose CR was removed, if safe
 ```
 
-`framework.py` is intentionally still the public import surface for hooks and
-tests. New hooks should import `HookConfig`, `SyncPlugin`, `SyncPlan`,
-`PruneRequest`, `CleanupPolicy`, `hook_inputs`, `run_sync`, and `run_hook` from
-`openstack_sync.hooks.framework`, even though the implementation now lives in
-the sibling modules listed above. `HookInputs` remains as a compatibility alias
-for `SyncPlan`. That keeps framework-level monkeypatches, operational tests, and
-older imports stable while the internals remain free to move. The sibling
-implementation modules should import each other directly, not import back
-through the facade.
+`openstack_sync.hooks.framework` is intentionally still the public import
+surface for hooks and tests. New hooks should import `HookConfig`, `SyncPlugin`,
+`SyncPlan`, `PruneRequest`, `CleanupPolicy`, `hook_inputs`, `run_sync`, and
+`run_hook` from `openstack_sync.hooks.framework`, even though the implementation
+now lives in the package modules listed above. `HookInputs` remains as a
+compatibility alias for `SyncPlan`. That keeps framework-level monkeypatches,
+operational tests, and older imports stable while the internals remain free to
+move. The package implementation modules should import each other directly, not
+import back through the facade.
 
 ## What the framework does for you
 

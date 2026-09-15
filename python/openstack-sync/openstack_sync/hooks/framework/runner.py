@@ -6,14 +6,14 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from openstack_sync.hooks.contracts import CleanupPolicy
-from openstack_sync.hooks.contracts import CredentialKey
-from openstack_sync.hooks.contracts import SyncPlan
-from openstack_sync.hooks.contracts import SyncPlugin
-from openstack_sync.hooks.contracts import SyncResource
-from openstack_sync.hooks.resources import _resource_key
-from openstack_sync.hooks.resources import group_by_credentials
-from openstack_sync.hooks.status import synced_message
+from openstack_sync.hooks.framework.contracts import CleanupPolicy
+from openstack_sync.hooks.framework.contracts import CredentialKey
+from openstack_sync.hooks.framework.contracts import SyncPlan
+from openstack_sync.hooks.framework.contracts import SyncPlugin
+from openstack_sync.hooks.framework.contracts import SyncResource
+from openstack_sync.hooks.framework.resources import _resource_key
+from openstack_sync.hooks.framework.resources import group_by_credentials
+from openstack_sync.hooks.framework.status import synced_message
 
 LOG = logging.getLogger("openstack_sync.hooks.framework")
 

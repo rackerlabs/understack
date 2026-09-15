@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from openstack_sync.hooks.contracts import HookConfig
+from openstack_sync.hooks.framework.contracts import HookConfig
 from openstack_sync.plugins.common import env_bool
 
 

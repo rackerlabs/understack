@@ -17,32 +17,32 @@ import sys
 from collections.abc import Callable
 from typing import Any
 
-from openstack_sync.hooks.common import add_resource_finalizer
-from openstack_sync.hooks.common import configure_logging
-from openstack_sync.hooks.common import patch_resource_status
-from openstack_sync.hooks.common import read_binding_context
-from openstack_sync.hooks.common import release_deleted_resource_finalizer
-from openstack_sync.hooks.common import remove_resource_finalizer
-from openstack_sync.hooks.config import build_crd_hook_config
-from openstack_sync.hooks.config import hook_enabled
-from openstack_sync.hooks.contracts import FINALIZER
-from openstack_sync.hooks.contracts import CleanupPolicy
-from openstack_sync.hooks.contracts import CredentialKey
-from openstack_sync.hooks.contracts import HookConfig
-from openstack_sync.hooks.contracts import HookInputs
-from openstack_sync.hooks.contracts import PruneRequest
-from openstack_sync.hooks.contracts import SyncPlan
-from openstack_sync.hooks.contracts import SyncPlugin
-from openstack_sync.hooks.contracts import SyncResource
-from openstack_sync.hooks.entrypoint import run_hook as _run_hook
-from openstack_sync.hooks.finalizers import release_deleted_finalizers
-from openstack_sync.hooks.finalizers import sync_live_finalizers
-from openstack_sync.hooks.planner import hook_inputs
-from openstack_sync.hooks.pruning import run_prune
-from openstack_sync.hooks.resources import group_by_credentials
-from openstack_sync.hooks.runner import run_sync as _run_sync
-from openstack_sync.hooks.status import patch_status
-from openstack_sync.hooks.status import synced_message
+from openstack_sync.hooks.framework.common import add_resource_finalizer
+from openstack_sync.hooks.framework.common import configure_logging
+from openstack_sync.hooks.framework.common import patch_resource_status
+from openstack_sync.hooks.framework.common import read_binding_context
+from openstack_sync.hooks.framework.common import release_deleted_resource_finalizer
+from openstack_sync.hooks.framework.common import remove_resource_finalizer
+from openstack_sync.hooks.framework.config import build_crd_hook_config
+from openstack_sync.hooks.framework.config import hook_enabled
+from openstack_sync.hooks.framework.contracts import FINALIZER
+from openstack_sync.hooks.framework.contracts import CleanupPolicy
+from openstack_sync.hooks.framework.contracts import CredentialKey
+from openstack_sync.hooks.framework.contracts import HookConfig
+from openstack_sync.hooks.framework.contracts import HookInputs
+from openstack_sync.hooks.framework.contracts import PruneRequest
+from openstack_sync.hooks.framework.contracts import SyncPlan
+from openstack_sync.hooks.framework.contracts import SyncPlugin
+from openstack_sync.hooks.framework.contracts import SyncResource
+from openstack_sync.hooks.framework.entrypoint import run_hook as _run_hook
+from openstack_sync.hooks.framework.finalizers import release_deleted_finalizers
+from openstack_sync.hooks.framework.finalizers import sync_live_finalizers
+from openstack_sync.hooks.framework.planner import hook_inputs
+from openstack_sync.hooks.framework.pruning import run_prune
+from openstack_sync.hooks.framework.resources import group_by_credentials
+from openstack_sync.hooks.framework.runner import run_sync as _run_sync
+from openstack_sync.hooks.framework.status import patch_status
+from openstack_sync.hooks.framework.status import synced_message
 from openstack_sync.utils import get_openstack_connection
 
 __all__ = [

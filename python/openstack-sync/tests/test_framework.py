@@ -295,7 +295,8 @@ def test_framework_public_facade_exports_expected_names():
 
 
 def test_framework_import_boundary_keeps_facade_at_edges():
-    extracted_modules = {
+    framework_modules = {
+        "common.py",
         "config.py",
         "contracts.py",
         "entrypoint.py",
@@ -312,8 +313,10 @@ def test_framework_import_boundary_keeps_facade_at_edges():
         "router_flavors.py",
     }
 
-    for module_name in extracted_modules:
-        assert _framework_imports(HOOKS_DIR / module_name) == [], module_name
+    for module_name in framework_modules:
+        assert (
+            _framework_imports(HOOKS_DIR / "framework" / module_name) == []
+        ), module_name
     for module_name in hook_entrypoints:
         assert _framework_imports(HOOKS_DIR / module_name), module_name
 
@@ -332,7 +335,7 @@ def test_framework_import_boundary_keeps_facade_at_edges():
     ],
 )
 def test_extracted_modules_keep_framework_log_channel(module_name):
-    module = importlib.import_module(f"openstack_sync.hooks.{module_name}")
+    module = importlib.import_module(f"openstack_sync.hooks.framework.{module_name}")
 
     assert module.LOG.name == "openstack_sync.hooks.framework"
 
