@@ -11,7 +11,7 @@
 {{- $crdPath := get $hook "crd" }}
 {{- if $crdPath }}
 {{- $crd := include "openstack-sync-operator.hookCrd" (list $ $hookName $hook) | fromYaml }}
-{{- $rules = append $rules (dict "apiGroups" (list $crd.group) "resources" (list $crd.plural) "verbs" (list "get" "list" "watch")) }}
+{{- $rules = append $rules (dict "apiGroups" (list $crd.group) "resources" (list $crd.plural) "verbs" (list "get" "list" "watch" "patch")) }}
 {{- if $crd.hasStatus }}
 {{- $rules = append $rules (dict "apiGroups" (list $crd.group) "resources" (list (printf "%s/status" $crd.plural)) "verbs" (list "get" "patch" "update")) }}
 {{- end }}

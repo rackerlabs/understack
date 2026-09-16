@@ -115,7 +115,7 @@ def test_a_runbook_deleted_out_of_band_is_not_an_error():
     assert fake.calls_for("DELETE") == ["/runbooks/CUSTOM_GONE-uuid"]
 
 
-def test_a_conflict_leaves_the_runbook_in_place():
+def test_a_conflict_leaves_the_runbook_in_place_and_fails_the_prune():
     fake = FakeBaremetal([_owned("CUSTOM_GONE")])
 
     def conflict(path: str, method: str, **kwargs: Any) -> Any:
@@ -124,7 +124,8 @@ def test_a_conflict_leaves_the_runbook_in_place():
         return FakeBaremetal.request(fake, path, method, **kwargs)
 
     with mock.patch.object(fake, "request", side_effect=conflict):
-        _prune(fake, [_spec("CUSTOM_KEEP")])
+        with pytest.raises(RuntimeError, match="CUSTOM_GONE"):
+            _prune(fake, [_spec("CUSTOM_KEEP")])
 
     assert sorted(fake.runbooks) == ["CUSTOM_GONE"]
 

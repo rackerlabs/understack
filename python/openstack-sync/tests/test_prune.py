@@ -11,6 +11,7 @@ import types
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from openstack import exceptions as openstack_exceptions
 
 from openstack_sync.plugins.neutron.router_flavors import markers
@@ -219,15 +220,47 @@ def test_prune_lists_flavors_once_for_all_profile_checks():
     ]
 
 
-def test_prune_skips_flavor_still_used_by_routers():
-    """A flavor with routers attached is never deleted."""
+def test_prune_fails_when_removed_flavor_is_still_used_by_routers():
+    """A flavor with routers attached keeps finalized cleanup pending."""
     flavor = _owned_flavor("in-use-flavor-id", "removed-flavor")
     conn = _conn([flavor])
     conn.network.routers = lambda flavor_id: [{"id": "router-1"}]
 
-    prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+    with pytest.raises(RuntimeError, match="removed-flavor"):
+        prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
 
     assert conn.network.deleted_flavors == []
+
+
+def test_prune_fails_when_removed_flavor_delete_conflicts():
+    flavor = _owned_flavor("in-use-flavor-id", "removed-flavor")
+    conn = _conn([flavor])
+
+    def conflict(flavor: dict[str, Any], ignore_missing: bool = True) -> None:
+        raise openstack_exceptions.ConflictException("still in use")
+
+    conn.network.delete_flavor = conflict
+
+    with pytest.raises(RuntimeError, match="removed-flavor"):
+        prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+
+    assert conn.network.deleted_flavors == []
+
+
+def test_prune_fails_when_removed_profile_delete_conflicts():
+    profile = _owned_profile("profile-id")
+    flavor = _owned_flavor("flavor-id", "removed-flavor", [profile.id])
+    conn = _conn([flavor], {profile.id: profile})
+
+    def conflict(profile: Any, ignore_missing: bool = True) -> None:
+        raise openstack_exceptions.ConflictException("still in use")
+
+    conn.network.delete_service_profile = conflict
+
+    with pytest.raises(RuntimeError, match="profile-id"):
+        prune.prune_removed_flavors(conn, [{"name": "kept-flavor"}])
+
+    assert conn.network.deleted_flavors == ["flavor-id"]
 
 
 # ---------------------------------------------------------------------------

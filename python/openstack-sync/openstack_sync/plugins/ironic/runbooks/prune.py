@@ -48,6 +48,7 @@ def prune_removed_runbooks(
     }
 
     LOG.info("Pruning removed Ironic runbooks")
+    incomplete = []
     for runbook in client.list_runbooks(conn):
         name = get_value(runbook, "name")
         if not name or name in desired_names:
@@ -60,3 +61,9 @@ def prune_removed_runbooks(
             client.delete_runbook(conn, client.assigned_uuid(runbook, str(name)))
         except openstack_exceptions.ConflictException:
             LOG.info("Ironic runbook %s is still in use; skipping delete", name)
+            incomplete.append(str(name))
+
+    if incomplete:
+        raise RuntimeError(
+            "Ironic runbooks still present after prune: " + ", ".join(incomplete)
+        )
