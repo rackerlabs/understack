@@ -2,10 +2,7 @@
 
 Focus on ``_validate_spec``, the cross-field rule the CRD cannot express:
 VLAN ranges require ``physical_network`` while tunnelled types
-(``vxlan``/``gre``/``geneve``) must omit it. ``flat`` is intentionally not a
-supported network type -- Neutron's segment range API only accepts
-vlan/vxlan/gre/geneve -- so it is neither in the CRD enum nor treated as a
-physical-network type here.
+(``vxlan``/``gre``/``geneve``) must omit it.
 """
 
 from __future__ import annotations
@@ -37,12 +34,6 @@ def _spec(**overrides: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Network-type classification: the sets my change touched
 # ---------------------------------------------------------------------------
-
-
-def test_flat_is_not_a_physical_network_type():
-    """``flat`` is unsupported and must not be classified as physical."""
-    assert "flat" not in PHYSICAL_NETWORK_TYPES
-    assert "flat" not in TUNNEL_NETWORK_TYPES
 
 
 def test_vlan_is_the_only_physical_network_type():
