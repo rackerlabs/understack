@@ -19,3 +19,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY --chmod=755 python/openstack-sync/openstack_sync/hooks/placeholder.py /hooks/placeholder.py
 COPY --chmod=755 python/openstack-sync/openstack_sync/hooks/router_flavors.py /hooks/router_flavors.py
 COPY --chmod=755 python/openstack-sync/openstack_sync/hooks/ironic_runbooks.py /hooks/ironic_runbooks.py
+COPY --chmod=755 python/openstack-sync/openstack_sync/hooks/segment_ranges.py /hooks/segment_ranges.py
