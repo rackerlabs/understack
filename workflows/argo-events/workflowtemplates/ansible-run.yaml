@@ -44,6 +44,141 @@ spec:
           secretKeyRef:
             name: nautobot-token
             key: url
+      # PAN-OS credentials (factory -> preconfig -> standard -> TACACS)
+      - name: PANOS_FACTORY_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: panos_factory_username
+            optional: true
+      - name: PANOS_FACTORY_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: panos_factory_password
+            optional: true
+      - name: PANOS_PRECONFIG_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: panos_preconfig_username
+            optional: true
+      - name: PANOS_PRECONFIG_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: panos_preconfig_password
+            optional: true
+      - name: PANOS_STANDARD_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: panos_standard_username
+            optional: true
+      - name: PANOS_STANDARD_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: panos_standard_password
+            optional: true
+      # F5 credentials (factory -> preconfig -> standard -> TACACS)
+      - name: F5_FACTORY_ROOT_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_factory_root_username
+            optional: true
+      - name: F5_FACTORY_ROOT_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_factory_root_password
+            optional: true
+      - name: F5_FACTORY_ADMIN_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_factory_admin_username
+            optional: true
+      - name: F5_FACTORY_ADMIN_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_factory_admin_password
+            optional: true
+      - name: F5_PRECONFIG_ROOT_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_preconfig_root_username
+            optional: true
+      - name: F5_PRECONFIG_ROOT_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_preconfig_root_password
+            optional: true
+      - name: F5_PRECONFIG_ADMIN_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_preconfig_admin_username
+            optional: true
+      - name: F5_PRECONFIG_ADMIN_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_preconfig_admin_password
+            optional: true
+      - name: F5_STANDARD_ROOT_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_standard_root_username
+            optional: true
+      - name: F5_STANDARD_ROOT_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_standard_root_password
+            optional: true
+      - name: F5_STANDARD_ADMIN_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_standard_admin_username
+            optional: true
+      - name: F5_STANDARD_ADMIN_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: f5_standard_admin_password
+            optional: true
+      # TACACS credentials (A-side and B-side for redundancy)
+      - name: TACACS_USER_A
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: tacacs_user_a
+            optional: true
+      - name: TACACS_PASS_A
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: tacacs_pass_a
+            optional: true
+      - name: TACACS_USER_B
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: tacacs_user_b
+            optional: true
+      - name: TACACS_PASS_B
+        valueFrom:
+          secretKeyRef:
+            name: network-device-credentials
+            key: tacacs_pass_b
+            optional: true
       envFrom:
       - configMapRef:
           name: cluster-metadata
