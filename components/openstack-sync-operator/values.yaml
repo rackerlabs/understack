@@ -30,6 +30,7 @@ rbac:
 plugins:
   openstackPlaceholder: false
   neutronRouterFlavors: false
+  neutronSubnetPools: false
   ironicRunbooks: false
 
 pluginData:
@@ -56,6 +57,14 @@ pluginData:
         # When true, removing a NeutronRouterFlavor CR also deletes its unused
         # operator-managed OpenStack flavor. Enable this before removing the CR.
         PRUNE: false
+
+  neutronSubnetPools:
+    hook:
+      path: /hooks/subnet_pools.py
+      crd: crds/neutron.understack.rackspace.net_neutronsubnetpools.yaml
+      envPrefix: NEUTRON_SUBNET_POOL
+      env:
+        SYNC_CRONTAB: "0 * * * *"
 
   ironicRunbooks:
     hook:
