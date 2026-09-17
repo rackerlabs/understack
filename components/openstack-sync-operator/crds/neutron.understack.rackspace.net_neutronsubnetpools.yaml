@@ -21,9 +21,6 @@ spec:
     - name: Pool
       type: string
       jsonPath: .spec.name
-    - name: IPVersion
-      type: integer
-      jsonPath: .spec.ip_version
     - name: AddressScope
       type: string
       jsonPath: .spec.address_scope.name
@@ -33,16 +30,45 @@ spec:
     - name: SyncStatus
       type: string
       jsonPath: .status.syncStatus
+    # A converged pool stays SyncStatus=Synced; manual-action notes show here.
+    - name: Message
+      type: string
+      jsonPath: .status.message
     - name: Age
       type: date
       jsonPath: .metadata.creationTimestamp
     schema:
       openAPIV3Schema:
         description: >-
-          NeutronSubnetPool defines one Neutron subnet pool and links it to a
-          Neutron address scope. Neutron stores that link as address_scope_id on
-          the subnet pool; Understack L3/SVI validation relies on subnets
-          inheriting that address scope through their subnet pool.
+          NeutronSubnetPool declares one OpenStack Neutron subnet pool. The top
+          level of spec is the complete, self-describing OpenStack subnet-pool
+          contract, mirroring the Neutron subnet pool and address scope
+          resources: name, address_scope, minimum/default/maximum_prefix_length,
+          is_default, shared, description, project_id, and tags. These fields
+          are authored here and are the single source of truth for the pool's
+          policy; the operator does not read them from anywhere else.
+
+
+          spec.nautobot is the reference contract: it says where Nautobot is and
+          which prefixes supply this pool's CIDRs, plus optional guardrails each
+          prefix must satisfy. Nautobot owns only the CIDRs (IP allocation is
+          its job); the CR references them by prefix UUID rather than copying
+          them, so blocks can be added or renumbered in Nautobot without
+          editing the CR. IP version is inferred from the resolved CIDRs and
+          must be consistent across them.
+
+
+          The contract must be complete: a name, an address scope, all three
+          prefix-length bounds (minimum <= default <= maximum, within the IP
+          family), and at least one CIDR prefix resolved from Nautobot. The
+          operator requires the bounds explicitly rather than falling back to
+          Neutron's permissive defaults. A named address scope is created if
+          absent and adopted if present, then attached to the pool; a scope
+          referenced by id must already exist. The operator never deletes an
+          address scope, because a scope outlives any one pool and the L3/SVI
+          validation of every subnet under it depends on the scope surviving.
+          Prefixes can only be added to an existing pool, never removed, because
+          Neutron forbids shrinking a subnet pool.
         type: object
         required:
         - spec
@@ -56,10 +82,13 @@ spec:
           spec:
             type: object
             required:
-            - name
-            - prefixes
-            - address_scope
             - cloudCredentialsRef
+            - name
+            - address_scope
+            - minimum_prefix_length
+            - default_prefix_length
+            - maximum_prefix_length
+            - nautobot
             properties:
               cloudCredentialsRef:
                 description: >-
@@ -80,31 +109,45 @@ spec:
                     minLength: 1
                     maxLength: 253
                   cloudName:
-                    description: >-
-                      Name of the cloud entry within the clouds.yaml to
-                      authenticate as.
+                    description: Name of the cloud entry within clouds.yaml.
                     type: string
                     minLength: 1
                     maxLength: 256
               name:
-                description: Neutron subnet pool name.
-                type: string
-                minLength: 1
-                maxLength: 255
-                pattern: ^[A-Za-z0-9._-]+$
-              project_id:
-                description: >-
-                  Optional OpenStack project ID to create the subnet pool in and
-                  to use when resolving an address scope by name.
+                description: Neutron subnet pool name. Required.
                 type: string
                 minLength: 1
                 maxLength: 255
                 pattern: ^[A-Za-z0-9._:-]+$
+              default_prefix_length:
+                description: >-
+                  Default subnet prefix length allocated from this pool.
+                  Required; must satisfy minimum <= default <= maximum.
+                type: integer
+                minimum: 0
+                maximum: 128
+              minimum_prefix_length:
+                description: >-
+                  Smallest allowed subnet prefix length allocated from this
+                  pool. Required.
+                type: integer
+                minimum: 0
+                maximum: 128
+              maximum_prefix_length:
+                description: >-
+                  Largest allowed subnet prefix length allocated from this pool.
+                  Required.
+                type: integer
+                minimum: 0
+                maximum: 128
               address_scope:
                 description: >-
-                  Address scope to attach to the Neutron subnet pool. Use id for
-                  an exact lookup, or name with optional project_id when the
-                  address scope name is unique for the selected cloud.
+                  Neutron address scope for this subnet pool. Required. When
+                  referenced by name, an existing scope is adopted and a missing
+                  one is created (shared, IP version inferred from the resolved
+                  prefixes), then linked to the pool; set create=false to require
+                  a pre-existing scope. When referenced by id the scope must
+                  already exist and is never created.
                 type: object
                 oneOf:
                 - required:
@@ -113,75 +156,172 @@ spec:
                   - name
                 properties:
                   id:
-                    description: Neutron address scope ID.
+                    description: >-
+                      Neutron address scope ID (UUID). A scope referenced by id
+                      must already exist; it is never created.
                     type: string
-                    minLength: 1
+                    minLength: 36
                     maxLength: 36
-                    pattern: ^[A-Fa-f0-9-]+$
+                    pattern: >-
+                      ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
                   name:
-                    description: Neutron address scope name.
+                    description: >-
+                      Neutron address scope name. Created if absent unless
+                      create is false.
                     type: string
                     minLength: 1
                     maxLength: 255
+                  create:
+                    description: >-
+                      Create the scope when referenced by name and absent.
+                      Defaults true; set false to require a pre-existing scope.
+                      Ignored when referenced by id.
+                    type: boolean
+                    default: true
+                  shared:
+                    description: >-
+                      Whether a newly created scope is shared. Defaults true.
+                      Applies only on create; an adopted or id-referenced scope
+                      keeps its value.
+                    type: boolean
+                    default: true
                   project_id:
                     description: >-
-                      Optional project ID used only when resolving this address
-                      scope by name. Defaults to spec.project_id when omitted.
+                      Optional project ID used when resolving this address scope
+                      by name, and set as the owner when the operator creates
+                      it.
                     type: string
                     minLength: 1
                     maxLength: 255
                     pattern: ^[A-Za-z0-9._:-]+$
-              prefixes:
-                description: CIDR prefixes delegated by the Neutron subnet pool.
-                type: array
-                minItems: 1
-                items:
-                  type: string
-                  minLength: 1
-                  maxLength: 128
-                  pattern: ^(([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}|[0-9A-Fa-f:.]+/[0-9]{1,3})$
-              ip_version:
+              project_id:
                 description: >-
-                  IP version for the subnet pool. Neutron derives this from
-                  prefixes; the operator uses this optional value to validate
-                  prefixes and address-scope family before creating the pool.
-                type: integer
-                enum:
-                - 4
-                - 6
-              default_prefixlen:
-                description: Default prefix length allocated from this pool.
-                type: integer
-                minimum: 0
-                maximum: 128
-              min_prefixlen:
-                description: Smallest prefix length that may be allocated.
-                type: integer
-                minimum: 0
-                maximum: 128
-              max_prefixlen:
-                description: Largest prefix length that may be allocated.
-                type: integer
-                minimum: 0
-                maximum: 128
-              default_quota:
-                description: Per-project subnet quota for this pool.
-                type: integer
-                minimum: 0
+                  OpenStack project ID that owns the subnet pool; also used for
+                  lookups.
+                type: string
+                minLength: 1
+                maxLength: 255
+                pattern: ^[A-Za-z0-9._:-]+$
               is_default:
-                description: Whether this is the default pool for its IP version.
+                description: >-
+                  Whether this is the default subnet pool for its IP version.
+                  Admin-only in Neutron, and Neutron permits at most one default
+                  pool per IP family. When set, the operator checks for an
+                  existing default of the same family before writing and fails
+                  the CR with a message naming the conflicting pool rather than
+                  surfacing Neutron's generic error.
                 type: boolean
                 default: false
               shared:
-                description: Whether the Neutron subnet pool is shared.
+                description: >-
+                  Whether this subnet pool is shared across projects. Neutron
+                  does not allow changing this on an existing pool, so it has no
+                  default: set it explicitly, and the operator will refuse to
+                  reconcile a pool whose current value differs rather than
+                  silently diverge. Leave it unset only to adopt a pool without
+                  asserting its sharing.
                 type: boolean
-                default: false
+              nautobot:
+                description: >-
+                  The Nautobot reference contract: where Nautobot is and which
+                  prefixes supply this pool's CIDRs, plus optional guardrails
+                  each prefix must satisfy. Nautobot owns only the CIDRs; the
+                  pool's name, address scope, and prefix lengths are declared at
+                  the top of spec, not read from Nautobot.
+                type: object
+                required:
+                - url
+                - tokenSecretRef
+                - prefix_refs
+                properties:
+                  url:
+                    description: Base Nautobot URL, for example https://nautobot.example.com.
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  api_version:
+                    description: Nautobot REST API version sent in the Accept header.
+                    type: string
+                    minLength: 1
+                    maxLength: 32
+                    default: "2.0"
+                  tokenSecretRef:
+                    description: Secret key containing a Nautobot API token.
+                    type: object
+                    required:
+                    - secretName
+                    - key
+                    properties:
+                      secretName:
+                        description: Name of a Secret in the same namespace as this resource.
+                        type: string
+                        minLength: 1
+                        maxLength: 253
+                      key:
+                        description: Secret data key containing the token.
+                        type: string
+                        minLength: 1
+                        maxLength: 253
+                  prefix_refs:
+                    description: >-
+                      Nautobot prefix IDs that contribute CIDRs to this subnet
+                      pool. Kubernetes stores references, not copied CIDRs.
+                    type: array
+                    minItems: 1
+                    items:
+                      type: object
+                      required:
+                      - id
+                      properties:
+                        id:
+                          description: Nautobot prefix UUID.
+                          type: string
+                          minLength: 36
+                          maxLength: 36
+                          pattern: >-
+                            ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$
+                  require:
+                    description: >-
+                      Optional guardrails each referenced Nautobot prefix must
+                      satisfy before it is accepted for this subnet pool.
+                    type: object
+                    properties:
+                      namespace:
+                        description: Required Nautobot IPAM namespace, for example Rackspace.
+                        type: string
+                        minLength: 1
+                        maxLength: 255
+                      location:
+                        description: >-
+                          Nautobot location the prefix must be under.
+                        type: string
+                        minLength: 1
+                        maxLength: 255
+                      status:
+                        description: Required Nautobot prefix status.
+                        type: string
+                        minLength: 1
+                        maxLength: 255
+                      type:
+                        description: Required Nautobot prefix type.
+                        type: string
+                        minLength: 1
+                        maxLength: 255
+                      tags:
+                        description: Required Nautobot tags.
+                        type: array
+                        items:
+                          type: string
+                          minLength: 1
+                          maxLength: 255
               description:
                 description: Description stored on the Neutron subnet pool.
                 type: string
                 maxLength: 1024
               tags:
-                description: Neutron tags to apply to the subnet pool.
+                description: >-
+                  Neutron tags to apply to this subnet pool, in addition to the
+                  operator's ownership marker.
                 type: array
                 items:
                   type: string
@@ -199,11 +339,11 @@ spec:
                 - Failed
                 - Unknown
               lastSyncTime:
-                description: LastSyncTime is the last time the operator attempted to sync the subnet pool.
+                description: LastSyncTime is the last time the operator attempted this sync.
                 type: string
                 format: date-time
               observedGeneration:
-                description: ObservedGeneration is the metadata generation last processed by the operator.
+                description: ObservedGeneration is the metadata generation last processed.
                 type: integer
                 format: int64
               message:
@@ -239,9 +379,7 @@ spec:
                       - "False"
                       - Unknown
                     reason:
-                      description: >-
-                        CamelCase programmatic identifier for the reason of the
-                        last transition.
+                      description: CamelCase programmatic identifier for the last transition.
                       type: string
                       minLength: 1
                       maxLength: 1024
