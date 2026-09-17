@@ -1005,6 +1005,7 @@ source = { editable = "." }
 dependencies = [
     { name = "kubernetes" },
     { name = "openstacksdk" },
+    { name = "pynautobot" },
     { name = "python-ironicclient" },
     { name = "python-openstackclient" },
 ]
@@ -1020,6 +1021,7 @@ test = [
 requires-dist = [
     { name = "kubernetes", specifier = ">=32.0.0" },
     { name = "openstacksdk", specifier = ">=4.18.0" },
+    { name = "pynautobot", specifier = ">=3,<4" },
     { name = "python-ironicclient", specifier = ">=6.2.0" },
     { name = "python-openstackclient", specifier = ">=10.2.1" },
 ]
@@ -1380,6 +1382,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f", size = 4955991, upload-time = "2026-03-29T13:29:33.898Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
+]
+
+[[package]]
+name = "pynautobot"
+version = "3.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f4/48/7d9e65090a124a456ef6fae9e8515af92edeb6ddd52046f12063322d0918/pynautobot-3.1.1.tar.gz", hash = "sha256:8e3f167bd7a07659d0fb1a9cbfb3eb6e7a5375420872d3c08754e4dec5cb0bc1", size = 33440, upload-time = "2026-07-06T20:52:51.484Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9f/6b/5561a21b6a922bca782d787015282d8be39402ad1e0cf51131e266b2cb6f/pynautobot-3.1.1-py3-none-any.whl", hash = "sha256:81bebe7aaaa2391886386821ec8dcba23add32a9d49e2719bb20e64c77b23a01", size = 41884, upload-time = "2026-07-06T20:52:50.127Z" },
 ]
 
 [[package]]

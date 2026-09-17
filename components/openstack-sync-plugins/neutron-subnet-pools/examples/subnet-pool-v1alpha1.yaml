@@ -7,25 +7,46 @@ metadata:
     app.kubernetes.io/name: openstack-sync-plugins
     app.kubernetes.io/component: neutron-subnet-pools
     app.kubernetes.io/part-of: openstack-sync
+# The top level of spec is the OpenStack subnet-pool contract and the single
+# source of truth for this pool's policy: name, address_scope, the three
+# prefix-length bounds, and sharing are declared here and are required.
+# spec.nautobot is the reference contract: endpoint, token, the prefixes that
+# supply the pool's CIDRs, and optional guardrails. Nautobot owns only the
+# CIDRs; the CR references them by prefix UUID rather than copying them.
 spec:
   cloudCredentialsRef:
     secretName: infrasetup
     cloudName: understack
-  name: SAMPLE-PUBLIC-IP-POOL
-  description: SITE-Dev public network allocation
+  # OpenStack subnet-pool contract (required).
+  name: PUBLIC-IP-POOL
   address_scope:
-    name: sample-publicnet-ip4
-  prefixes:
-    - 100.101.102.128/25
-    - 10.4.88.0/24
-  ip_version: 4
-  default_prefixlen: 28
-  min_prefixlen: 27
-  max_prefixlen: 30
-  default_quota: 0
-  is_default: false
+    # Created if absent, adopted if present. create: false requires it to exist.
+    name: publicnet-ip4
+    create: true
+    shared: true
+  minimum_prefix_length: 27
+  default_prefix_length: 28
+  maximum_prefix_length: 30
   shared: true
+  is_default: false
   tags:
-    - openstack-subnet-pool
-    - public
-    - site-dev
+    - managed-by-openstack-sync
+  nautobot:
+    url: https://nautobot.example.com
+    api_version: "2.0"
+    tokenSecretRef:
+      secretName: nautobot
+      key: token
+    prefix_refs:
+      - id: 2bc3ecab-b6dc-46cd-9bd4-1c0ea8a07f87
+      - id: 53c8ee3b-09b9-41ab-a413-b1a1f5ecec6a
+    require:
+      namespace: Rackspace
+      # Optional; defaults to the operator's site (UNDERSTACK_SITE).
+      location: site-dev
+      status: Active
+      type: pool
+      # Guards against a fat-fingered prefix_refs id: the referenced prefix
+      # must carry the IPAM marker that earmarks a block for OpenStack pools.
+      tags:
+        - openstack-subnet-pool
