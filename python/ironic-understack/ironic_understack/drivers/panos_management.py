@@ -144,7 +144,7 @@ class PanosManagement(noop_mgmt.NoopManagement):
             LOG.exception(msg)
             raise
 
-    @base.clean_step(priority=10, requires_ramdisk=False)
+    @base.clean_step(priority=0, requires_ramdisk=False)
     def reset_to_factory_defaults(self, task):
         """Reset firewall to factory defaults.
 
@@ -171,7 +171,7 @@ class PanosManagement(noop_mgmt.NoopManagement):
 
         LOG.warning("[node:%s] Factory reset not yet implemented, skipping", node.uuid)
 
-    @base.clean_step(priority=5, requires_ramdisk=False, abortable=True, argsinfo={})
+    @base.clean_step(priority=0, requires_ramdisk=False, abortable=True, argsinfo={})
     def clear_configuration(self, task):
         """Clear specific configuration sections without full factory reset.
 
