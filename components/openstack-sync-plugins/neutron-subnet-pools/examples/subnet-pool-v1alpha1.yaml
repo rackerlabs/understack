@@ -1,0 +1,31 @@
+---
+apiVersion: neutron.understack.rackspace.net/v1alpha1
+kind: NeutronSubnetPool
+metadata:
+  name: sample-public-ip-pool
+  labels:
+    app.kubernetes.io/name: openstack-sync-plugins
+    app.kubernetes.io/component: neutron-subnet-pools
+    app.kubernetes.io/part-of: openstack-sync
+spec:
+  cloudCredentialsRef:
+    secretName: infrasetup
+    cloudName: understack
+  name: SAMPLE-PUBLIC-IP-POOL
+  description: SITE-Dev public network allocation
+  address_scope:
+    name: sample-publicnet-ip4
+  prefixes:
+    - 100.101.102.128/25
+    - 10.4.88.0/24
+  ip_version: 4
+  default_prefixlen: 28
+  min_prefixlen: 27
+  max_prefixlen: 30
+  default_quota: 0
+  is_default: false
+  shared: true
+  tags:
+    - openstack-subnet-pool
+    - public
+    - site-dev
