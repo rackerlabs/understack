@@ -82,21 +82,27 @@ def find_range(conn: Any, managed: str, cache: RangeCache) -> Any | None:
 
 
 def _immutable_drift(segment_range: Any, spec: dict[str, Any]) -> str | None:
-    """Return a description of any immutable-field mismatch, else None."""
-    checks = (
-        ("network_type", str(get_value(segment_range, "network_type", default=""))),
-        (
-            "physical_network",
-            get_value(segment_range, "physical_network", default=None),
+    """Return a description of any immutable-field mismatch, else None.
+
+    ``physical_network`` is compared as a string with the empty string standing
+    for "unset": Neutron's column is non-nullable and it normalizes non-VLAN
+    ranges to ``physical_network=''``, while a tunnelled spec omits the field
+    entirely. Comparing the raw values would report drift on every reconcile of
+    a vxlan/gre/geneve range against its own spec.
+    """
+    have = {
+        "network_type": str(get_value(segment_range, "network_type", default="")),
+        "physical_network": str(
+            get_value(segment_range, "physical_network", default="")
         ),
-    )
+    }
     want = {
         "network_type": spec["network_type"],
-        "physical_network": spec.get("physical_network"),
+        "physical_network": spec.get("physical_network") or "",
     }
-    for field, have in checks:
-        if have != want[field]:
-            return f"{field}: have={have!r} want={want[field]!r}"
+    for field, have_value in have.items():
+        if have_value != want[field]:
+            return f"{field}: have={have_value!r} want={want[field]!r}"
     return None
 
 

@@ -99,3 +99,65 @@ def test_unshared_range_without_project_id_is_rejected():
 
 def test_unshared_range_with_project_id_passes():
     reconcile._validate_spec(_spec(shared=False, project_id="proj-1"))
+
+
+# ---------------------------------------------------------------------------
+# _immutable_drift: Neutron normalizes non-VLAN ranges to physical_network=""
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("network_type", ["vxlan", "gre", "geneve"])
+def test_tunnel_range_stored_with_empty_physical_network_is_not_drift(
+    network_type: str,
+):
+    """A tunnelled spec omits physical_network; Neutron stores it as "".
+
+    Without normalization every reconcile would report immutable drift against
+    the range the operator itself created.
+    """
+    spec = _spec(network_type=network_type)
+    spec.pop("physical_network")
+    existing = {
+        "network_type": network_type,
+        "physical_network": "",
+    }
+
+    assert reconcile._immutable_drift(existing, spec) is None
+
+
+@pytest.mark.parametrize("stored", [None, ""])
+def test_tunnel_range_with_unset_physical_network_is_not_drift(stored: Any):
+    """Treat both None and "" as unset, whichever the SDK hands back."""
+    spec = _spec(network_type="vxlan")
+    spec.pop("physical_network")
+
+    assert (
+        reconcile._immutable_drift(
+            {"network_type": "vxlan", "physical_network": stored}, spec
+        )
+        is None
+    )
+
+
+def test_matching_vlan_range_is_not_drift():
+    existing = {"network_type": "vlan", "physical_network": "physnet1"}
+
+    assert reconcile._immutable_drift(existing, _spec()) is None
+
+
+def test_physical_network_mismatch_is_drift():
+    existing = {"network_type": "vlan", "physical_network": "physnet2"}
+
+    drift = reconcile._immutable_drift(existing, _spec())
+
+    assert drift is not None
+    assert "physical_network" in drift
+
+
+def test_network_type_mismatch_is_drift():
+    existing = {"network_type": "vxlan", "physical_network": ""}
+
+    drift = reconcile._immutable_drift(existing, _spec())
+
+    assert drift is not None
+    assert "network_type" in drift
