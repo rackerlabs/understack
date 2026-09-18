@@ -265,6 +265,9 @@ pod:
           - name: ironic-inspection-rules
             mountPath: /etc/ironic/inspection-rules/
             readOnly: true
+          - name: panos-credentials
+            mountPath: /etc/panos-credentials
+            readOnly: true
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -278,6 +281,11 @@ pod:
           - name: ironic-inspection-rules
             configMap:
               name: ironic-inspection-rules
+              optional: true
+          - name: panos-credentials
+            secret:
+              secretName: panos-credentials
+              defaultMode: 0400
               optional: true
   replicas:
     api: 4
