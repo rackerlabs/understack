@@ -23,8 +23,8 @@ from typing import Any
 from openstack_sync.plugins.common import get_value
 
 #: Prepended to every operator-managed segment range name in Neutron. Chosen to
-#: be unambiguous and to survive Neutron's name length limit (255) with room to
-#: spare for a logical name.
+#: be unambiguous and short: at 14 chars it leaves 241 of Neutron's 255-char
+#: name column for the logical name, which is what the CRD caps ``spec.name`` at.
 NAME_PREFIX = "understack-sr:"
 
 

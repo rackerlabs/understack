@@ -102,10 +102,13 @@ spec:
                 description: >-
                   Neutron network segment range name. This is the identity the
                   operator uses to find, adopt, create, and prune the range, so
-                  it must be unique per cloud.
+                  it must be unique per cloud. The operator prepends a 14-char
+                  ownership prefix (``understack-sr:``) before storing the name
+                  in Neutron, whose name column holds 255 chars, so the logical
+                  name is capped at 241.
                 type: string
                 minLength: 1
-                maxLength: 255
+                maxLength: 241
                 pattern: ^[A-Za-z0-9._/-]+$
               network_type:
                 description: >-
@@ -125,10 +128,11 @@ spec:
                   The physical network the segment range is bound to. Required
                   for ``vlan`` ranges and must be omitted for the tunnelled
                   types (``vxlan``, ``gre``, ``geneve``); the operator enforces
-                  this at reconcile time.
+                  this at reconcile time. Neutron stores this in a 64-char
+                  column.
                 type: string
                 minLength: 1
-                maxLength: 255
+                maxLength: 64
               minimum:
                 description: >-
                   The minimum segmentation ID in the range (inclusive). Must be
