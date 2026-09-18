@@ -15,6 +15,14 @@ ARG NEUTRON_LIB_GIT_REF=6d0367183cc92656ba449acefd830cb4e11f2f5b
 ADD --keep-git-dir=true https://github.com/rackerlabs/neutron-lib.git#${NEUTRON_LIB_GIT_REF} /src/neutron-lib
 RUN git -C /src/neutron-lib fetch --unshallow --tags
 
+# networking-baremetal ships the ironic-neutron-agent. The airship base image
+# installs it from PyPI unpinned, so whatever it picks up drifts with rebuilds
+# and is not tied to our release. Pin it the same way as neutron and neutron-lib.
+# renovate: name=openstack/networking-baremetal repo=https://github.com/openstack/networking-baremetal.git branch=stable/2026.1
+ARG NETWORKING_BAREMETAL_GIT_REF=6c7190329728859b262f31fe33323d2a7e0b9c93
+ADD --keep-git-dir=true https://github.com/openstack/networking-baremetal.git#${NETWORKING_BAREMETAL_GIT_REF} /src/networking-baremetal
+RUN git -C /src/networking-baremetal fetch --unshallow --tags
+
 COPY python/neutron-understack /src/neutron-understack
 
 ARG OPENSTACK_VERSION="required_argument"
@@ -32,6 +40,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
       --constraint /upper-constraints.txt \
         /src/neutron \
         /src/neutron-lib \
+        /src/networking-baremetal \
         /src/neutron-understack
 
 ARG OPENSTACK_VERSION="required_argument"
