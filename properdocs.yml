@@ -142,6 +142,7 @@ nav:
     - Quick Start: deploy-guide/gitops-install.md
     - 'Tools and Prerequisites':
       - kubernetes.md
+      - deploy-guide/control-plane-network-requirements.md
     - 'Preparing Our Deployment':
       - deploy-guide/deploy-repo.md
       - deploy-guide/config-dex.md

@@ -7,7 +7,10 @@ To get started, ensure you have the following prerequisites:
 * A clone of this repository.
 * Another [Git repository,](#deploy-repository) referred to as the
   [Deploy Repository](#deploy-repository).
-* Access to at least one Kubernetes cluster.
+* Access to at least one Kubernetes cluster, whose nodes meet the
+  [Control Plane Network Requirements](./control-plane-network-requirements.md)
+  — in short, an OVS bridge with trunk access to the provider VLAN range for
+  OVN, and host networking that does not depend on it.
 * A DNS zone. For example `dev.yourdomain.com`. We will refer to this
   as `DNS_ZONE`.
 * Bare metal machines to adopt in OpenStack Ironic
