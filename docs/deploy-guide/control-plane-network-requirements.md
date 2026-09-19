@@ -45,29 +45,12 @@ Give the bridge an uplink of its own instead. A kernel netdev cannot be both an
 OVS bridge port and the host L3 interface, so the two cannot share one
 interface.
 
-Two ways to provide the uplink:
-
-- **Dedicated ports.** A second bonded port pair, given to the bridge. Real
-  LACP on both bonds, genuine bandwidth isolation, and the whole PF is
-  available to `vfio-pci` if you later move to OVS-DPDK. Preferred where the
-  ports exist.
-- **SR-IOV virtual functions.** Where the nodes have only two ports cabled,
-  carve the uplink out of them: host on the PF bond, bridge on one VF per PF.
-  Workable, with constraints worth knowing before you commit to it:
-
-    - A VF cannot run LACP, so the bridge's bond cannot be `802.3ad`. If the
-      two ports are one LACP port-channel, the OVS bond must be `balance-slb`;
-      `active-backup` drops frames arriving on the inactive member, which the
-      upstream switch's hashing guarantees will happen.
-    - Each VF must be set `trust on` and `spoofchk off`, with no VF VLAN.
-      Legacy SR-IOV has no per-VF trunk allow-list, so `trust on` — which also
-      makes the VF VLAN-promiscuous — is the only mechanism that carries a
-      trunk into a VF. Setting a VF VLAN breaks the trunk.
-    - If the bonded ports are on separate cards, the bridge needs a VF on each.
-      A VF's MAC exists only in its own card's embedded switch, so a single VF
-      loses return traffic the switch hashes to the other card.
-    - Isolation is logical, not physical: both bonds share the same ports, so
-      there is no dedicated bandwidth.
+Where that uplink comes from is yours to decide. A dedicated port pair is the
+simplest and gives real bandwidth isolation. Where the nodes have only two
+ports cabled, SR-IOV can carve the uplink out of them — host on the physical
+function bond, bridge on a virtual function — at the cost of several
+constraints on bonding mode and VF configuration, since a VF cannot run LACP
+and needs explicit settings to carry a trunk at all.
 
 An addressless bridge on every control plane node also makes gateway chassis
 placement a scheduling decision rather than a host networking one.
@@ -90,8 +73,7 @@ Dedicated ports avoid this — the two trunks are physically separate.
 ## MTU
 
 `global_physnet_mtu` sets what Neutron advertises. The path must carry that
-plus 4 bytes for the VLAN tag, end to end, including the switch ports. On an
-SR-IOV uplink note that a VF's MTU cannot exceed its PF's.
+plus 4 bytes for the VLAN tag, end to end, including the switch ports.
 
 ## Verification
 
