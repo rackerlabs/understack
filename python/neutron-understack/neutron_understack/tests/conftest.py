@@ -341,15 +341,7 @@ def oslo_config():
 
 
 @pytest.fixture
-def _ml2_understack_conf(oslo_config, ucvni_group_id) -> None:
-    oslo_config.config(
-        ucvni_group=str(ucvni_group_id),
-        group="ml2_understack",
-    )
-    oslo_config.config(
-        network_node_switchport_uuid="a27f7260-a7c5-4f0c-ac70-6258b026d368",
-        group="ml2_understack",
-    )
+def _ml2_understack_conf(oslo_config) -> None:
     oslo_config.config(
         undersync_dry_run=False,
         group="ml2_understack",

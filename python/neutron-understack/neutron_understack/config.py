@@ -9,20 +9,6 @@ _OPT_GRP_UNDERSTACK_VNI = "understack_vni"
 
 _mech_understack_opts = [
     cfg.StrOpt(
-        "nb_url",
-        help="Nautobot URL",
-        required=False,
-    ),
-    cfg.StrOpt(
-        "nb_token",
-        help="Nautobot API token",
-        required=False,
-    ),
-    cfg.StrOpt(
-        "ucvni_group",
-        help="hack",
-    ),
-    cfg.StrOpt(
         "undersync_url",
         help="Undersync URL",
     ),
@@ -30,41 +16,10 @@ _mech_understack_opts = [
         "undersync_dry_run", default=True, help="Call Undersync with dry-run mode"
     ),
     cfg.StrOpt(
-        "provisioning_network",
-        help="provisioning_network ID as configured in ironic.conf",
-        default="change_me",
-    ),
-    cfg.StrOpt(
-        "shared_nautobot_namespace_name",
-        default="Global",
-        help=(
-            "Nautobot namespace name that will house all external prefixes, i.e "
-            "prefixes that need to be routable outside of a tenant environment."
-        ),
-    ),
-    # TODO:: this can very likely be deprecated now
-    cfg.StrOpt(
-        "network_node_switchport_uuid",
-        help=(
-            "Nautobot UUID of the network node's switchport interface, that "
-            "is used to trunk all vlans used by a neutron router."
-        ),
-    ),
-    cfg.StrOpt(
         "network_node_switchport_physnet",
         help=(
             "Name of the physnet configured on a network node's"
             "baremetal port that provides connectivity to OVN."
-        ),
-    ),
-    cfg.BoolOpt(
-        "enforce_unique_vlans_in_fabric",
-        default=True,
-        help=(
-            "When enabled, Neutron performs an extra check during the creation of a"
-            "new VLAN network. This check ensures that the VLAN ID being assigned is"
-            "not already in use within a fabric. The verification is handled by "
-            "Nautobot."
         ),
     ),
     cfg.ListOpt(
