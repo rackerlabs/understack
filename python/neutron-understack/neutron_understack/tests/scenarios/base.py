@@ -59,11 +59,6 @@ def _apply_understack_ml2_overrides():
         "undersync_url", "http://undersync.test", group="ml2_understack"
     )
     cfg.CONF.set_override("undersync_dry_run", False, group="ml2_understack")
-    cfg.CONF.set_override(
-        "provisioning_network",
-        "00000000-0000-0000-0000-000000000000",
-        group="ml2_understack",
-    )
 
 
 class _UnderstackMl2ScenarioMixin:
