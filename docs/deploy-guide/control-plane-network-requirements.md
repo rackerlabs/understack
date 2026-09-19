@@ -4,6 +4,10 @@ What UnderStack needs from the networking on the nodes running the control
 plane. How you build it is out of scope — these are the requirements the
 deployment assumes.
 
+This is the **provider network** path that OVN uses for tenant and external
+traffic. For the provisioning network — MetalLB for DHCP and the dnsmasq
+ranges — see [Networking](../networking.md).
+
 ## Summary
 
 | Requirement | Detail |
@@ -17,8 +21,10 @@ deployment assumes.
 ## Trunk access
 
 OVN does not use a fixed VLAN. Neutron allocates a segmentation ID per provider
-network from the configured segment range, and `ovn-controller` adds a localnet
-port carrying that tag to the bridge named in `ovn_bridge_mappings`.
+network from the VLAN [network segment
+range](../design-guide/neutron-networking.md#vlans) configured for the fabric,
+and `ovn-controller` adds a localnet port carrying that tag to the bridge named
+in `ovn_bridge_mappings`.
 
 Consequences for the uplink:
 

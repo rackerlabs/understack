@@ -4,6 +4,10 @@
     Your networking configurations in UnderStack are highly dependent on
     your own environment.
 
+This page covers the provisioning network. For what the control plane nodes
+need in order to carry OVN's provider traffic, see
+[Control Plane Network Requirements](deploy-guide/control-plane-network-requirements.md).
+
 ## MetalLB Load Balancer for DHCP
 
 We are using [MetalLB](https://metallb.io/) to provide a TCP/UDP load balancer
