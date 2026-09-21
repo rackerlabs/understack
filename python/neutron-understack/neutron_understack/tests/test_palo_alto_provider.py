@@ -1,4 +1,5 @@
 import copy
+import logging
 from types import MethodType
 from types import SimpleNamespace
 
@@ -15,6 +16,7 @@ from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib.exceptions import l3 as l3_exc
 
+from neutron_understack.ironic import NodeReleaseResult
 from neutron_understack.l3_router import palo_alto
 
 
@@ -310,7 +312,10 @@ class TestRouterDelete:
 
     def test_releases_adopted_node(self, mocker):
         ironic = mocker.Mock()
-        ironic.release_node_for_router.return_value = mocker.Mock(id="node-uuid")
+        node = mocker.Mock(id="node-uuid")
+        ironic.release_node_for_router.return_value = NodeReleaseResult(
+            node=node, released=True
+        )
         provider = _make_provider(
             mocker, FakeFlavorPlugin(_palo_alto_driver()), ironic=ironic
         )
@@ -322,7 +327,9 @@ class TestRouterDelete:
 
     def test_warns_when_no_node_bound(self, mocker):
         ironic = mocker.Mock()
-        ironic.release_node_for_router.return_value = None
+        ironic.release_node_for_router.return_value = NodeReleaseResult(
+            node=None, released=False
+        )
         provider = _make_provider(
             mocker, FakeFlavorPlugin(_palo_alto_driver()), ironic=ironic
         )
@@ -331,6 +338,22 @@ class TestRouterDelete:
         provider._process_router_delete(
             "router", "after_delete", "trigger", FakePayload(self._router())
         )
+
+    def test_warns_when_release_is_pending_reconciliation(self, mocker, caplog):
+        ironic = mocker.Mock()
+        ironic.release_node_for_router.return_value = NodeReleaseResult(
+            node=mocker.Mock(id="node-uuid"), released=False
+        )
+        provider = _make_provider(
+            mocker, FakeFlavorPlugin(_palo_alto_driver()), ironic=ironic
+        )
+
+        with caplog.at_level(logging.WARNING):
+            provider._process_router_delete(
+                "router", "after_delete", "trigger", FakePayload(self._router())
+            )
+
+        assert "is incomplete; reconciliation will retry it" in caplog.text
 
     def test_skips_non_palo_alto_router(self, mocker):
         ironic = mocker.Mock()
