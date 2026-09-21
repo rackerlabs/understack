@@ -310,6 +310,65 @@ refusal in one domain does not block safe work in the other. When `--apply`
 performs only the safe portion, the command verifies that work and exits `2`
 to report that part of the router remains unresolved.
 
+### net trunk audit
+
+```bash
+# Every baremetal trunk, or just one.
+kubectl us net trunk audit
+kubectl us net trunk audit <trunk-name-or-id>
+```
+
+Reports the trunk state ml2/ovn left behind on baremetal trunks. ml2/ovn used
+to manage any trunk whose parent port had a `Logical_Switch_Port`, baremetal
+parents included -- their LSP is `type=external` only so OVN can schedule an HA
+chassis group, while the VLANs are programmed on the leaf switch by undersync.
+It wrote `parent_name`/`tag` into each subport's binding profile and LSP, where
+they mean nothing, and pointed `parent_name` at an LSP on a different logical
+switch. [LP #2167105](https://bugs.launchpad.net/neutron/+bug/2167105) stops it
+managing these trunks, but the rows it already wrote stay behind: the code that
+removed them on subport delete now returns early.
+
+Trunks whose parent port is not baremetal are skipped -- ml2/ovn still owns
+those. For each baremetal trunk the audit verifies:
+
+- the trunk's status matches its parent port: `ACTIVE` when the parent is
+  vif-attached with a `physical_network`, `DOWN` when it is unbound. A trunk
+  last touched before neutron-understack took over the status corrects itself
+  on its next subport change;
+- no subport binding profile carries `parent_name` or `tag`;
+- no subport LSP carries `parent_name` or `tag_request` (Neutron converts a
+  `tag` write into `tag_request`; northd derives the read-only `tag` from it);
+  and
+- each subport is claimed with `device_owner=trunk:subport`.
+
+Any failed check produces a nonzero exit status.
+
+### net trunk repair
+
+```bash
+# Plan only; this writes nothing.
+kubectl us net trunk repair
+kubectl us net trunk repair <trunk-name-or-id>
+
+# Apply the displayed plan and verify the result.
+kubectl us net trunk repair <trunk-name-or-id> --apply
+```
+
+Repairs what the audit reports, except the trunk status, which is not settable
+through the Neutron API.
+
+The subport's binding profile is the source of truth: ml2/ovn derives the LSP's
+`parent_name`/`tag` from it (`ovn_client._get_port_options`), so dropping those
+keys through Neutron makes ml2/ovn rewrite the LSP itself. The same port update
+also resets the subport's stale `vif_type=ovs` binding to `unbound`, and
+re-claims a subport whose `device_owner` is missing. Only rows ml2/ovn did not
+rewrite are then cleared directly with `ovn-nbctl clear`.
+
+Nothing else in the binding profile is touched, and the dynamic VLAN segments
+and level-0 binding levels that actually carry the subports are never modified.
+With `--apply`, the affected trunks are reloaded afterwards and the command
+exits nonzero if any repair did not stick.
+
 ### backup local
 
 ```bash

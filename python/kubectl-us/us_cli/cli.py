@@ -7,6 +7,7 @@ import typer
 from us_cli.commands import backup
 from us_cli.commands import raw
 from us_cli.commands import router
+from us_cli.commands import trunk
 from us_cli.connection import ConnectionContext
 
 app = typer.Typer(
@@ -58,6 +59,7 @@ def main(
 
 raw.register(net_app)
 net_app.add_typer(router.app, name="router")
+net_app.add_typer(trunk.app, name="trunk")
 
 app.add_typer(net_app, name="net")
 backup.register(app)
