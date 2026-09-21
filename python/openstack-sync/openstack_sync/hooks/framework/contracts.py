@@ -7,6 +7,7 @@ import os
 from abc import ABC
 from abc import abstractmethod
 from dataclasses import dataclass
+from dataclasses import field
 from enum import Enum
 from typing import Any
 
@@ -149,6 +150,21 @@ class PruneRequest:
     authoritative_empty: bool
 
 
+@dataclass(frozen=True)
+class ReconcileResult:
+    """Outcome of one CR's reconcile.
+
+    ``notes`` are folded into the status message. ``extra_status`` is merged
+    into the CR's status subresource verbatim, alongside the framework's own
+    ``syncStatus``/``message``/``conditions`` fields -- the framework never
+    inspects or validates its contents, so only the plugin and its CRD's
+    status schema give it meaning.
+    """
+
+    notes: list[str] = field(default_factory=list)
+    extra_status: dict[str, Any] | None = None
+
+
 class CleanupPolicy(Enum):
     """How a plugin wants the framework to handle prune and finalizers."""
 
@@ -179,13 +195,16 @@ class SyncPlugin(ABC):
         """Block until the OpenStack service this plugin targets is reachable."""
 
     @abstractmethod
-    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> list[str]:
+    def reconcile(self, conn: Any, spec: dict[str, Any], cache: Any) -> ReconcileResult:
         """Converge one CR spec onto OpenStack.
 
-        Returns human-readable notes about state that diverges from the spec but
-        that the operator cannot correct on its own -- usually empty. Notes do
-        not make the reconcile a failure; they qualify the success reported on
-        the CR status. Raise to signal an actual failure.
+        Returns a :class:`ReconcileResult` carrying human-readable notes about
+        state that diverges from the spec but that the operator cannot correct
+        on its own -- usually empty -- plus optional ``extra_status`` fields to
+        merge into the CR's status subresource, for a plugin whose CRD reports
+        structured status beyond syncStatus/message/conditions. Notes do not
+        make the reconcile a failure; they qualify the success reported on the
+        CR status. Raise to signal an actual failure.
         """
 
     def new_cache(self) -> Any:

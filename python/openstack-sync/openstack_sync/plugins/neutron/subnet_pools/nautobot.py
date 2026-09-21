@@ -34,6 +34,9 @@ LOG = logging.getLogger(__name__)
 #: the default require.location when a CR does not set one.
 SITE_ENV = "UNDERSTACK_SITE"
 
+#: Condition reason reported when a referenced Nautobot prefix no longer exists.
+PREFIX_NOT_FOUND_REASON = "NautobotPrefixMissing"
+
 
 @dataclass(frozen=True)
 class NautobotPrefix:
@@ -60,14 +63,16 @@ def resolve_spec(
     :exc:`ConfigError` when a referenced prefix is missing, fails the
     guardrails, or the group mixes IP versions.
     """
-    _required_mapping(spec, "nautobot", "spec")
+    nautobot_spec = _required_mapping(spec, "nautobot", "spec")
     name = _required_string(spec, "name")
+    nautobot_url = _required_string(nautobot_spec, "url")
     client = _nautobot_client(spec, cache, namespace)
     prefix_refs = _nautobot_prefix_refs(spec)
     requirements = _nautobot_requirements(spec)
     prefixes = load_nautobot_prefixes(
         client,
         prefix_refs,
+        nautobot_url=nautobot_url,
         require_location=_require_location(requirements),
     )
     _validate_prefixes(prefixes, requirements)
@@ -75,6 +80,19 @@ def resolve_spec(
     resolved = dict(spec)
     resolved["prefixes"] = [prefix.prefix for prefix in prefixes]
     resolved["ip_version"] = _subnet_pool_ip_version(name, prefixes)
+    # Kept alongside the flat CIDR list above (which reconcile.py validates and
+    # sends to Neutron) so the plugin can report each prefix's Nautobot id and
+    # UI link on the CR status without reconcile.py needing to know about
+    # Nautobot at all.
+    resolved["nautobot_prefix_links"] = [
+        {
+            "id": prefix.id,
+            "cidr": prefix.prefix,
+            "url": prefix_url(nautobot_url, prefix.id),
+        }
+        for prefix in prefixes
+        if prefix.id
+    ]
 
     LOG.info(
         "Resolved subnet pool %s from %s Nautobot prefix(es): %s",
@@ -83,6 +101,17 @@ def resolve_spec(
         ", ".join(prefix.prefix for prefix in prefixes),
     )
     return resolved
+
+
+def prefix_url(nautobot_url: str, prefix_id: str) -> str:
+    """Return the Nautobot UI URL for one prefix record.
+
+    Mirrors the URL shape used by the ``link.argocd.argoproj.io/external-link``
+    annotation hand-authored on today's CRs: ``<nautobot_url>/ipam/prefixes/
+    <id>/``. Centralised here so every consumer (CR status, future tooling)
+    builds the same link the same way.
+    """
+    return f"{nautobot_url.rstrip('/')}/ipam/prefixes/{prefix_id}/"
 
 
 # ---------------------------------------------------------------------------
@@ -123,12 +152,14 @@ def load_nautobot_prefixes(
     client: Any,
     prefix_refs: list[dict[str, str]],
     *,
+    nautobot_url: str,
     require_location: str | None = None,
 ) -> list[NautobotPrefix]:
     """Load prefixes from Nautobot by id, filtered by *require_location*."""
     prefixes: list[NautobotPrefix] = []
     for ref in prefix_refs:
         prefix_id = ref["id"]
+        link = prefix_url(nautobot_url, prefix_id)
         query: dict[str, str] = {"id": prefix_id}
         if require_location:
             query["location"] = require_location
@@ -142,17 +173,21 @@ def load_nautobot_prefixes(
                     "(for example 'iad3-dev')"
                 ) from exc
             raise ConfigError(
-                f"Nautobot prefix lookup failed for id {prefix_id}: {exc}"
+                f"Nautobot prefix lookup failed for id {prefix_id} ({link}): {exc}"
             ) from exc
 
         if record is None:
             if require_location:
                 raise ConfigError(
-                    f"Nautobot prefix {prefix_id} was not found under "
+                    f"Nautobot prefix {prefix_id} ({link}) was not found under "
                     f"location {require_location!r}: it does not exist or is not "
-                    "associated with that location (spec.nautobot.require.location)"
+                    "associated with that location (spec.nautobot.require.location)",
+                    reason=PREFIX_NOT_FOUND_REASON,
                 )
-            raise ConfigError(f"Nautobot prefix {prefix_id} was not found")
+            raise ConfigError(
+                f"Nautobot prefix {prefix_id} ({link}) was not found",
+                reason=PREFIX_NOT_FOUND_REASON,
+            )
         prefixes.append(_prefix_from_record(record))
     return prefixes
 

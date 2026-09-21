@@ -50,13 +50,26 @@ def _pool(
 
 
 def _spec(**overrides: Any) -> dict[str, Any]:
-    """A spec already carrying the Nautobot-resolved prefixes and IP version."""
+    """A spec already carrying what nautobot.resolve_spec attaches.
+
+    ``prefixes``/``ip_version``/``nautobot_prefix_links`` are exactly the
+    fields the real resolver adds; ``_stub_nautobot`` below bypasses the
+    resolver itself but keeps its output contract.
+    """
     spec: dict[str, Any] = {
         "name": "pool-a",
         "project_id": "project-a",
         "address_scope": {"name": "scope-a"},
         "prefixes": ["10.0.0.0/8"],
         "ip_version": 4,
+        "nautobot_prefix_links": [
+            {
+                "id": "2bc3ecab-b6dc-46cd-9bd4-1c0ea8a07f87",
+                "cidr": "10.0.0.0/8",
+                "url": "https://nautobot.example.test/ipam/prefixes/"
+                "2bc3ecab-b6dc-46cd-9bd4-1c0ea8a07f87/",
+            }
+        ],
         "default_prefix_length": 24,
         "minimum_prefix_length": 24,
         "maximum_prefix_length": 28,
@@ -157,9 +170,9 @@ def test_sync_adopts_ansible_created_pool_without_shrinking():
     network.update_subnet_pool.return_value = updated
     conn = _conn(network)
 
-    notes = reconcile.sync_subnet_pool(conn, _spec(shared=True), "openstack", {})
+    result = reconcile.sync_subnet_pool(conn, _spec(shared=True), "openstack", {})
 
-    assert notes == []
+    assert result.notes == []
     update_kwargs = network.update_subnet_pool.call_args.kwargs
     assert update_kwargs["address_scope_id"] == "scope-id"
     assert "prefixes" not in update_kwargs  # unchanged, so not pushed
@@ -183,12 +196,35 @@ def test_sync_reports_note_and_keeps_prefixes_when_pool_would_shrink():
     conn = _conn(network)
 
     # Spec now only wants 10.0.0.0/8, dropping 192.0.2.0/24.
-    notes = reconcile.sync_subnet_pool(conn, _spec(prefixes=["10.0.0.0/8"]), "ns", {})
+    result = reconcile.sync_subnet_pool(conn, _spec(prefixes=["10.0.0.0/8"]), "ns", {})
 
-    assert len(notes) == 1
-    assert "192.0.2.0/24" in notes[0]
+    assert len(result.notes) == 1
+    assert "192.0.2.0/24" in result.notes[0]
     if network.update_subnet_pool.called:
         assert "prefixes" not in network.update_subnet_pool.call_args.kwargs
+
+
+def test_sync_subnet_pool_reports_resolved_prefix_links():
+    """nautobot_prefix_links on the resolved spec is surfaced verbatim."""
+    links = [
+        {
+            "id": "2bc3ecab-b6dc-46cd-9bd4-1c0ea8a07f87",
+            "cidr": "10.0.0.0/8",
+            "url": "https://nautobot.example.test/ipam/prefixes/"
+            "2bc3ecab-b6dc-46cd-9bd4-1c0ea8a07f87/",
+        }
+    ]
+    network = mock.MagicMock()
+    network.address_scopes.return_value = [_scope()]
+    network.subnet_pools.return_value = []
+    network.create_subnet_pool.return_value = _pool(tags=[])
+    conn = _conn(network)
+
+    result = reconcile.sync_subnet_pool(
+        conn, _spec(nautobot_prefix_links=links), "openstack", {}
+    )
+
+    assert result.extra_status == {"prefixes": links}
 
 
 def test_ensure_address_scope_by_id_uses_exact_lookup():

@@ -9,6 +9,7 @@ from typing import Any
 from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import HookConfig
 from openstack_sync.hooks.framework import PruneRequest
+from openstack_sync.hooks.framework import ReconcileResult
 from openstack_sync.hooks.framework import SyncPlugin
 from openstack_sync.hooks.framework import build_crd_hook_config
 from openstack_sync.hooks.framework import hook_enabled
@@ -43,7 +44,7 @@ class SubnetPoolPlugin(SyncPlugin):
 
     def reconcile(
         self, conn: Any, spec: dict[str, Any], cache: dict[str, Any]
-    ) -> list[str]:
+    ) -> ReconcileResult:
         namespace = self.config.namespace or pod_namespace()
         return reconcile_module.sync_subnet_pool(conn, spec, namespace, cache)
 

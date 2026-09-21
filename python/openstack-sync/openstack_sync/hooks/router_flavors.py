@@ -9,6 +9,7 @@ from typing import Any
 from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import HookConfig
 from openstack_sync.hooks.framework import PruneRequest
+from openstack_sync.hooks.framework import ReconcileResult
 from openstack_sync.hooks.framework import SyncPlugin
 from openstack_sync.hooks.framework import build_crd_hook_config
 from openstack_sync.hooks.framework import hook_enabled
@@ -42,8 +43,9 @@ class RouterFlavorPlugin(SyncPlugin):
 
     def reconcile(
         self, conn: Any, spec: dict[str, Any], cache: reconcile_module.ProfileCache
-    ) -> list[str]:
-        return reconcile_module.sync_flavor(conn, spec, cache)
+    ) -> ReconcileResult:
+        notes = reconcile_module.sync_flavor(conn, spec, cache)
+        return ReconcileResult(notes=notes)
 
     def prune_resources(self, conn: Any, request: PruneRequest) -> None:
         if self.cleanup_policy() is CleanupPolicy.BEST_EFFORT_PRUNE:

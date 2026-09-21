@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from typing import Any
+from typing import Protocol
 
 from openstack_sync.hooks.framework.contracts import CleanupPolicy
 from openstack_sync.hooks.framework.contracts import CredentialKey
@@ -15,10 +16,29 @@ from openstack_sync.hooks.framework.pruning import PruneResult
 from openstack_sync.hooks.framework.resources import _resource_key
 from openstack_sync.hooks.framework.resources import group_by_credentials
 from openstack_sync.hooks.framework.status import synced_message
+from openstack_sync.plugins.common import ConfigError
 
 LOG = logging.getLogger(__name__)
 
-PatchStatus = Callable[[SyncPlugin, SyncResource, str, str], None]
+
+class PatchStatus(Protocol):
+    """Patch one CR's status.
+
+    ``extra_status`` and ``reason`` default to None: a failed reconcile has
+    nothing extra to report, and reports the generic failure reason.
+    """
+
+    def __call__(
+        self,
+        plugin: SyncPlugin,
+        resource: SyncResource,
+        sync_status: str,
+        message: str,
+        extra_status: dict[str, Any] | None = None,
+        reason: str | None = None,
+    ) -> None: ...
+
+
 SyncLiveFinalizers = Callable[
     [SyncPlugin, list[SyncResource], CleanupPolicy],
     set[tuple[str | None, str | None]],
@@ -109,23 +129,31 @@ def run_sync(
 
         for resource in group:
             try:
-                notes = plugin.reconcile(conn, resource.spec, cache)
+                result = plugin.reconcile(conn, resource.spec, cache)
             except Exception as exc:  # noqa: BLE001
                 failed += 1
-                patch_status(plugin, resource, "Failed", str(exc))
+                patch_status(
+                    plugin, resource, "Failed", str(exc), reason=_failure_reason(exc)
+                )
                 LOG.error(
                     "Failed to reconcile %s %s: %s", noun, resource.display_name, exc
                 )
                 continue
 
-            if notes:
+            if result.notes:
                 LOG.warning(
                     "%s %s converged but needs manual action: %s",
                     noun.capitalize(),
                     resource.display_name,
-                    "; ".join(notes),
+                    "; ".join(result.notes),
                 )
-            patch_status(plugin, resource, "Synced", synced_message(noun, notes))
+            patch_status(
+                plugin,
+                resource,
+                "Synced",
+                synced_message(noun, result.notes),
+                extra_status=result.extra_status,
+            )
 
     if failed or unreadable:
         # Pruning deletes resources absent from the desired set. A CR that
@@ -173,3 +201,11 @@ def _fail_group(
 ) -> None:
     for resource in group:
         patch_status(plugin, resource, "Failed", message)
+
+
+def _failure_reason(exc: Exception) -> str | None:
+    """Return the reason a ConfigError names, or None for any other error."""
+    if not isinstance(exc, ConfigError):
+        return None
+    reason = exc.reason
+    return reason if isinstance(reason, str) and reason else None

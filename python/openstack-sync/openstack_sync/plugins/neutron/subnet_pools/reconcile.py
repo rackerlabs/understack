@@ -16,6 +16,7 @@ from typing import Any
 
 from openstack import exceptions as openstack_exceptions
 
+from openstack_sync.hooks.framework import ReconcileResult
 from openstack_sync.plugins.common import ConfigError
 from openstack_sync.plugins.common import get_value
 from openstack_sync.plugins.common import resource_id
@@ -438,11 +439,15 @@ def resolve_desired_names(specs: list[dict[str, Any]]) -> list[str]:
 
 def sync_subnet_pool(
     conn: Any, spec: dict[str, Any], namespace: str, cache: dict[str, Any]
-) -> list[str]:
+) -> ReconcileResult:
     """Converge one NeutronSubnetPool spec.
 
     Resolves the CR's Nautobot prefix references first, so *spec* need only
     carry the CRD fields; ``prefixes`` and ``ip_version`` are derived here.
+
+    Returns a :class:`ReconcileResult` whose ``extra_status`` carries the
+    resolved prefixes (id, CIDR, and Nautobot URL) under the ``prefixes`` key,
+    for the CRD's ``status.prefixes``.
     """
     resolved = nautobot_module.resolve_spec(spec, cache, namespace)
     name = resolved["name"]
@@ -490,4 +495,6 @@ def sync_subnet_pool(
         "Reconciled subnet pool: %s",
         json.dumps(render_subnet_pool(pool), sort_keys=True),
     )
-    return notes
+    return ReconcileResult(
+        notes=notes, extra_status={"prefixes": resolved["nautobot_prefix_links"]}
+    )
