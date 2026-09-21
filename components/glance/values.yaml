@@ -55,6 +55,8 @@ bootstrap:
   structured:
     images: null
 
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -68,6 +70,22 @@ dependencies:
         - glance-db-sync
         - glance-ks-user
         - glance-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+    bootstrap:
+      services:
+        - endpoint: internal
+          service: image
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
 
 pod:
   etcSources:
