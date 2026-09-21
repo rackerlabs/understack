@@ -310,6 +310,73 @@ refusal in one domain does not block safe work in the other. When `--apply`
 performs only the safe portion, the command verifies that work and exits `2`
 to report that part of the router remains unresolved.
 
+### net trunk audit
+
+```bash
+# Every baremetal trunk, or just one.
+kubectl us net trunk audit
+kubectl us net trunk audit <trunk-name-or-id>
+```
+
+Checks baremetal trunk subports against what neutron-understack now owns.
+ml2/ovn used to manage any trunk whose parent port had a `Logical_Switch_Port`,
+baremetal parents included -- their LSP is `type=external` only so OVN can
+schedule an HA chassis group, while the VLANs are programmed on the leaf switch
+by undersync. It left subports bound as `vif_type=ovs`.
+[LP #2167105](https://bugs.launchpad.net/neutron/+bug/2167105) stops it
+managing these trunks, but the state it already wrote stays behind.
+
+The subport's binding profile carries `parent_name` (the parent port) and `tag`
+(the segmentation ID), which neutron-understack writes because Nova reads them
+to put the VLAN link in `network_data.json`. ml2/ovn copies the same keys onto
+the subport's LSP as `parent_name`/`tag_request`; that is expected and neither
+audited nor changed.
+
+Trunks whose parent port is not baremetal are skipped -- ml2/ovn still owns
+those. Within a baremetal trunk, only ports already owned by
+`device_owner=trunk:subport` are migration targets. Ports with another semantic
+owner, including `network:router_interface` and `network:router_gateway`, are
+reported as skipped and left to that service. For each in-scope port the audit
+verifies:
+
+- the trunk's status matches its parent port: `ACTIVE` when the parent is
+  vif-attached with a `physical_network`, `DOWN` when it is unbound. A trunk
+  last touched before neutron-understack took over the status corrects itself
+  on its next successful Undersync reconciliation;
+- each in-scope subport's status matches the expected trunk status;
+- its `binding:vif_type` is `other` (bound to the switchport through its parent)
+  while the parent is bound, and `unbound` while it is not, so a leftover
+  `ovs` fails;
+- each subport's binding profile carries `parent_name` equal to the trunk's
+  parent port and `tag` equal to its segmentation ID.
+
+Any failed check produces a nonzero exit status.
+
+The audit changes nothing. Neutron policy reserves `binding:profile` for
+services, and `binding:vif_type` is not writable through the API, so the CLI
+cannot correct a subport itself. neutron-understack does it when the parent
+port's binding changes: it rewrites each subport's `parent_name`, `tag` and
+`vif_type`. When a subport's profile or `vif_type` has drifted, the audit prints
+the command that triggers this for the trunk's node, which is the parent port's
+`binding:host_id`:
+
+```bash
+openstack baremetal node service <node> \
+  --service-steps '[{"interface": "network", "step": "reattach_networking"}]'
+```
+
+Ironic's `reattach_networking` service step unbinds the parent (`binding:host_id`
+and `binding:profile` cleared) and rebinds it from the Ironic port's own
+records, without a reboot. The node must be `active`, and its network is down
+while the parent rebinds, so run it when that is acceptable. Ironic only touches
+the parent, so the neutron-understack that includes the binding handling must
+already be deployed. When the parent is unbound there is no node to reattach,
+and the subports are corrected when it is next bound. Run the audit again to
+confirm.
+
+Trunk and subport statuses are not settable through the Neutron API, and a
+mismatch names no command: a successful Undersync reconciliation corrects it.
+
 ### backup local
 
 ```bash
