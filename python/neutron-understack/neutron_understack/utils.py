@@ -1,6 +1,8 @@
 import logging
 import uuid
 from contextlib import contextmanager
+from types import SimpleNamespace
+from typing import NamedTuple
 
 from neutron.common.ovn import constants as ovn_const
 from neutron.db import models_v2
@@ -8,16 +10,21 @@ from neutron.objects import ports as port_obj
 from neutron.objects import trunk as trunk_obj
 from neutron.objects.network import NetworkSegment
 from neutron.objects.network_segment_range import NetworkSegmentRange
+from neutron.plugins.ml2 import models as models_ml2
 from neutron.plugins.ml2.driver_context import portbindings
+from neutron.services.trunk import models as trunk_models
 from neutron.services.trunk.plugin import TrunkPlugin
 from neutron_lib import constants
 from neutron_lib import constants as p_const
 from neutron_lib import context as n_context
 from neutron_lib.api.definitions import segment as segment_def
+from neutron_lib.db import api as db_api
 from neutron_lib.plugins import directory
 from neutron_lib.plugins import utils as plugin_utils
 from neutron_lib.plugins.ml2 import api
 from oslo_config import cfg
+from oslo_serialization import jsonutils
+from sqlalchemy import and_
 
 from neutron_understack.ironic import IronicClient
 from neutron_understack.ml2_type_annotations import NetworkSegmentDict
@@ -90,6 +97,175 @@ def get_admin_session():
 def update_port_fields(port_id: str, fields: dict) -> None:
     with get_admin_session() as session:
         session.query(models_v2.Port).filter_by(id=port_id).update(fields)
+
+
+def update_port_fields_if_owner(
+    session,
+    port_ids: list[str],
+    fields: dict,
+    current_owner: str,
+    include_unowned: bool = True,
+) -> list[str]:
+    """Update ports that are still owned by current_owner, or unowned.
+
+    Returns the ids of the ports it updated; any other port belongs to another
+    service and is left alone. Pass include_unowned=False to leave an unowned
+    port alone too.
+    """
+    owners = (current_owner, "") if include_unowned else (current_owner,)
+    owned = [
+        port_id
+        for (port_id,) in session.query(models_v2.Port.id)
+        .filter(
+            models_v2.Port.id.in_(port_ids),
+            models_v2.Port.device_owner.in_(owners),
+        )
+        .with_for_update()
+    ]
+    if owned:
+        session.query(models_v2.Port).filter(models_v2.Port.id.in_(owned)).update(
+            fields, synchronize_session=False
+        )
+    return owned
+
+
+class SubportTrunk(NamedTuple):
+    """What a subport's trunk says about it and about the trunk's parent port."""
+
+    parent_port_id: str
+    segmentation_id: int
+    # The parent's active binding, or None if it has none.
+    parent_binding: SimpleNamespace | None
+
+
+def fetch_subport_trunk(context, port_id: str) -> SubportTrunk | None:
+    """The trunk a port is a subport of, with its parent's active binding.
+
+    One query for just the columns needed: loading the Trunk object would also
+    load every one of its subports, and the parent Port object its bindings.
+    """
+    with db_api.CONTEXT_READER.using(context):
+        row = (
+            context.session.query(
+                trunk_models.Trunk.port_id,
+                trunk_models.SubPort.segmentation_id,
+                models_ml2.PortBinding.vnic_type,
+                models_ml2.PortBinding.vif_type,
+                models_ml2.PortBinding.profile,
+            )
+            .join(
+                trunk_models.SubPort,
+                trunk_models.SubPort.trunk_id == trunk_models.Trunk.id,
+            )
+            .outerjoin(
+                models_ml2.PortBinding,
+                and_(
+                    models_ml2.PortBinding.port_id == trunk_models.Trunk.port_id,
+                    models_ml2.PortBinding.status == constants.ACTIVE,
+                ),
+            )
+            .filter(trunk_models.SubPort.port_id == port_id)
+            .one_or_none()
+        )
+    if row is None:
+        return None
+    parent_binding = None
+    if row.vnic_type is not None:
+        parent_binding = SimpleNamespace(
+            vnic_type=row.vnic_type,
+            vif_type=row.vif_type,
+            profile=jsonutils.loads(row.profile) if row.profile else {},
+        )
+    return SubportTrunk(row.port_id, row.segmentation_id, parent_binding)
+
+
+def subports_in_state(
+    context,
+    parent_port_id: str,
+    segmentation_ids: dict[str, int],
+    owner: str,
+    status: str,
+    vif_type: str,
+) -> bool:
+    """Whether every subport already has the state claim_subports would write.
+
+    Two reads and no locks, so a trunk that is already right costs no writes.
+    segmentation_ids maps each subport's port id to its VLAN.
+    """
+    port_ids = list(segmentation_ids)
+    with db_api.CONTEXT_READER.using(context):
+        session = context.session
+        matching = (
+            session.query(models_v2.Port.id)
+            .filter(
+                models_v2.Port.id.in_(port_ids),
+                models_v2.Port.device_owner == owner,
+                models_v2.Port.status == status,
+            )
+            .count()
+        )
+        if matching != len(port_ids):
+            return False
+        bindings = _active_binding_rows(session, port_ids)
+        if len(bindings) != len(port_ids):
+            return False
+        for binding in bindings:
+            profile = jsonutils.loads(binding.profile) if binding.profile else {}
+            if (
+                binding.vif_type != vif_type
+                or profile.get("parent_name") != parent_port_id
+                or profile.get("tag") != int(segmentation_ids[binding.port_id])
+            ):
+                return False
+    return True
+
+
+def set_subports_trunk_binding(
+    session,
+    parent_port_id: str,
+    segmentation_ids: dict[str, int],
+    vif_type: str,
+) -> None:
+    """Record subports' parent, VLAN and vif_type on their active bindings.
+
+    segmentation_ids maps each subport's port id to its VLAN.
+
+    Nova builds the instance's VLAN link from the profile's parent_name and tag,
+    which ml2/ovn used to write. Written straight to the binding rows, like the
+    port fields above, so ml2/ovn is not re-entered to rewrite the subport's LSP.
+    """
+    for binding in _active_binding_rows(session, list(segmentation_ids)):
+        profile = jsonutils.loads(binding.profile) if binding.profile else {}
+        profile["parent_name"] = parent_port_id
+        profile["tag"] = int(segmentation_ids[binding.port_id])
+        binding.profile = jsonutils.dumps(profile)
+        binding.vif_type = vif_type
+
+
+def clear_subports_trunk_binding(session, port_ids: list[str]) -> None:
+    """Take parent_name and tag back off subports leaving their trunk."""
+    for binding in _active_binding_rows(session, port_ids):
+        profile = jsonutils.loads(binding.profile) if binding.profile else {}
+        profile.pop("parent_name", None)
+        profile.pop("tag", None)
+        binding.profile = jsonutils.dumps(profile)
+        binding.vif_type = portbindings.VIF_TYPE_UNBOUND
+
+
+def _active_binding_rows(session, port_ids: list[str]) -> list[models_ml2.PortBinding]:
+    """The ACTIVE binding of each port that has one, in a single query."""
+    by_port: dict[str, list[models_ml2.PortBinding]] = {}
+    for binding in session.query(models_ml2.PortBinding).filter(
+        models_ml2.PortBinding.port_id.in_(port_ids)
+    ):
+        by_port.setdefault(binding.port_id, []).append(binding)
+    active = (
+        plugin_utils.get_port_binding_by_status_and_host(
+            bindings, constants.ACTIVE, port_id=port_id
+        )
+        for port_id, bindings in by_port.items()
+    )
+    return [binding for binding in active if binding is not None]
 
 
 def clear_device_id_for_port(port_id: str) -> None:
@@ -480,14 +656,27 @@ def active_port_binding(port: port_obj.Port) -> port_obj.PortBinding | None:
     )
 
 
-def parent_port_is_bound(port: port_obj.Port) -> bool:
-    port_binding = active_port_binding(port)
+def binding_is_baremetal(binding) -> bool:
+    """Whether a port binding, or None, has VNIC_TYPE_BAREMETAL."""
+    return bool(binding and binding.vnic_type == portbindings.VNIC_BAREMETAL)
+
+
+def binding_is_bound(binding) -> bool:
+    """Whether a port binding, or None, is a baremetal one carried by a switchport."""
     return bool(
-        port_binding
-        and port_binding.vif_type == portbindings.VIF_TYPE_OTHER
-        and port_binding.vnic_type == portbindings.VNIC_BAREMETAL
-        and port_binding.profile
+        binding_is_baremetal(binding)
+        and binding.vif_type == portbindings.VIF_TYPE_OTHER
+        and binding.profile
     )
+
+
+def is_port_baremetal(port: port_obj.Port) -> bool:
+    """Whether this port's active binding is VNIC_TYPE_BAREMETAL."""
+    return binding_is_baremetal(active_port_binding(port))
+
+
+def parent_port_is_bound(port: port_obj.Port) -> bool:
+    return binding_is_bound(active_port_binding(port))
 
 
 def fetch_subport_network_id(subport_id: str) -> str:

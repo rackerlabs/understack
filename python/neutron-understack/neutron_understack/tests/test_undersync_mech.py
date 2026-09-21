@@ -1,4 +1,5 @@
 import logging
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -10,9 +11,11 @@ from neutron_lib.callbacks import events
 from neutron_lib.callbacks import priority_group
 from neutron_lib.callbacks import resources
 from neutron_lib.plugins.ml2 import api
+from neutron_lib.services.trunk import constants as trunk_consts
 
 from neutron_understack import undersync_mech
 from neutron_understack.undersync_mech import UndersyncDriver
+from neutron_understack.utils import SubportTrunk
 
 
 def _make_context(vnic_type=portbindings.VNIC_BAREMETAL, segments=None):
@@ -237,6 +240,7 @@ class TestInitialize:
         assert subscribed == {
             (resources.SUBPORTS, events.PRECOMMIT_DELETE),
             (resources.TRUNK, events.PRECOMMIT_DELETE),
+            (resources.TRUNK, events.AFTER_CREATE),
             (resources.SUBPORTS, events.AFTER_CREATE),
             (resources.SUBPORTS, events.AFTER_DELETE),
             (resources.TRUNK, events.AFTER_DELETE),
@@ -275,6 +279,187 @@ class TestInitialize:
 
 
 class TestUpdatePortPostcommit:
+    @pytest.fixture
+    def trunk_subport(self, mocker, port_context, trunk, subport):
+        """A baremetal trunk subport; returns its parent's active binding.
+
+        The parent starts out bound; tests unbind it by changing the binding.
+        """
+        port_context.current["device_owner"] = trunk_consts.TRUNK_SUBPORT_OWNER
+        port_context.current[portbindings.PROFILE] = {}
+        parent_binding = SimpleNamespace(
+            vnic_type=portbindings.VNIC_BAREMETAL,
+            vif_type=portbindings.VIF_TYPE_OTHER,
+            profile={"physical_network": "physnet"},
+        )
+        mocker.patch(
+            "neutron_understack.utils.fetch_subport_trunk",
+            return_value=SubportTrunk(
+                trunk.port_id, subport.segmentation_id, parent_binding
+            ),
+        )
+        return parent_binding
+
+    @pytest.fixture
+    def update_state(self, mocker):
+        return mocker.patch(
+            "neutron_understack.undersync_mech.trunk_driver.claim_subports"
+        )
+
+    def test_restores_a_subport_ml2_unbound_under_a_bound_parent(
+        self,
+        undersync_driver,
+        undersync_client,
+        port_context,
+        trunk_subport,
+        trunk,
+        subport,
+        update_state,
+    ):
+        port_context.current[portbindings.VIF_TYPE] = portbindings.VIF_TYPE_UNBOUND
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        update_state.assert_called_once_with(
+            trunk.port_id,
+            [
+                {
+                    "port_id": port_context.current["id"],
+                    "segmentation_id": subport.segmentation_id,
+                }
+            ],
+            trunk_consts.TRUNK_ACTIVE_STATUS,
+        )
+        undersync_client.sync.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "profile",
+        [
+            {},
+            {"parent_name": "someone-else", "tag": 200},
+            {"tag": 200},
+        ],
+    )
+    def test_restores_a_subport_whose_profile_lacks_the_parent_and_tag(
+        self,
+        undersync_driver,
+        port_context,
+        trunk_subport,
+        trunk,
+        subport,
+        update_state,
+        profile,
+    ):
+        port_context.current[portbindings.VIF_TYPE] = portbindings.VIF_TYPE_OTHER
+        port_context.current[portbindings.PROFILE] = {
+            **profile,
+            **({"tag": subport.segmentation_id} if profile == {"tag": 200} else {}),
+        }
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        update_state.assert_called_once_with(
+            trunk.port_id,
+            [
+                {
+                    "port_id": port_context.current["id"],
+                    "segmentation_id": subport.segmentation_id,
+                }
+            ],
+            trunk_consts.TRUNK_ACTIVE_STATUS,
+        )
+
+    def test_leaves_an_intact_subport_binding_alone(
+        self,
+        undersync_driver,
+        undersync_client,
+        port_context,
+        trunk_subport,
+        trunk,
+        subport,
+        update_state,
+    ):
+        port_context.current[portbindings.VIF_TYPE] = portbindings.VIF_TYPE_OTHER
+        port_context.current[portbindings.PROFILE] = {
+            "parent_name": trunk.port_id,
+            "tag": subport.segmentation_id,
+        }
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        update_state.assert_not_called()
+        undersync_client.sync.assert_not_called()
+
+    def test_a_subport_under_an_unbound_parent_stays_unbound(
+        self,
+        undersync_driver,
+        port_context,
+        trunk_subport,
+        trunk,
+        subport,
+        update_state,
+    ):
+        trunk_subport.vif_type = portbindings.VIF_TYPE_UNBOUND
+        port_context.current[portbindings.VIF_TYPE] = portbindings.VIF_TYPE_UNBOUND
+        port_context.current[portbindings.PROFILE] = {
+            "parent_name": trunk.port_id,
+            "tag": subport.segmentation_id,
+        }
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        update_state.assert_not_called()
+
+    def test_records_the_profile_of_a_subport_under_an_unbound_parent(
+        self,
+        undersync_driver,
+        port_context,
+        trunk_subport,
+        trunk,
+        subport,
+        update_state,
+    ):
+        trunk_subport.vif_type = portbindings.VIF_TYPE_UNBOUND
+        port_context.current[portbindings.VIF_TYPE] = portbindings.VIF_TYPE_UNBOUND
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        update_state.assert_called_once_with(
+            trunk.port_id,
+            [
+                {
+                    "port_id": port_context.current["id"],
+                    "segmentation_id": subport.segmentation_id,
+                }
+            ],
+            trunk_consts.TRUNK_DOWN_STATUS,
+        )
+
+    def test_ignores_a_port_another_service_owns(
+        self, mocker, undersync_driver, port_context, update_state
+    ):
+        port_context.current["device_owner"] = "network:router_interface"
+        lookup = mocker.patch("neutron_understack.utils.fetch_subport_trunk")
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        lookup.assert_not_called()
+        update_state.assert_not_called()
+
+    def test_ignores_a_subport_of_a_non_baremetal_parent(
+        self,
+        undersync_driver,
+        port_context,
+        trunk_subport,
+        update_state,
+    ):
+        trunk_subport.vnic_type = portbindings.VNIC_NORMAL
+        port_context.current[portbindings.VIF_TYPE] = portbindings.VIF_TYPE_UNBOUND
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        update_state.assert_not_called()
+
     def test_syncs_when_the_port_is_bound(
         self, undersync_driver, undersync_client, port_context
     ):
@@ -336,6 +521,76 @@ class TestUpdatePortPostcommit:
 
         undersync_client.sync.assert_not_called()
 
+    @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
+    def test_marks_a_bound_parent_trunk_active_after_sync(
+        self, mocker, undersync_driver, undersync_client, port_context, trunk
+    ):
+        lookup = mocker.patch(
+            "neutron_understack.undersync_mech.trunk_objects.Trunk.get_object",
+            return_value=trunk,
+        )
+        mocker.patch(
+            "neutron_understack.undersync_mech.trunk_driver.trunk_state_is_current",
+            return_value=False,
+        )
+        update = mocker.patch(
+            "neutron_understack.undersync_mech.trunk_driver.update_trunk_state"
+        )
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        undersync_client.sync.assert_called_once_with("physnet")
+        lookup.assert_called_once_with(
+            "plugin_context", id=port_context.current["trunk_details"]["trunk_id"]
+        )
+        update.assert_called_once_with(
+            trunk, trunk.sub_ports, trunk_consts.TRUNK_ACTIVE_STATUS
+        )
+
+    @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
+    def test_leaves_a_parent_trunk_alone_when_it_is_already_current(
+        self, mocker, undersync_driver, undersync_client, port_context, trunk
+    ):
+        mocker.patch(
+            "neutron_understack.undersync_mech.trunk_objects.Trunk.get_object",
+            return_value=trunk,
+        )
+        mocker.patch(
+            "neutron_understack.undersync_mech.trunk_driver.trunk_state_is_current",
+            return_value=True,
+        )
+        update = mocker.patch(
+            "neutron_understack.undersync_mech.trunk_driver.update_trunk_state"
+        )
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        undersync_client.sync.assert_called_once_with("physnet")
+        update.assert_not_called()
+
+    @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
+    def test_marks_an_unbound_parent_trunk_down_after_sync(
+        self, mocker, undersync_driver, port_context, trunk
+    ):
+        port_context._binding.vif_type = portbindings.VIF_TYPE_UNBOUND
+        mocker.patch(
+            "neutron_understack.undersync_mech.trunk_objects.Trunk.get_object",
+            return_value=trunk,
+        )
+        mocker.patch(
+            "neutron_understack.undersync_mech.trunk_driver.trunk_state_is_current",
+            return_value=False,
+        )
+        update = mocker.patch(
+            "neutron_understack.undersync_mech.trunk_driver.update_trunk_state"
+        )
+
+        undersync_driver.update_port_postcommit(port_context)
+
+        update.assert_called_once_with(
+            trunk, trunk.sub_ports, trunk_consts.TRUNK_DOWN_STATUS
+        )
+
 
 class TestDeletePortPostcommit:
     def test_syncs_the_ports_vlan_group(
@@ -373,22 +628,50 @@ class TestTrunkEventHandlers:
             "neutron_understack.utils.fetch_port_object", return_value=port_object
         )
 
+    @pytest.fixture
+    def state_update(self, mocker):
+        return mocker.patch(
+            "neutron_understack.undersync_mech.trunk_driver.update_trunk_state"
+        )
+
+    @staticmethod
+    def _payload(mocker, trunk):
+        return mocker.Mock(
+            states=[trunk, trunk], metadata={"subports": trunk.sub_ports}
+        )
+
     @pytest.mark.parametrize(
         "handler_name",
-        ["_subports_after_create", "_subports_after_delete", "_trunk_after_delete"],
+        [
+            "_trunk_after_create",
+            "_subports_after_create",
+            "_subports_after_delete",
+            "_trunk_after_delete",
+        ],
     )
     def test_syncs_the_parent_ports_vlan_group(
-        self, mocker, undersync_driver, undersync_client, trunk, handler_name
+        self,
+        mocker,
+        undersync_driver,
+        undersync_client,
+        trunk,
+        state_update,
+        handler_name,
     ):
         handler = getattr(undersync_driver, handler_name)
 
-        handler(None, None, None, mocker.Mock(states=[trunk]))
+        handler(None, None, None, self._payload(mocker, trunk))
 
         undersync_client.sync.assert_called_once_with("physnet")
 
     @pytest.mark.parametrize(
         "handler_name",
-        ["_subports_after_create", "_subports_after_delete", "_trunk_after_delete"],
+        [
+            "_trunk_after_create",
+            "_subports_after_create",
+            "_subports_after_delete",
+            "_trunk_after_delete",
+        ],
     )
     def test_does_not_sync_when_the_parent_port_is_unbound(
         self,
@@ -397,17 +680,18 @@ class TestTrunkEventHandlers:
         undersync_client,
         trunk,
         port_object,
+        state_update,
         handler_name,
     ):
         port_object.bindings[0].vif_type = portbindings.VIF_TYPE_UNBOUND
         handler = getattr(undersync_driver, handler_name)
 
-        handler(None, None, None, mocker.Mock(states=[trunk]))
+        handler(None, None, None, self._payload(mocker, trunk))
 
         undersync_client.sync.assert_not_called()
 
     def test_trunk_delete_without_subports_does_nothing(
-        self, mocker, undersync_driver, undersync_client, trunk
+        self, mocker, undersync_driver, undersync_client, trunk, state_update
     ):
         trunk.sub_ports = []
         fetch = mocker.patch(
@@ -425,17 +709,51 @@ class TestTrunkEventHandlers:
         "binding_profile", [{"physical_network": None}], indirect=True
     )
     def test_logs_instead_of_raising_when_the_physnet_is_missing(
-        self, mocker, caplog, undersync_driver, undersync_client, trunk
+        self,
+        mocker,
+        caplog,
+        undersync_driver,
+        undersync_client,
+        trunk,
+        state_update,
     ):
         """This runs postcommit, so raising would only surface as a 500."""
         caplog.set_level(logging.ERROR, logger=undersync_mech.LOG.name)
 
         undersync_driver._subports_after_delete(
-            None, None, None, mocker.Mock(states=[trunk])
+            None, None, None, self._payload(mocker, trunk)
         )
 
         assert "physical_network is required" in caplog.text
         undersync_client.sync.assert_not_called()
+
+    def test_trunk_becomes_active_only_after_sync_returns(
+        self, mocker, undersync_driver, undersync_client, trunk, state_update
+    ):
+        calls = []
+        undersync_client.sync.side_effect = lambda physnet: calls.append("sync")
+        state_update.side_effect = lambda *args: calls.append("state")
+
+        undersync_driver._trunk_after_create(
+            None, None, None, self._payload(mocker, trunk)
+        )
+
+        assert calls == ["sync", "state"]
+        state_update.assert_called_once_with(
+            trunk, trunk.sub_ports, trunk_consts.TRUNK_ACTIVE_STATUS
+        )
+
+    def test_trunk_stays_down_when_sync_raises(
+        self, mocker, undersync_driver, undersync_client, trunk, state_update
+    ):
+        undersync_client.sync.side_effect = RuntimeError("sync failed")
+
+        with pytest.raises(RuntimeError, match="sync failed"):
+            undersync_driver._trunk_after_create(
+                None, None, None, self._payload(mocker, trunk)
+            )
+
+        state_update.assert_not_called()
 
 
 class TestValidateParentPhysnet:

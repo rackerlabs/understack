@@ -109,12 +109,11 @@ class _UnderstackMl2ScenarioMixin:
             profile["physical_network"] = physnet
         return profile
 
-    def _bind_baremetal_port(self, net_id, physnet, host, fixed_ips=None):
-        """Create a baremetal port on the network and vif-attach it to physnet.
+    def _create_baremetal_port(self, net_id, fixed_ips=None):
+        """Create an unbound baremetal port on the network. Returns its id.
 
-        Returns the bound port's id. binding:host_id / binding:profile writes
-        require the service role under secure RBAC. Pass ``fixed_ips=[]`` to force
-        a port with no IP even on a subnetted network.
+        Pass ``fixed_ips=[]`` to force a port with no IP even on a subnetted
+        network.
         """
         create_kwargs = {portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL}
         if fixed_ips is not None:
@@ -127,7 +126,14 @@ class _UnderstackMl2ScenarioMixin:
             **create_kwargs,
         )
         assert res.status_int == 201, res.body
-        port_id = self.deserialize(self.fmt, res)["port"]["id"]
+        return self.deserialize(self.fmt, res)["port"]["id"]
+
+    def _vif_attach_port(self, port_id, physnet, host):
+        """vif-attach a port to a switch, as Ironic does on deploy.
+
+        binding:host_id / binding:profile writes require the service role under
+        secure RBAC.
+        """
         data = {
             "port": {
                 portbindings.HOST_ID: host,
@@ -136,6 +142,14 @@ class _UnderstackMl2ScenarioMixin:
         }
         req = self.new_update_request("ports", data, port_id, as_service=True)
         assert req.get_response(self.api).status_int == 200
+
+    def _bind_baremetal_port(self, net_id, physnet, host, fixed_ips=None):
+        """Create a baremetal port on the network and vif-attach it to physnet.
+
+        Returns the bound port's id.
+        """
+        port_id = self._create_baremetal_port(net_id, fixed_ips=fixed_ips)
+        self._vif_attach_port(port_id, physnet, host)
         return port_id
 
     def _trunk_subports(self, trunk_id):
