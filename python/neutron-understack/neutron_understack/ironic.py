@@ -1,7 +1,9 @@
 import importlib.metadata
 import logging
+from dataclasses import dataclass
 
 from openstack import connection
+from openstack import exceptions as sdk_exc
 from openstack.baremetal.baremetal_service import BaremetalService
 from openstack.baremetal.v1.node import Node as BaremetalNode
 from oslo_config import cfg
@@ -12,21 +14,15 @@ LOG = logging.getLogger(__name__)
 
 # Ironic provision-state targets (verbs) used by the netdev router flavor
 # lifecycle. available -> (manage) -> manageable -> (adopt) -> active on adopt;
-# manageable -> (provide) -> available to roll back a partial adoption; and
-# active -> (deleted/undeploy) -> available (triggering cleaning) on release.
+# and active -> (deleted/undeploy) -> available (triggering cleaning) on
+# release. Failed adoption/cleaning is recovered to manageable and parked.
 _PROVISION_MANAGE = "manage"
 _PROVISION_ADOPT = "adopt"
-_PROVISION_PROVIDE = "provide"
 _PROVISION_UNDEPLOY = "deleted"
 
-# Stable provision states (not verbs). We wait for adopt to reach "active"
-# explicitly rather than via set_node_provision_state(wait=True): the SDK's
-# EXPECTED_STATES maps the "adopt" verb to "available" (in
-# openstack/baremetal/v1/_common.py), which is wrong -- Ironic drives adopt to
-# "active" -- so the built-in wait would poll for the wrong state and time out.
-# https://review.opendev.org/c/openstack/openstacksdk/+/999686
-# Will remove this ones the changes gets raised
 _STATE_ACTIVE = "active"
+_STATE_ADOPT_FAILED = "adopt failed"
+_STATE_CLEAN_FAILED = "clean failed"
 _STATE_MANAGEABLE = "manageable"
 _STATE_AVAILABLE = "available"
 
@@ -35,11 +31,17 @@ _STATE_AVAILABLE = "available"
 # instantaneous, but we still bound the wait so an API worker cannot hang
 # forever on an unresponsive Ironic.
 _PROVISION_TIMEOUT = 300
+_RECONCILE_PROVISION_TIMEOUT = 60
+_PANOS_DRIVER = "panos"
+_ROUTER_RELEASE_MARKER = "understack_router_release"  # release is in progress
 
-# Ironic hardware type for network appliance devices. Router flavors only adopt
-# nodes of this driver, so a resource_class shared with other hardware types
-# (e.g. servers) cannot cause us to adopt the wrong node.
-_NETDEV_DRIVER = "netdev"
+
+@dataclass(frozen=True)
+class NodeReleaseResult:
+    """Outcome of looking up and releasing a router's Ironic node."""
+
+    node: BaremetalNode | None
+    released: bool
 
 
 class IronicClient:
@@ -79,40 +81,31 @@ class IronicClient:
     ) -> BaremetalNode | None:
         """Return the first available Ironic node with the given resource class.
 
-        Ironic filters server-side by ``driver=netdev``, ``resource_class``,
-        ``provision_state=available`` and not-in-maintenance, so any returned
-        node is a netdev appliance that is actually usable, in the interchangeable
-        pool for this flavor. Selection is first-match; there is no
-        scheduling/ranking.
-        (WIP circle back here , if there is any rule select netdev).
+        Select the first matching Palo Alto node, excluding maintenance,
+        instance associations and pending releases. No ranking is applied.
         """
-        try:
-            node = next(
-                self.irclient.nodes(
-                    driver=_NETDEV_DRIVER,
-                    resource_class=resource_class,
-                    provision_state="available",
-                    # Skip nodes an operator has parked in maintenance.
-                    # Ironic will still let us adopt such a node, so
-                    # without this filter we would silently put a router on
-                    # hardware that was deliberately taken out of service.
-                    is_maintenance=False,
-                    details=True,
-                )
-            )
-        except StopIteration:
+        for node in self.irclient.nodes(
+            driver=_PANOS_DRIVER,
+            resource_class=resource_class,
+            provision_state="available",
+            is_maintenance=False,
+            details=True,
+        ):
+            # Already claimed, or reserved by a release still cleaning up.
+            if node.instance_id or _ROUTER_RELEASE_MARKER in (node.extra or {}):
+                continue
             LOG.info(
-                "No available netdev node found for resource_class=%s",
+                "Selected available Palo Alto node %s (name=%s) for resource_class=%s",
+                node.id,
+                node.name,
                 resource_class,
             )
-            return None
+            return node
         LOG.info(
-            "Selected available netdev node %s (name=%s) for resource_class=%s",
-            node.id,
-            node.name,
+            "No available Palo Alto node found for resource_class=%s",
             resource_class,
         )
-        return node
+        return None
 
     def node_by_instance_uuid(self, instance_uuid: str) -> BaremetalNode | None:
         """Return the node currently adopted for the given instance UUID."""
@@ -120,6 +113,50 @@ class IronicClient:
             return next(self.irclient.nodes(instance_id=instance_uuid, details=True))
         except StopIteration:
             return None
+
+    def panos_reconcile_nodes(self) -> list[BaremetalNode]:
+        """Find bound nodes, and releases whose association was cleared.
+
+        Scoped by driver, so another ``netdev`` consumer's node is never a
+        candidate. A node whose stamp never landed is not discoverable here.
+        """
+        return [
+            node
+            for node in self.irclient.nodes(
+                driver=_PANOS_DRIVER,
+                is_maintenance=False,
+                details=True,
+            )
+            if self._is_router_reconcile_candidate(node)
+        ]
+
+    @staticmethod
+    def _is_router_reconcile_candidate(node: BaremetalNode) -> bool:
+        extra = node.extra or {}
+        if not isinstance(extra, dict):
+            return False
+        return bool(node.instance_id) or _ROUTER_RELEASE_MARKER in extra
+
+    @staticmethod
+    def router_id_for_release(node: BaremetalNode) -> str | None:
+        """Resolve ownership without authorizing a conflicting release marker."""
+        extra = node.extra or {}
+        if not isinstance(extra, dict):
+            return None
+        identities = []
+        marker = extra.get(_ROUTER_RELEASE_MARKER)
+        if _ROUTER_RELEASE_MARKER in extra:
+            if not isinstance(marker, str) or not marker:
+                return None
+            identities.append(marker)
+        instance_id = node.instance_id
+        if instance_id:
+            if not isinstance(instance_id, str):
+                return None
+            identities.append(instance_id)
+        if not identities or len(set(identities)) != 1:
+            return None
+        return identities[0]
 
     def attach_vif_to_node(self, node: str | BaremetalNode, vif_id: str) -> None:
         """Attach a Neutron port (VIF) to the node."""
@@ -155,6 +192,9 @@ class IronicClient:
         stamping ``lessee`` (owning project), ``instance_uuid`` (router UUID) and
         ``instance_name`` (router name). ``instance_name`` is a distinct field
         from the node's own ``name``, so the node's enrollment name is preserved.
+
+        Identity is stamped after manage; earlier failures need manual recovery.
+        Concurrent claims remain a separate concern.
         """
         node_id = node.id if isinstance(node, BaremetalNode) else node
         LOG.info(
@@ -167,10 +207,7 @@ class IronicClient:
         )
         try:
             # available -> manageable, required before the adopt verb is valid.
-            # Kept inside the try so a manage failure like the wait timing out
-            # after the node already reached manageable, or a concurrent create
-            # having claimed the node and is rolled back too, instead of stranding
-            # the node in manageable.
+            # Attempt identity-checked rollback if manage or a later step fails.
             managed = self.irclient.set_node_provision_state(
                 node, _PROVISION_MANAGE, wait=True, timeout=_PROVISION_TIMEOUT
             )
@@ -196,26 +233,20 @@ class IronicClient:
                 instance_id=router_id,
                 instance_name=router_name,
             )
-            # manageable -> active via adopt (no real deploy for netdev nodes).
-            # Issue with wait=False and wait explicitly for "active": the SDK's
-            # built-in wait for the "adopt" verb targets "available" (wrong).
             LOG.info("Node %s: adopt (manageable -> active)", node_id)
+            # Use wait=False: the SDK waits for available after adopt, not active.
+            # https://review.opendev.org/c/openstack/openstacksdk/+/999686
             self.irclient.set_node_provision_state(node, _PROVISION_ADOPT, wait=False)
             adopted = self.irclient.wait_for_nodes_provision_state(
                 [node], _STATE_ACTIVE, timeout=_PROVISION_TIMEOUT
             )[0]
         except Exception:
-            # Adopt was not confirmed. The node may be manageable (maybe stamped),
-            # still adopting, adopt-failed, or even active if the wait aborted
-            # after the transition completed. _return_node_to_available re-reads
-            # the state and picks the right recovery, then we re-raise so the
-            # caller aborts the router create.
             LOG.warning(
                 "Adoption of node %s for router %s failed; rolling back to available",
                 node_id,
                 router_id,
             )
-            self._return_node_to_available(node)
+            self._return_node_to_available(node_id, router_id)
             raise
         LOG.info(
             "Node %s adopted for router %s: provision_state=%s lessee=%s "
@@ -228,99 +259,190 @@ class IronicClient:
             adopted.instance_name,
         )
 
-    def _return_node_to_available(self, node: str | BaremetalNode) -> None:
-        """Return a node to the available pool from whatever state it is in.
+    def _return_node_to_available(
+        self,
+        node: str | BaremetalNode,
+        router_id: str,
+        *,
+        timeout: int = _PROVISION_TIMEOUT,
+    ) -> bool:
+        """Best-effort release, keeping the node discoverable until it is clean.
 
-        Re-reads the node's current provision state and picks the correct verb,
-        because this runs both as adopt rollback (where a timed-out or aborted
-        adopt may have left the node ``manageable``, ``active`` or in a failure
-        state) and as normal release. Best-effort and guarded so it never masks
-        a caller's original error:
-
-        * ``available``  -> just clear any stale ownership stamps;
-        * ``manageable`` -> clear our ownership stamps, then ``provide``;
-        * ``active``     -> ``undeploy`` (triggers cleaning), then clear ownership
-          -- undeploy tears down instance_uuid/instance_name but NOT lessee;
-        * anything else (e.g. ``adopt failed``, ``adopting``) -> leave for
-          reconciliation rather than issue an invalid transition.
+        Marks before transitioning, since undeploy clears the instance fields
+        even when it fails. Acts only on a node whose router identity still
+        matches, so a failed create cannot undo another one's work. A healthy
+        active release ends in ``available``; a failed transition parks in
+        ``manageable``.
         """
         try:
-            node = self.irclient.get_node(node)
-        except Exception:
-            LOG.exception("Could not fetch node to return it to available")
-            return
-        node_id = node.id
-        state = node.provision_state
+            current = self.irclient.get_node(node)
+            if current is None:
+                return True
+            if current.driver != _PANOS_DRIVER or current.is_maintenance:
+                return False
+            extra = current.extra or {}
+            if self.router_id_for_release(current) != router_id:
+                LOG.warning(
+                    "Node %s no longer belongs to router %s", current.id, router_id
+                )
+                return False
+            state = current.provision_state
+            targets = {
+                _STATE_ADOPT_FAILED: _PROVISION_MANAGE,
+                _STATE_CLEAN_FAILED: _PROVISION_MANAGE,
+                _STATE_ACTIVE: _PROVISION_UNDEPLOY,
+                # Ironic's failed undeploy enters error; deleted retries it.
+                "error": _PROVISION_UNDEPLOY,
+            }
+            # Parked in manageable: identity cleared, but kept out of the
+            # pool so a node that just failed a transition is not reused.
+            park_manageable = state in {
+                _STATE_MANAGEABLE,
+                _STATE_ADOPT_FAILED,
+                _STATE_CLEAN_FAILED,
+            }
+            if (
+                state != _STATE_AVAILABLE
+                and state != _STATE_MANAGEABLE
+                and state not in targets
+            ):
+                LOG.warning(
+                    "Node %s is in state %s; deferring release for router %s",
+                    current.id,
+                    state,
+                    router_id,
+                )
+                return False
 
-        if state == _STATE_AVAILABLE:
-            # Already available, but may still carry a lessee from a prior
-            # adoption (undeploy does not clear it); make sure it is truly free.
-            self._clear_ownership(node, node_id)
-        elif state == _STATE_MANAGEABLE:
-            LOG.info("Returning node %s to available (clear stamps + provide)", node_id)
-            self._clear_ownership(node, node_id)
-            self._guarded_provision(node, _PROVISION_PROVIDE, node_id)
-        elif state == _STATE_ACTIVE:
-            LOG.info("Returning node %s to available (undeploy)", node_id)
-            self._guarded_provision(node, _PROVISION_UNDEPLOY, node_id)
-            # undeploy clears instance_uuid/instance_name but leaves lessee, so
-            # the node would rejoin the pool still leased to the deleted router's
-            # project. Clear ownership explicitly.
-            self._clear_ownership(node, node_id)
-        else:
-            LOG.warning(
-                "Node %s is in state %s; cannot auto-return it to available, "
-                "leaving for reconciliation",
-                node_id,
-                state,
+            if _ROUTER_RELEASE_MARKER not in extra:
+                marker_patch = (
+                    {
+                        "op": "add",
+                        "path": f"/extra/{_ROUTER_RELEASE_MARKER}",
+                        "value": router_id,
+                    }
+                    if isinstance(current.extra, dict)
+                    else {
+                        "op": "add",
+                        "path": "/extra",
+                        "value": {_ROUTER_RELEASE_MARKER: router_id},
+                    }
+                )
+                self.irclient.patch_node(
+                    current,
+                    [marker_patch],
+                    retry_on_conflict=False,
+                )
+            # Re-read: the marker patch and the provision transition lock
+            # independently, and nothing binds the two atomically. (Ironic's
+            # conductor does guard instance_uuid against overwrite, but that
+            # protects a different field than this.)
+            current = self.irclient.get_node(current.id)
+            if not self._release_matches(current, router_id):
+                return False
+            if current.provision_state != state:
+                return False
+
+            # One transition for most states; ``adopt failed`` and
+            # ``clean failed`` need manage first. Bounded so an unexpected
+            # state cannot spin an API worker.
+            for _step in range(2):
+                state = current.provision_state
+                if state == _STATE_AVAILABLE:
+                    break
+                if state in {_STATE_ADOPT_FAILED, _STATE_CLEAN_FAILED}:
+                    park_manageable = True
+                if state == _STATE_MANAGEABLE:
+                    park_manageable = True
+                    break
+                target = targets.get(state)
+                if target is None:
+                    LOG.warning(
+                        "Node %s moved to state %s while releasing router %s; "
+                        "deferring",
+                        current.id,
+                        state,
+                        router_id,
+                    )
+                    return False
+                self.irclient.set_node_provision_state(
+                    current, target, wait=True, timeout=timeout
+                )
+                current = self.irclient.get_node(current.id)
+                if not self._release_matches(current, router_id):
+                    return False
+            final_state = _STATE_MANAGEABLE if park_manageable else _STATE_AVAILABLE
+            if current.provision_state != final_state or not self._release_matches(
+                current, router_id
+            ):
+                return False
+            # One patch, touching only our own keys.
+            cleanup_patch = [
+                {"op": "add", "path": "/lessee", "value": None},
+                {"op": "add", "path": "/instance_uuid", "value": None},
+                {"op": "add", "path": "/instance_name", "value": None},
+            ]
+            cleanup_patch.append(
+                {"op": "remove", "path": f"/extra/{_ROUTER_RELEASE_MARKER}"}
             )
-
-    def _clear_ownership(self, node: BaremetalNode, node_id: str) -> None:
-        """Clear lessee + instance association so the node rejoins the pool free."""
-        try:
-            self.irclient.update_node(
-                node,
+            self.irclient.patch_node(
+                current,
+                cleanup_patch,
                 retry_on_conflict=False,
-                lessee=None,
-                instance_id=None,
-                instance_name=None,
             )
-            LOG.info("Cleared ownership stamps on node %s", node_id)
-        except Exception:
-            LOG.exception("Failed to clear ownership on node %s", node_id)
-
-    def _guarded_provision(
-        self, node: BaremetalNode, target: str, node_id: str
-    ) -> None:
-        """Drive a provision-state transition, logging (not raising) on failure."""
-        try:
-            self.irclient.set_node_provision_state(
-                node, target, wait=True, timeout=_PROVISION_TIMEOUT
+            current = self.irclient.get_node(current.id)
+            return (
+                current.provision_state == final_state
+                and not current.instance_id
+                and not current.instance_name
+                and not current.lessee
+                and _ROUTER_RELEASE_MARKER not in (current.extra or {})
             )
-            LOG.info("Node %s reached available via %s", node_id, target)
+        except sdk_exc.NotFoundException:
+            # A removed Ironic node has nothing left to release.
+            return True
         except Exception:
             LOG.exception(
-                "Failed to return node %s to available via %s; manual cleanup "
-                "may be required",
-                node_id,
-                target,
+                "Failed to release node %s for router %s; will retry", node, router_id
             )
+            return False
 
-    def release_node_for_router(self, router_id: str) -> BaremetalNode | None:
-        """Return the router's node to the available pool, whatever its state.
+    def _release_matches(self, node: BaremetalNode | None, router_id: str) -> bool:
+        if node is None:
+            return False
+        extra = node.extra or {}
+        if not isinstance(extra, dict):
+            return False
+        return (
+            node.driver == _PANOS_DRIVER
+            and not node.is_maintenance
+            and self.router_id_for_release(node) == router_id
+            and extra.get(_ROUTER_RELEASE_MARKER) == router_id
+        )
+
+    def release_orphan_node(self, node_id: str, router_id: str) -> bool:
+        """Release the exact confirmed orphan, returning cleanup completion."""
+        return self._return_node_to_available(
+            node_id, router_id, timeout=_RECONCILE_PROVISION_TIMEOUT
+        )
+
+    def release_node_for_router(self, router_id: str) -> NodeReleaseResult:
+        """Release the router's node and clear its ownership, whatever its state.
 
         A fully adopted node is ``active`` and is undeployed (triggering
-        cleaning); other states are handled by ``_return_node_to_available``.
-        Returns the node, or None if none is bound to this router.
+        cleaning); failed or already manageable nodes are parked in
+        ``manageable`` after ownership cleanup.
         """
         node = self.node_by_instance_uuid(router_id)
         if node is None:
-            return None
+            return NodeReleaseResult(node=None, released=False)
         LOG.info(
             "Releasing node %s bound to router %s (current provision_state=%s)",
             node.id,
             router_id,
             node.provision_state,
         )
-        self._return_node_to_available(node)
-        return node
+        return NodeReleaseResult(
+            node=node,
+            released=self._return_node_to_available(node, router_id),
+        )

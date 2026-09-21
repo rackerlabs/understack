@@ -235,7 +235,6 @@ class PaloAlto(base.L3ServiceProvider):
             )
             return existing[0]
         LOG.info("Creating shared anchor network %s", ANCHOR_NETWORK_NAME)
-        # Not using API,coz _process_router_create runs as a callback inside the
         # Calling the core plugin directly (not via the REST API) skips the
         # API layer that fills in extension-attribute defaults, so we must
         # supply them ourselves. project_id (ownership) and router:external
@@ -790,8 +789,8 @@ class PaloAlto(base.L3ServiceProvider):
             resource_class,
         )
 
-    # avoiding Before_delete coz It fires before the "router in use" check
-    # releases node for a router that did not get deleted
+    # Use AFTER_DELETE: BEFORE_DELETE precedes the router-in-use check and
+    # could release the node even when deletion is rejected.
     @registry.receives(resources.ROUTER, [events.AFTER_DELETE])
     def _process_router_delete(self, resource, event, trigger, payload=None):
         router = payload.states[0]
@@ -799,18 +798,26 @@ class PaloAlto(base.L3ServiceProvider):
         if not self._is_palo_alto_provider(context, router):
             return
 
-        node = self._ironic.release_node_for_router(router["id"])
-        if node is None:
+        result = self._ironic.release_node_for_router(router["id"])
+        if result.node is None:
             LOG.warning(
                 "Palo Alto router %s deleted but no adopted Ironic node was "
                 "found to release",
                 router["id"],
             )
             return
+        if not result.released:
+            LOG.warning(
+                "Release of Ironic node %s from deleted Palo Alto router %s "
+                "is incomplete; reconciliation will retry it",
+                result.node.id,
+                router["id"],
+            )
+            return
         LOG.info(
-            "Released Ironic node %s from deleted Palo Alto router %s "
-            "(active -> available, cleaning triggered)",
-            node.id,
+            "Released Ironic node %s from deleted Palo Alto router %s; "
+            "ownership cleanup completed",
+            result.node.id,
             router["id"],
         )
 
