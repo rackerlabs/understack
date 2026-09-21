@@ -56,6 +56,8 @@ network:
   use_external_ingress_controller: true
 
 # (nicholas.kuechler) updating the jobs list to remove the 'horizon-db-init' job.
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -64,6 +66,12 @@ dependencies:
   static:
     db_sync:
       jobs:
+    dashboard:
+      services:
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: oslo_db
 
 manifests:
   job_db_init: false
