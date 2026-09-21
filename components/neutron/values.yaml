@@ -162,6 +162,8 @@ pod:
 
 
 # (nicholas.kuechler) updating the jobs list to remove the 'neutron-rabbit-init' job.
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -185,17 +187,62 @@ dependencies:
         - neutron-db-sync
         - neutron-ks-user
         - neutron-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
     rpc_server:
       jobs:
         - neutron-db-sync
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
     ovn_maintenance_worker:
       jobs:
         - neutron-db-sync
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+    periodic_worker:
+      jobs:
+        - neutron-db-sync
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
     ironic_agent:
       jobs:
         - neutron-db-sync
         - neutron-ks-user
         - neutron-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
 
 manifests:
   job_db_init: false
