@@ -180,6 +180,8 @@ pod:
       requests:
         memory: "256Mi"
 
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -194,8 +196,6 @@ dependencies:
       services:
         - endpoint: internal
           service: oslo_db
-        - endpoint: internal
-          service: identity
     db_sync:
       jobs:
     backup:
@@ -203,26 +203,50 @@ dependencies:
         - cinder-db-sync
         - cinder-ks-user
         - cinder-ks-endpoints
+      services:
+        - endpoint: internal
+          service: volumev3
     db_purge:
       jobs:
         - cinder-db-sync
         - cinder-ks-user
         - cinder-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
     scheduler:
       jobs:
         - cinder-db-sync
         - cinder-ks-user
         - cinder-ks-endpoints
+      services:
+        - endpoint: internal
+          service: volumev3
     volume:
       jobs:
         - cinder-db-sync
         - cinder-ks-user
         - cinder-ks-endpoints
+      services:
+        - endpoint: internal
+          service: volumev3
     volume_usage_audit:
       jobs:
         - cinder-db-sync
         - cinder-ks-user
         - cinder-ks-endpoints
+      services:
+        - endpoint: internal
+          service: volumev3
+    create_internal_tenant:
+      services: []
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
 
 manifests:
   job_backup_storage_init: false
