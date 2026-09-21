@@ -87,6 +87,20 @@ conf:
       default_availability_zones: ""
       # add 50 to the max MTU we want of 9000 to handle Neutron's -50 for VXLAN type
       global_physnet_mtu: 9050
+    l2vni:
+      # networking-baremetal ships an L2VNI trunk reconciler that manages
+      # trunk subports for network nodes off OVN ha_chassis_group membership.
+      # We do not use it, neutron-understack owns baremetal VLAN binding here.
+      # Both flags have to be off: the agent initializes the trunk manager if
+      # either one is set, and the event-driven path reconciles on every OVN
+      # localnet port change regardless of the periodic flag.
+      enable_l2vni_trunk_reconciliation: false
+      enable_l2vni_trunk_reconciliation_events: false
+      # Only read when the reconciler above is turned back on. It defaults to
+      # 'geneve', which is not in our ml2 type_drivers, so creating the anchor
+      # networks fails outright instead of falling back. 'vxlan' is the only
+      # other accepted value.
+      l2vni_subport_anchor_network_type: "vxlan"
     oslo_messaging_notifications:
       driver: messagingv2
     oslo_messaging_rabbit:
