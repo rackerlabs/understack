@@ -274,9 +274,6 @@ manifests:
   # neutron-ironic-agent cannot register without it.
   deployment_rpc_server: true
   deployment_ovn_maintenance_worker: true
-  # The janitor only needs the OVN maintenance worker. The chart enables the
-  # generic periodic worker by default; disable it.
-  deployment_periodic_worker: false
   daemonset_sriov_agent: false
   daemonset_l2gw_agent: false
   daemonset_bagpipe_bgp: false
