@@ -445,9 +445,9 @@ def test_available_node_steps_down_before_metadata_patch(mocker):
         return -1
 
     manage_idx = first_index(
-        lambda c: c[0] == "node.set_provision_state"
-        and len(c[1]) > 1
-        and c[1][1] == "manage"
+        lambda c: (
+            c[0] == "node.set_provision_state" and len(c[1]) > 1 and c[1][1] == "manage"
+        )
     )
     metadata_idx = first_index(lambda c: c[0] == "node.update")
 
@@ -521,11 +521,94 @@ def test_enroll_fails_on_existing_node_with_other_driver(mocker):
         return_value=fake_ironic,
     )
 
-    with pytest.raises(RuntimeError, match="refusing to enroll it as a netdev"):
+    with pytest.raises(RuntimeError, match="refusing to enroll it as 'netdev'"):
         netdev_reconciler.enroll(**ENROLL_ARGS)
 
     fake_ironic.node.create.assert_not_called()
     fake_ironic.port.create.assert_not_called()
+
+
+def test_enroll_defaults_to_the_netdev_driver(mocker):
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS)
+
+    node_data = fake_ironic.node.create.call_args.kwargs
+    assert node_data["driver"] == "netdev"
+
+
+def test_enroll_creates_the_node_with_the_requested_driver(mocker):
+    # The caller that knows it is enrolling a specific appliance passes its
+    # own hardware type, so the node is identifiable from the driver alone.
+    fake_ironic, _ = make_ironic_client()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, driver="paloalto")
+
+    node_data = fake_ironic.node.create.call_args.kwargs
+    assert node_data["driver"] == "paloalto"
+
+
+@pytest.mark.parametrize(
+    ("existing_driver", "requested_driver"),
+    [("netdev", "paloalto"), ("paloalto", "netdev")],
+)
+def test_enroll_refuses_to_re_enrol_a_node_as_a_different_driver(
+    mocker, existing_driver, requested_driver
+):
+    # A node enrolled as one hardware type must not be silently switched to
+    # another; changing a driver is a deliberate operator action.
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = SimpleNamespace(
+        uuid="node-123", driver=existing_driver, provision_state="available"
+    )
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    with pytest.raises(
+        RuntimeError, match=f"refusing to enroll it as '{requested_driver}'"
+    ):
+        netdev_reconciler.enroll(**ENROLL_ARGS, driver=requested_driver)
+
+    fake_ironic.node.create.assert_not_called()
+    fake_ironic.node.update.assert_not_called()
+    fake_ironic.node.set_provision_state.assert_not_called()
+    fake_ironic.port.create.assert_not_called()
+    fake_ironic.port.update.assert_not_called()
+
+
+def test_enroll_reuses_a_node_already_on_the_requested_driver(mocker):
+    fake_ironic, _ = make_ironic_client()
+    fake_ironic.node.get.side_effect = None
+    fake_ironic.node.get.return_value = SimpleNamespace(
+        uuid="node-123",
+        driver="paloalto",
+        provision_state="available",
+        resource_class="generic",
+    )
+    fake_ironic.port.list.return_value = matching_ports()
+    mocker.patch(
+        "understack_workflows.ironic.client.get_ironic_client",
+        return_value=fake_ironic,
+    )
+
+    netdev_reconciler.enroll(**ENROLL_ARGS, driver="paloalto")
+
+    fake_ironic.node.create.assert_not_called()
+    fake_ironic.node.update.assert_not_called()
+    fake_ironic.node.set_provision_state.assert_not_called()
+    fake_ironic.port.create.assert_not_called()
+    fake_ironic.port.update.assert_not_called()
 
 
 def test_enroll_fails_on_node_in_unexpected_state(mocker):
