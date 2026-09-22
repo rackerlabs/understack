@@ -122,6 +122,8 @@ bootstrap:
 
 # (nicholas.kuechler) Using custom dependencies in order to
 # prevent the nova-db-init and nova-rabbit-init jobs from running
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -133,19 +135,47 @@ dependencies:
         - nova-db-sync
         - nova-ks-user
         - nova-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_db
     api_metadata:
       jobs:
         - nova-db-sync
         - nova-ks-user
         - nova-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_db
+    bootstrap:
+      services:
+        - endpoint: internal
+          service: compute
     cell_setup:
       jobs:
         - nova-db-sync
       # remove default dependency to run on the same node as a compute service
       pod: []
+      services:
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: compute
     service_cleaner:
       jobs:
         - nova-db-sync
+      services:
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: compute
     compute:
       pod: []
       jobs:
@@ -166,6 +196,13 @@ dependencies:
     conductor:
       jobs:
         - nova-db-sync
+      services:
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: compute
     archive_deleted_rows:
       jobs:
         - nova-db-sync
@@ -174,6 +211,20 @@ dependencies:
     scheduler:
       jobs:
         - nova-db-sync
+      services:
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: compute
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
 
 pod:
   etcSources:

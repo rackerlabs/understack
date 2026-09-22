@@ -55,6 +55,8 @@ conf:
     oslo_messaging_rabbit:
       amqp_durable_queues: true
 
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -66,6 +68,17 @@ dependencies:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
     driver_agent:
       jobs:
         - octavia-db-sync
@@ -76,18 +89,64 @@ dependencies:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
+        - endpoint: internal
+          service: load_balancer
     housekeeping:
       jobs:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
+        - endpoint: internal
+          service: load_balancer
     health_manager:
       jobs:
         - octavia-db-sync
         - octavia-ks-user
         - octavia-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_db_persistence
+        - endpoint: internal
+          service: oslo_messaging
+        - endpoint: internal
+          service: oslo_cache
+        - endpoint: internal
+          service: network
+        - endpoint: internal
+          service: load_balancer
     db_sync:
       jobs:
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
 
 pod:
   mounts:

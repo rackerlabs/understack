@@ -178,6 +178,8 @@ network:
   # by OpenStack Helm
   use_external_ingress_controller: true
 
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -209,6 +211,11 @@ dependencies:
         - ironic-db-sync
         - ironic-ks-user
         - ironic-ks-endpoints
+      services:
+        - endpoint: internal
+          service: oslo_db
+        - endpoint: internal
+          service: oslo_messaging
     # (nicholas.kuechler) The upstream helm values have ironic-db-init
     # as a dependency for db_sync, but we have job_db_init false so
     # ironic-db-init never gets created, and this dependency won't pass.
@@ -216,6 +223,13 @@ dependencies:
     # https://opendev.org/openstack/openstack-helm/src/branch/master/ironic/values.yaml#L310-L312
     db_sync:
       jobs:
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
 
 manifests:
   job_db_init: false

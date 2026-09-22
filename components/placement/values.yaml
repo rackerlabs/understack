@@ -19,6 +19,8 @@ network:
   use_external_ingress_controller: true
 
 # (nicholas.kuechler) updating the jobs list to remove the 'placement-db-init' job.
+# (doug.goldstein) removed the 'identity' service dependency from all components,
+#   it is unused (the service) and other jobs wait on keystone working anyway.
 dependencies:
   dynamic:
     common:
@@ -27,6 +29,13 @@ dependencies:
   static:
     db_sync:
       jobs:
+    ks_endpoints:
+      services: []
+    ks_service:
+      services: []
+    ks_user:
+      services: []
+
 
 pod:
   etcSources:
