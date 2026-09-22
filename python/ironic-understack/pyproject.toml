@@ -28,6 +28,7 @@ chassis_model = "ironic_understack.hooks.inspect_hook_chassis_model:InspectHookC
 
 [project.entry-points."ironic.hardware.types"]
 netdev = "ironic_understack.drivers.netdev_hardware:NetdevHardware"
+paloalto = "ironic_understack.drivers.paloalto_hardware:PaloAltoHardware"
 
 [project.entry-points."ironic.hardware.interfaces.inspect"]
 redfish-understack = "ironic_understack.drivers.redfish_inspect_understack:UnderstackRedfishInspect"
