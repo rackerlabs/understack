@@ -31,7 +31,7 @@ FW_FIELDS: dict[str, Any] = {
 
 def _node(
     *,
-    driver: str = "netdev",
+    driver: str = "paloalto",
     resource_class: str = "pa1410",
     provision_state: str = "active",
     driver_info: dict | None = None,
@@ -103,6 +103,7 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
         physical_network="f20-1-network",
         ports=BASE_ARGS["ports"],
         resource_class="pa1410",
+        driver="paloalto",
         external_cmdb_id=None,
         driver_info={
             "management_ip": "10.15.149.46",
@@ -132,6 +133,27 @@ def test_enroll_fw_optional_fw_fields_can_be_omitted(mocker):
         "management_switch_port": "Ethernet1/24",
     }
     assert kwargs["extra"] == {}
+
+
+def test_enroll_fw_passes_explicit_legacy_driver_to_engine(mocker):
+    _mock_client(mocker, node=None)
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, driver="netdev")
+
+    assert engine.call_args.kwargs["driver"] == "netdev"
+
+
+@pytest.mark.parametrize("driver", ["", "   "])
+def test_enroll_fw_rejects_blank_driver_before_ironic_calls(mocker, driver):
+    client = mocker.patch.object(enroll_fw, "IronicClient")
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    with pytest.raises(ValueError, match="non-empty --driver"):
+        enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, driver=driver)
+
+    client.assert_not_called()
+    engine.assert_not_called()
 
 
 def test_existing_non_active_node_delegates_to_engine(mocker):
@@ -268,16 +290,33 @@ def test_active_node_rejects_missing_port(mocker):
     client.update_node.assert_not_called()
 
 
-def test_active_node_rejects_non_netdev_driver(mocker):
+@pytest.mark.parametrize("driver", ["ipmi", "netdev"])
+def test_active_node_rejects_different_driver(mocker, driver):
     client = _mock_client(
-        mocker, node=_node(driver="ipmi"), node_ports=[_actual_port()]
+        mocker, node=_node(driver=driver), node_ports=[_actual_port()]
     )
     mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
 
-    with pytest.raises(RuntimeError, match="non-netdev"):
+    with pytest.raises(RuntimeError, match="refusing to enroll it as 'paloalto'"):
         enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
     client.update_node.assert_not_called()
+
+
+def test_active_legacy_node_updates_metadata_with_explicit_matching_driver(mocker):
+    client = _mock_client(
+        mocker, node=_node(driver="netdev"), node_ports=[_actual_port()]
+    )
+    engine = mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
+
+    enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS, driver="netdev")
+
+    engine.assert_not_called()
+    client.update_node.assert_called_once()
+    paths = _patch_paths(client.update_node.call_args)
+    assert paths["/driver_info/management_ip"] == "10.15.149.46"
+    assert "/driver" not in paths
+    client.set_node_provision_state.assert_not_called()
 
 
 def test_active_node_rejects_resource_class_change(mocker):
@@ -293,6 +332,37 @@ def test_active_node_rejects_resource_class_change(mocker):
 
 
 # --- argument parsing -------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("driver_args", "expected"), [([], "paloalto"), (["--driver", "netdev"], "netdev")]
+)
+def test_main_passes_default_or_explicit_driver(mocker, driver_args, expected):
+    engine = mocker.patch.object(enroll_fw, "enroll_fw")
+    mocker.patch.object(enroll_fw.helpers, "setup_logger")
+    mocker.patch(
+        "sys.argv",
+        [
+            "enroll-fw",
+            "--name",
+            "fw1",
+            "--physical-network",
+            "net",
+            "--ports",
+            "[]",
+            "--resource-class",
+            "pa1410",
+            "--management-switch",
+            "switch1",
+            "--management-switch-port",
+            "eth1",
+            *driver_args,
+        ],
+    )
+
+    enroll_fw.main()
+
+    assert engine.call_args.kwargs["driver"] == expected
 
 
 def test_argument_parser_requires_resource_class():

@@ -12,6 +12,11 @@ from understack_workflows.ironic.client import IronicClient
 logger = logging.getLogger(__name__)
 
 DEFAULT_RESOURCE_CLASS = "generic"
+
+# ``netdev`` is the generic Ironic hardware type for any network device.
+# please pass your own driver (e.g. ``paloalto``).
+DEFAULT_DRIVER = "netdev"
+
 PLACEHOLDER_SWITCH_ID = "00:00:00:00:00:00"
 
 # Provision states from which enrollment can proceed to "available".
@@ -137,11 +142,13 @@ def enroll(
     ports: list[dict],
     external_cmdb_id: int | str | None = None,
     resource_class: str | None = DEFAULT_RESOURCE_CLASS,
+    driver: str | None = DEFAULT_DRIVER,
     driver_info: dict | None = None,
     extra: dict | None = None,
     properties: dict | None = None,
 ) -> None:
     effective_resource_class = resource_class or DEFAULT_RESOURCE_CLASS
+    effective_driver = driver or DEFAULT_DRIVER
     netdev_ports = build_netdev_ports(ports)
 
     # driver_info/extra/properties are generic Ironic node metadata a caller may
@@ -158,9 +165,10 @@ def enroll(
 
     logger.info(
         "Starting enroll-netdev workflow name=%s physical_network=%s "
-        "resource_class=%s port_count=%s",
+        "driver=%s resource_class=%s port_count=%s",
         name,
         physical_network,
+        effective_driver,
         effective_resource_class,
         len(netdev_ports),
     )
@@ -176,6 +184,7 @@ def enroll(
         client=client,
         name=name,
         resource_class=effective_resource_class,
+        driver=effective_driver,
         driver_info=node_driver_info,
         extra=node_extra,
         properties=node_properties,
@@ -293,6 +302,7 @@ def find_or_create_netdev_node(
     client: IronicClient,
     name: str,
     resource_class: str,
+    driver: str = DEFAULT_DRIVER,
     driver_info: dict,
     extra: dict,
     properties: dict | None = None,
@@ -310,16 +320,19 @@ def find_or_create_netdev_node(
             client=client,
             name=name,
             resource_class=resource_class,
+            driver=driver,
             driver_info=driver_info,
             extra=extra,
             properties=properties or {},
         )
         return node, True
 
-    if node.driver != "netdev":
+    # a node enrolled as one hardware type must not be silently re-enrolled
+    # as another.
+    if node.driver != driver:
         raise RuntimeError(
             f"Node {name} ({node.uuid}) already exists with driver "
-            f"{node.driver!r}; refusing to enroll it as a netdev"
+            f"{node.driver!r}; refusing to enroll it as {driver!r}"
         )
 
     if node.provision_state not in REENROLLABLE_STATES:
@@ -385,13 +398,14 @@ def create_netdev_node(
     client: IronicClient,
     name: str,
     resource_class: str,
+    driver: str = DEFAULT_DRIVER,
     driver_info: dict,
     extra: dict,
     properties: dict | None = None,
 ) -> Node:
     node_data = {
         "automated_clean": False,
-        "driver": "netdev",
+        "driver": driver,
         "name": name,
         "resource_class": resource_class,
     }

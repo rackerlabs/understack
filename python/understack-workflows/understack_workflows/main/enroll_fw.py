@@ -11,12 +11,14 @@ from understack_workflows.ironic.client import IronicClient
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_FIREWALL_DRIVER = "paloalto"
+
 
 def main() -> None:
     """Enroll a firewall, or update its metadata in place.
 
-    A firewall is a generic netdev node plus firewall metadata: management
-    access in the node's driver_info and the mate serial in extra.
+    Uses the Palo Alto hardware type by default, with management access in
+    the node's driver_info and the mate serial in extra.
 
     """
     helpers.setup_logger()
@@ -27,6 +29,7 @@ def main() -> None:
         physical_network=args.physical_network,
         ports=netdev_reconciler.parse_ports_arg(args.ports),
         resource_class=args.resource_class,
+        driver=args.driver,
         external_cmdb_id=args.external_cmdb_id,
         management_ip=args.management_ip,
         management_switch=args.management_switch,
@@ -78,6 +81,7 @@ def enroll_fw(
     physical_network: str,
     ports: list[dict],
     resource_class: str,
+    driver: str = DEFAULT_FIREWALL_DRIVER,
     external_cmdb_id: int | str | None = None,
     management_ip: str = "",
     management_switch: str = "",
@@ -87,6 +91,9 @@ def enroll_fw(
     vendor: str = "",
     model: str = "",
 ) -> None:
+    driver = (driver or "").strip()
+    if not driver:
+        raise ValueError("enroll-fw requires a non-empty --driver")
     resource_class = _require_specific_resource_class(resource_class)
     management_switch, management_switch_port = _require_management_location(
         management_switch, management_switch_port
@@ -116,6 +123,7 @@ def enroll_fw(
             physical_network=physical_network,
             ports=ports,
             resource_class=resource_class,
+            driver=driver,
             external_cmdb_id=external_cmdb_id,
             driver_info=driver_info,
             extra=extra,
@@ -131,6 +139,7 @@ def enroll_fw(
         physical_network=physical_network,
         ports=ports,
         resource_class=resource_class,
+        driver=driver,
         external_cmdb_id=external_cmdb_id,
         driver_info=driver_info,
         extra=extra,
@@ -154,6 +163,7 @@ def _update_active_firewall(
     physical_network: str,
     ports: list[dict],
     resource_class: str,
+    driver: str,
     external_cmdb_id: int | str | None,
     driver_info: dict,
     extra: dict,
@@ -164,13 +174,13 @@ def _update_active_firewall(
     An active firewall is carrying live traffic, so its base configuration must
     not change here. We re-validate the submitted ports and compare them
     read-only against the node's real ports.
-    If everything matches we patch only driver_info/extra.
+    If everything matches we patch only driver_info/extra/properties.
     """
     node_driver = getattr(node, "driver", None)
-    if node_driver != "netdev":
+    if node_driver != driver:
         raise RuntimeError(
             f"Node {name} ({node.uuid}) is active with driver {node_driver!r}; "
-            "refusing to modify a non-netdev node"
+            f"refusing to enroll it as {driver!r}"
         )
 
     node_resource_class = getattr(node, "resource_class", None)
@@ -243,7 +253,7 @@ def _reject_structural_drift(
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
-        description="Enroll a firewall (netdev node + firewall metadata)",
+        description="Enroll a firewall (defaults to the paloalto hardware type)",
     )
     parser.add_argument("--name", required=True, help="Ironic node name")
     parser.add_argument(
@@ -264,6 +274,15 @@ def argument_parser():
         required=True,
         help="Ironic resource class (required: use a purpose-made pool, not "
         "the generic default, or the router flavor may adopt wrong hardware)",
+    )
+    parser.add_argument(
+        "--driver",
+        default=DEFAULT_FIREWALL_DRIVER,
+        help=(
+            "Ironic hardware type to enroll the node as "
+            f"(default: {DEFAULT_FIREWALL_DRIVER}). Must match an existing "
+            "node's driver."
+        ),
     )
     parser.add_argument(
         "--external-cmdb-id",
