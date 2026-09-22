@@ -168,6 +168,9 @@ pod:
       server:
         min_available: 2
   resources:
+    # (doug.goldstein) No CPU limits, CFS throttling hurts more than it
+    # helps. Helm merges our values over the chart defaults, so the limits
+    # need an explicit null instead of just being left out.
     enabled: true
     server:
       requests:
@@ -175,6 +178,29 @@ pod:
         cpu: "200m"
       limits:
         memory: "4096Mi"
+        cpu: null
+    periodic_worker:
+      limits:
+        cpu: null
+    ovn_maintenance_worker:
+      limits:
+        cpu: null
+    ironic_agent:
+      limits:
+        cpu: null
+    jobs:
+      db_sync:
+        limits:
+          cpu: null
+      ks_endpoints:
+        limits:
+          cpu: null
+      ks_service:
+        limits:
+          cpu: null
+      ks_user:
+        limits:
+          cpu: null
   probes:
     server:
       server:
