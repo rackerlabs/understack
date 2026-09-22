@@ -303,6 +303,9 @@ pod:
         # allow for zero downtime ironic-api deployments by keeping an api node online
         min_available: 1
   resources:
+    # (doug.goldstein) No CPU limits, CFS throttling hurts more than it
+    # helps. Helm merges our values over the chart defaults, so the limits
+    # need an explicit null instead of just being left out.
     enabled: true
     api:
       requests:
@@ -310,14 +313,30 @@ pod:
         cpu: "100m"
       limits:
         memory: "2048Mi"
-        cpu: "500m"
+        cpu: null
     conductor:
       requests:
         memory: "1024Mi"
         cpu: "100m"
       limits:
         memory: "2048Mi"
-        cpu: "8000m"
+        cpu: null
+    novncproxy:
+      limits:
+        cpu: null
+    jobs:
+      db_sync:
+        limits:
+          cpu: null
+      ks_endpoints:
+        limits:
+          cpu: null
+      ks_service:
+        limits:
+          cpu: null
+      ks_user:
+        limits:
+          cpu: null
   affinity:
     anti:
       type:
