@@ -170,8 +170,14 @@ def test_resolve_spec_rejects_prefix_not_under_required_location(monkeypatch):
     Nautobot returns nothing for ?id=<uuid>&location=<other>, which the resolver
     reports as the prefix not being under the required location.
     """
-    with pytest.raises(ConfigError, match="was not found under location 'iad3-dev'"):
+    with pytest.raises(
+        ConfigError, match="was not found under location 'iad3-dev'"
+    ) as excinfo:
         _resolve(monkeypatch, _single_ref_spec(), None)
+    assert f"https://nautobot.example.test/ipam/prefixes/{PUBLIC_ID}/" in str(
+        excinfo.value
+    )
+    assert excinfo.value.reason == nautobot.PREFIX_NOT_FOUND_REASON
 
 
 def _location_400_request_error() -> nautobot.pynautobot.RequestError:
@@ -277,12 +283,18 @@ def test_resolve_spec_reuses_cached_client(monkeypatch):
 
 
 def test_resolve_spec_rejects_missing_prefix(monkeypatch):
-    with pytest.raises(ConfigError, match="was not found"):
+    """A deleted/missing prefix's message includes a link and a reason."""
+    with pytest.raises(ConfigError, match="was not found") as excinfo:
         _resolve(monkeypatch, _spec(), None)
+    assert f"https://nautobot.example.test/ipam/prefixes/{PUBLIC_ID}/" in str(
+        excinfo.value
+    )
+    assert excinfo.value.reason == nautobot.PREFIX_NOT_FOUND_REASON
 
 
 def test_resolve_spec_rejects_prefix_that_fails_requirements(monkeypatch):
-    with pytest.raises(ConfigError, match="status is 'Reserved'"):
+    """A prefix failing a guardrail must not carry the missing-prefix reason."""
+    with pytest.raises(ConfigError, match="status is 'Reserved'") as excinfo:
         _resolve(
             monkeypatch,
             _spec(),
@@ -293,6 +305,7 @@ def test_resolve_spec_rejects_prefix_that_fails_requirements(monkeypatch):
                 status=SimpleNamespace(name="Reserved"),
             ),
         )
+    assert excinfo.value.reason is None
 
 
 def test_resolve_spec_rejects_prefix_missing_required_tag(monkeypatch):

@@ -78,7 +78,15 @@ def env_required(name: str) -> str:
 
 
 class ConfigError(Exception):
-    """Raised when a plugin receives an invalid or incomplete configuration."""
+    """Raised when a plugin receives an invalid or incomplete configuration.
+
+    Optional ``reason``: a CamelCase condition reason to report on the CR
+    status instead of the generic "ReconcileError". Defaults to None.
+    """
+
+    def __init__(self, message: str, *, reason: str | None = None) -> None:
+        super().__init__(message)
+        self.reason = reason
 
 
 # ---------------------------------------------------------------------------

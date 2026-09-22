@@ -129,19 +129,25 @@ def truncate_message(message: Any, max_length: int = 2048) -> str:
 
 
 def _desired_condition(
-    sync_status: str, message: str, generation: int | None = None
+    sync_status: str,
+    message: str,
+    generation: int | None = None,
+    reason: str | None = None,
 ) -> dict[str, Any]:
     """Return the Ready condition to write, without its timestamp.
 
     A CR has one notion of success, so it reports one condition. ``Ready`` is
     the name Kubernetes tooling expects: ``kubectl wait --for=condition=Ready``
     and kubernetes-entrypoint's ``custom_resources`` dependency both work off it.
+
+    ``reason`` overrides "ReconcileError" on failure; a synced CR always
+    reports "Reconciled".
     """
     synced = sync_status == "Synced"
     condition: dict[str, Any] = {
         "type": "Ready",
         "status": "True" if synced else "False",
-        "reason": "Reconciled" if synced else "ReconcileError",
+        "reason": "Reconciled" if synced else (reason or "ReconcileError"),
         "message": truncate_message(message),
     }
     if generation is not None:
@@ -183,11 +189,23 @@ def _status_is_current(
     sync_status: str,
     message: str,
     generation: int | None,
+    extra_status: dict[str, Any] | None = None,
+    reason: str | None = None,
 ) -> bool:
     """Return True when the existing CR status already matches desired state.
 
     Timestamp fields are intentionally ignored. Rewriting them on every no-op
     reconcile creates a Kubernetes Modified event and can requeue the hook.
+
+    ``extra_status`` is opaque plugin-supplied status (see
+    :class:`~openstack_sync.hooks.framework.contracts.ReconcileResult`): every
+    key it carries must already be present on *current* with an equal value,
+    or the status is not current. A key missing from *current* -- for example
+    right after a CRD adds a new status field -- counts as a mismatch, so the
+    one-time backfill patch always goes out rather than being silently skipped
+    forever.
+
+    ``reason`` must match too, so a changed reason is not skipped as a no-op.
     """
     if not current:
         return False
@@ -203,8 +221,15 @@ def _status_is_current(
     existing = _ready_condition(current)
     if existing is None:
         return False
-    desired = _desired_condition(sync_status, truncated_message, generation)
-    return all(existing.get(key) == value for key, value in desired.items())
+    desired = _desired_condition(sync_status, truncated_message, generation, reason)
+    if not all(existing.get(key) == value for key, value in desired.items()):
+        return False
+
+    if extra_status:
+        if any(current.get(key) != value for key, value in extra_status.items()):
+            return False
+
+    return True
 
 
 #: Memoised CustomObjectsApi, so one config load serves every patch in a run.
@@ -528,6 +553,8 @@ def patch_resource_status(
     crd_kind: str,
     status_enabled: bool,
     current_status: dict[str, Any] | None = None,
+    extra_status: dict[str, Any] | None = None,
+    reason: str | None = None,
 ) -> None:
     """Patch the status subresource of a CR.
 
@@ -550,11 +577,20 @@ def patch_resource_status(
         status_enabled: When False the function returns immediately.
         current_status: Current CR status from the binding context. When it
             already matches the desired stable fields, the patch is skipped.
+        extra_status: Additional top-level status fields to merge in verbatim,
+            beyond syncStatus/lastSyncTime/message/conditions/
+            observedGeneration. Opaque to this function: only the caller's CRD
+            schema gives these fields meaning. ``None`` or empty writes
+            nothing extra.
+        reason: Condition reason to report instead of "ReconcileError" on
+            failure. Ignored when ``sync_status`` is "Synced".
     """
     if not status_enabled:
         return
 
-    if _status_is_current(current_status, sync_status, message, generation):
+    if _status_is_current(
+        current_status, sync_status, message, generation, extra_status, reason
+    ):
         LOG.debug(
             "skipping %s status patch for %s; status is already current",
             crd_kind,
@@ -577,7 +613,7 @@ def patch_resource_status(
         return
 
     timestamp = utc_timestamp()
-    condition = _desired_condition(sync_status, message, generation)
+    condition = _desired_condition(sync_status, message, generation, reason)
     condition["lastTransitionTime"] = _transition_time(
         current_status, str(condition["status"]), timestamp
     )
@@ -589,6 +625,8 @@ def patch_resource_status(
     }
     if generation is not None:
         status["observedGeneration"] = generation
+    if extra_status:
+        status.update(extra_status)
 
     try:
         _customobjects_api().patch_namespaced_custom_object_status(

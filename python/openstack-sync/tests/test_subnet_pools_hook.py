@@ -22,6 +22,7 @@ from openstack_sync.hooks import subnet_pools as hook
 from openstack_sync.hooks.framework import CleanupPolicy
 from openstack_sync.hooks.framework import HookConfig
 from openstack_sync.hooks.framework import PruneRequest
+from openstack_sync.hooks.framework import ReconcileResult
 from openstack_sync.plugins.neutron.subnet_pools.config import BINDING_NAME
 from openstack_sync.plugins.neutron.subnet_pools.config import ENV_PREFIX
 from openstack_sync.plugins.neutron.subnet_pools.config import OWNERSHIP_TAG
@@ -164,23 +165,25 @@ def test_plugin_reconcile_delegates_to_sync_subnet_pool():
     conn = mock.MagicMock()
     cache: dict[str, Any] = {}
     spec = {"name": "pool-a"}
+    stub_result = ReconcileResult(notes=[], extra_status={"prefixes": []})
 
     with mock.patch.object(
-        hook.reconcile_module, "sync_subnet_pool", return_value=[]
+        hook.reconcile_module, "sync_subnet_pool", return_value=stub_result
     ) as sync_subnet_pool:
-        notes = plugin.reconcile(conn, spec, cache)
+        result = plugin.reconcile(conn, spec, cache)
 
-    assert notes == []
+    assert result is stub_result
     sync_subnet_pool.assert_called_once_with(conn, spec, "openstack", cache)
 
 
 def test_plugin_reconcile_falls_back_to_pod_namespace_when_unset():
     plugin = hook.SubnetPoolPlugin(_config(namespace=None))
     conn = mock.MagicMock()
+    stub_result = ReconcileResult(notes=[], extra_status={"prefixes": []})
 
     with (
         mock.patch.object(
-            hook.reconcile_module, "sync_subnet_pool", return_value=[]
+            hook.reconcile_module, "sync_subnet_pool", return_value=stub_result
         ) as sync_subnet_pool,
         mock.patch.object(hook, "pod_namespace", return_value="fallback-ns"),
     ):
@@ -399,6 +402,46 @@ def test_main_reconciles_an_already_converged_pool(monkeypatch, tmp_path):
     conn.network.create_subnet_pool.assert_not_called()
     conn.network.update_subnet_pool.assert_not_called()
     conn.network.set_tags.assert_not_called()
+
+
+def test_main_reports_resolved_prefixes_on_the_cr_status(monkeypatch, tmp_path):
+    """End to end: status.prefixes carries each Nautobot prefix's id/cidr/url.
+
+    Exercises the real path from SubnetPoolPlugin.reconcile through
+    sync_subnet_pool and nautobot.resolve_spec -- only pynautobot.api and the
+    leaf patch_resource_status call are mocked -- so this is a regression test
+    for the framework's extra_status plumbing, not just the plugin in
+    isolation.
+    """
+    clear_env(monkeypatch)
+    set_crd_identity(monkeypatch)
+    monkeypatch.setenv(f"{ENV_PREFIX}_ENABLED", "true")
+    monkeypatch.setenv(f"{ENV_PREFIX}_STATUS_ENABLED", "true")
+    monkeypatch.setenv("POD_NAMESPACE", "openstack")
+    conn = _neutron_conn()
+
+    code, patch_status = _run_main(
+        monkeypatch, tmp_path, _schedule_context("PUBLIC-IP-POOL"), conn
+    )
+
+    assert code == 0
+    extra_status = patch_status.call_args.kwargs["extra_status"]
+    assert extra_status == {
+        "prefixes": [
+            {
+                "id": "2bc3ecab-b6dc-46cd-9bd4-1c0ea8a07f87",
+                "cidr": "204.232.163.128/25",
+                "url": "https://nautobot.example.test/ipam/prefixes/"
+                "2bc3ecab-b6dc-46cd-9bd4-1c0ea8a07f87/",
+            },
+            {
+                "id": "53c8ee3b-09b9-41ab-a413-b1a1f5ecec6a",
+                "cidr": "10.4.88.0/24",
+                "url": "https://nautobot.example.test/ipam/prefixes/"
+                "53c8ee3b-09b9-41ab-a413-b1a1f5ecec6a/",
+            },
+        ]
+    }
 
 
 def test_main_creates_a_missing_pool(monkeypatch, tmp_path):

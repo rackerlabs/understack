@@ -142,9 +142,9 @@ def test_plugin_reconcile_delegates_to_sync_flavor():
     with mock.patch.object(
         hook.reconcile_module, "sync_flavor", return_value=["a note"]
     ) as sync_flavor:
-        notes = plugin.reconcile(conn, spec, cache)
+        result = plugin.reconcile(conn, spec, cache)
 
-    assert notes == ["a note"]
+    assert result.notes == ["a note"]
     sync_flavor.assert_called_once_with(conn, spec, cache)
 
 

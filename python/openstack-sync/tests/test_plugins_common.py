@@ -34,6 +34,21 @@ def test_env_bool_rejects_boolean_aliases(monkeypatch, value):
         common.env_bool("OPENSTACK_SYNC_TEST_BOOL", False)
 
 
+def test_config_error_reason_defaults_to_none():
+    """Existing call sites raise ConfigError(message) with no reason kwarg."""
+    error = common.ConfigError("something went wrong")
+
+    assert str(error) == "something went wrong"
+    assert error.reason is None
+
+
+def test_config_error_carries_an_explicit_reason():
+    error = common.ConfigError("prefix gone", reason="NautobotPrefixMissing")
+
+    assert str(error) == "prefix gone"
+    assert error.reason == "NautobotPrefixMissing"
+
+
 def test_get_value_reads_openstacksdk_attribute_names():
     profile = sdk_service_profile.ServiceProfile(
         id="profile-id",

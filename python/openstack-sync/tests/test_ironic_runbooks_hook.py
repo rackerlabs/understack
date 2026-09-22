@@ -185,9 +185,9 @@ def test_plugin_reconcile_delegates_to_sync_runbook():
     with mock.patch.object(
         hook.reconcile_module, "sync_runbook", return_value=["a note"]
     ) as sync_runbook:
-        notes = plugin.reconcile(conn, spec, cache)
+        result = plugin.reconcile(conn, spec, cache)
 
-    assert notes == ["a note"]
+    assert result.notes == ["a note"]
     sync_runbook.assert_called_once_with(conn, spec, cache)
 
 

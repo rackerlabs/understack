@@ -350,6 +350,23 @@ spec:
                 description: Message provides details about the last sync attempt.
                 type: string
                 maxLength: 2048
+              prefixes:
+                description: >-
+                  The Nautobot prefixes resolved for this pool, one entry per
+                  spec.nautobot.prefix_refs item.
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      description: Nautobot prefix UUID (spec.nautobot.prefix_refs[].id).
+                      type: string
+                    cidr:
+                      description: CIDR Nautobot resolved for this prefix.
+                      type: string
+                    url:
+                      description: Nautobot UI URL for this prefix record.
+                      type: string
               conditions:
                 description: Conditions describe current observed state.
                 type: array
