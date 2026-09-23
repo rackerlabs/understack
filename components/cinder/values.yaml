@@ -19,10 +19,13 @@ conf:
       default_volume_type: __DEFAULT__
       # add DriverFilter to the default list so our SVM filtering function gets called
       scheduler_default_filters: DriverFilter,AvailabilityZoneFilter,CapacityFilter,CapabilitiesFilter
+      backup_driver: ""
     oslo_messaging_notifications:
       driver: messagingv2
     oslo_messaging_rabbit:
       amqp_durable_queues: true
+    oslo_concurrency:
+      lock_path: /tmp/cinder-lock
   rabbitmq:
     policies: [] # Override the policy being injected by OSH
   cinder_api_uwsgi:
@@ -68,100 +71,31 @@ network:
   use_external_ingress_controller: true
 
 pod:
-  mounts:
-    cinder_volume:
-      cinder_volume:
-        # necessary because the netapp driver requires this for scratch space
-        # and even makes sure its writeable a better approach should go upstream
-        volumeMounts:
-          - mountPath: /var/lib/cinder
-            name: var-lib-cinder
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: var-lib-cinder
-            emptyDir: {}
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-                - secret:
-                    name: cinder-netapp-config
-                    optional: true
-    cinder_volume_usage_audit:
-      cinder_volume_usage_audit:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-    cinder_db_sync:
-      cinder_db_sync:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-    cinder_backup:
-      cinder_backup:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-    cinder_scheduler:
-      cinder_scheduler:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
-    cinder_db_purge:
-      cinder_db_purge:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
+  etcSources:
     cinder_api:
-      cinder_api:
-        volumeMounts:
-          - name: cinder-etc-snippets
-            mountPath: /etc/cinder/cinder.conf.d/
-            readOnly: true
-        volumes:
-          - name: cinder-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: cinder-ks-etc
+      - secret:
+          name: cinder-ks-etc
+    cinder_scheduler:
+      - secret:
+          name: cinder-ks-etc
+    cinder_volume:
+      - secret:
+          name: cinder-ks-etc
+      - secret:
+          name: cinder-netapp-config
+          optional: true
+    cinder_volume_usage_audit:
+      - secret:
+          name: cinder-ks-etc
+    cinder_db_sync:
+      - secret:
+          name: cinder-ks-etc
+    cinder_backup:
+      - secret:
+          name: cinder-ks-etc
+    cinder_db_purge:
+      - secret:
+          name: cinder-ks-etc
   lifecycle:
     disruption_budget:
       deployments:
