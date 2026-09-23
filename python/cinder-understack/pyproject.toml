@@ -24,21 +24,19 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "cinder>=27.0.0,<28",
+    "cinder<29",
 ]
 
 [project.urls]
 Source = "https://github.com/rackerlabs/understack"
 
 [dependency-groups]
-dev = [
-    "pytest>=9.1.1",
-]
 test = [
     "ddt>=1.4.4",
     "fixtures>=3.0.0",
+    "pytest>=9.1.1",
     "stestr>=3.2.1",
- ]
+]
 
 [tool.uv]
 default-groups = ["test"]

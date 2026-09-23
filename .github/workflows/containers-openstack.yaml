@@ -33,7 +33,6 @@ jobs:
     strategy:
       matrix:
         project:
-          - cinder
           - glance
           - horizon
           - octavia
@@ -45,6 +44,15 @@ jobs:
       dockerfile_path: containers/${{ matrix.project }}/Dockerfile
       build_args: OPENSTACK_VERSION=2025.2
       latest_name: "2025.2"
+
+  cinder:
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: cinder
+      dockerfile_path: containers/cinder/Dockerfile
+      build_args: OPENSTACK_VERSION=2026.1
+      latest_name: "2026.1"
 
   placement:
     uses: ./.github/workflows/build-container-reuse.yaml
