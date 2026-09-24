@@ -40,7 +40,7 @@ cisco-asa = "neutron_understack.config:list_cisco_asa_opts"
 understack-vni = "neutron_understack.config:list_understack_vni_opts"
 
 [project.entry-points."neutron.ml2.mechanism_drivers"]
-understack = "neutron_understack.neutron_understack_mech:UnderstackDriver"
+understack = "neutron_understack.understack_mech:UnderstackDriver"
 undersync = "neutron_understack.undersync_mech:UndersyncDriver"
 
 [project.entry-points."neutron.service_plugins"]

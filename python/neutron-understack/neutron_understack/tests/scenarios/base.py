@@ -27,7 +27,7 @@ from neutron_lib.plugins import directory
 from oslo_config import cfg
 
 from neutron_understack import config as understack_config
-from neutron_understack.undersync import Undersync
+from neutron_understack.undersync_client import Undersync
 
 #: Physnets the type manager knows about (the parent setUp configures physnet1/2
 #: with VLAN ranges), so ``allocate_dynamic_segment`` succeeds for the VLAN group

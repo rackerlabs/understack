@@ -26,12 +26,12 @@ from neutron_lib.callbacks.events import DBEventPayload
 from oslo_config import fixture as config_fixture
 
 from neutron_understack import config as understack_config
-from neutron_understack.neutron_understack_mech import UnderstackDriver
 from neutron_understack.tests.helpers import Ml2PluginNoInit
 from neutron_understack.tests.helpers import extend_network_dict
 from neutron_understack.tests.helpers import extend_port_dict_with_trunk
-from neutron_understack.trunk import UnderStackTrunkDriver
-from neutron_understack.undersync import Undersync
+from neutron_understack.trunk import UnderstackTrunkDriver
+from neutron_understack.understack_mech import UnderstackDriver
+from neutron_understack.undersync_client import Undersync
 
 
 @pytest.fixture
@@ -286,8 +286,8 @@ def understack_driver(oslo_config) -> UnderstackDriver:
 
 
 @pytest.fixture
-def understack_trunk_driver(understack_driver) -> UnderStackTrunkDriver:
-    return UnderStackTrunkDriver.create(understack_driver)
+def understack_trunk_driver(understack_driver) -> UnderstackTrunkDriver:
+    return UnderstackTrunkDriver.create(understack_driver)
 
 
 @pytest.fixture

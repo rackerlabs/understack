@@ -7,8 +7,8 @@ from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
 
-from neutron_understack import neutron_understack_mech
-from neutron_understack.neutron_understack_mech import UnderstackDriver
+from neutron_understack import understack_mech
+from neutron_understack.understack_mech import UnderstackDriver
 
 
 def _port_update_context(original, current):
@@ -36,8 +36,7 @@ class TestUpdatePortPreCommit:
             "device_id": "router-a",
         }
         validate = mocker.patch(
-            "neutron_understack.neutron_understack_mech."
-            "svi_router.validate_svi_router_port",
+            "neutron_understack.understack_mech.svi_router.validate_svi_router_port",
             return_value=True,
         )
 
@@ -63,8 +62,7 @@ class TestUpdatePortPreCommit:
             ],
         }
         validate = mocker.patch(
-            "neutron_understack.neutron_understack_mech."
-            "svi_router.validate_svi_router_port",
+            "neutron_understack.understack_mech.svi_router.validate_svi_router_port",
             return_value=True,
         )
 
@@ -90,8 +88,7 @@ class TestUpdatePortPreCommit:
             "fixed_ips": [{"subnet_id": "subnet-a"}],
         }
         validate = mocker.patch(
-            "neutron_understack.neutron_understack_mech."
-            "svi_router.validate_svi_router_port",
+            "neutron_understack.understack_mech.svi_router.validate_svi_router_port",
             return_value=True,
         )
 
@@ -111,8 +108,7 @@ class TestUpdatePortPreCommit:
         }
         current = {**original, "name": "new-name"}
         validate = mocker.patch(
-            "neutron_understack.neutron_understack_mech."
-            "svi_router.validate_svi_router_port"
+            "neutron_understack.understack_mech.svi_router.validate_svi_router_port"
         )
 
         understack_driver.update_port_precommit(_port_update_context(original, current))
@@ -129,8 +125,7 @@ class TestUpdatePortPreCommit:
         }
         current = {**original, "fixed_ips": [{"subnet_id": "subnet-b"}]}
         validate = mocker.patch(
-            "neutron_understack.neutron_understack_mech."
-            "svi_router.validate_svi_router_port"
+            "neutron_understack.understack_mech.svi_router.validate_svi_router_port"
         )
 
         understack_driver.update_port_precommit(_port_update_context(original, current))
@@ -152,7 +147,7 @@ class TestUpdatePortPostCommit:
         understack_driver.undersync.sync.assert_not_called()
 
 
-MECH_UTILS = "neutron_understack.neutron_understack_mech.utils"
+MECH_UTILS = "neutron_understack.understack_mech.utils"
 
 
 class TestDeletePortPostCommit:
@@ -274,7 +269,7 @@ class TestBindPort:
         mocker.patch.object(port_context, "allocate_dynamic_segment")
         mocker.patch.object(port_context, "continue_binding")
         mocker.patch(
-            "neutron_understack.neutron_understack_mech.utils.vlan_segment_for_physnet",
+            "neutron_understack.understack_mech.utils.vlan_segment_for_physnet",
             return_value=vlan_network_segment,
         )
         port_context._prepare_to_bind(port_context.network.network_segments)
@@ -344,7 +339,7 @@ class TestBindPort:
         """
         mocker.patch.object(port_context, "continue_binding")
         port_context._prepare_to_bind(port_context.network.network_segments)
-        caplog.set_level(logging.ERROR, logger=neutron_understack_mech.LOG.name)
+        caplog.set_level(logging.ERROR, logger=understack_mech.LOG.name)
 
         understack_driver.bind_port(port_context)
 
