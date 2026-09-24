@@ -130,6 +130,43 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         self._assert_subport_unbound(subport_id, "host-a", segment_id)
         self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
 
+    @pytest.mark.scenario("TRUNK-ORDER-01")
+    def test_subport_remove_deallocates_before_it_notifies_undersync(self):
+        """Both drivers handle SUBPORTS AFTER_DELETE; order is by priority.
+
+        The understack trunk driver deallocates the segment and the undersync
+        driver notifies Undersync. Undersync reconciles from device state, so it
+        must run *after* the segment work -- guaranteed by undersync subscribing
+        above the trunk driver's PRIORITY_DEFAULT. A recorder on each side pins
+        the relative order, which the per-driver priority unit test cannot.
+        """
+        parent_net = self._make_network(self.fmt, "parent-net", True)["network"]["id"]
+        parent_id = self._bind_baremetal_port(parent_net, DEFAULT_PHYSNET, "host-a")
+        subport_net = self._make_network(self.fmt, "subport-net", True)["network"]["id"]
+        subport_id = self._plain_port(subport_net)
+        trunk_id = self._make_trunk(parent_id)
+        self._add_subport(trunk_id, subport_id)
+        self._assert_subport_bound(trunk_id, subport_id, "host-a")
+
+        calls: list[str] = []
+        trunk_driver = self.understack_driver.trunk_driver
+        original_dealloc = trunk_driver._handle_segment_deallocation
+
+        def _record_dealloc(*args, **kwargs):
+            calls.append("understack.deallocate")
+            return original_dealloc(*args, **kwargs)
+
+        self.undersync_mock.sync.side_effect = lambda physnet: calls.append(
+            f"undersync.sync:{physnet}"
+        )
+
+        with mock.patch.object(
+            trunk_driver, "_handle_segment_deallocation", side_effect=_record_dealloc
+        ):
+            self._remove_subport(trunk_id, subport_id)
+
+        assert calls == ["understack.deallocate", f"undersync.sync:{DEFAULT_PHYSNET}"]
+
     @pytest.mark.scenario("TRUNK-PARENT-NOIP")
     def test_subport_add_syncs_when_parent_has_no_ip(self):
         # Parent network has a subnet, but the parent port is bound with no IP.

@@ -300,6 +300,15 @@ adds/removes must reconcile the parent's switch (VLAN group).
   callback, surfaced as `CallbackFailure`), with no binding level or dynamic
   segment allocated
 
+### TRUNK-ORDER-01 — subport removal deallocates before it notifies Undersync
+- given: a bound baremetal parent with a trunk and an attached subport
+- when: the subport is removed
+- then: on the shared SUBPORTS AFTER_DELETE event, the understack trunk driver's
+  segment deallocation runs before the undersync driver's `sync`, since undersync
+  reconciles from real device state and must not be told to reconcile until the
+  segment work is done. The ordering comes from undersync subscribing at a
+  priority above the understack trunk driver's `PRIORITY_DEFAULT`
+
 ## Router interface (VRF & SVI flavors)
 
 These scenarios load a real L3 router + flavors plugin (`ML2TestFramework`). The
