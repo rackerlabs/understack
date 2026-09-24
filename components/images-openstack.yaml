@@ -93,9 +93,9 @@ images:
     glance_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
     # skyline
-    skyline: "ghcr.io/rackerlabs/understack/skyline:2025.2"
-    skyline_db_sync: "ghcr.io/rackerlabs/understack/skyline:2025.2"
-    skyline_nginx: "ghcr.io/rackerlabs/understack/skyline:2025.2"
+    skyline: "ghcr.io/rackerlabs/understack/skyline:2026.1"
+    skyline_db_sync: "ghcr.io/rackerlabs/understack/skyline:2026.1"
+    skyline_nginx: "ghcr.io/rackerlabs/understack/skyline:2026.1"
 
     # cinder
     cinder_api: "ghcr.io/rackerlabs/understack/cinder:2026.1"

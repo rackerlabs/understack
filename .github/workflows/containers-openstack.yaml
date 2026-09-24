@@ -40,6 +40,7 @@ jobs:
           - nova
           - neutron
           - placement
+          - skyline
           - openstack-client
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
@@ -48,15 +49,6 @@ jobs:
       dockerfile_path: containers/${{ matrix.project }}/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
-
-  skyline:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: skyline
-      dockerfile_path: containers/skyline/Dockerfile
-      build_args: OPENSTACK_VERSION=2025.2
-      latest_name: "2025.2"
 
   octavia:
     uses: ./.github/workflows/build-container-reuse.yaml
