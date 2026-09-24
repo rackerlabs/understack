@@ -49,6 +49,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: setup
     strategy:
+      # Don't let one module's failure cancel the other modules' lint jobs.
+      fail-fast: false
       matrix:
         app: ${{ fromJson(needs.setup.outputs.apps) }}
     steps:
@@ -63,8 +65,17 @@ jobs:
           go-version-file: go/${{ matrix.app }}/go.mod
           cache-dependency-path: go/${{ matrix.app }}/go.sum
 
+      # install-mode: goinstall builds golangci-lint from source using the
+      # toolchain setup-go installed from this module's go.mod. golangci-lint
+      # refuses to run when the Go version it was built with is older than the
+      # version a module targets, and the published binaries are built with
+      # whatever Go was current at release time. Building from source makes
+      # build-Go >= target-Go hold by construction, so a dependency bump that
+      # raises a module's `go` directive can no longer break linting while
+      # GOLANGCI_LINT_VERSION waits on a Renovate PR.
       - name: golangci-lint ${{ matrix.app }}
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
+          install-mode: goinstall
           working-directory: go/${{ matrix.app }}
