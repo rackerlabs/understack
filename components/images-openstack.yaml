@@ -98,13 +98,13 @@ images:
     skyline_nginx: "ghcr.io/rackerlabs/understack/skyline:2025.2"
 
     # cinder
-    cinder_api: "ghcr.io/rackerlabs/understack/cinder:2025.2"
-    cinder_db_sync: "ghcr.io/rackerlabs/understack/cinder:2025.2"
-    cinder_scheduler: "ghcr.io/rackerlabs/understack/cinder:2025.2"
-    cinder_volume: "ghcr.io/rackerlabs/understack/cinder:2025.2"
-    cinder_volume_usage_audit: "ghcr.io/rackerlabs/understack/cinder:2025.2"
-    cinder_db_purge: "ghcr.io/rackerlabs/understack/cinder:2025.2"
-    cinder_backup: "ghcr.io/rackerlabs/understack/cinder:2025.2"
+    cinder_api: "ghcr.io/rackerlabs/understack/cinder:2026.1"
+    cinder_db_sync: "ghcr.io/rackerlabs/understack/cinder:2026.1"
+    cinder_scheduler: "ghcr.io/rackerlabs/understack/cinder:2026.1"
+    cinder_volume: "ghcr.io/rackerlabs/understack/cinder:2026.1"
+    cinder_volume_usage_audit: "ghcr.io/rackerlabs/understack/cinder:2026.1"
+    cinder_db_purge: "ghcr.io/rackerlabs/understack/cinder:2026.1"
+    cinder_backup: "ghcr.io/rackerlabs/understack/cinder:2026.1"
     cinder_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
     cinder_backup_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
