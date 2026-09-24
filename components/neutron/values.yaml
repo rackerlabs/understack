@@ -191,6 +191,9 @@ pod:
       limits:
         memory: "4096Mi"
         cpu: null
+    rpc_server:
+      limits:
+        cpu: null
     periodic_worker:
       limits:
         cpu: null
