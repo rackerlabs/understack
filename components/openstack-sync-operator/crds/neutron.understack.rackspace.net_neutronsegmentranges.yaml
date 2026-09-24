@@ -46,14 +46,14 @@ spec:
       openAPIV3Schema:
         description: >-
           NeutronSegmentRange defines one Neutron network segment range
-          (``openstack network segment range``). The operator finds, adopts, or
-          creates the range identified by ``spec.name`` and reconciles its
-          network type, physical network, and minimum/maximum segmentation IDs
-          toward the spec. Creating a CR claims ownership of the matching
-          OpenStack segment range. Neutron does not allow updating the
-          ``network_type`` or ``physical_network`` of an existing range, so a
-          CR that disagrees with an existing range on either field fails loudly
-          rather than silently diverging.
+          (``openstack network segment range``). The operator finds or creates
+          the operator-owned range identified by ``spec.name`` and reconciles
+          its minimum/maximum segmentation IDs toward the spec. Creating a CR
+          claims ownership of a range the operator creates under an ownership
+          prefix; a range created out-of-band is not adopted. Neutron only
+          allows updating minimum and maximum on an existing range, so a CR
+          that disagrees on network_type, physical_network, shared or
+          project_id fails loudly rather than silently diverging.
         type: object
         required:
         - spec
@@ -101,7 +101,7 @@ spec:
               name:
                 description: >-
                   Neutron network segment range name. This is the identity the
-                  operator uses to find, adopt, create, and prune the range, so
+                  operator uses to find, create, and prune the range, so
                   it must be unique per cloud. The operator prepends a 14-char
                   ownership prefix (``understack-sr:``) before storing the name
                   in Neutron, whose name column holds 255 chars, so the logical

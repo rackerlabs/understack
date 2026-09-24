@@ -7,9 +7,11 @@ NetworkSegmentRange resource exposes only ``name``, ``network_type``,
 ``physical_network``, ``minimum``, ``maximum``, ``shared`` and ``project_id``.
 
 Ownership therefore rides on the range's ``name``. Every range the operator
-creates or adopts carries an owner-prefixed name, and prune only ever deletes
-ranges whose name carries that prefix. A range created out-of-band with a plain
-name is never in the managed set, so it is never pruned.
+creates carries an owner-prefixed name, and it manages only ranges whose name
+carries that prefix: both reconcile lookup and prune ignore any other range.
+A range created out-of-band with a plain name is never in the managed set, so
+it is neither adopted nor pruned -- the operator creates its own prefixed range
+instead.
 
 The prefix is transparent to CR authors: ``spec.name`` is the logical name, and
 :func:`managed_name` / :func:`logical_name` translate between the logical name

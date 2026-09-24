@@ -161,3 +161,75 @@ def test_network_type_mismatch_is_drift():
 
     assert drift is not None
     assert "network_type" in drift
+
+
+# ---------------------------------------------------------------------------
+# _immutable_drift: shared and project_id are allow_put: False in neutron_lib
+# ---------------------------------------------------------------------------
+
+
+def test_shared_change_is_immutable_drift():
+    """Neutron rejects a PUT of ``shared``; report it as drift, not an update."""
+    existing = {"network_type": "vlan", "physical_network": "physnet1", "shared": True}
+
+    drift = reconcile._immutable_drift(existing, _spec(shared=False, project_id="p1"))
+
+    assert drift is not None
+    assert "shared" in drift
+
+
+def test_project_id_change_on_unshared_range_is_immutable_drift():
+    existing = {
+        "network_type": "vlan",
+        "physical_network": "physnet1",
+        "shared": False,
+        "project_id": "old-project",
+    }
+
+    drift = reconcile._immutable_drift(
+        existing, _spec(shared=False, project_id="new-project")
+    )
+
+    assert drift is not None
+    assert "project_id" in drift
+
+
+def test_project_id_is_ignored_for_shared_range():
+    """A shared range ignores project_id, so a stored value is not drift."""
+    existing = {
+        "network_type": "vlan",
+        "physical_network": "physnet1",
+        "shared": True,
+        "project_id": "leftover",
+    }
+
+    assert reconcile._immutable_drift(existing, _spec(shared=True)) is None
+
+
+# ---------------------------------------------------------------------------
+# _mutable_updates: only minimum and maximum are PUT-able
+# ---------------------------------------------------------------------------
+
+
+def test_mutable_updates_reports_only_minimum_and_maximum():
+    existing = {
+        "minimum": 100,
+        "maximum": 200,
+        "shared": True,
+        "project_id": None,
+    }
+
+    updates = reconcile._mutable_updates(existing, _spec(minimum=100, maximum=300))
+
+    assert updates == {"maximum": 300}
+
+
+def test_mutable_updates_ignores_shared_and_project_id():
+    """shared/project_id are immutable now, so they never appear as updates."""
+    existing = {"minimum": 100, "maximum": 200, "shared": True}
+
+    updates = reconcile._mutable_updates(
+        existing, _spec(minimum=100, maximum=200, shared=False, project_id="p1")
+    )
+
+    assert updates == {}

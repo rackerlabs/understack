@@ -7,6 +7,7 @@ import sys
 from typing import Any
 
 from openstack_sync.hooks.framework import HookConfig
+from openstack_sync.hooks.framework import ReconcileResult
 from openstack_sync.hooks.framework import SyncPlugin
 from openstack_sync.hooks.framework import build_crd_hook_config
 from openstack_sync.hooks.framework import hook_enabled
@@ -35,13 +36,16 @@ class SegmentRangePlugin(SyncPlugin):
     def new_cache(self) -> reconcile_module.RangeCache:
         # Keyed by managed range name and shared across every CR in one
         # credential group, so the managed-range listing is fetched once and
-        # reused by each reconcile and the prune.
+        # reused by each reconcile in the group. Prune does not receive this
+        # cache (SyncPlugin.prune / PruneRequest carry no cache) and re-lists
+        # from Neutron itself.
         return {}
 
     def reconcile(
         self, conn: Any, spec: dict[str, Any], cache: reconcile_module.RangeCache
-    ) -> list[str]:
-        return reconcile_module.sync_segment_range(conn, spec, cache)
+    ) -> ReconcileResult:
+        notes = reconcile_module.sync_segment_range(conn, spec, cache)
+        return ReconcileResult(notes=notes)
 
     def prune(
         self,

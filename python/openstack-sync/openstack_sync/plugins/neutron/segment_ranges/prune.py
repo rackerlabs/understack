@@ -22,7 +22,14 @@ from openstack_sync.plugins.neutron.segment_ranges.markers import managed_name
 LOG = logging.getLogger(__name__)
 
 
-def _delete_range(conn: Any, segment_range: Any) -> None:
+def _delete_range(conn: Any, segment_range: Any) -> bool:
+    """Delete *segment_range*, returning whether it is now gone.
+
+    A range still bound to a segment answers Neutron with a Conflict; that is a
+    failure to complete cleanup, not a success. Returning False lets the caller
+    keep the CR's finalizer so the delete is retried rather than releasing it
+    while the range still exists in Neutron.
+    """
     range_id = resource_id(segment_range)
     name = logical_name(str(get_value(segment_range, "name", default=range_id)))
     LOG.info("Deleting removed segment range %s (%s)", name, range_id)
@@ -32,6 +39,8 @@ def _delete_range(conn: Any, segment_range: Any) -> None:
         LOG.info("Segment range %s (%s) is already absent", name, range_id)
     except openstack_exceptions.ConflictException:
         LOG.info("Segment range %s is still in use; skipping delete", name)
+        return False
+    return True
 
 
 def prune_removed_ranges(
@@ -57,6 +66,7 @@ def prune_removed_ranges(
         managed_name(str(spec["name"])) for spec in desired_specs if spec.get("name")
     }
 
+    incomplete = []
     LOG.info("Pruning removed segment ranges")
     for segment_range in list(conn.network.network_segment_ranges()):
         if not is_managed_range(segment_range):
@@ -64,4 +74,8 @@ def prune_removed_ranges(
         name = str(get_value(segment_range, "name", default=""))
         if name in desired_names:
             continue
-        _delete_range(conn, segment_range)
+        if not _delete_range(conn, segment_range):
+            incomplete.append(logical_name(name))
+
+    if incomplete:
+        raise RuntimeError("segment ranges still present: " + ", ".join(incomplete))
