@@ -83,8 +83,8 @@ images:
     ovn_controller: "quay.io/airshipit/ovn:ubuntu_noble-20260711"
 
     # horizon
-    horizon: "ghcr.io/rackerlabs/understack/horizon:2025.2"
-    horizon_db_sync: "ghcr.io/rackerlabs/understack/horizon:2025.2"
+    horizon: "ghcr.io/rackerlabs/understack/horizon:2026.1"
+    horizon_db_sync: "ghcr.io/rackerlabs/understack/horizon:2026.1"
 
     # glance
     glance_api: "ghcr.io/rackerlabs/understack/glance:2026.1"

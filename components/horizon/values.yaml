@@ -40,20 +40,6 @@ endpoints:
   oslo_db:
     hosts:
       default: mariadb-primary
-  dashboard:
-    host_fqdn_override:
-      public:
-        tls:
-          secretName: keystone-tls-public
-          issuerRef:
-            name: understack-cluster-issuer
-            kind: ClusterIssuer
-
-network:
-  # configure OpenStack Helm to use Undercloud's ingress
-  # instead of expecting the ingress controller provided
-  # by OpenStack Helm
-  use_external_ingress_controller: true
 
 # (nicholas.kuechler) updating the jobs list to remove the 'horizon-db-init' job.
 # (doug.goldstein) removed the 'identity' service dependency from all components,
@@ -76,8 +62,6 @@ dependencies:
 manifests:
   job_db_init: false
   secret_db: false
-  service_ingress: false
-  ingress_api: false
 
 pod:
   lifecycle:
