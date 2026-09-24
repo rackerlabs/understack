@@ -15,8 +15,8 @@ from neutron_understack import config
 from neutron_understack import routers
 from neutron_understack import utils
 from neutron_understack.l3_router import svi as svi_router
-from neutron_understack.trunk import UnderStackTrunkDriver
-from neutron_understack.undersync import Undersync
+from neutron_understack.trunk import UnderstackTrunkDriver
+from neutron_understack.undersync_client import Undersync
 
 from .ml2_type_annotations import NetworkContext
 from .ml2_type_annotations import PortContext
@@ -48,7 +48,7 @@ class UnderstackDriver(MechanismDriver):
         conf = cfg.CONF.ml2_understack
 
         self.undersync = Undersync(conf.undersync_url)
-        self.trunk_driver = UnderStackTrunkDriver.create(self)
+        self.trunk_driver = UnderstackTrunkDriver.create(self)
         self.subscribe()
 
     def subscribe(self):
@@ -263,14 +263,14 @@ class UnderstackDriver(MechanismDriver):
         else:
             port = context.current
 
-        vlan_group_name = port[portbindings.PROFILE].get("physical_network")
+        physnet = port[portbindings.PROFILE].get("physical_network")
 
         if current_vif_unbound and original_vif_other:
             self._tenant_network_port_cleanup(context)
-            if vlan_group_name:
-                self.undersync.sync(vlan_group_name)
-        elif current_vif_other and vlan_group_name:
-            self.undersync.sync(vlan_group_name)
+            if physnet:
+                self.undersync.sync(physnet)
+        elif current_vif_other and physnet:
+            self.undersync.sync(physnet)
 
     def _tenant_network_port_cleanup(self, context: PortContext):
         """Tenant network port cleanup in the UnderCloud infrastructure.
@@ -315,9 +315,9 @@ class UnderstackDriver(MechanismDriver):
     def _delete_port_baremetal(self, context: PortContext) -> None:
         port = context.current
 
-        vlan_group_name = port[portbindings.PROFILE].get("physical_network")
+        physnet = port[portbindings.PROFILE].get("physical_network")
 
-        if not vlan_group_name:
+        if not physnet:
             return
 
         # A port's dynamic VLAN segment is normally released by
@@ -325,13 +325,13 @@ class UnderstackDriver(MechanismDriver):
         # update_port_postcommit bound->unbound transition. A port deleted
         # while still bound skips that transition entirely, so without this
         # the segment -- and its VLAN -- leaks forever.
-        segment = utils.network_segment_by_physnet(port["network_id"], vlan_group_name)
+        segment = utils.network_segment_by_physnet(port["network_id"], physnet)
         if segment:
             utils.release_segment_if_unused(segment)
 
         # Reconcile the switch so the removed port's VLAN config is torn down,
         # matching the unbind path in _update_port_baremetal.
-        self.undersync.sync(vlan_group_name)
+        self.undersync.sync(physnet)
 
     def bind_port(self, context: PortContext) -> None:
         """Bind the VXLAN network segment and allocate dynamic VLAN segments.
@@ -342,7 +342,7 @@ class UnderstackDriver(MechanismDriver):
         one we bind.  There may be other segments, but we only bind the vxlan
         one.
 
-        We obtain the dynamic segment for this (network, vlan_group) pair.
+        We obtain the dynamic segment for this (network, physnet) pair.
 
         If there are no VXLAN segments, then bind a VLAN segment instead (this
         is required for VLAN-type networks like the provisioning network).
@@ -377,9 +377,9 @@ class UnderstackDriver(MechanismDriver):
 
         port = context.current
 
-        vlan_group_name = port[portbindings.PROFILE].get("physical_network")
+        physnet = port[portbindings.PROFILE].get("physical_network")
 
-        if not vlan_group_name:
+        if not physnet:
             LOG.error(
                 "bind_port_segment: physical_network is required in the "
                 "binding_profile for baremetal port binding, but was not found. "
@@ -395,21 +395,21 @@ class UnderstackDriver(MechanismDriver):
         LOG.debug(
             "bind_port_segment: interface network %s vlan group %s",
             network_id,
-            vlan_group_name,
+            physnet,
         )
 
-        current_vlan_segment = utils.vlan_segment_for_physnet(context, vlan_group_name)
+        current_vlan_segment = utils.vlan_segment_for_physnet(context, physnet)
         if current_vlan_segment:
             LOG.info(
                 "vlan segment: %(segment)s already preset for physnet: %(physnet)s",
-                {"segment": current_vlan_segment, "physnet": vlan_group_name},
+                {"segment": current_vlan_segment, "physnet": physnet},
             )
             dynamic_segment = current_vlan_segment
         else:
             dynamic_segment = context.allocate_dynamic_segment(
                 segment={
                     "network_type": p_const.TYPE_VLAN,
-                    "physical_network": vlan_group_name,
+                    "physical_network": physnet,
                 },
             )
 

@@ -168,5 +168,7 @@ class PortContext:
 
 
 class BindingLevelsDict(TypedDict):
-    bound_driver: Literal["understack"]
+    # understack binds the VXLAN segment at level 0 and hands the dynamic VLAN
+    # segment to undersync, which binds it at level 1.
+    bound_driver: Literal["understack", "undersync"]
     bound_segment: NetworkSegmentDict

@@ -41,7 +41,7 @@ def _missing_physnet_msg(port_id: str) -> str:
     )
 
 
-class UnderStackTrunkDriver(trunk_base.DriverBase):
+class UnderstackTrunkDriver(trunk_base.DriverBase):
     def __init__(
         self,
         name,
@@ -172,7 +172,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         )
 
     def _handle_segment_allocation(
-        self, subports: list[SubPort], vlan_group_name: str, binding_host: str
+        self, subports: list[SubPort], physnet: str, binding_host: str
     ) -> set:
         allowed_vlan_ids = set()
         for subport in subports:
@@ -181,11 +181,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             )
             current_segment = utils.network_segment_by_physnet(
                 network_id=subport_network_id,
-                physnet=vlan_group_name,
+                physnet=physnet,
             )
             network_segment = current_segment or utils.allocate_dynamic_segment(
                 network_id=subport_network_id,
-                physnet=vlan_group_name,
+                physnet=physnet,
             )
             allowed_vlan_ids.add(int(network_segment["segmentation_id"]))
 
@@ -203,15 +203,15 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_profile = parent_port.bindings[0].profile
         binding_host = parent_port.bindings[0].host
 
-        vlan_group_name = binding_profile.get("physical_network")
-        if not vlan_group_name:
+        physnet = binding_profile.get("physical_network")
+        if not physnet:
             # Reached from the PRECOMMIT_CREATE handlers, so raising here aborts
             # the transaction and surfaces the error to the API caller.
             raise exc.BadRequest(
                 resource="port", msg=_missing_physnet_msg(parent_port.id)
             )
 
-        self._handle_segment_allocation(subports, vlan_group_name, binding_host)
+        self._handle_segment_allocation(subports, physnet, binding_host)
 
     def clean_trunk(
         self, trunk_details: dict, binding_profile: dict, host: str
@@ -233,8 +233,8 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_profile = parent_port_obj.bindings[0].profile
         binding_host = parent_port_obj.bindings[0].host
 
-        vlan_group_name = binding_profile.get("physical_network")
-        if not vlan_group_name:
+        physnet = binding_profile.get("physical_network")
+        if not physnet:
             # This runs postcommit: the subports are already gone from the DB,
             # so raising cannot roll anything back. The PRECOMMIT_DELETE
             # handlers reject this case while it is still abortable; getting
@@ -246,7 +246,7 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
             binding_profile=binding_profile,
             binding_host=binding_host,
             subports=subports,
-            vlan_group_name=vlan_group_name,
+            physnet=physnet,
         )
 
     def _delete_unused_segment(self, segment_id: str) -> NetworkSegment:
@@ -272,11 +272,11 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
         binding_host: str,
         subports: list[SubPort],
         invoke_undersync: bool = True,
-        vlan_group_name: str | None = None,
+        physnet: str | None = None,
     ) -> None:
         self._handle_segment_deallocation(subports, binding_host)
-        if invoke_undersync and vlan_group_name:
-            self.undersync.sync(vlan_group_name)
+        if invoke_undersync and physnet:
+            self.undersync.sync(physnet)
 
     def subports_added(self, resource, event, trunk_plugin, payload):
         trunk = payload.states[0]
@@ -289,16 +289,16 @@ class UnderStackTrunkDriver(trunk_base.DriverBase):
 
         if utils.parent_port_is_bound(parent_port):
             binding_profile = parent_port.bindings[0].profile
-            vlan_group_name = binding_profile.get("physical_network")
-            if not vlan_group_name:
+            physnet = binding_profile.get("physical_network")
+            if not physnet:
                 # subports_added validates the same parent port on
                 # PRECOMMIT_CREATE, so normally we never get here. This runs
                 # postcommit, where raising cannot undo the subport creation,
                 # and there is no vlan group to sync.
                 LOG.error(_missing_physnet_msg(parent_port.id))
                 return
-            LOG.debug("subports_added_post found vlan_group_name=%s", vlan_group_name)
-            self.undersync.sync(vlan_group_name)
+            LOG.debug("subports_added_post found physnet=%s", physnet)
+            self.undersync.sync(physnet)
 
     def _validate_parent_port_physnet(self, trunk: Trunk) -> None:
         """Reject a teardown whose parent port has no physical_network.
