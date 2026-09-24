@@ -51,7 +51,7 @@ spec:
           - name: operation
           - name: device_uuid
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command:
           - openstack
         args:
@@ -73,7 +73,7 @@ spec:
         parameters:
           - name: device_uuid
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command:
           - openstack
         args:

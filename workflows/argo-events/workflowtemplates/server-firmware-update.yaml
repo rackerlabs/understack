@@ -92,7 +92,7 @@ spec:
           - name: operation
           - name: node_id
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command:
           - openstack
         args:
@@ -115,7 +115,7 @@ spec:
           - name: object_ref
           - name: param
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command:
           - openstack
         args:
@@ -138,7 +138,7 @@ spec:
         parameters:
           - name: node_id
       script:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command: [sh]
         source: |
           # Check for firmware update traits, sorted to allow runbook prioritization such as:
