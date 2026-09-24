@@ -12,9 +12,23 @@ labels:
 # values, but should include all endpoints
 # required by this chart
 endpoints:
+  # OSH renamed nova's database endpoints to match the cells v2 layout: the API
+  # database endpoint 'oslo_db_api' became 'oslo_db', and cell1's database
+  # endpoint 'oslo_db' became 'oslo_db_cell1'. The default paths moved with the
+  # names, so 'oslo_db' now defaults to /nova and 'oslo_db_cell1' to
+  # /nova_cell1. Our databases were created under the old names, so pin the
+  # paths to the databases that exist in MariaDB instead of renaming them.
   oslo_db:
     hosts:
       default: mariadb-primary
+    path: /nova_api
+  oslo_db_cell0:
+    hosts:
+      default: mariadb-primary
+  oslo_db_cell1:
+    hosts:
+      default: mariadb-primary
+    path: /nova
   oslo_messaging:
     statefulset:
       replicas: 3
@@ -27,42 +41,28 @@ endpoints:
         public: 443
     scheme:
       public: https
-    host_fqdn_override:
-      public:
-        tls:
-          secretName: nova-tls-public
-          issuerRef:
-            name: understack-cluster-issuer
-            kind: ClusterIssuer
 
 network:
   # we're using ironic and actual switches
   backend:
     - baremetal
 
-  # configure OpenStack Helm to use Undercloud's ingress
-  # instead of expecting the ingress controller provided
-  # by OpenStack Helm
-  use_external_ingress_controller: true
-
 conf:
   ceph:
     # ceph is providing block storage to VM creation and is connected via libvirt
     # we aren't using this so we don't want to enable this part of the chart
     enabled: false
-  DEFAULT:
-    # sets the number of uWSGI processes as well
-    osapi_compute_workers: 4
-    # We are not wiring up the network to the nova metadata API so we must use
-    # config_drive to pass data. To avoid users having to remember this, just
-    # force it on always.
-    force_config_drive: true
   nova_ironic:
     ironic:
       # this is where we populate our hardware
       project_domain_name: infra
       project_name: baremetal
   nova:
+    DEFAULT:
+      # We are not wiring up the network to the nova metadata API so we must use
+      # config_drive to pass data. To avoid users having to remember this, just
+      # force it on always.
+      force_config_drive: true
     quota:
       # adjust default quotas to make it possible to use baremetal
       cores: 512
@@ -268,7 +268,7 @@ pod:
   # should detect a dead process, not a busy one. Readiness failing under load
   # is fine (pulls the pod from rotation briefly); liveness failing restarts it.
   probes:
-    api:
+    api-osapi:
       default:
         liveness:
           enabled: true
@@ -307,11 +307,11 @@ manifests:
   job_rabbit_init: false
   job_storage_init: false
   pod_rally_test: false
-  secret_db_api: true
   secret_db_cell0: true
   secret_db: true
-  service_ingress_metadata: false
-  service_ingress_osapi: false
+  # only holds the root DB_CONNECTION for the db-init/db-drop jobs, which we
+  # disable above, so there is nothing to render it for
+  secret_db_cell1: false
   daemonset_compute: false
   statefulset_compute_ironic: true
   statefulset_conductor: true
@@ -325,11 +325,6 @@ manifests:
   # that is later consumed via components/openstack helm chart
   secret_keystone: false
   secret_ks_etc: false
-  ingress_metadata: false
-  ingress_novncproxy: false
-  ingress_serialproxy: false
-  ingress_spiceproxy: false
-  ingress_osapi: false
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
