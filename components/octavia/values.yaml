@@ -54,6 +54,9 @@ conf:
       driver: messagingv2
     oslo_messaging_rabbit:
       amqp_durable_queues: true
+      rabbit_quorum_queue: true
+      rabbit_transient_quorum_queue: true
+      use_queue_manager: true
 
 # (doug.goldstein) removed the 'identity' service dependency from all components,
 #   it is unused (the service) and other jobs wait on keystone working anyway.
@@ -79,11 +82,6 @@ dependencies:
           service: oslo_cache
         - endpoint: internal
           service: network
-    driver_agent:
-      jobs:
-        - octavia-db-sync
-        - octavia-ks-user
-        - octavia-ks-endpoints
     worker:
       jobs:
         - octavia-db-sync
@@ -149,67 +147,22 @@ dependencies:
 
 
 pod:
-  mounts:
+  etcSources:
     octavia_db_sync:
-      octavia_db_sync:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
-    octavia_driver_agent:
-      octavia_driver_agent:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
+      - secret:
+          name: octavia-ks-etc
     octavia_api:
-      octavia_api:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
+      - secret:
+          name: octavia-ks-etc
+    octavia_worker:
+      - secret:
+          name: octavia-ks-etc
     octavia_housekeeping:
-      octavia_housekeeping:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
+      - secret:
+          name: octavia-ks-etc
     octavia_health_manager:
-      octavia_health_manager:
-        volumeMounts:
-          - name: octavia-etc-snippets
-            mountPath: /etc/octavia/octavia.conf.d/
-            readOnly: true
-        volumes:
-          - name: octavia-etc-snippets
-            projected:
-              sources:
-                - secret:
-                    name: octavia-ks-etc
+      - secret:
+          name: octavia-ks-etc
   resources:
     enabled: true
     api:
@@ -220,7 +173,10 @@ manifests:
   job_db_init: false
   job_rabbit_init: false
   pod_rally_test: false
-  secret_db: true
+  secret_db: false
+  secret_db_persistence: false
+  secret_rabbitmq: false
+  secret_registry: false
   service_ingress_api: false
   # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
   # Kubernetes section generation in OpenStack Helm, because we want those
