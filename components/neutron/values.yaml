@@ -347,7 +347,7 @@ manifests:
   daemonset_bagpipe_bgp: false
   daemonset_bgp_dragent: false
   daemonset_netns_cleanup_cron: false
-  deployment_ironic_agent: true
+  statefulset_ironic_agent: true
   service_ingress_server: false
   # We set the `secret_keystone` and `secret_ks_etc` to false in order to disable
   # Kubernetes section generation in OpenStack Helm, because we want those
