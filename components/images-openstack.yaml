@@ -109,10 +109,10 @@ images:
     cinder_backup_storage_init: "docker.io/openstackhelm/ceph-config-helper:latest-ubuntu_jammy"
 
     # octavia
-    octavia_api: "ghcr.io/rackerlabs/understack/octavia:2025.2"
-    octavia_db_sync: "ghcr.io/rackerlabs/understack/octavia:2025.2"
-    octavia_worker: "ghcr.io/rackerlabs/understack/octavia:2025.2"
-    octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:2025.2"
-    octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:2025.2"
+    octavia_api: "ghcr.io/rackerlabs/understack/octavia:2026.1"
+    octavia_db_sync: "ghcr.io/rackerlabs/understack/octavia:2026.1"
+    octavia_worker: "ghcr.io/rackerlabs/understack/octavia:2026.1"
+    octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:2026.1"
+    octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:2026.1"
     octavia_health_manager_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
 ...

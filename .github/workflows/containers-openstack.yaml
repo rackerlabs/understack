@@ -42,6 +42,7 @@ jobs:
           - placement
           - skyline
           - openstack-client
+          - octavia
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
@@ -49,15 +50,6 @@ jobs:
       dockerfile_path: containers/${{ matrix.project }}/Dockerfile
       build_args: OPENSTACK_VERSION=2026.1
       latest_name: "2026.1"
-
-  octavia:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: octavia
-      dockerfile_path: containers/octavia/Dockerfile
-      build_args: OPENSTACK_VERSION=2025.2
-      latest_name: "2025.2"
 
   horizon:
     uses: ./.github/workflows/build-container-reuse.yaml
