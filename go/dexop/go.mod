@@ -6,7 +6,7 @@ toolchain go1.24.4
 
 require (
 	github.com/dexidp/dex/api/v2 v2.4.0
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.3
 	github.com/sethvargo/go-password v0.3.1
