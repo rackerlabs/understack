@@ -33,78 +33,45 @@ jobs:
     strategy:
       matrix:
         project:
+          - cinder
           - glance
-          - horizon
-          - octavia
-          - skyline
+          - ironic
+          - keystone
+          - nova
+          - neutron
+          - placement
+          - openstack-client
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
       container_name: ${{ matrix.project }}
       dockerfile_path: containers/${{ matrix.project }}/Dockerfile
+      build_args: OPENSTACK_VERSION=2026.1
+      latest_name: "2026.1"
+
+  skyline:
+    uses: ./.github/workflows/build-container-reuse.yaml
+    secrets: inherit
+    with:
+      container_name: skyline
+      dockerfile_path: containers/skyline/Dockerfile
       build_args: OPENSTACK_VERSION=2025.2
       latest_name: "2025.2"
 
-  cinder:
+  octavia:
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
-      container_name: cinder
-      dockerfile_path: containers/cinder/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
+      container_name: octavia
+      dockerfile_path: containers/octavia/Dockerfile
+      build_args: OPENSTACK_VERSION=2025.2
+      latest_name: "2025.2"
 
-  placement:
+  horizon:
     uses: ./.github/workflows/build-container-reuse.yaml
     secrets: inherit
     with:
-      container_name: placement
-      dockerfile_path: containers/placement/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
-
-  nova:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: nova
-      dockerfile_path: containers/nova/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
-
-  neutron:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: neutron
-      dockerfile_path: containers/neutron/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
-
-  ironic:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: ironic
-      dockerfile_path: containers/ironic/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
-      target: final
-
-  keystone:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: keystone
-      dockerfile_path: containers/keystone/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
-
-  openstack-client:
-    uses: ./.github/workflows/build-container-reuse.yaml
-    secrets: inherit
-    with:
-      container_name: openstack-client
-      dockerfile_path: containers/openstack-client/Dockerfile
-      build_args: OPENSTACK_VERSION=2026.1
-      latest_name: "2026.1"
+      container_name: horizon
+      dockerfile_path: containers/horizon/Dockerfile
+      build_args: OPENSTACK_VERSION=2025.2
+      latest_name: "2025.2"

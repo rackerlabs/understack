@@ -6,11 +6,11 @@ images:
   tags:
     # these are common across all these OpenStack Helm installations
     bootstrap: "ghcr.io/rackerlabs/understack/ansible:latest"
-    db_init: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
-    db_drop: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
-    ks_user: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
-    ks_service: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
-    ks_endpoints: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
+    db_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
+    db_drop: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
+    ks_user: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
+    ks_service: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
+    ks_endpoints: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
 
     # keystone
     keystone_api: "ghcr.io/rackerlabs/understack/keystone:2026.1"
@@ -30,9 +30,9 @@ images:
     ironic_pxe_http: "docker.io/nginx:1.29.8"
     ironic_db_sync: "ghcr.io/rackerlabs/understack/ironic:2026.1"
     # these want curl which apparently is in the openstack-client image
-    ironic_manage_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
-    ironic_retrive_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
-    ironic_retrive_swift_config: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
+    ironic_manage_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
+    ironic_retrive_cleaning_network: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
+    ironic_retrive_swift_config: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
 
     # neutron
     neutron_db_sync: "ghcr.io/rackerlabs/understack/neutron:2026.1"
@@ -55,7 +55,7 @@ images:
     # nova
     nova_api: "ghcr.io/rackerlabs/understack/nova:2026.1"
     nova_cell_setup: "ghcr.io/rackerlabs/understack/nova:2026.1"
-    nova_cell_setup_init: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
+    nova_cell_setup_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
     nova_compute: "ghcr.io/rackerlabs/understack/nova:2026.1"
     nova_compute_ironic: "ghcr.io/rackerlabs/understack/nova:2026.1"
     nova_compute_ssh: "ghcr.io/rackerlabs/understack/nova:2026.1"
@@ -114,5 +114,5 @@ images:
     octavia_worker: "ghcr.io/rackerlabs/understack/octavia:2025.2"
     octavia_housekeeping: "ghcr.io/rackerlabs/understack/octavia:2025.2"
     octavia_health_manager: "ghcr.io/rackerlabs/understack/octavia:2025.2"
-    octavia_health_manager_init: "ghcr.io/rackerlabs/understack/openstack-client:2025.2"
+    octavia_health_manager_init: "ghcr.io/rackerlabs/understack/openstack-client:2026.1"
 ...

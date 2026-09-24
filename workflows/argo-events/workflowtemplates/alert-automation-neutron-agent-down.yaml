@@ -23,7 +23,7 @@ spec:
           - name: id
           - name: hostname
       container:
-        image: ghcr.io/rackerlabs/understack/openstack-client:2025.2
+        image: ghcr.io/rackerlabs/understack/openstack-client:2026.1
         command: ["sh", "-c"]
         args:
           - |
