@@ -31,7 +31,7 @@ FW_FIELDS: dict[str, Any] = {
 
 def _node(
     *,
-    driver: str = "paloalto",
+    driver: str = "panos",
     resource_class: str = "pa1410",
     provision_state: str = "active",
     driver_info: dict | None = None,
@@ -103,7 +103,7 @@ def test_enroll_fw_hands_metadata_to_the_engine(mocker):
         physical_network="f20-1-network",
         ports=BASE_ARGS["ports"],
         resource_class="pa1410",
-        driver="paloalto",
+        driver="panos",
         external_cmdb_id=None,
         driver_info={
             "management_ip": "10.15.149.46",
@@ -297,7 +297,7 @@ def test_active_node_rejects_different_driver(mocker, driver):
     )
     mocker.patch.object(enroll_fw.netdev_reconciler, "enroll")
 
-    with pytest.raises(RuntimeError, match="refusing to enroll it as 'paloalto'"):
+    with pytest.raises(RuntimeError, match="refusing to enroll it as 'panos'"):
         enroll_fw.enroll_fw(**BASE_ARGS, **FW_FIELDS)
 
     client.update_node.assert_not_called()
@@ -335,7 +335,7 @@ def test_active_node_rejects_resource_class_change(mocker):
 
 
 @pytest.mark.parametrize(
-    ("driver_args", "expected"), [([], "paloalto"), (["--driver", "netdev"], "netdev")]
+    ("driver_args", "expected"), [([], "panos"), (["--driver", "netdev"], "netdev")]
 )
 def test_main_passes_default_or_explicit_driver(mocker, driver_args, expected):
     engine = mocker.patch.object(enroll_fw, "enroll_fw")

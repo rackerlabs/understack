@@ -8,7 +8,7 @@ metadata:
       Defined in `workflows/argo-events/workflowtemplates/enroll-fw.yaml`.
       Reuses enroll-netdev for the node/port lifecycle and additionally records
       firewall management details in driver_info and the HA mate serial in extra.
-      Defaults to the paloalto hardware type.
+      Defaults to the panos hardware type.
 kind: WorkflowTemplate
 spec:
   serviceAccountName: workflow
@@ -45,7 +45,7 @@ spec:
       - name: vendor
         value: "Palo Alto"
       - name: driver
-        value: "paloalto"
+        value: "panos"
       - name: model
         value: ""
   templates:

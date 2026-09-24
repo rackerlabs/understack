@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_RESOURCE_CLASS = "generic"
 
 # ``netdev`` is the generic Ironic hardware type for any network device.
-# please pass your own driver (e.g. ``paloalto``).
+# please pass your own driver (e.g. ``panos``).
 DEFAULT_DRIVER = "netdev"
 
 PLACEHOLDER_SWITCH_ID = "00:00:00:00:00:00"
