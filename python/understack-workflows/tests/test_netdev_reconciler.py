@@ -550,15 +550,15 @@ def test_enroll_creates_the_node_with_the_requested_driver(mocker):
         return_value=fake_ironic,
     )
 
-    netdev_reconciler.enroll(**ENROLL_ARGS, driver="paloalto")
+    netdev_reconciler.enroll(**ENROLL_ARGS, driver="panos")
 
     node_data = fake_ironic.node.create.call_args.kwargs
-    assert node_data["driver"] == "paloalto"
+    assert node_data["driver"] == "panos"
 
 
 @pytest.mark.parametrize(
     ("existing_driver", "requested_driver"),
-    [("netdev", "paloalto"), ("paloalto", "netdev")],
+    [("netdev", "panos"), ("panos", "netdev")],
 )
 def test_enroll_refuses_to_re_enrol_a_node_as_a_different_driver(
     mocker, existing_driver, requested_driver
@@ -592,7 +592,7 @@ def test_enroll_reuses_a_node_already_on_the_requested_driver(mocker):
     fake_ironic.node.get.side_effect = None
     fake_ironic.node.get.return_value = SimpleNamespace(
         uuid="node-123",
-        driver="paloalto",
+        driver="panos",
         provision_state="available",
         resource_class="generic",
     )
@@ -602,7 +602,7 @@ def test_enroll_reuses_a_node_already_on_the_requested_driver(mocker):
         return_value=fake_ironic,
     )
 
-    netdev_reconciler.enroll(**ENROLL_ARGS, driver="paloalto")
+    netdev_reconciler.enroll(**ENROLL_ARGS, driver="panos")
 
     fake_ironic.node.create.assert_not_called()
     fake_ironic.node.update.assert_not_called()

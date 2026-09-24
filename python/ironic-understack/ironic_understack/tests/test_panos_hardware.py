@@ -1,21 +1,21 @@
 from ironic_understack.drivers.netdev_hardware import NetdevHardware
-from ironic_understack.drivers.paloalto_hardware import PaloAltoHardware
+from ironic_understack.drivers.panos_hardware import PanosHardware
 
 
 def _interface_names(ifaces):
     return [cls.__name__ for cls in ifaces]
 
 
-def test_paloalto_is_a_netdev():
-    # A Palo Alto appliance is a network device; the separate hardware type
+def test_panos_is_a_netdev():
+    # A PAN-OS appliance is a network device; the separate hardware type
     # exists so it is identifiable from the driver alone.
-    assert issubclass(PaloAltoHardware, NetdevHardware)
+    assert issubclass(PanosHardware, NetdevHardware)
 
 
-def test_paloalto_matches_netdev_interfaces_today():
+def test_panos_matches_netdev_interfaces_today():
     # Nothing diverges yet. This pins that, so adding a real inspect or deploy
     # interface later is a deliberate change rather than an accident.
-    pa = PaloAltoHardware()
+    pa = PanosHardware()
     netdev = NetdevHardware()
     for name in (
         "supported_bios_interfaces",
@@ -35,11 +35,11 @@ def test_paloalto_matches_netdev_interfaces_today():
         assert getattr(pa, name) == getattr(netdev, name), name
 
 
-def test_paloalto_deploy_is_noop():
-    hw = PaloAltoHardware()
+def test_panos_deploy_is_noop():
+    hw = PanosHardware()
     assert _interface_names(hw.supported_deploy_interfaces) == ["NoDeploy"]
 
 
-def test_paloalto_network_is_neutron():
-    hw = PaloAltoHardware()
+def test_panos_network_is_neutron():
+    hw = PanosHardware()
     assert _interface_names(hw.supported_network_interfaces) == ["NeutronNetwork"]

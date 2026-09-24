@@ -11,7 +11,7 @@ from understack_workflows.ironic.client import IronicClient
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_FIREWALL_DRIVER = "paloalto"
+DEFAULT_FIREWALL_DRIVER = "panos"
 
 
 def main() -> None:
@@ -253,7 +253,7 @@ def _reject_structural_drift(
 def argument_parser():
     parser = argparse.ArgumentParser(
         prog=os.path.basename(__file__),
-        description="Enroll a firewall (defaults to the paloalto hardware type)",
+        description="Enroll a firewall (defaults to the panos hardware type)",
     )
     parser.add_argument("--name", required=True, help="Ironic node name")
     parser.add_argument(
