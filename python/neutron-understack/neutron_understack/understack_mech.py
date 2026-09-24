@@ -254,22 +254,15 @@ class UnderstackDriver(MechanismDriver):
             self._update_port_baremetal(context)
 
     def _update_port_baremetal(self, context: PortContext) -> None:
-        current_vif_unbound = context.vif_type == portbindings.VIF_TYPE_UNBOUND
-        original_vif_other = context.original_vif_type == portbindings.VIF_TYPE_OTHER
-        current_vif_other = context.vif_type == portbindings.VIF_TYPE_OTHER
-
-        if current_vif_unbound and original_vif_other:
-            port = context.original
-        else:
-            port = context.current
-
+        unbinding = utils.is_port_unbinding(context)
+        port = context.original if unbinding else context.current
         physnet = port[portbindings.PROFILE].get("physical_network")
 
-        if current_vif_unbound and original_vif_other:
+        if unbinding:
             self._tenant_network_port_cleanup(context)
             if physnet:
                 self.undersync.sync(physnet)
-        elif current_vif_other and physnet:
+        elif utils.is_port_bound_to_switchport(context) and physnet:
             self.undersync.sync(physnet)
 
     def _tenant_network_port_cleanup(self, context: PortContext):

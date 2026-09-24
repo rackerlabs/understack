@@ -102,8 +102,10 @@ class TestPortFieldManipulation:
 
 
 class PortContext:
-    def __init__(self, current):
+    def __init__(self, current=None, vif_type=None, original_vif_type=None):
         self.current = current
+        self.vif_type = vif_type
+        self.original_vif_type = original_vif_type
 
 
 class TestIsRouterInterface:
@@ -125,6 +127,59 @@ class TestIsRouterInterface:
     def test_router_interface_false_device_owner_none(self):
         context = PortContext(current={"device_owner": None})
         assert not utils.is_router_interface(context)
+
+
+VIF_TYPES = [
+    portbindings.VIF_TYPE_UNBOUND,
+    portbindings.VIF_TYPE_OTHER,
+    portbindings.VIF_TYPE_BINDING_FAILED,
+    portbindings.VIF_TYPE_OVS,
+]
+
+VIF_TYPE_PAIRS = [(c, o) for c in VIF_TYPES for o in VIF_TYPES]
+
+UNBINDING_PAIR = (portbindings.VIF_TYPE_UNBOUND, portbindings.VIF_TYPE_OTHER)
+
+
+class TestVifTransitionPredicates:
+    def test_unbinding_only_for_other_to_unbound(self):
+        context = PortContext(
+            vif_type=UNBINDING_PAIR[0], original_vif_type=UNBINDING_PAIR[1]
+        )
+        assert utils.is_port_unbinding(context)
+
+    @pytest.mark.parametrize(
+        ("vif_type", "original_vif_type"),
+        [pair for pair in VIF_TYPE_PAIRS if pair != UNBINDING_PAIR],
+    )
+    def test_unbinding_is_false_for_every_other_combination(
+        self, vif_type, original_vif_type
+    ):
+        context = PortContext(vif_type=vif_type, original_vif_type=original_vif_type)
+        assert not utils.is_port_unbinding(context)
+
+    @pytest.mark.parametrize("original_vif_type", VIF_TYPES)
+    def test_bound_to_switchport_ignores_the_original_vif_type(self, original_vif_type):
+        context = PortContext(
+            vif_type=portbindings.VIF_TYPE_OTHER, original_vif_type=original_vif_type
+        )
+        assert utils.is_port_bound_to_switchport(context)
+
+    @pytest.mark.parametrize(
+        "vif_type", [v for v in VIF_TYPES if v != portbindings.VIF_TYPE_OTHER]
+    )
+    def test_bound_to_switchport_false_unless_vif_type_is_other(self, vif_type):
+        context = PortContext(vif_type=vif_type, original_vif_type=None)
+        assert not utils.is_port_bound_to_switchport(context)
+
+    @pytest.mark.parametrize(("vif_type", "original_vif_type"), VIF_TYPE_PAIRS)
+    def test_predicates_are_mutually_exclusive(self, vif_type, original_vif_type):
+        """Drivers branch on these with if/elif; no input should satisfy both."""
+        context = PortContext(vif_type=vif_type, original_vif_type=original_vif_type)
+        assert not (
+            utils.is_port_unbinding(context)
+            and utils.is_port_bound_to_switchport(context)
+        )
 
 
 class TestMergeOverlappedRanges:

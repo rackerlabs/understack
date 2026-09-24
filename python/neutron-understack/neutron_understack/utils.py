@@ -498,6 +498,22 @@ def is_baremetal_port(context: PortContext) -> bool:
     return context.current[portbindings.VNIC_TYPE] == portbindings.VNIC_BAREMETAL
 
 
+def is_port_unbinding(context: PortContext) -> bool:
+    """True if the port just transitioned from bound (OTHER) to unbound.
+
+    Read physical_network from context.original here, not context.current.
+    """
+    return (
+        context.vif_type == portbindings.VIF_TYPE_UNBOUND
+        and context.original_vif_type == portbindings.VIF_TYPE_OTHER
+    )
+
+
+def is_port_bound_to_switchport(context: PortContext) -> bool:
+    """True if the port is currently bound with VIF_TYPE_OTHER."""
+    return context.vif_type == portbindings.VIF_TYPE_OTHER
+
+
 def is_router_interface(context: PortContext) -> bool:
     """Returns True if this port is the internal side of a router."""
     return context.current["device_owner"] in [
