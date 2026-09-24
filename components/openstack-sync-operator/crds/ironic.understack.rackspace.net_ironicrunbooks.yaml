@@ -6,6 +6,9 @@ metadata:
 spec:
   group: ironic.understack.rackspace.net
   names:
+    categories:
+    - openstack-sync
+    - ironic
     kind: IronicRunbook
     listKind: IronicRunbookList
     plural: ironicrunbooks

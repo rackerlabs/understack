@@ -6,6 +6,9 @@ metadata:
 spec:
   group: neutron.understack.rackspace.net
   names:
+    categories:
+    - openstack-sync
+    - neutron
     kind: NeutronSubnetPool
     listKind: NeutronSubnetPoolList
     plural: neutronsubnetpools
