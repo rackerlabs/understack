@@ -26,6 +26,11 @@ def setup_conf():
                 "1d": "bmc",
             },
         ),
+        cfg.StrOpt(
+            "network_device_credentials_dir",
+            help="Directory containing network device credentials",
+            default="/etc/network-device-credentials",
+        ),
     ]
     cfg.CONF.register_group(grp)
     cfg.CONF.register_opts(opts, group=grp)

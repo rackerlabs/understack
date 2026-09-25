@@ -49,6 +49,8 @@ conf:
     "baremetal:node:set_console_state": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s) "
     # allow node lessee to get console
     "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
+  ironic_understack:
+    network_device_credentials_dir: /etc/network-device-credentials
   ironic:
     DEFAULT:
       # hardware types we have enabled in ironic
