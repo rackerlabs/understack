@@ -6,6 +6,8 @@ metadata:
 spec:
   group: openstack.understack.rackspace.net
   names:
+    categories:
+    - openstack-sync
     kind: OpenstackPlaceholder
     listKind: OpenstackPlaceholderList
     plural: openstackplaceholders
