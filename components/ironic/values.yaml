@@ -265,6 +265,9 @@ pod:
     ironic_conductor:
       - secret:
           name: ironic-ks-etc
+      - secret:
+          name: network-device-credentials-ini
+          optional: true
     ironic_novncproxy:
       - secret:
           name: ironic-ks-etc
