@@ -169,3 +169,7 @@ cephObjectStores:
 configOverride: |
   [global]
   mon_data_avail_warn = 5
+
+toolbox:
+  # image is left unset so the pod tracks the cluster's Ceph version
+  enabled: true
