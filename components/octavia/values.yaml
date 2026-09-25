@@ -164,10 +164,43 @@ pod:
       - secret:
           name: octavia-ks-etc
   resources:
+    # (doug.goldstein) No CPU limits, CFS throttling hurts more than it
+    # helps. Helm merges our values over the chart defaults, so the limits
+    # need an explicit null instead of just being left out.
     enabled: true
     api:
       requests:
         memory: "512Mi"
+      limits:
+        cpu: null
+    driver_agent:
+      limits:
+        cpu: null
+    worker:
+      limits:
+        cpu: null
+    housekeeping:
+      limits:
+        cpu: null
+    health_manager:
+      limits:
+        cpu: null
+    jobs:
+      bootstrap:
+        limits:
+          cpu: null
+      db_sync:
+        limits:
+          cpu: null
+      ks_endpoints:
+        limits:
+          cpu: null
+      ks_service:
+        limits:
+          cpu: null
+      ks_user:
+        limits:
+          cpu: null
 
 manifests:
   job_db_init: false

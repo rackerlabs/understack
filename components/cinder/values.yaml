@@ -103,16 +103,41 @@ pod:
         # usually set on per-deployment basis.
         min_available: 0
   resources:
+    # (doug.goldstein) No CPU limits, CFS throttling hurts more than it
+    # helps. Helm merges our values over the chart defaults, so the limits
+    # need an explicit null instead of just being left out.
     enabled: true
     api:
       requests:
         memory: "256Mi"
+      limits:
+        cpu: null
     scheduler:
       requests:
         memory: "256Mi"
+      limits:
+        cpu: null
     volume:
       requests:
         memory: "256Mi"
+      limits:
+        cpu: null
+    jobs:
+      db_sync:
+        limits:
+          cpu: null
+      ks_endpoints:
+        limits:
+          cpu: null
+      ks_service:
+        limits:
+          cpu: null
+      ks_user:
+        limits:
+          cpu: null
+      volume_usage_audit:
+        limits:
+          cpu: null
 
 # (doug.goldstein) removed the 'identity' service dependency from all components,
 #   it is unused (the service) and other jobs wait on keystone working anyway.

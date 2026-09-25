@@ -103,12 +103,38 @@ pod:
       api:
         min_available: 1
   resources:
+    # (doug.goldstein) No CPU limits, CFS throttling hurts more than it
+    # helps. Helm merges our values over the chart defaults, so the limits
+    # need an explicit null instead of just being left out.
     enabled: true
     api:
       requests:
         memory: "2560Mi"
       limits:
         memory: "6144Mi"
+        cpu: null
+    jobs:
+      bootstrap:
+        limits:
+          cpu: null
+      db_sync:
+        limits:
+          cpu: null
+      ks_endpoints:
+        limits:
+          cpu: null
+      ks_service:
+        limits:
+          cpu: null
+      ks_user:
+        limits:
+          cpu: null
+      metadefs_load:
+        limits:
+          cpu: null
+      storage_init:
+        limits:
+          cpu: null
   probes:
     api:
       glance-api:
