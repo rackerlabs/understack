@@ -141,6 +141,9 @@ conf:
       processes: 2
 
 manifests:
+  # its pre-delete hook makes ArgoCD add pre-delete finalizers to the
+  # Application, which the app-of-apps then fights. no-op for us anyway.
+  job_clean: false
   job_db_init: false
   job_rabbit_init: false
   # disabled for now but we might want this
