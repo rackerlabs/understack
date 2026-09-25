@@ -326,6 +326,15 @@ wheels = [
 ]
 
 [[package]]
+name = "fixtures"
+version = "4.3.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/79/fc/da17efe78bb35b945441170363328ad11d953d69e6273bceb668b1d68c34/fixtures-4.3.2.tar.gz", hash = "sha256:b7db64014732513f23d12b0c49ae527ba0c0c1f2667ec97d9136d67157ebce5d", size = 47173, upload-time = "2026-03-25T17:25:40.51Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/58/b7efb4b7c01cefd47efb53e50c7f1eb2cdc4aff3d98268bdc46c7f628f2c/fixtures-4.3.2-py3-none-any.whl", hash = "sha256:c71ad55a9139bd20b3265c1d44c1a67fefb9efdddd79614096f538de63fbf4d8", size = 41625, upload-time = "2026-03-25T17:25:38.898Z" },
+]
+
+[[package]]
 name = "futurist"
 version = "3.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -452,6 +461,7 @@ dependencies = [
 
 [package.dev-dependencies]
 test = [
+    { name = "fixtures" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-github-actions-annotate-failures" },
@@ -466,6 +476,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 test = [
+    { name = "fixtures", specifier = ">=4" },
     { name = "pytest", specifier = ">=9.0.1,<10" },
     { name = "pytest-cov", specifier = ">=7,<8" },
     { name = "pytest-github-actions-annotate-failures" },
