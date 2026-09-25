@@ -72,12 +72,12 @@ class _UnderstackMl2ScenarioMixin:
         _apply_understack_ml2_overrides()
         super().setUp()
         # Replace the real HTTP Undersync client with a mock -- the single
-        # genuine external edge on the binding path. The trunk driver captured
-        # its own reference at construction (trunk.py), so patch that too.
+        # genuine external edge on the binding path. The undersync mechanism
+        # driver owns the client and makes every sync() call.
         self.understack_driver = self._mech_driver("understack")
+        self.undersync_driver = self._mech_driver("undersync")
         self.undersync_mock = mock.MagicMock(spec_set=Undersync)
-        self.understack_driver.undersync = self.undersync_mock
-        self.understack_driver.trunk_driver.undersync = self.undersync_mock
+        self.undersync_driver.undersync = self.undersync_mock
 
     @staticmethod
     def _mech_driver(name):
