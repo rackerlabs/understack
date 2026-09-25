@@ -71,10 +71,22 @@ pod:
         # usually set on per-deployment basis.
         min_available: 0
   resources:
+    # (doug.goldstein) No CPU limits, CFS throttling hurts more than it
+    # helps. Helm merges our values over the chart defaults, so the limits
+    # need an explicit null instead of just being left out.
     enabled: true
     server:
       requests:
         memory: "512Mi"
+      limits:
+        cpu: null
+    jobs:
+      db_sync:
+        limits:
+          cpu: null
+      tests:
+        limits:
+          cpu: null
 
 annotations:
   # we need to modify the annotations on OpenStack Helm
