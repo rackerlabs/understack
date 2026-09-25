@@ -92,6 +92,9 @@ spec:
         envFrom:
           - configMapRef:
               name: cluster-metadata
+          - secretRef:
+              name: network-device-credentials
+              optional: true
         env:
           - name: WF_NS
             value: "{{workflow.namespace}}"

@@ -30,5 +30,13 @@ def setup_conf():
     cfg.CONF.register_group(grp)
     cfg.CONF.register_opts(opts, group=grp)
 
+    # Register network device credential groups (loaded from network_devices.conf)
+    # These sections are populated from /etc/ironic/ironic.conf.d/network_devices.conf
+    # which is mounted via etcSources from the network-device-credentials-ini secret
+    for group_name in ["panos", "f5", "service_accounts"]:
+        grp = cfg.OptGroup(group_name)
+        cfg.CONF.register_group(grp)
+        # Options are defined in the INI file, not pre-registered here
+
 
 setup_conf()

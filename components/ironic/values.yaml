@@ -49,6 +49,8 @@ conf:
     "baremetal:node:set_console_state": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s) "
     # allow node lessee to get console
     "baremetal:node:get_console": "((role:member and system_scope:all) or rule:service_role) or (role:service and system_scope:all) or (role:member and project_id:%(node.owner)s) or (role:service and project_id:%(node.owner)s) or (role:member and project_id:%(node.lessee)s)"
+  ironic_understack:
+    network_device_credentials_dir: /etc/network-device-credentials
   ironic:
     DEFAULT:
       # hardware types we have enabled in ironic
@@ -263,6 +265,9 @@ pod:
     ironic_conductor:
       - secret:
           name: ironic-ks-etc
+      - secret:
+          name: network-device-credentials-ini
+          optional: true
     ironic_novncproxy:
       - secret:
           name: ironic-ks-etc
@@ -279,6 +284,9 @@ pod:
           - name: ironic-inspection-rules
             mountPath: /etc/ironic/inspection-rules/
             readOnly: true
+          - name: network-device-credentials
+            mountPath: /etc/network-device-credentials
+            readOnly: true
         volumes:
           - name: dnsmasq-ironic
             persistentVolumeClaim:
@@ -292,6 +300,10 @@ pod:
           - name: ironic-inspection-rules
             configMap:
               name: ironic-inspection-rules
+              optional: true
+          - name: network-device-credentials
+            secret:
+              secretName: network-device-credentials
               optional: true
   replicas:
     api: 4
