@@ -13,7 +13,8 @@ To enable this we are using the following plugins/features of Neutron:
 - [networking-baremetal][networking-baremetal] to have Neutron aware of the physical
   networks of Ironic baremetal ports.
 - our custom mechanism drivers `understack` and `undersync` (both must be loaded,
-  with `baremetal` from [networking-baremetal][networking-baremetal] loaded between them)
+  in that order, with `baremetal` from
+  [networking-baremetal][networking-baremetal] loaded between them)
 - [ovn-router][ovn-admin] as the L3 router plugin
 - [trunk plugin][neutron-trunk] service plugin
 - [network segment range][neutron-network-segment-range] service plugin
@@ -399,29 +400,54 @@ The names and the IDs all match, along with the VLAN ID of the segment where the
 ## ML2 Mechanism Operations
 
 Our ML2 mechanism is split across two drivers that must both be present in
-`mechanism_drivers`, with the `baremetal` driver from
+`mechanism_drivers`, **in this order**, with the `baremetal` driver from
 [networking-baremetal][networking-baremetal] loaded between them:
 
-- `understack` — the primary driver responsible for allocating dynamic VLAN
-  segments on VXLAN networks (`bind_port()`), releasing them when ports are
-  removed (`delete_port_postcommit()`), and triggering switch configuration
-  updates (`update_port_postcommit()`)
+- `understack` — owns the Neutron-side bookkeeping: it allocates dynamic VLAN
+  segments on VXLAN networks (`bind_port()`), releases them when a port is
+  unbound or deleted (`update_port_postcommit()`, `delete_port_postcommit()`),
+  allocates segments for trunk subports, and handles router uplinks and SVI
+  validation. It never contacts Undersync.
 - `baremetal` — the [networking-baremetal][networking-baremetal] driver that
   makes Neutron aware of the physical networks of Ironic baremetal ports
-- `undersync` — handles level-1 binding by calling `set_binding()`
-  on the VLAN segment that `understack` allocated via `continue_binding()`;
-  without it port binding fails at level 1
+- `undersync` — completes level-1 binding by calling `set_binding()` on the VLAN
+  segment `understack` allocated via `continue_binding()`, and is the **sole
+  owner of the Undersync client**. It works out what changed and tells Undersync
+  which `physical_network` (vlan group) to reconcile.
 
 The binding flow is: `understack` handles the VXLAN segment at level 0 and
 calls `continue_binding()` with a dynamically allocated VLAN segment, then
 `undersync` finalises the binding at level 1 by calling
-`set_binding()` on that VLAN segment.
+`set_binding()` on that VLAN segment. Without `undersync` loaded, port binding
+fails at level 1.
 
 Together they are responsible for:
 
 - creating dynamic VLAN segments on VXLAN networks via port binding operations via `bind_port()`
 - deleting dynamic VLAN segments on VXLAN networks when ports are removed via `delete_port_postcommit()`
-- triggering the actual operation to update the leaf/spine devices to provide the connectivity via `update_port_postcommit()`
+- triggering the actual operation to update the leaf/spine devices to provide the connectivity via `update_port_postcommit()` on the `undersync` driver
+
+### Driver ordering is load-bearing
+
+`undersync` must be listed **after** `understack`, for two independent reasons:
+
+1. **ML2 hooks.** `MechanismManager` invokes `*_postcommit` in the order the
+   drivers appear in `mechanism_drivers`. Understack's bookkeeping — releasing
+   the dynamic segment, cleaning the trunk — has to finish before Undersync is
+   told to reconcile, because Undersync reconciles from real device state.
+2. **Trunk and subport callbacks.** These are `neutron-lib` registry events, so
+   driver order does not apply; ordering comes from callback priority instead.
+   `undersync` subscribes above `PRIORITY_DEFAULT`, which the understack trunk
+   driver uses. It matters for `SUBPORTS AFTER_DELETE` and `TRUNK AFTER_DELETE`,
+   where understack tears down in the AFTER handler rather than in precommit.
+
+A distinct priority is also required because `neutron-lib` stores the
+`cancellable` flag per priority *group*, set by whichever subscriber creates the
+group first. Mechanism drivers initialise before the trunk service plugin loads,
+so sharing `PRIORITY_DEFAULT` would let `undersync`'s flag decide the trunk
+driver's cancellation behaviour too.
+
+Both drivers read the `[ml2_understack]` config group.
 
 ```mermaid
 sequenceDiagram

@@ -49,6 +49,10 @@ conf:
         # ovn is listed first so it creates virtual ports for routers before
         # our baremetal drivers run, matching the recommended ordering from
         # https://docs.openstack.org/networking-baremetal/latest/
+        #
+        # understack must come before undersync: ML2 invokes *_postcommit in
+        # this order, and Undersync reconciles from real device state, so it
+        # must be notified after understack's segment release and trunk cleanup.
         mechanism_drivers: "ovn,understack,baremetal,undersync"
         tenant_network_types: "vxlan"
         type_drivers: "vlan,vxlan"

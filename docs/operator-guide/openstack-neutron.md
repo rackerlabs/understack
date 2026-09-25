@@ -220,7 +220,9 @@ conf:
         # this line just aims to add 'logger' but its
         # replacing so you'll need to pay attention
         # to any changes your environment might have
-        # from the default
+        # from the default. Keep 'understack' ahead of
+        # 'undersync': ML2 calls *_postcommit in this order and
+        # undersync must be notified after understack's cleanup.
         mechanism_drivers: "logger,ovn,understack,baremetal,undersync"
   logging:
     loggers:
