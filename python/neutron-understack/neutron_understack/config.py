@@ -6,6 +6,7 @@ _OPT_GRP_ML2_UNDERSTACK = "ml2_understack"
 _OPT_GRP_IRONIC = "ironic"
 _OPT_GRP_L3_SVC_CISCO_ASA = "l3_service_cisco_asa"
 _OPT_GRP_UNDERSTACK_VNI = "understack_vni"
+_OPT_GRP_NETDEV_RECONCILE = "netdev_router_reconcile"
 
 _mech_understack_opts = [
     cfg.StrOpt(
@@ -69,6 +70,30 @@ _understack_vni_opts = [
 ]
 
 
+_netdev_reconcile_opts = [
+    cfg.BoolOpt(
+        "enabled",
+        default=True,
+        help=(
+            "Run the periodic netdev-router reconciler in the OVN maintenance "
+            "worker. It releases panos Ironic nodes whose instance_uuid names "
+            "a router that no longer exists. Set to false to stop it from "
+            "changing any node state; set dry_run to inspect what it would do "
+            "without changing anything."
+        ),
+    ),
+    cfg.BoolOpt(
+        "dry_run",
+        default=False,
+        help=(
+            "Log the netdev nodes the reconciler would release without "
+            "releasing them. Use this to confirm the candidate set in a new "
+            "region before letting it act."
+        ),
+    ),
+]
+
+
 def list_understack_opts():
     return [
         (_OPT_GRP_ML2_UNDERSTACK, _mech_understack_opts),
@@ -100,6 +125,12 @@ def list_understack_vni_opts():
     ]
 
 
+def list_netdev_reconcile_opts():
+    return [
+        (_OPT_GRP_NETDEV_RECONCILE, _netdev_reconcile_opts),
+    ]
+
+
 def register_ml2_understack_opts(config):
     config.register_opts(_mech_understack_opts, _OPT_GRP_ML2_UNDERSTACK)
 
@@ -116,6 +147,10 @@ def register_l3_svc_cisco_asa_opts(config):
 
 def register_understack_vni_opts(config):
     config.register_opts(_understack_vni_opts, _OPT_GRP_UNDERSTACK_VNI)
+
+
+def register_netdev_reconcile_opts(config):
+    config.register_opts(_netdev_reconcile_opts, _OPT_GRP_NETDEV_RECONCILE)
 
 
 def get_session(group: str) -> ks_session.Session:

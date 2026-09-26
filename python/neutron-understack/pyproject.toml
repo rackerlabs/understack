@@ -38,6 +38,7 @@ ironic = "neutron_understack.config:list_ironic_opts"
 understack = "neutron_understack.config:list_understack_opts"
 cisco-asa = "neutron_understack.config:list_cisco_asa_opts"
 understack-vni = "neutron_understack.config:list_understack_vni_opts"
+netdev-router-reconcile = "neutron_understack.config:list_netdev_reconcile_opts"
 
 [project.entry-points."neutron.ml2.mechanism_drivers"]
 understack = "neutron_understack.understack_mech:UnderstackDriver"
