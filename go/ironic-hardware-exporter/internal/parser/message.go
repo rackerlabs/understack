@@ -2,9 +2,10 @@ package parser
 
 import (
 	"encoding/json"
-	"log"
 	"strings"
 	"time"
+
+	"charm.land/log/v2"
 )
 
 //Messages in rabbitmq are double nested inside oslo.
@@ -111,7 +112,8 @@ func Parse(body []byte) (*HardwareMessage, error) {
 	// if it fails fall back to now so we always have a valid timestamp
 	ts, err := time.Parse("2006-01-02T15:04:05.999999", inner.Payload.Timestamp)
 	if err != nil {
-		log.Printf("warning: could not parse event timestamp %q, falling back to now — Ironic may have changed the timestamp format: %v", inner.Payload.Timestamp, err)
+		log.Warn("could not parse event timestamp, falling back to now — Ironic may have changed the timestamp format",
+			"timestamp", inner.Payload.Timestamp, "error", err)
 		ts = time.Now().UTC()
 	}
 
