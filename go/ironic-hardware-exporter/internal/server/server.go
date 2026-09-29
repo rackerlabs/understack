@@ -2,9 +2,9 @@ package server
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
+	"charm.land/log/v2"
 	"github.com/labstack/echo/v4"
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/cache"
 	"github.com/rackerlabs/understack/go/ironic-hardware-exporter/internal/metrics"
@@ -31,7 +31,7 @@ func (s *Server) Start() error {
 	e.GET("/ready", s.handleReady)
 
 	addr := fmt.Sprintf(":%d", s.port)
-	log.Printf("HTTP server listening on %s", addr)
+	log.Info("HTTP server listening", "addr", addr)
 	return e.Start(addr)
 }
 
@@ -39,7 +39,7 @@ func (s *Server) handleMetrics(c echo.Context) error {
 	nodes := s.store.GetAll()
 	families := metrics.Transform(nodes)
 	output := metrics.Render(families)
-	log.Printf("GET /metrics — served %d nodes", len(nodes))
+	log.Info("GET /metrics served", "nodes", len(nodes))
 	return c.Blob(http.StatusOK, contentTypePrometheus, []byte(output))
 }
 
