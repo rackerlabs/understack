@@ -46,6 +46,7 @@ jobs:
       apps: ${{ steps.list_dirs.outputs.apps }}
 
   golangci-lint:
+    name: golangci-lint (${{ matrix.app }})
     runs-on: ubuntu-latest
     needs: setup
     strategy:
@@ -53,6 +54,10 @@ jobs:
       fail-fast: false
       matrix:
         app: ${{ fromJson(needs.setup.outputs.apps) }}
+        include:
+          - app: dexop
+            # renovate: datasource=github-releases depName=golangci/golangci-lint
+            GOLANGCI_LINT_VERSION: v2.14.0
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -76,6 +81,6 @@ jobs:
       - name: golangci-lint ${{ matrix.app }}
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
-          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          version: ${{ matrix.GOLANGCI_LINT_VERSION || env.GOLANGCI_LINT_VERSION }}
           install-mode: goinstall
           working-directory: go/${{ matrix.app }}
