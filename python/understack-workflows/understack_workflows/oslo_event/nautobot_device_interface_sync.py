@@ -206,39 +206,48 @@ def _assign_ip_to_interface(
         logger.warning("Failed to associate IP %s with interface: %s", ip_address, e)
 
 
-def sync_idrac_interface(
+def sync_management_interface(
     device_uuid: str,
-    bmc_mac: str,
+    interface_name: str,
+    mac: str,
     nautobot_client: Nautobot,
-    bmc_ip: str | None = None,
+    ip: str | None = None,
+    description: str | None = None,
 ) -> None:
-    """Sync iDRAC interface to Nautobot.
+    """Sync management interface (iDRAC, management, etc.) to Nautobot.
 
-    Creates or updates the iDRAC management interface for a device.
+    Creates or updates a management interface for a device.
     Looks up existing interface by name + device_id.
-    Optionally assigns the BMC IP address to the interface.
+    Optionally assigns an IP address to the interface.
 
-    TODO: Add cable management for iDRAC. Currently not implemented because
-    LLDP data for iDRAC switch connection is not available in Ironic inventory.
-    Would require querying the BMC directly via Redfish (see bmc_chassis_info.py).
+    TODO: Add cable management for management interfaces. Currently not implemented
+    because LLDP data for management switch connections is not always available in
+    Ironic. Would require additional discovery or manual specification.
 
     Args:
         device_uuid: Nautobot device UUID
-        bmc_mac: BMC MAC address from inventory
+        interface_name: Interface name (e.g., "iDRAC", "management")
+        mac: MAC address
         nautobot_client: Nautobot API client
-        bmc_ip: Optional BMC IP address from inventory (bmc_address)
+        ip: Optional IP address to assign
+        description: Optional interface description
     """
-    if not bmc_mac:
-        logger.debug("No bmc_mac provided for device %s", device_uuid)
+    if not mac:
+        logger.debug(
+            "No MAC provided for %s interface on device %s", interface_name, device_uuid
+        )
         return
 
-    mac_address = bmc_mac.upper()
-    idrac_interface = None
+    mac_address = mac.upper()
+    mgmt_interface = None
 
-    # Check if iDRAC interface already exists
+    if not description:
+        description = f"Management interface ({interface_name})"
+
+    # Check if interface already exists
     existing = nautobot_client.dcim.interfaces.get(
         device_id=device_uuid,
-        name="iDRAC",
+        name=interface_name,
     )
 
     # pynautobot.get() can return Record, list, or None - we expect a single Record
@@ -251,33 +260,67 @@ def sync_idrac_interface(
         if current_mac != mac_address:
             existing.mac_address = mac_address  # type: ignore[attr-defined]
             existing.save()  # type: ignore[union-attr]
-            logger.info("Updated iDRAC MAC for device %s: %s", device_uuid, mac_address)
+            logger.info(
+                "Updated %s MAC for device %s: %s",
+                interface_name,
+                device_uuid,
+                mac_address,
+            )
         else:
             logger.debug(
-                "iDRAC interface already up to date for device %s", device_uuid
+                "%s interface already up to date for device %s",
+                interface_name,
+                device_uuid,
             )
-        idrac_interface = existing
+        mgmt_interface = existing
     else:
-        # Create new iDRAC interface
-        idrac_interface = nautobot_client.dcim.interfaces.create(
+        # Create new management interface
+        mgmt_interface = nautobot_client.dcim.interfaces.create(
             device=device_uuid,
-            name="iDRAC",
+            name=interface_name,
             type="1000base-t",
             mac_address=mac_address,
-            description="Dedicated iDRAC interface",
+            description=description,
             mgmt_only=True,
             enabled=True,
             status="Active",
         )
         logger.info(
-            "Created iDRAC interface for device %s: %s", device_uuid, mac_address
+            "Created %s interface for device %s: %s",
+            interface_name,
+            device_uuid,
+            mac_address,
         )
 
-    # Assign BMC IP address to iDRAC interface
-    if idrac_interface and bmc_ip:
-        idrac_id = getattr(idrac_interface, "id", None)
-        if idrac_id:
-            _assign_ip_to_interface(nautobot_client, idrac_id, bmc_ip)
+    # Assign IP address to interface
+    if mgmt_interface and ip:
+        mgmt_id = getattr(mgmt_interface, "id", None)
+        if mgmt_id:
+            _assign_ip_to_interface(nautobot_client, mgmt_id, ip)
+
+
+def sync_idrac_interface(
+    device_uuid: str,
+    bmc_mac: str,
+    nautobot_client: Nautobot,
+    bmc_ip: str | None = None,
+) -> None:
+    """Sync iDRAC interface to Nautobot (wrapper for sync_management_interface).
+
+    Args:
+        device_uuid: Nautobot device UUID
+        bmc_mac: BMC MAC address from inventory
+        nautobot_client: Nautobot API client
+        bmc_ip: Optional BMC IP address from inventory (bmc_address)
+    """
+    sync_management_interface(
+        device_uuid=device_uuid,
+        interface_name="iDRAC",
+        mac=bmc_mac,
+        nautobot_client=nautobot_client,
+        ip=bmc_ip,
+        description="Dedicated iDRAC interface",
+    )
 
 
 def _build_interfaces_from_ports(
@@ -396,8 +439,8 @@ def _cleanup_stale_interfaces(
         intf_name = getattr(intf, "name", None)
         intf_id = getattr(intf, "id", None)
 
-        # Skip iDRAC - it's managed separately and not in Ironic ports
-        if intf_name == "iDRAC":
+        # Skip management interfaces - managed separately, not in Ironic ports
+        if intf_name in ("iDRAC", "management"):
             continue
 
         if intf_id not in valid_interface_ids:
@@ -562,6 +605,7 @@ def sync_interfaces_from_data(
     inventory: dict,
     ports: list,
     nautobot_client: Nautobot,
+    node=None,
 ) -> int:
     """Sync interfaces to Nautobot using pre-fetched inventory and ports.
 
@@ -573,6 +617,7 @@ def sync_interfaces_from_data(
         inventory: Ironic node inventory dict (from get_node_inventory)
         ports: List of Ironic port objects (from list_ports)
         nautobot_client: Nautobot API client
+        node: Optional Ironic node object (for accessing extra fields)
 
     Returns:
         EXIT_STATUS_SUCCESS on success, EXIT_STATUS_FAILURE on failure
@@ -607,6 +652,26 @@ def sync_interfaces_from_data(
         bmc_ip = inv.get("bmc_address")
         if bmc_mac:
             sync_idrac_interface(node_uuid, bmc_mac, nautobot_client, bmc_ip)
+
+        # Sync management interface for netdev appliances (firewalls, etc.)
+        # Management data comes from node.driver_info for netdev devices
+        if node:
+            driver_info = getattr(node, "driver_info", {}) or {}
+            mgmt_ip = driver_info.get("management_ip")
+
+            # MAC might be in driver_info or extra - check both
+            extra = getattr(node, "extra", {}) or {}
+            mgmt_mac = driver_info.get("management_mac") or extra.get("mgmt_mac")
+
+            if mgmt_mac:
+                sync_management_interface(
+                    device_uuid=node_uuid,
+                    interface_name="management",
+                    mac=mgmt_mac,
+                    nautobot_client=nautobot_client,
+                    ip=mgmt_ip,
+                    description="Management interface",
+                )
 
         # Cleanup stale interfaces no longer in Ironic
         valid_ids = {intf.uuid for intf in interfaces}
