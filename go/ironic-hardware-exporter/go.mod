@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/labstack/echo/v4 v4.13.4
 	github.com/maypok86/otter v1.2.4
-	github.com/rabbitmq/amqp091-go v1.10.0
+	github.com/rabbitmq/amqp091-go v1.13.0
 )
 
 require (
