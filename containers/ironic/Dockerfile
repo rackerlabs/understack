@@ -12,12 +12,12 @@ RUN apt-get update && \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # renovate: name=openstack/ironic repo=https://github.com/rackerlabs/ironic.git branch=understack/2026.1
-ARG IRONIC_GIT_REF=5ef091d4eddbde8ea28a558093bd25e08bdda255
+ARG IRONIC_GIT_REF=92fc8e1952e93c721e8efe25e4c01c6f98c3db4d
 ADD --keep-git-dir=true https://github.com/rackerlabs/ironic.git#${IRONIC_GIT_REF} /src/ironic
 RUN git -C /src/ironic fetch --unshallow --tags
 
 # renovate: name=openstack/sushy repo=https://github.com/openstack/sushy.git branch=stable/2026.1
-ARG SUSHY_GIT_REF=eaf1dfb807cdc40f9b192bc892a4ab54c71198fe
+ARG SUSHY_GIT_REF=43e8e7734ff52bfd8ee8c0656fa32b56830f6574
 ADD --keep-git-dir=true https://github.com/openstack/sushy.git#${SUSHY_GIT_REF} /src/sushy
 RUN git -C /src/sushy fetch --unshallow --tags && \
     sed -i '/sushy==.*/d' /upper-constraints.txt
