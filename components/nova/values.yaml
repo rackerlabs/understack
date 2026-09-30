@@ -308,6 +308,9 @@ pod:
             timeoutSeconds: 10
             failureThreshold: 3
   resources:
+    # (doug.goldstein) No CPU limits, CFS throttling hurts more than it
+    # helps. Helm merges our values over the chart defaults, so the limits
+    # need an explicit null instead of just being left out.
     enabled: true
     api:
       # JIRA:PUC-2007 - raise osapi resources. Heavy all_tenants queries with 8
@@ -316,14 +319,43 @@ pod:
         cpu: "500m"
         memory: "512Mi"
       limits:
-        cpu: "4"
+        cpu: null
         memory: "2Gi"
+    api_metadata:
+      limits:
+        cpu: null
     conductor:
       requests:
         memory: "256Mi"
+      limits:
+        cpu: null
+    scheduler:
+      limits:
+        cpu: null
     compute_ironic:
       requests:
         memory: "256Mi"
+      limits:
+        cpu: null
+    jobs:
+      bootstrap:
+        limits:
+          cpu: null
+      cell_setup:
+        limits:
+          cpu: null
+      db_sync:
+        limits:
+          cpu: null
+      ks_endpoints:
+        limits:
+          cpu: null
+      ks_service:
+        limits:
+          cpu: null
+      ks_user:
+        limits:
+          cpu: null
 
 manifests:
   job_db_init: false
