@@ -52,6 +52,29 @@ conf:
     # ceph is providing block storage to VM creation and is connected via libvirt
     # we aren't using this so we don't want to enable this part of the chart
     enabled: false
+  logging:
+    # The chart sends the root logger to a null handler and only wires up
+    # 'nova' and 'os.brick', so anything oslo.messaging or oslo.service logs
+    # (RabbitMQ declare failures, signal handling, graceful shutdown) is
+    # silently dropped. Route their warnings and errors to stdout. This list
+    # replaces the chart's, so it must keep the chart's own loggers.
+    loggers:
+      keys:
+        - root
+        - nova
+        - os.brick
+        - oslo_messaging
+        - oslo_service
+    logger_oslo_messaging:
+      level: WARNING
+      handlers:
+        - stdout
+      qualname: oslo_messaging
+    logger_oslo_service:
+      level: WARNING
+      handlers:
+        - stdout
+      qualname: oslo_service
   nova_ironic:
     ironic:
       # this is where we populate our hardware
