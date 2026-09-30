@@ -16,7 +16,7 @@ ADD --keep-git-dir=true https://github.com/rackerlabs/neutron-lib.git#${NEUTRON_
 RUN git -C /src/neutron-lib fetch --unshallow --tags
 
 # renovate: name=openstack/networking-baremetal repo=https://github.com/openstack/networking-baremetal.git branch=stable/2026.1
-ARG NETWORKING_BAREMETAL_GIT_REF=e713f05659b1bf2794a462ab8aa13ee367ef4045
+ARG NETWORKING_BAREMETAL_GIT_REF=c476ca73e449cbc860f4b3cf515d4b010c116e82
 ADD --keep-git-dir=true https://github.com/openstack/networking-baremetal.git#${NETWORKING_BAREMETAL_GIT_REF} /src/networking-baremetal
 RUN git -C /src/networking-baremetal fetch --unshallow --tags
 
