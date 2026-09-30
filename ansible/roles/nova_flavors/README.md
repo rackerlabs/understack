@@ -147,6 +147,7 @@ None
 
 For each flavor:
 
+1. **Check resource class exists** - if the flavor's resource class is not present in this environment's device-types, log a warning and skip the flavor
 1. **Lookup resource specs** - finds the device-type resource class specifications
 2. **Build trait requirements** - extracts required and forbidden traits, adds `CUSTOM_` prefix
 3. **Build base extra_specs** - creates resource consumption specs (always 0 for bare metal) and resource class requirement
@@ -190,14 +191,20 @@ This ensures valid extra_spec keys for OpenStack placement.
 
 ## Error Handling
 
-The role will fail if:
+If a flavor references a resource class that is not defined by any device-type
+in the current environment, that flavor is **skipped** (not created) and a
+warning is logged naming the flavor, the missing resource class, and the
+resource classes that are known. This is intentional: not every flavor exists
+in every site, so a flavor whose hardware is absent is treated as
+"not applicable here" rather than a hard failure.
 
-- A flavor references a non-existent resource class (not found in any device-type)
+The role will still fail if:
+
 - Required ConfigMaps are not mounted at expected paths
 - OpenStack authentication fails
 - Flavor creation fails (invalid parameters, permissions, etc.)
 
-Error messages will indicate which flavor and resource class caused the failure.
+Error and skip messages indicate which flavor and resource class were involved.
 
 ## Testing
 
