@@ -16,7 +16,6 @@ from neutron_understack import routers
 from neutron_understack import utils
 from neutron_understack.l3_router import svi as svi_router
 from neutron_understack.trunk import UnderstackTrunkDriver
-from neutron_understack.undersync_client import Undersync
 
 from .ml2_type_annotations import NetworkContext
 from .ml2_type_annotations import PortContext
@@ -45,10 +44,8 @@ class UnderstackDriver(MechanismDriver):
 
     def initialize(self):
         config.register_ml2_understack_opts(cfg.CONF)
-        conf = cfg.CONF.ml2_understack
 
-        self.undersync = Undersync(conf.undersync_url)
-        self.trunk_driver = UnderstackTrunkDriver.create(self)
+        self.trunk_driver = UnderstackTrunkDriver.create()
         self.subscribe()
 
     def subscribe(self):
@@ -117,7 +114,7 @@ class UnderstackDriver(MechanismDriver):
     def create_port_precommit(self, context: PortContext):
         # Early SVI address scope check fires before port is committed and
         # before create_port_postcommit, so invalid subnets never reach the
-        # VLAN allocation / trunk / Undersync steps.
+        # VLAN allocation / trunk steps.
         # Neutron surfaces the BadRequest back through the router-interface API.
         # update_port_precommit covers existing-port attaches.
         if utils.is_router_interface(context):
@@ -250,20 +247,8 @@ class UnderstackDriver(MechanismDriver):
             )
 
     def update_port_postcommit(self, context: PortContext) -> None:
-        if utils.is_baremetal_port(context):
-            self._update_port_baremetal(context)
-
-    def _update_port_baremetal(self, context: PortContext) -> None:
-        unbinding = utils.is_port_unbinding(context)
-        port = context.original if unbinding else context.current
-        physnet = port[portbindings.PROFILE].get("physical_network")
-
-        if unbinding:
+        if utils.is_baremetal_port(context) and utils.is_port_unbinding(context):
             self._tenant_network_port_cleanup(context)
-            if physnet:
-                self.undersync.sync(physnet)
-        elif utils.is_port_bound_to_switchport(context) and physnet:
-            self.undersync.sync(physnet)
 
     def _tenant_network_port_cleanup(self, context: PortContext):
         """Tenant network port cleanup in the UnderCloud infrastructure.
@@ -278,23 +263,16 @@ class UnderstackDriver(MechanismDriver):
         """
         trunk_details = context.current.get("trunk_details", {})
         segment_id = context.original_top_bound_segment["id"]
-        original_binding = context.original[portbindings.PROFILE]
+
+        LOG.debug("releasing vlan segment %s from interface", segment_id)
 
         segment = utils.network_segment_by_id(segment_id)
         if segment:
             utils.release_segment_if_unused(segment)
 
-        networks_to_remove = {segment_id}
-
-        LOG.debug(
-            "update_port_postcommit removing vlans %s from interface",
-            networks_to_remove,
-        )
-
         if trunk_details:
             self.trunk_driver.clean_trunk(
                 trunk_details=trunk_details,
-                binding_profile=original_binding,
                 host=context.original_host,
             )
 
@@ -303,28 +281,22 @@ class UnderstackDriver(MechanismDriver):
 
     def delete_port_postcommit(self, context: PortContext) -> None:
         if utils.is_baremetal_port(context):
-            self._delete_port_baremetal(context)
+            self._release_segment_on_delete(context)
 
-    def _delete_port_baremetal(self, context: PortContext) -> None:
+    def _release_segment_on_delete(self, context: PortContext) -> None:
+        # _tenant_network_port_cleanup only runs on the bound->unbound
+        # update_port_postcommit transition; a port deleted while still bound
+        # skips it, leaking the segment and its VLAN. The undersync driver
+        # reconciles the switch in its own delete_port_postcommit.
         port = context.current
 
         physnet = port[portbindings.PROFILE].get("physical_network")
-
         if not physnet:
             return
 
-        # A port's dynamic VLAN segment is normally released by
-        # _tenant_network_port_cleanup, but that only runs on the
-        # update_port_postcommit bound->unbound transition. A port deleted
-        # while still bound skips that transition entirely, so without this
-        # the segment -- and its VLAN -- leaks forever.
         segment = utils.network_segment_by_physnet(port["network_id"], physnet)
         if segment:
             utils.release_segment_if_unused(segment)
-
-        # Reconcile the switch so the removed port's VLAN config is torn down,
-        # matching the unbind path in _update_port_baremetal.
-        self.undersync.sync(physnet)
 
     def bind_port(self, context: PortContext) -> None:
         """Bind the VXLAN network segment and allocate dynamic VLAN segments.

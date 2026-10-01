@@ -1,4 +1,6 @@
+import importlib
 import logging
+import pathlib
 from dataclasses import dataclass
 from types import SimpleNamespace
 
@@ -7,8 +9,8 @@ from neutron_lib import constants as p_const
 from neutron_lib.api.definitions import portbindings
 from neutron_lib.plugins.ml2 import api
 
+from neutron_understack import trunk
 from neutron_understack import understack_mech
-from neutron_understack.understack_mech import UnderstackDriver
 
 
 def _port_update_context(original, current):
@@ -134,29 +136,52 @@ class TestUpdatePortPreCommit:
 
 
 class TestUpdatePortPostCommit:
-    def test_with_simple_port(self, understack_driver, port_context):
+    """Only the unbind transition does work here.
+
+    Reconciling the switch belongs to the undersync driver now; the only thing
+    this hook still owns is releasing the tenant network's segment.
+    """
+
+    def test_does_nothing_for_a_port_that_is_still_bound(
+        self, mocker, understack_driver, port_context
+    ):
+        cleanup = mocker.patch.object(understack_driver, "_tenant_network_port_cleanup")
+
         understack_driver.update_port_postcommit(port_context)
 
-        understack_driver.undersync.sync.assert_called_once()
+        cleanup.assert_not_called()
 
-    def test_skips_non_baremetal_port(self, understack_driver, port_context):
+    def test_cleans_up_when_the_port_is_unbound(
+        self, mocker, understack_driver, port_context
+    ):
+        port_context._binding.vif_type = portbindings.VIF_TYPE_UNBOUND
+        cleanup = mocker.patch.object(understack_driver, "_tenant_network_port_cleanup")
+
+        understack_driver.update_port_postcommit(port_context)
+
+        cleanup.assert_called_once_with(port_context)
+
+    def test_skips_non_baremetal_port(self, mocker, understack_driver, port_context):
+        port_context._binding.vif_type = portbindings.VIF_TYPE_UNBOUND
         port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_NORMAL
+        cleanup = mocker.patch.object(understack_driver, "_tenant_network_port_cleanup")
 
         understack_driver.update_port_postcommit(port_context)
 
-        understack_driver.undersync.sync.assert_not_called()
+        cleanup.assert_not_called()
 
 
 MECH_UTILS = "neutron_understack.understack_mech.utils"
 
 
 class TestDeletePortPostCommit:
-    def test_skips_non_baremetal_port(self, understack_driver, port_context):
+    def test_skips_non_baremetal_port(self, mocker, understack_driver, port_context):
         port_context.current[portbindings.VNIC_TYPE] = portbindings.VNIC_NORMAL
+        find_segment = mocker.patch(f"{MECH_UTILS}.network_segment_by_physnet")
 
         understack_driver.delete_port_postcommit(port_context)
 
-        understack_driver.undersync.sync.assert_not_called()
+        find_segment.assert_not_called()
 
     def test_releases_unused_dynamic_segment_on_tenant_network(
         self, mocker, understack_driver, port_context
@@ -165,7 +190,8 @@ class TestDeletePortPostCommit:
 
         This is the only way it gets released: unlike an explicit unbind
         (update_port_postcommit -> _tenant_network_port_cleanup), a direct
-        delete never goes through that transition.
+        delete never goes through that transition. The switch reconcile is the
+        undersync driver's job, tested there.
         """
         segment = mocker.Mock(id="segment-a", is_dynamic=True)
         find_segment = mocker.patch(
@@ -180,8 +206,6 @@ class TestDeletePortPostCommit:
             port_context.current["network_id"], "physnet"
         )
         release.assert_called_once_with("segment-a")
-        # The switch must be reconciled so the removed port's VLAN is torn down.
-        understack_driver.undersync.sync.assert_called_once_with("physnet")
 
     def test_keeps_segment_still_bound_to_other_ports(
         self, mocker, understack_driver, port_context
@@ -232,7 +256,6 @@ class TestDeletePortPostCommit:
 
         understack_driver.delete_port_postcommit(port_context)
 
-        understack_driver.undersync.sync.assert_called_once_with("physnet")
         release.assert_called_once_with("segment-a")
 
 
@@ -418,16 +441,27 @@ class TestCreateNetworkPostCommit:
         understack_driver.create_network_postcommit(FakeContext())
 
 
-class TestKeystoneAuthentication:
-    def test_initialize_with_keystone_auth(self, mocker):
-        """Test that Undersync creates its own session using the ironic auth config."""
-        mock_session_instance = mocker.MagicMock()
-        mock_get_session = mocker.patch(
-            "neutron_understack.config.get_session",
-            return_value=mock_session_instance,
-        )
-        driver = UnderstackDriver()
-        driver.initialize()
+class TestNoUndersyncCoupling:
+    """The understack driver must not be able to reach Undersync at all."""
 
-        mock_get_session.assert_called_once_with("ironic")
-        assert driver.undersync._session == mock_session_instance
+    def test_driver_has_no_undersync_attribute(self, understack_driver):
+        assert not hasattr(understack_driver, "undersync")
+
+    def test_trunk_driver_has_no_undersync_attribute(self, understack_trunk_driver):
+        assert not hasattr(understack_trunk_driver, "undersync")
+
+    @pytest.mark.parametrize(
+        "module_name",
+        ["neutron_understack.understack_mech", "neutron_understack.trunk"],
+    )
+    def test_module_does_not_import_the_undersync_client(self, module_name):
+        """Fails the moment the import creeps back into either module."""
+        module = importlib.import_module(module_name)
+
+        assert not hasattr(module, "Undersync")
+
+    def test_trunk_module_never_mentions_undersync(self):
+        """It still reads physical_network, but only to allocate segments."""
+        source = pathlib.Path(trunk.__file__).read_text().lower()
+
+        assert "undersync" not in source

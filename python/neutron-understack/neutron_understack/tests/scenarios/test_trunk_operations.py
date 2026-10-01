@@ -135,10 +135,11 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         """Both drivers handle SUBPORTS AFTER_DELETE; order is by priority.
 
         The understack trunk driver deallocates the segment and the undersync
-        driver notifies Undersync. Undersync reconciles from device state, so it
-        must run *after* the segment work -- guaranteed by undersync subscribing
-        above the trunk driver's PRIORITY_DEFAULT. A recorder on each side pins
-        the relative order, which the per-driver priority unit test cannot.
+        driver notifies Undersync. Undersync computes the desired switch state
+        when called, so it must run *after* the segment work -- guaranteed by
+        undersync subscribing above the trunk driver's PRIORITY_DEFAULT. A
+        recorder on each side pins the relative order, which the per-driver
+        priority unit test cannot.
         """
         parent_net = self._make_network(self.fmt, "parent-net", True)["network"]["id"]
         parent_id = self._bind_baremetal_port(parent_net, DEFAULT_PHYSNET, "host-a")
