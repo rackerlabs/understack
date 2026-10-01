@@ -13,6 +13,7 @@ license = "MIT"
 dependencies = [
     "ironic>=35.1.0,<36",
     "pyyaml~=6.0",
+    "requests",
 ]
 
 # REMOVE ME: delete this once we move away from patching a venv or we upgrade to a newer ironic base version
@@ -33,6 +34,10 @@ panos = "ironic_understack.drivers.panos_hardware:PanosHardware"
 [project.entry-points."ironic.hardware.interfaces.inspect"]
 redfish-understack = "ironic_understack.drivers.redfish_inspect_understack:UnderstackRedfishInspect"
 idrac-redfish-understack = "ironic_understack.drivers.redfish_inspect_understack:UnderstackDracRedfishInspect"
+panos = "ironic_understack.drivers.panos_inspect:PanosInspect"
+
+[project.entry-points."ironic.hardware.interfaces.management"]
+panos = "ironic_understack.drivers.panos_management:PanosManagement"
 
 [project.entry-points."ironic.api.middleware"]
 portgroup-name-validation = "ironic_understack.middleware.portgroup_name_middleware:PortgroupNameValidationMiddleware"
