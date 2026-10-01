@@ -48,3 +48,6 @@ spec:
       - configMapRef:
           name: cluster-metadata
           optional: false
+      - secretRef:
+          name: network-device-credentials
+          optional: true
