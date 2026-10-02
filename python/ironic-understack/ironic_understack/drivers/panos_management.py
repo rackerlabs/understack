@@ -15,6 +15,18 @@ class PanosManagement(noop_mgmt.NoopManagement):
     NoopManagement.
     """
 
+    def get_properties(self):
+        return {
+            "management_ip": "Address of the appliance's management interface, "
+            "used for the XML API. Required.",
+        }
+
+    def validate(self, task):
+        if not task.node.driver_info.get("management_ip"):
+            raise exception.MissingParameterValue(
+                f"Node {task.node.uuid} is missing driver_info management_ip"
+            )
+
     @base.verify_step(priority=10)
     def setup_initial_configuration(self, task):
         """First-time setup of a factory-fresh appliance.
