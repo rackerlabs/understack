@@ -61,8 +61,8 @@ conf:
       enabled_console_interfaces: redfish-graphical,no-console
       enabled_deploy_interfaces: direct,ramdisk,noop
       enabled_firmware_interfaces: redfish,no-firmware
-      enabled_inspect_interfaces: redfish,idrac-redfish,agent,no-inspect
-      enabled_management_interfaces: redfish,idrac-redfish,noop
+      enabled_inspect_interfaces: redfish,idrac-redfish,agent,panos,no-inspect
+      enabled_management_interfaces: redfish,idrac-redfish,panos,noop
       enabled_network_interfaces: neutron,noop
       # remove fake once there is a noop that the ManualManagement uses, which netdev is derived from
       enabled_power_interfaces: redfish,idrac-redfish,fake

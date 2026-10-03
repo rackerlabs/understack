@@ -457,6 +457,7 @@ source = { editable = "." }
 dependencies = [
     { name = "ironic" },
     { name = "pyyaml" },
+    { name = "requests" },
 ]
 
 [package.dev-dependencies]
@@ -472,6 +473,7 @@ test = [
 requires-dist = [
     { name = "ironic", specifier = ">=35.1.0,<36" },
     { name = "pyyaml", specifier = "~=6.0" },
+    { name = "requests" },
 ]
 
 [package.metadata.requires-dev]
