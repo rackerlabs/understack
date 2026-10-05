@@ -4,18 +4,13 @@ import os
 import sys
 
 from understack_workflows.helpers import boolean_args
-from understack_workflows.helpers import credential
 from understack_workflows.helpers import setup_logger
+from understack_workflows.openstack.client import get_session
 from understack_workflows.undersync.client import Undersync
 
 
 def call_undersync(args):
-    undersync_token = credential("undersync", "token")
-    if not undersync_token:
-        logger.error("Please provide auth token for Undersync.")
-        sys.exit(1)
-
-    undersync = Undersync(undersync_token)
+    undersync = Undersync(get_session())
 
     try:
         logger.debug(

@@ -7,6 +7,7 @@ from importlib import metadata as _meta
 
 from ironicclient.client import Client as IronicClient
 from ironicclient.client import get_client as _get_ironic_client
+from keystoneauth1.session import Session
 from openstack import config as _os_config
 from openstack.connection import Connection
 
@@ -33,6 +34,11 @@ def _get_os_cloud_region(cloud=None, region_name=""):
     )
 
 
+def get_session(cloud=None, region_name="") -> Session:
+    """Returns a keystoneauth1 Session based on our clouds.yaml."""
+    return _get_os_cloud_region(cloud, region_name).get_session()
+
+
 def get_openstack_client(cloud=None, region_name="") -> Connection:
     """Returns an OpenStackSDK Connection based on our clouds.yaml."""
     cloud_region = _get_os_cloud_region(cloud, region_name)
@@ -56,4 +62,5 @@ def get_ironic_client(cloud=None, region_name="") -> IronicClient:  # type: igno
 __all__ = [
     "get_ironic_client",
     "get_openstack_client",
+    "get_session",
 ]

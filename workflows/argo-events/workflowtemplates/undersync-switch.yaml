@@ -63,22 +63,16 @@ spec:
           - --force
           - "{{inputs.parameters.force}}"
         volumeMounts:
-          - mountPath: /etc/nb-token/
-            name: nb-token
-            readOnly: true
-          - mountPath: /etc/undersync/
-            name: undersync-token
+          - mountPath: /etc/openstack
+            name: baremetal-manage
             readOnly: true
         env:
-          - name: NAUTOBOT_URL
-            valueFrom:
-              secretKeyRef:
-                name: nautobot-token
-                key: url
+          - name: OS_CLOUD
+            value: understack
       volumes:
-        - name: nb-token
+        - name: baremetal-manage
           secret:
-            secretName: nautobot-token
-        - name: undersync-token
-          secret:
-            secretName: undersync-token
+            secretName: baremetal-manage
+            items:
+              - key: clouds.yaml
+                path: clouds.yaml
