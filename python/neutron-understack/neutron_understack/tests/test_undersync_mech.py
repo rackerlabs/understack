@@ -17,7 +17,11 @@ from neutron_understack.undersync_mech import UndersyncDriver
 
 def _make_context(vnic_type=portbindings.VNIC_BAREMETAL, segments=None):
     context = MagicMock()
-    context.current = {"id": "port-1", portbindings.VNIC_TYPE: vnic_type}
+    context.current = {
+        "id": "port-1",
+        portbindings.VNIC_TYPE: vnic_type,
+        portbindings.PROFILE: {"physical_network": "physnet1"},
+    }
     context.segments_to_bind = segments or []
     return context
 
@@ -51,6 +55,28 @@ def vxlan_segment():
 
 
 class TestUndersyncDriverBindPort:
+    def test_skips_port_without_a_binding_profile(self, undersync_driver, vlan_segment):
+        ctx = _make_context(segments=[vlan_segment()])
+        del ctx.current[portbindings.PROFILE]
+
+        undersync_driver.bind_port(ctx)
+
+        ctx.set_binding.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "binding_profile",
+        [{}, {"local_link_information": []}, {"physical_network": None}],
+    )
+    def test_skips_port_without_a_physical_network(
+        self, undersync_driver, vlan_segment, binding_profile
+    ):
+        ctx = _make_context(segments=[vlan_segment()])
+        ctx.current[portbindings.PROFILE] = binding_profile
+
+        undersync_driver.bind_port(ctx)
+
+        ctx.set_binding.assert_not_called()
+
     def test_binds_vlan_segment(self, undersync_driver, vlan_segment):
         seg = vlan_segment()
         ctx = _make_context(segments=[seg])
