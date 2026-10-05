@@ -48,6 +48,9 @@ data:
     # by TBN even when no other trait matches.
     CUSTOM_DEFAULT_TBN_TRAIT:
       actions:
+        - action: attach_portgroup
+          filter: port.is_portgroup && port.category == 'network'
+          max_count: 1
         - action: attach_port
           filter: port.category == 'network'
           max_count: 1
