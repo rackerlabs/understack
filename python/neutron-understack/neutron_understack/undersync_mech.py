@@ -189,6 +189,14 @@ class UndersyncDriver(MechanismDriver):
             LOG.debug("Skipping unsupported vnic_type %s", vnic_type)
             return
 
+        binding_profile = port.get(portbindings.PROFILE) or {}
+        if not binding_profile.get("physical_network"):
+            LOG.debug(
+                "Skipping port %s without a physical_network in its " "binding_profile",
+                port["id"],
+            )
+            return
+
         for segment in context.segments_to_bind:
             if segment[api.NETWORK_TYPE] == p_const.TYPE_VLAN:
                 LOG.debug(
