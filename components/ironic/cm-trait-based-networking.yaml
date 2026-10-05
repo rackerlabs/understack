@@ -4,9 +4,9 @@ metadata:
   name: ironic-trait-based-networking
 data:
   trait_based_networking.yaml: |
-    # Trait Based Networking (TBN) config for grouping category=network ports
-    # into a dynamic portgroup, and only ever auto-attaching category=network
-    # ports via vif_attach (category=storage ports are left alone).
+    # Trait Based Networking (TBN) config. category=network ports auto-attach via
+    # the CUSTOM_NETWORK_PORTGROUP / default handlers. category=storage ports
+    # attach only when a VIF requests the CUSTOM_STORAGE_ATTACH trait.
     #
     # Applied to a node only when CUSTOM_NETWORK_PORTGROUP appears in the
     # node's instance_info.traits (Nova copies matching flavor/image traits
@@ -29,6 +29,16 @@ data:
         # this action picks up the single remaining port instead).
         - action: attach_port
           filter: port.category == 'network'
+          max_count: 1
+
+    # Attaches a single category=storage port for a storage VIF. Single-port
+    # only for now (A/B grouping is deferred). Require it on a flavor with:
+    #   openstack flavor set --property trait:CUSTOM_STORAGE_ATTACH=required <flavor>
+    CUSTOM_STORAGE_ATTACH:
+      order: 1
+      actions:
+        - action: attach_port
+          filter: port.category == 'storage'
           max_count: 1
 
     # Overrides Ironic's built-in fallback trait (CUSTOM_DEFAULT_TBN_TRAIT),
