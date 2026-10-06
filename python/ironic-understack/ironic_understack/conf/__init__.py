@@ -46,6 +46,12 @@ def setup_conf():
             help="PAN-OS factory password",
         ),
         cfg.StrOpt("panorama_master_key", secret=True, help="Panorama master key"),
+        cfg.BoolOpt(
+            "verify_ssl",
+            default=False,
+            help="Verify the TLS certificate of the PAN-OS XML API. Off by "
+            "default because appliances ship with self-signed certificates.",
+        ),
     ]
     panos_grp = cfg.OptGroup("netdev_panos", title="PAN-OS Credentials")
     cfg.CONF.register_group(panos_grp)
