@@ -293,12 +293,19 @@ adds/removes must reconcile the parent's switch (VLAN group).
   parent binding there is no physnet to carry the subport on and nothing to
   reconcile
 
-### TRUNK-SEGID-RANGE-01 — subport seg_id outside the allowed range is rejected
+### TRUNK-SEGID-NATIVE-01 — subport seg_id matching the native VLAN is rejected
 - given: a bound baremetal parent with a trunk
-- when: a subport is added with a segmentation_id outside `[1, 3799]`
+- when: a subport is added with a segmentation_id equal to the VLAN segment of
+  the parent's network on the parent's physical network
 - then: `SubportSegmentationIDError` (raised in the SUBPORTS PRECOMMIT_CREATE
   callback, surfaced as `CallbackFailure`), with no binding level or dynamic
   segment allocated
+
+### TRUNK-SEGID-NONNATIVE-01 — any non-native subport seg_id is allowed
+- given: a bound baremetal parent with a trunk
+- when: a subport is added with a valid VLAN segmentation_id outside the old
+  broad allowed range but different from the parent's native VLAN
+- then: the subport is added and gets its dynamic segment normally
 
 ### TRUNK-ORDER-01 — subport removal deallocates before it notifies Undersync
 - given: a bound baremetal parent with a trunk and an attached subport
