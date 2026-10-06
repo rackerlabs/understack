@@ -372,10 +372,17 @@ class TestBindPort:
 
     @pytest.mark.parametrize("port_dict", [{"trunk": True}], indirect=True)
     def test_with_trunk_details(
-        self, mocker, understack_driver, port_context, understack_trunk_driver
+        self,
+        mocker,
+        understack_driver,
+        port_context,
+        understack_trunk_driver,
+        vlan_network_segment,
     ):
-        mocker.patch(
-            "neutron_understack.utils.fetch_subport_network_id", return_value="112233"
+        mocker.patch.object(
+            port_context,
+            "allocate_dynamic_segment",
+            return_value=vlan_network_segment,
         )
         mocker.patch.object(port_context, "continue_binding")
         port_context._prepare_to_bind(port_context.network.network_segments)
@@ -383,7 +390,11 @@ class TestBindPort:
         understack_driver.trunk_driver = understack_trunk_driver
         mocker.patch.object(understack_driver.trunk_driver, "configure_trunk")
         understack_driver.bind_port(port_context)
-        understack_driver.trunk_driver.configure_trunk.assert_called_once()
+        understack_driver.trunk_driver.configure_trunk.assert_called_once_with(
+            port_context.current["trunk_details"],
+            port_context.current["id"],
+            vlan_network_segment,
+        )
         port_context.continue_binding.assert_called_once()
 
 

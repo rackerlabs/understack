@@ -383,7 +383,7 @@ class UnderstackDriver(MechanismDriver):
         trunk_details = context.current.get("trunk_details") or {}
         port_id = context.current["id"]
         if trunk_details:
-            self.trunk_driver.configure_trunk(trunk_details, port_id)
+            self.trunk_driver.configure_trunk(trunk_details, port_id, dynamic_segment)
 
         LOG.debug("continue_binding for segment: %s", segment)
         context.continue_binding(
