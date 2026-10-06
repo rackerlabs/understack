@@ -293,7 +293,7 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
                 subport_id,
                 seg_id=native_segment[segments_db.SEGMENTATION_ID],
             )
-        assert "matches the native VLAN" in str(exc_info.value)
+        assert "used as both" in str(exc_info.value)
         assert not ml2_db.get_binding_level_objs(self.context, subport_id, "host-a")
         assert (
             segments_db.get_dynamic_segment(

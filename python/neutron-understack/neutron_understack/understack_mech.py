@@ -189,6 +189,8 @@ class UnderstackDriver(MechanismDriver):
                 raise
 
     def update_port_precommit(self, context: PortContext):
+        self._check_trunk_native_vlan(context)
+
         if not utils.is_router_interface(context):
             return
 
@@ -245,6 +247,42 @@ class UnderstackDriver(MechanismDriver):
                     "router": current.get("device_id"),
                 },
             )
+
+    def _check_trunk_native_vlan(self, context: PortContext) -> None:
+        """Reject a parent-port update that would collide with a subport tag."""
+        port = context.current
+        trunk_details = port.get("trunk_details")
+        if not trunk_details:
+            return
+
+        physical_network = (port.get(portbindings.PROFILE) or {}).get(
+            "physical_network"
+        )
+        if not physical_network:
+            return
+
+        original_profile = context.original.get(portbindings.PROFILE) or {}
+        original_physical_network = original_profile.get("physical_network")
+        if physical_network == original_physical_network:
+            # The native VLAN for a (network, physnet) pair is stable. If a
+            # rebind has to allocate a replacement segment, the binding-path
+            # candidate check below remains authoritative.
+            return
+
+        native_segment = utils.network_segment_by_physnet(
+            network_id=port["network_id"], physnet=physical_network
+        )
+        if native_segment is None:
+            # A first binding to this (network, physnet) allocates the segment
+            # later. _bind_port_segment validates that candidate before doing
+            # any trunk configuration.
+            return
+
+        self.trunk_driver.check_trunk_native_vlan(
+            trunk_details=trunk_details,
+            physical_network=physical_network,
+            native_vlan_id=native_segment.segmentation_id,
+        )
 
     def update_port_postcommit(self, context: PortContext) -> None:
         if utils.is_baremetal_port(context) and utils.is_port_unbinding(context):
@@ -383,7 +421,12 @@ class UnderstackDriver(MechanismDriver):
         trunk_details = context.current.get("trunk_details") or {}
         port_id = context.current["id"]
         if trunk_details:
-            self.trunk_driver.configure_trunk(trunk_details, port_id)
+            self.trunk_driver.configure_trunk(
+                trunk_details=trunk_details,
+                port_id=port_id,
+                physical_network=physnet,
+                native_vlan_id=dynamic_segment[api.SEGMENTATION_ID],
+            )
 
         LOG.debug("continue_binding for segment: %s", segment)
         context.continue_binding(
