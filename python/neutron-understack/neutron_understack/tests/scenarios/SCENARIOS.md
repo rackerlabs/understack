@@ -333,9 +333,10 @@ trunk subport.
 - then: nothing is written to the trunk or its subports. If the trunk has been
   left DOWN, the next parent update takes it back to ACTIVE
 
-### TRUNK-SEGID-RANGE-01 — subport seg_id outside the allowed range is rejected
+### TRUNK-SEGID-NATIVE-01 — subport seg_id matching the native VLAN is rejected
 - given: a bound baremetal parent with a trunk
-- when: a subport is added with a segmentation_id outside `[1, 3799]`
+- when: a subport is added with a segmentation_id equal to the VLAN segment of
+  the parent's network on the parent's physical network
 - then: `SubportSegmentationIDError` (raised in the SUBPORTS PRECOMMIT_CREATE
   callback, surfaced as `CallbackFailure`), with no binding level or dynamic
   segment allocated and the port left unclaimed
@@ -348,6 +349,12 @@ trunk subport.
   the subport already carries `parent_name`, `tag` and `vif_type=unbound`; the
   vif-attach then binds the subport (dynamic segment + level-0 row), syncs
   `physnet1`, takes both to ACTIVE and sets `vif_type=other`
+
+### TRUNK-SEGID-NONNATIVE-01 — any non-native subport seg_id is allowed
+- given: a bound baremetal parent with a trunk
+- when: a subport is added with a valid VLAN segmentation_id outside the old
+  broad allowed range but different from the parent's native VLAN
+- then: the subport is added and gets its dynamic segment normally
 
 ### TRUNK-ORDER-01 — subport removal deallocates before it notifies Undersync
 - given: a bound baremetal parent with a trunk and an attached subport
