@@ -29,6 +29,13 @@ class SubportSegmentationIDError(exc.NeutronException):
     )
 
 
+class SubportSegmentationIDRangeError(exc.NeutronException):
+    message = (
+        "VLAN %(seg_id)s for subport %(subport_id)s is outside the configured "
+        "tenant trunk VLAN range %(minimum)s-%(maximum)s."
+    )
+
+
 def _missing_physnet_msg(port_id: str) -> str:
     """physical_network names the segment range a subport allocates from."""
     return (
@@ -98,20 +105,31 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
     def _check_subports_segmentation_id(
         self, subports: list[SubPort], trunk_id: str, parent_port: Port
     ) -> None:
-        """Reject a subport tag that matches the parent's native VLAN.
+        """Validate tenant tags and reject a parent native VLAN collision.
 
         A switchport cannot have a mapped VLAN ID equal to the native VLAN ID.
         Resolve the native VLAN from the parent port's network and physical
         network so that multi-segment networks are checked against the segment
         used on this particular switch.
 
-        The only case where this check is not required is for a network node
-        trunk, since its subport segmentation_ids are the same as the network
-        segment VLAN tags allocated to the subports. Therefore, there is no
-        possibility of conflict with the native VLAN.
+        The network-node trunk is exempt because its segmentation IDs are
+        internally allocated fabric VLANs, not tenant-selected mapped VLANs.
+        They are the same tags as the subports' network segments, so they also
+        cannot conflict with the parent through VLAN mapping.
         """
         if trunk_id == utils.fetch_network_node_trunk_id():
             return
+
+        minimum, maximum = cfg.CONF.ml2_understack.default_tenant_vlan_id_range
+        for subport in subports:
+            seg_id = int(subport["segmentation_id"])
+            if not minimum <= seg_id <= maximum:
+                raise SubportSegmentationIDRangeError(
+                    seg_id=seg_id,
+                    subport_id=subport["port_id"],
+                    minimum=minimum,
+                    maximum=maximum,
+                )
 
         if not utils.parent_port_is_bound(parent_port):
             return

@@ -4,6 +4,7 @@ from neutron_lib import exceptions as exc
 
 from neutron_understack import utils
 from neutron_understack.trunk import SubportSegmentationIDError
+from neutron_understack.trunk import SubportSegmentationIDRangeError
 
 
 class TestSubportsAdded:
@@ -381,12 +382,14 @@ class TestCleanTrunk:
         deallocate.assert_called_once_with([], "host-a")
 
 
+@pytest.mark.usefixtures("oslo_config")
 class TestCheckSubportsSegmentationId:
     def test_when_trunk_id_is_network_node_trunk_id(
         self,
         mocker,
         understack_trunk_driver,
         trunk_id,
+        subport,
         port_object,
     ):
         mocker.patch(
@@ -396,9 +399,10 @@ class TestCheckSubportsSegmentationId:
         find_segment = mocker.patch(
             "neutron_understack.utils.network_segment_by_physnet"
         )
+        subport.segmentation_id = 4000
 
         result = understack_trunk_driver._check_subports_segmentation_id(
-            [], str(trunk_id), port_object
+            [subport], str(trunk_id), port_object
         )
 
         find_segment.assert_not_called()
@@ -423,7 +427,7 @@ class TestCheckSubportsSegmentationId:
             return_value=vlan_network_segment,
         )
         port_object.network_id = str(network_id)
-        subport.segmentation_id = 4000
+        subport.segmentation_id = 2000
 
         result = understack_trunk_driver._check_subports_segmentation_id(
             [subport], trunk_id, port_object
@@ -433,6 +437,80 @@ class TestCheckSubportsSegmentationId:
             network_id=str(network_id), physnet="physnet"
         )
         assert result is None
+
+    @pytest.mark.parametrize("segmentation_id", [2, 3871])
+    def test_when_segmentation_id_is_on_configured_range_boundary(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk_id,
+        subport,
+        port_object,
+        segmentation_id,
+    ):
+        mocker.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value="different-trunk-id",
+        )
+        port_object.bindings[0].vif_type = portbindings.VIF_TYPE_UNBOUND
+        subport.segmentation_id = segmentation_id
+
+        result = understack_trunk_driver._check_subports_segmentation_id(
+            [subport], trunk_id, port_object
+        )
+
+        assert result is None
+
+    @pytest.mark.parametrize("segmentation_id", [1, 3872, 4094])
+    def test_when_segmentation_id_is_outside_configured_range(
+        self,
+        mocker,
+        understack_trunk_driver,
+        trunk_id,
+        subport,
+        port_object,
+        segmentation_id,
+    ):
+        mocker.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value="different-trunk-id",
+        )
+        find_segment = mocker.patch(
+            "neutron_understack.utils.network_segment_by_physnet"
+        )
+        subport.segmentation_id = segmentation_id
+
+        with pytest.raises(
+            SubportSegmentationIDRangeError, match="outside the configured"
+        ):
+            understack_trunk_driver._check_subports_segmentation_id(
+                [subport], trunk_id, port_object
+            )
+
+        find_segment.assert_not_called()
+
+    def test_uses_configured_tenant_vlan_range(
+        self,
+        mocker,
+        oslo_config,
+        understack_trunk_driver,
+        trunk_id,
+        subport,
+        port_object,
+    ):
+        oslo_config.config(
+            default_tenant_vlan_id_range=[100, 200], group="ml2_understack"
+        )
+        mocker.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value="different-trunk-id",
+        )
+        subport.segmentation_id = 99
+
+        with pytest.raises(SubportSegmentationIDRangeError, match="100-200"):
+            understack_trunk_driver._check_subports_segmentation_id(
+                [subport], trunk_id, port_object
+            )
 
     def test_when_segmentation_id_matches_native_vlan(
         self,
@@ -468,6 +546,7 @@ class TestCheckSubportsSegmentationId:
             return_value="different-trunk-id",
         )
         port_object.bindings[0].vif_type = portbindings.VIF_TYPE_UNBOUND
+        subport.segmentation_id = 2000
         find_segment = mocker.patch(
             "neutron_understack.utils.network_segment_by_physnet"
         )
