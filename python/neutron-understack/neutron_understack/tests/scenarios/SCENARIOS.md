@@ -301,11 +301,12 @@ adds/removes must reconcile the parent's switch (VLAN group).
   callback, surfaced as `CallbackFailure`), with no binding level or dynamic
   segment allocated
 
-### TRUNK-SEGID-NONNATIVE-01 — any non-native subport seg_id is allowed
+### TRUNK-SEGID-RANGE-01 — subport seg_id outside the tenant range is rejected
 - given: a bound baremetal parent with a trunk
-- when: a subport is added with a valid VLAN segmentation_id outside the old
-  broad allowed range but different from the parent's native VLAN
-- then: the subport is added and gets its dynamic segment normally
+- when: a subport is added with a VLAN segmentation_id outside the configured
+  `default_tenant_vlan_id_range`
+- then: the request is rejected before a binding level or dynamic segment is
+  allocated
 
 ### TRUNK-ORDER-01 — subport removal deallocates before it notifies Undersync
 - given: a bound baremetal parent with a trunk and an attached subport

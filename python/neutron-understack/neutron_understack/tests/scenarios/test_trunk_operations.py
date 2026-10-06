@@ -302,19 +302,22 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
             is None
         )
 
-    @pytest.mark.scenario("TRUNK-SEGID-NONNATIVE-01")
-    def test_subport_segid_outside_old_range_is_allowed(self):
+    @pytest.mark.scenario("TRUNK-SEGID-RANGE-01")
+    def test_subport_segid_outside_configured_range_is_rejected(self):
         parent_net = self._make_network(self.fmt, "parent-net", True)["network"]["id"]
         parent_id = self._bind_baremetal_port(parent_net, DEFAULT_PHYSNET, "host-a")
         subport_net = self._make_network(self.fmt, "subport-net", True)["network"]["id"]
         subport_id = self._plain_port(subport_net)
         trunk_id = self._make_trunk(parent_id)
-        native_segment = segments_db.get_dynamic_segment(
-            self.context, parent_net, physical_network=DEFAULT_PHYSNET
+        with pytest.raises(cb_exc.CallbackFailure) as exc_info:
+            self._add_subport(trunk_id, subport_id, seg_id=4000)
+        assert "outside the configured tenant trunk VLAN range 2-3871" in str(
+            exc_info.value
         )
-        native_vlan = native_segment[segments_db.SEGMENTATION_ID]
-        subport_vlan = 4000 if native_vlan != 4000 else 4001
-
-        self._add_subport(trunk_id, subport_id, seg_id=subport_vlan)
-
-        self._assert_subport_bound(trunk_id, subport_id, "host-a", seg_id=subport_vlan)
+        assert not ml2_db.get_binding_level_objs(self.context, subport_id, "host-a")
+        assert (
+            segments_db.get_dynamic_segment(
+                self.context, subport_net, physical_network=DEFAULT_PHYSNET
+            )
+            is None
+        )
