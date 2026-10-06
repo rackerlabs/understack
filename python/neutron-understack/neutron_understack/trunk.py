@@ -23,9 +23,9 @@ SUPPORTED_SEGMENTATION_TYPES = (trunk_consts.SEGMENTATION_TYPE_VLAN,)
 
 class SubportSegmentationIDError(exc.NeutronException):
     message = (
-        "Segmentation ID: %(seg_id)s cannot be set to the Subport: "
-        "%(subport_id)s because it matches the native VLAN on physical "
-        "network: %(physical_network)s. Please use a different Segmentation ID."
+        "VLAN %(seg_id)s on physical network %(physical_network)s cannot be "
+        "used as both the native VLAN for trunk %(trunk_id)s and the "
+        "segmentation ID for subport %(subport_id)s."
     )
 
 
@@ -129,19 +129,63 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
         if native_segment is None:
             return
 
-        native_vlan_id = int(native_segment.segmentation_id)
+        self._check_native_vlan_conflict(
+            subports=subports,
+            trunk_id=trunk_id,
+            physical_network=physical_network,
+            native_vlan_id=native_segment.segmentation_id,
+        )
+
+    def _check_native_vlan_conflict(
+        self,
+        subports: list[SubPort] | list[dict],
+        trunk_id: str,
+        physical_network: str,
+        native_vlan_id: int,
+    ) -> None:
+        """Enforce the trunk's native/tagged VLAN uniqueness invariant."""
+        native_vlan_id = int(native_vlan_id)
         for subport in subports:
-            seg_id = subport.segmentation_id
+            seg_id = int(subport["segmentation_id"])
             if seg_id == native_vlan_id:
                 raise SubportSegmentationIDError(
                     seg_id=seg_id,
-                    subport_id=subport.port_id,
+                    subport_id=subport["port_id"],
+                    trunk_id=trunk_id,
                     physical_network=physical_network,
                 )
 
-    def configure_trunk(self, trunk_details: dict, port_id: str) -> None:
-        parent_port_obj = utils.fetch_port_object(port_id)
+    def check_trunk_native_vlan(
+        self,
+        trunk_details: dict,
+        physical_network: str,
+        native_vlan_id: int,
+    ) -> None:
+        """Check a candidate parent native VLAN against existing subports."""
+        if trunk_details["trunk_id"] == utils.fetch_network_node_trunk_id():
+            return
+
+        self._check_native_vlan_conflict(
+            subports=trunk_details.get("sub_ports", []),
+            trunk_id=trunk_details["trunk_id"],
+            physical_network=physical_network,
+            native_vlan_id=native_vlan_id,
+        )
+
+    def configure_trunk(
+        self,
+        trunk_details: dict,
+        port_id: str,
+        physical_network: str,
+        native_vlan_id: int,
+    ) -> None:
+        self.check_trunk_native_vlan(
+            trunk_details=trunk_details,
+            physical_network=physical_network,
+            native_vlan_id=native_vlan_id,
+        )
         subports = trunk_details.get("sub_ports", [])
+        parent_port_obj = utils.fetch_port_object(port_id)
         self._add_subports_networks_to_parent_port_switchport(
             parent_port=parent_port_obj, subports=subports
         )

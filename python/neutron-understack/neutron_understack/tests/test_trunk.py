@@ -282,8 +282,23 @@ class TestConfigureTrunk:
         mocker.patch.object(
             understack_trunk_driver, "_add_subports_networks_to_parent_port_switchport"
         )
-        understack_trunk_driver.configure_trunk({}, port_id)
+        check_native_vlan = mocker.patch.object(
+            understack_trunk_driver, "check_trunk_native_vlan"
+        )
+        trunk_details = {"trunk_id": "trunk-a", "sub_ports": []}
 
+        understack_trunk_driver.configure_trunk(
+            trunk_details=trunk_details,
+            port_id=port_id,
+            physical_network="physnet-a",
+            native_vlan_id=1800,
+        )
+
+        check_native_vlan.assert_called_once_with(
+            trunk_details=trunk_details,
+            physical_network="physnet-a",
+            native_vlan_id=1800,
+        )
         understack_trunk_driver._add_subports_networks_to_parent_port_switchport.assert_called_once_with(
             parent_port=port_object,
             subports=[],
@@ -386,7 +401,7 @@ class TestCheckSubportsSegmentationId:
         port_object.network_id = str(network_id)
         subport.segmentation_id = vlan_network_segment.segmentation_id
 
-        with pytest.raises(SubportSegmentationIDError, match="matches the native VLAN"):
+        with pytest.raises(SubportSegmentationIDError, match="used as both"):
             understack_trunk_driver._check_subports_segmentation_id(
                 [subport], trunk_id, port_object
             )
