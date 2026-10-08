@@ -64,10 +64,44 @@ class PaloAltoFlavorMisconfigured(n_exc.BadRequest):
     )
 
 
+# Conflict -> HTTP 409: every allowed VLAN on the router's trunk is in use.
 class NoPaloAltoSubportVlanAvailable(n_exc.Conflict):
     message = (
         "No Palo Alto trunk subport VLAN is available for router %(router_id)s "
         "on trunk %(trunk_id)s. Allowed ranges: %(network_segment_ranges)s."
+    )
+
+
+# BadRequest -> HTTP 400: the router has no adopted node to wire.
+class PaloAltoNodeNotAdopted(n_exc.BadRequest):
+    message = (
+        "Palo Alto router %(router_id)s has no adopted Ironic node to attach "
+        "its anchor parent port to."
+    )
+
+
+# BadRequest -> HTTP 400: the node's baremetal port is missing enrollment data.
+class PaloAltoParentNotAnnotated(n_exc.BadRequest):
+    message = (
+        "Palo Alto router %(router_id)s parent port %(port_id)s was not "
+        "annotated by Ironic (missing %(missing)s); check the node's baremetal "
+        "port has physical_network."
+    )
+
+
+# BadRequest -> HTTP 400: the gateway event fired without a gateway port.
+class PaloAltoGatewayPortNotFound(n_exc.BadRequest):
+    message = (
+        "Palo Alto router %(router_id)s gateway was created but no router "
+        "gateway port was found."
+    )
+
+
+# BadRequest -> HTTP 400: the interface event carried no port.
+class PaloAltoInterfacePortMissing(n_exc.BadRequest):
+    message = (
+        "Palo Alto router %(router_id)s interface attachment has no router "
+        "interface port."
     )
 
 
@@ -438,13 +472,7 @@ class PaloAlto(base.L3ServiceProvider):
         router_id = router["id"]
         node = self._ironic.node_by_instance_uuid(router_id)
         if node is None:
-            raise n_exc.BadRequest(
-                resource="router",
-                msg=(
-                    f"Palo Alto router {router_id} has no adopted Ironic node to "
-                    "attach the gateway uplink to."
-                ),
-            )
+            raise PaloAltoNodeNotAdopted(router_id=router_id)
 
         parent_port_id = parent_port["id"]
         if parent_port_id in self._ironic.node_vif_ids(node):
@@ -487,13 +515,10 @@ class PaloAlto(base.L3ServiceProvider):
         """
         missing = _missing_binding_fields(parent_port)
         if missing:
-            raise n_exc.BadRequest(
-                resource="router",
-                msg=(
-                    f"Palo Alto router {router_id} parent port {parent_port['id']} "
-                    f"was not annotated by Ironic (missing {', '.join(missing)}); "
-                    "check the node's baremetal port has physical_network."
-                ),
+            raise PaloAltoParentNotAnnotated(
+                router_id=router_id,
+                port_id=parent_port["id"],
+                missing=", ".join(missing),
             )
 
     def _trunk_for_router(self, router_id: str) -> dict | None:
@@ -856,13 +881,7 @@ class PaloAlto(base.L3ServiceProvider):
 
         gateway_port = self._gateway_port_for_router(router_id)
         if gateway_port is None:
-            raise n_exc.BadRequest(
-                resource="router",
-                msg=(
-                    f"Palo Alto router {router_id} gateway was created but no "
-                    "router gateway port was found."
-                ),
-            )
+            raise PaloAltoGatewayPortNotFound(router_id=router_id)
 
         parent = self._ensure_parent_port(router)
         parent = self._ensure_parent_vif_attached(router, parent)
@@ -914,13 +933,7 @@ class PaloAlto(base.L3ServiceProvider):
 
         interface_port = payload.metadata.get("port")
         if not interface_port:
-            raise n_exc.BadRequest(
-                resource="router",
-                msg=(
-                    f"Palo Alto router {router_id} interface attachment has no "
-                    "router interface port."
-                ),
-            )
+            raise PaloAltoInterfacePortMissing(router_id=router_id)
         if interface_port.get("device_owner") not in const.ROUTER_INTERFACE_OWNERS:
             return
 

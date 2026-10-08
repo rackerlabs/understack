@@ -154,6 +154,18 @@ class TestExceptionHttpCodes:
     def test_no_subport_vlan_available_is_conflict(self):
         assert issubclass(palo_alto.NoPaloAltoSubportVlanAvailable, n_exc.Conflict)
 
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            palo_alto.PaloAltoNodeNotAdopted,
+            palo_alto.PaloAltoParentNotAnnotated,
+            palo_alto.PaloAltoGatewayPortNotFound,
+            palo_alto.PaloAltoInterfacePortMissing,
+        ],
+    )
+    def test_wiring_errors_are_bad_request(self, exc):
+        assert issubclass(exc, n_exc.BadRequest)
+
 
 class TestResourceClassLookup:
     def test_reads_resource_class_from_profile_metainfo(self, mocker):
@@ -500,7 +512,7 @@ class TestParentVifAttach:
     def test_raises_when_no_adopted_node(self, mocker):
         provider, ironic = self._provider(mocker, node=None, vif_ids=[])
 
-        with pytest.raises(n_exc.BadRequest):
+        with pytest.raises(palo_alto.PaloAltoNodeNotAdopted, match="router r1 "):
             provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
         ironic.attach_vif_to_node.assert_not_called()
 
@@ -510,7 +522,10 @@ class TestParentVifAttach:
         unannotated = {"id": "parent-1", "binding:host_id": "", "binding:profile": {}}
         provider, _ = self._provider(mocker, node, vif_ids=[], fresh_port=unannotated)
 
-        with pytest.raises(n_exc.BadRequest):
+        with pytest.raises(
+            palo_alto.PaloAltoParentNotAnnotated,
+            match=r"parent port parent-1 .*\(missing binding:host_id, physical_network",
+        ):
             provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
 
 
@@ -852,7 +867,7 @@ class TestGatewayCreateHandler:
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
         mocker.patch.object(provider, "_gateway_port_for_router", return_value=None)
 
-        with pytest.raises(n_exc.BadRequest):
+        with pytest.raises(palo_alto.PaloAltoGatewayPortNotFound, match="router r1 "):
             provider._process_gateway_create("r", "e", "t", self._payload(mocker))
 
 
@@ -921,7 +936,7 @@ class TestRouterInterfaceCreateHandler:
         payload = self._payload(mocker, port=None)
         payload.metadata = {}
 
-        with pytest.raises(n_exc.BadRequest):
+        with pytest.raises(palo_alto.PaloAltoInterfacePortMissing, match="router r1 "):
             provider._process_router_interface_create("r", "e", "t", payload)
 
 
