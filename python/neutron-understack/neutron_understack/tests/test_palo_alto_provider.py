@@ -367,10 +367,9 @@ class TestRouterDelete:
 
 
 class TestGatewayLookups:
-    def test_names_are_deterministic(self, mocker):
-        provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
-        assert provider._parent_port_name("r1") == "palo-alto-router-anchor-r1"
-        assert provider._trunk_name("r1") == "palo-alto-router-trunk-r1"
+    def test_names_are_deterministic(self):
+        assert palo_alto._parent_port_name("r1") == "palo-alto-router-anchor-r1"
+        assert palo_alto._trunk_name("r1") == "palo-alto-router-trunk-r1"
 
     def test_trunk_plugin_delegates_to_utils(self, mocker):
         tp = mocker.Mock()
@@ -513,6 +512,28 @@ class TestParentVifAttach:
 
         with pytest.raises(n_exc.BadRequest):
             provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+
+
+class TestMissingBindingFields:
+    def test_none_missing_when_annotated(self):
+        assert palo_alto._missing_binding_fields(_ANNOTATED_PARENT) == []
+
+    def test_all_missing_when_unbound(self):
+        port = {"id": "parent-1", "binding:host_id": "", "binding:profile": None}
+
+        assert palo_alto._missing_binding_fields(port) == [
+            "binding:host_id",
+            "physical_network",
+            "local_link_information",
+        ]
+
+    def test_reports_only_missing_profile_field(self):
+        port = {
+            **_ANNOTATED_PARENT,
+            "binding:profile": {"local_link_information": [{"port_id": "Eth1/1"}]},
+        }
+
+        assert palo_alto._missing_binding_fields(port) == ["physical_network"]
 
 
 class TestTrunk:
@@ -674,6 +695,44 @@ class TestSubportVlanAllocation:
             provider._next_available_subport_vlan(
                 "r1", trunk, palo_alto.INTERFACE_SUBPORT_VLAN_START
             )
+
+
+class TestFirstFreeVlan:
+    def test_starts_at_requested_vlan(self):
+        assert palo_alto._first_free_vlan([(1, 300)], set(), 201) == 201
+
+    def test_skips_used_vlans(self):
+        assert palo_alto._first_free_vlan([(200, 205)], {201, 202}, 201) == 203
+
+    def test_continues_into_next_range(self):
+        assert palo_alto._first_free_vlan([(200, 201), (300, 301)], {201}, 201) == 300
+
+    def test_accepts_unsorted_ranges(self):
+        assert palo_alto._first_free_vlan([(300, 301), (200, 210)], set(), 201) == 201
+
+    def test_returns_none_when_exhausted(self):
+        assert palo_alto._first_free_vlan([(200, 201)], {200, 201}, 200) is None
+
+
+class TestSubportHelpers:
+    def test_has_subport(self):
+        trunk = {"id": "trunk-1", "sub_ports": [{"port_id": "gw-1"}]}
+
+        assert palo_alto._has_subport(trunk, "gw-1") is True
+        assert palo_alto._has_subport(trunk, "intf-1") is False
+        assert palo_alto._has_subport({"id": "trunk-1"}, "gw-1") is False
+
+    def test_used_subport_vlans_counts_only_vlan_tags(self):
+        trunk = {
+            "id": "trunk-1",
+            "sub_ports": [
+                {"port_id": "a", "segmentation_type": "vlan", "segmentation_id": 200},
+                {"port_id": "b", "segmentation_type": "vlan", "segmentation_id": None},
+                {"port_id": "c", "segmentation_type": "inherit"},
+            ],
+        }
+
+        assert palo_alto._used_subport_vlans(trunk) == {200}
 
 
 class TestInterfaceSubport:

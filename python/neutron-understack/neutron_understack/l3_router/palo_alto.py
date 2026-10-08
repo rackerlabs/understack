@@ -86,6 +86,56 @@ def _parse_metainfo(raw) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _parent_port_name(router_id: str) -> str:
+    """Deterministic name for the router's anchor-network parent port."""
+    return f"{ANCHOR_PARENT_PORT_NAME_PREFIX}-{router_id}"
+
+
+def _trunk_name(router_id: str) -> str:
+    """Deterministic name for the router's trunk."""
+    return f"{TRUNK_NAME_PREFIX}-{router_id}"
+
+
+def _has_subport(trunk: dict, port_id: str) -> bool:
+    """Return True if the port is already a subport on the trunk."""
+    return any(sp["port_id"] == port_id for sp in trunk.get("sub_ports", []))
+
+
+def _used_subport_vlans(trunk: dict) -> set[int]:
+    """Return VLAN segmentation IDs already used on a router trunk."""
+    return {
+        sp["segmentation_id"]
+        for sp in trunk.get("sub_ports", [])
+        if sp.get("segmentation_type") == "vlan"
+        and sp.get("segmentation_id") is not None
+    }
+
+
+def _first_free_vlan(
+    ranges: list[tuple[int, int]], used: set[int], start: int
+) -> int | None:
+    """Return the lowest VLAN >= start that is in ranges and not used, or None."""
+    for low, high in sorted(ranges):
+        for vlan in range(max(low, start), high + 1):
+            if vlan not in used:
+                return vlan
+    return None
+
+
+def _missing_binding_fields(port: dict) -> list[str]:
+    """Return the binding fields Ironic should have set on the port but did not."""
+    profile = port.get(portbindings.PROFILE) or {}
+    return [
+        name
+        for name, value in (
+            ("binding:host_id", port.get(portbindings.HOST_ID)),
+            ("physical_network", profile.get("physical_network")),
+            ("local_link_information", profile.get("local_link_information")),
+        )
+        if not value
+    ]
+
+
 @registry.has_registry_receivers
 class PaloAlto(base.L3ServiceProvider):
     """L3 service provider for the Palo Alto router flavor.
@@ -259,14 +309,6 @@ class PaloAlto(base.L3ServiceProvider):
     def _trunk_plugin(self):
         return utils.fetch_trunk_plugin()
 
-    def _parent_port_name(self, router_id: str) -> str:
-        """Deterministic name for the router's anchor-network parent port."""
-        return f"{ANCHOR_PARENT_PORT_NAME_PREFIX}-{router_id}"
-
-    def _trunk_name(self, router_id: str) -> str:
-        """Deterministic name for the router's trunk."""
-        return f"{TRUNK_NAME_PREFIX}-{router_id}"
-
     def _gateway_port_for_router(self, router_id: str) -> dict | None:
         """Return the router's Neutron external-gateway port, or None.
 
@@ -302,7 +344,7 @@ class PaloAlto(base.L3ServiceProvider):
         ports = core_plugin.get_ports(
             admin_context,
             filters={
-                "name": [self._parent_port_name(router_id)],
+                "name": [_parent_port_name(router_id)],
                 "network_id": [anchor_network["id"]],
             },
         )
@@ -318,7 +360,7 @@ class PaloAlto(base.L3ServiceProvider):
         core_plugin = directory.get_plugin()
         admin_context = n_context.get_admin_context()
         anchor_network = self._ensure_anchor_network()
-        port_name = self._parent_port_name(router["id"])
+        port_name = _parent_port_name(router["id"])
         LOG.info(
             "Creating Palo Alto anchor parent port %s for router %s",
             port_name,
@@ -443,16 +485,7 @@ class PaloAlto(base.L3ServiceProvider):
         node's baremetal port most likely has no physical_network (enroll side);
         surface a clear error here instead of a silent no-op at undersync.
         """
-        profile = parent_port.get(portbindings.PROFILE) or {}
-        missing = [
-            name
-            for name, value in (
-                ("binding:host_id", parent_port.get(portbindings.HOST_ID)),
-                ("physical_network", profile.get("physical_network")),
-                ("local_link_information", profile.get("local_link_information")),
-            )
-            if not value
-        ]
+        missing = _missing_binding_fields(parent_port)
         if missing:
             raise n_exc.BadRequest(
                 resource="router",
@@ -467,14 +500,14 @@ class PaloAlto(base.L3ServiceProvider):
         """Return the router's existing trunk (by deterministic name), or None."""
         admin_context = n_context.get_admin_context()
         trunks = self._trunk_plugin.get_trunks(
-            admin_context, filters={"name": [self._trunk_name(router_id)]}
+            admin_context, filters={"name": [_trunk_name(router_id)]}
         )
         return trunks[0] if trunks else None
 
     def _create_trunk(self, router: dict, parent_port: dict) -> dict:
         """Create the router's trunk with the parent port as its trunk parent."""
         admin_context = n_context.get_admin_context()
-        trunk_name = self._trunk_name(router["id"])
+        trunk_name = _trunk_name(router["id"])
         LOG.info(
             "Creating Palo Alto trunk %s on parent port %s for router %s",
             trunk_name,
@@ -506,30 +539,19 @@ class PaloAlto(base.L3ServiceProvider):
             return existing
         return self._create_trunk(router, parent_port)
 
-    def _used_subport_vlans(self, trunk: dict) -> set[int]:
-        """Return VLAN segmentation IDs already used on a router trunk."""
-        return {
-            sp["segmentation_id"]
-            for sp in trunk.get("sub_ports", [])
-            if sp.get("segmentation_type") == "vlan"
-            and sp.get("segmentation_id") is not None
-        }
-
     def _next_available_subport_vlan(
         self, router_id: str, trunk: dict, start_vlan: int
     ) -> int:
         """Pick the first allowed, unused Palo Alto subport VLAN from start."""
-        used = self._used_subport_vlans(trunk)
-        ranges = sorted(utils.allowed_tenant_vlan_id_ranges())
-        for start, end in ranges:
-            for vlan in range(max(start, start_vlan), end + 1):
-                if vlan not in used:
-                    return vlan
-        raise NoPaloAltoSubportVlanAvailable(
-            router_id=router_id,
-            trunk_id=trunk["id"],
-            network_segment_ranges=utils.printable_ranges(ranges),
-        )
+        ranges = utils.allowed_tenant_vlan_id_ranges()
+        vlan = _first_free_vlan(ranges, _used_subport_vlans(trunk), start_vlan)
+        if vlan is None:
+            raise NoPaloAltoSubportVlanAvailable(
+                router_id=router_id,
+                trunk_id=trunk["id"],
+                network_segment_ranges=utils.printable_ranges(sorted(ranges)),
+            )
+        return vlan
 
     def _add_router_port_subport(
         self,
@@ -546,8 +568,7 @@ class PaloAlto(base.L3ServiceProvider):
         program the switch. No-ops if the port is already a subport.
         """
         port_id = port["id"]
-        existing = {sp["port_id"] for sp in trunk.get("sub_ports", [])}
-        if port_id in existing:
+        if _has_subport(trunk, port_id):
             LOG.debug(
                 "Palo Alto %s port %s already a subport on trunk %s",
                 label,
@@ -594,7 +615,7 @@ class PaloAlto(base.L3ServiceProvider):
     def _add_gateway_subport(self, router: dict, trunk: dict, gateway_port: dict):
         """Add the gateway port to the trunk as a VLAN subport (idempotent)."""
         port_id = gateway_port["id"]
-        if port_id in {sp["port_id"] for sp in trunk.get("sub_ports", [])}:
+        if _has_subport(trunk, port_id):
             LOG.debug(
                 "Palo Alto gateway port %s already a subport on trunk %s",
                 port_id,
@@ -612,7 +633,7 @@ class PaloAlto(base.L3ServiceProvider):
     def _add_interface_subport(self, router: dict, trunk: dict, interface_port: dict):
         """Add a router-interface port to the trunk as a VLAN subport."""
         port_id = interface_port["id"]
-        if port_id in {sp["port_id"] for sp in trunk.get("sub_ports", [])}:
+        if _has_subport(trunk, port_id):
             LOG.debug(
                 "Palo Alto interface port %s already a subport on trunk %s",
                 port_id,
@@ -635,8 +656,7 @@ class PaloAlto(base.L3ServiceProvider):
         Fires the trunk driver's SUBPORTS delete events, which release the
         fabric segment and update the switchport. No-ops if it is not a subport.
         """
-        existing = {sp["port_id"] for sp in trunk.get("sub_ports", [])}
-        if port_id not in existing:
+        if not _has_subport(trunk, port_id):
             LOG.debug(
                 "Palo Alto %s port %s is not a subport on trunk %s; skip removal",
                 label,
@@ -917,9 +937,9 @@ class PaloAlto(base.L3ServiceProvider):
             port_id=interface_port["id"],
             parent_id=previous_parent["id"] if previous_parent else None,
             trunk_id=previous_trunk["id"] if previous_trunk else None,
-            subport_present=any(
-                sp["port_id"] == interface_port["id"]
-                for sp in (previous_trunk or {}).get("sub_ports", [])
+            subport_present=(
+                previous_trunk is not None
+                and _has_subport(previous_trunk, interface_port["id"])
             ),
             parent_vif_attached=parent_vif_attached,
         )
