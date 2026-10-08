@@ -13,7 +13,7 @@ spec:
   destination:
     namespace: opentelemetry-operator
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack
   sources:
   - chart: opentelemetry-operator
     helm:

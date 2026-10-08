@@ -18,7 +18,7 @@ spec:
   destination:
     namespace: cert-manager
     server: {{ $.Values.cluster_server }}
-  project: understack-infra
+  project: understack
   sources:
   {{- if $installApp }}
   - chart: cert-manager

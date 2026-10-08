@@ -13,7 +13,7 @@ spec:
   destination:
     namespace: openebs
     server: {{ $.Values.cluster_server }}
-  project: understack-operators
+  project: understack
   sources:
   - chart: openebs
     helm:
