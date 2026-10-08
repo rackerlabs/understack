@@ -252,24 +252,15 @@ class PaloAlto(base.L3ServiceProvider):
             self._ironic_ref = IronicClient()
             return self._ironic_ref
 
-    def _is_palo_alto_provider(self, context, router):
+    def _is_palo_alto_provider(self, context, router) -> bool:
         flavor_id = router.get("flavor_id")
-        if flavor_id is None or flavor_id is const.ATTR_NOT_SPECIFIED:
-            LOG.debug(
-                "Palo Alto flavor check skipped: router=%s name=%s project=%s "
-                "flavor=%s request_id=%s",
-                router.get("id"),
-                router.get("name"),
-                router.get("project_id"),
-                flavor_id,
-                getattr(context, "request_id", None),
+        actual_driver = None
+        if flavor_id is not None and flavor_id is not const.ATTR_NOT_SPECIFIED:
+            flavor = self._flavor_plugin.get_flavor(context, flavor_id)
+            providers = self._flavor_plugin.get_flavor_next_provider(
+                context, flavor["id"]
             )
-            return False
-        flavor = self._flavor_plugin.get_flavor(context, flavor_id)
-        provider = self._flavor_plugin.get_flavor_next_provider(context, flavor["id"])[
-            0
-        ]
-        actual_driver = str(provider["driver"])
+            actual_driver = str(providers[0]["driver"])
         matched = actual_driver == self._palo_alto_provider
         LOG.debug(
             "Palo Alto flavor check: router=%s name=%s project=%s flavor=%s "
@@ -284,6 +275,13 @@ class PaloAlto(base.L3ServiceProvider):
             getattr(context, "request_id", None),
         )
         return matched
+
+    def _palo_alto_router(self, context, router_id: str) -> dict | None:
+        """Return the router if it uses the Palo Alto flavor, else None."""
+        router = self.l3plugin.get_router(context, router_id)
+        if not self._is_palo_alto_provider(context, router):
+            return None
+        return router
 
     def _resource_class_for_router(self, context, router) -> str:
         """Read the target resource_class from the flavor's profile metainfo.
@@ -873,10 +871,9 @@ class PaloAlto(base.L3ServiceProvider):
         subport is added -- the trunk driver only programs the switchport once
         the parent is bound.
         """
-        context = payload.context
         router_id = payload.resource_id
-        router = self.l3plugin.get_router(context, router_id)
-        if not self._is_palo_alto_provider(context, router):
+        router = self._palo_alto_router(payload.context, router_id)
+        if router is None:
             return
 
         gateway_port = self._gateway_port_for_router(router_id)
@@ -902,10 +899,9 @@ class PaloAlto(base.L3ServiceProvider):
         The gateway port still exists at this point, so we can find it and
         remove its subport before Neutron deletes it.
         """
-        context = payload.context
         router_id = payload.resource_id
-        router = self.l3plugin.get_router(context, router_id)
-        if not self._is_palo_alto_provider(context, router):
+        router = self._palo_alto_router(payload.context, router_id)
+        if router is None:
             return
 
         gateway_port = self._gateway_port_for_router(router_id)
@@ -925,10 +921,9 @@ class PaloAlto(base.L3ServiceProvider):
 
     def _process_router_interface_create(self, resource, event, trigger, payload=None):
         """Wire the interface before Neutron commits its RouterPort association."""
-        context = payload.context
         router_id = payload.resource_id
-        router = self.l3plugin.get_router(context, router_id)
-        if not self._is_palo_alto_provider(context, router):
+        router = self._palo_alto_router(payload.context, router_id)
+        if router is None:
             return
 
         interface_port = payload.metadata.get("port")
@@ -1040,8 +1035,7 @@ class PaloAlto(base.L3ServiceProvider):
             return
 
         try:
-            router = self.l3plugin.get_router(context, router_id)
-            is_palo_alto = self._is_palo_alto_provider(context, router)
+            router = self._palo_alto_router(context, router_id)
         except Exception:
             LOG.debug(
                 "Skipping Palo Alto interface cleanup for port %s; router %s "
@@ -1052,7 +1046,7 @@ class PaloAlto(base.L3ServiceProvider):
             )
             return
 
-        if not is_palo_alto:
+        if router is None:
             return
 
         # Neutron also deletes newly-created ports when attachment aborts. That

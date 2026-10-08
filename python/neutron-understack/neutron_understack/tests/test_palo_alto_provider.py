@@ -137,6 +137,36 @@ class TestPaloAltoProvider:
             is False
         )
 
+    def test_palo_alto_router_returns_router_for_palo_alto_flavor(self, mocker):
+        provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
+        router = {"id": "r1", "flavor_id": "f1"}
+        provider.l3plugin.get_router.return_value = router
+
+        assert provider._palo_alto_router("ctx", "r1") is router
+        provider.l3plugin.get_router.assert_called_once_with("ctx", "r1")
+
+    @pytest.mark.parametrize(
+        ("driver", "router"),
+        [
+            ("neutron_understack.l3_router.vrf.Vrf", {"id": "r1", "flavor_id": "f1"}),
+            (_palo_alto_driver(), {"id": "r1"}),
+        ],
+        ids=["other-flavor", "no-flavor"],
+    )
+    def test_palo_alto_router_returns_none_otherwise(self, mocker, driver, router):
+        provider = _make_provider(mocker, FakeFlavorPlugin(driver))
+        provider.l3plugin.get_router.return_value = router
+
+        assert provider._palo_alto_router("ctx", "r1") is None
+
+    def test_palo_alto_router_propagates_lookup_errors(self, mocker):
+        # Callers decide: most handlers let it raise, port delete skips cleanup.
+        provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
+        provider.l3plugin.get_router.side_effect = RuntimeError("db hiccup")
+
+        with pytest.raises(RuntimeError, match="db hiccup"):
+            provider._palo_alto_router("ctx", "r1")
+
 
 class TestExceptionHttpCodes:
     """Exceptions must map to real HTTP codes, not 500.
