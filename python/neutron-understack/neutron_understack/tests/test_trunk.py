@@ -270,25 +270,52 @@ class Test_HandleSegmentDeallocation:
 
 
 class TestConfigureTrunk:
+    def test_returns_without_configuring_when_port_is_not_a_trunk_parent(
+        self,
+        mocker,
+        understack_trunk_driver,
+        port_id,
+        vlan_network_segment,
+    ):
+        mocker.patch(
+            "neutron_understack.utils.fetch_trunk_by_parent_port", return_value=None
+        )
+        add_subports = mocker.patch.object(
+            understack_trunk_driver, "_add_subports_networks_to_parent_port_switchport"
+        )
+
+        understack_trunk_driver.configure_trunk(port_id, vlan_network_segment)
+
+        add_subports.assert_not_called()
+
     def test_that_add_subports_networks_is_called(
         self,
         mocker,
         understack_trunk_driver,
+        trunk,
         port_object,
         port_id,
         vlan_network_segment,
     ):
         mocker.patch(
+            "neutron_understack.utils.fetch_trunk_by_parent_port", return_value=trunk
+        )
+        mocker.patch(
             "neutron_understack.utils.fetch_port_object", return_value=port_object
         )
-        mocker.patch.object(
+        mocker.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value=str(trunk.id),
+        )
+        add_subports = mocker.patch.object(
             understack_trunk_driver, "_add_subports_networks_to_parent_port_switchport"
         )
-        understack_trunk_driver.configure_trunk({}, port_id, vlan_network_segment)
 
-        understack_trunk_driver._add_subports_networks_to_parent_port_switchport.assert_called_once_with(
+        understack_trunk_driver.configure_trunk(port_id, vlan_network_segment)
+
+        add_subports.assert_called_once_with(
             parent_port=port_object,
-            subports=[],
+            subports=trunk.sub_ports,
         )
 
     def test_rejects_subport_matching_newly_selected_native_vlan(
@@ -300,9 +327,14 @@ class TestConfigureTrunk:
         trunk_id,
         subport,
         vlan_network_segment,
+        trunk,
     ):
+        trunk.id = trunk_id
         mocker.patch(
             "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch(
+            "neutron_understack.utils.fetch_trunk_by_parent_port", return_value=trunk
         )
         mocker.patch(
             "neutron_understack.utils.fetch_network_node_trunk_id",
@@ -312,15 +344,9 @@ class TestConfigureTrunk:
             understack_trunk_driver, "_add_subports_networks_to_parent_port_switchport"
         )
         subport.segmentation_id = vlan_network_segment.segmentation_id
-        trunk_details = {
-            "trunk_id": str(trunk_id),
-            "sub_ports": [subport],
-        }
 
         with pytest.raises(SubportSegmentationIDError, match="matches the native VLAN"):
-            understack_trunk_driver.configure_trunk(
-                trunk_details, port_id, vlan_network_segment
-            )
+            understack_trunk_driver.configure_trunk(port_id, vlan_network_segment)
 
         add_subports.assert_not_called()
 
@@ -333,9 +359,14 @@ class TestConfigureTrunk:
         trunk_id,
         subport,
         vlan_network_segment,
+        trunk,
     ):
+        trunk.id = trunk_id
         mocker.patch(
             "neutron_understack.utils.fetch_port_object", return_value=port_object
+        )
+        mocker.patch(
+            "neutron_understack.utils.fetch_trunk_by_parent_port", return_value=trunk
         )
         mocker.patch(
             "neutron_understack.utils.fetch_network_node_trunk_id",
@@ -345,14 +376,8 @@ class TestConfigureTrunk:
             understack_trunk_driver, "_add_subports_networks_to_parent_port_switchport"
         )
         subport.segmentation_id = vlan_network_segment.segmentation_id
-        trunk_details = {
-            "trunk_id": str(trunk_id),
-            "sub_ports": [subport],
-        }
 
-        understack_trunk_driver.configure_trunk(
-            trunk_details, port_id, vlan_network_segment
-        )
+        understack_trunk_driver.configure_trunk(port_id, vlan_network_segment)
 
         add_subports.assert_called_once_with(
             parent_port=port_object,

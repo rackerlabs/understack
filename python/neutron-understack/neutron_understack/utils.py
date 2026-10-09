@@ -34,6 +34,11 @@ def fetch_port_object(port_id: str) -> port_obj.Port:
     return port
 
 
+def fetch_trunk_by_parent_port(port_id: str) -> trunk_obj.Trunk | None:
+    context = n_context.get_admin_context()
+    return trunk_obj.Trunk.get_object(context, port_id=port_id)
+
+
 def create_neutron_port_for_segment(
     segment: NetworkSegmentDict, context: PortContext
 ) -> PortDict:

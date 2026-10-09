@@ -165,16 +165,21 @@ class UnderstackTrunkDriver(trunk_base.DriverBase):
                     physical_network=physical_network,
                 )
 
-    def configure_trunk(
-        self, trunk_details: dict, port_id: str, native_segment: dict
-    ) -> None:
-        parent_port_obj = utils.fetch_port_object(port_id)
-        subports = trunk_details.get("sub_ports", [])
+    def configure_trunk(self, port_id: str, native_segment: dict) -> None:
+        """Configure a trunk when its parent acquires a native VLAN.
 
-        if (
-            subports
-            and trunk_details["trunk_id"] != utils.fetch_network_node_trunk_id()
-        ):
+        Resolve the trunk from the database rather than relying on the
+        ``trunk_details`` API extension. That extension is not guaranteed to
+        be present in the port dictionary used by ML2 during binding.
+        """
+        trunk = utils.fetch_trunk_by_parent_port(port_id)
+        if trunk is None:
+            return
+
+        parent_port_obj = utils.fetch_port_object(port_id)
+        subports = trunk.sub_ports
+
+        if subports and str(trunk.id) != utils.fetch_network_node_trunk_id():
             self._check_subports_native_vlan(
                 subports,
                 native_segment["physical_network"],
