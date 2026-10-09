@@ -12,6 +12,7 @@ from neutron.objects.network import NetworkSegment
 from neutron.plugins.ml2 import db as ml2_db
 from neutron.services.trunk import exceptions as trunk_exc
 from neutron_lib import constants as p_const
+from neutron_lib.api.definitions import portbindings
 from neutron_lib.callbacks import exceptions as cb_exc
 
 from neutron_understack.tests.scenarios.base import DEFAULT_PHYSNET
@@ -31,6 +32,33 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         res = self._create_port(self.fmt, net_id, is_admin=True)
         assert res.status_int == 201, res.body
         return self.deserialize(self.fmt, res)["port"]["id"]
+
+    def _unbound_baremetal_port(self, net_id):
+        res = self._create_port(
+            self.fmt,
+            net_id,
+            arg_list=(portbindings.VNIC_TYPE,),
+            is_admin=True,
+            **{portbindings.VNIC_TYPE: portbindings.VNIC_BAREMETAL},
+        )
+        assert res.status_int == 201, res.body
+        return self.deserialize(self.fmt, res)["port"]
+
+    def _vif_attach(self, port_id, physnet=DEFAULT_PHYSNET, host="host-a"):
+        data = {
+            "port": {
+                portbindings.HOST_ID: host,
+                portbindings.PROFILE: self.baremetal_binding_profile(physnet=physnet),
+            }
+        }
+        req = self.new_update_request("ports", data, port_id, as_service=True)
+        with mock.patch(
+            "neutron_understack.utils.fetch_network_node_trunk_id",
+            return_value=_FAKE_NN_TRUNK,
+        ):
+            res = req.get_response(self.api)
+        assert res.status_int == 200, res.body
+        return self.deserialize(self.fmt, res)["port"]
 
     def _make_trunk(self, parent_id):
         trunk = self.trunk_plugin.create_trunk(
@@ -228,6 +256,36 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
             )
             is None
         )
+        self.undersync_mock.sync.assert_not_called()
+
+    @pytest.mark.scenario("TRUNK-PARENT-BIND-NATIVE-01")
+    def test_unbound_trunk_rejects_native_vlan_collision_on_parent_bind(self):
+        """Binding must revalidate subports once the native VLAN is known."""
+        parent_net = self._make_network(self.fmt, "parent-net", True)["network"]["id"]
+        parent = self._unbound_baremetal_port(parent_net)
+        subport_net = self._make_network(self.fmt, "subport-net", True)["network"]["id"]
+        subport_id = self._plain_port(subport_net)
+        trunk_id = self._make_trunk(parent["id"])
+
+        # This is valid while the parent is unbound because its native VLAN is
+        # not known yet. Pin the segment that vif-attach will select so the
+        # eventual collision is deterministic.
+        self._add_subport(trunk_id, subport_id, seg_id=SUBPORT_VLAN)
+        native_segment = {
+            segments_db.NETWORK_TYPE: p_const.TYPE_VLAN,
+            segments_db.PHYSICAL_NETWORK: DEFAULT_PHYSNET,
+            segments_db.SEGMENTATION_ID: SUBPORT_VLAN,
+        }
+        segments_db.add_network_segment(
+            self.context, parent_net, native_segment, is_dynamic=True
+        )
+
+        self.undersync_mock.reset_mock()
+        updated = self._vif_attach(parent["id"])
+
+        assert updated[portbindings.VIF_TYPE] == portbindings.VIF_TYPE_BINDING_FAILED
+        assert not ml2_db.get_binding_level_objs(self.context, parent["id"], "host-a")
+        assert not ml2_db.get_binding_level_objs(self.context, subport_id, "host-a")
         self.undersync_mock.sync.assert_not_called()
 
     @pytest.mark.scenario("TRUNK-MULTI-01")
