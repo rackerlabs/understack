@@ -19,6 +19,7 @@ from neutron_lib.callbacks import registry
 from neutron_lib.callbacks import resources
 from neutron_lib.plugins import constants as plugin_constants
 from neutron_lib.plugins import directory
+from neutron_lib.services.trunk import constants as trunk_consts
 
 from neutron_understack import utils
 from neutron_understack.ironic import IronicClient
@@ -151,7 +152,7 @@ def _used_subport_vlans(trunk: dict) -> set[int]:
     return {
         sp["segmentation_id"]
         for sp in trunk.get("sub_ports", [])
-        if sp.get("segmentation_type") == "vlan"
+        if sp.get("segmentation_type") == trunk_consts.SEGMENTATION_TYPE_VLAN
         and sp.get("segmentation_id") is not None
     }
 
@@ -191,7 +192,7 @@ def _missing_binding_fields(port: dict) -> list[str]:
     return [
         name
         for name, value in (
-            ("binding:host_id", port.get(portbindings.HOST_ID)),
+            (portbindings.HOST_ID, port.get(portbindings.HOST_ID)),
             ("physical_network", profile.get("physical_network")),
             ("local_link_information", profile.get("local_link_information")),
         )
@@ -331,7 +332,7 @@ class PaloAlto(base.L3ServiceProvider):
             router_id=router["id"], flavor_id=router["flavor_id"]
         )
 
-    def _ensure_anchor_network(self):
+    def _ensure_anchor_network(self) -> dict:
         """Create the shared sentinel anchor network if it does not exist."""
         core_plugin = directory.get_plugin()
         admin_context = n_context.get_admin_context()
@@ -640,7 +641,7 @@ class PaloAlto(base.L3ServiceProvider):
                     "sub_ports": [
                         {
                             "port_id": port_id,
-                            "segmentation_type": "vlan",
+                            "segmentation_type": trunk_consts.SEGMENTATION_TYPE_VLAN,
                             "segmentation_id": segmentation_id,
                         }
                     ]
@@ -964,7 +965,7 @@ class PaloAlto(base.L3ServiceProvider):
             parent_vif_attached=parent_vif_attached,
         )
 
-    def _rollback_interface_attachment(self, payload):
+    def _rollback_interface_attachment(self, payload) -> None:
         """Undo this request's changes, including calls that failed postcommit."""
         snapshot = self._interface_snapshots.get(payload)
         if snapshot is None:
