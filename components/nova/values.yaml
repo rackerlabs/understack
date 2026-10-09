@@ -133,9 +133,15 @@ conf:
       driver: messagingv2
 
 console:
-  # we are working with baremetal nodes and not QEMU so we don't need novnc or spice
-  # connected to QEMU
-  console_kind: none
+  # Nova serves a graphical (noVNC) console for instances. For Ironic baremetal
+  # instances the nova ironic virt driver proxies this through nova-novncproxy
+  # (this is distinct from Ironic's own novncproxy that serves the node's
+  # out-of-band console). Setting this to "novnc" makes the chart deploy the
+  # nova-novncproxy service and render the [vnc] config. Each site must still
+  # publish the proxy by setting conf.nova.vnc.novncproxy_base_url (or the
+  # endpoints.compute_novnc_proxy public host) to a reachable FQDN and wiring
+  # up a route to the nova-novncproxy service on port 6080.
+  console_kind: novnc
 
 bootstrap:
   structured:
