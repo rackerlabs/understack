@@ -32,6 +32,7 @@ dependencies = [
 [project.scripts]
 bmc-kube-password = "understack_workflows.main.bmc_display_password:main"
 bmc-password = "understack_workflows.main.print_bmc_password:main"
+create-port-group = "understack_workflows.main.create_port_group:main"
 enroll-fw = "understack_workflows.main.enroll_fw:main"
 enroll-netdev = "understack_workflows.main.enroll_netdev:main"
 enroll-server = "understack_workflows.main.enroll_server:main"
