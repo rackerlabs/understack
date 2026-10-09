@@ -302,6 +302,15 @@ adds/removes must reconcile the parent's switch (VLAN group).
   subport was created because the unbound parent had no physical network or
   native VLAN yet
 
+### TRUNK-PARENT-BIND-NATIVE-02 — trunk and subports created before bind are configured at bind
+- given: an unbound baremetal parent with a trunk and several subports added
+  before the parent has any host or physical network
+- when: the parent is vif-attached
+- then: the parent binds, each subport gets a level-0 binding row on its
+  network's dynamic VLAN segment for the parent's physnet, and
+  `undersync.sync` fires for that physnet; none of this existed before the
+  bind because the subport add had no physnet to allocate on
+
 ### TRUNK-SEGID-NATIVE-01 — subport seg_id matching the native VLAN is rejected
 - given: a bound baremetal parent with a trunk
 - when: a subport is added with a segmentation_id equal to the VLAN segment of

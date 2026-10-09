@@ -258,6 +258,19 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         )
         self.undersync_mock.sync.assert_not_called()
 
+    # The understack driver raises SubportSegmentationIDError in bind_port, but
+    # ML2 has no way to abort a bind: it logs the failure and tries the next
+    # mechanism driver, which binds the port. This asserts the desired behavior;
+    # strict=True flips an unexpected pass into a failure, prompting removal of
+    # the xfail once the upstream Neutron fix is backported.
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "native VLAN collision on parent bind is detected but ML2 cannot "
+            "abort a bind; it falls through to the next mechanism driver and the "
+            "port binds (vif_type=other). Needs the upstream Neutron fix backported"
+        ),
+    )
     @pytest.mark.scenario("TRUNK-PARENT-BIND-NATIVE-01")
     def test_unbound_trunk_rejects_native_vlan_collision_on_parent_bind(self):
         """Binding must revalidate subports once the native VLAN is known."""
@@ -287,6 +300,34 @@ class TestTrunkOperations(UnderstackMl2TrunkScenarioBase):
         assert not ml2_db.get_binding_level_objs(self.context, parent["id"], "host-a")
         assert not ml2_db.get_binding_level_objs(self.context, subport_id, "host-a")
         self.undersync_mock.sync.assert_not_called()
+
+    @pytest.mark.scenario("TRUNK-PARENT-BIND-NATIVE-02")
+    def test_unbound_trunk_with_subports_configures_on_parent_bind(self):
+        """Everything created before the parent binds is configured at bind."""
+        parent_net = self._make_network(self.fmt, "parent-net", True)["network"]["id"]
+        parent = self._unbound_baremetal_port(parent_net)
+        sub_net_a = self._make_network(self.fmt, "sub-a", True)["network"]["id"]
+        sub_net_b = self._make_network(self.fmt, "sub-b", True)["network"]["id"]
+        subport_a = self._plain_port(sub_net_a)
+        subport_b = self._plain_port(sub_net_b)
+        trunk_id = self._make_trunk(parent["id"])
+        self._add_subport(trunk_id, subport_a, seg_id=1500)
+        self._add_subport(trunk_id, subport_b, seg_id=1600)
+        for net_id in (sub_net_a, sub_net_b):
+            assert (
+                segments_db.get_dynamic_segment(
+                    self.context, net_id, physical_network=DEFAULT_PHYSNET
+                )
+                is None
+            )
+
+        self.undersync_mock.reset_mock()
+        updated = self._vif_attach(parent["id"])
+
+        assert updated[portbindings.VIF_TYPE] == portbindings.VIF_TYPE_OTHER
+        self._assert_subport_bound(trunk_id, subport_a, "host-a", seg_id=1500)
+        self._assert_subport_bound(trunk_id, subport_b, "host-a", seg_id=1600)
+        self.undersync_mock.sync.assert_any_call(DEFAULT_PHYSNET)
 
     @pytest.mark.scenario("TRUNK-MULTI-01")
     def test_multiple_subports_add_syncs(self):
