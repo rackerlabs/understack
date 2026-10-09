@@ -224,7 +224,7 @@ class PaloAlto(base.L3ServiceProvider):
 
         # Ensure the shared anchor network first: it is idempotent and meant to
         # persist, so creating it before adoption never strands an adopted node.
-        self._wiring._ensure_anchor_network()
+        self._wiring.ensure_anchor_network()
         self._ironic.adopt_node_for_router(
             node,
             project_id=router.get("project_id"),
@@ -282,25 +282,22 @@ class PaloAlto(base.L3ServiceProvider):
         the parent is bound.
         """
         router_id = payload.resource_id
-        router = self._palo_alto_router(payload.context, router_id)
-        if router is None:
+        if self._palo_alto_router(payload.context, router_id) is None:
             return
 
-        gateway_port = self._wiring._gateway_port_for_router(router_id)
+        gateway_port = self._wiring.gateway_port_for_router(router_id)
         if gateway_port is None:
             raise PaloAltoGatewayPortNotFound(router_id=router_id)
 
-        parent = self._wiring._ensure_parent_port(router)
-        parent = self._wiring._ensure_parent_vif_attached(router, parent)
-        trunk = self._wiring._ensure_trunk(router, parent)
-        self._wiring._add_gateway_subport(router, trunk, gateway_port)
+        stack = self._wiring.ensure_stack(router_id)
+        self._wiring.add_gateway_subport(router_id, stack.trunk, gateway_port)
 
         LOG.info(
             "Attached Palo Alto router %s gateway port %s via parent %s trunk %s",
             router_id,
             gateway_port["id"],
-            parent["id"],
-            trunk["id"],
+            stack.parent["id"],
+            stack.trunk["id"],
         )
 
     def _process_gateway_delete(self, resource, event, trigger, payload=None):
@@ -310,11 +307,10 @@ class PaloAlto(base.L3ServiceProvider):
         remove its subport before Neutron deletes it.
         """
         router_id = payload.resource_id
-        router = self._palo_alto_router(payload.context, router_id)
-        if router is None:
+        if self._palo_alto_router(payload.context, router_id) is None:
             return
 
-        gateway_port = self._wiring._gateway_port_for_router(router_id)
+        gateway_port = self._wiring.gateway_port_for_router(router_id)
         if gateway_port is None:
             LOG.debug(
                 "Palo Alto router %s gateway cleanup skipped; gateway port not found",
@@ -322,7 +318,7 @@ class PaloAlto(base.L3ServiceProvider):
             )
             return
 
-        self._wiring._cleanup_gateway_attachment(router, gateway_port)
+        self._wiring.cleanup_attachment(router_id, gateway_port["id"], "gateway")
         LOG.info(
             "Cleaned Palo Alto router %s gateway attachment (port %s)",
             router_id,
@@ -332,8 +328,7 @@ class PaloAlto(base.L3ServiceProvider):
     def _process_router_interface_create(self, resource, event, trigger, payload=None):
         """Wire the interface before Neutron commits its RouterPort association."""
         router_id = payload.resource_id
-        router = self._palo_alto_router(payload.context, router_id)
-        if router is None:
+        if self._palo_alto_router(payload.context, router_id) is None:
             return
 
         interface_port = payload.metadata.get("port")
@@ -342,14 +337,12 @@ class PaloAlto(base.L3ServiceProvider):
         if interface_port.get("device_owner") not in const.ROUTER_INTERFACE_OWNERS:
             return
 
-        self._interface_snapshots[payload] = (
-            self._wiring._snapshot_interface_attachment(router_id, interface_port["id"])
+        self._interface_snapshots[payload] = self._wiring.snapshot_interface_attachment(
+            router_id, interface_port["id"]
         )
         try:
-            parent = self._wiring._ensure_parent_port(router)
-            parent = self._wiring._ensure_parent_vif_attached(router, parent)
-            trunk = self._wiring._ensure_trunk(router, parent)
-            self._wiring._add_interface_subport(router, trunk, interface_port)
+            stack = self._wiring.ensure_stack(router_id)
+            self._wiring.add_interface_subport(router_id, stack.trunk, interface_port)
         except Exception:
             # Attach-by-port is reverted with a port update by Neutron, so it
             # cannot rely on PORT/BEFORE_DELETE to undo partial realization.
@@ -360,8 +353,8 @@ class PaloAlto(base.L3ServiceProvider):
             "Attached Palo Alto router %s interface port %s via parent %s trunk %s",
             router_id,
             interface_port["id"],
-            parent["id"],
-            trunk["id"],
+            stack.parent["id"],
+            stack.trunk["id"],
         )
 
     def _rollback_interface_attachment(self, payload) -> None:
@@ -370,7 +363,7 @@ class PaloAlto(base.L3ServiceProvider):
         if snapshot is None:
             return
         try:
-            self._wiring._undo_interface_attachment(snapshot)
+            self._wiring.undo_interface_attachment(snapshot)
         except Exception:
             # Preserve the original attach error. Keep the snapshot so the
             # subsequent ABORT_CREATE can retry compensation if it failed here.
@@ -432,7 +425,7 @@ class PaloAlto(base.L3ServiceProvider):
         ):
             return
 
-        self._wiring._cleanup_interface_attachment(router, port)
+        self._wiring.cleanup_attachment(router_id, port["id"], "interface")
         LOG.info(
             "Cleaned Palo Alto router %s interface attachment (port %s)",
             router_id,
