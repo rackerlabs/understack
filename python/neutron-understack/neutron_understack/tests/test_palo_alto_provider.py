@@ -1044,6 +1044,29 @@ class TestRouterInterfaceCreateHandler:
         with pytest.raises(palo_alto.PaloAltoInterfacePortMissing, match="router r1 "):
             provider._process_router_interface_create("r", "e", "t", payload)
 
+    def test_abort_after_successful_rollback_does_nothing(self, mocker):
+        # A rollback that succeeded must drop its snapshot, so the ABORT_CREATE
+        # Neutron publishes next does not run the undo a second time.
+        provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
+        provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
+        mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
+        mocker.patch.object(provider, "_parent_port_for_router", return_value=None)
+        trunk_lookup = mocker.patch.object(
+            provider, "_trunk_for_router", return_value=None
+        )
+        mocker.patch.object(
+            provider, "_ensure_parent_port", side_effect=RuntimeError("boom")
+        )
+        payload = self._payload(mocker)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            provider._process_router_interface_create("r", "e", "t", payload)
+        lookups = trunk_lookup.call_count
+
+        provider._process_router_interface_abort("r", "e", "t", payload)
+
+        assert trunk_lookup.call_count == lookups
+
 
 class TestGatewayTeardown:
     def _provider(self, mocker, trunk_after_removal):

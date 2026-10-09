@@ -45,7 +45,13 @@ _PortLabel = Literal["gateway", "interface"]
 
 
 @dataclass(frozen=True)
-class _InterfaceAttachment:
+class _AttachmentSnapshot:
+    """Router wiring that existed before an interface attach request.
+
+    Rollback compares current state against this, so it removes only what the
+    request added and leaves pre-existing parent, trunk and VIF in place.
+    """
+
     router_id: str
     port_id: str
     parent_id: str | None
@@ -164,7 +170,7 @@ def _first_free_vlan(
 @contextmanager
 def _device_id_cleared(port: dict) -> Generator[None, None, None]:
     """Clear the port's device_id for the block, then restore device_id + owner."""
-    # The trunk subport validator rejects a port that has device_id set
+    # Note: The trunk subport validator rejects a port that has device_id set
     # (rules.py check_not_in_use). Router-owned ports have
     # device_id=router_id, so clear it for the add and restore it
     # afterwards so the router keeps its port association.
@@ -210,7 +216,7 @@ class PaloAlto(base.L3ServiceProvider):
     def __init__(self, l3_plugin):
         super().__init__(l3_plugin)
         self._palo_alto_provider = f"{__name__}.{self.__class__.__name__}"
-        self._interface_attachments = weakref.WeakKeyDictionary()
+        self._interface_snapshots = weakref.WeakKeyDictionary()
         # Gateway attach must run on AFTER_CREATE (the gateway port does not
         # exist earlier) and must be cancellable so a wiring failure returns a
         # real API error instead of a swallowed 200. @registry.receives cannot
@@ -916,24 +922,8 @@ class PaloAlto(base.L3ServiceProvider):
         if interface_port.get("device_owner") not in const.ROUTER_INTERFACE_OWNERS:
             return
 
-        previous_parent = self._parent_port_for_router(router_id)
-        previous_trunk = self._trunk_for_router(router_id)
-        parent_vif_attached = False
-        if previous_parent is not None:
-            node = self._ironic.node_by_instance_uuid(router_id)
-            if node is not None:
-                vif_ids = self._ironic.node_vif_ids(node)
-                parent_vif_attached = previous_parent["id"] in vif_ids
-        self._interface_attachments[payload] = _InterfaceAttachment(
-            router_id=router_id,
-            port_id=interface_port["id"],
-            parent_id=previous_parent["id"] if previous_parent else None,
-            trunk_id=previous_trunk["id"] if previous_trunk else None,
-            subport_present=(
-                previous_trunk is not None
-                and _has_subport(previous_trunk, interface_port["id"])
-            ),
-            parent_vif_attached=parent_vif_attached,
+        self._interface_snapshots[payload] = self._snapshot_interface_attachment(
+            router_id, interface_port["id"]
         )
         try:
             parent = self._ensure_parent_port(router)
@@ -954,45 +944,71 @@ class PaloAlto(base.L3ServiceProvider):
             trunk["id"],
         )
 
+    def _snapshot_interface_attachment(
+        self, router_id: str, port_id: str
+    ) -> _AttachmentSnapshot:
+        """Record which wiring already exists before an interface attach."""
+        parent = self._parent_port_for_router(router_id)
+        trunk = self._trunk_for_router(router_id)
+        parent_vif_attached = False
+        if parent is not None:
+            node = self._ironic.node_by_instance_uuid(router_id)
+            if node is not None:
+                parent_vif_attached = parent["id"] in self._ironic.node_vif_ids(node)
+        return _AttachmentSnapshot(
+            router_id=router_id,
+            port_id=port_id,
+            parent_id=parent["id"] if parent else None,
+            trunk_id=trunk["id"] if trunk else None,
+            subport_present=trunk is not None and _has_subport(trunk, port_id),
+            parent_vif_attached=parent_vif_attached,
+        )
+
     def _rollback_interface_attachment(self, payload):
         """Undo this request's changes, including calls that failed postcommit."""
-        attachment = self._interface_attachments.get(payload)
-        if attachment is None:
+        snapshot = self._interface_snapshots.get(payload)
+        if snapshot is None:
             return
         try:
-            trunk = self._trunk_for_router(attachment.router_id)
-            if trunk is not None:
-                if not attachment.subport_present:
-                    self._remove_router_port_subport(
-                        trunk, attachment.port_id, "interface"
-                    )
-                admin_context = n_context.get_admin_context()
-                trunk = self._trunk_plugin.get_trunk(admin_context, trunk["id"])
-                if trunk.get("sub_ports"):
-                    # Other interfaces still need the shared parent and VIF.
-                    self._interface_attachments.pop(payload, None)
-                    return
-                if trunk["id"] != attachment.trunk_id:
-                    self._trunk_plugin.delete_trunk(admin_context, trunk["id"])
-
-            parent = self._parent_port_for_router(attachment.router_id)
-            if parent is not None:
-                if parent["id"] != attachment.parent_id:
-                    self._detach_and_delete_parent(attachment.router_id, parent["id"])
-                elif not attachment.parent_vif_attached:
-                    node = self._ironic.node_by_instance_uuid(attachment.router_id)
-                    if node is not None:
-                        self._ironic.detach_vif_from_node(node, parent["id"])
-            self._interface_attachments.pop(payload, None)
+            self._undo_interface_attachment(snapshot)
         except Exception:
             # Preserve the original attach error. Keep the snapshot so the
             # subsequent ABORT_CREATE can retry compensation if it failed here.
             LOG.exception(
                 "Failed to roll back Palo Alto router %s interface port %s; "
                 "attachment cleanup is incomplete",
-                attachment.router_id,
-                attachment.port_id,
+                snapshot.router_id,
+                snapshot.port_id,
             )
+            return
+        self._interface_snapshots.pop(payload, None)
+
+    def _undo_interface_attachment(self, snapshot: _AttachmentSnapshot) -> None:
+        """Return the router's wiring to the state recorded in the snapshot.
+
+        Re-reads current state rather than replaying the calls that succeeded,
+        because a remote call can apply its change and still raise.
+        """
+        trunk = self._trunk_for_router(snapshot.router_id)
+        if trunk is not None:
+            if not snapshot.subport_present:
+                self._remove_router_port_subport(trunk, snapshot.port_id, "interface")
+            admin_context = n_context.get_admin_context()
+            trunk = self._trunk_plugin.get_trunk(admin_context, trunk["id"])
+            if trunk.get("sub_ports"):
+                # Other interfaces still need the shared parent and VIF.
+                return
+            if trunk["id"] != snapshot.trunk_id:
+                self._trunk_plugin.delete_trunk(admin_context, trunk["id"])
+
+        parent = self._parent_port_for_router(snapshot.router_id)
+        if parent is not None:
+            if parent["id"] != snapshot.parent_id:
+                self._detach_and_delete_parent(snapshot.router_id, parent["id"])
+            elif not snapshot.parent_vif_attached:
+                node = self._ironic.node_by_instance_uuid(snapshot.router_id)
+                if node is not None:
+                    self._ironic.detach_vif_from_node(node, parent["id"])
 
     def _process_router_interface_abort(self, resource, event, trigger, payload=None):
         # The registry continues invoking callbacks after validation errors. An
