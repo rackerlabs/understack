@@ -18,6 +18,7 @@ from neutron_lib.exceptions import l3 as l3_exc
 
 from neutron_understack.ironic import NodeReleaseResult
 from neutron_understack.l3_router import palo_alto
+from neutron_understack.l3_router import palo_alto_wiring
 
 
 @pytest.fixture(autouse=True)
@@ -61,7 +62,7 @@ def _make_provider(mocker, flavor_plugin, ironic=None, core_plugin=None):
         side_effect=lambda *a: flavor_plugin if a else core_plugin,
     )
     # get_admin_context() would init oslo policy; not needed for these tests.
-    mocker.patch.object(palo_alto.n_context, "get_admin_context")
+    mocker.patch.object(palo_alto_wiring.n_context, "get_admin_context")
     provider = palo_alto.PaloAlto(mocker.Mock())
     provider._flavor_plugin_ref = flavor_plugin
     if ironic is not None:
@@ -182,13 +183,15 @@ class TestExceptionHttpCodes:
         assert issubclass(palo_alto.PaloAltoFlavorMisconfigured, n_exc.BadRequest)
 
     def test_no_subport_vlan_available_is_conflict(self):
-        assert issubclass(palo_alto.NoPaloAltoSubportVlanAvailable, n_exc.Conflict)
+        assert issubclass(
+            palo_alto_wiring.NoPaloAltoSubportVlanAvailable, n_exc.Conflict
+        )
 
     @pytest.mark.parametrize(
         "exc",
         [
-            palo_alto.PaloAltoNodeNotAdopted,
-            palo_alto.PaloAltoParentNotAnnotated,
+            palo_alto_wiring.PaloAltoNodeNotAdopted,
+            palo_alto_wiring.PaloAltoParentNotAnnotated,
             palo_alto.PaloAltoGatewayPortNotFound,
             palo_alto.PaloAltoInterfacePortMissing,
         ],
@@ -533,14 +536,16 @@ class TestEventSubscriptions:
 
 class TestGatewayLookups:
     def test_names_are_deterministic(self):
-        assert palo_alto._parent_port_name("r1") == "palo-alto-router-anchor-r1"
-        assert palo_alto._trunk_name("r1") == "palo-alto-router-trunk-r1"
+        assert palo_alto_wiring._parent_port_name("r1") == "palo-alto-router-anchor-r1"
+        assert palo_alto_wiring._trunk_name("r1") == "palo-alto-router-trunk-r1"
 
     def test_trunk_plugin_delegates_to_utils(self, mocker):
         tp = mocker.Mock()
-        mocker.patch.object(palo_alto.utils, "fetch_trunk_plugin", return_value=tp)
+        mocker.patch.object(
+            palo_alto_wiring.utils, "fetch_trunk_plugin", return_value=tp
+        )
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
-        assert provider._trunk_plugin is tp
+        assert provider._wiring._trunk_plugin() is tp
 
     def test_gateway_port_found_filters_by_owner_and_router(self, mocker):
         core_plugin = mocker.Mock()
@@ -549,7 +554,7 @@ class TestGatewayLookups:
             mocker, FakeFlavorPlugin(_palo_alto_driver()), core_plugin=core_plugin
         )
 
-        assert provider._gateway_port_for_router("r1") == {"id": "gw-1"}
+        assert provider._wiring._gateway_port_for_router("r1") == {"id": "gw-1"}
         _args, kwargs = core_plugin.get_ports.call_args
         assert kwargs["filters"]["device_id"] == ["r1"]
         assert kwargs["filters"]["device_owner"] == ["network:router_gateway"]
@@ -560,7 +565,7 @@ class TestGatewayLookups:
         provider = _make_provider(
             mocker, FakeFlavorPlugin(_palo_alto_driver()), core_plugin=core_plugin
         )
-        assert provider._gateway_port_for_router("r1") is None
+        assert provider._wiring._gateway_port_for_router("r1") is None
 
 
 class TestParentPort:
@@ -577,7 +582,7 @@ class TestParentPort:
             mocker, FakeFlavorPlugin(_palo_alto_driver()), core_plugin=core
         )
 
-        port = provider._ensure_parent_port({"id": "r1"})
+        port = provider._wiring._ensure_parent_port({"id": "r1"})
 
         assert port == {"id": "parent-new"}
         core.create_port.assert_called_once()
@@ -594,7 +599,7 @@ class TestParentPort:
             mocker, FakeFlavorPlugin(_palo_alto_driver()), core_plugin=core
         )
 
-        port = provider._ensure_parent_port({"id": "r1"})
+        port = provider._wiring._ensure_parent_port({"id": "r1"})
 
         assert port == {"id": "parent-existing"}
         core.create_port.assert_not_called()
@@ -629,7 +634,9 @@ class TestParentVifAttach:
         node = mocker.Mock(id="node-1")
         provider, ironic = self._provider(mocker, node, vif_ids=[])
 
-        result = provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+        result = provider._wiring._ensure_parent_vif_attached(
+            {"id": "r1"}, {"id": "parent-1"}
+        )
 
         ironic.attach_vif_to_node.assert_called_once_with(node, "parent-1")
         assert result == _ANNOTATED_PARENT  # fresh, annotated copy returned
@@ -640,7 +647,9 @@ class TestParentVifAttach:
         ironic.node_vif_ids.side_effect = [[], ["parent-1"]]
         ironic.attach_vif_to_node.side_effect = RuntimeError("rpc timeout")
 
-        result = provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+        result = provider._wiring._ensure_parent_vif_attached(
+            {"id": "r1"}, {"id": "parent-1"}
+        )
 
         ironic.attach_vif_to_node.assert_called_once_with(node, "parent-1")
         assert result == _ANNOTATED_PARENT
@@ -652,21 +661,25 @@ class TestParentVifAttach:
         ironic.attach_vif_to_node.side_effect = RuntimeError("rpc timeout")
 
         with pytest.raises(RuntimeError, match="rpc timeout"):
-            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+            provider._wiring._ensure_parent_vif_attached(
+                {"id": "r1"}, {"id": "parent-1"}
+            )
 
     def test_skips_attach_when_already_attached(self, mocker):
         node = mocker.Mock(id="node-1")
         provider, ironic = self._provider(mocker, node, vif_ids=["parent-1"])
 
-        provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+        provider._wiring._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
 
         ironic.attach_vif_to_node.assert_not_called()
 
     def test_raises_when_no_adopted_node(self, mocker):
         provider, ironic = self._provider(mocker, node=None, vif_ids=[])
 
-        with pytest.raises(palo_alto.PaloAltoNodeNotAdopted, match="router r1 "):
-            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+        with pytest.raises(palo_alto_wiring.PaloAltoNodeNotAdopted, match="router r1 "):
+            provider._wiring._ensure_parent_vif_attached(
+                {"id": "r1"}, {"id": "parent-1"}
+            )
         ironic.attach_vif_to_node.assert_not_called()
 
     def test_raises_when_parent_not_annotated(self, mocker):
@@ -676,10 +689,12 @@ class TestParentVifAttach:
         provider, _ = self._provider(mocker, node, vif_ids=[], fresh_port=unannotated)
 
         with pytest.raises(
-            palo_alto.PaloAltoParentNotAnnotated,
+            palo_alto_wiring.PaloAltoParentNotAnnotated,
             match=r"parent port parent-1 .*\(missing binding:host_id, physical_network",
         ):
-            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+            provider._wiring._ensure_parent_vif_attached(
+                {"id": "r1"}, {"id": "parent-1"}
+            )
 
     def test_recovery_logs_original_attach_error(self, mocker, caplog):
         node = mocker.Mock(id="node-1")
@@ -689,7 +704,9 @@ class TestParentVifAttach:
         ironic.attach_vif_to_node.side_effect = error
 
         with caplog.at_level(logging.WARNING, logger=palo_alto.__name__):
-            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+            provider._wiring._ensure_parent_vif_attached(
+                {"id": "r1"}, {"id": "parent-1"}
+            )
 
         [record] = [r for r in caplog.records if r.levelno == logging.WARNING]
         assert "raised, but the VIF is attached" in record.getMessage()
@@ -704,8 +721,10 @@ class TestParentVifAttach:
         ironic.node_vif_ids.side_effect = [[], ["parent-1"]]
         ironic.attach_vif_to_node.side_effect = RuntimeError("rpc timeout")
 
-        with pytest.raises(palo_alto.PaloAltoParentNotAnnotated):
-            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+        with pytest.raises(palo_alto_wiring.PaloAltoParentNotAnnotated):
+            provider._wiring._ensure_parent_vif_attached(
+                {"id": "r1"}, {"id": "parent-1"}
+            )
 
     def test_reraises_attach_error_when_recheck_fails(self, mocker):
         node = mocker.Mock(id="node-1")
@@ -714,7 +733,9 @@ class TestParentVifAttach:
         ironic.attach_vif_to_node.side_effect = RuntimeError("rpc timeout")
 
         with pytest.raises(RuntimeError, match="rpc timeout"):
-            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+            provider._wiring._ensure_parent_vif_attached(
+                {"id": "r1"}, {"id": "parent-1"}
+            )
 
     def test_raises_when_already_attached_parent_is_not_annotated(self, mocker):
         node = mocker.Mock(id="node-1")
@@ -723,19 +744,21 @@ class TestParentVifAttach:
             mocker, node, vif_ids=["parent-1"], fresh_port=unannotated
         )
 
-        with pytest.raises(palo_alto.PaloAltoParentNotAnnotated):
-            provider._ensure_parent_vif_attached({"id": "r1"}, {"id": "parent-1"})
+        with pytest.raises(palo_alto_wiring.PaloAltoParentNotAnnotated):
+            provider._wiring._ensure_parent_vif_attached(
+                {"id": "r1"}, {"id": "parent-1"}
+            )
         ironic.attach_vif_to_node.assert_not_called()
 
 
 class TestMissingBindingFields:
     def test_none_missing_when_annotated(self):
-        assert palo_alto._missing_binding_fields(_ANNOTATED_PARENT) == []
+        assert palo_alto_wiring._missing_binding_fields(_ANNOTATED_PARENT) == []
 
     def test_all_missing_when_unbound(self):
         port = {"id": "parent-1", "binding:host_id": "", "binding:profile": None}
 
-        assert palo_alto._missing_binding_fields(port) == [
+        assert palo_alto_wiring._missing_binding_fields(port) == [
             "binding:host_id",
             "physical_network",
             "local_link_information",
@@ -747,7 +770,7 @@ class TestMissingBindingFields:
             "binding:profile": {"local_link_information": [{"port_id": "Eth1/1"}]},
         }
 
-        assert palo_alto._missing_binding_fields(port) == ["physical_network"]
+        assert palo_alto_wiring._missing_binding_fields(port) == ["physical_network"]
 
 
 class TestTrunk:
@@ -755,14 +778,16 @@ class TestTrunk:
         tp = mocker.Mock()
         tp.get_trunks.return_value = existing_trunks
         tp.create_trunk.return_value = {"id": "trunk-new"}
-        mocker.patch.object(palo_alto.utils, "fetch_trunk_plugin", return_value=tp)
+        mocker.patch.object(
+            palo_alto_wiring.utils, "fetch_trunk_plugin", return_value=tp
+        )
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
         return provider, tp
 
     def test_creates_trunk_when_absent(self, mocker):
         provider, tp = self._provider_with_trunk(mocker, existing_trunks=[])
 
-        trunk = provider._ensure_trunk({"id": "r1"}, {"id": "parent-1"})
+        trunk = provider._wiring._ensure_trunk({"id": "r1"}, {"id": "parent-1"})
 
         assert trunk == {"id": "trunk-new"}
         tp.create_trunk.assert_called_once()
@@ -776,7 +801,7 @@ class TestTrunk:
             mocker, existing_trunks=[{"id": "trunk-existing"}]
         )
 
-        trunk = provider._ensure_trunk({"id": "r1"}, {"id": "parent-1"})
+        trunk = provider._wiring._ensure_trunk({"id": "r1"}, {"id": "parent-1"})
 
         assert trunk == {"id": "trunk-existing"}
         tp.create_trunk.assert_not_called()
@@ -799,10 +824,14 @@ class TestGatewaySubport:
     def _provider(self, mocker):
         tp = mocker.Mock()
         tp.add_subports.return_value = {"id": "trunk-1", "updated": True}
-        mocker.patch.object(palo_alto.utils, "fetch_trunk_plugin", return_value=tp)
-        self.clear = mocker.patch.object(palo_alto.utils, "clear_device_id_for_port")
+        mocker.patch.object(
+            palo_alto_wiring.utils, "fetch_trunk_plugin", return_value=tp
+        )
+        self.clear = mocker.patch.object(
+            palo_alto_wiring.utils, "clear_device_id_for_port"
+        )
         self.restore = mocker.patch.object(
-            palo_alto.utils, "set_device_id_and_owner_for_port"
+            palo_alto_wiring.utils, "set_device_id_and_owner_for_port"
         )
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
         return provider, tp
@@ -811,7 +840,7 @@ class TestGatewaySubport:
         provider, tp = self._provider(mocker)
         trunk = {"id": "trunk-1", "sub_ports": []}
 
-        provider._add_gateway_subport({"id": "r1"}, trunk, dict(_GATEWAY_PORT))
+        provider._wiring._add_gateway_subport({"id": "r1"}, trunk, dict(_GATEWAY_PORT))
 
         tp.add_subports.assert_called_once()
         _ctx, trunk_id, body = tp.add_subports.call_args[0]
@@ -819,7 +848,7 @@ class TestGatewaySubport:
         sub = body["sub_ports"][0]
         assert sub["port_id"] == "gw-1"
         assert sub["segmentation_type"] == "vlan"
-        assert sub["segmentation_id"] == palo_alto.GATEWAY_SUBPORT_VLAN
+        assert sub["segmentation_id"] == palo_alto_wiring.GATEWAY_SUBPORT_VLAN
         # device_id cleared for the add (trunk validator rejects it) and restored
         self.clear.assert_called_once_with("gw-1")
         self.restore.assert_called_once_with("gw-1", "r1", "network:router_gateway")
@@ -831,12 +860,12 @@ class TestGatewaySubport:
             "sub_ports": [
                 {
                     "port_id": "gw-1",
-                    "segmentation_id": palo_alto.GATEWAY_SUBPORT_VLAN,
+                    "segmentation_id": palo_alto_wiring.GATEWAY_SUBPORT_VLAN,
                 }
             ],
         }
 
-        provider._add_gateway_subport({"id": "r1"}, trunk, dict(_GATEWAY_PORT))
+        provider._wiring._add_gateway_subport({"id": "r1"}, trunk, dict(_GATEWAY_PORT))
 
         tp.add_subports.assert_not_called()
         self.clear.assert_not_called()
@@ -847,7 +876,9 @@ class TestGatewaySubport:
         trunk = {"id": "trunk-1", "sub_ports": []}
 
         with pytest.raises(RuntimeError, match="trunk rejected"):
-            provider._add_gateway_subport({"id": "r1"}, trunk, dict(_GATEWAY_PORT))
+            provider._wiring._add_gateway_subport(
+                {"id": "r1"}, trunk, dict(_GATEWAY_PORT)
+            )
 
         self.clear.assert_called_once_with("gw-1")
         self.restore.assert_called_once_with("gw-1", "r1", "network:router_gateway")
@@ -856,7 +887,7 @@ class TestGatewaySubport:
 class TestSubportVlanAllocation:
     def _provider(self, mocker, ranges):
         mocker.patch.object(
-            palo_alto.utils,
+            palo_alto_wiring.utils,
             "allowed_tenant_vlan_id_ranges",
             return_value=ranges,
         )
@@ -867,8 +898,8 @@ class TestSubportVlanAllocation:
         trunk = {"id": "trunk-1", "sub_ports": []}
 
         assert (
-            provider._next_available_subport_vlan(
-                "r1", trunk, palo_alto.INTERFACE_SUBPORT_VLAN_START
+            provider._wiring._next_available_subport_vlan(
+                "r1", trunk, palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START
             )
             == 201
         )
@@ -892,8 +923,8 @@ class TestSubportVlanAllocation:
         }
 
         assert (
-            provider._next_available_subport_vlan(
-                "r1", trunk, palo_alto.INTERFACE_SUBPORT_VLAN_START
+            provider._wiring._next_available_subport_vlan(
+                "r1", trunk, palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START
             )
             == 202
         )
@@ -916,36 +947,42 @@ class TestSubportVlanAllocation:
             ],
         }
 
-        with pytest.raises(palo_alto.NoPaloAltoSubportVlanAvailable):
-            provider._next_available_subport_vlan(
-                "r1", trunk, palo_alto.INTERFACE_SUBPORT_VLAN_START
+        with pytest.raises(palo_alto_wiring.NoPaloAltoSubportVlanAvailable):
+            provider._wiring._next_available_subport_vlan(
+                "r1", trunk, palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START
             )
 
 
 class TestFirstFreeVlan:
     def test_starts_at_requested_vlan(self):
-        assert palo_alto._first_free_vlan([(1, 300)], set(), 201) == 201
+        assert palo_alto_wiring._first_free_vlan([(1, 300)], set(), 201) == 201
 
     def test_skips_used_vlans(self):
-        assert palo_alto._first_free_vlan([(200, 205)], {201, 202}, 201) == 203
+        assert palo_alto_wiring._first_free_vlan([(200, 205)], {201, 202}, 201) == 203
 
     def test_continues_into_next_range(self):
-        assert palo_alto._first_free_vlan([(200, 201), (300, 301)], {201}, 201) == 300
+        assert (
+            palo_alto_wiring._first_free_vlan([(200, 201), (300, 301)], {201}, 201)
+            == 300
+        )
 
     def test_accepts_unsorted_ranges(self):
-        assert palo_alto._first_free_vlan([(300, 301), (200, 210)], set(), 201) == 201
+        assert (
+            palo_alto_wiring._first_free_vlan([(300, 301), (200, 210)], set(), 201)
+            == 201
+        )
 
     def test_returns_none_when_exhausted(self):
-        assert palo_alto._first_free_vlan([(200, 201)], {200, 201}, 200) is None
+        assert palo_alto_wiring._first_free_vlan([(200, 201)], {200, 201}, 200) is None
 
 
 class TestSubportHelpers:
     def test_has_subport(self):
         trunk = {"id": "trunk-1", "sub_ports": [{"port_id": "gw-1"}]}
 
-        assert palo_alto._has_subport(trunk, "gw-1") is True
-        assert palo_alto._has_subport(trunk, "intf-1") is False
-        assert palo_alto._has_subport({"id": "trunk-1"}, "gw-1") is False
+        assert palo_alto_wiring._has_subport(trunk, "gw-1") is True
+        assert palo_alto_wiring._has_subport(trunk, "intf-1") is False
+        assert palo_alto_wiring._has_subport({"id": "trunk-1"}, "gw-1") is False
 
     def test_used_subport_vlans_counts_only_vlan_tags(self):
         trunk = {
@@ -957,17 +994,21 @@ class TestSubportHelpers:
             ],
         }
 
-        assert palo_alto._used_subport_vlans(trunk) == {200}
+        assert palo_alto_wiring._used_subport_vlans(trunk) == {200}
 
 
 class TestInterfaceSubport:
     def _provider(self, mocker):
         tp = mocker.Mock()
         tp.add_subports.return_value = {"id": "trunk-1", "updated": True}
-        mocker.patch.object(palo_alto.utils, "fetch_trunk_plugin", return_value=tp)
-        self.clear = mocker.patch.object(palo_alto.utils, "clear_device_id_for_port")
+        mocker.patch.object(
+            palo_alto_wiring.utils, "fetch_trunk_plugin", return_value=tp
+        )
+        self.clear = mocker.patch.object(
+            palo_alto_wiring.utils, "clear_device_id_for_port"
+        )
         self.restore = mocker.patch.object(
-            palo_alto.utils, "set_device_id_and_owner_for_port"
+            palo_alto_wiring.utils, "set_device_id_and_owner_for_port"
         )
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
         return provider, tp
@@ -975,7 +1016,7 @@ class TestInterfaceSubport:
     def test_adds_subport_with_next_available_vlan(self, mocker):
         provider, tp = self._provider(mocker)
         next_vlan = mocker.patch.object(
-            provider, "_next_available_subport_vlan", return_value=201
+            provider._wiring, "_next_available_subport_vlan", return_value=201
         )
         trunk = {
             "id": "trunk-1",
@@ -983,15 +1024,17 @@ class TestInterfaceSubport:
                 {
                     "port_id": "gw-1",
                     "segmentation_type": "vlan",
-                    "segmentation_id": palo_alto.GATEWAY_SUBPORT_VLAN,
+                    "segmentation_id": palo_alto_wiring.GATEWAY_SUBPORT_VLAN,
                 }
             ],
         }
 
-        provider._add_interface_subport({"id": "r1"}, trunk, dict(_INTERFACE_PORT))
+        provider._wiring._add_interface_subport(
+            {"id": "r1"}, trunk, dict(_INTERFACE_PORT)
+        )
 
         next_vlan.assert_called_once_with(
-            "r1", trunk, palo_alto.INTERFACE_SUBPORT_VLAN_START
+            "r1", trunk, palo_alto_wiring.INTERFACE_SUBPORT_VLAN_START
         )
         tp.add_subports.assert_called_once()
         _ctx, trunk_id, body = tp.add_subports.call_args[0]
@@ -1005,7 +1048,9 @@ class TestInterfaceSubport:
 
     def test_add_subport_is_idempotent(self, mocker):
         provider, tp = self._provider(mocker)
-        next_vlan = mocker.patch.object(provider, "_next_available_subport_vlan")
+        next_vlan = mocker.patch.object(
+            provider._wiring, "_next_available_subport_vlan"
+        )
         trunk = {
             "id": "trunk-1",
             "sub_ports": [
@@ -1017,7 +1062,9 @@ class TestInterfaceSubport:
             ],
         }
 
-        provider._add_interface_subport({"id": "r1"}, trunk, dict(_INTERFACE_PORT))
+        provider._wiring._add_interface_subport(
+            {"id": "r1"}, trunk, dict(_INTERFACE_PORT)
+        )
 
         next_vlan.assert_not_called()
         tp.add_subports.assert_not_called()
@@ -1026,16 +1073,18 @@ class TestInterfaceSubport:
     def test_vlan_exhaustion_raises_before_device_id_is_cleared(self, mocker):
         provider, tp = self._provider(mocker)
         mocker.patch.object(
-            provider,
+            provider._wiring,
             "_next_available_subport_vlan",
-            side_effect=palo_alto.NoPaloAltoSubportVlanAvailable(
+            side_effect=palo_alto_wiring.NoPaloAltoSubportVlanAvailable(
                 router_id="r1", trunk_id="trunk-1", network_segment_ranges="200"
             ),
         )
         trunk = {"id": "trunk-1", "sub_ports": []}
 
-        with pytest.raises(palo_alto.NoPaloAltoSubportVlanAvailable):
-            provider._add_interface_subport({"id": "r1"}, trunk, dict(_INTERFACE_PORT))
+        with pytest.raises(palo_alto_wiring.NoPaloAltoSubportVlanAvailable):
+            provider._wiring._add_interface_subport(
+                {"id": "r1"}, trunk, dict(_INTERFACE_PORT)
+            )
 
         tp.add_subports.assert_not_called()
         self.clear.assert_not_called()
@@ -1055,19 +1104,21 @@ class TestGatewayCreateHandler:
         provider.l3plugin.get_router.return_value = router
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
         mocker.patch.object(
-            provider, "_gateway_port_for_router", return_value={"id": "gw-1"}
+            provider._wiring, "_gateway_port_for_router", return_value={"id": "gw-1"}
         )
         parent = {"id": "parent-1"}
         bound = {"id": "parent-1", "bound": True}
         trunk = {"id": "trunk-1"}
         m_parent = mocker.patch.object(
-            provider, "_ensure_parent_port", return_value=parent
+            provider._wiring, "_ensure_parent_port", return_value=parent
         )
         m_vif = mocker.patch.object(
-            provider, "_ensure_parent_vif_attached", return_value=bound
+            provider._wiring, "_ensure_parent_vif_attached", return_value=bound
         )
-        m_trunk = mocker.patch.object(provider, "_ensure_trunk", return_value=trunk)
-        m_sub = mocker.patch.object(provider, "_add_gateway_subport")
+        m_trunk = mocker.patch.object(
+            provider._wiring, "_ensure_trunk", return_value=trunk
+        )
+        m_sub = mocker.patch.object(provider._wiring, "_add_gateway_subport")
 
         provider._process_gateway_create("r", "e", "t", self._payload(mocker))
 
@@ -1083,7 +1134,7 @@ class TestGatewayCreateHandler:
             mocker, FakeFlavorPlugin("neutron_understack.l3_router.vrf.Vrf")
         )
         provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
-        m_parent = mocker.patch.object(provider, "_ensure_parent_port")
+        m_parent = mocker.patch.object(provider._wiring, "_ensure_parent_port")
 
         provider._process_gateway_create("r", "e", "t", self._payload(mocker))
 
@@ -1093,7 +1144,9 @@ class TestGatewayCreateHandler:
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
         provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
-        mocker.patch.object(provider, "_gateway_port_for_router", return_value=None)
+        mocker.patch.object(
+            provider._wiring, "_gateway_port_for_router", return_value=None
+        )
 
         with pytest.raises(palo_alto.PaloAltoGatewayPortNotFound, match="router r1 "):
             provider._process_gateway_create("r", "e", "t", self._payload(mocker))
@@ -1116,15 +1169,19 @@ class TestRouterInterfaceCreateHandler:
         bound = {"id": "parent-1", "bound": True}
         trunk = {"id": "trunk-1"}
         m_parent = mocker.patch.object(
-            provider, "_ensure_parent_port", return_value=parent
+            provider._wiring, "_ensure_parent_port", return_value=parent
         )
         m_vif = mocker.patch.object(
-            provider, "_ensure_parent_vif_attached", return_value=bound
+            provider._wiring, "_ensure_parent_vif_attached", return_value=bound
         )
-        m_trunk = mocker.patch.object(provider, "_ensure_trunk", return_value=trunk)
-        m_sub = mocker.patch.object(provider, "_add_interface_subport")
-        mocker.patch.object(provider, "_parent_port_for_router", return_value=None)
-        mocker.patch.object(provider, "_trunk_for_router", return_value=None)
+        m_trunk = mocker.patch.object(
+            provider._wiring, "_ensure_trunk", return_value=trunk
+        )
+        m_sub = mocker.patch.object(provider._wiring, "_add_interface_subport")
+        mocker.patch.object(
+            provider._wiring, "_parent_port_for_router", return_value=None
+        )
+        mocker.patch.object(provider._wiring, "_trunk_for_router", return_value=None)
 
         provider._process_router_interface_create("r", "e", "t", self._payload(mocker))
 
@@ -1138,7 +1195,7 @@ class TestRouterInterfaceCreateHandler:
             mocker, FakeFlavorPlugin("neutron_understack.l3_router.vrf.Vrf")
         )
         provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
-        m_parent = mocker.patch.object(provider, "_ensure_parent_port")
+        m_parent = mocker.patch.object(provider._wiring, "_ensure_parent_port")
 
         provider._process_router_interface_create("r", "e", "t", self._payload(mocker))
 
@@ -1148,7 +1205,7 @@ class TestRouterInterfaceCreateHandler:
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
         provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
-        m_parent = mocker.patch.object(provider, "_ensure_parent_port")
+        m_parent = mocker.patch.object(provider._wiring, "_ensure_parent_port")
         port = {**_INTERFACE_PORT, "device_owner": "network:dhcp"}
 
         provider._process_router_interface_create(
@@ -1173,12 +1230,14 @@ class TestRouterInterfaceCreateHandler:
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
         provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
-        mocker.patch.object(provider, "_parent_port_for_router", return_value=None)
+        mocker.patch.object(
+            provider._wiring, "_parent_port_for_router", return_value=None
+        )
         trunk_lookup = mocker.patch.object(
-            provider, "_trunk_for_router", return_value=None
+            provider._wiring, "_trunk_for_router", return_value=None
         )
         mocker.patch.object(
-            provider, "_ensure_parent_port", side_effect=RuntimeError("boom")
+            provider._wiring, "_ensure_parent_port", side_effect=RuntimeError("boom")
         )
         payload = self._payload(mocker)
 
@@ -1195,7 +1254,9 @@ class TestGatewayTeardown:
     def _provider(self, mocker, trunk_after_removal):
         tp = mocker.Mock()
         tp.get_trunk.return_value = trunk_after_removal
-        mocker.patch.object(palo_alto.utils, "fetch_trunk_plugin", return_value=tp)
+        mocker.patch.object(
+            palo_alto_wiring.utils, "fetch_trunk_plugin", return_value=tp
+        )
         ironic = mocker.Mock()
         ironic.node_by_instance_uuid.return_value = mocker.Mock(id="node-1")
         core = mocker.Mock()
@@ -1211,7 +1272,7 @@ class TestGatewayTeardown:
         provider, tp, _, _ = self._provider(mocker, trunk_after_removal={})
         trunk = {"id": "trunk-1", "sub_ports": [{"port_id": "gw-1"}]}
 
-        provider._remove_router_port_subport(trunk, "gw-1", "gateway")
+        provider._wiring._remove_router_port_subport(trunk, "gw-1", "gateway")
 
         tp.remove_subports.assert_called_once()
         _ctx, tid, body = tp.remove_subports.call_args[0]
@@ -1222,7 +1283,7 @@ class TestGatewayTeardown:
         provider, tp, _, _ = self._provider(mocker, trunk_after_removal={})
         trunk = {"id": "trunk-1", "sub_ports": []}
 
-        provider._remove_router_port_subport(trunk, "gw-1", "gateway")
+        provider._wiring._remove_router_port_subport(trunk, "gw-1", "gateway")
 
         tp.remove_subports.assert_not_called()
 
@@ -1230,7 +1291,7 @@ class TestGatewayTeardown:
         provider, tp, _, _ = self._provider(mocker, trunk_after_removal={})
         trunk = {"id": "trunk-1", "sub_ports": [{"port_id": "intf-1"}]}
 
-        provider._remove_router_port_subport(trunk, "intf-1", "interface")
+        provider._wiring._remove_router_port_subport(trunk, "intf-1", "interface")
 
         tp.remove_subports.assert_called_once()
         _ctx, tid, body = tp.remove_subports.call_args[0]
@@ -1248,7 +1309,7 @@ class TestGatewayTeardown:
             },
         )
 
-        provider._delete_parent_stack_if_unused("r1", {"id": "trunk-1"})
+        provider._wiring._delete_parent_stack_if_unused("r1", {"id": "trunk-1"})
 
         tp.delete_trunk.assert_called_once()
         ironic.detach_vif_from_node.assert_called_once()
@@ -1267,7 +1328,7 @@ class TestGatewayTeardown:
             },
         )
 
-        provider._delete_parent_stack_if_unused("r1", {"id": "trunk-1"})
+        provider._wiring._delete_parent_stack_if_unused("r1", {"id": "trunk-1"})
 
         tp.delete_trunk.assert_not_called()
         ironic.detach_vif_from_node.assert_not_called()
@@ -1287,9 +1348,9 @@ class TestGatewayDeleteHandler:
         provider.l3plugin.get_router.return_value = router
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
         mocker.patch.object(
-            provider, "_gateway_port_for_router", return_value={"id": "gw-1"}
+            provider._wiring, "_gateway_port_for_router", return_value={"id": "gw-1"}
         )
-        m_cleanup = mocker.patch.object(provider, "_cleanup_gateway_attachment")
+        m_cleanup = mocker.patch.object(provider._wiring, "_cleanup_gateway_attachment")
 
         provider._process_gateway_delete("r", "e", "t", self._payload(mocker))
 
@@ -1300,7 +1361,7 @@ class TestGatewayDeleteHandler:
             mocker, FakeFlavorPlugin("neutron_understack.l3_router.vrf.Vrf")
         )
         provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
-        m_cleanup = mocker.patch.object(provider, "_cleanup_gateway_attachment")
+        m_cleanup = mocker.patch.object(provider._wiring, "_cleanup_gateway_attachment")
 
         provider._process_gateway_delete("r", "e", "t", self._payload(mocker))
 
@@ -1310,8 +1371,10 @@ class TestGatewayDeleteHandler:
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
         provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
-        mocker.patch.object(provider, "_gateway_port_for_router", return_value=None)
-        m_cleanup = mocker.patch.object(provider, "_cleanup_gateway_attachment")
+        mocker.patch.object(
+            provider._wiring, "_gateway_port_for_router", return_value=None
+        )
+        m_cleanup = mocker.patch.object(provider._wiring, "_cleanup_gateway_attachment")
 
         provider._process_gateway_delete("r", "e", "t", self._payload(mocker))
 
@@ -1335,7 +1398,7 @@ class TestRouterInterfacePortDeleteHandler:
     @pytest.mark.parametrize("port_check", [True, None, "missing"])
     def test_skips_unless_l3_explicitly_authorized_removal(self, mocker, port_check):
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
-        cleanup = mocker.patch.object(provider, "_cleanup_interface_attachment")
+        cleanup = mocker.patch.object(provider._wiring, "_cleanup_interface_attachment")
         payload = self._payload(mocker)
         if port_check == "missing":
             payload.metadata.pop("port_check")
@@ -1352,7 +1415,9 @@ class TestRouterInterfacePortDeleteHandler:
         router = {"id": "r1", "flavor_id": "f1"}
         provider.l3plugin.get_router.return_value = router
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
-        m_cleanup = mocker.patch.object(provider, "_cleanup_interface_attachment")
+        m_cleanup = mocker.patch.object(
+            provider._wiring, "_cleanup_interface_attachment"
+        )
 
         provider._process_router_interface_port_delete(
             "r", "e", "t", self._payload(mocker)
@@ -1362,7 +1427,9 @@ class TestRouterInterfacePortDeleteHandler:
 
     def test_skips_non_router_interface_port(self, mocker):
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
-        m_cleanup = mocker.patch.object(provider, "_cleanup_interface_attachment")
+        m_cleanup = mocker.patch.object(
+            provider._wiring, "_cleanup_interface_attachment"
+        )
         port = {**_INTERFACE_PORT, "device_owner": "network:dhcp"}
 
         provider._process_router_interface_port_delete(
@@ -1377,7 +1444,9 @@ class TestRouterInterfacePortDeleteHandler:
             mocker, FakeFlavorPlugin("neutron_understack.l3_router.vrf.Vrf")
         )
         provider.l3plugin.get_router.return_value = {"id": "r1", "flavor_id": "f1"}
-        m_cleanup = mocker.patch.object(provider, "_cleanup_interface_attachment")
+        m_cleanup = mocker.patch.object(
+            provider._wiring, "_cleanup_interface_attachment"
+        )
 
         provider._process_router_interface_port_delete(
             "r", "e", "t", self._payload(mocker)
@@ -1388,7 +1457,9 @@ class TestRouterInterfacePortDeleteHandler:
     def test_skips_when_router_lookup_fails(self, mocker):
         provider = _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()))
         provider.l3plugin.get_router.side_effect = RuntimeError("db hiccup")
-        m_cleanup = mocker.patch.object(provider, "_cleanup_interface_attachment")
+        m_cleanup = mocker.patch.object(
+            provider._wiring, "_cleanup_interface_attachment"
+        )
 
         provider._process_router_interface_port_delete(
             "r", "e", "t", self._payload(mocker)
@@ -1404,7 +1475,9 @@ class TestRouterInterfacePortDeleteHandler:
             "_is_palo_alto_provider",
             side_effect=RuntimeError("flavor lookup failed"),
         )
-        m_cleanup = mocker.patch.object(provider, "_cleanup_interface_attachment")
+        m_cleanup = mocker.patch.object(
+            provider._wiring, "_cleanup_interface_attachment"
+        )
 
         provider._process_router_interface_port_delete(
             "r", "e", "t", self._payload(mocker)
@@ -1418,7 +1491,7 @@ class TestRouterInterfacePortDeleteHandler:
         provider.l3plugin.get_router.return_value = router
         mocker.patch.object(provider, "_is_palo_alto_provider", return_value=True)
         mocker.patch.object(
-            provider,
+            provider._wiring,
             "_cleanup_interface_attachment",
             side_effect=RuntimeError("cleanup failed"),
         )
@@ -1433,7 +1506,9 @@ class TestGatewayCleanupPartialAdd:
     def _provider(self, mocker, trunks, ports):
         tp = mocker.Mock()
         tp.get_trunks.return_value = trunks
-        mocker.patch.object(palo_alto.utils, "fetch_trunk_plugin", return_value=tp)
+        mocker.patch.object(
+            palo_alto_wiring.utils, "fetch_trunk_plugin", return_value=tp
+        )
         ironic = mocker.Mock()
         ironic.node_by_instance_uuid.return_value = mocker.Mock(id="node-1")
         core = mocker.Mock()
@@ -1453,7 +1528,7 @@ class TestGatewayCleanupPartialAdd:
             mocker, trunks=[], ports=[{"id": "parent-1"}]
         )
 
-        provider._cleanup_gateway_attachment({"id": "r1"}, {"id": "gw-1"})
+        provider._wiring._cleanup_gateway_attachment({"id": "r1"}, {"id": "gw-1"})
 
         ironic.detach_vif_from_node.assert_called_once()
         core.delete_port.assert_called_once()
@@ -1463,7 +1538,7 @@ class TestGatewayCleanupPartialAdd:
     def test_noop_when_no_trunk_and_no_parent(self, mocker):
         provider, ironic, core = self._provider(mocker, trunks=[], ports=[])
 
-        provider._cleanup_gateway_attachment({"id": "r1"}, {"id": "gw-1"})
+        provider._wiring._cleanup_gateway_attachment({"id": "r1"}, {"id": "gw-1"})
 
         core.delete_port.assert_not_called()
         ironic.detach_vif_from_node.assert_not_called()
@@ -1573,22 +1648,22 @@ def interface_lifecycle(mocker):
     )
     trunk_plugin.delete_trunk.side_effect = lambda _ctx, tid: state.trunks.pop(tid)
     mocker.patch.object(
-        palo_alto.utils, "fetch_trunk_plugin", return_value=trunk_plugin
+        palo_alto_wiring.utils, "fetch_trunk_plugin", return_value=trunk_plugin
     )
     mocker.patch.object(
-        palo_alto.utils,
+        palo_alto_wiring.utils,
         "allowed_tenant_vlan_id_ranges",
         side_effect=lambda: (
             [(200, 200)] if state.fail == "vlan_allocation" else [(200, 210)]
         ),
     )
     mocker.patch.object(
-        palo_alto.utils,
+        palo_alto_wiring.utils,
         "clear_device_id_for_port",
         side_effect=lambda pid: update_port(context, pid, {"port": {"device_id": ""}}),
     )
     mocker.patch.object(
-        palo_alto.utils,
+        palo_alto_wiring.utils,
         "set_device_id_and_owner_for_port",
         side_effect=lambda pid, did, owner: update_port(
             context, pid, {"port": {"device_id": did, "device_owner": owner}}
@@ -1618,7 +1693,7 @@ def interface_lifecycle(mocker):
     provider = _make_provider(
         mocker, FakeFlavorPlugin(_palo_alto_driver()), ironic=ironic, core_plugin=core
     )
-    palo_alto.n_context.get_admin_context.return_value = context
+    palo_alto_wiring.n_context.get_admin_context.return_value = context
 
     # Bind the installed Neutron methods, including its real rollback context
     # managers. Only persistence and pre-event subnet validation are doubled.
@@ -1827,11 +1902,11 @@ class TestRouterInterfaceLifecycle:
         self, interface_lifecycle, existing_trunk, existing_vif
     ):
         env = interface_lifecycle
-        parent = env.provider._ensure_parent_port(env.router)
+        parent = env.provider._wiring._ensure_parent_port(env.router)
         if existing_vif:
-            env.provider._ensure_parent_vif_attached(env.router, parent)
+            env.provider._wiring._ensure_parent_vif_attached(env.router, parent)
         if existing_trunk:
-            env.provider._ensure_trunk(env.router, parent)
+            env.provider._wiring._ensure_trunk(env.router, parent)
         trunks = copy.deepcopy(env.state.trunks)
         vifs = set(env.state.vifs)
         env.state.fail = "subport_postcommit"
@@ -1846,9 +1921,9 @@ class TestRouterInterfaceLifecycle:
 
     def test_failed_subnet_preserves_existing_gateway(self, interface_lifecycle):
         env = interface_lifecycle
-        parent = env.provider._ensure_parent_port(env.router)
-        env.provider._ensure_parent_vif_attached(env.router, parent)
-        env.provider._ensure_trunk(env.router, parent)
+        parent = env.provider._wiring._ensure_parent_port(env.router)
+        env.provider._wiring._ensure_parent_vif_attached(env.router, parent)
+        env.provider._wiring._ensure_trunk(env.router, parent)
         env.state.trunks["trunk-1"]["sub_ports"] = [
             {"port_id": "gw-1", "segmentation_type": "vlan", "segmentation_id": 200}
         ]
@@ -1868,7 +1943,7 @@ class TestRouterInterfaceLifecycle:
     ):
         env = interface_lifecycle
         env.state.fail = "subport_postcommit"
-        cleanup = env.provider._remove_router_port_subport
+        cleanup = env.provider._wiring._remove_router_port_subport
         attempts = []
 
         def fail_once(*args):
@@ -1878,7 +1953,7 @@ class TestRouterInterfaceLifecycle:
             return cleanup(*args)
 
         mocker.patch.object(
-            env.provider, "_remove_router_port_subport", side_effect=fail_once
+            env.provider._wiring, "_remove_router_port_subport", side_effect=fail_once
         )
         with pytest.raises(
             l3_exc.RouterInterfaceAttachmentConflict, match="subport_postcommit"
