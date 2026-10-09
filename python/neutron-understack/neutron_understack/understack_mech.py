@@ -381,7 +381,18 @@ class UnderstackDriver(MechanismDriver):
         LOG.debug("bind_port_segment: Native VLAN segment %s", dynamic_segment)
 
         port_id = context.current["id"]
-        self.trunk_driver.configure_trunk(port_id, dynamic_segment)
+        try:
+            self.trunk_driver.configure_trunk(port_id, dynamic_segment)
+        except Exception:
+            # The native VLAN is only known once it has been allocated, so the
+            # subport collision check cannot run first. ML2 swallows bind_port
+            # exceptions, so nothing else would give this segment back until
+            # the port is deleted.
+            if not current_vlan_segment and not utils.ports_bound_to_segment(
+                dynamic_segment[api.ID]
+            ):
+                utils.release_dynamic_segment(dynamic_segment[api.ID])
+            raise
 
         LOG.debug("continue_binding for segment: %s", segment)
         context.continue_binding(
