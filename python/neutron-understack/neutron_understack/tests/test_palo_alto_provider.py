@@ -408,6 +408,129 @@ class TestRouterDelete:
         ironic.release_node_for_router.assert_not_called()
 
 
+class TestEventSubscriptions:
+    """Publish through the real registry and check what Neutron's caller sees.
+
+    These pin the event phase and cancellable flag of each subscription, which
+    calling a handler directly cannot. They mock only the plugins and Ironic,
+    never provider internals, so they hold across internal refactors.
+    """
+
+    _ROUTER = {"id": "r1", "name": "pa-router", "project_id": "p1", "flavor_id": "f1"}
+
+    def _payload(self, **kwargs):
+        return events.DBEventPayload("ctx", resource_id="r1", **kwargs)
+
+    def test_router_create_failure_aborts_the_create(self, mocker):
+        ironic = mocker.Mock()
+        ironic.available_node_for_resource_class.return_value = None
+        _make_provider(mocker, _adopting_plugin(), ironic=ironic)
+
+        with pytest.raises(callback_exc.CallbackFailure) as failure:
+            registry.publish(
+                resources.ROUTER,
+                events.BEFORE_CREATE,
+                self,
+                payload=self._payload(states=(dict(self._ROUTER),)),
+            )
+
+        assert any(
+            isinstance(exc, palo_alto.NoNetdevNodeAvailable)
+            for exc in failure.value.inner_exceptions
+        )
+
+    def test_router_node_released_after_delete_not_before(self, mocker):
+        # Releasing on BEFORE_DELETE would free the node even when Neutron
+        # then rejects the delete (for example, router still in use).
+        ironic = mocker.Mock()
+        ironic.release_node_for_router.return_value = NodeReleaseResult(
+            node=mocker.Mock(id="node-1"), released=True
+        )
+        _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()), ironic=ironic)
+        payload = self._payload(states=(dict(self._ROUTER),))
+
+        registry.publish(resources.ROUTER, events.BEFORE_DELETE, self, payload=payload)
+        ironic.release_node_for_router.assert_not_called()
+
+        registry.publish(resources.ROUTER, events.AFTER_DELETE, self, payload=payload)
+        ironic.release_node_for_router.assert_called_once_with("r1")
+
+    def test_router_release_error_does_not_fail_the_delete(self, mocker):
+        # The router row is already gone; reconciliation retries the release.
+        ironic = mocker.Mock()
+        ironic.release_node_for_router.side_effect = RuntimeError("ironic down")
+        _make_provider(mocker, FakeFlavorPlugin(_palo_alto_driver()), ironic=ironic)
+
+        registry.publish(
+            resources.ROUTER,
+            events.AFTER_DELETE,
+            self,
+            payload=self._payload(states=(dict(self._ROUTER),)),
+        )
+
+        ironic.release_node_for_router.assert_called_once_with("r1")
+
+    def test_gateway_wiring_error_reaches_the_caller(self, mocker):
+        # ROUTER_GATEWAY/AFTER_CREATE only re-raises for a cancellable
+        # subscriber; otherwise the API would return success for a gateway
+        # that was never wired.
+        core = mocker.Mock()
+        core.get_ports.return_value = []  # gateway port not found
+        provider = _make_provider(
+            mocker, FakeFlavorPlugin(_palo_alto_driver()), core_plugin=core
+        )
+        provider.l3plugin.get_router.return_value = dict(self._ROUTER)
+
+        with pytest.raises(callback_exc.CallbackFailure) as failure:
+            registry.publish(
+                resources.ROUTER_GATEWAY,
+                events.AFTER_CREATE,
+                self,
+                payload=self._payload(),
+            )
+
+        assert any(
+            isinstance(exc, palo_alto.PaloAltoGatewayPortNotFound)
+            for exc in failure.value.inner_exceptions
+        )
+
+    def test_gateway_teardown_runs_before_gateway_port_delete(self, mocker):
+        # BEFORE_DELETE is the last point where the gateway port still exists.
+        core = mocker.Mock()
+        core.get_ports.return_value = [dict(_GATEWAY_PORT)]
+        trunk_plugin = mocker.Mock()
+        trunk_plugin.get_trunks.return_value = [
+            {
+                "id": "trunk-1",
+                "port_id": "parent-1",
+                "sub_ports": [{"port_id": "gw-1"}, {"port_id": "intf-1"}],
+            }
+        ]
+        trunk_plugin.get_trunk.return_value = {
+            "id": "trunk-1",
+            "port_id": "parent-1",
+            "sub_ports": [{"port_id": "intf-1"}],
+        }
+        mocker.patch(
+            "neutron_understack.utils.fetch_trunk_plugin", return_value=trunk_plugin
+        )
+        provider = _make_provider(
+            mocker, FakeFlavorPlugin(_palo_alto_driver()), core_plugin=core
+        )
+        provider.l3plugin.get_router.return_value = dict(self._ROUTER)
+
+        registry.publish(
+            resources.ROUTER_GATEWAY,
+            events.BEFORE_DELETE,
+            self,
+            payload=self._payload(),
+        )
+
+        trunk_plugin.remove_subports.assert_called_once()
+        _ctx, trunk_id, body = trunk_plugin.remove_subports.call_args[0]
+        assert (trunk_id, body) == ("trunk-1", {"sub_ports": [{"port_id": "gw-1"}]})
+
+
 class TestGatewayLookups:
     def test_names_are_deterministic(self):
         assert palo_alto._parent_port_name("r1") == "palo-alto-router-anchor-r1"
